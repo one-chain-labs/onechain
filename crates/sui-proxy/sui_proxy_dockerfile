@@ -1,0 +1,3 @@
+FROM gcr.io/distroless/cc-debian12
+
+COPY --chmod=755 one-proxy /opt/sui/bin/one-proxy
