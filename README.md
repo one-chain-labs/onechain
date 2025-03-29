@@ -4,7 +4,7 @@
 
 # One Chain
 
-[One Chain](https://One.org) is a next-generation smart contract platform with high throughput, low latency, and an asset-oriented programming model powered by the [Move programming language](https://github.com/MystenLabs/awesome-move).
+[One Chain](https://www.onelabs.cc) is the bridging the best of traditional finance with the best of Web 3.0 will make our financial system fairer, faster, and more accessible to all..
 
 ## One Chain Highlights
 
