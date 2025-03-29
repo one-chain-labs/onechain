@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/One-chain/hoc/refs/heads/main/docs/logo.svg" alt="Logo" width="100" height="100">
+<img src="https://raw.githubusercontent.com/one-chain-labs/onechain/refs/heads/main/docs/logo.jpg" alt="Logo" width="100" height="100">
 </p>
 
 # One Chain
