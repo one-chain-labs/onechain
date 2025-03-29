@@ -50,6 +50,6 @@ One Chain has a native token called One Chain, with a fixed supply. The One Chai
 
 Use the following links to learn more about One Chain and the One Chain ecosystem:
 
- * Learn more about working with One Chain in the [One Chain Blog](https://onechain.medium.com).
- * Join the One Chain community on [One Chain 💬 Telegram](https://t.me/hello_onechain).
- * Find out more about the One Chain ecosystem on the [One Chain Resources](https://www.onelabs.cc) page.
+ * Learn more about working with One Chain in the [📔 Blog](https://onechain.medium.com).
+ * Join the One Chain community on [💬 Telegram](https://t.me/hello_onechain).
+ * Find out more about the One Chain ecosystem on the [Website](https://www.onelabs.cc) page.
