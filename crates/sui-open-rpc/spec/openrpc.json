@@ -3843,6 +3843,7 @@
                     "stakeRequestEpoch": "62",
                     "stakeActiveEpoch": "63",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Active",
                     "estimatedReward": "520000000"
                   },
@@ -3851,6 +3852,7 @@
                     "stakeRequestEpoch": "142",
                     "stakeActiveEpoch": "143",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Pending"
                   }
                 ]
@@ -3864,6 +3866,7 @@
                     "stakeRequestEpoch": "244",
                     "stakeActiveEpoch": "245",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Unstaked"
                   }
                 ]
@@ -3926,6 +3929,7 @@
                   "stakeRequestEpoch": "62",
                   "stakeActiveEpoch": "63",
                   "principal": "200000000000",
+                  "lock": false,
                   "status": "Active",
                   "estimatedReward": "520000000"
                 },
@@ -3934,6 +3938,7 @@
                   "stakeRequestEpoch": "244",
                   "stakeActiveEpoch": "245",
                   "principal": "200000000000",
+                  "lock": false,
                   "status": "Unstaked"
                 }
               ]
@@ -8348,12 +8353,16 @@
           }
         ],
         "required": [
+          "lock",
           "principal",
           "stakeActiveEpoch",
           "stakeRequestEpoch",
           "stakedSuiId"
         ],
         "properties": {
+          "lock": {
+            "type": "boolean"
+          },
           "principal": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -9374,8 +9383,22 @@
           }
         }
       },
-      "SuiSystemStateSummary": {
+      "SuiSupperCommitteeSummary": {
         "description": "This is the JSON-RPC type for the SUI system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the SUI system state type.",
+        "type": "object",
+        "required": [
+          "proposalList"
+        ],
+        "properties": {
+          "proposalList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectID"
+            }
+          }
+        }
+      },
+      "SuiSystemStateSummary": {
         "type": "object",
         "required": [
           "activeValidators",
@@ -9387,6 +9410,7 @@
           "inactivePoolsSize",
           "maxValidatorCount",
           "minValidatorJoiningStake",
+          "onlyTrustedValidator",
           "pendingActiveValidatorsId",
           "pendingActiveValidatorsSize",
           "pendingRemovals",
@@ -9407,8 +9431,10 @@
           "stakingPoolMappingsSize",
           "storageFundNonRefundableBalance",
           "storageFundTotalObjectStorageRebates",
+          "supperCommittee",
           "systemStateVersion",
           "totalStake",
+          "trustedValidators",
           "validatorCandidatesId",
           "validatorCandidatesSize",
           "validatorLowStakeGracePeriod",
@@ -9496,6 +9522,9 @@
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
             ]
+          },
+          "onlyTrustedValidator": {
+            "type": "boolean"
           },
           "pendingActiveValidatorsId": {
             "description": "ID of the object that contains the list of new validators that will join at the end of the epoch.",
@@ -9650,6 +9679,9 @@
               }
             ]
           },
+          "supperCommittee": {
+            "$ref": "#/components/schemas/SuiSupperCommitteeSummary"
+          },
           "systemStateVersion": {
             "description": "The current version of the system state data structure type.",
             "allOf": [
@@ -9665,6 +9697,12 @@
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
             ]
+          },
+          "trustedValidators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuiAddress"
+            }
           },
           "validatorCandidatesId": {
             "description": "ID of the object that stores preactive validators, mapping their addresses to their `Validator` structs.",
@@ -9932,6 +9970,7 @@
           "nextEpochCommissionRate",
           "nextEpochGasPrice",
           "nextEpochStake",
+          "onlyValidatorStaking",
           "operationCapId",
           "p2pAddress",
           "pendingPoolTokenWithdraw",
@@ -9942,6 +9981,7 @@
           "projectUrl",
           "proofOfPossessionBytes",
           "protocolPubkeyBytes",
+          "revenueReceivingAddress",
           "rewardsPool",
           "stakingPoolId",
           "stakingPoolSuiBalance",
@@ -10065,6 +10105,9 @@
               }
             ]
           },
+          "onlyValidatorStaking": {
+            "type": "boolean"
+          },
           "operationCapId": {
             "$ref": "#/components/schemas/ObjectID"
           },
@@ -10114,6 +10157,9 @@
           },
           "protocolPubkeyBytes": {
             "$ref": "#/components/schemas/Base64"
+          },
+          "revenueReceivingAddress": {
+            "$ref": "#/components/schemas/SuiAddress"
           },
           "rewardsPool": {
             "description": "The epoch stake rewards will be added here at the end of each epoch.",

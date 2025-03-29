@@ -125,7 +125,7 @@ module sui_system::validator_set_tests {
         );
         advance_epoch_with_dummy_rewards(&mut validator_set, scenario);
 
-        assert_eq(validator_set.derive_reference_gas_price(), 41);
+        assert_eq(validator_set.derive_reference_gas_price(), 42);
 
         add_and_activate_validator(
             &mut validator_set,
