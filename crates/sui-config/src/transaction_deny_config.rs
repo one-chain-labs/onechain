@@ -29,7 +29,7 @@ pub struct TransactionDenyConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     package_deny_list: Vec<ObjectID>,
 
-    /// A list of sui addresses that are not allowed to be used as the sender or sponsor.
+    /// A list of OneChain addresses that are not allowed to be used as the sender or sponsor.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     address_deny_list: Vec<SuiAddress>,
 

@@ -342,7 +342,7 @@ impl BridgeNodeConfig {
         let (gas_coin, gas_object_ref, owner) = sui_client.get_gas_data_panic_if_not_gas(gas_object_id).await;
         if owner != Owner::AddressOwner(client_sui_address) {
             return Err(anyhow!(
-                "Gas object {:?} is not owned by bridge client key's associated sui address {:?}, but {:?}",
+                "Gas object {:?} is not owned by bridge client key's associated OneChain address {:?}, but {:?}",
                 gas_object_id,
                 client_sui_address,
                 owner

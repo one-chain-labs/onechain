@@ -3,8 +3,10 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use colored::Colorize;
 use serde::Serialize;
-use std::fmt::{Debug, Display, Formatter, Write};
-use std::str::FromStr;
+use std::{
+    fmt::{Debug, Display, Formatter, Write},
+    str::FromStr,
+};
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponse};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::{
@@ -136,8 +138,7 @@ impl SuiSupperCommitteeCommand {
                 SuiSupperCommitteeResponse::CreateUpdateOnlyValidatorStakingProposal(response)
             }
             SuiSupperCommitteeCommand::VoteProposal { operation_cap_id, proposal_id, agree, gas_budget } => {
-                let agree = bool::from_str(&agree)
-                    .map_err(|_| anyhow!("only-agree-staking invalid boolean value"))?;
+                let agree = bool::from_str(&agree).map_err(|_| anyhow!("only-agree-staking invalid boolean value"))?;
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let (_status, _summary, cap_obj_ref) = get_cap_object_ref(context, operation_cap_id).await?;
                 let proposal_ref = get_proposal_ref(context, proposal_id).await?;

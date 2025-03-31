@@ -230,7 +230,7 @@ async fn test_dry_run_no_gas_big_transfer() {
 
     let amount = 1_000_000_000u64;
     let mut builder = ProgrammableTransactionBuilder::new();
-    builder.transfer_sui(recipient, Some(amount));
+    builder.transfer_oct(recipient, Some(amount));
     let pt = builder.finish();
     let data = TransactionData::new_programmable(
         sender,
@@ -623,7 +623,7 @@ async fn test_dev_inspect_gas_coin_argument() {
     let amount = 500;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient], vec![amount]).unwrap();
+        builder.pay_oct(vec![recipient], vec![amount]).unwrap();
         builder.finish()
     };
     let kind = TransactionKind::programmable(pt);
@@ -661,7 +661,7 @@ async fn test_dev_inspect_gas_price() {
     let amount = 500;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient], vec![amount]).unwrap();
+        builder.pay_oct(vec![recipient], vec![amount]).unwrap();
         builder.finish()
     };
     let kind = TransactionKind::programmable(pt);
@@ -1290,7 +1290,7 @@ async fn test_objected_owned_gas() {
     let child_object = Object::with_object_owner_for_testing(child_object_id, parent_object_id);
     authority_state.insert_genesis_object(child_object.clone()).await;
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
-    let data = TransactionData::new_transfer_sui(
+    let data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         None,
@@ -1643,7 +1643,7 @@ async fn test_handle_transfer_sui_with_amount_insufficient_gas() {
     let authority_state = init_state_with_ids(vec![(sender, object_id)]).await;
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
     let object = authority_state.get_object(&object_id).await.unwrap();
-    let data = TransactionData::new_transfer_sui(
+    let data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         Some(GAS_VALUE_FOR_TESTING),
@@ -2450,7 +2450,7 @@ async fn test_transfer_sui_no_amount() {
 
     let gas_ref = gas_object.compute_object_reference();
     let tx_data =
-        TransactionData::new_transfer_sui(recipient, sender, None, gas_ref, rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER, rgp);
+        TransactionData::new_transfer_oct(recipient, sender, None, gas_ref, rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER, rgp);
 
     // Make sure transaction handling works as usual.
     let transaction = to_sender_signed_transaction(tx_data, &sender_key);
@@ -2482,7 +2482,7 @@ async fn test_transfer_sui_with_amount() {
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
 
     let gas_ref = gas_object.compute_object_reference();
-    let tx_data = TransactionData::new_transfer_sui(
+    let tx_data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         Some(500),
@@ -2520,7 +2520,7 @@ async fn test_store_revert_transfer_sui() {
     let authority_state = init_state_with_objects(vec![gas_object.clone()]).await;
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
 
-    let tx_data = TransactionData::new_transfer_sui(
+    let tx_data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         None,

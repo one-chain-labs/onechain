@@ -348,7 +348,7 @@ impl<R, S: store::SimulatorStore> Simulacrum<R, S> {
 
         let pt = {
             let mut builder = sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder::new();
-            builder.transfer_sui(address, Some(amount));
+            builder.transfer_oct(address, Some(amount));
             builder.finish()
         };
 
@@ -534,7 +534,7 @@ impl Simulacrum {
 
         let pt = {
             let mut builder = ProgrammableTransactionBuilder::new();
-            builder.transfer_sui(recipient, Some(transfer_amount));
+            builder.transfer_oct(recipient, Some(transfer_amount));
             builder.finish()
         };
 

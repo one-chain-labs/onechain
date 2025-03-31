@@ -102,13 +102,13 @@ async fn create_credential_and_sign_test_tx(
     pk_bytes.extend_from_slice(x.unwrap());
     let pk = PublicKey::try_from_bytes(SignatureScheme::PasskeyAuthenticator, &pk_bytes).unwrap();
 
-    // Derives its sui address and make a test transaction with it as sender.
+    // Derives its OneChain address and make a test transaction with it as sender.
     let sender = SuiAddress::from(&pk);
     let recipient = dbg_addr(2);
     let object_id = ObjectID::ZERO;
     let object = Object::immutable_with_id_for_testing(object_id);
     let gas_price = 1000;
-    let tx_data = TransactionData::new_transfer_sui(
+    let tx_data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         None,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use expect_test::expect;
+use one_chain::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use reqwest::Client;
 use std::{
     fs,
@@ -10,7 +11,6 @@ use std::{
     path::PathBuf,
     sync::{Arc, RwLock},
 };
-use sui::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_move_build::{BuildConfig, SuiPackageHooks};
 use sui_sdk::{

@@ -28,7 +28,7 @@ async fn test_pay_sui_failure_empty_recipients() {
     let coin1 = Object::with_id_owner_gas_for_testing(coin_id, sender, 2000000);
 
     // an empty set of programmable transaction commands will still charge gas
-    let res = execute_pay_sui(vec![coin1], vec![], vec![], sender, sender_key, 2000000).await;
+    let res = execute_pay_oct(vec![coin1], vec![], vec![], sender, sender_key, 2000000).await;
 
     let effects = res.txn_result.unwrap().into_data();
     assert_eq!(effects.status(), &ExecutionStatus::Success);
@@ -46,7 +46,7 @@ async fn test_pay_sui_failure_insufficient_gas_balance_one_input_coin() {
     let recipient2 = dbg_addr(2);
 
     let res =
-        execute_pay_sui(vec![coin1], vec![recipient1, recipient2], vec![100, 100], sender, sender_key, 2200000).await;
+        execute_pay_oct(vec![coin1], vec![recipient1, recipient2], vec![100, 100], sender, sender_key, 2200000).await;
 
     assert_eq!(UserInputError::try_from(res.txn_result.unwrap_err()).unwrap(), UserInputError::GasBalanceTooLow {
         gas_balance: 2000,
@@ -62,7 +62,7 @@ async fn test_pay_sui_failure_insufficient_total_balance_one_input_coin() {
     let recipient2 = dbg_addr(2);
 
     let res =
-        execute_pay_sui(vec![coin1], vec![recipient1, recipient2], vec![100, 100], sender, sender_key, 500000).await;
+        execute_pay_oct(vec![coin1], vec![recipient1, recipient2], vec![100, 100], sender, sender_key, 500000).await;
 
     assert_eq!(res.txn_result.as_ref().unwrap().status(), &ExecutionStatus::Failure {
         error: ExecutionFailureStatus::InsufficientCoinBalance,
@@ -79,7 +79,7 @@ async fn test_pay_sui_failure_insufficient_gas_balance_multiple_input_coins() {
     let recipient2 = dbg_addr(2);
 
     let res =
-        execute_pay_sui(vec![coin1, coin2], vec![recipient1, recipient2], vec![100, 100], sender, sender_key, 2000000)
+        execute_pay_oct(vec![coin1, coin2], vec![recipient1, recipient2], vec![100, 100], sender, sender_key, 2000000)
             .await;
 
     assert_eq!(UserInputError::try_from(res.txn_result.unwrap_err()).unwrap(), UserInputError::GasBalanceTooLow {
@@ -97,7 +97,7 @@ async fn test_pay_sui_failure_insufficient_total_balance_multiple_input_coins() 
     let recipient2 = dbg_addr(2);
 
     let res =
-        execute_pay_sui(vec![coin1, coin2], vec![recipient1, recipient2], vec![4000, 4000], sender, sender_key, 500000)
+        execute_pay_oct(vec![coin1, coin2], vec![recipient1, recipient2], vec![4000, 4000], sender, sender_key, 500000)
             .await;
     assert_eq!(res.txn_result.as_ref().unwrap().status(), &ExecutionStatus::Failure {
         error: ExecutionFailureStatus::InsufficientCoinBalance,
@@ -115,7 +115,7 @@ async fn test_pay_sui_success_one_input_coin() -> anyhow::Result<()> {
     let recipient2 = dbg_addr(2);
     let recipient3 = dbg_addr(3);
     let recipient_amount_map: HashMap<_, u64> = HashMap::from([(recipient1, 100), (recipient2, 200), (recipient3, 300)]);
-    let res = execute_pay_sui(
+    let res = execute_pay_oct(
         vec![coin_obj],
         vec![recipient1, recipient2, recipient3],
         vec![100, 200, 300],
@@ -169,7 +169,7 @@ async fn test_pay_sui_success_multiple_input_coins() -> anyhow::Result<()> {
     let recipient1 = dbg_addr(1);
     let recipient2 = dbg_addr(2);
 
-    let res = execute_pay_sui(
+    let res = execute_pay_oct(
         vec![coin_obj1, coin_obj2, coin_obj3],
         vec![recipient1, recipient2],
         vec![500, 1500],
@@ -215,7 +215,7 @@ async fn test_pay_all_sui_failure_insufficient_gas_one_input_coin() {
     let coin1 = Object::with_id_owner_gas_for_testing(ObjectID::random(), sender, 1800);
     let recipient = dbg_addr(2);
 
-    let res = execute_pay_all_sui(vec![&coin1], recipient, sender, sender_key, 2000000).await;
+    let res = execute_pay_all_oct(vec![&coin1], recipient, sender, sender_key, 2000000).await;
 
     assert_eq!(UserInputError::try_from(res.txn_result.unwrap_err()).unwrap(), UserInputError::GasBalanceTooLow {
         gas_balance: 1800,
@@ -229,7 +229,7 @@ async fn test_pay_all_sui_failure_insufficient_gas_budget_multiple_input_coins()
     let coin1 = Object::with_id_owner_gas_for_testing(ObjectID::random(), sender, 1000);
     let coin2 = Object::with_id_owner_gas_for_testing(ObjectID::random(), sender, 1000);
     let recipient = dbg_addr(2);
-    let res = execute_pay_all_sui(vec![&coin1, &coin2], recipient, sender, sender_key, 2500000).await;
+    let res = execute_pay_all_oct(vec![&coin1, &coin2], recipient, sender, sender_key, 2500000).await;
 
     assert_eq!(UserInputError::try_from(res.txn_result.unwrap_err()).unwrap(), UserInputError::GasBalanceTooLow {
         gas_balance: 2000,
@@ -243,7 +243,7 @@ async fn test_pay_all_sui_success_one_input_coin() -> anyhow::Result<()> {
     let object_id = ObjectID::random();
     let coin_obj = Object::with_id_owner_gas_for_testing(object_id, sender, 3000000);
     let recipient = dbg_addr(2);
-    let res = execute_pay_all_sui(vec![&coin_obj], recipient, sender, sender_key, 2000000).await;
+    let res = execute_pay_all_oct(vec![&coin_obj], recipient, sender, sender_key, 2000000).await;
 
     let effects = res.txn_result.unwrap().into_data();
     assert_eq!(*effects.status(), ExecutionStatus::Success);
@@ -269,7 +269,7 @@ async fn test_pay_all_sui_success_multiple_input_coins() -> anyhow::Result<()> {
     let coin_obj3 = Object::with_id_owner_gas_for_testing(ObjectID::random(), sender, 1000);
     let recipient = dbg_addr(2);
     let res =
-        execute_pay_all_sui(vec![&coin_obj1, &coin_obj2, &coin_obj3], recipient, sender, sender_key, 3000000).await;
+        execute_pay_all_oct(vec![&coin_obj1, &coin_obj2, &coin_obj3], recipient, sender, sender_key, 3000000).await;
 
     let effects = res.txn_result.unwrap().into_data();
     assert_eq!(*effects.status(), ExecutionStatus::Success);
@@ -291,7 +291,7 @@ struct PaySuiTransactionBlockExecutionResult {
     pub txn_result: Result<SignedTransactionEffects, SuiError>,
 }
 
-async fn execute_pay_sui(
+async fn execute_pay_oct(
     input_coin_objects: Vec<Object>,
     recipients: Vec<SuiAddress>,
     amounts: Vec<u64>,
@@ -308,7 +308,7 @@ async fn execute_pay_sui(
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
 
     let mut builder = ProgrammableTransactionBuilder::new();
-    builder.pay_sui(recipients, amounts).unwrap();
+    builder.pay_oct(recipients, amounts).unwrap();
     let pt = builder.finish();
     let data = TransactionData::new_programmable(sender, input_coin_refs, pt, gas_budget, rgp);
     let tx = to_sender_signed_transaction(data, &sender_key);
@@ -317,7 +317,7 @@ async fn execute_pay_sui(
     PaySuiTransactionBlockExecutionResult { authority_state, txn_result }
 }
 
-async fn execute_pay_all_sui(
+async fn execute_pay_all_oct(
     input_coin_objects: Vec<&Object>,
     recipient: SuiAddress,
     sender: SuiAddress,
@@ -343,7 +343,7 @@ async fn execute_pay_all_sui(
     }
 
     let mut builder = ProgrammableTransactionBuilder::new();
-    builder.pay_all_sui(recipient);
+    builder.pay_all_oct(recipient);
     let pt = builder.finish();
     let data = TransactionData::new_programmable(sender, input_coins, pt, gas_budget, rgp);
     let tx = to_sender_signed_transaction(data, &sender_key);

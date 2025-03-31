@@ -94,10 +94,10 @@ async fn create_txes(test_cluster: &TestCluster) -> BTreeMap<CommonTransactionCo
     // Transfer Whole Sui Coin and Transfer Portion of Sui Coin
     //
     let whole_sui_coin_tx = TestTransactionBuilder::new(sender, gas_objects.pop().unwrap(), gas_price)
-        .transfer_sui(None, SuiAddress::default())
+        .transfer_oct(None, SuiAddress::default())
         .build();
     let partial_sui_coin_tx = TestTransactionBuilder::new(sender, gas_objects.pop().unwrap(), gas_price)
-        .transfer_sui(Some(10), SuiAddress::default())
+        .transfer_oct(Some(10), SuiAddress::default())
         .build();
     ret.insert(CommonTransactionCosts::TransferWholeSuiCoin, whole_sui_coin_tx);
     ret.insert(CommonTransactionCosts::TransferPortionSuiCoin, partial_sui_coin_tx);

@@ -36,7 +36,7 @@ pub trait IndexerApi {
     #[method(name = "getOwnedObjects")]
     async fn get_owned_objects(
         &self,
-        /// the owner's Sui address
+        /// the owner's OneChain address
         address: SuiAddress,
         /// the objects query criteria.
         query: Option<SuiObjectResponseQuery>,

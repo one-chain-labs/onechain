@@ -4,9 +4,9 @@
 use futures::future;
 use jsonrpsee::{core::client::ClientT, rpc_params};
 use move_core_types::{annotated_value::MoveStructLayout, ident_str};
+use one_chain::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
-use sui::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use sui_config::node::RunWithRange;
 use sui_json_rpc_types::{
     EventFilter,
@@ -960,7 +960,7 @@ async fn test_access_old_object_pruned() {
     let sender = tx_builder.sender();
     let gas_object = tx_builder.gas_object();
     let effects =
-        test_cluster.sign_and_execute_transaction(&tx_builder.transfer_sui(None, sender).build()).await.effects.unwrap();
+        test_cluster.sign_and_execute_transaction(&tx_builder.transfer_oct(None, sender).build()).await.effects.unwrap();
     let new_gas_version = effects.gas_object().reference.version;
     test_cluster.trigger_reconfiguration().await;
     // Construct a new transaction that uses the old gas object reference.
@@ -970,7 +970,7 @@ async fn test_access_old_object_pruned() {
             .await
             // Make sure we are doing something different from the first transaction.
             // Otherwise we would just end up with the same digest.
-            .transfer_sui(Some(1), sender)
+            .transfer_oct(Some(1), sender)
             .build(),
     );
     for validator in test_cluster.swarm.active_validators() {

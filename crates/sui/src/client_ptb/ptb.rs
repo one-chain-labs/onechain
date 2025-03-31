@@ -252,7 +252,7 @@ pub fn to_source_string(strings: Vec<String>) -> String {
 }
 
 pub fn ptb_description() -> clap::Command {
-    clap::Command::new("sui client ptb")
+    clap::Command::new("one_chian client ptb")
         .about(
             "Build, preview, and execute programmable transaction blocks. Depending on your \
             shell, you might have to use quotes around arrays or other passed values. \

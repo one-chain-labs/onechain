@@ -96,7 +96,7 @@ impl TransactionBuilderServer for TransactionBuilderApi {
         Ok(TransactionBlockBytes::from_data(data)?)
     }
 
-    async fn transfer_sui(
+    async fn transfer_oct(
         &self,
         signer: SuiAddress,
         sui_object_id: ObjectID,
@@ -104,7 +104,7 @@ impl TransactionBuilderServer for TransactionBuilderApi {
         recipient: SuiAddress,
         amount: Option<BigInt<u64>>,
     ) -> RpcResult<TransactionBlockBytes> {
-        let data = self.0.transfer_sui(signer, sui_object_id, *gas_budget, recipient, amount.map(|a| *a)).await?;
+        let data = self.0.transfer_oct(signer, sui_object_id, *gas_budget, recipient, amount.map(|a| *a)).await?;
         Ok(TransactionBlockBytes::from_data(data)?)
     }
 
@@ -124,7 +124,7 @@ impl TransactionBuilderServer for TransactionBuilderApi {
         Ok(TransactionBlockBytes::from_data(data)?)
     }
 
-    async fn pay_sui(
+    async fn pay_oct(
         &self,
         signer: SuiAddress,
         input_coins: Vec<ObjectID>,
@@ -134,19 +134,19 @@ impl TransactionBuilderServer for TransactionBuilderApi {
     ) -> RpcResult<TransactionBlockBytes> {
         let data = self
             .0
-            .pay_sui(signer, input_coins, recipients, amounts.into_iter().map(|a| *a).collect(), *gas_budget)
+            .pay_oct(signer, input_coins, recipients, amounts.into_iter().map(|a| *a).collect(), *gas_budget)
             .await?;
         Ok(TransactionBlockBytes::from_data(data)?)
     }
 
-    async fn pay_all_sui(
+    async fn pay_all_oct(
         &self,
         signer: SuiAddress,
         input_coins: Vec<ObjectID>,
         recipient: SuiAddress,
         gas_budget: BigInt<u64>,
     ) -> RpcResult<TransactionBlockBytes> {
-        let data = self.0.pay_all_sui(signer, input_coins, recipient, *gas_budget).await?;
+        let data = self.0.pay_all_oct(signer, input_coins, recipient, *gas_budget).await?;
         Ok(TransactionBlockBytes::from_data(data)?)
     }
 

@@ -740,7 +740,7 @@ fn test_sponsored_transaction_validity_check() {
     // TransferSui
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(SuiAddress::random_for_testing_only(), Some(50000));
+        builder.transfer_oct(SuiAddress::random_for_testing_only(), Some(50000));
         builder.finish()
     };
     let kind = TransactionKind::programmable(pt);
@@ -751,7 +751,7 @@ fn test_sponsored_transaction_validity_check() {
     // PaySui
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![], vec![]).unwrap();
+        builder.pay_oct(vec![], vec![]).unwrap();
         builder.finish()
     };
     let kind = TransactionKind::programmable(pt);
@@ -762,7 +762,7 @@ fn test_sponsored_transaction_validity_check() {
     // PayAllSui
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_all_sui(SuiAddress::random_for_testing_only());
+        builder.pay_all_oct(SuiAddress::random_for_testing_only());
         builder.finish()
     };
     let kind = TransactionKind::programmable(pt);

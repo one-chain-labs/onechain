@@ -1246,7 +1246,7 @@ impl<const STRONG_THRESHOLD: bool> AuthorityQuorumSignInfo<STRONG_THRESHOLD> {
         })
     }
 
-    pub fn authorities<'a>(&'a self, committee: &'a Committee) -> impl Iterator<Item = SuiResult<&AuthorityName>> {
+    pub fn authorities<'a>(&'a self, committee: &'a Committee) -> impl Iterator<Item = SuiResult<&'a AuthorityName>> {
         self.signers_map.iter().map(|i| committee.authority_by_index(i).ok_or(SuiError::InvalidAuthenticator))
     }
 
@@ -1478,7 +1478,7 @@ pub enum SignatureScheme {
     ED25519,
     Secp256k1,
     Secp256r1,
-    BLS12381, // This is currently not supported for user Sui Address.
+    BLS12381, // This is currently not supported for user OneChain Address.
     MultiSig,
     ZkLoginAuthenticator,
     PasskeyAuthenticator,
@@ -1491,7 +1491,7 @@ impl SignatureScheme {
             SignatureScheme::Secp256k1 => 0x01,
             SignatureScheme::Secp256r1 => 0x02,
             SignatureScheme::MultiSig => 0x03,
-            SignatureScheme::BLS12381 => 0x04, // This is currently not supported for user Sui Address.
+            SignatureScheme::BLS12381 => 0x04, // This is currently not supported for user OneChain Address.
             SignatureScheme::ZkLoginAuthenticator => 0x05,
             SignatureScheme::PasskeyAuthenticator => 0x06,
         }

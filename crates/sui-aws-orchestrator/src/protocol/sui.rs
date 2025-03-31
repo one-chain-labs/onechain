@@ -48,7 +48,7 @@ impl FromStr for SuiBenchmarkType {
 
 impl BenchmarkType for SuiBenchmarkType {}
 
-/// All configurations information to run a Sui client or validator.
+/// All configurations information to run a OneChain client or validator.
 pub struct SuiProtocol {
     working_dir: PathBuf,
 }

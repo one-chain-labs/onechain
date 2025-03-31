@@ -769,7 +769,7 @@ pub mod tests {
         // executeTransactionBlock mutation call.
         let addresses = wallet.get_addresses();
         let gas = wallet.get_one_gas_object_owned_by_address(addresses[0]).await.unwrap();
-        let tx_data = TransactionData::new_transfer_sui(
+        let tx_data = TransactionData::new_transfer_oct(
             addresses[1],
             addresses[0],
             Some(1000),

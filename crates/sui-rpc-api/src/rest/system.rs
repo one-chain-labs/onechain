@@ -8,7 +8,9 @@ use crate::{
         accept::AcceptFormat,
         openapi::{ApiEndpoint, OperationBuilder, ResponseBuilder, RouteHandler},
     },
-    Result, RpcService, RpcServiceError,
+    Result,
+    RpcService,
+    RpcServiceError,
 };
 use axum::{
     extract::{Path, State},
@@ -208,7 +210,7 @@ pub struct SystemStateSummary {
     #[serde_as(as = "Vec<sui_types::sui_serde::BigInt<u64>>")]
     #[schemars(with = "Vec<U64>")]
     pub pending_removals: Vec<u64>,
-    /// ID of the object that maps from staking pool's ID to the sui address of a validator.
+    /// ID of the object that maps from staking pool's ID to the OneChain address of a validator.
     pub staking_pool_mappings_id: ObjectId,
     /// Number of staking pool mappings.
     #[serde_as(as = "sui_types::sui_serde::BigInt<u64>")]

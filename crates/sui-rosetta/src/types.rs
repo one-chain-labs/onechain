@@ -901,7 +901,7 @@ impl InternalOperation {
         let pt = match self {
             Self::PaySui { recipients, amounts, .. } => {
                 let mut builder = ProgrammableTransactionBuilder::new();
-                builder.pay_sui(recipients, amounts)?;
+                builder.pay_oct(recipients, amounts)?;
                 builder.finish()
             }
             Self::PayCoin { recipients, amounts, .. } => {

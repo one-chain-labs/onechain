@@ -1,16 +1,16 @@
 {
   "openrpc": "1.2.6",
   "info": {
-    "title": "Sui JSON-RPC",
-    "description": "Sui JSON-RPC API for interaction with Sui Full node. Make RPC calls using https://fullnode.NETWORK.sui.io:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
+    "title": "OneChain JSON-RPC",
+    "description": "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
     "contact": {
-      "name": "Mysten Labs",
-      "url": "https://mystenlabs.com",
-      "email": "build@mystenlabs.com"
+      "name": "OneChain Labs",
+      "url": "https://www.onelabs.cc",
+      "email": "build@onelabs.cc"
     },
     "license": {
       "name": "Apache-2.0",
-      "url": "https://raw.githubusercontent.com/MystenLabs/sui/main/LICENSE"
+      "url": "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE"
     },
     "version": "1.39.4"
   },
@@ -3012,7 +3012,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3063,7 +3063,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3157,7 +3157,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3261,7 +3261,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3636,7 +3636,7 @@
       "params": [
         {
           "name": "address",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4458,7 +4458,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4517,7 +4517,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4574,7 +4574,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4668,7 +4668,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4732,7 +4732,7 @@
       }
     },
     {
-      "name": "unsafe_payAllSui",
+      "name": "unsafe_payAllOct",
       "tags": [
         {
           "name": "Transaction Builder API"
@@ -4742,7 +4742,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4785,7 +4785,7 @@
       }
     },
     {
-      "name": "unsafe_paySui",
+      "name": "unsafe_payOct",
       "tags": [
         {
           "name": "Transaction Builder API"
@@ -4795,7 +4795,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4862,7 +4862,7 @@
       "params": [
         {
           "name": "sender",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4925,7 +4925,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4951,7 +4951,7 @@
         },
         {
           "name": "validator",
-          "description": "the validator's Sui address",
+          "description": "the validator's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4992,7 +4992,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5041,7 +5041,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5101,7 +5101,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5158,7 +5158,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5189,7 +5189,7 @@
         },
         {
           "name": "recipient",
-          "description": "the recipient's Sui address",
+          "description": "the recipient's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5205,17 +5205,17 @@
       }
     },
     {
-      "name": "unsafe_transferSui",
+      "name": "unsafe_transferOct",
       "tags": [
         {
           "name": "Transaction Builder API"
         }
       ],
-      "description": "Create an unsigned transaction to send SUI coin object to a Sui address. The SUI object is also used as the gas object.",
+      "description": "Create an unsigned transaction to send OCT coin object to a OneChain address. The object is also used as the gas object.",
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5239,7 +5239,7 @@
         },
         {
           "name": "recipient",
-          "description": "the recipient's Sui address",
+          "description": "the recipient's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -6184,7 +6184,7 @@
             "description": "Parsed json value of the event"
           },
           "sender": {
-            "description": "Sender's Sui address.",
+            "description": "Sender's OneChain address.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/SuiAddress"
@@ -9648,7 +9648,7 @@
             ]
           },
           "stakingPoolMappingsId": {
-            "description": "ID of the object that maps from staking pool's ID to the sui address of a validator.",
+            "description": "ID of the object that maps from staking pool's ID to the OneChain address of a validator.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ObjectID"

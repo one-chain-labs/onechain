@@ -6,8 +6,8 @@
 //! 2. restart the node in a new epoch when config file will be reloaded and take effects
 //!
 //! Example usage:
-//! sui fire-drill metadata-rotation \
-//! --sui-node-config-path validator.yaml \
+//! one_chain fire-drill metadata-rotation \
+//! --one-node-config-path validator.yaml \
 //! --account-key-path account.key \
 //! --fullnode-rpc-url http://fullnode-my-local-net:9000
 
@@ -46,8 +46,8 @@ pub enum FireDrill {
 
 #[derive(Parser)]
 pub struct MetadataRotation {
-    /// Path to sui node config.
-    #[clap(long = "sui-node-config-path")]
+    /// Path to one node config.
+    #[clap(long = "one-node-config-path")]
     sui_node_config_path: PathBuf,
     /// Path to account key file.
     #[clap(long = "account-key-path")]

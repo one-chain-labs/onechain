@@ -62,7 +62,7 @@ pub async fn generate_ingestion(config: Config) {
     for i in 0..num_checkpoints {
         for _ in 0..checkpoint_size {
             let tx_data =
-                TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_sui(Some(1), sender).build();
+                TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_oct(Some(1), sender).build();
             let tx = to_sender_signed_transaction(tx_data, &keypair);
             let (effects, _) = sim.execute_transaction(tx).unwrap();
             gas_object = effects.gas_object().0;

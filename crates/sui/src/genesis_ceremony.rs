@@ -231,7 +231,7 @@ pub fn run(cmd: Ceremony) -> Result<()> {
 fn check_protocol_version(builder: &Builder, protocol_version: ProtocolVersion) -> Result<()> {
     // It is entirely possible for the user to sign a genesis blob with an unknown
     // protocol version, but if this happens there is almost certainly some confusion
-    // (e.g. using a `sui` binary built at the wrong commit).
+    // (e.g. using a `one_chain` binary built at the wrong commit).
     if builder.protocol_version() != protocol_version {
         return Err(anyhow::anyhow!(
             "Serialized protocol version does not match local --protocol-version argument. ({:?} vs {:?})",

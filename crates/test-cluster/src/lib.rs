@@ -604,7 +604,7 @@ impl TestCluster {
         let context = &self.wallet;
         let (sender, gas) = context.get_one_gas_object().await.unwrap().unwrap();
         let tx = context.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas, rgp).transfer_sui(amount, funding_address).build(),
+            &TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(amount, funding_address).build(),
         );
         context.execute_transaction_must_succeed(tx).await;
 
@@ -612,7 +612,7 @@ impl TestCluster {
     }
 
     pub async fn transfer_sui_must_exceed(&self, sender: SuiAddress, receiver: SuiAddress, amount: u64) -> ObjectID {
-        let tx = self.test_transaction_builder_with_sender(sender).await.transfer_sui(Some(amount), receiver).build();
+        let tx = self.test_transaction_builder_with_sender(sender).await.transfer_oct(Some(amount), receiver).build();
         let effects = self.sign_and_execute_transaction(&tx).await.effects.unwrap();
         assert_eq!(&SuiExecutionStatus::Success, effects.status());
         effects.created().first().unwrap().object_id()

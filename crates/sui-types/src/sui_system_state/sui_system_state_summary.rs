@@ -168,7 +168,7 @@ pub struct SuiSystemStateSummary {
     #[schemars(with = "Vec<BigInt<u64>>")]
     #[serde_as(as = "Vec<Readable<BigInt<u64>, _>>")]
     pub pending_removals: Vec<u64>,
-    /// ID of the object that maps from staking pool's ID to the sui address of a validator.
+    /// ID of the object that maps from staking pool's ID to the OneChain address of a validator.
     pub staking_pool_mappings_id: ObjectID,
     /// Number of staking pool mappings.
     #[schemars(with = "BigInt<u64>")]

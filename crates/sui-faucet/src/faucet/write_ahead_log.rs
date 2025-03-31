@@ -238,7 +238,7 @@ mod tests {
         let recv = SuiAddress::random_for_testing_only();
         (
             recv,
-            TransactionData::new_pay_sui(
+            TransactionData::new_pay_oct(
                 send,
                 vec![coin],
                 vec![recv],

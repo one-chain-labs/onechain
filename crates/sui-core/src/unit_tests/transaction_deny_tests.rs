@@ -109,7 +109,7 @@ async fn transfer_with_account(
     state: &Arc<AuthorityState>,
 ) -> SuiResult<HandleTransactionResponse> {
     let rgp = state.reference_gas_price_for_testing().unwrap();
-    let data = TransactionData::new_transfer_sui_allow_sponsor(
+    let data = TransactionData::new_transfer_oct_allow_sponsor(
         sender_account.0,
         sender_account.0,
         None,

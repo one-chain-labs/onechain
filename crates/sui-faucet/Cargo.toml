@@ -1,10 +1,10 @@
 [package]
 name = "sui-faucet"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
 version.workspace = true
-edition = "2021"
-authors = ["Mysten Labs <build@mystenlabs.com>"]
-license = "Apache-2.0"
-publish = false
 
 [dependencies]
 anyhow.workspace = true

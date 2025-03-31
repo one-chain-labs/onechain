@@ -66,8 +66,8 @@ impl Command {
         Self { data: CommandData::DryRun(DryRun {}), ..Default::default() }
     }
 
-    pub fn new_pay_sui() -> Self {
-        Self { data: CommandData::PaySui(PaySui {}), ..Default::default() }
+    pub fn new_pay_oct() -> Self {
+        Self { data: CommandData::PayOct(PayOct {}), ..Default::default() }
     }
 
     pub fn new_get_checkpoints(
@@ -135,7 +135,7 @@ impl Command {
 pub enum CommandData {
     DryRun(DryRun),
     GetCheckpoints(GetCheckpoints),
-    PaySui(PaySui),
+    PayOct(PayOct),
     QueryTransactionBlocks(QueryTransactionBlocks),
     MultiGetTransactionBlocks(MultiGetTransactionBlocks),
     MultiGetObjects(MultiGetObjects),
@@ -165,7 +165,7 @@ pub struct GetCheckpoints {
 }
 
 #[derive(Clone)]
-pub struct PaySui {}
+pub struct PayOct {}
 
 #[derive(Clone, Default)]
 pub struct QueryTransactionBlocks {

@@ -3,7 +3,7 @@
 
 use clap::Parser;
 use insta::assert_json_snapshot;
-use sui::sui_commands::SuiCommand;
+use one_chain::sui_commands::SuiCommand;
 use sui_macros::sim_test;
 use sui_sdk::wallet_context::WalletContext;
 use test_cluster::TestClusterBuilder;

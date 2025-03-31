@@ -28,13 +28,13 @@ use utils::setup_for_write;
 // 5) executes it.
 // For some of these actions it prints some output.
 // Finally, at the end of the program it prints the number of coins for the
-// Sui address that received the coin.
+// OneChain address that received the coin.
 // If you run this program several times, you should see the number of coins
 // for the recipient address increases.
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // 1) get the Sui client, the sender and recipient that we will use
+    // 1) get the OneChain client, the sender and recipient that we will use
     // for the transaction, and find the coin we use as gas
     let (sui, sender, _recipient) = setup_for_write().await?;
 

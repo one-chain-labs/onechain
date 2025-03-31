@@ -23,7 +23,7 @@ fn test_with_random_gas_data(gas_data_test: GasDataWithObjects, executor: &mut E
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
         let recipient = dbg_addr(2);
-        builder.transfer_sui(recipient, None);
+        builder.transfer_oct(recipient, None);
         builder.finish()
     };
     let kind = TransactionKind::ProgrammableTransaction(pt);

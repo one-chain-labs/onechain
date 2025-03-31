@@ -20,12 +20,12 @@ use std::str::FromStr;
 
 use expect_test::expect;
 use move_package::{lock_file::schema::ManagedPackage, BuildConfig as MoveBuildConfig};
-use serde_json::json;
-use sui::{
-    client_ptb::ptb::PTB,
+use one_chain::{
+    client_ptb::{self, ptb::PTB},
     key_identity::{get_identity_address, KeyIdentity},
     sui_commands::IndexerArgs,
 };
+use serde_json::json;
 use sui_sdk::SuiClient;
 use sui_test_transaction_builder::batch_make_transfer_transactions;
 use sui_types::{
@@ -40,7 +40,7 @@ use sui_types::{
 };
 use tokio::time::sleep;
 
-use sui::{
+use one_chain::{
     client_commands::{
         estimate_gas_budget,
         Opts,
@@ -299,7 +299,7 @@ async fn test_ptb_publish_and_complex_arg_resolution() -> Result<(), anyhow::Err
     );
 
     let args = shlex::split(&complex_ptb_string).unwrap();
-    sui::client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
+    client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
 
     let delete_object_ptb_string = format!(
         r#"
@@ -313,7 +313,7 @@ async fn test_ptb_publish_and_complex_arg_resolution() -> Result<(), anyhow::Err
     );
 
     let args = shlex::split(&delete_object_ptb_string).unwrap();
-    sui::client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
+    client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
 
     Ok(())
 }
@@ -337,7 +337,7 @@ async fn test_ptb_publish() -> Result<(), anyhow::Error> {
         package_path.display()
     );
     let args = shlex::split(&publish_ptb_string).unwrap();
-    sui::client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
+    client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
     Ok(())
 }
 
@@ -1432,7 +1432,7 @@ async fn test_package_publish_test_flag() -> Result<(), anyhow::Error> {
     let mut package_path = PathBuf::from(TEST_DATA_DIR);
     package_path.push("module_publish_with_nonexistent_dependency");
     let mut build_config: MoveBuildConfig = BuildConfig::new_for_testing().config;
-    // this would have been the result of calling `sui client publish --test`
+    // this would have been the result of calling `one_chain client publish --test`
     build_config.test_mode = true;
 
     let result = SuiClientCommands::Publish {
@@ -1448,7 +1448,7 @@ async fn test_package_publish_test_flag() -> Result<(), anyhow::Error> {
     let expect = expect![[r#"
         Err(
             ModulePublishFailure {
-                error: "The `publish` subcommand should not be used with the `--test` flag\n\nCode in published packages must not depend on test code.\nIn order to fix this and publish the package without `--test`, remove any non-test dependencies on test-only code.\nYou can ensure all test-only dependencies have been removed by compiling the package normally with `sui move build`.",
+                error: "The `publish` subcommand should not be used with the `--test` flag\n\nCode in published packages must not depend on test code.\nIn order to fix this and publish the package without `--test`, remove any non-test dependencies on test-only code.\nYou can ensure all test-only dependencies have been removed by compiling the package normally with `one_chain move build`.",
             },
         )
     "#]];
@@ -1758,8 +1758,8 @@ async fn test_package_management_on_upgrade_command_conflict() -> Result<(), any
         Conflicting published package address: `Move.toml` contains published-at address 0x0000000000000000000000000000000000000000000000000000000000000bad but `Move.lock` file contains published-at address <elided-for-test>. You may want to:
 
                          - delete the published-at address in the `Move.toml` if the `Move.lock` address is correct; OR
-                         - update the `Move.lock` address using the `sui manage-package` command to be the same as the `Move.toml`; OR
-                         - check that your `sui active-env` (currently localnet) corresponds to the chain on which the package is published (i.e., devnet, testnet, mainnet); OR
+                         - update the `Move.lock` address using the `one_chain manage-package` command to be the same as the `Move.toml`; OR
+                         - check that your `one_chain active-env` (currently localnet) corresponds to the chain on which the package is published (i.e., devnet, testnet, mainnet); OR
                          - contact the maintainer if this package is a dependency and request resolving the conflict."#]];
     expect.assert_eq(&err_string);
     Ok(())
@@ -2358,7 +2358,7 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
         .data;
     let coin = object_refs.get(1).unwrap().object().unwrap().object_id;
 
-    SuiClientCommands::TransferSui {
+    SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address1),
         sui_coin_object_id: coin,
         amount: Some(1),
@@ -2373,7 +2373,7 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
     .execute(context)
     .await?;
 
-    SuiClientCommands::TransferSui {
+    SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address1),
         sui_coin_object_id: coin,
         amount: Some(1),
@@ -2389,7 +2389,7 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
     .await?;
 
     // use alias for transfer
-    SuiClientCommands::TransferSui {
+    SuiClientCommands::TransferOct {
         to: KeyIdentity::Alias(alias1),
         sui_coin_object_id: coin,
         amount: Some(1),
@@ -2509,7 +2509,7 @@ async fn test_stake_with_u64_amount() -> Result<(), anyhow::Error> {
 }
 
 async fn test_with_sui_binary(args: &[&str]) -> Result<(), anyhow::Error> {
-    let mut cmd = assert_cmd::Command::cargo_bin("sui").unwrap();
+    let mut cmd = assert_cmd::Command::cargo_bin("one_chain").unwrap();
     let args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     // test cluster will not response if this call is in the same thread
     let out = thread::spawn(move || cmd.args(args).assert());
@@ -2583,14 +2583,14 @@ async fn test_get_owned_objects_owned_by_address_and_check_pagination() -> Resul
 #[tokio::test]
 async fn test_linter_suppression_stats() -> Result<(), anyhow::Error> {
     const LINTER_MSG: &str = "Total number of linter warnings suppressed: 5 (unique lints: 3)";
-    let mut cmd = assert_cmd::Command::cargo_bin("sui").unwrap();
+    let mut cmd = assert_cmd::Command::cargo_bin("one_chain").unwrap();
     let args = vec!["move", "test", "--path", "tests/data/linter"];
-    let output = cmd.args(&args).output().expect("failed to run 'sui move test'");
+    let output = cmd.args(&args).output().expect("failed to run 'one_chain move test'");
     let out_str = str::from_utf8(&output.stderr).unwrap();
     assert!(out_str.contains(LINTER_MSG), "Expected to match {LINTER_MSG}, got: {out_str}");
     // test no-lint suppresses
     let args = vec!["move", "test", "--no-lint", "--path", "tests/data/linter"];
-    let output = cmd.args(&args).output().expect("failed to run 'sui move test'");
+    let output = cmd.args(&args).output().expect("failed to run 'one_chain move test'");
     let out_str = str::from_utf8(&output.stderr).unwrap();
     assert!(!out_str.contains(LINTER_MSG), "Expected _not to_ match {LINTER_MSG}, got: {out_str}");
     Ok(())
@@ -2663,7 +2663,7 @@ async fn test_dry_run() -> Result<(), anyhow::Error> {
     assert_dry_run(transfer_dry_run, object_id, "Transfer");
 
     // === TRANSFER SUI === //
-    let transfer_sui_dry_run = SuiClientCommands::TransferSui {
+    let transfer_sui_dry_run = SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(SuiAddress::random_for_testing_only()),
         sui_coin_object_id: object_to_send,
         amount: Some(1),
@@ -2705,7 +2705,7 @@ async fn test_dry_run() -> Result<(), anyhow::Error> {
     assert_dry_run(pay_dry_run, gas_coin_id, "Pay");
 
     // === PAY SUI === //
-    let pay_sui_dry_run = SuiClientCommands::PaySui {
+    let pay_sui_dry_run = SuiClientCommands::PayOct {
         input_coins: vec![object_id],
         recipients: vec![KeyIdentity::Address(SuiAddress::random_for_testing_only())],
         amounts: vec![1],
@@ -2717,7 +2717,7 @@ async fn test_dry_run() -> Result<(), anyhow::Error> {
     assert_dry_run(pay_sui_dry_run, object_id, "PaySui");
 
     // === PAY ALL SUI === //
-    let pay_all_sui_dry_run = SuiClientCommands::PayAllSui {
+    let pay_all_sui_dry_run = SuiClientCommands::PayAllOct {
         input_coins: vec![object_id],
         recipient: KeyIdentity::Address(SuiAddress::random_for_testing_only()),
         opts: Opts::for_testing_dry_run(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2838,7 +2838,7 @@ async fn test_pay_sui() -> Result<(), anyhow::Error> {
     let (address2, address3) = (addresses[0], addresses[1]);
     let context = &mut test_cluster.wallet;
     let amounts = [1000, 5000];
-    let pay_sui = SuiClientCommands::PaySui {
+    let pay_oct = SuiClientCommands::PayOct {
         input_coins: vec![object_id1, object_id2],
         recipients: vec![recipient1.clone(), recipient2.clone()],
         amounts: amounts.into(),
@@ -2847,12 +2847,12 @@ async fn test_pay_sui() -> Result<(), anyhow::Error> {
     .execute(context)
     .await?;
 
-    // pay sui takes the input coins and transfers from each of them (in order) the amounts to the
+    // pay OCT takes the input coins and transfers from each of them (in order) the amounts to the
     // respective receipients.
     // check if each recipient has one object, if the tx status is success,
     // and if the gas object used was the first object in the input coins
     // we also check if the balances of each recipient are right!
-    if let SuiClientCommandResult::TransactionBlock(response) = pay_sui {
+    if let SuiClientCommandResult::TransactionBlock(response) = pay_oct {
         assert!(response.status_ok().unwrap());
         // check gas coin used
         assert_eq!(response.effects.as_ref().unwrap().gas_object().object_id(), object_id1);
@@ -2882,7 +2882,7 @@ async fn test_pay_sui() -> Result<(), anyhow::Error> {
         assert_eq!(objs_refs.data.len(), 1);
         assert_eq!(client.coin_read_api().get_balance(address3, None).await?.total_balance, amounts[1] as u128);
     } else {
-        panic!("PaySui test failed");
+        panic!("PayOct test failed");
     }
     Ok(())
 }
@@ -2894,7 +2894,7 @@ async fn test_pay_all_sui() -> Result<(), anyhow::Error> {
     let recipient1 = &recipients[0];
     let address2 = addresses[0];
     let context = &mut test_cluster.wallet;
-    let pay_all_sui = SuiClientCommands::PayAllSui {
+    let pay_all_oct = SuiClientCommands::PayAllOct {
         input_coins: vec![object_id1, object_id2],
         recipient: recipient1.clone(),
         opts: Opts::for_testing(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2902,10 +2902,10 @@ async fn test_pay_all_sui() -> Result<(), anyhow::Error> {
     .execute(context)
     .await?;
 
-    // pay all sui will take the input coins and smash them into one coin and transfer that coin to
+    // pay all OCT will take the input coins and smash them into one coin and transfer that coin to
     // the recipient, so we check that the recipient has one object, if the tx status is success,
     // and if the gas object used was the first object in the input coins
-    if let SuiClientCommandResult::TransactionBlock(response) = pay_all_sui {
+    if let SuiClientCommandResult::TransactionBlock(response) = pay_all_oct {
         let objs_refs = client
             .read_api()
             .get_owned_objects(
@@ -2920,7 +2920,7 @@ async fn test_pay_all_sui() -> Result<(), anyhow::Error> {
         assert_eq!(objs_refs.data.len(), 1);
         assert_eq!(response.effects.unwrap().gas_object().object_id(), object_id1);
     } else {
-        panic!("PayAllSui test failed");
+        panic!("PayAllOct test failed");
     }
 
     Ok(())
@@ -2982,7 +2982,7 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
     let address2 = addresses[0];
     let context = &mut test_cluster.wallet;
     let amount = 1000;
-    let transfer_sui = SuiClientCommands::TransferSui {
+    let transfer_oct = SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address2),
         sui_coin_object_id: object_id1,
         amount: Some(amount),
@@ -2991,10 +2991,10 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
     .execute(context)
     .await?;
 
-    // transfer sui will transfer the amount from object_id1 to address2, and use the same object
+    // transfer OCT will transfer the amount from object_id1 to address2, and use the same object
     // as gas, and we check if the recipient address received the object, and the expected balance
     // is correct
-    if let SuiClientCommandResult::TransactionBlock(response) = transfer_sui {
+    if let SuiClientCommandResult::TransactionBlock(response) = transfer_oct {
         assert!(response.status_ok().unwrap());
         assert_eq!(response.effects.as_ref().unwrap().gas_object().object_id(), object_id1);
         let objs_refs = client
@@ -3011,10 +3011,10 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
         let balance = client.coin_read_api().get_balance(address2, None).await?.total_balance;
         assert_eq!(balance, amount as u128);
     } else {
-        panic!("TransferSui test failed");
+        panic!("TransferOct test failed");
     }
     // transfer the whole object by not passing an amount
-    let transfer_sui = SuiClientCommands::TransferSui {
+    let transfer_oct = SuiClientCommands::TransferOct {
         to: recipient1.clone(),
         sui_coin_object_id: object_id1,
         amount: None,
@@ -3022,7 +3022,7 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
     }
     .execute(context)
     .await?;
-    if let SuiClientCommandResult::TransactionBlock(response) = transfer_sui {
+    if let SuiClientCommandResult::TransactionBlock(response) = transfer_oct {
         assert!(response.status_ok().unwrap());
         assert_eq!(response.effects.as_ref().unwrap().gas_object().object_id(), object_id1);
         let objs_refs = client
@@ -3035,10 +3035,10 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
             )
             .await?;
         assert!(!objs_refs.has_next_page);
-        assert_eq!(objs_refs.data.len(), 2, "Expected to have two coins when calling transfer sui the 2nd time");
+        assert_eq!(objs_refs.data.len(), 2, "Expected to have two coins when calling transfer OCT the 2nd time");
         assert!(objs_refs.data.iter().any(|x| x.object().unwrap().object_id == object_id1));
     } else {
-        panic!("TransferSui test failed");
+        panic!("TransferOct test failed");
     }
     Ok(())
 }
@@ -3052,11 +3052,11 @@ async fn test_gas_estimation() -> Result<(), anyhow::Error> {
     let amount = 1000;
     let sender = context.active_address().unwrap();
     let tx_builder = client.transaction_builder();
-    let tx_kind = tx_builder.transfer_sui_tx_kind(address2, Some(amount));
+    let tx_kind = tx_builder.transfer_oct_tx_kind(address2, Some(amount));
     let gas_estimate = estimate_gas_budget(context, sender, tx_kind, rgp, None, None).await;
     assert!(gas_estimate.is_ok());
 
-    let transfer_sui_cmd = SuiClientCommands::TransferSui {
+    let transfer_oct_cmd = SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address2),
         sui_coin_object_id: object_id1,
         amount: Some(amount),
@@ -3071,13 +3071,13 @@ async fn test_gas_estimation() -> Result<(), anyhow::Error> {
     .execute(context)
     .await
     .unwrap();
-    if let SuiClientCommandResult::TransactionBlock(response) = transfer_sui_cmd {
+    if let SuiClientCommandResult::TransactionBlock(response) = transfer_oct_cmd {
         assert!(response.status_ok().unwrap());
         let gas_used = response.effects.as_ref().unwrap().gas_object().object_id();
         assert_eq!(gas_used, object_id1);
         assert!(response.effects.as_ref().unwrap().gas_cost_summary().gas_used() <= gas_estimate.unwrap());
     } else {
-        panic!("TransferSui test failed");
+        panic!("TransferOct test failed");
     }
     Ok(())
 }

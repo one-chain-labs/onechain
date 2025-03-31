@@ -45,16 +45,25 @@ use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponse, SuiT
 use sui_keys::{
     key_derive::generate_new_key,
     keypair_file::{
-        read_authority_keypair_from_file, read_key, read_keypair_from_file, read_network_keypair_from_file,
-        write_authority_keypair_to_file, write_keypair_to_file,
+        read_authority_keypair_from_file,
+        read_key,
+        read_keypair_from_file,
+        read_network_keypair_from_file,
+        write_authority_keypair_to_file,
+        write_keypair_to_file,
     },
     keystore::AccountKeystore,
 };
 use sui_sdk::{wallet_context::WalletContext, SuiClient};
 use sui_types::{
     crypto::{
-        generate_proof_of_possession, get_authority_key_pair, AuthorityKeyPair, AuthorityPublicKeyBytes, NetworkKeyPair,
-        SignatureScheme, SuiKeyPair,
+        generate_proof_of_possession,
+        get_authority_key_pair,
+        AuthorityKeyPair,
+        AuthorityPublicKeyBytes,
+        NetworkKeyPair,
+        SignatureScheme,
+        SuiKeyPair,
     },
     transaction::{CallArg, ObjectArg, Transaction, TransactionData},
 };
@@ -133,7 +142,7 @@ pub enum SuiValidatorCommand {
         /// Validator's OperationCap ID can be found by using the `display-metadata` subcommand.
         #[clap(name = "operation-cap-id", long)]
         operation_cap_id: Option<ObjectID>,
-        /// The Sui Address of the validator is being reported or un-reported
+        /// The OneChain Address of the validator is being reported or un-reported
         #[clap(name = "reportee-address")]
         reportee_address: SuiAddress,
         /// If true, undo an existing report.
@@ -189,7 +198,7 @@ pub enum SuiValidatorCommand {
         #[clap(name = "gas-budget", long)]
         gas_budget: Option<u64>,
     },
-    /// Update sui native bridge committee node url
+    /// Update OneChain native bridge committee node url
     UpdateBridgeCommitteeNodeUrl {
         /// New node url to be registered in the on chain bridge object.
         #[clap(long)]
@@ -244,7 +253,7 @@ fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyP
     } else {
         let kp = match key {
             Some(key) => {
-                println!("Generated new key file {:?} based on sui.keystore file.", file_name);
+                println!("Generated new key file {:?} based on one.keystore file.", file_name);
                 key
             }
             None => {

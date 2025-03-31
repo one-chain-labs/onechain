@@ -1,10 +1,10 @@
 [package]
 name = "sui-json-rpc"
-version = "0.0.0"
-authors = ["Mysten Labs <build@mystenlabs.com>"]
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+edition.workspace = true
 
 [dependencies]
 arc-swap.workspace = true

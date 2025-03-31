@@ -87,7 +87,7 @@ async fn _merge_coins(gas_coin: &str, mut wallet: WalletContext) -> Result<(), a
         let target_amount = vec![total_balance];
 
         let tx_data =
-            client.transaction_builder().pay_sui(active_address, coin_vector, target, target_amount, 1000000).await?;
+            client.transaction_builder().pay_oct(active_address, coin_vector, target, target_amount, 1000000).await?;
         let signature =
             wallet.config.keystore.sign_secure(&active_address, &tx_data, Intent::sui_transaction()).unwrap();
         let tx = Transaction::from_data(tx_data, vec![signature]);

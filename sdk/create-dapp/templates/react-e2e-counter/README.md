@@ -50,7 +50,7 @@ We can ensure we have some Sui in our new wallet by requesting Sui from the
 faucet (make sure to replace the address with your address):
 
 ```bash
-curl --location --request POST 'https://faucet.testnet.sui.io/gas' \
+curl --location --request POST 'https://faucet-testnet.onelabs.cc/gas' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "FixedAmountRequest": {

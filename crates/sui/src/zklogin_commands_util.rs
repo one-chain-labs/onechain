@@ -120,7 +120,7 @@ pub async fn perform_zk_login_test_tx(
     let response = sui.coin_read_api().get_coins(sender, None, None, Some(2)).await?;
 
     if response.data.len() != 2 {
-        panic!("Faucet did not work correctly and the provided Sui address has no coins")
+        panic!("Faucet did not work correctly and the provided OneChain address has no coins")
     }
 
     let transfer_coin = response.data[0].coin_object_id;
@@ -177,7 +177,7 @@ pub async fn perform_zk_login_test_tx(
 
 fn get_config(network: &str) -> (&str, &str) {
     match network {
-        "devnet" => ("https://faucet.devnet.sui.io/gas", "https://rpc.devnet.sui.io:443"),
+        "devnet" => ("https://faucet-devnet.onelabs.cc/gas", "https://rpc-devnet.onelabs.cc:443"),
         "localnet" => ("http://127.0.0.1:9123/gas", "http://127.0.0.1:9000"),
         _ => panic!("Invalid network"),
     }

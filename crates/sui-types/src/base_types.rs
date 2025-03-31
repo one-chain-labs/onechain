@@ -674,7 +674,7 @@ impl From<&MultiSigPublicKey> for SuiAddress {
     }
 }
 
-/// Sui address for [struct ZkLoginAuthenticator] is defined as the black2b hash of
+/// OneChain address for [struct ZkLoginAuthenticator] is defined as the black2b hash of
 /// [zklogin_flag || iss_bytes_length || iss_bytes || unpadded_address_seed_in_bytes].
 impl TryFrom<&ZkLoginAuthenticator> for SuiAddress {
     type Error = SuiError;

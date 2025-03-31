@@ -612,7 +612,7 @@ impl SimpleFaucet {
         let client = self.wallet.get_client().await?;
         client
             .transaction_builder()
-            .pay_sui(signer, vec![coin_id], recipients, amounts.to_vec(), budget)
+            .pay_oct(signer, vec![coin_id], recipients, amounts.to_vec(), budget)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to build PaySui transaction for coin {:?}, with err {:?}", coin_id, e))
     }
@@ -658,7 +658,7 @@ impl SimpleFaucet {
             let mut builder = ProgrammableTransactionBuilder::new();
             for (_uuid, recipient, amounts) in batch_requests {
                 let recipients = vec![recipient; amounts.len()];
-                builder.pay_sui(recipients, amounts)?;
+                builder.pay_oct(recipients, amounts)?;
             }
             builder.finish()
         };
@@ -904,7 +904,7 @@ pub async fn batch_transfer_gases(
                     .map_err(FaucetError::internal)?;
 
                 // Because we are batching transactions to faucet, we will just not use a real recipient for
-                // sui address, and instead just fill it with the ZERO address.
+                // OneChain address, and instead just fill it with the ZERO address.
                 let recipient = SuiAddress::ZERO;
                 {
                     // Register the intention to send this transaction before we send it, so that if
@@ -1199,7 +1199,7 @@ mod tests {
         let gas_budget = 50_000_000;
         let tx_data = client
             .transaction_builder()
-            .pay_all_sui(address, vec![bad_gas.0], SuiAddress::random_for_testing_only(), gas_budget)
+            .pay_all_oct(address, vec![bad_gas.0], SuiAddress::random_for_testing_only(), gas_budget)
             .await
             .unwrap();
         execute_tx(faucet.wallet_mut(), tx_data).await.unwrap();
@@ -1365,7 +1365,7 @@ mod tests {
         for gas in gas_coins.iter().take(gas_coins.len() - 1) {
             let tx_data = client
                 .transaction_builder()
-                .transfer_sui(address, gas.0, gas_budget, destination_address, None)
+                .transfer_oct(address, gas.0, gas_budget, destination_address, None)
                 .await
                 .unwrap();
             execute_tx(&mut context, tx_data).await.unwrap();
@@ -1425,7 +1425,7 @@ mod tests {
         for gas in gas_coins {
             let tx_data = client
                 .transaction_builder()
-                .transfer_sui(address, gas.0, gas_budget, destination_address, None)
+                .transfer_oct(address, gas.0, gas_budget, destination_address, None)
                 .await
                 .unwrap();
             execute_tx(&mut context, tx_data).await.unwrap();

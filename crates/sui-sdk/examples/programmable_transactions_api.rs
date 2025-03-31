@@ -18,14 +18,14 @@ use utils::setup_for_write;
 // This example shows how to use programmable transactions to chain multiple
 // actions into one transaction. Specifically, the example retrieves two addresses
 // from the local wallet, and then
-// 1) finds a coin from the active address that has Sui,
+// 1) finds a coin from the active address that has Oct,
 // 2) splits the coin into one coin of 1000 MIST and the rest,
-// 3  transfers the split coin to second Sui address,
+// 3  transfers the split coin to second OneChain address,
 // 4) signs the transaction,
 // 5) executes it.
 // For some of these actions it prints some output.
 // Finally, at the end of the program it prints the number of coins for the
-// Sui address that received the coin.
+// OneChain address that received the coin.
 // If you run this program several times, you should see the number of coins
 // for the recipient address increases.
 

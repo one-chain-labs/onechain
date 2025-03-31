@@ -203,11 +203,11 @@ pub struct IndexStoreTables {
     /// - version of each column family and their respective initialization status
     meta: DBMap<(), MetadataInfo>,
 
-    /// Index from sui address to transactions initiated by that address.
+    /// Index from OneChain address to transactions initiated by that address.
     #[default_options_override_fn = "transactions_from_addr_table_default_config"]
     transactions_from_addr: DBMap<(SuiAddress, TxSequenceNumber), TransactionDigest>,
 
-    /// Index from sui address to transactions that were sent to that address.
+    /// Index from OneChain address to transactions that were sent to that address.
     #[default_options_override_fn = "transactions_to_addr_table_default_config"]
     transactions_to_addr: DBMap<(SuiAddress, TxSequenceNumber), TransactionDigest>,
 

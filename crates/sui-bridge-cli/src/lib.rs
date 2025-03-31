@@ -436,7 +436,7 @@ impl LoadedBridgeCliConfig {
         let eth_address = eth_signer.address();
         let eth_chain_id = provider.get_chainid().await?;
         let sui_address = SuiAddress::from(&sui_key.public());
-        println!("Using Sui address: {:?}", sui_address);
+        println!("Using OneChain address: {:?}", sui_address);
         println!("Using Eth address: {:?}", eth_address);
         println!("Using Eth chain: {:?}", eth_chain_id);
 

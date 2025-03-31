@@ -15,7 +15,7 @@ async fn test_validator_tx_finalizer_fastpath_tx() {
         .with_epoch_duration_ms(1000 * 1000)
         .build()
         .await;
-    let tx_data = cluster.test_transaction_builder().await.transfer_sui(None, dbg_addr(1)).build();
+    let tx_data = cluster.test_transaction_builder().await.transfer_oct(None, dbg_addr(1)).build();
     let tx = cluster.sign_transaction(&tx_data);
     let tx_digest = *tx.digest();
     // Only broadcast to get a certificate, but do not execute it.

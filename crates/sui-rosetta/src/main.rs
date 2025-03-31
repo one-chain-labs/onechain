@@ -82,7 +82,7 @@ impl RosettaServerCommand {
 
                 let prefunded_accounts = read_prefunded_account(&path)?;
 
-                info!("Retrieved {} Sui address from keystore file {:?}", prefunded_accounts.len(), &path);
+                info!("Retrieved {} OneChain address from keystore file {:?}", prefunded_accounts.len(), &path);
 
                 let mut config: Value = serde_json::from_str(include_str!("../resources/rosetta_cli.json"))?;
 

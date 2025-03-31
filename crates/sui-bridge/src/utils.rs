@@ -57,7 +57,7 @@ pub fn generate_bridge_authority_key_and_write_to_file(path: &PathBuf) -> Result
     let eth_address = BridgeAuthorityPublicKeyBytes::from(&kp.public).to_eth_address();
     println!("Corresponding Ethereum address by this ecdsa key: {:?}", eth_address);
     let sui_address = SuiAddress::from(&kp.public);
-    println!("Corresponding Sui address by this ecdsa key: {:?}", sui_address);
+    println!("Corresponding OneChain address by this ecdsa key: {:?}", sui_address);
     let base64_encoded = kp.encode_base64();
     std::fs::write(path, base64_encoded).map_err(|err| anyhow!("Failed to write encoded key to path: {:?}", err))
 }
@@ -74,7 +74,7 @@ pub fn generate_bridge_client_key_and_write_to_file(path: &PathBuf, use_ecdsa: b
         SuiKeyPair::from(kp)
     };
     let sui_address = SuiAddress::from(&kp.public());
-    println!("Corresponding Sui address by this key: {:?}", sui_address);
+    println!("Corresponding OneChain address by this key: {:?}", sui_address);
 
     let contents = kp.encode_base64();
     std::fs::write(path, contents).map_err(|err| anyhow!("Failed to write encoded key to path: {:?}", err))
@@ -138,7 +138,7 @@ pub fn examine_key(path: &PathBuf, is_validator_key: bool) -> Result<(), anyhow:
             kp.public().as_bytes().to_vec()
         }
     };
-    println!("Corresponding Sui address: {:?}", sui_address);
+    println!("Corresponding OneChain address: {:?}", sui_address);
     println!("Corresponding PublicKey: {:?}", Hex::encode(pubkey));
     Ok(())
 }

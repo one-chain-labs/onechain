@@ -42,7 +42,7 @@ async fn test_profiler() {
     let output_dir = tempdir().unwrap();
     let profile_output = output_dir.path().join("profile.json");
 
-    let testnet_url = "https://fullnode.testnet.sui.io:443".to_string();
+    let testnet_url = "https://rpc-testnet.onelabs.cc:443".to_string();
     let tx_digest = "98KxVD14f2JgceKx4X27HaVAA2YGJ3Aazf6Y4tabpHa8".to_string();
 
     let cmd = ReplayToolCommand::ProfileTransaction {

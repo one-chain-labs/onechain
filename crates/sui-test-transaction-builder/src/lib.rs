@@ -199,7 +199,7 @@ impl TestTransactionBuilder {
         self
     }
 
-    pub fn transfer_sui(mut self, amount: Option<u64>, recipient: SuiAddress) -> Self {
+    pub fn transfer_oct(mut self, amount: Option<u64>, recipient: SuiAddress) -> Self {
         self.test_data = TestTransactionData::TransferSui(TransferSuiData { amount, recipient });
         self
     }
@@ -262,7 +262,7 @@ impl TestTransactionBuilder {
                 self.gas_budget.unwrap_or(self.gas_price * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
                 self.gas_price,
             ),
-            TestTransactionData::TransferSui(data) => TransactionData::new_transfer_sui(
+            TestTransactionData::TransferSui(data) => TransactionData::new_transfer_oct(
                 data.recipient,
                 self.sender,
                 data.amount,
@@ -408,7 +408,7 @@ pub async fn batch_make_transfer_transactions(context: &WalletContext, max_txn_n
             if res.len() >= max_txn_num {
                 return res;
             }
-            let data = TransactionData::new_transfer_sui(
+            let data = TransactionData::new_transfer_oct(
                 recipient,
                 address,
                 Some(2),
@@ -432,7 +432,7 @@ pub async fn make_transfer_sui_transaction(
     let gas_price = context.get_reference_gas_price().await.unwrap();
     context.sign_transaction(
         &TestTransactionBuilder::new(sender, gas_object, gas_price)
-            .transfer_sui(amount, recipient.unwrap_or(sender))
+            .transfer_oct(amount, recipient.unwrap_or(sender))
             .build(),
     )
 }

@@ -52,9 +52,9 @@ async fn test_sui_bridge_paused() {
     // verify bridge are not paused
     assert!(!bridge_client.get_bridge_summary().await.unwrap().is_frozen);
 
-    // try bridge from eth and verify it works on sui
+    // try bridge from eth and verify it works on OneChain
     initiate_bridge_eth_to_sui(&bridge_test_cluster, 10, 0).await.unwrap();
-    // verify Eth was transferred to Sui address
+    // verify Eth was transferred to OneChain address
     let eth_coin_type = sui_token_type_tags.get(&TOKEN_ID_ETH).unwrap();
     let eth_coin = bridge_client
         .sui_client()

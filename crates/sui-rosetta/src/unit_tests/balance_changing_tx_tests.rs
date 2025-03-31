@@ -74,7 +74,7 @@ async fn test_transfer_sui() {
     let recipient = get_random_address(&addresses, vec![sender]);
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(recipient, Some(50000));
+        builder.transfer_oct(recipient, Some(50000));
         builder.finish()
     };
     test_transaction(
@@ -104,7 +104,7 @@ async fn test_transfer_sui_whole_coin() {
     let recipient = get_random_address(&addresses, vec![sender]);
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(recipient, None);
+        builder.transfer_oct(recipient, None);
         builder.finish()
     };
     test_transaction(
@@ -347,7 +347,7 @@ async fn test_pay_sui_multiple_coin_same_recipient() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient1, recipient1, recipient1], vec![100000, 100000, 100000]).unwrap();
+        builder.pay_oct(vec![recipient1, recipient1, recipient1], vec![100000, 100000, 100000]).unwrap();
         builder.finish()
     };
     test_transaction(
@@ -380,7 +380,7 @@ async fn test_pay_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
+        builder.pay_oct(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
         builder.finish()
     };
     test_transaction(
@@ -413,7 +413,7 @@ async fn test_failed_pay_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
+        builder.pay_oct(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
         builder.finish()
     };
     test_transaction(&client, keystore, vec![], sender, pt, vec![coin1, coin2], 2000000, rgp, true).await;
@@ -486,7 +486,7 @@ async fn test_pay_all_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_all_sui(recipient);
+        builder.pay_all_oct(recipient);
         builder.finish()
     };
     test_transaction(

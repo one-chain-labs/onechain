@@ -23,7 +23,7 @@ async fn test_operation_data_parsing_pay_sui() -> Result<(), anyhow::Error> {
 
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![SuiAddress::random_for_testing_only()], vec![10000]).unwrap();
+        builder.pay_oct(vec![SuiAddress::random_for_testing_only()], vec![10000]).unwrap();
         builder.finish()
     };
     let gas_price = 10;

@@ -81,7 +81,7 @@ async fn test_transaction_expiration() {
 
     let (sender, gas) = test_cluster.wallet.get_one_gas_object().await.unwrap().unwrap();
     let rgp = test_cluster.get_reference_gas_price().await;
-    let mut data = TestTransactionBuilder::new(sender, gas, rgp).transfer_sui(Some(1), sender).build();
+    let mut data = TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(Some(1), sender).build();
     // Expired transaction returns an error
     let mut expired_data = data.clone();
     *expired_data.expiration_mut_for_testing() = TransactionExpiration::Epoch(0);
@@ -108,7 +108,7 @@ async fn reconfig_with_revert_end_to_end_test() {
     let gas1 = gas_objects.pop().unwrap();
     let tx = test_cluster
         .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas1, rgp).transfer_sui(None, sender).build());
+        .sign_transaction(&TestTransactionBuilder::new(sender, gas1, rgp).transfer_oct(None, sender).build());
     let effects1 = test_cluster.execute_transaction(tx).await;
     assert_eq!(0, effects1.effects.unwrap().executed_epoch());
 
@@ -116,7 +116,7 @@ async fn reconfig_with_revert_end_to_end_test() {
     let gas2 = gas_objects.pop().unwrap();
     let tx = test_cluster
         .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas2, rgp).transfer_sui(None, sender).build());
+        .sign_transaction(&TestTransactionBuilder::new(sender, gas2, rgp).transfer_oct(None, sender).build());
     let net = test_cluster.fullnode_handle.sui_node.with(|node| node.clone_authority_aggregator().unwrap());
     let cert = net.process_transaction(tx.clone(), None).await.unwrap().into_cert_for_testing();
 
@@ -233,7 +233,7 @@ async fn test_expired_locks() {
 
     let transfer_sui = |amount| {
         test_cluster.wallet.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_sui(Some(amount), receiver).build(),
+            &TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_oct(Some(amount), receiver).build(),
         )
     };
 

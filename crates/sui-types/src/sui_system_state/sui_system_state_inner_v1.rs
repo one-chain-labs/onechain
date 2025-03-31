@@ -7,7 +7,11 @@ use crate::{
     collection_types::{Bag, Table, TableVec, VecMap, VecSet},
     committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
     crypto::{
-        verify_proof_of_possession, AuthorityPublicKey, AuthorityPublicKeyBytes, AuthoritySignature, NetworkPublicKey,
+        verify_proof_of_possession,
+        AuthorityPublicKey,
+        AuthorityPublicKeyBytes,
+        AuthoritySignature,
+        NetworkPublicKey,
     },
     error::SuiError,
     id::ID,
@@ -24,7 +28,8 @@ use super::{
     epoch_start_sui_system_state::EpochStartValidatorInfoV1,
     get_validators_from_table_vec,
     sui_system_state_summary::{SuiSupperCommitteeSummary, SuiSystemStateSummary, SuiValidatorSummary},
-    AdvanceEpochParams, SuiSystemStateTrait,
+    AdvanceEpochParams,
+    SuiSystemStateTrait,
 };
 
 const E_METADATA_INVALID_POP: u64 = 0;
@@ -532,14 +537,11 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV1 {
                 let name = verified_metadata.sui_pubkey_bytes();
                 (
                     name,
-                    (
-                        validator.voting_power,
-                        NetworkMetadata {
-                            network_address: verified_metadata.net_address.clone(),
-                            narwhal_primary_address: verified_metadata.primary_address.clone(),
-                            network_public_key: Some(verified_metadata.network_pubkey.clone()),
-                        },
-                    ),
+                    (validator.voting_power, NetworkMetadata {
+                        network_address: verified_metadata.net_address.clone(),
+                        narwhal_primary_address: verified_metadata.primary_address.clone(),
+                        network_public_key: Some(verified_metadata.network_pubkey.clone()),
+                    }),
                 )
             })
             .collect();

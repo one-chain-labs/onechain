@@ -42,7 +42,7 @@ pub struct SuiEvent {
     #[serde_as(as = "DisplayFromStr")]
     /// Move module where this event was emitted.
     pub transaction_module: Identifier,
-    /// Sender's Sui address.
+    /// Sender's OneChain address.
     pub sender: SuiAddress,
     #[schemars(with = "String")]
     #[serde_as(as = "SuiStructTag")]

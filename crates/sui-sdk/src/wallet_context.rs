@@ -164,7 +164,7 @@ impl WalletContext {
             }
         }
         Err(anyhow!(
-            "No non-argument gas objects found for this address with value >= budget {budget}. Run sui client gas to check for gas objects."
+            "No non-argument gas objects found for this address with value >= budget {budget}. Run one_chain client gas to check for gas objects."
         ))
     }
 

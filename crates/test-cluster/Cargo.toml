@@ -1,6 +1,6 @@
 [package]
 name = "test-cluster"
-authors = ["Mysten Labs <build@mystenlabs.com>"]
+authors = ["OneChain Labs <build@onelabs.cc>"]
 version = "0.1.0"
 license = "Apache-2.0"
 publish = false

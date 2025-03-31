@@ -16,11 +16,13 @@ use crate::{
     shell::{install_shell_plugins, AsyncHandler, CacheKey, CommandStructure, CompletionCache, Shell},
 };
 
-const SUI: &str = "   _____       _    ______                       __
-  / ___/__  __(_)  / ____/___  ____  _________  / /__
-  \\__ \\/ / / / /  / /   / __ \\/ __ \\/ ___/ __ \\/ / _ \\
- ___/ / /_/ / /  / /___/ /_/ / / / (__  ) /_/ / /  __/
-/____/\\__,_/_/   \\____/\\____/_/ /_/____/\\____/_/\\___/";
+const ONE: &str = r#"
+  ___                ____ _           _
+ / _ \ _ __   ___   / ___| |__   __ _(_)_ __
+| | | | '_ \ / _ \ | |   | '_ \ / _` | | '_ \
+| |_| | | | |  __/ | |___| | | | (_| | | | | |
+ \___/|_| |_|\___|  \____|_| |_|\__,_|_|_| |_|
+"#;
 
 #[derive(Parser)]
 #[clap(name = "", rename_all = "kebab-case", no_binary_name = true)]
@@ -38,18 +40,18 @@ pub async fn start_console(
     err: &mut (dyn Write + Send),
 ) -> Result<(), anyhow::Error> {
     let app: Command = SuiClientCommands::command();
-    writeln!(out, "{}", SUI.cyan().bold())?;
+    writeln!(out, "{}", ONE.cyan().bold())?;
     let mut version = env!("CARGO_PKG_VERSION").to_owned();
     if let Some(git_rev) = std::option_env!("GIT_REVISION") {
         version.push('-');
         version.push_str(git_rev);
     }
-    writeln!(out, "--- Sui Console {version} ---")?;
+    writeln!(out, "--- OneChain Console {version} ---")?;
     writeln!(out)?;
     writeln!(out, "{}", context.config.deref())?;
 
     let client = context.get_client().await?;
-    writeln!(out, "Connecting to Sui full node. API version {}", client.api_version())?;
+    writeln!(out, "Connecting to OneChain full node. API version {}", client.api_version())?;
 
     if !client.available_rpc_methods().is_empty() {
         writeln!(out)?;
@@ -61,11 +63,11 @@ pub async fn start_console(
     }
 
     writeln!(out)?;
-    writeln!(out, "Welcome to the Sui interactive console.")?;
+    writeln!(out, "Welcome to the OneChain interactive console.")?;
     writeln!(out)?;
 
     let mut shell =
-        Shell::new("sui>-$ ", context, ClientCommandHandler, CommandStructure::from_clap(&install_shell_plugins(app)));
+        Shell::new("one>-$ ", context, ClientCommandHandler, CommandStructure::from_clap(&install_shell_plugins(app)));
 
     shell.run_async(out, err).await
 }
@@ -128,7 +130,7 @@ async fn handle_command(
 
     // Quit shell after RPC switch
     if matches!(result, SuiClientCommandResult::Switch(SwitchResponse { env: Some(_), .. })) {
-        println!("Sui environment switch completed, please restart Sui console.");
+        println!("OneChain environment switch completed, please restart OneChain console.");
         return Ok(true);
     }
     Ok(false)

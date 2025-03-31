@@ -208,7 +208,7 @@ async fn test_transaction_execution() {
         .validator_fullnode_handle
         .test_transaction_builder()
         .await
-        .transfer_sui(Some(1_000), recipient)
+        .transfer_oct(Some(1_000), recipient)
         .build();
     let signed_tx = cluster.network.validator_fullnode_handle.wallet.sign_transaction(&tx);
     let original_digest = signed_tx.digest();
@@ -279,7 +279,7 @@ async fn test_zklogin_sig_verify() {
     let zklogin_addr = (pk_zklogin).into();
     let rgp = test_cluster.get_reference_gas_price().await;
     let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
-    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_sui(None, SuiAddress::ZERO).build();
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
     let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
     let eph_sig = Signature::new_secure(&msg, kp);
     let generic_sig =
@@ -347,7 +347,7 @@ async fn test_transaction_dry_run() {
         .validator_fullnode_handle
         .test_transaction_builder()
         .await
-        .transfer_sui(Some(1_000), recipient)
+        .transfer_oct(Some(1_000), recipient)
         .build();
     let tx_bytes = Base64::encode(bcs::to_bytes(&tx).unwrap());
 
@@ -420,7 +420,7 @@ async fn test_transaction_dry_run_with_kind() {
         .validator_fullnode_handle
         .test_transaction_builder()
         .await
-        .transfer_sui(Some(1_000), recipient)
+        .transfer_oct(Some(1_000), recipient)
         .build();
     let tx_kind_bytes = Base64::encode(bcs::to_bytes(&tx.into_kind()).unwrap());
 
@@ -581,7 +581,7 @@ async fn test_payload_using_vars_mutation_passes() {
         .validator_fullnode_handle
         .test_transaction_builder()
         .await
-        .transfer_sui(Some(1_000), recipient)
+        .transfer_oct(Some(1_000), recipient)
         .build();
     let signed_tx = cluster.network.validator_fullnode_handle.wallet.sign_transaction(&tx);
     let (tx_bytes, sigs) = signed_tx.to_tx_bytes_and_signatures();

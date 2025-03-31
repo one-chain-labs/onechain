@@ -138,14 +138,14 @@ async fn create_credential_and_sign_test_tx(
     pk_bytes.extend_from_slice(x.unwrap());
     let pk = PublicKey::try_from_bytes(SignatureScheme::PasskeyAuthenticator, &pk_bytes).unwrap();
 
-    // Compute sui address as sender, fund gas and make a test transaction.
+    // Compute OneChain address as sender, fund gas and make a test transaction.
     let sender = match sender {
         Some(s) => s,
         None => SuiAddress::from(&pk),
     };
     let rgp = test_cluster.get_reference_gas_price().await;
     let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), sender).await;
-    let tx_data = TestTransactionBuilder::new(sender, gas, rgp).transfer_sui(None, SuiAddress::ZERO).build();
+    let tx_data = TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
     let intent_msg = IntentMessage::new(Intent::sui_transaction(), tx_data);
 
     // Compute the challenge = blake2b_hash(intent_msg(tx)) for passkey credential request.

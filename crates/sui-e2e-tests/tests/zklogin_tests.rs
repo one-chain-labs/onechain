@@ -44,7 +44,7 @@ async fn build_zklogin_tx(test_cluster: &TestCluster, max_epoch: EpochId) -> Tra
 
     let rgp = test_cluster.get_reference_gas_price().await;
     let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
-    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_sui(None, SuiAddress::ZERO).build();
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
 
     let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
     let eph_sig = Signature::new_secure(&msg, kp);
@@ -145,7 +145,7 @@ async fn test_expired_zklogin_sig() {
     let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
     let context = &test_cluster.wallet;
 
-    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_sui(None, SuiAddress::ZERO).build();
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
 
     let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
     let eph_sig = Signature::new_secure(&msg, kp);

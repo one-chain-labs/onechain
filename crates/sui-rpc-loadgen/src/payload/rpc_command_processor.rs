@@ -93,7 +93,7 @@ impl RpcCommandProcessor {
         match command {
             CommandData::DryRun(ref v) => self.process(v, signer_info).await,
             CommandData::GetCheckpoints(ref v) => self.process(v, signer_info).await,
-            CommandData::PaySui(ref v) => self.process(v, signer_info).await,
+            CommandData::PayOct(ref v) => self.process(v, signer_info).await,
             CommandData::QueryTransactionBlocks(ref v) => self.process(v, signer_info).await,
             CommandData::MultiGetTransactionBlocks(ref v) => self.process(v, signer_info).await,
             CommandData::MultiGetObjects(ref v) => self.process(v, signer_info).await,
@@ -520,7 +520,7 @@ async fn prepare_new_signer_and_coins(
 
     debug!("pay_amounts {pay_amounts:?}");
 
-    pay_sui(
+    pay_oct(
         client,
         &primary_keypair,
         vec![coin],
@@ -612,7 +612,7 @@ async fn get_sui_coin_ids(client: &SuiClient, address: SuiAddress) -> Vec<(Objec
     // TODO: implement iteration over next page
 }
 
-async fn pay_sui(
+async fn pay_oct(
     client: &SuiClient,
     keypair: &SuiKeyPair,
     input_coins: Vec<ObjectID>,

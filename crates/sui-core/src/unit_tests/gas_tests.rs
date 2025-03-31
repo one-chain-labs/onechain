@@ -461,7 +461,7 @@ async fn test_transfer_sui_insufficient_gas() {
 
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(recipient, None);
+        builder.transfer_oct(recipient, None);
         builder.finish()
     };
     let kind = TransactionKind::ProgrammableTransaction(pt);
@@ -508,7 +508,7 @@ async fn test_invalid_gas_owners() {
         let pt = {
             let mut builder = ProgrammableTransactionBuilder::new();
             let recipient = dbg_addr(2);
-            builder.transfer_sui(recipient, None);
+            builder.transfer_oct(recipient, None);
             builder.finish()
         };
         let kind = TransactionKind::ProgrammableTransaction(pt);

@@ -29,7 +29,7 @@ use sui_types::{
 /// https://github.com/MystenLabs/sui/blob/main/docs/content/guides/developer/sui-101/sign-and-send-txn.mdx
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // set up sui client for the desired network.
+    // set up OneChain client for the desired network.
     let sui_client = SuiClientBuilder::default().build_testnet().await?;
 
     // deterministically generate a keypair, testing only, do not use for mainnet,
@@ -94,7 +94,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // construct an example programmable transaction.
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![sender], vec![1])?;
+        builder.pay_oct(vec![sender], vec![1])?;
         builder.finish()
     };
 

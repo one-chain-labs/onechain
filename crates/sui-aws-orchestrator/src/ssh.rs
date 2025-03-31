@@ -11,8 +11,11 @@ use std::{
 };
 
 use futures::future::try_join_all;
-use russh::{client, client::Msg, Channel};
-use russh_keys::key;
+use russh::{
+    client::{self, Msg},
+    keys::{load_secret_key, ssh_key, PrivateKeyWithHashAlg, PublicKey},
+    Channel,
+};
 use tokio::{task::JoinHandle, time::sleep};
 
 use crate::{
@@ -248,9 +251,9 @@ struct Session {}
 impl client::Handler for Session {
     type Error = russh::Error;
 
-    async fn check_server_key(self, _server_public_key: &key::PublicKey) -> Result<(Self, bool), Self::Error> {
-        Ok((self, true))
-    }
+    // async fn check_server_key(self, _server_public_key: &PublicKey) -> Result<(Self, bool), Self::Error> {
+    //     Ok((self, true))
+    // }
 }
 
 /// Representation of an ssh connection.
@@ -275,8 +278,8 @@ impl SshConnection {
         inactivity_timeout: Option<Duration>,
         retries: Option<usize>,
     ) -> SshResult<Self> {
-        let key = russh_keys::load_secret_key(private_key_file, None)
-            .map_err(|error| SshError::PrivateKeyError { address, error })?;
+        let key =
+            load_secret_key(private_key_file, None).map_err(|error| SshError::PrivateKeyError { address, error })?;
 
         let config =
             client::Config { inactivity_timeout: inactivity_timeout.or(Some(Self::DEFAULT_TIMEOUT)), ..<_>::default() };
@@ -285,8 +288,10 @@ impl SshConnection {
             .await
             .map_err(|error| SshError::ConnectionError { address, error })?;
 
+        let k = PrivateKeyWithHashAlg::new(Arc::new(key), None);
+
         let _auth_res = session
-            .authenticate_publickey(username, Arc::new(key))
+            .authenticate_publickey(username, k)
             .await
             .map_err(|error| SshError::SessionError { address, error })?;
 

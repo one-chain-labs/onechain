@@ -352,7 +352,7 @@ impl AUTransactionGen for P2PTransferGenRandomGasRandomPriceRandomSponsorship {
         // construct a p2p transfer of a random amount of SUI
         let txn = {
             let mut builder = ProgrammableTransactionBuilder::new();
-            builder.transfer_sui(recipient.initial_data.account.address, Some(self.amount));
+            builder.transfer_oct(recipient.initial_data.account.address, Some(self.amount));
             builder.finish()
         };
         let sender_address = sender.initial_data.account.address;

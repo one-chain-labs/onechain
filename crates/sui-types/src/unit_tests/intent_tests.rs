@@ -60,7 +60,7 @@ fn test_authority_signature_intent() {
     let object_id = ObjectID::random();
     let object = Object::immutable_with_id_for_testing(object_id);
     let gas_price = 1000;
-    let data = TransactionData::new_transfer_sui(
+    let data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         None,
