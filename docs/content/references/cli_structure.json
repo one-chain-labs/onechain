@@ -1,0 +1,371 @@
+[
+  {
+    "name": "Update CLI",
+    "anchor": "update-cli",
+    "children": []
+  },
+  {
+    "name": "OneChain CLI commands",
+    "anchor": "onechain-cli-commands",
+    "children": [
+      {
+        "name": "OneChain Client CLI",
+        "anchor": "onechain-client-cli",
+        "children": [
+          {
+            "name": "Check OneChain CLI installation",
+            "anchor": "check-onechain-cli-installation",
+            "children": []
+          },
+          {
+            "name": "Commands",
+            "anchor": "commands",
+            "children": []
+          },
+          {
+            "name": "JSON output",
+            "anchor": "json-output",
+            "children": []
+          },
+          {
+            "name": "Examples",
+            "anchor": "examples",
+            "children": [
+              {
+                "name": "List available network environments",
+                "anchor": "list-available-network-environments",
+                "children": []
+              },
+              {
+                "name": "Create network environment",
+                "anchor": "create-network-environment",
+                "children": []
+              },
+              {
+                "name": "Set current environment",
+                "anchor": "set-current-environment",
+                "children": []
+              },
+              {
+                "name": "Get current active address",
+                "anchor": "get-current-active-address",
+                "children": []
+              },
+              {
+                "name": "Request a OCT coin from faucet",
+                "anchor": "request-a-oct-coin-from-faucet",
+                "children": []
+              },
+              {
+                "name": "Get objects owned by an address",
+                "anchor": "get-objects-owned-by-an-address",
+                "children": []
+              },
+              {
+                "name": "Get complete object information",
+                "anchor": "get-complete-object-information",
+                "children": []
+              },
+              {
+                "name": "Get dynamic fields of an object",
+                "anchor": "get-dynamic-fields-of-an-object",
+                "children": []
+              },
+              {
+                "name": "Send OCT or objects",
+                "anchor": "send-oct-or-objects",
+                "children": []
+              },
+              {
+                "name": "Replay a transaction",
+                "anchor": "replay-a-transaction",
+                "children": []
+              },
+              {
+                "name": "Profile a transaction",
+                "anchor": "profile-a-transaction",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Publish a Move package",
+            "anchor": "publish-a-move-package",
+            "children": []
+          },
+          {
+            "name": "Help",
+            "anchor": "help",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "OneChain Client PTB CLI",
+        "anchor": "onechain-client-ptb-cli",
+        "children": [
+          {
+            "name": "Commands",
+            "anchor": "commands-1",
+            "children": []
+          },
+          {
+            "name": "Design philosophy and concepts",
+            "anchor": "design-philosophy-and-concepts",
+            "children": [
+              {
+                "name": "Types",
+                "anchor": "types",
+                "children": []
+              },
+              {
+                "name": "Strings",
+                "anchor": "strings",
+                "children": []
+              },
+              {
+                "name": "Addresses and Object IDs",
+                "anchor": "addresses-and-object-ids",
+                "children": []
+              },
+              {
+                "name": "Assign",
+                "anchor": "assign",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Examples",
+            "anchor": "examples-1",
+            "children": [
+              {
+                "name": "Move call",
+                "anchor": "move-call",
+                "children": []
+              },
+              {
+                "name": "Publish",
+                "anchor": "publish",
+                "children": []
+              },
+              {
+                "name": "Split, destroy, and merge coins",
+                "anchor": "split-destroy-and-merge-coins",
+                "children": []
+              },
+              {
+                "name": "Transfer objects",
+                "anchor": "transfer-objects",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Reserved words",
+            "anchor": "reserved-words",
+            "children": []
+          },
+          {
+            "name": "JSON output",
+            "anchor": "json-output-1",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "OneChain Console CLI",
+        "anchor": "onechain-console-cli",
+        "children": [
+          {
+            "name": "Check OneChain CLI installation",
+            "anchor": "check-onechain-cli-installation-1",
+            "children": []
+          },
+          {
+            "name": "Commands",
+            "anchor": "commands-2",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "OneChain Keytool CLI",
+        "anchor": "onechain-keytool-cli",
+        "children": [
+          {
+            "name": "Check OneChain CLI installation",
+            "anchor": "check-onechain-cli-installation-2",
+            "children": []
+          },
+          {
+            "name": "Commands",
+            "anchor": "commands-3",
+            "children": []
+          },
+          {
+            "name": "JSON output",
+            "anchor": "json-output-2",
+            "children": []
+          },
+          {
+            "name": "Examples",
+            "anchor": "examples-2",
+            "children": [
+              {
+                "name": "List the key pairs in the local wallet",
+                "anchor": "list-the-key-pairs-in-the-local-wallet",
+                "children": []
+              },
+              {
+                "name": "Generate a new key pair and store it in a file",
+                "anchor": "generate-a-new-key-pair-and-store-it-in-a-file",
+                "children": []
+              },
+              {
+                "name": "Show the key pair data from a file",
+                "anchor": "show-the-key-pair-data-from-a-file",
+                "children": []
+              },
+              {
+                "name": "Sign a transaction",
+                "anchor": "sign-a-transaction",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Help",
+            "anchor": "help-1",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "OneChain Move CLI",
+        "anchor": "onechain-move-cli",
+        "children": [
+          {
+            "name": "Check OneChain CLI installation",
+            "anchor": "check-onechain-cli-installation-3",
+            "children": []
+          },
+          {
+            "name": "Commands",
+            "anchor": "commands-4",
+            "children": []
+          },
+          {
+            "name": "Examples",
+            "anchor": "examples-3",
+            "children": [
+              {
+                "name": "Create a new Move project",
+                "anchor": "create-a-new-move-project",
+                "children": []
+              },
+              {
+                "name": "Build a Move project",
+                "anchor": "build-a-move-project",
+                "children": []
+              },
+              {
+                "name": "Run tests in a Move project",
+                "anchor": "run-tests-in-a-move-project",
+                "children": []
+              },
+              {
+                "name": "Get test coverage for a module",
+                "anchor": "get-test-coverage-for-a-module",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Help",
+            "anchor": "help-2",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "OneChain Validator CLI",
+        "anchor": "onechain-validator-cli",
+        "children": [
+          {
+            "name": "Commands",
+            "anchor": "commands-5",
+            "children": []
+          },
+          {
+            "name": "Examples",
+            "anchor": "examples-4",
+            "children": [
+              {
+                "name": "Update gas price for next epoch",
+                "anchor": "update-gas-price-for-next-epoch",
+                "children": []
+              },
+              {
+                "name": "Set gas price for the next epoch",
+                "anchor": "set-gas-price-for-the-next-epoch",
+                "children": []
+              },
+              {
+                "name": "Display the validator information",
+                "anchor": "display-the-validator-information",
+                "children": []
+              },
+              {
+                "name": "Report a bad / non-performant validator",
+                "anchor": "report-a-bad--non-performant-validator",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Help",
+            "anchor": "help-3",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "OneChain CLI Cheat Sheet",
+        "anchor": "onechain-cli-cheat-sheet",
+        "children": [
+          {
+            "name": "Addresses & Aliases",
+            "anchor": "addresses--aliases",
+            "children": []
+          },
+          {
+            "name": "Faucet & Gas",
+            "anchor": "faucet--gas",
+            "children": []
+          },
+          {
+            "name": "Network Command Description",
+            "anchor": "network-command-description",
+            "children": []
+          },
+          {
+            "name": "Create, Build, and Test a Move Project",
+            "anchor": "create-build-and-test-a-move-project",
+            "children": []
+          },
+          {
+            "name": "Executing Transactions",
+            "anchor": "executing-transactions",
+            "children": []
+          },
+          {
+            "name": "Programmable Transaction Blocks (PTBs)",
+            "anchor": "programmable-transaction-blocks-(ptbs)",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+]
