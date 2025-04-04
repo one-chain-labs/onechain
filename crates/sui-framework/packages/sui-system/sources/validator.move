@@ -81,7 +81,7 @@ module sui_system::validator {
     const MAX_VALIDATOR_GAS_PRICE: u64 = 100_000;
 
     const LOCK_CLIFF_EPOCH: u64 = 180;
-    const LOCK_INTERVAL_EPOCHL: u64 = 24;
+    const LOCK_INTERVAL_EPOCH: u64 = 30;
     const LOCK_PERIOD: u64 = 24;
 
     public struct ValidatorMetadata has store {
@@ -473,7 +473,7 @@ module sui_system::validator {
                 withdrawn_stake,
                 stake_activation_epoch,
                 LOCK_CLIFF_EPOCH,
-                LOCK_INTERVAL_EPOCHL,
+                LOCK_INTERVAL_EPOCH,
                 LOCK_PERIOD,
                 ctx,
             );

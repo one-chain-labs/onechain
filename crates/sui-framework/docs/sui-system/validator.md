@@ -785,11 +785,11 @@ Validator Metadata is too long
 
 
 
-<a name="0x3_validator_LOCK_INTERVAL_EPOCHL"></a>
+<a name="0x3_validator_LOCK_INTERVAL_EPOCH"></a>
 
 
 
-<pre><code><b>const</b> <a href="validator.md#0x3_validator_LOCK_INTERVAL_EPOCHL">LOCK_INTERVAL_EPOCHL</a>: <a href="../move-stdlib/u64.md#0x1_u64">u64</a> = 24;
+<pre><code><b>const</b> <a href="validator.md#0x3_validator_LOCK_INTERVAL_EPOCH">LOCK_INTERVAL_EPOCH</a>: <a href="../move-stdlib/u64.md#0x1_u64">u64</a> = 30;
 </code></pre>
 
 
@@ -1350,7 +1350,7 @@ Request to withdraw stake from the validator's staking pool, processed at the en
             withdrawn_stake,
             stake_activation_epoch,
             <a href="validator.md#0x3_validator_LOCK_CLIFF_EPOCH">LOCK_CLIFF_EPOCH</a>,
-            <a href="validator.md#0x3_validator_LOCK_INTERVAL_EPOCHL">LOCK_INTERVAL_EPOCHL</a>,
+            <a href="validator.md#0x3_validator_LOCK_INTERVAL_EPOCH">LOCK_INTERVAL_EPOCH</a>,
             <a href="validator.md#0x3_validator_LOCK_PERIOD">LOCK_PERIOD</a>,
             ctx,
         );
