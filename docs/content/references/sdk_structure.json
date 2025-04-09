@@ -1,0 +1,244 @@
+[
+    {
+        "name": "Java API-Server Document v0.1",
+        "anchor": "java-api-server-document-v0-1",
+        "children": [
+            {
+                "name": "Revise records",
+                "anchor": "revise-records",
+                "children": []
+            },
+            {
+                "name": "1: Access preparation",
+                "anchor": "1--access-preparation",
+                "children": []
+            },
+            {
+                "name": "2: Api-Server domain name",
+                "anchor": "2--api-server-domain-name",
+                "children": []
+            },
+            {
+                "name": "3: Instructions for calling interface",
+                "anchor": "3--instructions-for-calling-interface",
+                "children": [
+                    {
+                        "name": "3.1: Request/Response",
+                        "anchor": "3-1--request-response",
+                        "children": []
+                    },
+                    {
+                        "name": "3.2: Interface parameter definition",
+                        "anchor": "3-2--interface-parameter-definition",
+                        "children": []
+                    },
+                    {
+                        "name": "3.3: Request for public parts",
+                        "anchor": "3-3--request-for-public-parts",
+                        "children": []
+                    },
+                    {
+                        "name": "3.4: Respond to the public",
+                        "anchor": "3-4--respond-to-the-public",
+                        "children": []
+                    },
+                    {
+                        "name": "3.5: Interface signature",
+                        "anchor": "3-5--interface-signature",
+                        "children": [
+                            {
+                                "name": "1) Generate public and private keys",
+                                "anchor": "1--generate-public-and-private-keys",
+                                "children": []
+                            },
+                            {
+                                "name": "2) Call the signature",
+                                "anchor": "2--call-the-signature",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "4: api-server interface",
+                "anchor": "4--api-server-interface",
+                "children": [
+                    {
+                        "name": "4.1: DID",
+                        "anchor": "4-1--did",
+                        "children": [
+                            {
+                                "name": "4.1.1: Send verification code",
+                                "anchor": "4-1-1--send-verification-code",
+                                "children": []
+                            },
+                            {
+                                "name": "4.1.2: Mobile phone number authentication",
+                                "anchor": "4-1-2--mobile-phone-number-authentication",
+                                "children": []
+                            },
+                            {
+                                "name": "4.1.3: Obtaining certification JWT-TOKEN",
+                                "anchor": "4-1-3--obtaining-certification-jwt-token",
+                                "children": []
+                            },
+                            {
+                                "name": "4.1.4: Obtain user information based on token",
+                                "anchor": "4-1-4--obtain-user-information-based-on-token",
+                                "children": []
+                            },
+                            {
+                                "name": "4.1.5: Refresh token",
+                                "anchor": "4-1-5--refresh-token",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "name": "4.2: Wallet related",
+                        "anchor": "4-2--wallet-related",
+                        "children": [
+                            {
+                                "name": "**4.2.1: Obtain information on the chain's supported currency and exchange rate with USD**",
+                                "anchor": "--4-2-1--obtain-information-on-the-chain's-supported-currency-and-exchange-rate-with-usd--",
+                                "children": []
+                            },
+                            {
+                                "name": "**4.2.2: Query the basic information of the wallet**",
+                                "anchor": "--4-2-2--query-the-basic-information-of-the-wallet--",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "name": "4.3: Transaction related",
+                        "anchor": "4-3--transaction-related",
+                        "children": [
+                            {
+                                "name": "**4.3.1: Query the transaction records on the address chain**",
+                                "anchor": "--4-3-1--query-the-transaction-records-on-the-address-chain--",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "name": "4.4: Transfer-related",
+                        "anchor": "4-4--transfer-related",
+                        "children": [
+                            {
+                                "name": "4.4.1: Create an Order",
+                                "anchor": "4-4-1--create-an-order",
+                                "children": []
+                            },
+                            {
+                                "name": "4.4.2: Execute transactions",
+                                "anchor": "4-4-2--execute-transactions",
+                                "children": []
+                            },
+                            {
+                                "name": "4.4.3: Pagination query",
+                                "anchor": "4-4-3--pagination-query",
+                                "children": []
+                            },
+                            {
+                                "name": "4.4.4: Order Query",
+                                "anchor": "4-4-4--order-query",
+                                "children": []
+                            },
+                            {
+                                "name": "4.4.5: Build payment transactions",
+                                "anchor": "4-4-5--build-payment-transactions",
+                                "children": []
+                            },
+                            {
+                                "name": "4.4.6: Send payment transactions",
+                                "anchor": "4-4-6--send-payment-transactions",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "5: Common error codes",
+                "anchor": "5--common-error-codes",
+                "children": []
+            },
+            {
+                "name": "6: Additional information",
+                "anchor": "6--additional-information",
+                "children": []
+            }
+        ]
+    },
+    {
+        "name": "OneChain Wallet Rust SDK",
+        "anchor": "onechain-wallet-rust-sdk",
+        "children": [
+            {
+                "name": "Getting started",
+                "anchor": "getting-started",
+                "children": []
+            },
+            {
+                "name": "ZKLogin",
+                "anchor": "zklogin",
+                "children": [
+                    {
+                        "name": "Send Sms Code",
+                        "anchor": "send-sms-code"
+                    },
+                    {
+                        "name": "Get Sms Auth Number",
+                        "anchor": "get-sms-auth-number"
+                    },
+                    {
+                        "name": "Get Zk JWT Token",
+                        "anchor": "get-zk-jwt-token"
+                    },
+                    {
+                        "name": "Get ZK Proof",
+                        "anchor": "get-zk-proof"
+                    },
+                    {
+                        "name": "Refresh JWT Token",
+                        "anchor": "refresh-jwt-token"
+                    }
+                ]
+            },
+            {
+                "name": "Build Transfer Tx",
+                "anchor": "build-transfer-tx",
+                "children": [
+                    {
+                        "name": "Create Transfer tx",
+                        "anchor": "create-transfer-tx"
+                    },
+                    {
+                        "name": "Sign Tx & Send Tx",
+                        "anchor": "sign-tx-send-tx"
+                    }
+                ]
+            },
+            {
+                "name": "Build Sponsor Tx",
+                "anchor": "build-sponsor-tx",
+                "children": [
+                    {
+                        "name": "Build Sponsor Ptb Tx Base64",
+                        "anchor": "build-sponsor-ptb-tx-base64"
+                    },
+                    {
+                        "name": "Create Sponsor tx",
+                        "anchor": "create-sponsor-tx"
+                    },
+                    {
+                        "name": "Sign Tx && Send Tx",
+                        "anchor": "sign-sponsor-tx-and-send-tx"
+                    }
+                ]
+            }
+        ]
+    }
+]
