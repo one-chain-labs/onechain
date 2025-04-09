@@ -4,7 +4,7 @@
 
 # One Chain
 
-[One Chain](https://www.onelabs.cc) is the bridging the best of traditional finance with the best of Web 3.0 will make our financial system fairer, faster, and more accessible to all..
+[One Chain](https://onelabs.cc) is the bridging the best of traditional finance with the best of Web 3.0 will make our financial system fairer, faster, and more accessible to all..
 
 ## One Chain Highlights
 
@@ -52,4 +52,4 @@ Use the following links to learn more about One Chain and the One Chain ecosyste
 
  * Learn more about working with One Chain in the [📔 Blog](https://onechain.medium.com).
  * Join the One Chain community on [💬 Telegram](https://t.me/hello_onechain).
- * Find out more about the One Chain ecosystem on the [Website](https://www.onelabs.cc) page.
+ * Find out more about the One Chain ecosystem on the [Website](https://onelabs.cc) page.
