@@ -240,5 +240,48 @@
                 ]
             }
         ]
+    },
+    {
+        "name": "OneChain Wallet Java SDK",
+        "anchor": "one_chain_wallet_java_sdk",
+        "children": [
+            {
+                "name": "How to use it",
+                "anchor": "how_to_use_it",
+                "children": [
+                    {
+                        "name": "Maven",
+                        "anchor": "maven",
+                        "children": []
+                    },
+                    {
+                        "name": "Connecting to wallet",
+                        "anchor": "connecting_to_wallet",
+                        "children": []
+                    },
+                    {
+                        "name": "Huione login",
+                        "anchor": "huione_login",
+                        "children": [
+                            {
+                                "name": "zklogin",
+                                "anchor": "zklogin-1",
+                                "children": []
+                            },
+                            {
+                                "name": "sponsored coin transfer transaction",
+                                "anchor": "sponsored_coin_transfer_transaction",
+                                "children": []
+                            },
+                            {
+                                "name": "sponsored any type of transaction",
+                                "anchor": "sponsored_any_type_of_transaction",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
     }
 ]
