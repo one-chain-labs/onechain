@@ -1,8 +1,10 @@
-# OneChain CLI
+# OneChain API
+
+## OneChain CLI
 
 OneChain provides a command line interface (CLI) tool to interact with the OneChain network, its features, and the Move programming language. The complete suite of tools is called the OneChain CLI, with commands grouped together by feature. Each group of commands is commonly referred to by its top-level command: OneChain Client CLI, OneChain Console CLI, OneChain Keytool CLI, OneChain Move CLI, and OneChain Validator CLI.
 
-## Update CLI {/* {#update-cli} */}
+### Update CLI {/* {#update-cli} */}
 
 To get the latest version of the CLI, you can run the following command from a terminal or console.
 
@@ -16,7 +18,7 @@ The `tracing` feature is important as it adds Move test coverage and debugger su
 
 :::
 
-## OneChain CLI commands {/* {#onechain-cli-commands} */}
+### OneChain CLI commands {/* {#onechain-cli-commands} */}
 
 There are a number of top-level commands available, but the five most useful to users are the following. Use the `help` flag for the commands that are not documented yet. For example, `one_chain validator --help`.  
 
@@ -29,11 +31,11 @@ There are a number of top-level commands available, but the five most useful to 
 
 
 
-### OneChain Client CLI {/* {#onechain-client-cli} */}
+#### OneChain Client CLI {/* {#onechain-client-cli} */}
 
 The OneChain CLI `client` command provides command-level access to interact with the OneChain network. Typical uses for `one_chain client` include publishing Move smart contracts, getting the information of an object, executing transactions, or managing addresses.
 
-#### Check OneChain CLI installation {/* {#check-onechain-cli-installation} */}
+##### Check OneChain CLI installation {/* {#check-onechain-cli-installation} */}
 
 Before you can use the OneChain CLI, you must install it. To check if the CLI exists on your system, open a terminal or console and type the following command:
 
@@ -45,7 +47,7 @@ If the terminal or console responds with a version number, you already have the 
 
 If the command is not found, follow the instructions in [Install OneChain](#update-cli) to get the OneChain CLI on your system.
 
-#### Commands {/* {#commands} */}
+##### Commands {/* {#commands} */}
 
 The following list itemizes all the available subcommands for the `one_chain client` command.
 
@@ -98,15 +100,15 @@ Options:
   -h, --help                    Print help
 ```
 
-#### JSON output {/* {#json-output} */}
+##### JSON output {/* {#json-output} */}
 
 Append the `--json` flag to commands to format responses in JSON instead of the more human-friendly default OneChain CLI output. This can be useful for extremely large datasets, for example, as those results can have a troublesome display on smaller screens. In these cases, the `--json` flag is useful.
 
-#### Examples {/* {#examples} */}
+##### Examples {/* {#examples} */}
 
 The following examples demonstrate some of the most often used commands.
 
-##### List available network environments {/* {#list-available-network-environments} */}
+###### List available network environments {/* {#list-available-network-environments} */}
 
 Use the `one_chain client envs` command to find the network environments set up in the CLI. The information for these environments is also stored in the client.yaml file in the OneChain configuration directory (`~/.one/one_config`).
 
@@ -118,7 +120,7 @@ Use the `one_chain client envs` command to find the network environments set up 
 ╰────────┴───────────────────────────────────┴────────╯
 ```
 
-##### Create network environment {/* {#create-network-environment} */}
+###### Create network environment {/* {#create-network-environment} */}
 
 Use `client new-env` to add details for a new network environment. This example creates an environment pointer to OneChain Mainnet. Setting the `alias` value makes referencing the environment less prone to typographical errors. After running this command, OneChain updates your client.yaml file in `~/.one/one_config` with the new information.
 
@@ -128,7 +130,7 @@ $ one_chain client new-env --alias=mainnet --rpc https://rpc-mainnet.onelabs.cc:
 Added new OneChain env [mainnet] to config.
 ```
 
-##### Set current environment {/* {#set-current-environment} */}
+###### Set current environment {/* {#set-current-environment} */}
 
 Use the `one_chain client switch` command to change the current network. This example switches the current network to `mainnet`.
 
@@ -141,7 +143,7 @@ Active environment switched to [mainnet]
 
 If you run `one_chain client envs` after this command, you see the asterisk in the `active` column on the `mainnet` row of the table.
 
-##### Get current active address {/* {#get-current-active-address} */}
+###### Get current active address {/* {#get-current-active-address} */}
 
 Use the `one_chain client active-address` command to reveal the current address. The CLI uses the current active address to execute address-specific CLI commands (like `one_chain client objects`) when you don't provide them with a OneChain address value.
 
@@ -152,7 +154,7 @@ $ one_chain client active-address
 0x514692f08249c3e9951234ce29074695840422564bff85e424b56de462913e0d
 ```
 
-##### Request a OCT coin from faucet {/* {#request-a-oct-coin-from-faucet} */}
+###### Request a OCT coin from faucet {/* {#request-a-oct-coin-from-faucet} */}
 
 If you use one of the standard public RPCs (for example, `rpc-devnet.onelabs.cc:443`), you can use the `faucet` command to request gas coins. If you use a custom faucet service, then pass in the URL to the faucet using the `--url` option.
 The `faucet` command works for a local network, as well. If you start your network with a custom faucet port, include the `--url` option. 
@@ -164,7 +166,7 @@ $ one_chain client faucet
 Request successful. It can take up to 1 minute to get the coin. Run one_chain client gas to check your gas coins.
 ```
 
-##### Get objects owned by an address {/* {#get-objects-owned-by-an-address} */}
+###### Get objects owned by an address {/* {#get-objects-owned-by-an-address} */}
 
 Use `one_chain client objects` to list summary information about the objects the current active address owns. You can provide a OneChain address value to the command to list objects for a particular address. This example lists objects for the current active address.
 
@@ -188,7 +190,7 @@ $ one_chain client objects 0x36df11369cf00ecf0be68d6ba965b0abe2e883bc5245911e3a2
 ╰───────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-##### Get complete object information {/* {#get-complete-object-information} */}
+###### Get complete object information {/* {#get-complete-object-information} */}
 
 Use `one_chain client object <OBJECT-ID>` to list object information for the ID you provide. This example displays the information for a Coin object.
 
@@ -218,7 +220,7 @@ $ one_chain client object 0xfffbb30ccb631f15f6cd36700589fc9c31cb04af28a95f3ed26d
 ╰───────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-##### Get dynamic fields of an object {/* {#get-dynamic-fields-of-an-object} */}
+###### Get dynamic fields of an object {/* {#get-dynamic-fields-of-an-object} */}
 
 Use the `one_chain client dynamic-field <DYNAMIC-FIELD-ID>` command to list the details of the dynamic field with the ID you provide.
 
@@ -246,7 +248,7 @@ $ one_chain client dynamic-field 0x5
 ╰─────────────┴───────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-##### Send OCT or objects {/* {#send-oct-or-objects} */}
+###### Send OCT or objects {/* {#send-oct-or-objects} */}
 
 In this example, let's see how to transfer OCT or transfer an object from one address to another. First of all, there two main commands for sending OCT or transferring objects: `pay` and `transfer`. 
 Both `pay` and `transfer` have a few sister commands: `pay-oct`, `pay-all-oct`, `transfer-oct`. 
@@ -474,7 +476,7 @@ $ one_chain client gas eloquent-amber
 ```
 
 
-##### Replay a transaction {/* {#replay-a-transaction} */}
+###### Replay a transaction {/* {#replay-a-transaction} */}
 
 Use the `one_chain client replay-transaction --tx-digest <TRANSACTION-DIGEST>` to re-execute a transaction locally and show the transaction effects.
 This command will fetch the transaction dependencies from the Full node specified in the client env. For transactions that happened quite far in
@@ -532,7 +534,7 @@ Execution finished successfully. Local and on-chain effects match.
 Use `one_chain client replay-batch --path <FILEPATH>` to replay several transactions listed in a newline-separated file. This
 will verify that all transactions local execution results match the effects on-chain.
 
-##### Profile a transaction {/* {#profile-a-transaction} */}
+###### Profile a transaction {/* {#profile-a-transaction} */}
 
 Use the `one_chain client profile-transaction --tx-digest <TRANSACTION-DIGEST>` command to re-execute a transaction locally
 and produce a gas profile. Similar to the `replay` command, this command fetches the transaction dependencies from the
@@ -578,7 +580,7 @@ Observing a transaction's gas consumption provides useful insight of expected ga
 When developing a smart contract, you can run a local network and publish the package to the local network. Then create a transaction that calls
 your published smart contract, and finally run the profiler on the transaction to see a breakdown of the gas cost.
 
-#### Publish a Move package {/* {#publish-a-move-package} */}
+##### Publish a Move package {/* {#publish-a-move-package} */}
 
 One of the main uses of the `one_chain client` command is to publish smart contracts on the OneChain network. This example switches the current environment to the Devnet network, then builds, tests, and publishes one of the existing Move examples available in the OneChain repository: [sui/examples/move](https://github.com/one-chain-labs/onechain/tree/main/examples/move)
 
@@ -803,7 +805,7 @@ This example also makes use of `one_chain move` commands. To learn more about th
     ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯
     ```
 
-#### Help {/* {#help} */}
+##### Help {/* {#help} */}
 
 Each command has its own help section. For example, `one_chain client call --help` displays the following prompt:
 
@@ -836,7 +838,7 @@ Options:
 ```
 
 
-### OneChain Client PTB CLI {/* {#onechain-client-ptb-cli} */}
+#### OneChain Client PTB CLI {/* {#onechain-client-ptb-cli} */}
 
 
 The `client ptb` command allows you to specify the transactions for execution in a programmable transaction block (PTB) directly from your CLI or through bash scripts.
@@ -847,7 +849,7 @@ The examples in this document were tested using a `bash` shell environment. Your
 
 :::
 
-#### Commands {/* {#commands-1} */}
+##### Commands {/* {#commands-1} */}
 
 The following list itemizes all the available args for the `one_chain client ptb` command. Use the `--help` for a long help version that includes some examples on how to use this command.
 
@@ -955,7 +957,7 @@ Options:
           Print help (see a summary with '-h')
 ```
 
-#### Design philosophy and concepts {/* {#design-philosophy-and-concepts} */}
+##### Design philosophy and concepts {/* {#design-philosophy-and-concepts} */}
 
 The main philosophy behind the CLI PTB support is to enable a user to build and execute a PTB from the command line. Bash scripts can be used to construct and execute the PTB just as you would do from the command line, providing great flexibility when it comes to automating different tasks.
 
@@ -967,7 +969,7 @@ All the following examples were tested using a `bash` shell environment and your
 
 :::
 
-##### Types {/* {#types} */}
+###### Types {/* {#types} */}
 
 Sometimes, CLI PTBs require that you specify the type of a value or variable. For instance, in the following example you must provide the `<u64>` type when calling the `0x1::option::is_none` function.
 
@@ -986,7 +988,7 @@ To pass in multiple types, delimit them with a comma:
 ...
 ```
 
-##### Strings {/* {#strings} */}
+###### Strings {/* {#strings} */}
 
 CLI PTBs support string literals as inputs, which will be encoded as pure values that can be used as inputs to `vector<u8>`, `std::ascii::String` and `std::string::String` parameters. The following example previews a transaction block that passes the string `"Hello, world"` to a function `m::f` in a package `$PKG` (its ID is held in an environment variable).
 
@@ -1000,7 +1002,7 @@ Double-quoted string literals tend to also be valid syntax for shells (like `bas
 
 :::
 
-##### Addresses and Object IDs {/* {#addresses-and-object-ids} */}
+###### Addresses and Object IDs {/* {#addresses-and-object-ids} */}
 
 You can pass literal addresses and objects IDs by prefixing them with '@'. This is needed to distinguish a hexadecimal value from an address in some situations. 
 
@@ -1012,7 +1014,7 @@ Here are some examples for `transfer-objects` and `gas-coin`:
 $ one_chain client ptb --transfer-objects "[ARRAY_OF_OBJECTS]" @0x02a212de6a9dfa3a69e22387acfbafbb1a9e591bd9d636e7895dcfc8de05f331 --gas-coin @0x00002819ee07a66e53800495ccf5eeade8a02054a2e0827546c70e4b226f0495
 ```
 
-##### Assign {/* {#assign} */}
+###### Assign {/* {#assign} */}
 
 Use the `--assign` argument to bind values to variables. There are two ways you can use it:
 
@@ -1050,7 +1052,7 @@ If you build a complex PTB, use the `--preview` flag to display the PTB transact
 
 :::
 
-#### Examples {/* {#examples-1} */}
+##### Examples {/* {#examples-1} */}
 
 The following examples demonstrate how to use the `client ptb` command.
 
@@ -1060,7 +1062,7 @@ When a PTB is executed, the output contains all the relevant information (transa
 
 :::
 
-##### Move call {/* {#move-call} */}
+###### Move call {/* {#move-call} */}
 
 When needing to execute a Move call, use the `--move-call` transaction to call a specific function from a package. The CLI PTB supports name resolution for common packages like `sui`, `std`, `deepbook`, so you can use both `0x1::option::is_none` as well as `std::option::is_none` for passing the function name.
 
@@ -1075,7 +1077,7 @@ To call a specific function from a specific package, you can use the following c
 --move-call PACKAGE_ADDR::MODULE::FUNCTION "<TYPE>" FUNC_ARG1 FUNC_ARG2 ...
 ```
 
-##### Publish {/* {#publish} */}
+###### Publish {/* {#publish} */}
 
 Publishing a package is one of the most important commands you need when working with OneChain. While the CLI has a standalone `publish` command, PTBs also support publishing and upgrading packages. One main difference is that with `one_chain client ptb`, you must explicitly transfer the `UpgradeCap` object that is returned when creating a package, or destroy it with a call to [`make_immutable`](/concepts/sui-move-concepts/packages.mdx). Here is an example on how to publish a Move project on chain using the `one_chain client ptb` command. It makes a call to the `sui::tx_context::sender` to acquire the sender and assigns the result of that call to the `sender` variable, and then calls the publish command. The result of `publish` is bounded to `upgrade_cap` variable, and then this object is transferred to the sender.
 
@@ -1089,7 +1091,7 @@ $ one_chain client ptb \
 --gas-budget 100000000
 ```
 
-##### Split, destroy, and merge coins {/* {#split-destroy-and-merge-coins} */}
+###### Split, destroy, and merge coins {/* {#split-destroy-and-merge-coins} */}
 
 The following example showcases how to split a gas coin into multiple coins, make a move call to destroy one or more of the new coins, and finally merge the coins that were not destroyed back into the gas coin. It also showcases how to use framework name resolution (for example, `sui::coin` instead of `0x2::coin`) and how to refer to different values in an array using the `.` syntax.
 
@@ -1109,7 +1111,7 @@ The following example showcases how to split a gas coin into multiple coins, mak
 --gas-budget 10000000
 ```
 
-##### Transfer objects {/* {#transfer-objects} */}
+###### Transfer objects {/* {#transfer-objects} */}
 
 This example creates three new coins from gas and transfers them to a different address.
 
@@ -1127,7 +1129,7 @@ You can also pass an alias (without the '@') instead of an address.
 
 :::
 
-#### Reserved words {/* {#reserved-words} */}
+##### Reserved words {/* {#reserved-words} */}
 
 You cannot use the following words for variable names:
 
@@ -1144,17 +1146,17 @@ You cannot use the following words for variable names:
 - `u128`
 - `u256`
 
-#### JSON output {/* {#json-output-1} */}
+##### JSON output {/* {#json-output-1} */}
 
 Append the `--json` flag to commands to format responses in JSON instead of the more human-friendly default OneChain CLI output. This can be useful for extremely large datasets, for example, as those results can have a troublesome display on smaller screens. In these cases, the `--json` flag is useful.
 
 
-### OneChain Console CLI {/* {#onechain-console-cli} */}
+#### OneChain Console CLI {/* {#onechain-console-cli} */}
 
 
 The OneChain CLI `console` command provides command-level access to interact with the OneChain network by wrapping the OneChain Client CLI command in a shell-like functionality. This command spins up a new process and provides the user an environment for running all the available OneChain Client CLI commands. In addition, it also offers command history support.
 
-#### Check OneChain CLI installation {/* {#check-onechain-cli-installation-1} */}
+##### Check OneChain CLI installation {/* {#check-onechain-cli-installation-1} */}
 
 Before you can use the OneChain CLI, you must install it. To check if the CLI exists on your system, open a terminal or console and type the following command:
 
@@ -1166,7 +1168,7 @@ If the terminal or console responds with a version number, you already have the 
 
 If the command is not found, follow the instructions in [Install OneChain](#update-cli) to get the OneChain CLI on your system.
 
-#### Commands {/* {#commands-2} */}
+##### Commands {/* {#commands-2} */}
 
 For all available commands, consult the [OneChain Client CLI docs](#onechain-client-cli). To start the OneChain Console, type `one_chain console`, which displays some information similar to the following: 
 
@@ -1207,12 +1209,12 @@ one>-$
 
 ```
 
-### OneChain Keytool CLI {/* {#onechain-keytool-cli} */}
+#### OneChain Keytool CLI {/* {#onechain-keytool-cli} */}
 
 
 The OneChain CLI `keytool` command provides several command-level access for the management and generation of addresses, as well as working with private keys, signatures, or zkLogin. For example, a user could export a private key from the OneChain Wallet and import it into the local OneChain CLI wallet using the `one_chain keytool import [...]` command.
 
-#### Check OneChain CLI installation {/* {#check-onechain-cli-installation-2} */}
+##### Check OneChain CLI installation {/* {#check-onechain-cli-installation-2} */}
 
 Before you can use the OneChain CLI, you must install it. To check if the CLI exists on your system, open a terminal or console and type the following command:
 
@@ -1224,7 +1226,7 @@ If the terminal or console responds with a version number, you already have the 
 
 If the command is not found, follow the instructions in [Install OneChain](#update-cli) to get the OneChain CLI on your system.
 
-#### Commands {/* {#commands-3} */}
+##### Commands {/* {#commands-3} */}
 
 ```
 Usage: one_chain keytool [OPTIONS] <COMMAND>
@@ -1275,15 +1277,15 @@ Options:
   -h, --help                       	Print help
 ```
 
-#### JSON output {/* {#json-output-2} */}
+##### JSON output {/* {#json-output-2} */}
 
 Append the `--json` flag to commands to format responses in JSON instead of the more human friendly default OneChain CLI output. This can be useful for extremely large datasets, for example, as those results can have a troublesome display on smaller screens. In these cases, the `--json` flag is useful. 
 
-#### Examples {/* {#examples-2} */}
+##### Examples {/* {#examples-2} */}
 
 The following examples demonstrate some of the most often used commands. 
 
-##### List the key pairs in the local wallet {/* {#list-the-key-pairs-in-the-local-wallet} */}
+###### List the key pairs in the local wallet {/* {#list-the-key-pairs-in-the-local-wallet} */}
 
 Use the `one_chain keytool list` command to output all the OneChain addresses that exist in the `~/.one/one_config/one.keystore` file in a readable format. 
 
@@ -1310,7 +1312,7 @@ $ one_chain keytool list
 ╰────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-##### Generate a new key pair and store it in a file {/* {#generate-a-new-key-pair-and-store-it-in-a-file} */}
+###### Generate a new key pair and store it in a file {/* {#generate-a-new-key-pair-and-store-it-in-a-file} */}
 
 To generate a new key pair with the `ed25519` scheme, use the `one_chain keytool generate ed25519` command. For other schemes, see `one_chain keytool generate –help`. The key pair file is saved to the current directory with its filename being the address. The content of the file is a Base64 encoded string of 33-byte `flag || privkey`. 
 
@@ -1328,7 +1330,7 @@ $ one_chain keytool generate ed25519
 ╰─────────────────┴───────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-##### Show the key pair data from a file {/* {#show-the-key-pair-data-from-a-file} */}
+###### Show the key pair data from a file {/* {#show-the-key-pair-data-from-a-file} */}
 
 Use `one_chain keytool show [filename]` to show the key pair data that is stored in a file. For example, the previous command generated a file named `0x5d8aa70f17d9343813d3ba6a59ecf5e8a23ffb487938e860999a722989eaef25.key`. 
 
@@ -1345,7 +1347,7 @@ $ one_chain keytool show 0x5d8aa70f17d9343813d3ba6a59ecf5e8a23ffb487938e860999a7
 ╰─────────────────┴──────────────────────────────────────────────────────────────────────╯
 ```
 
-##### Sign a transaction {/* {#sign-a-transaction} */}
+###### Sign a transaction {/* {#sign-a-transaction} */}
 
 ```sh
 $ one_chain keytool sign --data AAABACBRRpLwgknD6ZV3mc4pB0aVhAQiVkv/heQktW3kYpE+DQEBAQABAAAwR/FCqEKXpCpl+wqMenFtnRsL0EE9a/pd3+xF3xdSNQEaEUeErlBmGWxz3Bh+9BZh2mzayodzsri7xIZNDHRA3wIAAAAAAAAAILsR2d1FIZ5+ADDYZtJ2e9CWlpAxsGd4Y2rZrjlyTUF1MEfxQqhCl6QqZfsKjHpxbZ0bC9BBPWv6Xd/sRd8XUjXoAwAAAAAAAICWmAAAAAAAAA== --address 0x3047f142a84297a42a65fb0a8c7a716d9d1b0bd0413d6bfa5ddfec45df175235
@@ -1367,7 +1369,7 @@ $ one_chain keytool sign --data AAABACBRRpLwgknD6ZV3mc4pB0aVhAQiVkv/heQktW3kYpE+
 ╰──────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ```
 
-#### Help {/* {#help-1} */}
+##### Help {/* {#help-1} */}
 
 Each command has its own help section. For example `one_chain keytool sign –help` displays the following prompt:
 
@@ -1388,12 +1390,12 @@ Options:
   -h, --help           	Print help
 ```
 
-### OneChain Move CLI {/* {#onechain-move-cli} */}
+#### OneChain Move CLI {/* {#onechain-move-cli} */}
 
 
 The OneChain CLI `move` command provides several commands for working with Move source code. A typical usage of `one_chain move` is to compile and test the Move code, or to generate a new Move project by using `one_chain move new project_name`, which creates the needed directories and the `Move.toml` file.
 
-#### Check OneChain CLI installation {/* {#check-onechain-cli-installation-3} */}
+##### Check OneChain CLI installation {/* {#check-onechain-cli-installation-3} */}
 
 Before you can use the OneChain CLI, you must install it. To check if the CLI exists on your system, open a terminal or console and type the following command:
 
@@ -1405,7 +1407,7 @@ If the terminal or console responds with a version number, you already have the 
 
 If the command is not found, follow the instructions in [Install OneChain](#update-cli) to get the OneChain CLI on your system.
 
-#### Commands {/* {#commands-4} */}
+##### Commands {/* {#commands-4} */}
 
 Typing `one_chain move --help` into your terminal or console displays the following information on available commands.
 
@@ -1440,11 +1442,11 @@ Options:
   -V, --version                             	Print version
 ```
 
-#### Examples {/* {#examples-3} */}
+##### Examples {/* {#examples-3} */}
 
 The following examples demonstrate some of the most often used commands.
 
-##### Create a new Move project {/* {#create-a-new-move-project} */}
+###### Create a new Move project {/* {#create-a-new-move-project} */}
 
 To create a new Move project that automatically adds the necessary dependencies in a `Move.toml` file, run `one_chain move new [<PROJECT-NAME>]`.
 
@@ -1476,7 +1478,7 @@ Sui = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates
 smart_contract_test = "0x0"
 ```
 
-##### Build a Move project {/* {#build-a-move-project} */}
+###### Build a Move project {/* {#build-a-move-project} */}
 
 Use `one_chain move build` at the root of your Move project to build the package.
 
@@ -1490,7 +1492,7 @@ INCLUDING DEPENDENCY MoveStdlib
 BUILDING smart_contract_test
 ```
 
-##### Run tests in a Move project {/* {#run-tests-in-a-move-project} */}
+###### Run tests in a Move project {/* {#run-tests-in-a-move-project} */}
 
 Use `one_chain move test` to run the tests in a Move package.
 
@@ -1506,7 +1508,7 @@ Running Move unit tests
 Test result: OK. Total tests: 0; passed: 0; failed: 0
 ```
 
-##### Get test coverage for a module {/* {#get-test-coverage-for-a-module} */}
+###### Get test coverage for a module {/* {#get-test-coverage-for-a-module} */}
 
 
 :::caution
@@ -1543,7 +1545,7 @@ Module 0000000000000000000000000000000000000000000000000000000000000000::example
 +-------------------------+
 ```
 
-#### Help {/* {#help-2} */}
+##### Help {/* {#help-2} */}
 
 Each command has its own help section. For example `one_chain move build --help` displays the following prompt:
 
@@ -1586,11 +1588,11 @@ Options:
   -V, --version                                 Print version
 ```
 
-### OneChain Validator CLI {/* {#onechain-validator-cli} */}
+#### OneChain Validator CLI {/* {#onechain-validator-cli} */}
 
 The OneChain CLI `validator` command provides command-level access to validator features of the OneChain network.
 
-#### Commands {/* {#commands-5} */}
+##### Commands {/* {#commands-5} */}
 
 Typing `one_chain validator --help` into your terminal or console displays the following information on available commands.
 
@@ -1618,11 +1620,11 @@ Options:
   -h, --help                	Print help
 ```
 
-#### Examples {/* {#examples-4} */}
+##### Examples {/* {#examples-4} */}
 
 The following examples demonstrate some of the most often used commands. 
 
-##### Update gas price for next epoch {/* {#update-gas-price-for-next-epoch} */}
+###### Update gas price for next epoch {/* {#update-gas-price-for-next-epoch} */}
 
 ```sh
 $ one_chain validator  update-gas-price 500
@@ -1728,7 +1730,7 @@ A8z83EqjmgwRNFV6sme6A5tTTTQPjiLgiW76neyvhLud
 </details>
 
 
-##### Set gas price for the next epoch {/* {#set-gas-price-for-the-next-epoch} */}
+###### Set gas price for the next epoch {/* {#set-gas-price-for-the-next-epoch} */}
 
 :::tip
 
@@ -1740,7 +1742,7 @@ Beginning with the OneChain [release](https://github.com/one-chain-labs/onechain
 $ one_chain validator request_set_gas_price --args 0x5 \"42\" --gas-budget GAS-BUDGET-AMOUNT>
 ```
 
-##### Display the validator information {/* {#display-the-validator-information} */}
+###### Display the validator information {/* {#display-the-validator-information} */}
 
 ```sh
 $ one_chain validator display-metadata 0x3...de5
@@ -2011,7 +2013,7 @@ SuiValidatorSummary {
 ```
 </details>
 
-##### Report a bad / non-performant validator {/* {#report-a-bad--non-performant-validator} */}
+###### Report a bad / non-performant validator {/* {#report-a-bad--non-performant-validator} */}
 
 ```sh
 $ one_chain validator report-validator  0xf...3d9
@@ -2113,7 +2115,7 @@ $ one_chain validator report-validator  0xf...3d9
 </details>
 
 
-#### Help {/* {#help-3} */}
+##### Help {/* {#help-3} */}
 
 Each command has its own help section. For example `one_chain validator report-validator --help` will display the following prompt:
 
@@ -2137,12 +2139,12 @@ Options:
   -h, --help                             	Print help
 ```
 
-### OneChain CLI Cheat Sheet {/* {#onechain-cli-cheat-sheet} */}
+#### OneChain CLI Cheat Sheet {/* {#onechain-cli-cheat-sheet} */}
 
 The cheat sheet highlights common OneChain CLI commands.
 
 
-#### Addresses & Aliases {/* {#addresses--aliases} */}
+##### Addresses & Aliases {/* {#addresses--aliases} */}
 
 <table className="w-100">
 	<thead>
@@ -2191,7 +2193,7 @@ The cheat sheet highlights common OneChain CLI commands.
 	</tbody>
 </table>
 
-#### Faucet & Gas {/* {#faucet--gas} */}
+##### Faucet & Gas {/* {#faucet--gas} */}
 
 <table className="w-100">
 	<thead>
@@ -2224,7 +2226,7 @@ The cheat sheet highlights common OneChain CLI commands.
 	</tbody>
 </table>
 
-#### Network Command Description {/* {#network-command-description} */}
+##### Network Command Description {/* {#network-command-description} */}
 
 <table className="w-100">
 	<thead>
@@ -2265,7 +2267,7 @@ The cheat sheet highlights common OneChain CLI commands.
 	</tbody>
 </table>
 
-#### Create, Build, and Test a Move Project {/* {#create-build-and-test-a-move-project} */}
+##### Create, Build, and Test a Move Project {/* {#create-build-and-test-a-move-project} */}
 
 <table className="w-100">
 	<thead>
@@ -2302,7 +2304,7 @@ The cheat sheet highlights common OneChain CLI commands.
 	</tbody>
 </table>
 
-#### Executing Transactions {/* {#executing-transactions} */}
+##### Executing Transactions {/* {#executing-transactions} */}
 
 <table className="w-100">
 	<thead>
@@ -2337,7 +2339,7 @@ The cheat sheet highlights common OneChain CLI commands.
 	</tbody>
 </table>
 
-#### Programmable Transaction Blocks (PTBs) {/* {#programmable-transaction-blocks-(ptbs)} */}
+##### Programmable Transaction Blocks (PTBs) {/* {#programmable-transaction-blocks-(ptbs)} */}
 
 <table className="w-100">
 	<thead>
@@ -2377,3 +2379,1532 @@ The cheat sheet highlights common OneChain CLI commands.
 		</tr>
 	</tbody>
 </table>
+
+## OneChain SDKs
+
+### Java API-Server Document v0.1 {/* {#java-api-server-document-v0-1} */}
+
+#### Revise records {/* {#revise-records} */}
+| **Version number** | **Revision date** | **Revision content** |
+| --- | --- | --- |
+| **v0.1** | **2025-04-01** | **version release** |
+
+#### 1: Access preparation {/* {#1--access-preparation} */}
+Before accessing, contact the technician to add the test merchant in the UAT environment, and then provide the materials according to the following form:
+
+| Material Name | Material Description | Example |
+| --- | --- | --- |
+| Merchant server IP | The server IP that calls apiServer to add IP whitelist | 118.122.120.166 |
+| Merchant call server public key | Used to verify the source of the merchant request (the merchant generates it by itself and saves the private key, and provides the public key to call the interface to verify the signature) | MIIBIjAN......AQAB |
+
+#### 2: Api-Server domain name {/* {#2--api-server-domain-name} */}
+| Environment | Address | Description |
+| --- | --- | --- |
+| dev | https://onechain-api.tpknp.com/app/api/ | Development environment for development and debugging code |
+| uat | | Pre-issue environment for testing before going online |
+| prod | | Formal environment, production address |
+
+#### 3: Instructions for calling interface {/* {#3--instructions-for-calling-interface} */}
+
+##### 3.1: Request/Response {/* {#3-1--request-response} */}
+
+Information requests through the Web service will be completed by establishing an HTTP(s) connection. The request method is POST. The request content must be a JSON body. The HTTP(s) response will also be in JSON form.
+
+##### 3.2: Interface parameter definition {/* {#3-2--interface-parameter-definition} */}
+The field type to be defined will be explained according to the following definition:
+
+String character: string [length].
+
+The number between "[]" is the length of the string. It can be defined in two ways:
+
+· String[14]: A string with a maximum length of "14" characters.
+
+Required or optional fields are defined as follows:
+
+· M: Required fields
+
+· O: Optional fields
+
+Possible values: [type]{length}: The number between "[]" is an acceptable value type, and the value between {} represents an acceptable length
+
+##### 3.3: Request for public parts {/* {#3-3--request-for-public-parts} */}
+
+After requesting the public header and obtaining jwt-token, the subsequent interface request should be equipped with access_token.
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| **access_token** | **String[100]** | **Access token** | **M** | **5e70972c...** |
+
+##### 3.4: Respond to the public {/* {#3-4--respond-to-the-public} */}
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| code | String[16] | Response code | 000000 |
+| msg | String[256] | Response Instructions | success |
+| data | Object | Business Response Body | {} |
+| success | Boolean | Is the request handled correctly | true |
+| traceId | String[32] | Link id | 699241f7aafa7983 |
+| systemTime | Long | Server Timestamp | 1707035254834 |
+
+
+##### 3.5: Interface signature {/* {#3-5--interface-signature} */}
+
+The merchant calling the interface needs to sign the request/callback to verify the legitimacy of the source.
+
+###### 1) Generate public and private keys {/* {#1--generate-public-and-private-keys} */}
+
+```bash
+##Generate private key
+openssl genrsa -out privateKey 2048 
+##Generate public key 
+openssl rsa -in privateKey -pubout -out publicKey 
+##If the calling party is Java language, please convert the private key into pkcs8 format. The conversion command is as follows： 
+openssl pkcs8 -topk8 -inform PEM -in privateKey -outform PEM -nocrypt -out pkcs8Privatekey
+```
+
+###### 2) Call the signature {/* {#2--call-the-signature} */}
+
+For fields in the request, exclude <font style="color:#DF2A3F;">merchantsSign</font> fields, and other non-empty fields, spliced ​​in dictionary order, using the private key generated in the previous step for signature.
+
+Signature Algorithm: SHA256withRSA
+
+Example of signature string: merchantId=1000000&timestamp=1741406605069
+
+Notice:
+
+1. Before signing the BigDecimal type, you need to remove the extra 0 after the decimal. For example: 100.20 is removed and 100.2 is 100.2.
+2. Fields that are null do not participate in signatures
+
+#### 4: api-server interface {/* {#4--api-server-interface} */}
+
+##### 4.1: DID {/* {#4-1--did} */}
+
+###### 4.1.1: Send verification code {/* {#4-1-1--send-verification-code} */}
+
+<font style="color:#DF2A3F;">Note: The verification code currently sent is a huione site message</font>
+
+**Interface address**: /did/sendCode
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| **timestamp** | **Long** | **Current timestamp, unit** **<font style="color:#DF2A3F;">ms</font>** | **M** | **1743498522261** |
+| **merchantSign** | **String[1024]** | **M** | **CaHXZC/SlR6VrlTwa9g5...** |
+| **merchantId** | **String[30]** | **M** | **1000000** |
+| mobile | String[20] | Mobile number that accepts SMS verification code | M | 182828666 |
+| mobilePrefix | String[5] | Mobile number prefix | M | 855 |
+
+
+**Request Example**: 
+
+```json
+{
+  "merchantId": "1000000",
+  "merchantSign": "CaHXZC/SlR6VrlTwa9g5...",
+  "mobile": "182828666",
+  "mobilePrefix": "+855",
+  "timestamp": 1743498522261
+}
+```
+
+**Response data result**: 
+
+| **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- |
+| String[64] | Site letter id | 1901826733104803841 |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": "1901826733104803841",
+  "msg": "success",
+  "success": true,
+  "systemTime": 1742265802232,
+  "traceId": "1742265800814AvBRSYMAac0ciTRWg"
+}
+```
+
+###### 4.1.2: Mobile phone number authentication {/* {#4-1-2--mobile-phone-number-authentication} */}
+
+**Interface address**: /did/authenticateSms
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| mobile | String[20] | Mobile number that accepts SMS verification code | M | 182828666 |
+| mobilePrefix | String[5] | Mobile number prefix | M | 855 |
+| smsCode | String[10] | Verification code sent by the site message | M | 123456 |
+| code | String[30] | Site message id, returned by the interface that sends the verification code | M | 1901826733104803841 |
+
+
+**Request Example**: 
+
+```json
+{
+	"code": "1907263713418141697",
+	"mobile": "182828666",
+	"mobilePrefix": "+855",
+	"smsCode": "000000"
+}
+```
+
+**Response data result**: 
+
+| **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- |
+| String[64] | Authorization Code | Fww3fZCY4KVq9g |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "code": "Fww3fZCY4KVq9g"
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1742266313000,
+  "traceId": "1742266312266LDLO2ccGoM41kkrit"
+}
+```
+
+###### 4.1.3: Obtaining certification JWT-TOKEN {/* {#4-1-3--obtaining-certification-jwt-token} */}
+
+**Interface address**: /did/getToken
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| code | String[20] | Authorization code | M | Fww3fZCY4KVq9g |
+| nonce | String[50] | Random String | M | 1742266313000 |
+
+
+**Request Example**: 
+
+```json
+{
+	"code": "uaVO-P8yJwskVA",
+	"nonce": "1"
+}
+```
+
+**Response data result**: 
+
+**data:**
+
+| **Field name** | **Field type** | **Field description** | **Example** |
+| --- | --- | --- | --- |
+| accessToken | String[64] | Authorization code | eedecb58679... |
+| accessTokenProfile | Object | Access token details, used to generate address for SDK | See the description below |
+| anonymous | Boolean | Log in anonymously | false |
+| avatarUrl | String[512] | avatar url | https://www.huione.com/202209/20/20220920122759_b8893.jpg |
+| did | String[64] | User did | 4589717462235 |
+| jwtToken | String[512] | jtw token | eyJhbGciOiJSUzI1N... |
+| nickname | String[64] | Username | Zhang San |
+| salt | String[64] | salt, used to generate address of sdk | false |
+| settingPayPassword | Boolean | Whether to set a payment password | false |
+
+
+**accessTokenProfile:**
+
+| **Field name** | **Field type** | **Field description** | **Example** |
+| --- | --- | --- | --- |
+| aud | **String[64]** | **Recipient** |  |
+| azp | **String[64]** | **licensor** |  |
+| exp | **Long** | **Token Expiration time, unit: seconds** |  |
+| iat | **Long** | Token Issuance time, unit: milliseconds |  |
+| iss | **String[64]** | Issuer |  |
+| jti | **String[64]** | **Token Unique Identity** |  |
+| nbf | **Long** | **Token's effective time, unit: milliseconds** |  |
+| nonce | **String[64]** | **Random Value** |  |
+| sub | **String[64]** | **Theme** |  |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "accessToken": "eedecb5867994fb38305aa55f58837491742267152419",
+    "accessTokenProfile": {
+      "aud": "wallet-server",
+      "azp": "provider",
+      "exp": 1744859152,
+      "iat": 1742267152381,
+      "iss": "https://test.huionepay.com",
+      "jti": "4ba81410d46542019017e88f290aeaad1742267152381",
+      "nbf": 1742267152381,
+      "nonce": "1742267055312",
+      "sub": "1826899521471672321"
+    },
+    "anonymous": false,
+    "avatarUrl": null,
+    "did": "4589717462235",
+    "jwtToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEifQ.eyJhdWQiOiJ3YWxsZXQtc2VydmVyIiwic3ViIjoiMTgyNjg5OTUyMTQ3MTY3MjMyMSIsIm5iZiI6MTc0MjI2NzE1MjM4MSwiYXpwIjoicHJvdmlkZXIiLCJpc3MiOiJodHRwczovL3Rlc3QuaHVpb25lcGF5LmNvbSIsImV4cCI6MTc0NDg1OTE1MiwidXNlclByb2ZpbGVObyI6IjE5MDE1NDA1NzU5NDk2NjQyNTgiLCJpYXQiOjE3NDIyNjcxNTIzODEsIm5vbmNlIjoiMTc0MjI2NzA1NTMxMiIsImp0aSI6IjRiYTgxNDEwZDQ2NTQyMDE5MDE3ZTg4ZjI5MGFlYWFkMTc0MjI2NzE1MjM4MSJ9.Y7EdwqJj7lt8-276uI0zqGKZO_m8bh-EMmGcfCTo3aIwh5Oy9HSGPq4DnfkKwjSPMYLpAlzfT8MSHWTeq6NJa6Gb8YTUR9m4sX1Iq8tKKFh2THaOJj5FGaNRpQxCR74PhHEvccf4tE_u1BzfWm7KQN36MiRk7OBWIzCoCs5Fi0ih5sc9y-PHqN0E3zWi20t9elb4DLlCy0DLUsyLV2LG-Evvl8Mhjzo3jRbRX4I8ErTyjMAN_Buk5sTlP_Uf01THnXHIBPeqVPYq5piA6uucZP2gtM9tFCvqEbZct7bMRwOFh20BrLbxU2mDCeTsf-jlCBmhmnWkbxLHZBBl7yp19Q",
+    "nickname": null,
+    "salt": "1901540575882555394797177",
+    "settingPayPassword": false
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1742267152472,
+  "traceId": "1742267151477z0m0JyXbTXnwjvb8E"
+}
+```
+
+###### 4.1.4: Obtain user information based on token {/* {#4-1-4--obtain-user-information-based-on-token} */}
+
+**Interface address**: /did/getTokenUserProfile
+
+**Interface parameters**: 
+
+Just need the header to carry the token
+
+**Request Example**: 
+
+```json
+{}
+```
+
+**Response data result**: 
+
+**data:**
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| **accessToken** | **String[64]** | **Access token** | **723131b90d3748...** |
+| **avatarUrl** | **String[512]** | **Avatar url** | **https://www.huione.com/202209/20/20220920122759_b8893.jpg** |
+| **did** | **String[64]** | **User did** | **1827720282074849281** |
+| **expireTime** | **String[512]** | **token expiration time** | **eyJhbGciOiJSUzI1N...** |
+| **id** | **String[64]** | **User id** | **1905115439452069889** |
+| **provider** | **String[64]** | **Provider** | **huione** |
+| **userName** | **String[64]** | **Username** | **Zhang San** |
+| **userNo** | **String[128]** | **UserNo** | **1827720282587602945** |
+| **walletName** | **String[64]** | **Affiliated Merchant Name** | **false** |
+| **walletType** | **Boolean** | **Merchant id** | **false** |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "accessToken": "723131b90d3748ccb7eac370767532ae1743562093866",
+    "avatar": null,
+    "did": "1827720282074849281",
+    "expireTime": 1746154093,
+    "id": 1905115439452069889,
+    "provider": "huione",
+    "userName": null,
+    "userNo": "1827720282587602945",
+    "walletName": "Test Merchant",
+    "walletType": "1000000"
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743566574241,
+  "traceId": "1743566573393PRxbLv02jao5Tz41G"
+}
+```
+
+###### 4.1.5: Refresh token {/* {#4-1-5--refresh-token} */}
+
+**Interface address**: /did/refreshJwtToken
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| nonce | String[50] | Random String | M | 1742266313000 |
+
+
+**Request Example**: 
+
+```json
+{
+	"nonce": "1"
+}
+```
+
+**Response data result**: 
+
+**See** 4.1.3: Obtaining Certification JWT-TOKEN
+
+##### 4.2: Wallet related {/* {#4-2--wallet-related} */}
+
+###### **4.2.1: Obtain information on the chain's supported currency and exchange rate with USD** {/* {#--4-2-1--obtain-information-on-the-chain's-supported-currency-and-exchange-rate-with-usd--} */}
+
+**Interface address**: /wallet/queryChainCurrencyForList
+
+**Interface parameters**: 
+
+Just carry a token
+
+**Request Example**: 
+
+```json
+{}
+```
+
+**Response data result**: 
+
+**data:**
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| **chain** | **String[64]** | **Chapter Name** | **ETHEREUM** |
+| **currencyList** | **`List<CurrencyInfo>`** | **Correlation information supported by the chain** | **See the instructions below** |
+
+
+**currencyList**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| **calculateDecimals** | Integer | **Currency Precision** | **6** |
+| **coinType** | String[256] | **Currency Contract Address** | **See the instructions below** |
+| **currency** | String[32] | **currency name** | **0x2::oct::OCT** |
+| **currencyType** | Integer | **Currency Type** | **1:Fire Currency 2 Digital Currency** |
+| **displayDecimals** | Integer | **display accuracy** | **1** |
+| **exchangeRate** | BigDecimal | **Exchange Rate with USD** | **0.99** |
+| **name** | String[128] | **Currency Name** |  |
+| **pic** | String[1024] | **Coin Thumbnail** | **https://dpz1kj...** |
+| **symbol** | String[128] | **Symbol** | **$** |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": [
+    {
+      "chain": "ETHEREUM",
+      "currencyList": [
+        {
+          "calculateDecimals": 6,
+          "coinType": "0x3a6Ae0a9D4281DC4a712ed4fF45aC09869fEc66a",
+          "currency": "USDT",
+          "currencyType": 2,
+          "displayDecimals": 1,
+          "exchangeRate": "0.99",
+          "name": "",
+          "pic": "https://dpz1kj0gjjwqh.cloudfront.net/20240528/254fee356c8673cc16f3047ad93d4739.png",
+          "symbol": "ETH"
+        }
+      ]
+    },
+    {
+      "chain": "BSC",
+      "currencyList": [
+        {
+          "calculateDecimals": 9,
+          "coinType": "0x9a52F245f976B8b99Fdaa0FdB7dEBCe3C97A8db2",
+          "currency": "USDT",
+          "currencyType": 2,
+          "displayDecimals": 1,
+          "exchangeRate": "0.99",
+          "name": "",
+          "pic": "https://dpz1kj0gjjwqh.cloudfront.net/20240528/254fee356c8673cc16f3047ad93d4739.png",
+          "symbol": "BSC"
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "currencyList": [
+        {
+          "calculateDecimals": 6,
+          "coinType": "TEdXFvFKdCHNYpgoLAdA73e2VGL45r8hR8",
+          "currency": "USDT",
+          "currencyType": 2,
+          "displayDecimals": 1,
+          "exchangeRate": "0.99",
+          "name": "",
+          "pic": "https://dpz1kj0gjjwqh.cloudfront.net/20240528/254fee356c8673cc16f3047ad93d4739.png",
+          "symbol": "TRON"
+        }
+      ]
+    },
+    {
+      "chain": "BITCOIN",
+      "currencyList": []
+    },
+    {
+      "chain": "ONECHAIN",
+      "currencyList": [
+        {
+          "calculateDecimals": 6,
+          "coinType": "0x500b939ebca8687537da8918e9d9be1c5d9d5a322abffd89a6215f77357677c2::usdh::USDH",
+          "currency": "USDH",
+          "currencyType": 2,
+          "displayDecimals": 1,
+          "exchangeRate": "1",
+          "name": "",
+          "pic": "https://dpz1kj0gjjwqh.cloudfront.net/20240715/fe75a508f5289d40202da9305b542599.png",
+          "symbol": null
+        },
+        {
+          "calculateDecimals": 6,
+          "coinType": "0x3593438d7c3f20984250dcc575e48bb11331738f401010947cee37fa7105b5ec::usdt::USDT",
+          "currency": "USDT",
+          "currencyType": 2,
+          "displayDecimals": 1,
+          "exchangeRate": "0.99",
+          "name": "",
+          "pic": "https://dpz1kj0gjjwqh.cloudfront.net/20240528/254fee356c8673cc16f3047ad93d4739.png",
+          "symbol": "$"
+        },
+        {
+          "calculateDecimals": 9,
+          "coinType": "0x2::oct::OCT",
+          "currency": "USDT",
+          "currencyType": 2,
+          "displayDecimals": 1,
+          "exchangeRate": "0.99",
+          "name": "",
+          "pic": "https://dpz1kj0gjjwqh.cloudfront.net/20240528/254fee356c8673cc16f3047ad93d4739.png",
+          "symbol": "OCT"
+        }
+      ]
+    }
+  ],
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743843425724,
+  "traceId": "1743843425633QZP1ai9Sso7JuR0v8"
+}
+```
+
+****
+
+###### **4.2.2: Query the basic information of the wallet** {/* {#--4-2-2--query-the-basic-information-of-the-wallet--} */}
+
+**Interface address**: /wallet/queryUserWalletForList
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| **address** | **String[256]** | **Wallet address, just pass any one of them with did** | **M** | **0x85deaef8...** |
+| **did** | **String[50]** | **did, just pass any one of them with the wallet address** | **O** | **1827720282074849281** |
+
+
+**Request Example**: 
+
+```json
+{
+	"address": "0x85deaef819e3a5ad7a4fa6ab1932f6c3d4213d14e2bac18c9df13b7948ace320",
+	"did": ""
+}
+```
+
+**Response data result**: 
+
+**data:**
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| **account** | **String[64]** | **Account id** | **1000000** |
+| **accountName** | **String[512]** | **Account Name** | **Zhang San** |
+| **address** | **String[64]** | **Wallet Address** | **0x85deaef819e3...** |
+| **aliasName** | **String[512]** | **Alias** |  |
+| **chain** | **String[64]** | **Address chain** | **ONECHAIN** |
+| **did** | **String[64]** | **did** | **1827720282074849281** |
+| **userNo** | **String[64]** | **UserNO** | **1827720282587602945** |
+| **walletType** | **Boolean** | **Merchant id** | **1000000** |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": [
+    {
+      "account": "1000000",
+      "accountName": null,
+      "address": "0x85deaef819e3a5ad7a4fa6ab1932f6c3d4213d14e2bac18c9df13b7948ace320",
+      "aliasName": null,
+      "chain": "ONECHAIN",
+      "did": "1827720282074849281",
+      "userNo": "1827720282587602945",
+      "walletType": "1000000"
+    }
+  ],
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743568204781,
+  "traceId": "174356820443544wuMfvX7hboWgSLw"
+}
+```
+
+##### 4.3: Transaction related {/* {#4-3--transaction-related} */}
+
+###### **4.3.1: Query the transaction records on the address chain** {/* {#--4-3-1--query-the-transaction-records-on-the-address-chain--} */}
+
+**Interface address**: /tx/queryTx
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| **address** | **String[256]** | **Wallet Address** | **M** | **0x85deaef8...** |
+| **endTime** | **Long** | **endTime** | **O** | **1743578977000** |
+| **startTime** | **Long** | **Start Time** | **O** | **1743578977000** |
+| **txType** | **`List<String>`** | **Transaction Type**<br/>**RECEIVE=Cash**<br/>**PAYMENT=Pay**<br/>**TRANSACTION=Transaction**<br/>**CONTRACT=Contract** | **O** | **["PAYMENT"]** |
+| **txHash** | **String[256]** | **Transaction hash, which can be used to query a single record.** | **O** | **F2xwF82N...** |
+| **currency** | **String[50]** | **Trading Currency** | **O** | **USDH** |
+| **direction** | **String[50]** | Trading direction, IN/OUT, like swap type transactions, without direction, the results found may not be unique | **O** | **IN** |
+| **chain** | **String[50]** | **Chapter Type**<br/>**ONE_CHAIN, TRON, ETH, BSC, BTC** | **M** | **1827720282074849281** |
+| **pageIndex** | **Integer** | **1** | **M** | **1** |
+| **pageSize** | **Integer** | **10** | **M** | **10** |
+
+
+**Request Example**: 
+
+```json
+{
+	"address": "0x328643c4e3cdd6aea9d0c031b08cde225b4b74fff013b1a778d1125cab848218",
+	"chain": "ONE_CHAIN",
+	"txHash":"F2xwF82NKkjEzSs1YeBwimGrzYxMmq3kSwgNki35WaPb",
+	"direction":"",
+	"currency":"",
+	"endTime": null,
+	"pageIndex": 1,
+	"pageSize": 10,
+	"startTime": null,
+	"txType": []
+}
+```
+
+**Response data result**: 
+
+**data:**
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| **amount** | **String[64]** | Transaction amount, positive payment, negative payment | **10000** |
+| **chainName** | **String[512]** | Chain Name | **OneChain** |
+| **completeTime** | **String[64]** | Transaction Completion Time | **1743507013000** |
+| **hash** | **String[512]** | Trading hash | **C3Mwx5XKbB...** |
+| **receiver** | **String[64]** | Receive address | **0x559afcb...** |
+| **scanUrl** | **String[64]** | View address on the chain | **https://hchain-explorer.tpkn...** |
+| **sender** | **String[64]** | Send address | **0x60ce7d7...** |
+| **status** | **Boolean** | Transaction status, 20: Success, 25: Failure | **20** |
+| **symbol** | **String[10]** | **Trading Currency** | **USDH** |
+| **txType** | **String[64]** | **Transaction type**: <br/>**RECEIVE: Payment**<br/>**PAYMENT: Payment**<br/>**TRANSACTION: Transaction**<br/>**CONTRACT: Contract Call** | **RECEIVE** |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "pageIndex": 1,
+    "pageSize": 1,
+    "rows": [
+      {
+        "amount": "10000",
+        "chainName": "OneChain",
+        "completeTime": 1743507013000,
+        "hash": "C3Mwx5XKbBqddZ3j9qZhvtyaZME64J1mCdmEgqPrLCNm",
+        "receiver": "0x559afcb3f2a91f464fd7fe415303fc7ecf956915de7eb5182293fd0d1f5d86a4",
+        "scanUrl": "https://hchain-explorer.tpknp.com/#/transactionBlocksDetail?digest=C3Mwx5XKbBqddZ3j9qZhvtyaZME64J1mCdmEgqPrLCNm",
+        "sender": "0x60ce7d7db55af12440959c9483570ec433db911180dcb8220a815e32183bd293",
+        "status": 20,
+        "symbol": "USDH",
+        "txType": "RECEIVE"
+      }
+    ],
+    "totalNum": 6
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743650039925,
+  "traceId": "1743650039746J601VAHwPVzwqxQr0"
+}
+```
+
+##### 4.4: Transfer-related {/* {#4-4--transfer-related} */}
+
+###### 4.4.1: Create an Order {/* {#4-4-1--create-an-order} */}
+
+**Interface address**: /transfer/createOrder
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| amount | String[64] | Transfer amount | M | 10 |
+| coinType | String[64] | Transfer currency, fill in coinType, see 4.2.1 to return the result | M | OCT |
+| fromAddress | String[30] | Send address | M | 0x85deaef819e3a5a... |
+| remark | String[64] | Notes | O | remark |
+| toAddress | String[10] | Receiver's address | M | 0x559afcb3... |
+
+
+**Request Example**: 
+
+```json
+{
+	"amount":10,
+	"currency": "OCT",
+	"fromAddress": "0x85deaef819e3a5ad7a4fa6ab1932f6c3d4213d14e2bac18c9df13b7948ace320",
+	"remark": "",
+	"toAddress": "0x559afcb3f2a91f464fd7fe415303fc7ecf956915de7eb5182293fd0d1f5d86a4"
+}
+```
+
+**Response data result**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| hash | String[64] | hash | 1901826733104803841 |
+| rawTransaction | String | Content to be signed | |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "hash": "7pUb5ARr5akUdLBMUVorqviXJykS2bPT5qm1YAGVV6JC",
+    "rawTransaction": "AAADAAgA4fUFAAAAAAEATsnWcUtWe0CGXZYGglwplmHclJHtbJ5Y1mMebIRHb0AFAAAAAAAAACB7AG/3dJcZroJuODSRMZVBTtsaePvr1LJukYYVvuFHRAAgVZr8s/KpH0ZP1/5BUwP8fs+VaRXefrUYIpP9DR9dhqQCAgEBAAEBAAABAQMAAAAAAQIAhd6u+Bnjpa16T6arGTL2w9QhPRTiusGMnfE7eUis4yABOhpaugU108s1vVVQoMlxo694BjqAcV4Jp5ni+UFwDFEEAAAAAAAAACDb6it7ZuzOcZc3jl6MYCxcW2A6kQQyx4/fn0VibmbvvT6Mtb4thvi5l6Gf21+USJ5w70PJ0jb9XAtV2zavXuhU6AMAAAAAAADY0TwAAAAAAAA="
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743735300943,
+  "traceId": "1743735298074c0i0fb0qQ9yo0NYJ0"
+}
+```
+
+###### 4.4.2: Execute transactions {/* {#4-4-2--execute-transactions} */}
+
+**Interface address**: /transfer/sendTx
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| hash | String | order hash | M | |
+| txBytes | String | Original transaction content | M | |
+| userSig | String | User Signature | M | |
+
+**Request Example**: 
+
+```json
+{
+	"hash": "7pUb5ARr5akUdLBMUVorqviXJykS2bPT5qm1YAGVV6JC",
+	"txBytes": "AAADAAgA4fUFAAAAAAEATsnWcUtWe0CGXZYGglwplmHclJHtbJ5Y1mMebIRHb0AFAAAAAAAAACB7AG/3dJcZroJuODSRMZVBTtsaePvr1LJukYYVvuFHRAAgVZr8s/KpH0ZP1/5BUwP8fs+VaRXefrUYIpP9DR9dhqQCAgEBAAEBAAABAQMAAAAAAQIAhd6u+Bnjpa16T6arGTL2w9QhPRTiusGMnfE7eUis4yABOhpaugU108s1vVVQoMlxo694BjqAcV4Jp5ni+UFwDFEEAAAAAAAAACDb6it7ZuzOcZc3jl6MYCxcW2A6kQQyx4/fn0VibmbvvT6Mtb4thvi5l6Gf21+USJ5w70PJ0jb9XAtV2zavXuhU6AMAAAAAAADY0TwAAAAAAAA=",
+	"userSig": "BQNMNzE0OTY4NzI3NjM3OTk2NTg3MjUwODgxNjEzNDM0NTExMTI5MTc1MzUyMDI3ODE4NjkwMDQ2NTM1MTc0NTYzNzM2NTQxMTY3MDQ3MU0xNzYzMTk3OTgxNDIzNzU1MzUzNDIwNjA0MTQxMTM2OTEyMzM1MjI5OTk4MjE0NjE5ODUwNzg1Nzk0MzExNjg4OTUwNzAzNjczMjM5NQExAwJNMTY0MTc3NzAxNTE5Mzk5NTUyMjE0MzEwNjYzNDI5MzE1OTg4MDU2MzY3MTg1NTUzMDM0MjEyNzkyNTgyMTU2ODI4NTA2ODM3MTk5MTlMODkwMTM1MTAwMjEwODczMDEwNzU3NzM1MjY1Mzk3NTQ1NjkwNTcwMzk3OTQxMjkzNDU3MzkyNDM5NjA2OTczNzQ3NjcxNTk1OTI5MAJNMTM5NTIyNTE5NTkxNDg5OTI4NDQwNjA3NzQ2NjM3MjIzODg5NzczMDE4NDkwOTg4NTY4NTUxODg5MzU1NTQ1OTEyNTg3Mzg5ODM0ODBNMTkyMDEzODAwNDI4NzU2NjYxMDU3OTU3MTc3MzM5Mjg4NzEwNjI4NTIxOTE3ODIyNjE5MDEwNTM3OTMzOTg4MjM5ODA0Mzc1ODY4MjYCATEBMANNMTgyMDA1MDkyOTkxMjk4Mjg1MzEzOTA1NjgzMjAwODA3NTQ0OTM4NzMxODEzODU0Mjg5ODU5ODU4NDU5NjI2MjQ0MzUyOTE3MzcxMTZNMTYxMTg2MDkxNDEyMzkzMDI3MjY2NjE1NzYwMDgyNzE4Mjk5NjIxMjcyMjgyNjQzMjUwNDQ1MzkyMTQxNjI5NTM5MTk0ODQxMjAwNTgBMS95SnBjM01pT2lKb2RIUndjem92TDNSbGMzUXVhSFZwYjI1bGNHRjVMbU52YlNJcwEyZXlKaGJHY2lPaUpTVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0lzSW10cFpDSTZJakVpZlFMNDMyNjEwOTg3Njk0ODA5MTEyMzIzNjMyMTQ0NjE4OTI5MjA0MjQ4MjQ4NTU2MjkwNDI0MzQyMzUyNDUyNzUzMzMxMjI5MDY4MjM3OJQAAAAAAAAAYQAs7THNYomQw8DLmFV0qeaRsZ8GhrtXCNULXiQW6QjbhVPV54LurfSL/ougzIQ9HI2kh3XsjKRHt9Q4/Babq1AGJs4ydM4/8+5y/w9c+tlqYjp8CHekpEm7AvFyWiC/QwQ="
+}
+```
+
+**Response data result**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| hash | String | Trading hash | 7pUb5ARr... |
+| status | String | **Order Status**<br/>**UN_PAY: To be paid**<br/>**RUNNING: Transfer**<br/>**SUCCESS: Transfer Success**<br/>**FAIL: Transfer failed**<br/>**CANCEL: Cancel**<br/>**TIMEOUT: Timeout** | SUCCESS |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "hash": "7pUb5ARr5akUdLBMUVorqviXJykS2bPT5qm1YAGVV6JC",
+    "status": "SUCCESS"
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743735480267,
+  "traceId": "1743735478463VUqDU32Tu5KSqNvWk"
+}
+```
+
+###### 4.4.3: Pagination query {/* {#4-4-3--pagination-query} */}
+
+**Interface address**: /transfer/pageList
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| beginTime | Long | Transaction Start Time | O | |
+| completeBeginTime | Long | Transaction Completion Start Time | O | |
+| completeEndTime | Long | Transaction Completion End Time | O | |
+| currency | String | Currency | O | |
+| endTime | Long | Transaction End Time | O | |
+| hash | String | Trading hash | O | |
+| pageIndex | Long | Current Page | M | 1 |
+| pageSize | Long | Page Size | M | 10 |
+| statusList | `List<String>` | Status List | O | |
+| toAddress | String | Accounting Address | O | |
+
+
+**Request Example**: 
+
+```json
+{
+	"beginTime": null,
+	"completeBeginTime": null,
+	"completeEndTime": null,
+	"currency": null,
+	"endTime": null,
+	"hash": null,
+	"pageIndex": 1,
+	"pageSize": 1,
+	"statusList": null,
+	"toAddress": null
+}
+```
+
+**Response data result**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| address | long | origin address | 0x85deaef819e3a... |
+| addressName | String | Address Name | |
+| amount | String | Transfer amount | 0.1 |
+| completeTime | String | Completed Time | 1743735480000 |
+| createTime | String | Created Time | 1743735299000 |
+| currency | String | Currency | OCT |
+| did | String | User did | 1827720282074849281 |
+| hash | String | Trading hash | 7pUb5ARr5... |
+| merchantId | String | Merchant ID | 1000000 |
+| merchantName | String | Merchant Name | Test Merchant |
+| nickName | String | User Nickname | |
+| receiver | String | receiver name | 0x559afcb3f2a91f... |
+| remark | String | Notes | |
+| sender | String | sender name | 0x85deaef81... |
+| status | String | Status | SUCCESS |
+| toAddress | String | Accepted address | 0x559afcb3... |
+| toAddressName | String | Address Name | |
+| toDid | BigDecimal | Accounted user did | |
+| toMerchantId | String | Merchant ID to which the account address belongs | |
+| toMerchantName | Long | Merchant Name to the account address | |
+| toNickName | Long | Accounting user nickname | |
+| transferMethod | String | Transfer Method | ADDRESS |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "pageIndex": 1,
+    "pageSize": 1,
+    "rows": [
+      {
+        "address": "0x85deaef819e3a5ad7a4fa6ab1932f6c3d4213d14e2bac18c9df13b7948ace320",
+        "addressName": null,
+        "amount": "0.1",
+        "completeTime": 1743735480000,
+        "createTime": 1743735299000,
+        "currency": "OCT",
+        "did": "1827720282074849281",
+        "hash": "7pUb5ARr5akUdLBMUVorqviXJykS2bPT5qm1YAGVV6JC",
+        "merchantId": "1000000",
+        "merchantName": "Test Merchant",
+        "nickName": null,
+        "receiver": "0x559afcb3f2a91f464fd7fe415303fc7ecf956915de7eb5182293fd0d1f5d86a4",
+        "remark": "",
+        "sender": "0x85deaef819e3a5ad7a4fa6ab1932f6c3d4213d14e2bac18c9df13b7948ace320",
+        "status": "SUCCESS",
+        "toAddress": "0x559afcb3f2a91f464fd7fe415303fc7ecf956915de7eb5182293fd0d1f5d86a4",
+        "toAddressName": null,
+        "toDid": null,
+        "toMerchantId": null,
+        "toMerchantName": null,
+        "toNickName": null,
+        "transferMethod": "ADDRESS"
+      }
+    ],
+    "totalNum": 11
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743735636002,
+  "traceId": "17437356356365ViQIBp87DhagvODV"
+}
+```
+
+###### 4.4.4: Order Query {/* {#4-4-4--order-query} */}
+
+**Interface address**: /transfer/queryOrder
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| hash | String[128] | Transaction hash | M | 7pUb5AR... |
+
+
+**Request Example**: 
+
+```json
+{
+	"hash": "7pUb5ARr5akUdLBMUVorqviXJykS2bPT5qm1YAGVV6JC"
+}
+```
+
+**Response data result**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| address | long | origin address | 0x85deaef819e3a... |
+| addressName | String | Address Name | |
+| amount | String | Transfer amount | 0.1 |
+| completeTime | String | Completed Time | 1743735480000 |
+| createTime | String | Created Time | 1743735299000 |
+| currency | String | Currency | OCT |
+| did | String | User did | 1827720282074849281 |
+| hash | String | Trading hash | 7pUb5ARr5... |
+| merchantId | String | Merchant ID | 1000000 |
+| merchantName | String | Merchant Name | Test Merchant |
+| nickName | String | User Nickname | |
+| receiver | String | receiver name | 0x559afcb3f2a91f... |
+| remark | String | Notes | |
+| sender | String | sender name | 0x85deaef81... |
+| status | String | Status | SUCCESS |
+| toAddress | String | Accepted address | 0x559afcb3... |
+| toAddressName | String | Address Name | |
+| toDid | BigDecimal | Accounted user did | |
+| toMerchantId | String | Merchant ID to which the account address belongs | |
+| toMerchantName | Long | Merchant Name to the account address | |
+| toNickName | Long | Accounting user nickname | |
+| transferMethod | String | Transfer Method | ADDRESS |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "address": "0x85deaef819e3a5ad7a4fa6ab1932f6c3d4213d14e2bac18c9df13b7948ace320",
+    "addressName": null,
+    "amount": "0.1",
+    "completeTime": 1743735480000,
+    "createTime": 1743735299000,
+    "currency": "OCT",
+    "did": "1827720282074849281",
+    "hash": "7pUb5ARr5akUdLBMUVorqviXJykS2bPT5qm1YAGVV6JC",
+    "merchantId": "1000000",
+    "merchantName": "Test Merchant",
+    "nickName": null,
+    "receiver": "0x559afcb3f2a91f464fd7fe415303fc7ecf956915de7eb5182293fd0d1f5d86a4",
+    "remark": "",
+    "sender": "0x85deaef819e3a5ad7a4fa6ab1932f6c3d4213d14e2bac18c9df13b7948ace320",
+    "status": "SUCCESS",
+    "toAddress": "0x559afcb3f2a91f464fd7fe415303fc7ecf956915de7eb5182293fd0d1f5d86a4",
+    "toAddressName": null,
+    "toDid": null,
+    "toMerchantId": null,
+    "toMerchantName": null,
+    "toNickName": null,
+    "transferMethod": "ADDRESS"
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743736544108,
+  "traceId": "1743736535599UHO5IUkK9qq6NAhEN"
+}
+```
+
+###### 4.4.5: Build payment transactions {/* {#4-4-5--build-payment-transactions} */}
+
+**Interface address**: /transfer/buildSponsorTransaction
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| address | String[64] | Send address | M | 0x559afcb |
+| onlyTransactionKind | String[64] | Is it a transaction built offline | M | false |
+| rawTransaction | String[30] | Original transaction content | M | AAADA+HUjw... |
+| gasBudget | String[64] | Maximum service fee usage value | O | 0.004 |
+
+
+**Request Example**: 
+
+```json
+{
+	"address": "0x559afcb3f2a91f464fd7fe415303fc7ecf956915de7eb5182293fd0d1f5d86a4",
+	"onlyTransactionKind": false,
+	"rawTransaction": "AAADAQDx+HUjw60Tgo9VxKfRLE4adJgTAxm1JH4Ixk2gJ4mFnSMAAAAAAAAAINKPdekL6DNYOESF6Wtj1nHmF1anXdI0GSVTtH5JTTH2AAiAlpgAAAAAAAAghd6u+Bnjpa16T6arGTL2w9QhPRTiusGMnfE7eUis4yACAgEAAAEBAQABAQMAAAAAAQIAVZr8s/KpH0ZP1/5BUwP8fs+VaRXefrUYIpP9DR9dhqQBBYdTMfThKWVNHFm27t2+dJy9x/36/rtQeQGPQj4xZSeybTMAAAAAACAu5cP4tWkdgO5auEDh+8wNLcZg2O/FtYcj+cfAQ0qh01Wa/LPyqR9GT9f+QVMD/H7PlWkV3n61GCKT/Q0fXYak6AMAAAAAAAAACT0AAAAAAAA=",
+	"gasBudget":"0.004"
+}
+```
+
+**Response data result**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| expiration | Long | Transaction Expiration Time | 1743738124068 |
+| hash | String | hash | 7uqD7ME2... |
+| rawTransaction | String | Original transaction content | AAADAQDx+HUjw... |
+| reservationId | Long | Receipt id, you need to bring this field to send a payment transaction | |
+| sponsor | String | Fee sponsor address | 0x3e8cb5be2... |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "expiration": 1743738124068,
+    "hash": "7uqD7ME25VV3GpM5S4vqPFsg27EcSAs4wGgmGoBDA7Jm",
+    "rawTransaction": "AAADAQDx+HUjw60Tgo9VxKfRLE4adJgTAxm1JH4Ixk2gJ4mFnSMAAAAAAAAAINKPdekL6DNYOESF6Wtj1nHmF1anXdI0GSVTtH5JTTH2AAiAlpgAAAAAAAAghd6u+Bnjpa16T6arGTL2w9QhPRTiusGMnfE7eUis4yACAgEAAAEBAQABAQMAAAAAAQIAVZr8s/KpH0ZP1/5BUwP8fs+VaRXefrUYIpP9DR9dhqQBOjZVPhVDonIxQKaNzQDBtYmeZcUGxiMlCPPFWrl+vpoEAAAAAAAAACCnMs8g247NHxrVoZC8a62kZXpDK4Xdk6D2OYJvwzMBTT6Mtb4thvi5l6Gf21+USJ5w70PJ0jb9XAtV2zavXuhU6AMAAAAAAAAACT0AAAAAAAA=",
+    "reservationId": "463",
+    "sponsor": "0x3e8cb5be2d86f8b997a19fdb5f94489e70ef43c9d236fd5c0b55db36af5ee854"
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743737524042,
+  "traceId": "1743737522622DXpFHe8RBEdPwimTV"
+}
+```
+
+###### 4.4.6: Send payment transactions {/* {#4-4-6--send-payment-transactions} */}
+
+**Interface address**: /transfer/doProxyPayTx
+
+**Interface parameters**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
+| --- | --- | --- | --- | --- |
+| reservationId | String[64] | Receipt id | M | 0x559afcb |
+| txBytes | String[2048] | Original transaction content | M | false |
+| userSig | String[2048] | User Signature | M | ANoVkEd... |
+
+
+**Request Example**: 
+
+```json
+{
+	"reservationId": "463",
+	"txBytes": "AAADAQDx+HUjw60Tgo9VxKfRLE4adJgTAxm1JH4Ixk2gJ4mFnSMAAAAAAAAAINKPdekL6DNYOESF6Wtj1nHmF1anXdI0GSVTtH5JTTH2AAiAlpgAAAAAAAAghd6u+Bnjpa16T6arGTL2w9QhPRTiusGMnfE7eUis4yACAgEAAAEBAQABAQMAAAAAAQIAVZr8s/KpH0ZP1/5BUwP8fs+VaRXefrUYIpP9DR9dhqQBOjZVPhVDonIxQKaNzQDBtYmeZcUGxiMlCPPFWrl+vpoEAAAAAAAAACCnMs8g247NHxrVoZC8a62kZXpDK4Xdk6D2OYJvwzMBTT6Mtb4thvi5l6Gf21+USJ5w70PJ0jb9XAtV2zavXuhU6AMAAAAAAAAACT0AAAAAAAA=",
+	"userSig": "ANoVkEd68riiaup4IjWZIe+kkWr6urrRRT2zcLm4Acv3dZu3NYbiSzrJl4ZjIAdE0dLSnQy9hvpWgkKk6UM0nAQwHVD+4+mojTNKetYfGy+LJteXFUra6RNXmq2hXOl2ZA=="
+}
+```
+
+**Response data result**: 
+
+| **Field Name** | **Field Type** | **Field Description** | **Example** |
+| --- | --- | --- | --- |
+| hash | String | hash | 7uqD7ME2... |
+| status | String | Transaction status | true |
+
+
+**Response Example**: 
+
+```json
+{
+  "code": "000000",
+  "data": {
+    "hash": "7uqD7ME25VV3GpM5S4vqPFsg27EcSAs4wGgmGoBDA7Jm",
+    "status": true
+  },
+  "msg": "success",
+  "success": true,
+  "systemTime": 1743737593336,
+  "traceId": "1743737592695qRNsZbWg2xQw4hmiP"
+}
+```
+
+#### 5: Common error codes {/* {#5--common-error-codes} */}
+
+| **Response code** | **Description msg** |
+| --- | --- |
+| **A00000** | **Server Error** |
+| **A00001** | **Merchant signature configuration does not exist** |
+| **A00002** | **Invalid signature** |
+| **A00003** | **Request has expired** |
+| **A00004** | **Merchant does not exist** |
+| **A00005** | **ip is not in the whitelist of visits** |
+|  |  |
+|  |  |
+
+
+#### 6: Additional information {/* {#6--additional-information} */}
+
+zklogin flow chart
+
+![](https://cdn.nlark.com/yuque/0/2025/png/55242415/1743823740182-8b37219c-f046-48d4-9f18-4e43ff9081e1.png)
+
+### OneChain Wallet Rust Sdk
+
+OneChain Wallet Rust SDK is a Rust client SDK for interacting with the OneChain Wallet service.It provides a series of
+API interfaces for implementing identity authentication, payment transactions,financial services and other functions.
+
+#### Getting started {/* {#getting-started} */}
+
+```toml
+tokio = { version = "1", features = ["full"] }
+onechain_wallet_rust_sdk = { git = "https://github.com/one-chain-labs/onechain-wallet-rust-sdk.git" }
+sui_sdk = { git = "https://github.com/one-chain-labs/onechain.git", package = "sui-sdk" }
+anyhow = "1.0.97"
+num-bigint = "0.4.4"
+```
+
+#### ZKLogin {/* {#zklogin} */}
+
+##### 1.Send Sms Code {/* {#send_sms_code} */}
+
+```rust
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::DIDApi;
+use onechain_wallet_rust_sdk::types::did::SmsCodeSendReq;
+
+async fn send_sms_code(service: &OneChainWalletService) -> anyhow::Result<String> {
+    let req = SmsCodeSendReq {
+        mobile: "123123123".to_string(),
+        mobile_prefix: "855".to_string(),
+        provider: "huione".to_string(),
+    };
+
+    // get sms code
+    let sms_code = service.send_code(req).await?.get_data()?;
+    Ok(sms_code)
+}
+
+```
+
+##### 2.Get Sms Auth Number {/* {#get_sms_auth_number} */}
+
+```rust
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::DIDApi;
+use onechain_wallet_rust_sdk::types::did::SmsAuthenticateReq;
+
+async fn sms_auth(service: &OneChainWalletService, sms_code: String) -> anyhow::Result<String> {
+    let req = SmsAuthenticateReq {
+        mobile_prefix: "855".to_string(),
+        mobile: "123123123".to_string(),
+        provider: "huione".to_string(),
+        sms_code: "000000".to_string(),
+        code: sms_code,
+    };
+    let rsp = service.sms(req).await?.get_data()?;
+    Ok(rsp.code)
+}
+
+```
+
+##### 3.Get Zk JWT Token {/* {#get_zk_jwt_token} */}
+
+```rust
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::fastcrypto::ed25519::Ed25519KeyPair;
+use onechain_wallet_rust_sdk::fastcrypto::traits::KeyPair;
+use onechain_wallet_rust_sdk::fastcrypto_zkp::bn254::utils::get_nonce;
+use onechain_wallet_rust_sdk::rpc::DIDApi;
+use onechain_wallet_rust_sdk::sui_types::crypto::SuiKeyPair;
+use onechain_wallet_rust_sdk::types::common::ACCESS_TOKEN;
+use onechain_wallet_rust_sdk::types::did::{AuthorizeTokenProfileReq, AuthorizeTokenProfileResp};
+use rand::{random, thread_rng};
+use sui_sdk::SuiClient;
+
+async fn get_jwt_token(
+    sui_client: &SuiClient,
+    service: &mut OneChainWalletService,
+    auth_number: String,
+) -> anyhow::Result<(SuiKeyPair, String, AuthorizeTokenProfileResp)> {
+    let summary = sui_client
+        .governance_api()
+        .get_latest_sui_system_state()
+        .await?;
+
+    let max_epoch = 30 + summary.epoch;
+    let skp = SuiKeyPair::Ed25519(Ed25519KeyPair::generate(&mut thread_rng()));
+    let jwt_randomness = random::<i128>().abs().to_string();
+    let eph_pk_bytes = skp.to_bytes();
+    let nonce = get_nonce(&eph_pk_bytes, max_epoch, &jwt_randomness)?;
+
+    let req = AuthorizeTokenProfileReq {
+        provider: "huione".to_string(),
+        code: auth_number,
+        login_type: "sms".to_string(),
+        nonce: nonce.clone(),
+    };
+    let rsp = service.get_token(req).await?.get_data()?;
+    // set token header
+    service.set_header(ACCESS_TOKEN.to_string(), rsp.access_token.clone());
+
+    Ok((skp, nonce, rsp))
+}
+```
+
+##### 4.Get ZK Proof {/* {#get_zk_proof} */}
+
+```rust
+use onechain_wallet_rust_sdk::fastcrypto_zkp::bn254::zk_login::ZkLoginInputsReader;
+use num_bigint::BigUint;
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::DIDApi;
+use onechain_wallet_rust_sdk::types::did::{AuthorizeTokenProfileResp, ZkProofsReq};
+use onechain_wallet_rust_sdk::sui_types::crypto::SuiKeyPair;
+
+async fn get_zk_proof(
+    service: &OneChainWalletService,
+    max_epoch: i64,
+    jwt_randomness: String,
+    skp: &SuiKeyPair,
+    jwt_token_rsp: &AuthorizeTokenProfileResp,
+) -> anyhow::Result<ZkLoginInputsReader> {
+    let extended_ephemeral_public_key = BigUint::from_bytes_be(&skp.to_bytes()).to_string();
+
+    let req = ZkProofsReq {
+        max_epoch,
+        jwt_randomness,
+        extended_ephemeral_public_key,
+        jwt: jwt_token_rsp.jwt_token.clone(),
+        salt: jwt_token_rsp.salt.clone(),
+        key_claim_name: "sub".to_string(),
+    };
+    let reader = service.get_zk_proofs(req).await?.get_data()?;
+    Ok(reader)
+}
+
+```
+
+##### 5.Refresh JWT Token {/* {#refresh_jwt_token} */}
+
+**Prerequisites**
+
+```rust
+// set token header
+service.set_header(ACCESS_TOKEN.to_string(), rsp.access_token.clone());
+```
+
+```rust
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::DIDApi;
+use onechain_wallet_rust_sdk::types::did::{AuthorizeTokenProfileResp, RefreshJwtTokenReq};
+
+async fn refresh_jwt_token(
+    service: &OneChainWalletService,
+    nonce: String,
+) -> anyhow::Result<AuthorizeTokenProfileResp> {
+    let req = RefreshJwtTokenReq { nonce };
+    let resp = service.refresh_jwt_token(req).await?.get_data()?;
+    Ok(resp)
+}
+
+```
+
+#### Build Transfer Tx {/* {#build-transfer-tx} */}
+
+##### 1.Create Transfer tx {/* {#create_transfer_tx} */}
+
+```rust
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::TransferApi;
+use onechain_wallet_rust_sdk::types::common::CreateOrderResp;
+use onechain_wallet_rust_sdk::types::transfer::TransferOrderReq;
+
+async fn create_tx(
+    service: &OneChainWalletService,
+    from_address: String,
+    to_address: String,
+) -> anyhow::Result<CreateOrderResp> {
+    let req = TransferOrderReq {
+        from_address,
+        to_address,
+        coin_type: "OCT".to_string(),
+        amount: 0.001.to_string(),
+        remark: None,
+    };
+
+    let resp = service.create_order(req).await?.get_data()?;
+
+    Ok(resp)
+}
+```
+
+##### 2.Sign Tx & Send Tx {/* {#sign_and_send_tx} */}
+
+```rust
+use onechain_wallet_rust_sdk::fastcrypto_zkp::bn254::zk_login::ZkLoginInputs;
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::TransferApi;
+use onechain_wallet_rust_sdk::types::common::CreateOrderResp;
+use onechain_wallet_rust_sdk::types::transfer::{TransferOrderTxReq, TransferOrderTxResponse};
+use onechain_wallet_rust_sdk::utils::zk_login::zklogin_sign_tx_bytes;
+use onechain_wallet_rust_sdk::sui_types::crypto::SuiKeyPair;
+
+async fn send_tx(
+    service: &OneChainWalletService,
+    tx_order: CreateOrderResp,
+    keypair: &SuiKeyPair,
+    max_epoch: u64,
+    zk_login_inputs: ZkLoginInputs,
+) -> anyhow::Result<TransferOrderTxResponse> {
+    let user_sign = zklogin_sign_tx_bytes(
+        max_epoch,
+        keypair,
+        zk_login_inputs,
+        tx_order.raw_transaction.clone(),
+    )?;
+
+    let req = TransferOrderTxReq {
+        hash: tx_order.hash,
+        tx_bytes: tx_order.raw_transaction,
+        user_sig: user_sign,
+    };
+
+    let tx_resp = service.send_tx(req).await?.get_data()?;
+    Ok(tx_resp)
+}
+```
+
+#### Build Sponsor Tx {/* {#build-sponsor-tx} */}
+
+##### 1.Build Sponsor Ptb Tx Base64 {/* {#build_sponsor_ptb_tx_base64} */}
+
+```rust
+use onechain_wallet_rust_sdk::fastcrypto::encoding::{Base64, Encoding};
+use sui_sdk::SuiClient;
+use sui_sdk::rpc_types::SuiObjectDataOptions;
+use onechain_wallet_rust_sdk::sui_types::base_types::SuiAddress;
+use onechain_wallet_rust_sdk::sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use onechain_wallet_rust_sdk::sui_types::transaction::TransactionData;
+
+async fn build_ptb_tx_base64(sui_client: &SuiClient, from: SuiAddress) -> anyhow::Result<String> {
+    let coins = sui_client
+        .coin_read_api()
+        .get_coins(from, Some("0x2::oct::OCT".to_string()), None, None)
+        .await?;
+
+    let object = sui_client
+        .read_api()
+        .get_object_with_options(coins.data[0].coin_object_id, SuiObjectDataOptions::new())
+        .await?
+        .data
+        .unwrap();
+
+    let pt = {
+        let mut builder = ProgrammableTransactionBuilder::new();
+        builder.transfer_object(from, object.object_ref()).unwrap();
+        builder.finish()
+    };
+    let data = TransactionData::new_programmable(from, vec![], pt, 100000000, 1000);
+    Ok(Base64::encode(&bcs::to_bytes(&data)?))
+}
+```
+
+##### 2.Create Sponsor tx {/* {#create_sponsor_tx} */}
+
+```rust
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::TransferApi;
+use onechain_wallet_rust_sdk::types::transfer::{BuildSponsorTxReq, GasTxBuilderResponse};
+
+async fn create_sponsor_tx(
+    service: &OneChainWalletService,
+    wallet_address: String,
+    tx_base64: String,
+) -> anyhow::Result<GasTxBuilderResponse> {
+    let req = BuildSponsorTxReq {
+        address: wallet_address,
+        raw_transaction: tx_base64,
+        only_transaction_kind: false,
+        gas_budget: Some(0.01.to_string()),
+    };
+
+    let resp = service.build_sponsor_tx(req).await?.get_data()?;
+
+    Ok(resp)
+}
+```
+
+##### 3.Sign Tx && Send Tx {/* {#sign_sponsor_tx_and_send_tx} */}
+
+```rust
+use onechain_wallet_rust_sdk::fastcrypto_zkp::bn254::zk_login::ZkLoginInputs;
+use onechain_wallet_rust_sdk::client::OneChainWalletService;
+use onechain_wallet_rust_sdk::rpc::TransferApi;
+use onechain_wallet_rust_sdk::types::transfer::{
+    GasTxBuilderResponse, ProxyPayTxReq, ProxyPayTxResp,
+};
+use onechain_wallet_rust_sdk::utils::zk_login::zklogin_sign_tx_bytes;
+use onechain_wallet_rust_sdk::sui_types::crypto::SuiKeyPair;
+
+async fn sign_sponsor_tx_and_send_tx(
+    service: &OneChainWalletService,
+    sponsor_order: GasTxBuilderResponse,
+    keypair: &SuiKeyPair,
+    max_epoch: u64,
+    zk_login_inputs: ZkLoginInputs,
+) -> anyhow::Result<ProxyPayTxResp> {
+    let user_sign = zklogin_sign_tx_bytes(
+        max_epoch,
+        keypair,
+        zk_login_inputs,
+        sponsor_order.raw_transaction.clone(),
+    )?;
+
+    let req = ProxyPayTxReq {
+        user_sig: user_sign,
+        tx_bytes: sponsor_order.raw_transaction,
+        reservation_id: sponsor_order.reservation_id,
+    };
+
+    let resp = service.do_proxy_pay_tx(req).await?.get_data()?;
+    Ok(resp)
+}
+```
+
+### One chain wallet java sdk
+
+#### How to use it {/* {#how_to_use_it} */}
+
+```java
+mvn -DskipTests=true install
+```
+
+##### Maven {/* {#maven} */}
+
+```xml
+<dependency>
+    <groupId>io.xone.chain</groupId>
+    <artifactId>java-wallet</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+##### Connecting to wallet {/* {#connecting_to_wallet} */}
+
+- devnet-wallet:https://onechain-api.tpknp.com/app/api/
+
+- mainnet-wallet:
+
+```java
+huioneWalletClient = new OkhttpHuioneWalletClient("<wallet_url>");
+```
+
+##### Huione login {/* {#huione_login} */}
+
+###### zklogin {/* {#zklogin-1} */}
+
+```java
+public static void login(){
+        SmsCodeSendReq step1Req = new SmsCodeSendReq();
+        step1Req.setMobile(MOBILE);
+        step1Req.setMobilePrefix("855");
+        step1Req.setTimestamp(System.currentTimeMillis());
+        step1Req.setMerchantId("1000000");
+        step1Req.setMerchantSign(RsaSignUtil.sign(step1Req,REQUEST_PRIKEY));
+        CommonResp<String> step1Resp = didApi.sendCode(step1Req).get();
+        assert step1Resp.isSuccess();
+        //step2
+        SmsAuthenticateRequest step2Req = new SmsAuthenticateRequest();
+        step2Req.setMobile(MOBILE);
+        step2Req.setMobilePrefix("855");
+        step2Req.setSmsCode("000000");
+        step2Req.setCode(step1Resp.getData());
+        CommonResp<AuthenticateUserResponse> step2Resp = didApi.sms(step2Req).get();
+        assert step2Resp.isSuccess();
+
+
+        //step3
+        AuthorizeTokenProfileRequest step3Req = new AuthorizeTokenProfileRequest();
+        MAX_EPOCH = oneChain.getLatestOneChainSystemState().get().getEpoch().add(BigInteger.TEN);
+        TEMP_KEYPAIR = OneChainKeyGen.getInstance().generateNewKeyPair(SignatureScheme.ED25519);
+        RANDOMNESS = NonceGenerator.generateRandomness();
+        String nonce = NonceGenerator.generateNonce(TEMP_KEYPAIR.publicKeyBytes(), MAX_EPOCH, RANDOMNESS);
+        step3Req.setCode(step2Resp.getData().getCode());
+        step3Req.setNonce(nonce);
+        CommonResp<AuthorizeTokenProfileResponse> step3Resp = didApi.getToken(step3Req).get();
+        TOKEN_PROFILE = step3Resp.getData();
+        assert step3Resp.isSuccess();
+
+        //step4
+        AuthorizeTokenProfileResponse.AccessTokenProfile jwtToken = TOKEN_PROFILE.getAccessTokenProfile();
+        ZK_LOGIN_ADDRESS = ZkLoginAddressUtil.computeZkLoginAddress("sub", jwtToken.getSub(), jwtToken.getIss(), jwtToken.getAud(), TOKEN_PROFILE.getSalt(), false);
+        HeaderRequest headerRequest = new HeaderRequest();
+        headerRequest.setAccessToken(TOKEN_PROFILE.getAccessToken());
+        headerRequest.setTokenId(jwtToken.getJti());
+        huioneWalletClient.fillHeader(headerRequest);
+        CommonResp<UserTokenProfile> userTokenProfileCommonResp = didApi.getTokenUserProfile().get();
+        assert userTokenProfileCommonResp.isSuccess();
+
+        //step5
+        String jwt = TOKEN_PROFILE.getJwtToken();
+        ZK_LOGIN_DATA = requestZkService(MAX_EPOCH, RANDOMNESS.toString(), TEMP_KEYPAIR.publicKey(), jwt, TOKEN_PROFILE.getSalt());
+        DID = userTokenProfileCommonResp.getData().getDid();
+        requestOneChainFromFaucet();
+    }
+```
+For more examples, you can see [HuionePayTest](src/test/java/io/onechain/HuionePayTest.java)
+
+###### sponsored coin transfer transaction {/* {#sponsored_coin_transfer_transaction} */}
+
+```java
+@Test
+    public void testTransfer() {
+        TransferOrderReq transferOrderReq = new TransferOrderReq();
+        transferOrderReq.setRemark("test");
+        transferOrderReq.setCurrency("USDH");
+        transferOrderReq.setAmount(BigDecimal.valueOf(0.5));
+        transferOrderReq.setFromAddress(ZK_LOGIN_ADDRESS);
+        transferOrderReq.setToAddress(UN_KNOW_ADDRESS);
+        CommonResp<CreateOrderResp> createOrderRespCommonResp = transferApi.createOrder(transferOrderReq).get();
+        assert createOrderRespCommonResp.isSuccess();
+        CreateOrderResp order = createOrderRespCommonResp.getData();
+        BigInteger addressSeed = AddressSeedGenerator.genAddressSeed(new BigInteger(TOKEN_PROFILE.getSalt()), "sub", TOKEN_PROFILE.getAccessTokenProfile().getSub(), TOKEN_PROFILE.getAccessTokenProfile().getAud());
+        String signed = OneChain.signTransactionBlockByte(TEMP_KEYPAIR.encodePrivateKey(), Base64.getDecoder().decode(order.getRawTransaction()));
+        ZkLoginSignature zkLoginSignature = ZkLoginSignature.createZkLoginSignature(ZK_LOGIN_DATA, Base64.getDecoder().decode(signed), MAX_EPOCH.longValue(), addressSeed.toString());
+        String zkLoginSignatureStr = Base64.getEncoder().encodeToString(zkLoginSignature.bcsSerialize());
+        TransferOrderTxReq transferOrderTxReq = new TransferOrderTxReq();
+        transferOrderTxReq.setHash(order.getHash());
+        transferOrderTxReq.setUserSig(zkLoginSignatureStr);
+        transferOrderTxReq.setTxBytes(order.getRawTransaction());
+        CommonResp<TransferOrderTxResp> transferOrderTxRespCommonResp = transferApi.sendTx(transferOrderTxReq).get();
+        assert transferOrderTxRespCommonResp.isSuccess();
+    }
+```
+For more examples, you can see [HuionePayTest](src/test/java/io/onechain/HuionePayTest.java)
+
+###### sponsored any type of transaction  {/* {#sponsored_any_type_of_transaction} */}
+
+```java
+@SneakyThrows
+    @Test
+    public void testSponsorTransaction() {
+        BuildSponsorTransactionRequest buildSponsorTransactionRequest = new BuildSponsorTransactionRequest();
+        buildSponsorTransactionRequest.setRawTransaction(buildTransferData(ZK_LOGIN_ADDRESS));
+        buildSponsorTransactionRequest.setAddress(ZK_LOGIN_ADDRESS);
+        CommonResp<GasTxBuilderResponse> gasTxBuilderResponseCommonResp = transferApi.buildSponsorTransaction(buildSponsorTransactionRequest).get();
+        assert gasTxBuilderResponseCommonResp.isSuccess();
+        GasTxBuilderResponse data = gasTxBuilderResponseCommonResp.getData();
+        BigInteger addressSeed = AddressSeedGenerator.genAddressSeed(new BigInteger(TOKEN_PROFILE.getSalt()), "sub", TOKEN_PROFILE.getAccessTokenProfile().getSub(), TOKEN_PROFILE.getAccessTokenProfile().getAud());
+        String signed = OneChain.signTransactionBlockByte(TEMP_KEYPAIR.encodePrivateKey(), Base64.getDecoder().decode(data.getRawTransaction()));
+        ZkLoginSignature zkLoginSignature = ZkLoginSignature.createZkLoginSignature(ZK_LOGIN_DATA, Base64.getDecoder().decode(signed), MAX_EPOCH.longValue(), addressSeed.toString());
+        String zkLoginSignatureStr = Base64.getEncoder().encodeToString(zkLoginSignature.bcsSerialize());
+        ProxyPayTxRequest proxyPayTxRequest = new ProxyPayTxRequest();
+        proxyPayTxRequest.setReservationId(data.getReservationId());
+        proxyPayTxRequest.setUserSig(zkLoginSignatureStr);
+        proxyPayTxRequest.setTxBytes(data.getRawTransaction());
+        CommonResp<ProxyPayTxResp> proxyPayTxRespCommonResp = transferApi.doProxyPayTx(proxyPayTxRequest).get();
+        assert proxyPayTxRespCommonResp.isSuccess();
+        System.out.println(proxyPayTxRespCommonResp);
+    }
+```
+For more examples, you can see [HuionePayTest](src/test/java/io/onechain/HuionePayTest.java)
