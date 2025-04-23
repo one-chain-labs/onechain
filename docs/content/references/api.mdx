@@ -2464,7 +2464,7 @@ openssl pkcs8 -topk8 -inform PEM -in privateKey -outform PEM -nocrypt -out pkcs8
 
 ###### 2) Call the signature {/* {#2--call-the-signature} */}
 
-For fields in the request, exclude <font style="color:#DF2A3F;">merchantsSign</font> fields, and other non-empty fields, spliced ​​in dictionary order, using the private key generated in the previous step for signature.
+For fields in the request, exclude <font style={{ color: '#DF2A3F' }}>merchantsSign</font> fields, and other non-empty fields, spliced ​​in dictionary order, using the private key generated in the previous step for signature.
 
 Signature Algorithm: SHA256withRSA
 
@@ -2481,7 +2481,7 @@ Notice:
 
 ###### 4.1.1: Send verification code {/* {#4-1-1--send-verification-code} */}
 
-<font style="color:#DF2A3F;">Note: The verification code currently sent is a huione site message</font>
+<font style={{color:'#DF2A3F'}}>Note: The verification code currently sent is a huione site message</font>
 
 **Interface address**: /did/sendCode
 
@@ -2489,7 +2489,7 @@ Notice:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
-| **timestamp** | **Long** | **Current timestamp, unit** **<font style="color:#DF2A3F;">ms</font>** | **M** | **1743498522261** |
+| **timestamp** | **Long** | **Current timestamp, unit** **<font style={{ color: '#DF2A3F' }}>ms</font>** | **M** | **1743498522261** |
 | **merchantSign** | **String[1024]** | **M** | **CaHXZC/SlR6VrlTwa9g5...** |
 | **merchantId** | **String[30]** | **M** | **1000000** |
 | mobile | String[20] | Mobile number that accepts SMS verification code | M | 182828666 |
