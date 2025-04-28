@@ -41,10 +41,6 @@ $ rustup update stable
 
 Select the appropriate tab to view the requirements for your system.
 
-<Tabs groupId="operating-systems">
-
-<TabItem value="linux" label="Linux">
-
 The prerequisites needed for the Linux operating system include:
 
 - cURL
@@ -159,10 +155,6 @@ Use the following command to install `build-essential`:
 $ sudo apt-get install build-essential
 ```
 
-</TabItem>
-
-<TabItem value="mac" label="macOS">
-
 The prerequisites needed for the macOS operating system include:
 
 - Rust and Cargo
@@ -231,11 +223,6 @@ After installing Git, download and install the [Git command line interface](http
 ###### PostgreSQL
 
 Visit the official [PostgreSQL website](https://wiki.postgresql.org/wiki/Main_Page) for instructions on downloading PostgreSQL.
-
-</TabItem>
-
-</Tabs>
-
 
 #### How to build OneChain binaries
 
@@ -852,8 +839,6 @@ As the new test function shows, the first transaction (explicitly) calls the ini
 
 You can refer to the source code for the package (with all the tests and functions properly adjusted) in the [first_package](https://github.com/one-chain-labs/onechain/tree/main/examples/move/first_package/sources/example.move) module in the `sui/examples` directory. You can also use the following toggle to review the complete code.
 
-<details>
-<summary>
 ```move
 module my_first_package::example;
 
@@ -1013,5 +998,3 @@ fun test_module_init() {
 		scenario.end();
 }
 ```
-</summary>
-</details>
