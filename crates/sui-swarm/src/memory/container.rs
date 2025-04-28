@@ -3,12 +3,12 @@
 
 use super::node::RuntimeType;
 use futures::FutureExt;
+use one_node::{SuiNode, SuiNodeHandle};
 use std::{
     sync::{Arc, Weak},
     thread,
 };
 use sui_config::NodeConfig;
-use sui_node::{SuiNode, SuiNodeHandle};
 use sui_types::{
     base_types::ConciseableName,
     crypto::{AuthorityPublicKeyBytes, KeypairTraits},

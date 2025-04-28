@@ -17,9 +17,9 @@ use fastcrypto::{
     encoding::{Encoding, Hex},
     traits::EncodeDecodeBase64,
 };
+use one_node::SuiNode;
 use serde_json::{json, Value};
 use sui_config::{sui_config_dir, Config, NodeConfig, SUI_FULLNODE_CONFIG, SUI_KEYSTORE_FILENAME};
-use sui_node::SuiNode;
 use sui_rosetta::{
     types::{CurveType, PrefundedAccount, SuiEnv},
     RosettaOfflineServer,

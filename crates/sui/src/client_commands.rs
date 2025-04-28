@@ -1162,7 +1162,7 @@ impl SuiClientCommands {
 
                 if let Some(gas) = opts.gas {
                     if input_coins.contains(&gas) {
-                        bail!("Gas coin is in input coins of Pay transaction, use PaySui transaction instead!");
+                        bail!("Gas coin is in input coins of Pay transaction, use PayOct transaction instead!");
                     }
                 }
 
@@ -1170,8 +1170,8 @@ impl SuiClientCommands {
             }
 
             SuiClientCommands::PayOct { input_coins, recipients, amounts, opts } => {
-                ensure!(!input_coins.is_empty(), "PaySui transaction requires a non-empty list of input coins");
-                ensure!(!recipients.is_empty(), "PaySui transaction requires a non-empty list of recipient addresses");
+                ensure!(!input_coins.is_empty(), "PayOct transaction requires a non-empty list of input coins");
+                ensure!(!recipients.is_empty(), "PayOct transaction requires a non-empty list of recipient addresses");
                 ensure!(
                     recipients.len() == amounts.len(),
                     format!(
@@ -1193,7 +1193,7 @@ impl SuiClientCommands {
             }
 
             SuiClientCommands::PayAllOct { input_coins, recipient, opts } => {
-                ensure!(!input_coins.is_empty(), "PayAllSui transaction requires a non-empty list of input coins");
+                ensure!(!input_coins.is_empty(), "PayAllOct transaction requires a non-empty list of input coins");
                 let recipient = get_identity_address(Some(recipient), context)?;
                 let signer = context.get_object_owner(&input_coins[0]).await?;
                 let client = context.get_client().await?;
@@ -1682,7 +1682,7 @@ impl Display for SuiClientCommandResult {
                 }
 
                 let mut builder = TableBuilder::default();
-                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "suiBalance (SUI)"]);
+                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "balance (OCT)"]);
                 for coin in &gas_coins {
                     builder.push_record(vec![
                         coin.gas_coin_id.to_string(),
@@ -1795,7 +1795,7 @@ impl Display for SuiClientCommandResult {
                 write!(writer, "{}", env.as_deref().unwrap_or("None"))?;
             }
             SuiClientCommandResult::NewEnv(env) => {
-                writeln!(writer, "Added new Sui env [{}] to config.", env.alias)?;
+                writeln!(writer, "Added new OneChain env [{}] to config.", env.alias)?;
             }
             SuiClientCommandResult::Envs(envs, active) => {
                 let mut builder = TableBuilder::default();
@@ -2205,7 +2205,7 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, url: String) -> Res
             if let Some(err) = faucet_resp.error {
                 bail!("Faucet request was unsuccessful: {err}")
             } else {
-                println!("Request successful. It can take up to 1 minute to get the coin. Run one_chain client gas to check your gas coins.");
+                println!("Request successful. It can take up to 1 minute to get the coin. Run `one_chain client gas` to check your gas coins.");
             }
         }
         StatusCode::TOO_MANY_REQUESTS => {
@@ -2547,8 +2547,7 @@ async fn check_protocol_version_and_warn(client: &SuiClient) -> Result<(), anyho
             format!(
                 "[warning] CLI's protocol version is {cli_protocol_version}, but the active \
                 network's protocol version is {on_chain_protocol_version}. \
-                \n Consider installing the latest version of the CLI - \
-                https://docs.sui.io/guides/developer/getting-started/sui-install \n\n \
+                \n Consider installing the latest version of the CLI\n\n \
                 If publishing/upgrading returns a dependency verification error, then install the \
                 latest CLI version."
             )

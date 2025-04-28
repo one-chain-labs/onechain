@@ -127,8 +127,8 @@ pub struct IndexerArgs {
     #[clap(long, default_value = "localhost")]
     pg_host: String,
 
-    /// DB name for the Indexer Postgres DB. Default DB name is sui_indexer.
-    #[clap(long, default_value = "sui_indexer")]
+    /// DB name for the Indexer Postgres DB. Default DB name is one_indexer.
+    #[clap(long, default_value = "one_indexer")]
     pg_db_name: String,
 
     /// DB username for the Indexer Postgres DB. Default username is postgres.
@@ -147,7 +147,7 @@ impl IndexerArgs {
             with_graphql: None,
             pg_port: 5432,
             pg_host: "localhost".to_string(),
-            pg_db_name: "sui_indexer".to_string(),
+            pg_db_name: "one_indexer".to_string(),
             pg_user: "postgres".to_string(),
             pg_password: "postgrespw".to_string(),
         }
@@ -523,7 +523,7 @@ impl SuiCommand {
                 // Load the config of the Sui authority.
                 let network_config_path = network_config.clone().unwrap_or(sui_config_dir()?.join(SUI_NETWORK_CONFIG));
                 let network_config: NetworkConfig = PersistedConfig::read(&network_config_path).map_err(|err| {
-                    err.context(format!("Cannot open Sui network config file at {:?}", network_config_path))
+                    err.context(format!("Cannot open OneChain network config file at {:?}", network_config_path))
                 })?;
                 let bridge_committee_config: BridgeCommitteeConfig =
                     PersistedConfig::read(&bridge_committee_config_path).map_err(|err| {
@@ -629,7 +629,7 @@ async fn start(
     if epoch_duration_ms.is_some() && genesis_blob_exists(config.clone()) && !force_regenesis {
         bail!(
             "Epoch duration can only be set when passing the `--force-regenesis` flag, or when \
-            there is no genesis configuration in the default Sui configuration folder or the given \
+            there is no genesis configuration in the default OneChain configuration folder or the given \
             network.config argument.",
         );
     }
@@ -724,8 +724,9 @@ async fn start(
         };
 
         // Load the config of the Sui authority.
-        let network_config: NetworkConfig = PersistedConfig::read(&network_config_path)
-            .map_err(|err| err.context(format!("Cannot open Sui network config file at {:?}", network_config_path)))?;
+        let network_config: NetworkConfig = PersistedConfig::read(&network_config_path).map_err(|err| {
+            err.context(format!("Cannot open OneChain network config file at {:?}", network_config_path))
+        })?;
 
         swarm_builder = swarm_builder.dir(sui_config_path.clone()).with_network_config(network_config);
 
@@ -1097,7 +1098,7 @@ async fn genesis(
 async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> Result<(), anyhow::Error> {
     // Prompt user for connect to devnet fullnode if config does not exist.
     if !wallet_conf_path.exists() {
-        let env = match std::env::var_os("SUI_CONFIG_WITH_RPC_URL") {
+        let env = match std::env::var_os("ONE_CONFIG_WITH_RPC_URL") {
             Some(v) => {
                 Some(SuiEnv { alias: "custom".to_string(), rpc: v.into_string().unwrap(), ws: None, basic_auth: None })
             }
@@ -1109,7 +1110,7 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
                     );
                 } else {
                     print!(
-                        "Config file [{:?}] doesn't exist, do you want to connect to a Sui Full node server [y/N]?",
+                        "Config file [{:?}] doesn't exist, do you want to connect to a OneChain Full node server [y/N]?",
                         wallet_conf_path
                     );
                 }
@@ -1117,7 +1118,7 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
                     let url = if accept_defaults {
                         String::new()
                     } else {
-                        print!("Sui Full node server URL (Defaults to Sui Testnet if not specified) : ");
+                        print!("OneChain Full node server URL (Defaults to Testnet if not specified) : ");
                         read_line()?
                     };
                     Some(if url.trim().is_empty() {

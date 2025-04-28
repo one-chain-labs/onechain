@@ -1,4 +1,9 @@
-[
+[  {
+    "name": "OneChain RPC",
+    "link": "/RPC",
+    "anchor": "",
+    "children": []
+  },
   {
     "name": "OneChain CLI",
     "anchor": "onechain-cli",

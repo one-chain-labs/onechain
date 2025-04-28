@@ -7,9 +7,9 @@ use tokio::{sync::broadcast, time::sleep};
 use tracing::{error, info};
 
 use mysten_common::sync::async_once_cell::AsyncOnceCell;
+use one_node::metrics;
 use sui_config::{node::RunWithRange, Config, NodeConfig};
 use sui_core::runtime::SuiRuntimes;
-use sui_node::metrics;
 use sui_telemetry::send_telemetry_event;
 use sui_types::{
     committee::EpochId,
@@ -98,7 +98,7 @@ fn main() {
 
     // Run node in a separate runtime so that admin/monitoring functions continue to work
     // if it deadlocks.
-    let node_once_cell = Arc::new(AsyncOnceCell::<Arc<sui_node::SuiNode>>::new());
+    let node_once_cell = Arc::new(AsyncOnceCell::<Arc<one_node::SuiNode>>::new());
     let node_once_cell_clone = node_once_cell.clone();
     let rpc_runtime = runtimes.json_rpc.handle().clone();
 
@@ -106,7 +106,7 @@ fn main() {
     let (runtime_shutdown_tx, runtime_shutdown_rx) = broadcast::channel::<()>(1);
 
     runtimes.sui_node.spawn(async move {
-        match sui_node::SuiNode::start_async(config, registry_service, Some(rpc_runtime), VERSION).await {
+        match one_node::SuiNode::start_async(config, registry_service, Some(rpc_runtime), VERSION).await {
             Ok(sui_node) => node_once_cell_clone.set(sui_node).expect("Failed to set node in AsyncOnceCell"),
 
             Err(e) => {
@@ -149,7 +149,7 @@ fn main() {
             ))
             .unwrap();
 
-        sui_node::admin::run_admin_server(node, admin_interface_port, filter_handle).await
+        one_node::admin::run_admin_server(node, admin_interface_port, filter_handle).await
     });
 
     /* comment tele or change the google-analytics config to ourselves.

@@ -1,0 +1,196 @@
+[
+  {
+    "name": "Getting Started",
+    "anchor": "getting-started",
+    "children": [
+      {
+        "name": "Installing OneChain Binaries",
+        "anchor": "installing-onechain-binaries",
+        "children": [
+          {
+            "name": "Prerequisites",
+            "anchor": "prerequisites",
+            "children": [
+              {
+                "name": "Rust and Cargo",
+                "anchor": "rust-and-cargo",
+                "children": []
+              },
+              {
+                "name": "Additional prerequisites by operating system",
+                "anchor": "additional-prerequisites-by-operating-system",
+                "children": [
+                  {
+                    "name": "All Linux prerequisites",
+                    "anchor": "all-linux-prerequisites",
+                    "children": []
+                  },
+                  {
+                    "name": "cURL",
+                    "anchor": "curl",
+                    "children": []
+                  },
+                  {
+                    "name": "Git CLI",
+                    "anchor": "git-cli",
+                    "children": []
+                  },
+                  {
+                    "name": "CMake",
+                    "anchor": "cmake",
+                    "children": []
+                  },
+                  {
+                    "name": "GCC",
+                    "anchor": "gcc",
+                    "children": []
+                  },
+                  {
+                    "name": "libssl-dev",
+                    "anchor": "libssl-dev",
+                    "children": []
+                  },
+                  {
+                    "name": "libclang-dev",
+                    "anchor": "libclang-dev",
+                    "children": []
+                  },
+                  {
+                    "name": "libpq-dev (optional)",
+                    "anchor": "libpq-dev--optional-",
+                    "children": []
+                  },
+                  {
+                    "name": "build-essential",
+                    "anchor": "build-essential",
+                    "children": []
+                  },
+                  {
+                    "name": "Homebrew",
+                    "anchor": "homebrew",
+                    "children": []
+                  },
+                  {
+                    "name": "All macOS prerequisites",
+                    "anchor": "all-macos-prerequisites",
+                    "children": []
+                  },
+                  {
+                    "name": "cURL",
+                    "anchor": "curl-1",
+                    "children": []
+                  },
+                  {
+                    "name": "CMake",
+                    "anchor": "cmake-1",
+                    "children": []
+                  },
+                  {
+                    "name": "libpq (optional)",
+                    "anchor": "libpq--optional-",
+                    "children": []
+                  },
+                  {
+                    "name": "Git CLI",
+                    "anchor": "git-cli-1",
+                    "children": []
+                  },
+                  {
+                    "name": "PostgreSQL",
+                    "anchor": "postgresql",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "How to build OneChain binaries",
+            "anchor": "how-to-build-onechain-binaries",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "Connect to OneChain",
+        "anchor": "connect-to-onechain",
+        "children": [
+          {
+            "name": "Configure OneChain client",
+            "anchor": "configure-onechain-client",
+            "children": [
+              {
+                "name": "Connect to a custom RPC endpoint",
+                "anchor": "connect-to-a-custom-rpc-endpoint",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Get your OneChain address",
+        "anchor": "get-your-onechain-address",
+        "children": [
+          {
+            "name": "OneChain Wallet",
+            "anchor": "onechain-wallet",
+            "children": []
+          },
+          {
+            "name": "Command line interface",
+            "anchor": "command-line-interface",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "Request test tokens",
+        "anchor": "request-test-tokens",
+        "children": [
+          {
+            "name": "through CLI",
+            "anchor": "through-cli",
+            "children": []
+          },
+          {
+            "name": "through cURL",
+            "anchor": "through-curl",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Your First dApp",
+    "anchor": "your-first-dapp",
+    "children": [
+      {
+        "name": "Defining the package",
+        "anchor": "defining-the-package",
+        "children": []
+      },
+      {
+        "name": "Building your package",
+        "anchor": "building-your-package",
+        "children": []
+      },
+      {
+        "name": "Testing a package",
+        "anchor": "testing-a-package",
+        "children": []
+      },
+      {
+        "name": "Sui-specific testing",
+        "anchor": "sui-specific-testing",
+        "children": []
+      },
+      {
+        "name": "Module initializers",
+        "anchor": "module-initializers",
+        "children": []
+      }
+    ]
+  }
+]

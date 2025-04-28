@@ -666,7 +666,7 @@ sui-move-lsp = { path = "crates/sui-move-lsp" }
 sui-mvr-graphql-rpc = { path = "crates/sui-mvr-graphql-rpc" }
 sui-mvr-indexer = { path = "crates/sui-mvr-indexer" }
 sui-network = { path = "crates/sui-network" }
-sui-node = { path = "crates/sui-node" }
+one-node = { path = "crates/sui-node" }
 sui-open-rpc = { path = "crates/sui-open-rpc" }
 sui-open-rpc-macros = { path = "crates/sui-open-rpc-macros" }
 sui-package-dump = { path = "crates/sui-package-dump" }

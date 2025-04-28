@@ -38,7 +38,7 @@ pub const CONSENSUS_DB_NAME: &str = "consensus_db";
 pub const FULL_NODE_DB_PATH: &str = "full_node_db";
 
 pub fn sui_config_dir() -> Result<PathBuf, anyhow::Error> {
-    match std::env::var_os("SUI_CONFIG_DIR") {
+    match std::env::var_os("ONE_CONFIG_DIR") {
         Some(config_env) => Ok(config_env.into()),
         None => match dirs::home_dir() {
             Some(v) => Ok(v.join(SUI_DIR).join(SUI_CONFIG_DIR)),
@@ -57,7 +57,7 @@ pub fn sui_config_dir() -> Result<PathBuf, anyhow::Error> {
 pub fn genesis_blob_exists(config_dir: Option<PathBuf>) -> bool {
     if let Some(dir) = config_dir {
         dir.join(SUI_GENESIS_FILENAME).exists()
-    } else if let Some(config_env) = std::env::var_os("SUI_CONFIG_DIR") {
+    } else if let Some(config_env) = std::env::var_os("ONE_CONFIG_DIR") {
         Path::new(&config_env).join(SUI_GENESIS_FILENAME).exists()
     } else if let Some(home) = dirs::home_dir() {
         let mut config = PathBuf::new();

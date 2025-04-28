@@ -15,13 +15,13 @@ use std::{
 };
 use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
 
+use one_node::SuiNodeHandle;
 use sui_config::{
     node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange},
     ExecutionCacheConfig,
     NodeConfig,
 };
 use sui_macros::nondeterministic;
-use sui_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolVersion;
 use sui_swarm_config::{
     genesis_config::{AccountConfig, GenesisConfig, ValidatorGenesisConfig},

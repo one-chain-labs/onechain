@@ -116,8 +116,8 @@ pub const SUI_COIN_TYPE: &str = "0x2::oct::OCT";
 pub const SUI_LOCAL_NETWORK_URL: &str = "http://127.0.0.1:9000";
 pub const SUI_LOCAL_NETWORK_URL_0: &str = "http://0.0.0.0:9000";
 pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/gas";
-pub const SUI_DEVNET_URL: &str = "https://fullnode.devnet.sui.io:443";
-pub const SUI_TESTNET_URL: &str = "https://fullnode.testnet.sui.io:443";
+pub const SUI_DEVNET_URL: &str = "https://rpc-devnet.onelabs.cc:443";
+pub const SUI_TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
 
 /// A OneChain client builder for connecting to the OneChain network
 ///

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
+use one_node::SuiNodeHandle;
 use std::sync::{Mutex, MutexGuard};
 use sui_config::NodeConfig;
-use sui_node::SuiNodeHandle;
 use sui_types::{
     base_types::{AuthorityName, ConciseableName},
     crypto::KeypairTraits,
