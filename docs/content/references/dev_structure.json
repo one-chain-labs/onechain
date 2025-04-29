@@ -167,29 +167,384 @@
     "anchor": "your-first-dapp",
     "children": [
       {
-        "name": "Defining the package",
-        "anchor": "defining-the-package",
-        "children": []
+        "name": "Write a Move Package",
+        "anchor": "write-a-move-package",
+        "children": [
+          {
+            "name": "Defining the package",
+            "anchor": "defining-the-package",
+            "children": []
+          }
+        ]
       },
       {
-        "name": "Building your package",
-        "anchor": "building-your-package",
-        "children": []
+        "name": "Build and Test Packages",
+        "anchor": "build-and-test-packages",
+        "children": [
+          {
+            "name": "Building your package",
+            "anchor": "building-your-package",
+            "children": []
+          },
+          {
+            "name": "Testing a package",
+            "anchor": "testing-a-package",
+            "children": []
+          },
+          {
+            "name": "Sui-specific testing",
+            "anchor": "sui-specific-testing",
+            "children": [
+              {
+                "name": "Module initializers",
+                "anchor": "module-initializers",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
-        "name": "Testing a package",
-        "anchor": "testing-a-package",
-        "children": []
+        "name": "Publish a Package",
+        "anchor": "publish-a-package",
+        "children": [
+          {
+            "name": "Interact with the package",
+            "anchor": "interact-with-the-package",
+            "children": []
+          }
+        ]
       },
       {
-        "name": "Sui-specific testing",
-        "anchor": "sui-specific-testing",
-        "children": []
+        "name": "debugging",
+        "anchor": "debugging",
+        "children": [
+          {
+            "name": "Using debug in my_module",
+            "anchor": "using-debug-in-my_module",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "OneChain 101",
+    "anchor": "onechain-101",
+    "children": [
+      {
+        "name": "Shared versus Owned Objects",
+        "anchor": "shared-versus-owned-objects",
+        "children": [
+          {
+            "name": "Example: Escrow",
+            "anchor": "example--escrow",
+            "children": [
+              {
+                "name": "`Locked<T>` and `Key`",
+                "anchor": "-locked-t---and--key-",
+                "children": []
+              },
+              {
+                "name": "Owned objects",
+                "anchor": "owned-objects",
+                "children": []
+              },
+              {
+                "name": "Shared objects",
+                "anchor": "shared-objects",
+                "children": []
+              },
+              {
+                "name": "Comparison",
+                "anchor": "comparison",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
-        "name": "Module initializers",
-        "anchor": "module-initializers",
-        "children": []
+        "name": "Using Events",
+        "anchor": "using-events",
+        "children": [
+          {
+            "name": "Move event structure",
+            "anchor": "move-event-structure",
+            "children": []
+          },
+          {
+            "name": "Emit events in Move",
+            "anchor": "emit-events-in-move",
+            "children": [
+              {
+                "name": "Query events with RPC",
+                "anchor": "query-events-with-rpc",
+                "children": []
+              },
+              {
+                "name": "Query events in Rust",
+                "anchor": "query-events-in-rust",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Monitoring events",
+            "anchor": "monitoring-events",
+            "children": [
+              {
+                "name": "Poll events",
+                "anchor": "poll-events",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Access On-Chain Time",
+        "anchor": "access-on-chain-time",
+        "children": [
+          {
+            "name": "The sui::clock::Clock module",
+            "anchor": "the-sui--clock--clock-module",
+            "children": []
+          },
+          {
+            "name": "Epoch timestamps",
+            "anchor": "epoch-timestamps",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "Signing and Sending Transactions",
+        "anchor": "signing-and-sending-transactions",
+        "children": [
+          {
+            "name": "Workflow",
+            "anchor": "workflow",
+            "children": []
+          },
+          {
+            "name": "Examples",
+            "anchor": "examples",
+            "children": [
+              {
+                "name": "Notes",
+                "anchor": "notes",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sponsored Transactions",
+        "anchor": "sponsored-transactions",
+        "children": [
+          {
+            "name": "Roles in sponsored transactions",
+            "anchor": "roles-in-sponsored-transactions",
+            "children": []
+          },
+          {
+            "name": "Use cases",
+            "anchor": "use-cases",
+            "children": [
+              {
+                "name": "App-specific sponsorship",
+                "anchor": "app-specific-sponsorship",
+                "children": []
+              },
+              {
+                "name": "Wildcard sponsorship",
+                "anchor": "wildcard-sponsorship",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Sponsored transaction flow",
+            "anchor": "sponsored-transaction-flow",
+            "children": []
+          },
+          {
+            "name": "Risk considerations",
+            "anchor": "risk-considerations",
+            "children": [
+              {
+                "name": "Client equivocation risk",
+                "anchor": "client-equivocation-risk",
+                "children": []
+              },
+              {
+                "name": "Censorship risk",
+                "anchor": "censorship-risk",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Avoiding Equivocation",
+        "anchor": "avoiding-equivocation",
+        "children": [
+          {
+            "name": "Common pitfalls to avoid",
+            "anchor": "common-pitfalls-to-avoid",
+            "children": []
+          },
+          {
+            "name": "OneChain SDK",
+            "anchor": "onechain-sdk",
+            "children": [
+              {
+                "name": "SerialTransactionExecutor",
+                "anchor": "serialtransactionexecutor",
+                "children": []
+              },
+              {
+                "name": "ParallelTransactionExecutor",
+                "anchor": "paralleltransactionexecutor",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Debug tools",
+            "anchor": "debug-tools",
+            "children": [
+              {
+                "name": "one-tool",
+                "anchor": "one-tool",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Working with PTBs",
+        "anchor": "working-with-ptbs",
+        "children": [
+          {
+            "name": "Building Programmable Transaction Blocks",
+            "anchor": "building-programmable-transaction-blocks",
+            "children": [
+              {
+                "name": "Constructing inputs",
+                "anchor": "constructing-inputs",
+                "children": []
+              },
+              {
+                "name": "Available transactions",
+                "anchor": "available-transactions",
+                "children": []
+              },
+              {
+                "name": "Passing transaction results as arguments",
+                "anchor": "passing-transaction-results-as-arguments",
+                "children": []
+              },
+              {
+                "name": "Use the gas coin",
+                "anchor": "use-the-gas-coin",
+                "children": []
+              },
+              {
+                "name": "Get PTB bytes",
+                "anchor": "get-ptb-bytes",
+                "children": []
+              },
+              {
+                "name": "Building offline",
+                "anchor": "building-offline",
+                "children": []
+              },
+              {
+                "name": "Gas configuration",
+                "anchor": "gas-configuration",
+                "children": [
+                  {
+                    "name": "Gas price",
+                    "anchor": "gas-price",
+                    "children": []
+                  },
+                  {
+                    "name": "Budget",
+                    "anchor": "budget",
+                    "children": []
+                  },
+                  {
+                    "name": "Gas payment",
+                    "anchor": "gas-payment",
+                    "children": []
+                  },
+                  {
+                    "name": "dApp / Wallet integration",
+                    "anchor": "dapp---wallet-integration",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "name": "Sponsored PTBs",
+                "anchor": "sponsored-ptbs",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Coin management",
+            "anchor": "coin-management",
+            "children": [
+              {
+                "name": "SDK usage",
+                "anchor": "sdk-usage",
+                "children": []
+              },
+              {
+                "name": "Gas Smashing",
+                "anchor": "gas-smashing",
+                "children": []
+              },
+              {
+                "name": "Generic coins",
+                "anchor": "generic-coins",
+                "children": []
+              },
+              {
+                "name": "Concurrency",
+                "anchor": "concurrency",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Simulating References",
+            "anchor": "simulating-references",
+            "children": [
+              {
+                "name": "The borrow module",
+                "anchor": "the-borrow-module",
+                "children": []
+              },
+              {
+                "name": "Considerations",
+                "anchor": "considerations",
+                "children": []
+              },
+              {
+                "name": "Example",
+                "anchor": "example",
+                "children": []
+              }
+            ]
+          }
+        ]
       }
     ]
   }

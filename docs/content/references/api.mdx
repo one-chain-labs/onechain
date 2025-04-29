@@ -1,6 +1,6 @@
 # OneChain API
 
-## OneChain CLI
+## OneChain CLI {/* {#onechain-cli} */}
 
 OneChain provides a command line interface (CLI) tool to interact with the OneChain network, its features, and the Move programming language. The complete suite of tools is called the OneChain CLI, with commands grouped together by feature. Each group of commands is commonly referred to by its top-level command: OneChain Client CLI, OneChain Console CLI, OneChain Keytool CLI, OneChain Move CLI, and OneChain Validator CLI.
 
@@ -20,7 +20,7 @@ The `tracing` feature is important as it adds Move test coverage and debugger su
 
 ### OneChain CLI commands {/* {#onechain-cli-commands} */}
 
-There are a number of top-level commands available, but the five most useful to users are the following. Use the `help` flag for the commands that are not documented yet. For example, `one_chain validator --help`.  
+There are a number of top-level commands available, but the five most useful to users are the following. Use the `help` flag for the commands that are not documented yet. For example, `one_chain validator --help`.
 
 - **[OneChain Client CLI](#onechain-client-cli):** Use the `one_chain client` commands to interact with the OneChain network.
 - **[OneChain Client PTB CLI](#onechain-client-ptb-cli):** Use the `one_chain client ptb` command to build and execute PTBs.
@@ -157,7 +157,7 @@ $ one_chain client active-address
 ###### Request a OCT coin from faucet {/* {#request-a-oct-coin-from-faucet} */}
 
 If you use one of the standard public RPCs (for example, `rpc-devnet.onelabs.cc:443`), you can use the `faucet` command to request gas coins. If you use a custom faucet service, then pass in the URL to the faucet using the `--url` option.
-The `faucet` command works for a local network, as well. If you start your network with a custom faucet port, include the `--url` option. 
+The `faucet` command works for a local network, as well. If you start your network with a custom faucet port, include the `--url` option.
 
 ```sh
 $ one_chain client faucet
@@ -250,12 +250,12 @@ $ one_chain client dynamic-field 0x5
 
 ###### Send OCT or objects {/* {#send-oct-or-objects} */}
 
-In this example, let's see how to transfer OCT or transfer an object from one address to another. First of all, there two main commands for sending OCT or transferring objects: `pay` and `transfer`. 
-Both `pay` and `transfer` have a few sister commands: `pay-oct`, `pay-all-oct`, `transfer-oct`. 
+In this example, let's see how to transfer OCT or transfer an object from one address to another. First of all, there two main commands for sending OCT or transferring objects: `pay` and `transfer`.
+Both `pay` and `transfer` have a few sister commands: `pay-oct`, `pay-all-oct`, `transfer-oct`.
 
 The differences between these commands are:
 - commands that end in `-oct` deal with OneChain's native coin, and they use the input coints to pay for gas and for transferring OCT or the object.
-- `pay-` commands typically deal with coins and handle gas smashing for you, whereas `transfer` commands can handle the transfer of any object that has public transfer, meaning any object that has the `store` ability. 
+- `pay-` commands typically deal with coins and handle gas smashing for you, whereas `transfer` commands can handle the transfer of any object that has public transfer, meaning any object that has the `store` ability.
 - `pay` commands allow you to send coins to multiple recipients, whereas `transfer` commands only accept one recipient.
 - `pay-all-oct` is a special case of `pay-oct` that offers a way to transfer the entire balance after smashing.
 - `transfer-oct` is a legacy command and has been entirely superseded by `pay-oct` or `pay-all-oct` depending on whether an amount is specified or not.
@@ -453,7 +453,7 @@ $ one_chain client gas eloquent-amber
 ╰────────────────────────────────────────────────────────────────────┴────────────────────┴───────────────╯
 ```
 
-If you want to transfer the whole object, you can use `one_chain client pay-all-oct` or `one_chain client transfer-oct` (without passing the amount): 
+If you want to transfer the whole object, you can use `one_chain client pay-all-oct` or `one_chain client transfer-oct` (without passing the amount):
 ```sh
 $ one_chain client pay-oct --recipient eloquent-amber --input-coins 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52 --gas-budget 5000000
 ```
@@ -568,7 +568,7 @@ When looking at the profile in speedscope, there are three different views avail
 and you can hover your mouse over a bar or click a bar to see the computation units accrued by the function invocation. The transaction's total computation units, along with the storage computation units, are multiplied by the gas price to determine the gas cost of the transaction based on a tier system.
 
 **Time Order** shows the callstack of function invocations from left to right in the order
-of invocation, while **Left Heavy** combines repeated sequences of nested invocations into a single combined call stack. **Left Heavy** 
+of invocation, while **Left Heavy** combines repeated sequences of nested invocations into a single combined call stack. **Left Heavy**
 displays these sequences from left to right by total incurred gas consumption per combined call stack. This is useful when there have
 been hundreds of repeated calls to the same function to quickly observe the total gas consumption over all calls to that function.
 In both these views, you can click the top section and drag to zoom in and out over different sections of the profile.
@@ -633,7 +633,7 @@ This example also makes use of `one_chain move` commands. To learn more about th
     │ Used   │ 4565       │ 4565       │
     ╰────────┴────────────┴────────────╯
     ```
-1. Use `one_chain client gas` to verify that the active address has a gas coin for paying gas. 
+1. Use `one_chain client gas` to verify that the active address has a gas coin for paying gas.
     ```sh
     $ one_chain client gas
     ```
@@ -827,7 +827,7 @@ Options:
       --dry-run                         Perform a dry run of the transaction, without executing it
       --dev-inspect                     Perform a dev inspect
       --serialize-unsigned-transaction  Instead of executing the transaction, serialize the bcs bytes of the unsigned transaction data (TransactionData) using
-                                        base64 encoding, and print out the string <TX_BYTES>. The string can be used to execute transaction with `one_chain client  
+                                        base64 encoding, and print out the string <TX_BYTES>. The string can be used to execute transaction with `one_chain client
                                         execute-signed-tx --tx-bytes <TX_BYTES>`
       --serialize-signed-transaction    Instead of executing the transaction, serialize the bcs bytes of the signed transaction data (SenderSignedData) using
                                         base64 encoding, and print out the string <SIGNED_TX_BYTES>. The string can be used to execute transaction with `one_chain
@@ -994,7 +994,7 @@ CLI PTBs support string literals as inputs, which will be encoded as pure values
 
 ```sh
 $ one_chain client ptb --move-call "$PKG::m::f" '"Hello, world"' --gas-budget 10000000 --preview
-``` 
+```
 
 :::warning
 
@@ -1004,7 +1004,7 @@ Double-quoted string literals tend to also be valid syntax for shells (like `bas
 
 ###### Addresses and Object IDs {/* {#addresses-and-object-ids} */}
 
-You can pass literal addresses and objects IDs by prefixing them with '@'. This is needed to distinguish a hexadecimal value from an address in some situations. 
+You can pass literal addresses and objects IDs by prefixing them with '@'. This is needed to distinguish a hexadecimal value from an address in some situations.
 
 For addresses that are in your local wallet, you can use their alias instead (passing them without '@', for example, --transfer-objects my_alias).
 
@@ -1170,7 +1170,7 @@ If the command is not found, follow the instructions in [Install OneChain](#upda
 
 ##### Commands {/* {#commands-2} */}
 
-For all available commands, consult the [OneChain Client CLI docs](#onechain-client-cli). To start the OneChain Console, type `one_chain console`, which displays some information similar to the following: 
+For all available commands, consult the [OneChain Client CLI docs](#onechain-client-cli). To start the OneChain Console, type `one_chain console`, which displays some information similar to the following:
 
 ```sh
 🚀 ~ % one_chain console
@@ -1190,17 +1190,17 @@ RPC URL: https://rpc-testnet.onelabs.cc:443
 [warn] Client/Server api version mismatch, client api version : 1.14.0, server api version : 1.13.0
 Connecting to OneChain full node. API version 1.13.0
 
-Available RPC methods: ["sui_devInspectTransactionBlock", "sui_dryRunTransactionBlock", "sui_executeTransactionBlock", 
-"sui_getChainIdentifier", "sui_getCheckpoint", "sui_getCheckpoints", "sui_getEvents", "sui_getLatestCheckpointSequenceNumber", 
-"sui_getLoadedChildObjects", "sui_getMoveFunctionArgTypes", "sui_getNormalizedMoveFunction", "sui_getNormalizedMoveModule", 
-"sui_getNormalizedMoveModulesByPackage", "sui_getNormalizedMoveStruct", "sui_getObject", "sui_getProtocolConfig", 
-"sui_getTotalTransactionBlocks", "sui_getTransactionBlock", "sui_multiGetObjects", "sui_multiGetTransactionBlocks", 
-"sui_tryGetPastObject", "sui_tryMultiGetPastObjects", "suix_getAllBalances", "suix_getAllCoins", "suix_getBalance", 
-"suix_getCoinMetadata", "suix_getCoins", "suix_getCommitteeInfo", "suix_getDynamicFieldObject", "suix_getDynamicFields", 
-"suix_getLatestSuiSystemState", "suix_getOwnedObjects", "suix_getReferenceGasPrice", "suix_getStakes", "suix_getStakesByIds", 
-"suix_getTotalSupply", "suix_getValidatorsApy", "suix_queryEvents", "suix_queryTransactionBlocks", "suix_resolveNameServiceAddress", 
-"suix_resolveNameServiceNames", "suix_subscribeEvent", "suix_subscribeTransaction", "unsafe_batchTransaction", "unsafe_mergeCoins", 
-"unsafe_moveCall", "unsafe_pay", "unsafe_payAllOct", "unsafe_payOct", "unsafe_publish", "unsafe_requestAddStake", 
+Available RPC methods: ["sui_devInspectTransactionBlock", "sui_dryRunTransactionBlock", "sui_executeTransactionBlock",
+"sui_getChainIdentifier", "sui_getCheckpoint", "sui_getCheckpoints", "sui_getEvents", "sui_getLatestCheckpointSequenceNumber",
+"sui_getLoadedChildObjects", "sui_getMoveFunctionArgTypes", "sui_getNormalizedMoveFunction", "sui_getNormalizedMoveModule",
+"sui_getNormalizedMoveModulesByPackage", "sui_getNormalizedMoveStruct", "sui_getObject", "sui_getProtocolConfig",
+"sui_getTotalTransactionBlocks", "sui_getTransactionBlock", "sui_multiGetObjects", "sui_multiGetTransactionBlocks",
+"sui_tryGetPastObject", "sui_tryMultiGetPastObjects", "suix_getAllBalances", "suix_getAllCoins", "suix_getBalance",
+"suix_getCoinMetadata", "suix_getCoins", "suix_getCommitteeInfo", "suix_getDynamicFieldObject", "suix_getDynamicFields",
+"suix_getLatestSuiSystemState", "suix_getOwnedObjects", "suix_getReferenceGasPrice", "suix_getStakes", "suix_getStakesByIds",
+"suix_getTotalSupply", "suix_getValidatorsApy", "suix_queryEvents", "suix_queryTransactionBlocks", "suix_resolveNameServiceAddress",
+"suix_resolveNameServiceNames", "suix_subscribeEvent", "suix_subscribeTransaction", "unsafe_batchTransaction", "unsafe_mergeCoins",
+"unsafe_moveCall", "unsafe_pay", "unsafe_payAllOct", "unsafe_payOct", "unsafe_publish", "unsafe_requestAddStake",
 "unsafe_requestWithdrawStake", "unsafe_splitCoin", "unsafe_splitCoinEqual", "unsafe_transferObject", "unsafe_transferOct"]
 
 Welcome to the OneChain interactive console.
@@ -1233,7 +1233,7 @@ Usage: one_chain keytool [OPTIONS] <COMMAND>
 
 Commands:
   convert                           	Convert private key from legacy formats (e.g. Hex or Base64) to Bech32 encoded 33 byte `flag || private key` begins with `suiprivkey`
-  decode-or-verify-tx                   Given a Base64 encoded transaction bytes, decode its components. If a signature is provided, verify the signature against the transaction 
+  decode-or-verify-tx                   Given a Base64 encoded transaction bytes, decode its components. If a signature is provided, verify the signature against the transaction
   											and output the result.
   decode-multi-sig                  	Given a Base64 encoded MultiSig signature, decode its components. If tx_bytes is passed in, verify the multisig
   generate                          	Generate a new keypair with key scheme flag {ed25519 | secp256k1 | secp256r1} with optional derivation path, default to
@@ -1279,15 +1279,15 @@ Options:
 
 ##### JSON output {/* {#json-output-2} */}
 
-Append the `--json` flag to commands to format responses in JSON instead of the more human friendly default OneChain CLI output. This can be useful for extremely large datasets, for example, as those results can have a troublesome display on smaller screens. In these cases, the `--json` flag is useful. 
+Append the `--json` flag to commands to format responses in JSON instead of the more human friendly default OneChain CLI output. This can be useful for extremely large datasets, for example, as those results can have a troublesome display on smaller screens. In these cases, the `--json` flag is useful.
 
 ##### Examples {/* {#examples-2} */}
 
-The following examples demonstrate some of the most often used commands. 
+The following examples demonstrate some of the most often used commands.
 
 ###### List the key pairs in the local wallet {/* {#list-the-key-pairs-in-the-local-wallet} */}
 
-Use the `one_chain keytool list` command to output all the OneChain addresses that exist in the `~/.one/one_config/one.keystore` file in a readable format. 
+Use the `one_chain keytool list` command to output all the OneChain addresses that exist in the `~/.one/one_config/one.keystore` file in a readable format.
 
 
 ```sh
@@ -1314,7 +1314,7 @@ $ one_chain keytool list
 
 ###### Generate a new key pair and store it in a file {/* {#generate-a-new-key-pair-and-store-it-in-a-file} */}
 
-To generate a new key pair with the `ed25519` scheme, use the `one_chain keytool generate ed25519` command. For other schemes, see `one_chain keytool generate –help`. The key pair file is saved to the current directory with its filename being the address. The content of the file is a Base64 encoded string of 33-byte `flag || privkey`. 
+To generate a new key pair with the `ed25519` scheme, use the `one_chain keytool generate ed25519` command. For other schemes, see `one_chain keytool generate –help`. The key pair file is saved to the current directory with its filename being the address. The content of the file is a Base64 encoded string of 33-byte `flag || privkey`.
 
 ```sh
 $ one_chain keytool generate ed25519
@@ -1332,7 +1332,7 @@ $ one_chain keytool generate ed25519
 
 ###### Show the key pair data from a file {/* {#show-the-key-pair-data-from-a-file} */}
 
-Use `one_chain keytool show [filename]` to show the key pair data that is stored in a file. For example, the previous command generated a file named `0x5d8aa70f17d9343813d3ba6a59ecf5e8a23ffb487938e860999a722989eaef25.key`. 
+Use `one_chain keytool show [filename]` to show the key pair data that is stored in a file. For example, the previous command generated a file named `0x5d8aa70f17d9343813d3ba6a59ecf5e8a23ffb487938e860999a722989eaef25.key`.
 
 ```sh
 $ one_chain keytool show 0x5d8aa70f17d9343813d3ba6a59ecf5e8a23ffb487938e860999a722989eaef25.key
@@ -1383,10 +1383,10 @@ transaction bytes itself and its intent. If intent is absent, default will be us
 Usage: one_chain keytool sign [OPTIONS] --address <ADDRESS> --data <DATA>
 
 Options:
-  	--address <ADDRESS>  
-  	--data <DATA>   	 
+  	--address <ADDRESS>
+  	--data <DATA>
   	--json           	Return command outputs in json format
-  	--intent <INTENT>    
+  	--intent <INTENT>
   -h, --help           	Print help
 ```
 
@@ -1600,12 +1600,12 @@ Typing `one_chain validator --help` into your terminal or console displays the f
 Usage: one_chain validator [OPTIONS] [COMMAND]
 
 Commands:
-  make-validator-info          	 
-  become-candidate             	 
-  join-committee               	 
-  leave-committee              	 
-  display-metadata             	 
-  update-metadata              	 
+  make-validator-info
+  become-candidate
+  join-committee
+  leave-committee
+  display-metadata
+  update-metadata
   update-gas-price              	Update gas price that is used to calculate Reference Gas Price
   report-validator              	Report or un-report a validator
   serialize-payload-pop         	Serialize the payload that is used to generate Proof of Possession. This is useful to take the payload offline for an Authority protocol
@@ -1616,13 +1616,13 @@ Commands:
 Options:
   	--client.config <CONFIG>  Sets the file storing the state of our user accounts (an empty one will be created if missing)
   	--json                	Return command outputs in json format
-  -y, --yes                	 
+  -y, --yes
   -h, --help                	Print help
 ```
 
 ##### Examples {/* {#examples-4} */}
 
-The following examples demonstrate some of the most often used commands. 
+The following examples demonstrate some of the most often used commands.
 
 ###### Update gas price for next epoch {/* {#update-gas-price-for-next-epoch} */}
 
@@ -1702,7 +1702,7 @@ A8z83EqjmgwRNFV6sme6A5tTTTQPjiLgiW76neyvhLud
 │                                                                                               	│
 │ Shared Objects:                                                                               	│
 │  ┌──                                                                                          	│
-│  │ ID: 0x0...005                     	                                                            │ 
+│  │ ID: 0x0...005                     	                                                            │
 │  │ Version: 15                                                                                	│
 │  │ Digest: 6vdobiuiDQpJguDxVbbMNW5ddRqEFkP67C3FWrAVYYuZ                                       	│
 │  └──                                                                                          	│
@@ -2174,7 +2174,7 @@ The cheat sheet highlights common OneChain CLI commands.
 			<td className="w-2/3">`one_chain client switch --address ADDRESS`</td>
 			<td className="w-1/3">Make this the active address (accepts also an alias)</td>
 		</tr>
-		<tr> 	
+		<tr>
 			<td className="w-2/3">`one_chain keytool convert PRIVATE_KEY`</td>
 			<td className="w-1/3">Convert private key in Hex or Base64 to new format (Bech32 encoded 33 byte flag || private key starting with "suiprivkey")</td>
 		</tr>
@@ -2182,7 +2182,7 @@ The cheat sheet highlights common OneChain CLI commands.
 			<td className="w-2/3">`one_chain keytool generate ed25519`</td>
 			<td className="w-1/3">Generate a new keypair with ED25519 scheme and save it to file</td>
 		</tr>
-		<tr> 	
+		<tr>
       <td className="w-2/3">`one_chain keytool import INPUT KEY_SCHEME`</td>
 			<td className="w-1/3">Add a new key to OneChain CLI Keystore using either the input mnemonic phrase or a Bech32 encoded 33-byte flag || privkey starting with "suiprivkey"</td>
 		</tr>
@@ -2455,10 +2455,10 @@ The merchant calling the interface needs to sign the request/callback to verify 
 
 ```bash
 ##Generate private key
-openssl genrsa -out privateKey 2048 
-##Generate public key 
-openssl rsa -in privateKey -pubout -out publicKey 
-##If the calling party is Java language, please convert the private key into pkcs8 format. The conversion command is as follows： 
+openssl genrsa -out privateKey 2048
+##Generate public key
+openssl rsa -in privateKey -pubout -out publicKey
+##If the calling party is Java language, please convert the private key into pkcs8 format. The conversion command is as follows：
 openssl pkcs8 -topk8 -inform PEM -in privateKey -outform PEM -nocrypt -out pkcs8Privatekey
 ```
 
@@ -2485,7 +2485,7 @@ Notice:
 
 **Interface address**: /did/sendCode
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -2496,7 +2496,7 @@ Notice:
 | mobilePrefix | String[5] | Mobile number prefix | M | 855 |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -2508,14 +2508,14 @@ Notice:
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- |
 | String[64] | Site letter id | 1901826733104803841 |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -2532,7 +2532,7 @@ Notice:
 
 **Interface address**: /did/authenticateSms
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -2542,7 +2542,7 @@ Notice:
 | code | String[30] | Site message id, returned by the interface that sends the verification code | M | 1901826733104803841 |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -2553,14 +2553,14 @@ Notice:
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- |
 | String[64] | Authorization Code | Fww3fZCY4KVq9g |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -2579,7 +2579,7 @@ Notice:
 
 **Interface address**: /did/getToken
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -2587,7 +2587,7 @@ Notice:
 | nonce | String[50] | Random String | M | 1742266313000 |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -2596,7 +2596,7 @@ Notice:
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 **data:**
 
@@ -2628,7 +2628,7 @@ Notice:
 | sub | **String[64]** | **Theme** |  |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -2665,17 +2665,17 @@ Notice:
 
 **Interface address**: /did/getTokenUserProfile
 
-**Interface parameters**: 
+**Interface parameters**:
 
 Just need the header to carry the token
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {}
 ```
 
-**Response data result**: 
+**Response data result**:
 
 **data:**
 
@@ -2693,7 +2693,7 @@ Just need the header to carry the token
 | **walletType** | **Boolean** | **Merchant id** | **false** |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -2721,14 +2721,14 @@ Just need the header to carry the token
 
 **Interface address**: /did/refreshJwtToken
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
 | nonce | String[50] | Random String | M | 1742266313000 |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -2736,7 +2736,7 @@ Just need the header to carry the token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 **See** 4.1.3: Obtaining Certification JWT-TOKEN
 
@@ -2746,17 +2746,17 @@ Just need the header to carry the token
 
 **Interface address**: /wallet/queryChainCurrencyForList
 
-**Interface parameters**: 
+**Interface parameters**:
 
 Just carry a token
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {}
 ```
 
-**Response data result**: 
+**Response data result**:
 
 **data:**
 
@@ -2766,7 +2766,7 @@ Just carry a token
 | **currencyList** | **`List<CurrencyInfo>`** | **Correlation information supported by the chain** | **See the instructions below** |
 
 
-**currencyList**: 
+**currencyList**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- | --- |
@@ -2781,7 +2781,7 @@ Just carry a token
 | **symbol** | String[128] | **Symbol** | **$** |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -2891,7 +2891,7 @@ Just carry a token
 
 **Interface address**: /wallet/queryUserWalletForList
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -2899,7 +2899,7 @@ Just carry a token
 | **did** | **String[50]** | **did, just pass any one of them with the wallet address** | **O** | **1827720282074849281** |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -2908,7 +2908,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 **data:**
 
@@ -2924,7 +2924,7 @@ Just carry a token
 | **walletType** | **Boolean** | **Merchant id** | **1000000** |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -2954,7 +2954,7 @@ Just carry a token
 
 **Interface address**: /tx/queryTx
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -2970,7 +2970,7 @@ Just carry a token
 | **pageSize** | **Integer** | **10** | **M** | **10** |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -2987,7 +2987,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 **data:**
 
@@ -3005,7 +3005,7 @@ Just carry a token
 | **txType** | **String[64]** | **Transaction type**: <br/>**RECEIVE: Payment**<br/>**PAYMENT: Payment**<br/>**TRANSACTION: Transaction**<br/>**CONTRACT: Contract Call** | **RECEIVE** |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -3042,7 +3042,7 @@ Just carry a token
 
 **Interface address**: /transfer/createOrder
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -3053,7 +3053,7 @@ Just carry a token
 | toAddress | String[10] | Receiver's address | M | 0x559afcb3... |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -3065,7 +3065,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- | --- |
@@ -3073,7 +3073,7 @@ Just carry a token
 | rawTransaction | String | Content to be signed | |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -3093,7 +3093,7 @@ Just carry a token
 
 **Interface address**: /transfer/sendTx
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -3101,7 +3101,7 @@ Just carry a token
 | txBytes | String | Original transaction content | M | |
 | userSig | String | User Signature | M | |
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -3111,7 +3111,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- | --- |
@@ -3119,7 +3119,7 @@ Just carry a token
 | status | String | **Order Status**<br/>**UN_PAY: To be paid**<br/>**RUNNING: Transfer**<br/>**SUCCESS: Transfer Success**<br/>**FAIL: Transfer failed**<br/>**CANCEL: Cancel**<br/>**TIMEOUT: Timeout** | SUCCESS |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -3139,7 +3139,7 @@ Just carry a token
 
 **Interface address**: /transfer/pageList
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -3155,7 +3155,7 @@ Just carry a token
 | toAddress | String | Accounting Address | O | |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -3172,7 +3172,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- | --- |
@@ -3200,7 +3200,7 @@ Just carry a token
 | transferMethod | String | Transfer Method | ADDRESS |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -3247,14 +3247,14 @@ Just carry a token
 
 **Interface address**: /transfer/queryOrder
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
 | hash | String[128] | Transaction hash | M | 7pUb5AR... |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -3262,7 +3262,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- | --- |
@@ -3290,7 +3290,7 @@ Just carry a token
 | transferMethod | String | Transfer Method | ADDRESS |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -3330,7 +3330,7 @@ Just carry a token
 
 **Interface address**: /transfer/buildSponsorTransaction
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -3340,7 +3340,7 @@ Just carry a token
 | gasBudget | String[64] | Maximum service fee usage value | O | 0.004 |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -3351,7 +3351,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- | --- |
@@ -3362,7 +3362,7 @@ Just carry a token
 | sponsor | String | Fee sponsor address | 0x3e8cb5be2... |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
@@ -3385,7 +3385,7 @@ Just carry a token
 
 **Interface address**: /transfer/doProxyPayTx
 
-**Interface parameters**: 
+**Interface parameters**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Does it be necessary** | **Example** |
 | --- | --- | --- | --- | --- |
@@ -3394,7 +3394,7 @@ Just carry a token
 | userSig | String[2048] | User Signature | M | ANoVkEd... |
 
 
-**Request Example**: 
+**Request Example**:
 
 ```json
 {
@@ -3404,7 +3404,7 @@ Just carry a token
 }
 ```
 
-**Response data result**: 
+**Response data result**:
 
 | **Field Name** | **Field Type** | **Field Description** | **Example** |
 | --- | --- | --- | --- |
@@ -3412,7 +3412,7 @@ Just carry a token
 | status | String | Transaction status | true |
 
 
-**Response Example**: 
+**Response Example**:
 
 ```json
 {
