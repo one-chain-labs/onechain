@@ -26,78 +26,8 @@
                     "children": []
                   },
                   {
-                    "name": "cURL",
-                    "anchor": "curl",
-                    "children": []
-                  },
-                  {
-                    "name": "Git CLI",
-                    "anchor": "git-cli",
-                    "children": []
-                  },
-                  {
-                    "name": "CMake",
-                    "anchor": "cmake",
-                    "children": []
-                  },
-                  {
-                    "name": "GCC",
-                    "anchor": "gcc",
-                    "children": []
-                  },
-                  {
-                    "name": "libssl-dev",
-                    "anchor": "libssl-dev",
-                    "children": []
-                  },
-                  {
-                    "name": "libclang-dev",
-                    "anchor": "libclang-dev",
-                    "children": []
-                  },
-                  {
-                    "name": "libpq-dev (optional)",
-                    "anchor": "libpq-dev--optional-",
-                    "children": []
-                  },
-                  {
-                    "name": "build-essential",
-                    "anchor": "build-essential",
-                    "children": []
-                  },
-                  {
-                    "name": "Homebrew",
-                    "anchor": "homebrew",
-                    "children": []
-                  },
-                  {
                     "name": "All macOS prerequisites",
                     "anchor": "all-macos-prerequisites",
-                    "children": []
-                  },
-                  {
-                    "name": "cURL",
-                    "anchor": "curl-1",
-                    "children": []
-                  },
-                  {
-                    "name": "CMake",
-                    "anchor": "cmake-1",
-                    "children": []
-                  },
-                  {
-                    "name": "libpq (optional)",
-                    "anchor": "libpq--optional-",
-                    "children": []
-                  },
-                  {
-                    "name": "Git CLI",
-                    "anchor": "git-cli-1",
-                    "children": []
-                  },
-                  {
-                    "name": "PostgreSQL",
-                    "anchor": "postgresql",
                     "children": []
                   }
                 ]
