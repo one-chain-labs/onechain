@@ -412,7 +412,7 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 # authors = ["..."]			# e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
 [dependencies]
-Sui = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "main" }
+One = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "main" }
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
@@ -446,7 +446,7 @@ my_first_package = "0x0"
 The manifest file contents include available sections of the manifest and comments that provide additional information. In Move, you prepend the hash mark (`#`) to a line to denote a comment.
 
 - **[package]:** Contains metadata for the package. By default, the `one_chain move new` command populates only the `name` value of the metadata. In this case, the example passes `my_first_package` to the command, which becomes the name of the package. You can delete the first `#` of subsequent lines of the `[package]` section to provide values for the other available metadata fields.
-- **[dependencies]:** Lists the other packages that your package depends on to run. By default, the `one_chain move new` command lists the `Sui` package on GitHub (Testnet version) as the lone dependency.
+- **[dependencies]:** Lists the other packages that your package depends on to run. By default, the `one_chain move new` command lists the `One` package on GitHub as the lone dependency.
 - **[addresses]:** Declares named addresses that your package uses. By default, the section includes the package you create with the `one_chain move new` command and an address of `0x0`. This value can be left as-is and indicates that [package addresses are automatically managed](../../../../concepts/sui-move-concepts/packages/automated-address-management) when published and upgraded.
 - **[dev-dependencies]:** Includes only comments that describe the section.
 - **[dev-addresses]:** Includes only comments that describe the section.
@@ -461,9 +461,9 @@ Populate the `example.move` file with the following code:
 module my_first_package::example;
 
 // Part 1: These imports are provided by default
-// use sui::object::{Self, UID};
-// use sui::transfer;
-// use sui::tx_context::{Self, TxContext};
+// use one::object::{Self, UID};
+// use one::transfer;
+// use one::tx_context::{Self, TxContext};
 
 // Part 2: struct definitions
 public struct Sword has key, store {
@@ -508,9 +508,9 @@ public fun swords_created(self: &Forge): u64 {
 
 The comments in the preceding code highlight different parts of a typical Move source file.
 
-- **Part 1: Imports** - Code reuse is a necessity in modern programming. Move supports this concept with `use` aliases that allow your module to refer to types and functions declared in other modules. In this example, the module imports from `object`, `transfer`, and `tx_context` modules, but it does not need to do so explicitly, because the compiler provides these `use` statements by default. These modules are available to the package because the `Move.toml` file defines the Sui dependency (along with the `sui` named address) where they are defined.
+- **Part 1: Imports** - Code reuse is a necessity in modern programming. Move supports this concept with `use` aliases that allow your module to refer to types and functions declared in other modules. In this example, the module imports from `object`, `transfer`, and `tx_context` modules, but it does not need to do so explicitly, because the compiler provides these `use` statements by default. These modules are available to the package because the `Move.toml` file defines the `One` dependency (along with the `one` named address) where they are defined.
 
-- **Part 2: Struct declarations** - Structs define types that a module can create or destroy. Struct definitions can include abilities provided with the `has` keyword. The structs in this example, for instance, have the `key` ability, which indicates that these structs are Sui objects that you can transfer between addresses. The `store` ability on the structs provides the ability to appear in other struct fields and be transferred freely.
+- **Part 2: Struct declarations** - Structs define types that a module can create or destroy. Struct definitions can include abilities provided with the `has` keyword. The structs in this example, for instance, have the `key` ability, which indicates that these structs are OneChain objects that you can transfer between addresses. The `store` ability on the structs provides the ability to appear in other struct fields and be transferred freely.
 
 - **Part 3: Module initializer** - A special function that is invoked exactly once when the module publishes.
 
@@ -532,7 +532,7 @@ A successful build returns a response similar to the following:
 
 ```sh
 UPDATING GIT DEPENDENCY https://github.com/one-chain-labs/onechain.git
-INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY One
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING my_first_package
 ```
@@ -554,7 +554,7 @@ $ one_chain move test
 If you execute this command for the package created in [Write a Package](./write-package.mdx), you see the following output. Unsurprisingly, the test result has an `OK` status because there are no tests written yet to fail.
 
 ```sh
-BUILDING Sui
+BUILDING One
 BUILDING MoveStdlib
 BUILDING my_first_package
 Running Move unit tests
@@ -631,7 +631,7 @@ Run the test command again. Now the output shows a single successful test has ru
 
 ```sh
 BUILDING MoveStdlib
-BUILDING Sui
+BUILDING One
 BUILDING my_first_package
 Running Move unit tests
 [ PASS    ] 0x0::example::test_sword_create
@@ -640,7 +640,7 @@ Test result: OK. Total tests: 1; passed: 1; failed: 0
 
 :::tip
 
-Use a filter string to run only a matching subset of the unit tests. With a filter string provided, the `sui move test` checks the fully qualified (`<address>::<module_name>::<fn_name>`) name for a match.
+Use a filter string to run only a matching subset of the unit tests. With a filter string provided, the `one_chain move test` checks the fully qualified (`<address>::<module_name>::<fn_name>`) name for a match.
 
 :::
 
@@ -741,7 +741,7 @@ In the pure Move testing function, the function transfers the `sword` object to 
 Run the test command again to see two successful tests for our module:
 
 ```sh
-BUILDING Sui
+BUILDING One
 BUILDING MoveStdlib
 BUILDING my_first_package
 Running Move unit tests
@@ -767,7 +767,7 @@ For example, the following `init` functions are all valid:
 - `fun init(otw: EXAMPLE, ctx: &TxContext)`
 - `fun init(otw: EXAMPLE, ctx: &mut TxContext)`
 
-While the `sui move` command does not support publishing explicitly, you can still test module initializers using the testing framework by dedicating the first transaction to executing the initializer function.
+While the `one_chain move` command does not support publishing explicitly, you can still test module initializers using the testing framework by dedicating the first transaction to executing the initializer function.
 
 The `init` function for the module in the running example creates a `Forge` object.
 
@@ -1008,7 +1008,7 @@ Before you can call functions in a Move package (beyond an emulated OneChain exe
 To publish your package to the OneChain network, use the `publish` CLI command in the root of your package. You can use the `--gas-budget` flag to set a value for the maximum amount of gas the transaction can cost. If the cost of the transaction is more than the budget you set, the transaction fails and your package doesn't publish, but it's not necessary.
 
 ```sh
-$ sui client publish --gas-budget 5000000
+$ one_chain client publish --gas-budget 5000000
 ```
 
 If the publish transaction is successful, your terminal or console responds with the details of the publish transaction separated into sections, including transaction data, transaction effects, transaction block events, object changes, and balance changes.
@@ -1120,7 +1120,7 @@ Depending on your shell and operating system, you might need to pass some values
 
 Make sure to replace `<FORGE-ID>`, `<TO-ADDRESS>`, and `<PACKAGE-ID>` with the actual `objectId` of the `Forge` object, the address of the recipient (your address in this case), and the `packageID` of the package, respectively.
 
-After the transaction executes, you can check the status of the `Sword` object by using the `sui client objects` command again. Provided you used your address as the `<TO-ADDRESS>`, you should now see a total of four objects:
+After the transaction executes, you can check the status of the `Sword` object by using the `one_chain client objects` command again. Provided you used your address as the `<TO-ADDRESS>`, you should now see a total of four objects:
 
 ```
 ╭───────────────────────────────────────────────────────────────────────────────────────╮
@@ -1213,7 +1213,7 @@ $ one_chain move test
 The response prints out the expected results as the test calls the `new_sword` function.
 
 ```sh
-INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY One
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING my_first_package
 Running Move unit tests
@@ -2990,7 +2990,7 @@ Commit a signature to the Blake2b hash digest of the intent message (`intent || 
     // use SuiKeyPair to sign the digest.
     let sui_sig = skp_determ_0.sign(&digest);
 
-    // if you would like to verify the signature locally before submission, use this function. if it fails to verify locally, the transaction will fail to execute in Sui.
+    // if you would like to verify the signature locally before submission, use this function. if it fails to verify locally, the transaction will fail to execute in OneChain.
     let res = sui_sig.verify_secure(
         &intent_msg,
         sender,
@@ -3016,7 +3016,7 @@ Finally, submit the transaction with the signature.
         .await?;
 ```
 
-When using the [Sui CLI](/references/cli.mdx) for the first time, it creates a local file in `~/.one/keystore` on your machine with a list of private keys (encoded as Base64 encoded `flag || 32-byte-private-key`). You can use any key to sign transactions by specifying its address. Use `one_chain keytool list` to see a list of addresses.
+When using the [OneChain CLI](/references/cli.mdx) for the first time, it creates a local file in `~/.one/keystore` on your machine with a list of private keys (encoded as Base64 encoded `flag || 32-byte-private-key`). You can use any key to sign transactions by specifying its address. Use `one_chain keytool list` to see a list of addresses.
 
 There are three ways to initialize a key:
 
@@ -3047,7 +3047,7 @@ Create a transfer transaction in the CLI. Set the `$ONE_ADDRESS` to the one corr
 $ one_chain client gas
 ```
 ```sh
-$ one_chain client transfer-oct --to $ONE_ADDRESS --sui-coin-object-id $GAS_COIN_ID --gas-budget $GAS_BUDGET --serialize-unsigned-transaction
+$ one_chain client transfer-oct --to $ONE_ADDRESS --coin-object-id $GAS_COIN_ID --gas-budget $GAS_BUDGET --serialize-unsigned-transaction
 ```
 ```sh
 $ one_chain keytool sign --address $ONE_ADDRESS --data $TX_BYTES

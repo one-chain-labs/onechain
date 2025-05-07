@@ -2,16 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::BTreeSet,
-    fmt::Write,
-    fs::read_dir,
-    io::Read,
-    net::SocketAddr,
-    os::unix::prelude::FileExt,
-    path::PathBuf,
-    str,
-    thread,
-    time::Duration,
+    collections::BTreeSet, fmt::Write, fs::read_dir, io::Read, net::SocketAddr, os::unix::prelude::FileExt,
+    path::PathBuf, str, thread, time::Duration,
 };
 
 use std::env;
@@ -31,48 +23,27 @@ use sui_test_transaction_builder::batch_make_transfer_transactions;
 use sui_types::{
     object::Owner,
     transaction::{
-        TEST_ONLY_GAS_UNIT_FOR_GENERIC,
-        TEST_ONLY_GAS_UNIT_FOR_OBJECT_BASICS,
-        TEST_ONLY_GAS_UNIT_FOR_PUBLISH,
-        TEST_ONLY_GAS_UNIT_FOR_SPLIT_COIN,
-        TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
+        TEST_ONLY_GAS_UNIT_FOR_GENERIC, TEST_ONLY_GAS_UNIT_FOR_OBJECT_BASICS, TEST_ONLY_GAS_UNIT_FOR_PUBLISH,
+        TEST_ONLY_GAS_UNIT_FOR_SPLIT_COIN, TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
     },
 };
 use tokio::time::sleep;
 
 use one_chain::{
     client_commands::{
-        estimate_gas_budget,
-        Opts,
-        OptsWithGas,
-        SuiClientCommandResult,
-        SuiClientCommands,
-        SwitchResponse,
+        estimate_gas_budget, Opts, OptsWithGas, SuiClientCommandResult, SuiClientCommands, SwitchResponse,
     },
     sui_commands::{parse_host_port, SuiCommand},
 };
 use sui_config::{
-    PersistedConfig,
-    SUI_CLIENT_CONFIG,
-    SUI_FULLNODE_CONFIG,
-    SUI_GENESIS_FILENAME,
-    SUI_KEYSTORE_ALIASES_FILENAME,
-    SUI_KEYSTORE_FILENAME,
-    SUI_NETWORK_CONFIG,
+    PersistedConfig, SUI_CLIENT_CONFIG, SUI_FULLNODE_CONFIG, SUI_GENESIS_FILENAME, SUI_KEYSTORE_ALIASES_FILENAME,
+    SUI_KEYSTORE_FILENAME, SUI_NETWORK_CONFIG,
 };
 use sui_json::SuiJsonValue;
 use sui_json_rpc_types::{
-    get_new_package_obj_from_response,
-    OwnedObjectRef,
-    SuiExecutionStatus,
-    SuiObjectData,
-    SuiObjectDataFilter,
-    SuiObjectDataOptions,
-    SuiObjectResponse,
-    SuiObjectResponseQuery,
-    SuiTransactionBlockDataAPI,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockEffectsAPI,
+    get_new_package_obj_from_response, OwnedObjectRef, SuiExecutionStatus, SuiObjectData, SuiObjectDataFilter,
+    SuiObjectDataOptions, SuiObjectResponse, SuiObjectResponseQuery, SuiTransactionBlockDataAPI,
+    SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI,
 };
 use sui_keys::keystore::AccountKeystore;
 use sui_macros::sim_test;
@@ -2360,7 +2331,7 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
 
     SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address1),
-        sui_coin_object_id: coin,
+        coin_object_id: coin,
         amount: Some(1),
         opts: Opts {
             gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2375,7 +2346,7 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
 
     SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address1),
-        sui_coin_object_id: coin,
+        coin_object_id: coin,
         amount: Some(1),
         opts: Opts {
             gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2391,7 +2362,7 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
     // use alias for transfer
     SuiClientCommands::TransferOct {
         to: KeyIdentity::Alias(alias1),
-        sui_coin_object_id: coin,
+        coin_object_id: coin,
         amount: Some(1),
         opts: Opts {
             gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2665,7 +2636,7 @@ async fn test_dry_run() -> Result<(), anyhow::Error> {
     // === TRANSFER SUI === //
     let transfer_sui_dry_run = SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(SuiAddress::random_for_testing_only()),
-        sui_coin_object_id: object_to_send,
+        coin_object_id: object_to_send,
         amount: Some(1),
         opts: Opts::for_testing_dry_run(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
     }
@@ -2984,7 +2955,7 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
     let amount = 1000;
     let transfer_oct = SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address2),
-        sui_coin_object_id: object_id1,
+        coin_object_id: object_id1,
         amount: Some(amount),
         opts: Opts::for_testing(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
     }
@@ -3016,7 +2987,7 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
     // transfer the whole object by not passing an amount
     let transfer_oct = SuiClientCommands::TransferOct {
         to: recipient1.clone(),
-        sui_coin_object_id: object_id1,
+        coin_object_id: object_id1,
         amount: None,
         opts: Opts::for_testing(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
     }
@@ -3058,7 +3029,7 @@ async fn test_gas_estimation() -> Result<(), anyhow::Error> {
 
     let transfer_oct_cmd = SuiClientCommands::TransferOct {
         to: KeyIdentity::Address(address2),
-        sui_coin_object_id: object_id1,
+        coin_object_id: object_id1,
         amount: Some(amount),
         opts: Opts {
             gas_budget: None,
