@@ -10,7 +10,8 @@ use std::{
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponse};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
+    base_types::{ObjectID, SuiAddress},
+    object::Owner::Shared,
     transaction::{CallArg, ObjectArg},
 };
 use tracing::info;
@@ -141,10 +142,7 @@ impl SuiSupperCommitteeCommand {
                 let agree = bool::from_str(&agree).map_err(|_| anyhow!("only-agree-staking invalid boolean value"))?;
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let (_status, _summary, cap_obj_ref) = get_cap_object_ref(context, operation_cap_id).await?;
-                let proposal_ref = get_proposal_ref(context, proposal_id).await?;
-
-                let proposal_obj_mut =
-                    ObjectArg::SharedObject { id: proposal_id, initial_shared_version: proposal_ref.1, mutable: true };
+                let proposal_obj_mut = get_proposal_mut(context, proposal_id).await?;
 
                 let args = vec![
                     CallArg::Object(ObjectArg::ImmOrOwnedObject(cap_obj_ref)),
@@ -161,15 +159,20 @@ impl SuiSupperCommitteeCommand {
     }
 }
 
-async fn get_proposal_ref(context: &mut WalletContext, proposal_id: ObjectID) -> Result<ObjectRef> {
+async fn get_proposal_mut(context: &mut WalletContext, proposal_id: ObjectID) -> Result<ObjectArg> {
     let sui_client = context.get_client().await?;
-    let proposal_obj_ref = sui_client
+    let proposal_obj_owner = sui_client
         .read_api()
         .get_object_with_options(proposal_id, SuiObjectDataOptions::default().with_owner())
         .await?
-        .object_ref_if_exists()
+        .owner()
         .ok_or_else(|| anyhow!("OperationCap {} does not exist", proposal_id))?;
-    Ok(proposal_obj_ref)
+
+    if let Shared { initial_shared_version } = proposal_obj_owner {
+        Ok(ObjectArg::SharedObject { id: proposal_id, initial_shared_version, mutable: true })
+    } else {
+        Err(anyhow!("Proposal object {} is not a shared object", proposal_id))
+    }
 }
 
 impl Display for SuiSupperCommitteeResponse {

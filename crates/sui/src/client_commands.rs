@@ -42,15 +42,36 @@ use sui_source_validation::{BytecodeSourceVerifier, ValidationMode};
 use shared_crypto::intent::Intent;
 use sui_json::SuiJsonValue;
 use sui_json_rpc_types::{
-    Coin, DevInspectArgs, DevInspectResults, DryRunTransactionBlockResponse, DynamicFieldInfo, DynamicFieldPage,
-    SuiCoinMetadata, SuiData, SuiExecutionStatus, SuiObjectData, SuiObjectDataOptions, SuiObjectResponse,
-    SuiObjectResponseQuery, SuiParsedData, SuiProtocolConfigValue, SuiRawData, SuiTransactionBlockEffects,
-    SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
+    Coin,
+    DevInspectArgs,
+    DevInspectResults,
+    DryRunTransactionBlockResponse,
+    DynamicFieldInfo,
+    DynamicFieldPage,
+    SuiCoinMetadata,
+    SuiData,
+    SuiExecutionStatus,
+    SuiObjectData,
+    SuiObjectDataOptions,
+    SuiObjectResponse,
+    SuiObjectResponseQuery,
+    SuiParsedData,
+    SuiProtocolConfigValue,
+    SuiRawData,
+    SuiTransactionBlockEffects,
+    SuiTransactionBlockEffectsAPI,
+    SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions,
 };
 use sui_keys::keystore::AccountKeystore;
 use sui_move_build::{
-    build_from_resolution_graph, check_invalid_dependencies, check_unpublished_dependencies, gather_published_ids,
-    BuildConfig, CompiledPackage, PackageDependencies,
+    build_from_resolution_graph,
+    check_invalid_dependencies,
+    check_unpublished_dependencies,
+    gather_published_ids,
+    BuildConfig,
+    CompiledPackage,
+    PackageDependencies,
 };
 use sui_package_management::{LockCommand, PublishedAtError};
 use sui_replay::ReplayToolCommand;
@@ -58,7 +79,12 @@ use sui_sdk::{
     apis::ReadApi,
     sui_client_config::{SuiClientConfig, SuiEnv},
     wallet_context::WalletContext,
-    SuiClient, SUI_COIN_TYPE, SUI_DEVNET_URL, SUI_LOCAL_NETWORK_URL, SUI_LOCAL_NETWORK_URL_0, SUI_TESTNET_URL,
+    SuiClient,
+    SUI_COIN_TYPE,
+    SUI_DEVNET_URL,
+    SUI_LOCAL_NETWORK_URL,
+    SUI_LOCAL_NETWORK_URL_0,
+    SUI_TESTNET_URL,
 };
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, SuiAddress},
@@ -84,7 +110,10 @@ use tabled::{
         object::{Cell as TableCell, Columns as TableCols, Rows as TableRows},
         span::Span as TableSpan,
         style::HorizontalLine,
-        Alignment as TableAlignment, Border as TableBorder, Modify as TableModify, Panel as TablePanel,
+        Alignment as TableAlignment,
+        Border as TableBorder,
+        Modify as TableModify,
+        Panel as TablePanel,
         Style as TableStyle,
     },
 };
@@ -1056,18 +1085,15 @@ impl SuiClientCommands {
                 let client = context.get_client().await?;
                 let tx_read = client
                     .read_api()
-                    .get_transaction_with_options(
-                        digest,
-                        SuiTransactionBlockResponseOptions {
-                            show_input: true,
-                            show_raw_input: false,
-                            show_effects: true,
-                            show_events: true,
-                            show_object_changes: true,
-                            show_balance_changes: false,
-                            show_raw_effects: false,
-                        },
-                    )
+                    .get_transaction_with_options(digest, SuiTransactionBlockResponseOptions {
+                        show_input: true,
+                        show_raw_input: false,
+                        show_effects: true,
+                        show_events: true,
+                        show_object_changes: true,
+                        show_balance_changes: false,
+                        show_raw_effects: false,
+                    })
                     .await?;
                 SuiClientCommandResult::TransactionBlock(tx_read)
             }

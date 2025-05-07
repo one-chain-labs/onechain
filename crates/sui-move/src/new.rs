@@ -6,7 +6,7 @@ use move_cli::base::new;
 use move_package::source_package::layout::SourcePackageLayout;
 use std::{fs::create_dir_all, io::Write, path::Path};
 
-const SUI_PKG_NAME: &str = "Sui";
+const SUI_PKG_NAME: &str = "One";
 
 // Use testnet by default. Probably want to add options to make this configurable later
 const SUI_PKG_PATH: &str = "{ git = \"https://github.com/one-chain-labs/onechain.git\", subdir = \"crates/sui-framework/packages/sui-framework\", rev = \"main\" }";

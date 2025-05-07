@@ -524,7 +524,7 @@ impl LocalExec {
         if local_object.is_some() {
             return Ok(local_object);
         }
-        let response = block_on({ self.fetcher.get_child_object(object_id, version_upper_bound) });
+        let response = block_on(self.fetcher.get_child_object(object_id, version_upper_bound));
         match response {
             Ok(object) => {
                 let obj_ref = object.compute_object_reference();

@@ -148,7 +148,11 @@ title: Module `0x2::coin_vesting`
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="../sui-framework/coin_vesting.md#0x2_coin_vesting_release">release</a>&lt;T&gt;(self: &<b>mut</b> <a href="../sui-framework/coin_vesting.md#0x2_coin_vesting_CoinVesting">CoinVesting</a>&lt;T&gt;, ctx: &<b>mut</b> TxContext){
     <b>let</b> withdraw = self.<a href="../sui-framework/coin_vesting.md#0x2_coin_vesting_release_non_entry">release_non_entry</a>(ctx);
-    <a href="../sui-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(<a href="../sui-framework/coin.md#0x2_coin_from_balance">coin::from_balance</a>(withdraw,ctx),ctx.sender());
+    <b>if</b>(withdraw.value() &gt; 0){
+        <a href="../sui-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(<a href="../sui-framework/coin.md#0x2_coin_from_balance">coin::from_balance</a>(withdraw,ctx),ctx.sender());
+    }<b>else</b> {
+        withdraw.<a href="../sui-framework/coin_vesting.md#0x2_coin_vesting_destroy_zero">destroy_zero</a>();
+    };
 }
 </code></pre>
 

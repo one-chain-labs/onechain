@@ -44,7 +44,11 @@ public fun new_form_balance<T>(
 
 public entry fun release<T>(self: &mut CoinVesting<T>, ctx: &mut TxContext){
     let withdraw = self.release_non_entry(ctx);
-    transfer::public_transfer(coin::from_balance(withdraw,ctx),ctx.sender());
+    if(withdraw.value() > 0){
+        transfer::public_transfer(coin::from_balance(withdraw,ctx),ctx.sender());
+    }else {
+        withdraw.destroy_zero();
+    };
 }
 
 public fun release_non_entry<T>(self: &mut CoinVesting<T>, ctx: &TxContext): Balance<T> {
