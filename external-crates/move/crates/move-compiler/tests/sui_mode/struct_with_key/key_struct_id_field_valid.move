@@ -1,12 +1,12 @@
 // valid
 module a::m {
-    use sui::object;
+    use one::object;
     struct S has key {
         id: object::UID
     }
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }

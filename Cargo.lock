@@ -9370,6 +9370,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "one-tool"
+version = "1.39.4"
+dependencies = [
+ "anemo",
+ "anemo-cli",
+ "anyhow",
+ "bcs",
+ "bin-version",
+ "clap",
+ "colored",
+ "comfy-table",
+ "eyre",
+ "fastcrypto",
+ "futures",
+ "hex",
+ "indicatif",
+ "itertools 0.13.0",
+ "move-core-types",
+ "num_cpus",
+ "object_store",
+ "prometheus",
+ "ron",
+ "serde",
+ "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "sui-archival",
+ "sui-config",
+ "sui-core",
+ "sui-network",
+ "sui-package-dump",
+ "sui-protocol-config",
+ "sui-replay",
+ "sui-sdk",
+ "sui-snapshot",
+ "sui-storage",
+ "sui-tls",
+ "sui-types",
+ "telemetry-subscribers",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "typed-store",
+]
+
+[[package]]
 name = "one_chain"
 version = "1.39.4"
 dependencies = [
@@ -13933,6 +13979,7 @@ dependencies = [
  "move-package",
  "mysten-metrics",
  "one-node",
+ "one-tool",
  "one_chain",
  "p256",
  "passkey-authenticator",
@@ -13964,7 +14011,6 @@ dependencies = [
  "sui-swarm",
  "sui-swarm-config",
  "sui-test-transaction-builder",
- "sui-tool",
  "sui-types",
  "telemetry-subscribers",
  "tempfile",
@@ -15906,52 +15952,6 @@ dependencies = [
  "tokio-rustls 0.26.0",
  "tower-layer",
  "x509-parser",
-]
-
-[[package]]
-name = "sui-tool"
-version = "1.39.4"
-dependencies = [
- "anemo",
- "anemo-cli",
- "anyhow",
- "bcs",
- "bin-version",
- "clap",
- "colored",
- "comfy-table",
- "eyre",
- "fastcrypto",
- "futures",
- "hex",
- "indicatif",
- "itertools 0.13.0",
- "move-core-types",
- "num_cpus",
- "object_store",
- "prometheus",
- "ron",
- "serde",
- "serde_json",
- "strum 0.24.1",
- "strum_macros 0.24.3",
- "sui-archival",
- "sui-config",
- "sui-core",
- "sui-network",
- "sui-package-dump",
- "sui-protocol-config",
- "sui-replay",
- "sui-sdk",
- "sui-snapshot",
- "sui-storage",
- "sui-tls",
- "sui-types",
- "telemetry-subscribers",
- "tempfile",
- "tokio",
- "tracing",
- "typed-store",
 ]
 
 [[package]]

@@ -1,18 +1,18 @@
 // invalid Random by mutable reference
 
 module a::m {
-    public entry fun no_random_mut(_: &mut sui::random::Random) {
+    public entry fun no_random_mut(_: &mut one::random::Random) {
         abort 0
     }
 }
 
-module sui::random {
+module one::random {
     struct Random has key {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }

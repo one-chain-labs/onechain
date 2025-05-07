@@ -1,9 +1,9 @@
 // tests modules can use transfer functions outside of the defining module, if the type
 // has store
 module a::m {
-    use sui::transfer::{Self, Receiving};
+    use one::transfer::{Self, Receiving};
     use a::other;
-    use sui::object::UID;
+    use one::object::UID;
 
     public fun t(s: other::S) {
         transfer::public_transfer(s, @0x100)
@@ -24,18 +24,18 @@ module a::m {
 
 module a::other {
     struct S has key, store {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module sui::transfer {
-    use sui::object::UID;
+module one::transfer {
+    use one::object::UID;
 
     struct Receiving<phantom T: key> { }
 

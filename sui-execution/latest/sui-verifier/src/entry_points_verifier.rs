@@ -201,7 +201,7 @@ fn verify_param_type(
     param: &SignatureToken,
     verifier_config: &VerifierConfig,
 ) -> Result<(), String> {
-    // Only `sui::sui_system` is allowed to expose entry functions that accept a mutable clock
+    // Only `one::one_system` is allowed to expose entry functions that accept a mutable clock
     // parameter.
     if Clock::is_mutable(view, param) {
         return Err(format!(
@@ -211,7 +211,7 @@ fn verify_param_type(
         ));
     }
 
-    // Only `sui::sui_system` is allowed to expose entry functions that accept a mutable Random
+    // Only `one::one_system` is allowed to expose entry functions that accept a mutable Random
     // parameter.
     if verifier_config.reject_mutable_random_on_entry_functions && is_mutable_random(view, param) {
         return Err(format!(

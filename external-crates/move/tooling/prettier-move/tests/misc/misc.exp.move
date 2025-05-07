@@ -13,7 +13,7 @@
 module suitears::timelock;
 
 use std::{string::String, type_name::{Self, TypeName}};
-use sui::{
+use one::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,
@@ -137,7 +137,7 @@ public fun unlock_time<T: store>(self: &Timelock<T>): u64 {
      * @notice Locks the `data` for `unlock_time` milliseconds.
      *
      * @param data An object with the store ability.
-     * @param c The shared `sui::clock::Clock` object.
+     * @param c The shared `one::clock::Clock` object.
      * @patam unlock_time The lock period in milliseconds.
      * @return {Timelock<T>}.
      *
@@ -160,7 +160,7 @@ public fun lock<T: store>(
      * @notice Unlocks a {Timelock<T>} and returns the locked resource `T`.
      *
      * @param self A {Timelock<T>}
-     * @param c The shared `sui::clock::Clock` object.
+     * @param c The shared `one::clock::Clock` object.
      * @return `T`. An object with the store ability.
      *
      * aborts-if

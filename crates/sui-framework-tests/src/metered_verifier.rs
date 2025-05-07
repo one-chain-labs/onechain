@@ -29,7 +29,7 @@ fn build(path: &Path) -> SuiResult<CompiledPackage> {
 #[cfg_attr(msim, ignore)]
 fn test_metered_move_bytecode_verifier() {
     move_package::package_hooks::register_package_hooks(Box::new(SuiPackageHooks));
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sui-framework/packages/sui-framework");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sui-framework/packages/one-framework");
     let compiled_package = build(&path).unwrap();
     let compiled_modules: Vec<_> = compiled_package.get_modules().cloned().collect();
 

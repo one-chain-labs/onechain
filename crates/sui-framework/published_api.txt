@@ -990,166 +990,166 @@ extract_coin_balance
 	0x3::sui_system_state_inner
 SuiSystemState
 	public struct
-	0x3::sui_system
+	0x3::one_system
 create
 	public(package) fun
-	0x3::sui_system
+	0x3::one_system
 create_update_trusted_validator_proposal
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 create_update_only_trusted_validator_proposal
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 create_update_only_validator_staking_proposal
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 vote_proposal
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_add_validator_candidate
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_remove_validator_candidate
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_add_validator
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_remove_validator
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_set_gas_price
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 set_candidate_validator_gas_price
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_set_revenue_receiving_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_set_commission_rate
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 set_candidate_validator_commission_rate
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_add_stake
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_add_val_stake
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_add_stake_non_entry
 	public fun
-	0x3::sui_system
+	0x3::one_system
 request_add_val_stake_non_entry
 	public fun
-	0x3::sui_system
+	0x3::one_system
 request_add_stake_mul_coin
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_add_val_stake_mul_coin
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 request_withdraw_stake
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 convert_to_fungible_staked_sui
 	public fun
-	0x3::sui_system
+	0x3::one_system
 redeem_fungible_staked_sui
 	public fun
-	0x3::sui_system
+	0x3::one_system
 request_withdraw_stake_non_entry
 	public fun
-	0x3::sui_system
+	0x3::one_system
 report_validator
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 undo_report_validator
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 rotate_operation_cap
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_name
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_description
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_image_url
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_project_url
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_next_epoch_network_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_candidate_validator_network_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_next_epoch_p2p_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_candidate_validator_p2p_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_next_epoch_primary_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_candidate_validator_primary_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_next_epoch_worker_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_candidate_validator_worker_address
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_next_epoch_protocol_pubkey
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_candidate_validator_protocol_pubkey
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_next_epoch_worker_pubkey
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_candidate_validator_worker_pubkey
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_validator_next_epoch_network_pubkey
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 update_candidate_validator_network_pubkey
 	public entry fun
-	0x3::sui_system
+	0x3::one_system
 validator_address_by_pool_id
 	public fun
-	0x3::sui_system
+	0x3::one_system
 pool_exchange_rates
 	public fun
-	0x3::sui_system
+	0x3::one_system
 active_validator_addresses
 	public fun
-	0x3::sui_system
+	0x3::one_system
 advance_epoch
 	fun
-	0x3::sui_system
+	0x3::one_system
 load_system_state
 	fun
-	0x3::sui_system
+	0x3::one_system
 load_system_state_mut
 	fun
-	0x3::sui_system
+	0x3::one_system
 load_inner_maybe_upgrade
 	fun
-	0x3::sui_system
+	0x3::one_system
 validator_voting_powers
 	fun
-	0x3::sui_system
+	0x3::one_system
 GenesisValidatorMetadata
 	public struct
 	0x3::genesis

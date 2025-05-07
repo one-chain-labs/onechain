@@ -3,11 +3,11 @@
 
 #[allow(unused_use)]
 module bridge::committee {
-    use sui::ecdsa_k1;
-    use sui::event::emit;
-    use sui::vec_map::{Self, VecMap};
-    use sui::vec_set;
-    use sui_system::sui_system::SuiSystemState;
+    use one::ecdsa_k1;
+    use one::event::emit;
+    use one::vec_map::{Self, VecMap};
+    use one::vec_set;
+    use one_system::one_system::SuiSystemState;
 
     use bridge::crypto;
     use bridge::message::{Self, Blocklist, BridgeMessage};

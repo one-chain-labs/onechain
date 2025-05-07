@@ -393,7 +393,7 @@ fn default_aliases(context: &mut Context) -> AliasMapBuilder {
     // Unused loc since these will not conflict and are implicit so no warnings are given
     let loc = Loc::invalid();
     let std_address = maybe_make_well_known_address(context, loc, symbol!("std"));
-    let sui_address = maybe_make_well_known_address(context, loc, symbol!("sui"));
+    let sui_address = maybe_make_well_known_address(context, loc, symbol!("one"));
     let mut modules: Vec<(Address, Symbol)> = vec![];
     let mut members: Vec<(Address, Symbol, Symbol, ModuleMemberKind)> = vec![];
     // if std is defined, add implicit std aliases

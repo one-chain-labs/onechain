@@ -192,7 +192,7 @@ fn verify_param_type(
     function_type_args: &[AbilitySet],
     param: &SignatureToken,
 ) -> Result<(), String> {
-    // Only `sui::sui_system` is allowed to expose entry functions that accept a mutable clock
+    // Only `one::one_system` is allowed to expose entry functions that accept a mutable clock
     // parameter.
     if Clock::is_mutable(view, param) {
         return Err(format!(

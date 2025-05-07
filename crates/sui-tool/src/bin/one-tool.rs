@@ -3,7 +3,7 @@
 
 use clap::*;
 use colored::Colorize;
-use sui_tool::commands::ToolCommand;
+use one_tool::commands::ToolCommand;
 use sui_types::exit_main;
 
 // Define the `GIT_REVISION` and `VERSION` consts

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module bridge::limiter {
-    use sui::clock::{Self, Clock};
-    use sui::event::emit;
-    use sui::vec_map::{Self, VecMap};
+    use one::clock::{Self, Clock};
+    use one::event::emit;
+    use one::vec_map::{Self, VecMap};
 
     use bridge::chain_ids::{Self, BridgeRoute};
     use bridge::treasury::BridgeTreasury;

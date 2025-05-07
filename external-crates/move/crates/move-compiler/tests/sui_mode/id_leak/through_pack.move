@@ -1,7 +1,7 @@
 // not allowed since C is not packed with a fresh UID
 module b::test {
-    use sui::object::UID;
-    use sui::transfer::transfer;
+    use one::object::UID;
+    use one::transfer::transfer;
 
     struct A has key {
         id: UID
@@ -26,7 +26,7 @@ module b::test {
 
 // allowed since Bar does not have key
 module a::m {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Foo has key {
         id: UID,
@@ -45,20 +45,20 @@ module a::m {
 
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module sui::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
     public fun sender(_: &TxContext): address {
         @0
     }
 }
 
-module sui::transfer {
+module one::transfer {
     public fun transfer<T: key>(_: T, _: address) {
         abort 0
     }

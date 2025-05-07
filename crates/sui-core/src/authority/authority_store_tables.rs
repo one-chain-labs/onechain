@@ -412,7 +412,7 @@ impl AuthorityPerpetualTables {
         Ok(())
     }
 
-    // fallible get object methods for sui-tool, which may need to attempt to read a corrupted database
+    // fallible get object methods for one-tool, which may need to attempt to read a corrupted database
     pub fn get_object_fallible(&self, object_id: &ObjectID) -> SuiResult<Option<Object>> {
         let obj_entry = self.objects.unbounded_iter().skip_prior_to(&ObjectKey::max_for_id(object_id))?.next();
 

@@ -60,7 +60,7 @@ title: Module `0xb::message`
 
 <pre><code><b>use</b> <a href="../move-stdlib/ascii.md#0x1_ascii">0x1::ascii</a>;
 <b>use</b> <a href="../move-stdlib/vector.md#0x1_vector">0x1::vector</a>;
-<b>use</b> <a href="../sui-framework/bcs.md#0x2_bcs">0x2::bcs</a>;
+<b>use</b> <a href="../one-framework/bcs.md#0x2_bcs">0x2::bcs</a>;
 <b>use</b> <a href="chain_ids.md#0xb_chain_ids">0xb::chain_ids</a>;
 <b>use</b> <a href="message_types.md#0xb_message_types">0xb::message_types</a>;
 </code></pre>

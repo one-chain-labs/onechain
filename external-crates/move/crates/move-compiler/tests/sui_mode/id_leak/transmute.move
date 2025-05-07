@@ -1,8 +1,8 @@
 // not allowed, it re-uses an ID in a new object
 module a::m {
-    use sui::object::UID;
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer::transfer;
+    use one::object::UID;
+    use one::tx_context::{Self, TxContext};
+    use one::transfer::transfer;
 
     struct Cat has key {
         id: UID,
@@ -20,20 +20,20 @@ module a::m {
 
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module sui::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
     public fun sender(_: &TxContext): address {
         @0
     }
 }
 
-module sui::transfer {
+module one::transfer {
     public fun transfer<T: key>(_: T, _: address) {
         abort 0
     }

@@ -43,20 +43,20 @@ module bridge::bridge_env {
     use bridge::usdt::{Self, USDT};
     use std::ascii::String;
     use std::type_name;
-    use sui::address;
-    use sui::clock::Clock;
-    use sui::coin::{Self, Coin, CoinMetadata, TreasuryCap};
-    use sui::ecdsa_k1::{KeyPair, secp256k1_keypair_from_seed, secp256k1_sign};
-    use sui::event;
-    use sui::package::UpgradeCap;
-    use sui::test_scenario::{Self, Scenario};
-    use sui::test_utils::destroy;
-    use sui_system::governance_test_utils::{
+    use one::address;
+    use one::clock::Clock;
+    use one::coin::{Self, Coin, CoinMetadata, TreasuryCap};
+    use one::ecdsa_k1::{KeyPair, secp256k1_keypair_from_seed, secp256k1_sign};
+    use one::event;
+    use one::package::UpgradeCap;
+    use one::test_scenario::{Self, Scenario};
+    use one::test_utils::destroy;
+    use one_system::governance_test_utils::{
         advance_epoch_with_reward_amounts,
         create_sui_system_state_for_testing,
         create_validator_for_testing
     };
-    use sui_system::sui_system::{
+    use one_system::one_system::{
         validator_voting_powers_for_testing,
         SuiSystemState
     };
@@ -209,7 +209,7 @@ module bridge::bridge_env {
     public fun create_env(chain_id: u8): BridgeEnv {
         let mut scenario = test_scenario::begin(@0x0);
         let ctx = scenario.ctx();
-        let mut clock = sui::clock::create_for_testing(ctx);
+        let mut clock = one::clock::create_for_testing(ctx);
         clock.set_for_testing(1_000_000_000);
         let btc_coins = coin::zero<BTC>(ctx);
         let eth_coins = coin::zero<ETH>(ctx);
@@ -1247,11 +1247,11 @@ module bridge::bridge_env {
 module bridge::test_token {
     use std::ascii;
     use std::type_name;
-    use sui::address;
-    use sui::coin::{CoinMetadata, TreasuryCap, create_currency};
-    use sui::hex;
-    use sui::package::{UpgradeCap, test_publish};
-    use sui::test_utils::create_one_time_witness;
+    use one::address;
+    use one::coin::{CoinMetadata, TreasuryCap, create_currency};
+    use one::hex;
+    use one::package::{UpgradeCap, test_publish};
+    use one::test_utils::create_one_time_witness;
 
     public struct TEST_TOKEN has drop {}
 
@@ -1284,11 +1284,11 @@ module bridge::test_token {
 module bridge::btc {
     use std::ascii;
     use std::type_name;
-    use sui::address;
-    use sui::coin::{CoinMetadata, TreasuryCap, create_currency};
-    use sui::hex;
-    use sui::package::{UpgradeCap, test_publish};
-    use sui::test_utils::create_one_time_witness;
+    use one::address;
+    use one::coin::{CoinMetadata, TreasuryCap, create_currency};
+    use one::hex;
+    use one::package::{UpgradeCap, test_publish};
+    use one::test_utils::create_one_time_witness;
 
     public struct BTC has drop {}
 
@@ -1321,11 +1321,11 @@ module bridge::btc {
 module bridge::eth {
     use std::ascii;
     use std::type_name;
-    use sui::address;
-    use sui::coin::{CoinMetadata, TreasuryCap, create_currency};
-    use sui::hex;
-    use sui::package::{UpgradeCap, test_publish};
-    use sui::test_utils::create_one_time_witness;
+    use one::address;
+    use one::coin::{CoinMetadata, TreasuryCap, create_currency};
+    use one::hex;
+    use one::package::{UpgradeCap, test_publish};
+    use one::test_utils::create_one_time_witness;
 
     public struct ETH has drop {}
 
@@ -1358,11 +1358,11 @@ module bridge::eth {
 module bridge::usdc {
     use std::ascii;
     use std::type_name;
-    use sui::address;
-    use sui::coin::{CoinMetadata, TreasuryCap, create_currency};
-    use sui::hex;
-    use sui::package::{UpgradeCap, test_publish};
-    use sui::test_utils::create_one_time_witness;
+    use one::address;
+    use one::coin::{CoinMetadata, TreasuryCap, create_currency};
+    use one::hex;
+    use one::package::{UpgradeCap, test_publish};
+    use one::test_utils::create_one_time_witness;
 
     public struct USDC has drop {}
 
@@ -1395,11 +1395,11 @@ module bridge::usdc {
 module bridge::usdt {
     use std::ascii;
     use std::type_name;
-    use sui::address;
-    use sui::coin::{CoinMetadata, TreasuryCap, create_currency};
-    use sui::hex;
-    use sui::package::{UpgradeCap, test_publish};
-    use sui::test_utils::create_one_time_witness;
+    use one::address;
+    use one::coin::{CoinMetadata, TreasuryCap, create_currency};
+    use one::hex;
+    use one::package::{UpgradeCap, test_publish};
+    use one::test_utils::create_one_time_witness;
 
     public struct USDT has drop {}
 

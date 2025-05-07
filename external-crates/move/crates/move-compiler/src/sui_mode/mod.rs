@@ -29,7 +29,7 @@ pub const UTF_TYPE_NAME: Symbol = symbol!("String");
 pub const ASCII_MODULE_NAME: Symbol = symbol!("ascii");
 pub const ASCII_TYPE_NAME: Symbol = symbol!("String");
 
-pub const SUI_ADDR_NAME: Symbol = symbol!("sui");
+pub const SUI_ADDR_NAME: Symbol = symbol!("one");
 pub const OBJECT_MODULE_NAME: Symbol = symbol!("object");
 pub const OBJECT_NEW: Symbol = symbol!("new");
 pub const OBJECT_NEW_UID_FROM_HASH: Symbol = symbol!("new_uid_from_hash");
@@ -42,8 +42,8 @@ pub const TX_CONTEXT_TYPE_NAME: Symbol = symbol!("TxContext");
 pub const SUI_MODULE_NAME: Symbol = symbol!("oct");
 pub const SUI_OTW_NAME: Symbol = symbol!("OCT");
 
-pub const SUI_SYSTEM_ADDR_NAME: Symbol = symbol!("sui_system");
-pub const SUI_SYSTEM_MODULE_NAME: Symbol = symbol!("sui_system");
+pub const SUI_SYSTEM_ADDR_NAME: Symbol = symbol!("one_system");
+pub const SUI_SYSTEM_MODULE_NAME: Symbol = symbol!("one_system");
 pub const SUI_SYSTEM_CREATE: Symbol = symbol!("create");
 pub const CLOCK_MODULE_NAME: Symbol = symbol!("clock");
 pub const CLOCK_TYPE_NAME: Symbol = symbol!("Clock");

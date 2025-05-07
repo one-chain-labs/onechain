@@ -69,7 +69,7 @@ pub struct ObjectInfoResponse {
     pub layout: Option<MoveStructLayout>,
     /// Transaction the object is locked on in this authority.
     /// None if the object is not currently locked by this authority.
-    /// This should be only used for debugging purpose, such as from sui-tool. No prod clients should
+    /// This should be only used for debugging purpose, such as from one-tool. No prod clients should
     /// rely on it.
     pub lock_for_debugging: Option<SignedTransaction>,
 }

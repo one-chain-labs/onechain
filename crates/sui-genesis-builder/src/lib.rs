@@ -1037,7 +1037,6 @@ pub fn generate_genesis_system_object(
 mod test {
     use crate::{validator_info::ValidatorInfo, Builder};
     use fastcrypto::traits::KeyPair;
-    use move_core_types::account_address;
     use sui_config::{
         genesis::*,
         local_ip_utils,

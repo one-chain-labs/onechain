@@ -19,13 +19,13 @@ pub const ID_STRUCT_NAME: &IdentStr = ident_str!("ID");
 pub const RESOLVED_SUI_ID: (&AccountAddress, &IdentStr, &IdentStr) =
     (&SUI_FRAMEWORK_ADDRESS, OBJECT_MODULE_NAME, ID_STRUCT_NAME);
 
-/// Rust version of the Move sui::object::Info type
+/// Rust version of the Move one::object::Info type
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, Eq, PartialEq)]
 pub struct UID {
     pub id: ID,
 }
 
-/// Rust version of the Move sui::object::ID type
+/// Rust version of the Move one::object::ID type
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, Eq, PartialEq)]
 #[serde(transparent)]
 pub struct ID {

@@ -1016,14 +1016,14 @@ mod checked {
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, EVENT_MODULE) {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::NonEntryFunctionInvoked,
-                format!("Cannot directly call functions in sui::{}", EVENT_MODULE),
+                format!("Cannot directly call functions in one::{}", EVENT_MODULE),
             ));
         }
 
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) && PRIVATE_TRANSFER_FUNCTIONS.contains(&function) {
             let msg = format!(
-                "Cannot directly call sui::{m}::{f}. \
-            Use the public variant instead, sui::{m}::public_{f}",
+                "Cannot directly call one::{m}::{f}. \
+            Use the public variant instead, one::{m}::public_{f}",
                 m = TRANSFER_MODULE,
                 f = function
             );

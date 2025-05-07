@@ -24,7 +24,7 @@ fn build_system_packages() {
     let tempdir = tempfile::tempdir().unwrap();
     let out_dir = if std::env::var_os("UPDATE").is_some() {
         let crate_root = Path::new(CRATE_ROOT);
-        let _ = std::fs::remove_dir_all(crate_root.join(COMPILED_PACKAGES_DIR));
+        // let _ = std::fs::remove_dir_all(crate_root.join(COMPILED_PACKAGES_DIR));
         let _ = std::fs::remove_dir_all(crate_root.join(DOCS_DIR));
         let _ = std::fs::remove_file(crate_root.join(PUBLISHED_API_FILE));
         crate_root
@@ -39,8 +39,8 @@ fn build_system_packages() {
 
     let bridge_path = packages_path.join("bridge");
     let deepbook_path = packages_path.join("deepbook");
-    let sui_system_path = packages_path.join("sui-system");
-    let sui_framework_path = packages_path.join("sui-framework");
+    let sui_system_path = packages_path.join("one-system");
+    let sui_framework_path = packages_path.join("one-framework");
     let move_stdlib_path = packages_path.join("move-stdlib");
 
     build_packages(&bridge_path, &deepbook_path, &sui_system_path, &sui_framework_path, &move_stdlib_path, out_dir);
@@ -97,8 +97,8 @@ fn build_packages(
         out_dir,
         "bridge",
         "deepbook",
-        "sui-system",
-        "sui-framework",
+        "one-system",
+        "one-framework",
         "move-stdlib",
         config,
     );

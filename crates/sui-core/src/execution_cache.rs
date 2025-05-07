@@ -144,7 +144,7 @@ pub fn build_execution_cache(
     }
 }
 
-/// Should only be used for sui-tool or tests. Nodes must use build_execution_cache which
+/// Should only be used for one-tool or tests. Nodes must use build_execution_cache which
 /// uses the epoch_start_config to prevent cache impl from switching except at epoch boundaries.
 pub fn build_execution_cache_from_env(
     prometheus_registry: &Registry,
@@ -263,7 +263,7 @@ pub trait ObjectCacheRead: Send + Sync {
         ) {
             assert!(
                 input_key.version().is_none() || input_key.version().unwrap().is_valid(),
-                "Shared objects in cancelled transaction should always be available immediately, 
+                "Shared objects in cancelled transaction should always be available immediately,
                  but it appears that transaction manager is waiting for {:?} to become available",
                 input_key
             );

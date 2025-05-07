@@ -22,13 +22,13 @@ module bridge::message_tests {
         treasury::{Self, BTC, ETH, USDC},
     };
     use std::ascii;
-    use sui::{
+    use one::{
         address, balance,
         coin::{Self, Coin},
         hex, test_scenario,
         test_utils::{assert_eq, destroy},
     };
-    use sui::bcs;
+    use one::bcs;
 
     const INVALID_CHAIN: u8 = 42;
 
@@ -449,7 +449,7 @@ module bridge::message_tests {
         let mut message_bytes = b"SUI_BRIDGE_MESSAGE";
         message_bytes.append(message);
 
-        let pubkey = sui::ecdsa_k1::secp256k1_ecrecover(
+        let pubkey = one::ecdsa_k1::secp256k1_ecrecover(
             &x"b75e64b040eef6fa510e4b9be853f0d35183de635c6456c190714f9546b163ba12583e615a2e9944ec2d21b520aebd9b14e181dcae0fcc6cdaefc0aa235b3abe00",
             &message_bytes,
             0,

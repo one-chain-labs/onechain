@@ -1,5 +1,5 @@
 [package]
-name = "sui-tool"
+name = "one-tool"
 version.workspace = true
 authors = ["Mysten Labs <build@mystenlabs.com>"]
 license = "Apache-2.0"

@@ -140,7 +140,7 @@ pub fn sui_framework_address_concat_string(suffix: &str) -> String {
 /// Parses `s` as an address. Valid formats for addresses are:
 ///
 /// - A 256bit number, encoded in decimal, or hexadecimal with a leading "0x" prefix.
-/// - One of a number of pre-defined named addresses: std, sui, sui_system, deepbook.
+/// - One of a number of pre-defined named addresses: std, one, one_system, deepbook.
 ///
 /// Parsing succeeds if and only if `s` matches one of these formats exactly, with no remaining
 /// suffix. This function is intended for use within the authority codebases.
@@ -188,8 +188,8 @@ pub fn resolve_address(addr: &str) -> Option<AccountAddress> {
     match addr {
         "deepbook" => Some(DEEPBOOK_ADDRESS),
         "std" => Some(MOVE_STDLIB_ADDRESS),
-        "sui" => Some(SUI_FRAMEWORK_ADDRESS),
-        "sui_system" => Some(SUI_SYSTEM_ADDRESS),
+        "one" => Some(SUI_FRAMEWORK_ADDRESS),
+        "one_system" => Some(SUI_SYSTEM_ADDRESS),
         "bridge" => Some(BRIDGE_ADDRESS),
         _ => None,
     }
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_parse_sui_named_address() {
-        let result = parse_sui_address("sui").expect("should not error");
+        let result = parse_sui_address("one").expect("should not error");
 
         let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002"];
         expected.assert_eq(&result.to_string());
@@ -325,8 +325,8 @@ mod tests {
 
     #[test]
     fn test_parse_sui_module_id() {
-        let result = parse_sui_module_id("0x2::sui").expect("should not error");
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::sui"];
+        let result = parse_sui_module_id("0x2::one").expect("should not error");
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::one"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 

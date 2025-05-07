@@ -1,10 +1,10 @@
-# sui-tool
+# one-tool
 
-`sui-tool` contains assorted debugging utilities for Sui.
+`one-tool` contains assorted debugging utilities for OneChain.
 
-You can build and run `sui-tool` from source with:
+You can build and run `one-tool` from source with:
 ```sh
-cargo run --bin sui-tool -- <args>
+cargo run --bin one-tool -- <args>
 ```
 
 ## `anemo` tools
@@ -12,7 +12,7 @@ cargo run --bin sui-tool -- <args>
 You can use the anemo CLI tools to ping or call an RPC on an Anemo server. Note that (for now) this uses randomly generated keys, so a server or method that restricts access to allowlisted peers will reject connections from this tool.
 
 Anemo networks are identified by a "server name" that the client must match. Server names you may want to use:
-- Sui discovery and state sync: `sui`
+- OneChain discovery and state sync: `one_chain`
 
 ### ping
 
@@ -21,7 +21,7 @@ Example command to ping an anemo server:
 ```sh
 SERVER_NAME="sui"; \
 ADDRESS="1.2.3.4:5678"; \
-cargo run --bin sui-tool -- anemo ping --server-name "$SERVER_NAME" "$ADDRESS"
+cargo run --bin one-tool -- anemo ping --server-name "$SERVER_NAME" "$ADDRESS"
 ```
 
 ### call
@@ -38,6 +38,6 @@ ADDRESS="1.2.3.4:5678"; \
 SERVICE_NAME="StateSync"; \
 METHOD_NAME="GetCheckpointSummary"; \
 REQUEST="BySequenceNumber(123)"; \
-cargo run --bin sui-tool -- \
+cargo run --bin one-tool -- \
     anemo call --server-name "$SERVER_NAME" "$ADDRESS" "$SERVICE_NAME" "$METHOD_NAME" "$REQUEST"
 ```

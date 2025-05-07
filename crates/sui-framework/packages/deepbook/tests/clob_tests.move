@@ -5,11 +5,11 @@
 /// Tests for the pool module.
 /// They are sequential and based on top of each other.
 module deepbook::clob_test {
-    use sui::clock::{Self, Clock};
-    use sui::coin::{Self, mint_for_testing, burn_for_testing};
-    use sui::oct::OCT;
-    use sui::test_scenario::{Self as test, Scenario, next_tx, ctx, end, TransactionEffects};
-    use sui::test_utils::assert_eq;
+    use one::clock::{Self, Clock};
+    use one::coin::{Self, mint_for_testing, burn_for_testing};
+    use one::oct::OCT;
+    use one::test_scenario::{Self as test, Scenario, next_tx, ctx, end, TransactionEffects};
+    use one::test_utils::assert_eq;
     use deepbook::clob_v2::{Self as clob, Pool, PoolOwnerCap, WrappedPool, Order, USD, account_balance, get_pool_stat,
         order_id_for_test, list_open_orders, mint_account_cap_transfer, borrow_mut_pool};
     use deepbook::custodian_v2::{Self as custodian, AccountCap, account_owner};
