@@ -5,7 +5,7 @@
     "description": "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
     "contact": {
       "name": "OneChain Labs",
-      "url": "https://www.onelabs.cc",
+      "url": "https://onelabs.cc",
       "email": "build@onelabs.cc"
     },
     "license": {

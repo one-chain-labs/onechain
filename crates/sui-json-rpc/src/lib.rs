@@ -70,7 +70,7 @@ pub fn sui_rpc_doc(version: &str) -> Project {
         "OneChain JSON-RPC",
         "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
         "OneChain Labs",
-        "https://www.onelabs.cc",
+        "https://onelabs.cc",
         "build@onelabs.cc",
         "Apache-2.0",
         "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE",
