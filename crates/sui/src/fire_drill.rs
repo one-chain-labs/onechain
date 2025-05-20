@@ -34,6 +34,7 @@ use sui_types::{
     committee::EpochId,
     crypto::{generate_proof_of_possession, get_authority_key_pair, get_key_pair, SuiKeyPair},
     multiaddr::{Multiaddr, Protocol},
+    sui_system_state::SUI_SYSTEM_MODULE_NAME,
     transaction::{CallArg, Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_GENERIC},
     SUI_SYSTEM_PACKAGE_ID,
 };
@@ -283,7 +284,7 @@ async fn update_metadata_on_chain(
     let tx_data = TransactionData::new_move_call(
         sui_address,
         SUI_SYSTEM_PACKAGE_ID,
-        ident_str!("sui_system").to_owned(),
+        SUI_SYSTEM_MODULE_NAME.to_owned(),
         ident_str!(function).to_owned(),
         vec![],
         gas_obj_ref,

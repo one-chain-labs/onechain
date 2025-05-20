@@ -22,6 +22,7 @@ use sui_types::{
     sui_system_state::{
         sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
         sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
+        SUI_SYSTEM_MODULE_NAME,
     },
     SUI_SYSTEM_PACKAGE_ID,
 };
@@ -699,7 +700,7 @@ pub async fn construct_unsigned_0x5_txn(
     TransactionData::new_move_call(
         sender,
         SUI_SYSTEM_PACKAGE_ID,
-        ident_str!("sui_system").to_owned(),
+        SUI_SYSTEM_MODULE_NAME.to_owned(),
         ident_str!(function).to_owned(),
         vec![],
         gas_obj_ref,
