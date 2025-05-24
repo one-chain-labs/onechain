@@ -6,7 +6,7 @@ module one_system::stake_tests {
     use one::coin;
     use one::test_scenario;
     use one_system::one_system::SuiSystemState;
-    use one_system::staking_pool::{Self, StakedSui, PoolTokenExchangeRate};
+    use one_system::staking_pool::{Self, StakedOct, PoolTokenExchangeRate};
     use one::test_utils::assert_eq;
     use one_system::validator_set;
     use one::test_utils;
@@ -43,8 +43,8 @@ module one_system::stake_tests {
     const MIST_PER_OCT: u64 = 1_000_000_000;
 
     #[test]
-    fun test_split_join_staked_sui() {
-        // All this is just to generate a dummy StakedSui object to split and join later
+    fun test_split_join_staked_oct() {
+        // All this is just to generate a dummy StakedOct object to split and join later
         set_up_sui_system_state();
         let mut scenario_val = test_scenario::begin(STAKER_ADDR_1);
         let scenario = &mut scenario_val;
@@ -52,20 +52,20 @@ module one_system::stake_tests {
 
         scenario.next_tx(STAKER_ADDR_1);
         {
-            let mut staked_sui = scenario.take_from_sender<StakedSui>();
+            let mut staked_oct = scenario.take_from_sender<StakedOct>();
             let ctx = scenario.ctx();
-            staked_sui.split_to_sender(20 * MIST_PER_OCT, ctx);
-            scenario.return_to_sender(staked_sui);
+            staked_oct.split_to_sender(20 * MIST_PER_OCT, ctx);
+            scenario.return_to_sender(staked_oct);
         };
 
         // Verify the correctness of the split and send the join txn
         scenario.next_tx(STAKER_ADDR_1);
         {
-            let staked_sui_ids = scenario.ids_for_sender<StakedSui>();
-            assert!(staked_sui_ids.length() == 2); // staked sui split to 2 coins
+            let staked_oct_ids = scenario.ids_for_sender<StakedOct>();
+            assert!(staked_oct_ids.length() == 2); // staked oct split to 2 coins
 
-            let mut part1 = scenario.take_from_sender_by_id<StakedSui>(staked_sui_ids[0]);
-            let part2 = scenario.take_from_sender_by_id<StakedSui>(staked_sui_ids[1]);
+            let mut part1 = scenario.take_from_sender_by_id<StakedOct>(staked_oct_ids[0]);
+            let part2 = scenario.take_from_sender_by_id<StakedOct>(staked_oct_ids[1]);
 
             let amount1 = part1.amount();
             let amount2 = part2.amount();
@@ -81,12 +81,12 @@ module one_system::stake_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = staking_pool::EIncompatibleStakedSui)]
+    #[expected_failure(abort_code = staking_pool::EIncompatibleStakedOct)]
     fun test_join_different_epochs() {
         set_up_sui_system_state();
         let mut scenario_val = test_scenario::begin(STAKER_ADDR_1);
         let scenario = &mut scenario_val;
-        // Create two instances of staked sui w/ different epoch activations
+        // Create two instances of staked oct w/ different epoch activations
         stake_with(STAKER_ADDR_1, VALIDATOR_ADDR_1, 60, scenario);
         advance_epoch(scenario);
         stake_with(STAKER_ADDR_1, VALIDATOR_ADDR_1, 60, scenario);
@@ -94,9 +94,9 @@ module one_system::stake_tests {
         // Verify that these cannot be merged
         scenario.next_tx(STAKER_ADDR_1);
         {
-            let staked_sui_ids = scenario.ids_for_sender<StakedSui>();
-            let mut part1 = scenario.take_from_sender_by_id<StakedSui>(staked_sui_ids[0]);
-            let part2 = scenario.take_from_sender_by_id<StakedSui>(staked_sui_ids[1]);
+            let staked_oct_ids = scenario.ids_for_sender<StakedOct>();
+            let mut part1 = scenario.take_from_sender_by_id<StakedOct>(staked_oct_ids[0]);
+            let part2 = scenario.take_from_sender_by_id<StakedOct>(staked_oct_ids[1]);
 
             part1.join(part2);
 
@@ -106,7 +106,7 @@ module one_system::stake_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = staking_pool::EStakedSuiBelowThreshold)]
+    #[expected_failure(abort_code = staking_pool::EStakedOctBelowThreshold)]
     fun test_split_below_threshold() {
         set_up_sui_system_state();
         let mut scenario_val = test_scenario::begin(STAKER_ADDR_1);
@@ -116,17 +116,17 @@ module one_system::stake_tests {
 
         scenario.next_tx(STAKER_ADDR_1);
         {
-            let mut staked_sui = scenario.take_from_sender<StakedSui>();
+            let mut staked_oct = scenario.take_from_sender<StakedOct>();
             let ctx = scenario.ctx();
             // The remaining amount after splitting is below the threshold so this should fail.
-            staked_sui.split_to_sender(1 * MIST_PER_OCT + 1, ctx);
-            scenario.return_to_sender(staked_sui);
+            staked_oct.split_to_sender(1 * MIST_PER_OCT + 1, ctx);
+            scenario.return_to_sender(staked_oct);
         };
         scenario_val.end();
     }
 
     #[test]
-    #[expected_failure(abort_code = staking_pool::EStakedSuiBelowThreshold)]
+    #[expected_failure(abort_code = staking_pool::EStakedOctBelowThreshold)]
     fun test_split_nonentry_below_threshold() {
         set_up_sui_system_state();
         let mut scenario_val = test_scenario::begin(STAKER_ADDR_1);
@@ -136,12 +136,12 @@ module one_system::stake_tests {
 
         scenario.next_tx(STAKER_ADDR_1);
         {
-            let mut staked_sui = scenario.take_from_sender<StakedSui>();
+            let mut staked_oct = scenario.take_from_sender<StakedOct>();
             let ctx = scenario.ctx();
             // The remaining amount after splitting is below the threshold so this should fail.
-            let stake = staked_sui.split(1 * MIST_PER_OCT + 1, ctx);
+            let stake = staked_oct.split(1 * MIST_PER_OCT + 1, ctx);
             test_utils::destroy(stake);
-            scenario.return_to_sender(staked_sui);
+            scenario.return_to_sender(staked_oct);
         };
         scenario_val.end();
     }
@@ -175,8 +175,8 @@ module one_system::stake_tests {
         scenario.next_tx(STAKER_ADDR_1);
         {
 
-            let staked_sui = scenario.take_from_sender<StakedSui>();
-            assert!(staked_sui.amount() == 60 * MIST_PER_OCT);
+            let staked_oct = scenario.take_from_sender<StakedOct>();
+            assert!(staked_oct.amount() == 60 * MIST_PER_OCT);
 
 
             let mut system_state = scenario.take_shared<SuiSystemState>();
@@ -188,7 +188,7 @@ module one_system::stake_tests {
             let ctx = scenario.ctx();
 
             // Unstake from VALIDATOR_ADDR_1
-            system_state_mut_ref.request_withdraw_stake(staked_sui, ctx);
+            system_state_mut_ref.request_withdraw_stake(staked_oct, ctx);
 
             assert!(system_state_mut_ref.validator_stake_amount(VALIDATOR_ADDR_1) == 160 * MIST_PER_OCT);
             test_scenario::return_shared(system_state);
@@ -252,13 +252,13 @@ module one_system::stake_tests {
 
             assert!(!system_state_mut_ref.validators().is_active_validator_by_sui_address(VALIDATOR_ADDR_1));
 
-            let staked_sui = scenario.take_from_sender<StakedSui>();
-            assert_eq(staked_sui.amount(), 100 * MIST_PER_OCT);
+            let staked_oct = scenario.take_from_sender<StakedOct>();
+            assert_eq(staked_oct.amount(), 100 * MIST_PER_OCT);
 
             // Unstake from VALIDATOR_ADDR_1
             assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 0);
             let ctx = scenario.ctx();
-            system_state_mut_ref.request_withdraw_stake(staked_sui, ctx);
+            system_state_mut_ref.request_withdraw_stake(staked_oct, ctx);
 
             // Make sure they have all of their stake.
             assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt);
@@ -304,13 +304,13 @@ module one_system::stake_tests {
             let mut system_state = scenario.take_shared<SuiSystemState>();
             let system_state_mut_ref = &mut system_state;
 
-            let staked_sui = scenario.take_from_sender<StakedSui>();
-            assert_eq(staked_sui.amount(), 100 * MIST_PER_OCT);
+            let staked_oct = scenario.take_from_sender<StakedOct>();
+            assert_eq(staked_oct.amount(), 100 * MIST_PER_OCT);
 
             // Unstake from VALIDATOR_ADDR_1
             assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 0);
             let ctx = scenario.ctx();
-            system_state_mut_ref.request_withdraw_stake(staked_sui, ctx);
+            system_state_mut_ref.request_withdraw_stake(staked_oct, ctx);
 
             // Make sure they have all of their stake.
             assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt);
@@ -511,9 +511,9 @@ module one_system::stake_tests {
         let scenario = &mut scenario_val;
         stake_with(@0x42, @0x2, 100, scenario); // stakes 100 SUI with 0x2
         scenario.next_tx(@0x42);
-        let staked_sui = scenario.take_from_address<StakedSui>(@0x42);
-        let pool_id = staked_sui.pool_id();
-        test_scenario::return_to_address(@0x42, staked_sui);
+        let staked_oct = scenario.take_from_address<StakedOct>(@0x42);
+        let pool_id = staked_oct.pool_id();
+        test_scenario::return_to_address(@0x42, staked_oct);
         advance_epoch(scenario); // advances epoch to effectuate the stake
         // Each staking pool gets 10 SUI of rewards.
         advance_epoch_with_reward_amounts(0, 20, scenario);

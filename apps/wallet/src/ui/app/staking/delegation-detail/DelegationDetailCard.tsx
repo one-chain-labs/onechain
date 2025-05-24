@@ -92,7 +92,7 @@ export function DelegationDetailCard({ validatorAddress, stakedId }: DelegationD
 		apy: 0,
 	};
 
-	const delegationId = delegationData?.status === 'Active' && delegationData?.stakedSuiId;
+	const delegationId = delegationData?.status === 'Active' && delegationData?.stakedOctId;
 
 	const stakeByValidatorAddress = `/stake/new?${new URLSearchParams({
 		address: validatorAddress,

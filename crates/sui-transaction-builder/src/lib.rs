@@ -855,11 +855,11 @@ impl TransactionBuilder {
     pub async fn request_withdraw_stake(
         &self,
         signer: SuiAddress,
-        staked_sui: ObjectID,
+        staked_oct: ObjectID,
         gas: Option<ObjectID>,
         gas_budget: u64,
     ) -> anyhow::Result<TransactionData> {
-        let staked_sui = self.get_object_ref(staked_sui).await?;
+        let staked_oct = self.get_object_ref(staked_oct).await?;
         let gas_price = self.0.get_reference_gas_price().await?;
         let gas = self.select_gas(signer, gas, gas_budget, vec![], gas_price).await?;
         TransactionData::new_move_call(
@@ -869,7 +869,7 @@ impl TransactionBuilder {
             WITHDRAW_STAKE_FUN_NAME.to_owned(),
             vec![],
             gas,
-            vec![CallArg::SUI_SYSTEM_MUT, CallArg::Object(ObjectArg::ImmOrOwnedObject(staked_sui))],
+            vec![CallArg::SUI_SYSTEM_MUT, CallArg::Object(ObjectArg::ImmOrOwnedObject(staked_oct))],
             gas_budget,
             gas_price,
         )

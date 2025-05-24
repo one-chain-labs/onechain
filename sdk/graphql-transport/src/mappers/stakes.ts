@@ -20,7 +20,7 @@ export function mapGraphQLStakeToRpcStake(stakes: Rpc_Stake_FieldsFragment[]): D
 
 		const delegatedStake = delegatedStakes.get(pool)!;
 		delegatedStake.stakes.push({
-			stakedSuiId: stake.address,
+			stakedOctId: stake.address,
 			stakeRequestEpoch: stake.requestedEpoch?.epochId.toString()!,
 			stakeActiveEpoch: stake.activatedEpoch?.epochId.toString()!,
 			principal: stake.principal?.value,

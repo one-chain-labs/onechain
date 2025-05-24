@@ -8,8 +8,8 @@ title: Module `0x3::validator`
 -  [Struct `Validator`](#0x3_validator_Validator)
 -  [Struct `StakingRequestEvent`](#0x3_validator_StakingRequestEvent)
 -  [Struct `UnstakingRequestEvent`](#0x3_validator_UnstakingRequestEvent)
--  [Struct `ConvertingToFungibleStakedSuiEvent`](#0x3_validator_ConvertingToFungibleStakedSuiEvent)
--  [Struct `RedeemingFungibleStakedSuiEvent`](#0x3_validator_RedeemingFungibleStakedSuiEvent)
+-  [Struct `ConvertingToFungibleStakedOctEvent`](#0x3_validator_ConvertingToFungibleStakedOctEvent)
+-  [Struct `RedeemingFungibleStakedOctEvent`](#0x3_validator_RedeemingFungibleStakedOctEvent)
 -  [Constants](#@Constants_0)
 -  [Function `new_metadata`](#0x3_validator_new_metadata)
 -  [Function `new`](#0x3_validator_new)
@@ -19,8 +19,8 @@ title: Module `0x3::validator`
 -  [Function `request_set_revenue_receiving_address`](#0x3_validator_request_set_revenue_receiving_address)
 -  [Function `request_add_stake`](#0x3_validator_request_add_stake)
 -  [Function `request_add_stake_no_check`](#0x3_validator_request_add_stake_no_check)
--  [Function `convert_to_fungible_staked_sui`](#0x3_validator_convert_to_fungible_staked_sui)
--  [Function `redeem_fungible_staked_sui`](#0x3_validator_redeem_fungible_staked_sui)
+-  [Function `convert_to_fungible_staked_oct`](#0x3_validator_convert_to_fungible_staked_oct)
+-  [Function `redeem_fungible_staked_oct`](#0x3_validator_redeem_fungible_staked_oct)
 -  [Function `request_add_stake_at_genesis`](#0x3_validator_request_add_stake_at_genesis)
 -  [Function `request_withdraw_stake`](#0x3_validator_request_withdraw_stake)
 -  [Function `set_only_validator_staking`](#0x3_validator_set_only_validator_staking)
@@ -489,14 +489,14 @@ Event emitted when a new unstake request is received.
 
 </details>
 
-<a name="0x3_validator_ConvertingToFungibleStakedSuiEvent"></a>
+<a name="0x3_validator_ConvertingToFungibleStakedOctEvent"></a>
 
-## Struct `ConvertingToFungibleStakedSuiEvent`
+## Struct `ConvertingToFungibleStakedOctEvent`
 
-Event emitted when a staked SUI is converted to a fungible staked SUI.
+Event emitted when a staked OCT is converted to a fungible staked OCT.
 
 
-<pre><code><b>struct</b> <a href="validator.md#0x3_validator_ConvertingToFungibleStakedSuiEvent">ConvertingToFungibleStakedSuiEvent</a> <b>has</b> <b>copy</b>, drop
+<pre><code><b>struct</b> <a href="validator.md#0x3_validator_ConvertingToFungibleStakedOctEvent">ConvertingToFungibleStakedOctEvent</a> <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -519,13 +519,13 @@ Event emitted when a staked SUI is converted to a fungible staked SUI.
 
 </dd>
 <dt>
-<code>staked_sui_principal_amount: <a href="../move-stdlib/u64.md#0x1_u64">u64</a></code>
+<code>staked_oct_principal_amount: <a href="../move-stdlib/u64.md#0x1_u64">u64</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>fungible_staked_sui_amount: <a href="../move-stdlib/u64.md#0x1_u64">u64</a></code>
+<code>fungible_staked_oct_amount: <a href="../move-stdlib/u64.md#0x1_u64">u64</a></code>
 </dt>
 <dd>
 
@@ -535,14 +535,14 @@ Event emitted when a staked SUI is converted to a fungible staked SUI.
 
 </details>
 
-<a name="0x3_validator_RedeemingFungibleStakedSuiEvent"></a>
+<a name="0x3_validator_RedeemingFungibleStakedOctEvent"></a>
 
-## Struct `RedeemingFungibleStakedSuiEvent`
+## Struct `RedeemingFungibleStakedOctEvent`
 
-Event emitted when a fungible staked SUI is redeemed.
+Event emitted when a fungible staked OCT is redeemed.
 
 
-<pre><code><b>struct</b> <a href="validator.md#0x3_validator_RedeemingFungibleStakedSuiEvent">RedeemingFungibleStakedSuiEvent</a> <b>has</b> <b>copy</b>, drop
+<pre><code><b>struct</b> <a href="validator.md#0x3_validator_RedeemingFungibleStakedOctEvent">RedeemingFungibleStakedOctEvent</a> <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -559,7 +559,7 @@ Event emitted when a fungible staked SUI is redeemed.
 
 </dd>
 <dt>
-<code>fungible_staked_sui_amount: <a href="../move-stdlib/u64.md#0x1_u64">u64</a></code>
+<code>fungible_staked_oct_amount: <a href="../move-stdlib/u64.md#0x1_u64">u64</a></code>
 </dt>
 <dd>
 
@@ -739,20 +739,20 @@ Intended validator is not a candidate one.
 
 
 
-<a name="0x3_validator_EStakedSuiIsLock"></a>
+<a name="0x3_validator_EStakedOctIsLock"></a>
 
 
 
-<pre><code><b>const</b> <a href="validator.md#0x3_validator_EStakedSuiIsLock">EStakedSuiIsLock</a>: <a href="../move-stdlib/u64.md#0x1_u64">u64</a> = 203;
+<pre><code><b>const</b> <a href="validator.md#0x3_validator_EStakedOctIsLock">EStakedOctIsLock</a>: <a href="../move-stdlib/u64.md#0x1_u64">u64</a> = 203;
 </code></pre>
 
 
 
-<a name="0x3_validator_EStakedSuiNotLock"></a>
+<a name="0x3_validator_EStakedOctNotLock"></a>
 
 
 
-<pre><code><b>const</b> <a href="validator.md#0x3_validator_EStakedSuiNotLock">EStakedSuiNotLock</a>: <a href="../move-stdlib/u64.md#0x1_u64">u64</a> = 204;
+<pre><code><b>const</b> <a href="validator.md#0x3_validator_EStakedOctNotLock">EStakedOctNotLock</a>: <a href="../move-stdlib/u64.md#0x1_u64">u64</a> = 204;
 </code></pre>
 
 
@@ -1089,7 +1089,7 @@ Process pending stake and pending withdraws, and update the gas price.
 Request to add stake to the validator's staking pool, processed at the end of the epoch.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_request_add_stake">request_add_stake</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, stake: <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, staker_address: <b>address</b>, is_validator: bool, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_request_add_stake">request_add_stake</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, stake: <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, staker_address: <b>address</b>, is_validator: bool, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -1104,7 +1104,7 @@ Request to add stake to the validator's staking pool, processed at the end of th
     staker_address: <b>address</b>,
     is_validator: bool,
     ctx: &<b>mut</b> TxContext,
-): StakedSui {
+): StakedOct {
     <b>if</b> (self.only_validator_staking) {
         <b>assert</b>!(is_validator, <a href="validator.md#0x3_validator_EOnlyValidatorStake">EOnlyValidatorStake</a>);
     }<b>else</b> {
@@ -1129,7 +1129,7 @@ Request to add stake to the validator's staking pool, processed at the end of th
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_request_add_stake_no_check">request_add_stake_no_check</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, stake: <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, staker_address: <b>address</b>, is_validator: bool, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_request_add_stake_no_check">request_add_stake_no_check</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, stake: <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, staker_address: <b>address</b>, is_validator: bool, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -1144,11 +1144,11 @@ Request to add stake to the validator's staking pool, processed at the end of th
     staker_address: <b>address</b>,
     is_validator: bool,
     ctx: &<b>mut</b> TxContext,
-) : StakedSui {
+) : StakedOct {
     <b>let</b> stake_amount = stake.value();
     <b>assert</b>!(stake_amount &gt; 0, <a href="validator.md#0x3_validator_EInvalidStakeAmount">EInvalidStakeAmount</a>);
     <b>let</b> stake_epoch = ctx.epoch() + 1;
-    <b>let</b> staked_sui = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_request_add_stake">request_add_stake</a>(stake, stake_epoch, is_validator, ctx);
+    <b>let</b> staked_oct = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_request_add_stake">request_add_stake</a>(stake, stake_epoch, is_validator, ctx);
     // Process stake right away <b>if</b> staking pool is preactive.
     <b>if</b> (self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_is_preactive">is_preactive</a>()) {
         self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.process_pending_stake();
@@ -1164,7 +1164,7 @@ Request to add stake to the validator's staking pool, processed at the end of th
             amount: stake_amount,
         }
     );
-    staked_sui
+    staked_oct
 }
 </code></pre>
 
@@ -1172,13 +1172,13 @@ Request to add stake to the validator's staking pool, processed at the end of th
 
 </details>
 
-<a name="0x3_validator_convert_to_fungible_staked_sui"></a>
+<a name="0x3_validator_convert_to_fungible_staked_oct"></a>
 
-## Function `convert_to_fungible_staked_sui`
+## Function `convert_to_fungible_staked_oct`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, staked_sui: <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_FungibleStakedSui">staking_pool::FungibleStakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, staked_oct: <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_FungibleStakedOct">staking_pool::FungibleStakedOct</a>
 </code></pre>
 
 
@@ -1187,27 +1187,27 @@ Request to add stake to the validator's staking pool, processed at the end of th
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="validator.md#0x3_validator_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(
+<pre><code><b>public</b>(package) <b>fun</b> <a href="validator.md#0x3_validator_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(
     self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">Validator</a>,
-    staked_sui: StakedSui,
+    staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
-): FungibleStakedSui {
-    <b>assert</b>!(!staked_sui.lock(), <a href="validator.md#0x3_validator_EStakedSuiIsLock">EStakedSuiIsLock</a>);
-    <b>let</b> stake_activation_epoch = staked_sui.stake_activation_epoch();
-    <b>let</b> staked_sui_principal_amount = staked_sui.staked_sui_amount();
+): FungibleStakedOct {
+    <b>assert</b>!(!staked_oct.lock(), <a href="validator.md#0x3_validator_EStakedOctIsLock">EStakedOctIsLock</a>);
+    <b>let</b> stake_activation_epoch = staked_oct.stake_activation_epoch();
+    <b>let</b> staked_oct_principal_amount = staked_oct.staked_oct_amount();
 
-    <b>let</b> fungible_staked_sui = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(staked_sui, ctx);
+    <b>let</b> fungible_staked_oct = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(staked_oct, ctx);
 
     <a href="../one-framework/event.md#0x2_event_emit">event::emit</a>(
-        <a href="validator.md#0x3_validator_ConvertingToFungibleStakedSuiEvent">ConvertingToFungibleStakedSuiEvent</a> {
+        <a href="validator.md#0x3_validator_ConvertingToFungibleStakedOctEvent">ConvertingToFungibleStakedOctEvent</a> {
             pool_id: self.<a href="validator.md#0x3_validator_staking_pool_id">staking_pool_id</a>(),
             stake_activation_epoch,
-            staked_sui_principal_amount,
-            fungible_staked_sui_amount: fungible_staked_sui.value(),
+            staked_oct_principal_amount,
+            fungible_staked_oct_amount: fungible_staked_oct.value(),
         }
     );
 
-    fungible_staked_sui
+    fungible_staked_oct
 }
 </code></pre>
 
@@ -1215,13 +1215,13 @@ Request to add stake to the validator's staking pool, processed at the end of th
 
 </details>
 
-<a name="0x3_validator_redeem_fungible_staked_sui"></a>
+<a name="0x3_validator_redeem_fungible_staked_oct"></a>
 
-## Function `redeem_fungible_staked_sui`
+## Function `redeem_fungible_staked_oct`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, fungible_staked_sui: <a href="staking_pool.md#0x3_staking_pool_FungibleStakedSui">staking_pool::FungibleStakedSui</a>, ctx: &<a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, fungible_staked_oct: <a href="staking_pool.md#0x3_staking_pool_FungibleStakedOct">staking_pool::FungibleStakedOct</a>, ctx: &<a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -1230,21 +1230,21 @@ Request to add stake to the validator's staking pool, processed at the end of th
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="validator.md#0x3_validator_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(
+<pre><code><b>public</b>(package) <b>fun</b> <a href="validator.md#0x3_validator_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(
     self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">Validator</a>,
-    fungible_staked_sui: FungibleStakedSui,
+    fungible_staked_oct: FungibleStakedOct,
     ctx: &TxContext,
 ): Balance&lt;OCT&gt; {
-    <b>let</b> fungible_staked_sui_amount = fungible_staked_sui.value();
+    <b>let</b> fungible_staked_oct_amount = fungible_staked_oct.value();
 
-    <b>let</b> sui = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(fungible_staked_sui, ctx);
+    <b>let</b> sui = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(fungible_staked_oct, ctx);
 
     self.next_epoch_stake = self.next_epoch_stake - sui.value();
 
     <a href="../one-framework/event.md#0x2_event_emit">event::emit</a>(
-        <a href="validator.md#0x3_validator_RedeemingFungibleStakedSuiEvent">RedeemingFungibleStakedSuiEvent</a> {
+        <a href="validator.md#0x3_validator_RedeemingFungibleStakedOctEvent">RedeemingFungibleStakedOctEvent</a> {
             pool_id: self.<a href="validator.md#0x3_validator_staking_pool_id">staking_pool_id</a>(),
-            fungible_staked_sui_amount,
+            fungible_staked_oct_amount,
             sui_amount: sui.value(),
         }
     );
@@ -1284,14 +1284,14 @@ Request to add stake to the validator's staking pool at genesis
     <b>let</b> stake_amount = stake.value();
     <b>assert</b>!(stake_amount &gt; 0, <a href="validator.md#0x3_validator_EInvalidStakeAmount">EInvalidStakeAmount</a>);
 
-    <b>let</b> staked_sui = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_request_add_stake">request_add_stake</a>(
+    <b>let</b> staked_oct = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_request_add_stake">request_add_stake</a>(
         stake,
         0, // epoch 0 -- <a href="genesis.md#0x3_genesis">genesis</a>
         lock,
         ctx
     );
 
-    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_sui, staker_address);
+    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_oct, staker_address);
 
     // Process stake right away
     self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.process_pending_stake();
@@ -1310,7 +1310,7 @@ Request to add stake to the validator's staking pool at genesis
 Request to withdraw stake from the validator's staking pool, processed at the end of the epoch.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_request_withdraw_stake">request_withdraw_stake</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, staked_sui: <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): (<a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../one-framework/coin_vesting.md#0x2_coin_vesting_CoinVesting">coin_vesting::CoinVesting</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x3_validator_request_withdraw_stake">request_withdraw_stake</a>(self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">validator::Validator</a>, staked_oct: <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): (<a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../one-framework/coin_vesting.md#0x2_coin_vesting_CoinVesting">coin_vesting::CoinVesting</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;)
 </code></pre>
 
 
@@ -1321,13 +1321,13 @@ Request to withdraw stake from the validator's staking pool, processed at the en
 
 <pre><code><b>public</b>(package) <b>fun</b> <a href="validator.md#0x3_validator_request_withdraw_stake">request_withdraw_stake</a>(
     self: &<b>mut</b> <a href="validator.md#0x3_validator_Validator">Validator</a>,
-    staked_sui: StakedSui,
+    staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
 ): (Balance&lt;OCT&gt;, Option&lt;CoinVesting&lt;OCT&gt;&gt;) {
-    <b>let</b> lock = staked_sui.lock();
-    <b>let</b> principal_amount = staked_sui.staked_sui_amount();
-    <b>let</b> stake_activation_epoch = staked_sui.stake_activation_epoch();
-    <b>let</b> <b>mut</b> withdrawn_stake = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_request_withdraw_stake">request_withdraw_stake</a>(staked_sui, ctx);
+    <b>let</b> lock = staked_oct.lock();
+    <b>let</b> principal_amount = staked_oct.staked_oct_amount();
+    <b>let</b> stake_activation_epoch = staked_oct.stake_activation_epoch();
+    <b>let</b> <b>mut</b> withdrawn_stake = self.<a href="staking_pool.md#0x3_staking_pool">staking_pool</a>.<a href="validator.md#0x3_validator_request_withdraw_stake">request_withdraw_stake</a>(staked_oct, ctx);
     <b>let</b> withdraw_amount = withdrawn_stake.value();
     <b>let</b> reward_amount = withdraw_amount - principal_amount;
     self.next_epoch_stake = self.next_epoch_stake - withdraw_amount;

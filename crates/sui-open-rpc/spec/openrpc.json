@@ -3839,7 +3839,7 @@
                 "stakingPool": "0xb4eeb46b70f0bebcae832aeef9f7c5db76052ab656e5f81853d0cf701cdbc8eb",
                 "stakes": [
                   {
-                    "stakedSuiId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
+                    "stakedOctId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
                     "stakeRequestEpoch": "62",
                     "stakeActiveEpoch": "63",
                     "principal": "200000000000",
@@ -3848,7 +3848,7 @@
                     "estimatedReward": "520000000"
                   },
                   {
-                    "stakedSuiId": "0x14cfd5e91c13a481370240e392464c329a203fb9f0a8158aaab9b2a90044b26e",
+                    "stakedOctId": "0x14cfd5e91c13a481370240e392464c329a203fb9f0a8158aaab9b2a90044b26e",
                     "stakeRequestEpoch": "142",
                     "stakeActiveEpoch": "143",
                     "principal": "200000000000",
@@ -3862,7 +3862,7 @@
                 "stakingPool": "0xbaa75ac72e548aeecf2ce8b4e88530651d6e8f93e0fb79b4bc65a512beb5b9f3",
                 "stakes": [
                   {
-                    "stakedSuiId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
+                    "stakedOctId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
                     "stakeRequestEpoch": "244",
                     "stakeActiveEpoch": "245",
                     "principal": "200000000000",
@@ -3886,7 +3886,7 @@
       "description": "Return one or more [DelegatedStake]. If a Stake was withdrawn its status will be Unstaked.",
       "params": [
         {
-          "name": "staked_sui_ids",
+          "name": "staked_oct_ids",
           "required": true,
           "schema": {
             "type": "array",
@@ -3911,7 +3911,7 @@
           "name": "Returns the staking information for the address the request provides.",
           "params": [
             {
-              "name": "staked_sui_ids",
+              "name": "staked_oct_ids",
               "value": [
                 "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
                 "0x754eb2eed23e6c6bb32c89fe1f21ab588374445e72e0402aea014b2956105799"
@@ -3925,7 +3925,7 @@
               "stakingPool": "0x6710024f81dd33ab6833482ee8034e779a48e6ef635c7f856df4905022458bfb",
               "stakes": [
                 {
-                  "stakedSuiId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
+                  "stakedOctId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
                   "stakeRequestEpoch": "62",
                   "stakeActiveEpoch": "63",
                   "principal": "200000000000",
@@ -3934,7 +3934,7 @@
                   "estimatedReward": "520000000"
                 },
                 {
-                  "stakedSuiId": "0x754eb2eed23e6c6bb32c89fe1f21ab588374445e72e0402aea014b2956105799",
+                  "stakedOctId": "0x754eb2eed23e6c6bb32c89fe1f21ab588374445e72e0402aea014b2956105799",
                   "stakeRequestEpoch": "244",
                   "stakeActiveEpoch": "245",
                   "principal": "200000000000",
@@ -4999,8 +4999,8 @@
           }
         },
         {
-          "name": "staked_sui",
-          "description": "StakedSui object ID",
+          "name": "staked_oct",
+          "description": "StakedOct object ID",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/ObjectID"
@@ -8357,7 +8357,7 @@
           "principal",
           "stakeActiveEpoch",
           "stakeRequestEpoch",
-          "stakedSuiId"
+          "stakedOctId"
         ],
         "properties": {
           "lock": {
@@ -8372,8 +8372,8 @@
           "stakeRequestEpoch": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
-          "stakedSuiId": {
-            "description": "ID of the StakedSui receipt object.",
+          "stakedOctId": {
+            "description": "ID of the StakedOct receipt object.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ObjectID"

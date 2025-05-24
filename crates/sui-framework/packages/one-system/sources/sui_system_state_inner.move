@@ -4,7 +4,7 @@
 module one_system::sui_system_state_inner {
     use one::balance::{Self, Balance};
     use one::coin::Coin;
-    use one_system::staking_pool::{StakedSui, FungibleStakedSui};
+    use one_system::staking_pool::{StakedOct, FungibleStakedOct};
     use one::oct::OCT;
     use one_system::validator::{Self, Validator};
     use one_system::validator_set::{Self, ValidatorSet,UpdateTrustedValidatorsAction,UpdateOnlyTrustedValidatorAction,
@@ -517,7 +517,7 @@ module one_system::sui_system_state_inner {
         stake: Coin<OCT>,
         validator_address: address,
         ctx: &mut TxContext,
-    ) : StakedSui {
+    ) : StakedOct {
         self.validators.request_add_stake(
             validator_address,
             stake.into_balance(),
@@ -531,7 +531,7 @@ module one_system::sui_system_state_inner {
         cap: &UnverifiedValidatorOperationCap,
         stake: Coin<OCT>,
         ctx: &mut TxContext,
-    ) : StakedSui{
+    ) : StakedOct{
 
         self.validators.request_add_stake(
             *cap.unverified_operation_cap_address(),
@@ -549,7 +549,7 @@ module one_system::sui_system_state_inner {
         stake_amount: option::Option<u64>,
         validator_address: address,
         ctx: &mut TxContext,
-    ) : StakedSui {
+    ) : StakedOct {
         let balance = extract_coin_balance(stakes, stake_amount, ctx);
         self.validators.request_add_stake(validator_address, balance, false,ctx)
     }
@@ -560,7 +560,7 @@ module one_system::sui_system_state_inner {
         stakes: vector<Coin<OCT>>,
         stake_amount: option::Option<u64>,
         ctx: &mut TxContext,
-    ) : StakedSui {
+    ) : StakedOct {
         let balance = extract_coin_balance(stakes, stake_amount, ctx);
         self.validators.request_add_stake(*cap.unverified_operation_cap_address(), balance, false,ctx)
     }
@@ -569,27 +569,27 @@ module one_system::sui_system_state_inner {
     /// Withdraw some portion of a stake from a validator's staking pool.
     public(package) fun request_withdraw_stake(
         self: &mut SuiSystemStateInnerV2,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
     ) :  (Balance<OCT>,Option<CoinVesting<OCT>>){
-        self.validators.request_withdraw_stake(staked_sui, ctx)
+        self.validators.request_withdraw_stake(staked_oct, ctx)
     }
 
 
-    public(package) fun convert_to_fungible_staked_sui(
+    public(package) fun convert_to_fungible_staked_oct(
         self: &mut SuiSystemStateInnerV2,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
-    ) : FungibleStakedSui {
-        self.validators.convert_to_fungible_staked_sui(staked_sui, ctx)
+    ) : FungibleStakedOct {
+        self.validators.convert_to_fungible_staked_oct(staked_oct, ctx)
     }
 
-    public(package) fun redeem_fungible_staked_sui(
+    public(package) fun redeem_fungible_staked_oct(
         self: &mut SuiSystemStateInnerV2,
-        fungible_staked_sui: FungibleStakedSui,
+        fungible_staked_oct: FungibleStakedOct,
         ctx: &TxContext,
     ) : Balance<OCT> {
-        self.validators.redeem_fungible_staked_sui(fungible_staked_sui, ctx)
+        self.validators.redeem_fungible_staked_oct(fungible_staked_oct, ctx)
     }
 
     /// Report a validator as a bad or non-performant actor in the system.

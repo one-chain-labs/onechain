@@ -246,8 +246,8 @@ pub trait TransactionBuilder {
         &self,
         /// the transaction signer's OneChain address
         signer: SuiAddress,
-        /// StakedSui object ID
-        staked_sui: ObjectID,
+        /// StakedOct object ID
+        staked_oct: ObjectID,
         /// gas object to be used in this transaction, node will pick one from the signer's possession if not provided
         gas: Option<ObjectID>,
         /// the gas budget, the transaction will fail if the gas cost exceed the budget

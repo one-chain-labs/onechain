@@ -19,7 +19,7 @@ use super::{
     move_object::MoveObject,
     move_package::MovePackage,
     owner::{Owner, OwnerImpl},
-    stake::StakedSui,
+    stake::StakedOct,
     sui_address::{addr, SuiAddress},
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block,
@@ -288,7 +288,7 @@ pub(crate) enum IObject {
     MoveObject(MoveObject),
     Coin(Coin),
     CoinMetadata(CoinMetadata),
-    StakedSui(StakedSui),
+    StakedOct(StakedOct),
     SuinsRegistration(SuinsRegistration),
 }
 
@@ -383,16 +383,16 @@ impl Object {
         OwnerImpl::from(self).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
-    pub(crate) async fn staked_suis(
+    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<Cursor>,
         last: Option<u64>,
         before: Option<Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(self).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(self).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.

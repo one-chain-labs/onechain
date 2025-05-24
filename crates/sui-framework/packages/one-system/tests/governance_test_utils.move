@@ -7,7 +7,7 @@ module one_system::governance_test_utils {
     use one::balance;
     use one::oct::OCT;
     use one::coin::{Self, Coin};
-    use one_system::staking_pool::{StakedSui, StakingPool};
+    use one_system::staking_pool::{StakedOct, StakingPool};
     use one::test_utils::assert_eq;
     use one_system::validator::{Self, Validator};
     use one_system::one_system::{Self, SuiSystemState};
@@ -168,15 +168,15 @@ module one_system::governance_test_utils {
     }
 
     public fun unstake(
-        staker: address, staked_sui_idx: u64, scenario: &mut Scenario
+        staker: address, staked_oct_idx: u64, scenario: &mut Scenario
     ) {
         scenario.next_tx(staker);
-        let stake_sui_ids = scenario.ids_for_sender<StakedSui>();
-        let staked_sui = scenario.take_from_sender_by_id(stake_sui_ids[staked_sui_idx]);
+        let stake_sui_ids = scenario.ids_for_sender<StakedOct>();
+        let staked_oct = scenario.take_from_sender_by_id(stake_sui_ids[staked_oct_idx]);
         let mut system_state = scenario.take_shared<SuiSystemState>();
 
         let ctx = scenario.ctx();
-        system_state.request_withdraw_stake(staked_sui, ctx);
+        system_state.request_withdraw_stake(staked_oct, ctx);
         test_scenario::return_shared(system_state);
     }
 
@@ -323,14 +323,14 @@ module one_system::governance_test_utils {
     public fun stake_plus_current_rewards(addr: address, staking_pool: &StakingPool, scenario: &mut Scenario): u64 {
         let mut sum = 0;
         scenario.next_tx(addr);
-        let mut stake_ids = scenario.ids_for_sender<StakedSui>();
+        let mut stake_ids = scenario.ids_for_sender<StakedOct>();
         let current_epoch = scenario.ctx().epoch();
 
         while (!stake_ids.is_empty()) {
-            let staked_sui_id = stake_ids.pop_back();
-            let staked_sui = scenario.take_from_sender_by_id<StakedSui>(staked_sui_id);
-            sum = sum + staking_pool.calculate_rewards(&staked_sui, current_epoch);
-            scenario.return_to_sender(staked_sui);
+            let staked_oct_id = stake_ids.pop_back();
+            let staked_oct = scenario.take_from_sender_by_id<StakedOct>(staked_oct_id);
+            sum = sum + staking_pool.calculate_rewards(&staked_oct, current_epoch);
+            scenario.return_to_sender(staked_oct);
         };
         sum
     }

@@ -7,7 +7,7 @@ module one_system::validator_set {
     use one::oct::OCT;
     use one_system::validator::{Validator, staking_pool_id, sui_address};
     use one_system::validator_cap::{Self, UnverifiedValidatorOperationCap, ValidatorOperationCap};
-    use one_system::staking_pool::{PoolTokenExchangeRate, StakedSui, pool_id, FungibleStakedSui, fungible_staked_sui_pool_id};
+    use one_system::staking_pool::{PoolTokenExchangeRate, StakedOct, pool_id, FungibleStakedOct, fungible_staked_oct_pool_id};
     use one::priority_queue as pq;
     use one::vec_map::{Self, VecMap};
     use one::vec_set::{Self,VecSet};
@@ -392,7 +392,7 @@ module one_system::validator_set {
         stake: Balance<OCT>,
         is_validator: bool,
         ctx: &mut TxContext,
-    ) : StakedSui {
+    ) : StakedOct {
         let sui_amount = stake.value();
         assert!(sui_amount >= MIN_STAKING_THRESHOLD, EStakingBelowThreshold);
         let validator = get_candidate_or_active_validator_mut(self, validator_address);
@@ -401,34 +401,34 @@ module one_system::validator_set {
 
     /// Called by `sui_system`, to withdraw some share of a stake from the validator. The share to withdraw
     /// is denoted by `principal_withdraw_amount`. One of two things occurs in this function:
-    /// 1. If the `staked_sui` is staked with an active validator, the request is added to the validator's
+    /// 1. If the `staked_oct` is staked with an active validator, the request is added to the validator's
     ///    staking pool's pending stake withdraw entries, processed at the end of the epoch.
-    /// 2. If the `staked_sui` was staked with a validator that is no longer active,
+    /// 2. If the `staked_oct` was staked with a validator that is no longer active,
     ///    the stake and any rewards corresponding to it will be immediately processed.
     public(package) fun request_withdraw_stake(
         self: &mut ValidatorSet,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
     ) : (Balance<OCT>,Option<CoinVesting<OCT>>) {
-        let staking_pool_id = pool_id(&staked_sui);
+        let staking_pool_id = pool_id(&staked_oct);
         let validator =
             if (self.staking_pool_mappings.contains(staking_pool_id)) { // This is an active validator.
-                let validator_address = self.staking_pool_mappings[pool_id(&staked_sui)];
+                let validator_address = self.staking_pool_mappings[pool_id(&staked_oct)];
                 get_candidate_or_active_validator_mut(self, validator_address)
             } else { // This is an inactive pool.
                 assert!(self.inactive_validators.contains(staking_pool_id), ENoPoolFound);
                 let wrapper = &mut self.inactive_validators[staking_pool_id];
                 wrapper.load_validator_maybe_upgrade()
             };
-        validator.request_withdraw_stake(staked_sui, ctx)
+        validator.request_withdraw_stake(staked_oct, ctx)
     }
 
-    public(package) fun convert_to_fungible_staked_sui(
+    public(package) fun convert_to_fungible_staked_oct(
         self: &mut ValidatorSet,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
-    ) : FungibleStakedSui {
-        let staking_pool_id = pool_id(&staked_sui);
+    ) : FungibleStakedOct {
+        let staking_pool_id = pool_id(&staked_oct);
         let validator =
             if (self.staking_pool_mappings.contains(staking_pool_id)) { // This is an active validator.
                 let validator_address = self.staking_pool_mappings[staking_pool_id];
@@ -439,15 +439,15 @@ module one_system::validator_set {
                 wrapper.load_validator_maybe_upgrade()
             };
 
-        validator.convert_to_fungible_staked_sui(staked_sui, ctx)
+        validator.convert_to_fungible_staked_oct(staked_oct, ctx)
     }
 
-    public(package) fun redeem_fungible_staked_sui(
+    public(package) fun redeem_fungible_staked_oct(
         self: &mut ValidatorSet,
-        fungible_staked_sui: FungibleStakedSui,
+        fungible_staked_oct: FungibleStakedOct,
         ctx: &TxContext,
     ) : Balance<OCT> {
-        let staking_pool_id = fungible_staked_sui_pool_id(&fungible_staked_sui);
+        let staking_pool_id = fungible_staked_oct_pool_id(&fungible_staked_oct);
 
         let validator =
             if (self.staking_pool_mappings.contains(staking_pool_id)) { // This is an active validator.
@@ -459,7 +459,7 @@ module one_system::validator_set {
                 wrapper.load_validator_maybe_upgrade()
             };
 
-        validator.redeem_fungible_staked_sui(fungible_staked_sui, ctx)
+        validator.redeem_fungible_staked_oct(fungible_staked_oct, ctx)
     }
 
     // ==== validator config setting functions ====

@@ -275,7 +275,7 @@ pub async fn metadata(
                     .flat_map(|s| {
                         s.stakes.into_iter().filter_map(|s| {
                             if let StakeStatus::Active { .. } = s.status {
-                                Some(s.staked_sui_id)
+                                Some(s.staked_oct_id)
                             } else {
                                 None
                             }

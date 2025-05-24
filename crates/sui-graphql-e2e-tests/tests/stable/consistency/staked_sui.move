@@ -6,7 +6,7 @@
 //# run-graphql
 {
   address(address: "@{C}") {
-    stakedSuis {
+    stakedOcts {
       edges {
         cursor
         node {
@@ -44,7 +44,7 @@
 //# run-graphql
 {
   address(address: "@{C}") {
-    stakedSuis {
+    stakedOcts {
       edges {
         cursor
         node {
@@ -60,7 +60,7 @@
 # checkpoint 1 - at that point in time, we did not have any additional stakes.
 {
   no_coins_after_obj_3_1_chkpt_1: address(address: "@{C}") {
-    stakedSuis(after: "@{cursor_0}") {
+    stakedOcts(after: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -70,7 +70,7 @@
     }
   }
   no_coins_before_obj_3_1_chkpt_1: address(address: "@{C}") {
-    stakedSuis(before: "@{cursor_0}") {
+    stakedOcts(before: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -80,7 +80,7 @@
     }
   }
   no_coins_after_obj_7_0_chkpt_1: address(address: "@{C}") {
-    stakedSuis(after: "@{cursor_0}") {
+    stakedOcts(after: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -90,7 +90,7 @@
     }
   }
   no_coins_before_obj_7_0_chkpt_1: address(address: "@{C}") {
-    stakedSuis(before: "@{cursor_0}") {
+    stakedOcts(before: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -105,7 +105,7 @@
 # The second stake was created at checkpoint 3, and thus will be visible.
 {
   coins_after_obj_3_1_chkpt_3: address(address: "@{C}") {
-    stakedSuis(after: "@{cursor_0}") {
+    stakedOcts(after: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -115,7 +115,7 @@
     }
   }
   coins_before_obj_3_1_chkpt_3: address(address: "@{C}") {
-    stakedSuis(before: "@{cursor_0}") {
+    stakedOcts(before: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -125,7 +125,7 @@
     }
   }
   coins_after_obj_7_0_chkpt_3: address(address: "@{C}") {
-    stakedSuis(after: "@{cursor_1}") {
+    stakedOcts(after: "@{cursor_1}") {
       edges {
         cursor
         node {
@@ -135,7 +135,7 @@
     }
   }
   coins_before_obj_7_0_chkpt_3: address(address: "@{C}") {
-    stakedSuis(before: "@{cursor_1}") {
+    stakedOcts(before: "@{cursor_1}") {
       edges {
         cursor
         node {

@@ -728,20 +728,20 @@ export const RPC_METHODS: {
 					owner,
 				},
 			},
-			(data) => data.address?.stakedSuis?.nodes,
+			(data) => data.address?.stakedOcts?.nodes,
 		);
 
 		return mapGraphQLStakeToRpcStake(stakes);
 	},
-	async getStakesByIds(transport, [stakedSuiIds]) {
+	async getStakesByIds(transport, [stakedOctIds]) {
 		const stakes = await transport.graphqlQuery(
 			{
 				query: GetStakesByIdsDocument,
 				variables: {
-					ids: stakedSuiIds,
+					ids: stakedOctIds,
 				},
 			},
-			(data) => data.objects?.nodes.map((node) => node?.asMoveObject?.asStakedSui!).filter(Boolean),
+			(data) => data.objects?.nodes.map((node) => node?.asMoveObject?.asStakedOct!).filter(Boolean),
 		);
 
 		return mapGraphQLStakeToRpcStake(stakes);

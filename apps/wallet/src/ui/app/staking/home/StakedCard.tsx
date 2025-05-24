@@ -109,7 +109,7 @@ export function StakeCard({
 	currentEpoch,
 	inactiveValidator = false,
 }: StakeCardProps) {
-	const { stakedSuiId, principal, stakeRequestEpoch, estimatedReward, validatorAddress } =
+	const { stakedOctId, principal, stakeRequestEpoch, estimatedReward, validatorAddress } =
 		delegationObject;
 
 	// TODO: Once two step withdraw is available, add cool down and withdraw now logic
@@ -152,7 +152,7 @@ export function StakeCard({
 			data-testid="stake-card"
 			to={`/stake/delegation-detail?${new URLSearchParams({
 				validator: validatorAddress,
-				staked: stakedSuiId,
+				staked: stakedOctId,
 			}).toString()}`}
 			className="no-underline"
 		>
@@ -174,7 +174,7 @@ export function StakeCard({
 
 					<div className="text-steel text-pBody opacity-0 group-hover:opacity-100">
 						<IconTooltip
-							tip="Object containing the delegated staked SUI tokens, owned by each delegator"
+							tip="Object containing the delegated staked OCT tokens, owned by each delegator"
 							placement="top"
 						/>
 					</div>

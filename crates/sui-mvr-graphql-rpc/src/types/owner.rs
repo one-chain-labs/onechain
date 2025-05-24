@@ -7,7 +7,7 @@ use super::{
     cursor::Page,
     dynamic_field::{DynamicField, DynamicFieldName},
     move_package::MovePackage,
-    stake::StakedSui,
+    stake::StakedOct,
     suins_registration::{DomainFormat, NameService, SuinsRegistration},
 };
 use crate::{
@@ -102,13 +102,13 @@ pub(crate) struct OwnerImpl {
                 `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`."
     ),
     field(
-        name = "staked_suis",
+        name = "staked_octs",
         arg(name = "first", ty = "Option<u64>"),
         arg(name = "after", ty = "Option<object::Cursor>"),
         arg(name = "last", ty = "Option<u64>"),
         arg(name = "before", ty = "Option<object::Cursor>"),
-        ty = "Connection<String, StakedSui>",
-        desc = "The `0x3::staking_pool::StakedSui` objects owned by this object or address."
+        ty = "Connection<String, StakedOct>",
+        desc = "The `0x3::staking_pool::StakedOct` objects owned by this object or address."
     ),
     field(
         name = "default_suins_name",
@@ -136,7 +136,7 @@ pub(crate) enum IOwner {
     MoveObject(MoveObject),
     Coin(Coin),
     CoinMetadata(CoinMetadata),
-    StakedSui(StakedSui),
+    StakedOct(StakedOct),
     SuinsRegistration(SuinsRegistration),
 }
 
@@ -195,16 +195,16 @@ impl Owner {
         OwnerImpl::from(self).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this object or address.
-    pub(crate) async fn staked_suis(
+    /// The `0x3::staking_pool::StakedOct` objects owned by this object or address.
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(self).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(self).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object or address.
@@ -338,16 +338,16 @@ impl OwnerImpl {
         Coin::paginate(ctx.data_unchecked(), page, coin, Some(self.address), self.checkpoint_viewed_at).await.extend()
     }
 
-    pub(crate) async fn staked_suis(
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
+    ) -> Result<Connection<String, StakedOct>> {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        StakedSui::paginate(ctx.data_unchecked(), page, self.address, self.checkpoint_viewed_at).await.extend()
+        StakedOct::paginate(ctx.data_unchecked(), page, self.address, self.checkpoint_viewed_at).await.extend()
     }
 
     pub(crate) async fn default_suins_name(

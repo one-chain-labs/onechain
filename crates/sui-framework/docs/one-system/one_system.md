@@ -63,8 +63,8 @@ the SuiSystemStateInner version, or vice versa.
 -  [Function `request_add_stake_mul_coin`](#0x3_one_system_request_add_stake_mul_coin)
 -  [Function `request_add_val_stake_mul_coin`](#0x3_one_system_request_add_val_stake_mul_coin)
 -  [Function `request_withdraw_stake`](#0x3_one_system_request_withdraw_stake)
--  [Function `convert_to_fungible_staked_sui`](#0x3_one_system_convert_to_fungible_staked_sui)
--  [Function `redeem_fungible_staked_sui`](#0x3_one_system_redeem_fungible_staked_sui)
+-  [Function `convert_to_fungible_staked_oct`](#0x3_one_system_convert_to_fungible_staked_oct)
+-  [Function `redeem_fungible_staked_oct`](#0x3_one_system_redeem_fungible_staked_oct)
 -  [Function `request_withdraw_stake_non_entry`](#0x3_one_system_request_withdraw_stake_non_entry)
 -  [Function `report_validator`](#0x3_one_system_report_validator)
 -  [Function `undo_report_validator`](#0x3_one_system_undo_report_validator)
@@ -685,8 +685,8 @@ Add stake to a validator's staking pool.
     validator_address: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> staked_sui = <a href="one_system.md#0x3_one_system_request_add_stake_non_entry">request_add_stake_non_entry</a>(wrapper, stake, validator_address, ctx);
-    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_sui, ctx.sender());
+    <b>let</b> staked_oct = <a href="one_system.md#0x3_one_system_request_add_stake_non_entry">request_add_stake_non_entry</a>(wrapper, stake, validator_address, ctx);
+    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_oct, ctx.sender());
 }
 </code></pre>
 
@@ -715,8 +715,8 @@ Add stake to a validator's staking pool.
     stake: Coin&lt;OCT&gt;,
     ctx: &<b>mut</b> TxContext,
 ){
-    <b>let</b> staked_sui = <a href="one_system.md#0x3_one_system_request_add_val_stake_non_entry">request_add_val_stake_non_entry</a>(wrapper, cap, stake, ctx);
-    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_sui, ctx.sender());
+    <b>let</b> staked_oct = <a href="one_system.md#0x3_one_system_request_add_val_stake_non_entry">request_add_val_stake_non_entry</a>(wrapper, cap, stake, ctx);
+    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_oct, ctx.sender());
 }
 </code></pre>
 
@@ -728,10 +728,10 @@ Add stake to a validator's staking pool.
 
 ## Function `request_add_stake_non_entry`
 
-The non-entry version of <code>request_add_stake</code>, which returns the staked SUI instead of transferring it to the sender.
+The non-entry version of <code>request_add_stake</code>, which returns the staked OCT instead of transferring it to the sender.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_request_add_stake_non_entry">request_add_stake_non_entry</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, validator_address: <b>address</b>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_request_add_stake_non_entry">request_add_stake_non_entry</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, validator_address: <b>address</b>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -745,7 +745,7 @@ The non-entry version of <code>request_add_stake</code>, which returns the stake
     stake: Coin&lt;OCT&gt;,
     validator_address: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
-): StakedSui {
+): StakedOct {
     <b>let</b> self = <a href="one_system.md#0x3_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
     self.<a href="one_system.md#0x3_one_system_request_add_stake">request_add_stake</a>(stake, validator_address, ctx)
 }
@@ -761,7 +761,7 @@ The non-entry version of <code>request_add_stake</code>, which returns the stake
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_request_add_val_stake_non_entry">request_add_val_stake_non_entry</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, cap: &<a href="validator_cap.md#0x3_validator_cap_UnverifiedValidatorOperationCap">validator_cap::UnverifiedValidatorOperationCap</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_request_add_val_stake_non_entry">request_add_val_stake_non_entry</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, cap: &<a href="validator_cap.md#0x3_validator_cap_UnverifiedValidatorOperationCap">validator_cap::UnverifiedValidatorOperationCap</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -775,7 +775,7 @@ The non-entry version of <code>request_add_stake</code>, which returns the stake
     cap: &UnverifiedValidatorOperationCap,
     stake: Coin&lt;OCT&gt;,
     ctx: &<b>mut</b> TxContext,
-): StakedSui{
+): StakedOct{
     <b>let</b> self = <a href="one_system.md#0x3_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
     self.<a href="one_system.md#0x3_one_system_request_add_val_stake">request_add_val_stake</a>(cap, stake, ctx)
 }
@@ -809,8 +809,8 @@ Add stake to a validator's staking pool using multiple coins.
     ctx: &<b>mut</b> TxContext,
 ) {
     <b>let</b> self = <a href="one_system.md#0x3_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    <b>let</b> staked_sui = self.<a href="one_system.md#0x3_one_system_request_add_stake_mul_coin">request_add_stake_mul_coin</a>(stakes, stake_amount, validator_address, ctx);
-    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_sui, ctx.sender());
+    <b>let</b> staked_oct = self.<a href="one_system.md#0x3_one_system_request_add_stake_mul_coin">request_add_stake_mul_coin</a>(stakes, stake_amount, validator_address, ctx);
+    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_oct, ctx.sender());
 }
 </code></pre>
 
@@ -841,8 +841,8 @@ Add stake to a validator's staking pool using multiple coins.
     ctx: &<b>mut</b> TxContext,
 ){
     <b>let</b> self = <a href="one_system.md#0x3_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    <b>let</b> staked_sui = self.<a href="one_system.md#0x3_one_system_request_add_val_stake_mul_coin">request_add_val_stake_mul_coin</a>(cap, stakes, stake_amount, ctx);
-    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_sui, ctx.sender());
+    <b>let</b> staked_oct = self.<a href="one_system.md#0x3_one_system_request_add_val_stake_mul_coin">request_add_val_stake_mul_coin</a>(cap, stakes, stake_amount, ctx);
+    <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(staked_oct, ctx.sender());
 }
 </code></pre>
 
@@ -857,7 +857,7 @@ Add stake to a validator's staking pool using multiple coins.
 Withdraw stake from a validator's staking pool.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="one_system.md#0x3_one_system_request_withdraw_stake">request_withdraw_stake</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, staked_sui: <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="one_system.md#0x3_one_system_request_withdraw_stake">request_withdraw_stake</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, staked_oct: <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -868,10 +868,10 @@ Withdraw stake from a validator's staking pool.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="one_system.md#0x3_one_system_request_withdraw_stake">request_withdraw_stake</a>(
     wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">SuiSystemState</a>,
-    staked_sui: StakedSui,
+    staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> (withdrawn_stake,<a href="../one-framework/coin_vesting.md#0x2_coin_vesting">coin_vesting</a>) = <a href="one_system.md#0x3_one_system_request_withdraw_stake_non_entry">request_withdraw_stake_non_entry</a>(wrapper, staked_sui, ctx);
+    <b>let</b> (withdrawn_stake,<a href="../one-framework/coin_vesting.md#0x2_coin_vesting">coin_vesting</a>) = <a href="one_system.md#0x3_one_system_request_withdraw_stake_non_entry">request_withdraw_stake_non_entry</a>(wrapper, staked_oct, ctx);
     <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(withdrawn_stake.into_coin(ctx), ctx.sender());
     <b>if</b>(<a href="../one-framework/coin_vesting.md#0x2_coin_vesting">coin_vesting</a>.is_some()){
         <a href="../one-framework/transfer.md#0x2_transfer_public_transfer">transfer::public_transfer</a>(<a href="../one-framework/coin_vesting.md#0x2_coin_vesting">coin_vesting</a>.destroy_some(),ctx.sender());
@@ -885,14 +885,14 @@ Withdraw stake from a validator's staking pool.
 
 </details>
 
-<a name="0x3_one_system_convert_to_fungible_staked_sui"></a>
+<a name="0x3_one_system_convert_to_fungible_staked_oct"></a>
 
-## Function `convert_to_fungible_staked_sui`
+## Function `convert_to_fungible_staked_oct`
 
-Convert StakedSui into a FungibleStakedSui object.
+Convert StakedOct into a FungibleStakedOct object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, staked_sui: <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_FungibleStakedSui">staking_pool::FungibleStakedSui</a>
+<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, staked_oct: <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_FungibleStakedOct">staking_pool::FungibleStakedOct</a>
 </code></pre>
 
 
@@ -901,13 +901,13 @@ Convert StakedSui into a FungibleStakedSui object.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(
     wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">SuiSystemState</a>,
-    staked_sui: StakedSui,
+    staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
-): FungibleStakedSui {
+): FungibleStakedOct {
     <b>let</b> self = <a href="one_system.md#0x3_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="one_system.md#0x3_one_system_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(staked_sui, ctx)
+    self.<a href="one_system.md#0x3_one_system_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(staked_oct, ctx)
 }
 </code></pre>
 
@@ -915,14 +915,14 @@ Convert StakedSui into a FungibleStakedSui object.
 
 </details>
 
-<a name="0x3_one_system_redeem_fungible_staked_sui"></a>
+<a name="0x3_one_system_redeem_fungible_staked_oct"></a>
 
-## Function `redeem_fungible_staked_sui`
+## Function `redeem_fungible_staked_oct`
 
-Convert FungibleStakedSui into a StakedSui object.
+Convert FungibleStakedOct into a StakedOct object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, fungible_staked_sui: <a href="staking_pool.md#0x3_staking_pool_FungibleStakedSui">staking_pool::FungibleStakedSui</a>, ctx: &<a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, fungible_staked_oct: <a href="staking_pool.md#0x3_staking_pool_FungibleStakedOct">staking_pool::FungibleStakedOct</a>, ctx: &<a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -931,13 +931,13 @@ Convert FungibleStakedSui into a StakedSui object.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(
     wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">SuiSystemState</a>,
-    fungible_staked_sui: FungibleStakedSui,
+    fungible_staked_oct: FungibleStakedOct,
     ctx: &TxContext,
 ): Balance&lt;OCT&gt; {
     <b>let</b> self = <a href="one_system.md#0x3_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="one_system.md#0x3_one_system_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(fungible_staked_sui, ctx)
+    self.<a href="one_system.md#0x3_one_system_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(fungible_staked_oct, ctx)
 }
 </code></pre>
 
@@ -952,7 +952,7 @@ Convert FungibleStakedSui into a StakedSui object.
 Non-entry version of <code>request_withdraw_stake</code> that returns the withdrawn SUI instead of transferring it to the sender.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_request_withdraw_stake_non_entry">request_withdraw_stake_non_entry</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, staked_sui: <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): (<a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../one-framework/coin_vesting.md#0x2_coin_vesting_CoinVesting">coin_vesting::CoinVesting</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_request_withdraw_stake_non_entry">request_withdraw_stake_non_entry</a>(wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">one_system::SuiSystemState</a>, staked_oct: <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): (<a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../one-framework/coin_vesting.md#0x2_coin_vesting_CoinVesting">coin_vesting::CoinVesting</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;)
 </code></pre>
 
 
@@ -963,11 +963,11 @@ Non-entry version of <code>request_withdraw_stake</code> that returns the withdr
 
 <pre><code><b>public</b> <b>fun</b> <a href="one_system.md#0x3_one_system_request_withdraw_stake_non_entry">request_withdraw_stake_non_entry</a>(
     wrapper: &<b>mut</b> <a href="one_system.md#0x3_one_system_SuiSystemState">SuiSystemState</a>,
-    staked_sui: StakedSui,
+    staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
 ) :(Balance&lt;OCT&gt;,Option&lt;CoinVesting&lt;OCT&gt;&gt;) {
     <b>let</b> self = <a href="one_system.md#0x3_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="one_system.md#0x3_one_system_request_withdraw_stake">request_withdraw_stake</a>(staked_sui, ctx)
+    self.<a href="one_system.md#0x3_one_system_request_withdraw_stake">request_withdraw_stake</a>(staked_oct, ctx)
 }
 </code></pre>
 

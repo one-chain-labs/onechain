@@ -43,7 +43,7 @@ module one_system::one_system {
 
     use one::coin::Coin;
     use one::clock::Clock;
-    use one_system::staking_pool::{StakedSui, FungibleStakedSui};
+    use one_system::staking_pool::{StakedOct, FungibleStakedOct};
     use one::oct::OCT;
     use one::table::Table;
     use one_system::validator::Validator;
@@ -287,8 +287,8 @@ module one_system::one_system {
         validator_address: address,
         ctx: &mut TxContext,
     ) {
-        let staked_sui = request_add_stake_non_entry(wrapper, stake, validator_address, ctx);
-        transfer::public_transfer(staked_sui, ctx.sender());
+        let staked_oct = request_add_stake_non_entry(wrapper, stake, validator_address, ctx);
+        transfer::public_transfer(staked_oct, ctx.sender());
     }
 
     public entry fun request_add_val_stake(
@@ -297,17 +297,17 @@ module one_system::one_system {
         stake: Coin<OCT>,
         ctx: &mut TxContext,
     ){
-        let staked_sui = request_add_val_stake_non_entry(wrapper, cap, stake, ctx);
-        transfer::public_transfer(staked_sui, ctx.sender());
+        let staked_oct = request_add_val_stake_non_entry(wrapper, cap, stake, ctx);
+        transfer::public_transfer(staked_oct, ctx.sender());
     }
 
-    /// The non-entry version of `request_add_stake`, which returns the staked SUI instead of transferring it to the sender.
+    /// The non-entry version of `request_add_stake`, which returns the staked OCT instead of transferring it to the sender.
     public fun request_add_stake_non_entry(
         wrapper: &mut SuiSystemState,
         stake: Coin<OCT>,
         validator_address: address,
         ctx: &mut TxContext,
-    ): StakedSui {
+    ): StakedOct {
         let self = load_system_state_mut(wrapper);
         self.request_add_stake(stake, validator_address, ctx)
     }
@@ -317,7 +317,7 @@ module one_system::one_system {
         cap: &UnverifiedValidatorOperationCap,
         stake: Coin<OCT>,
         ctx: &mut TxContext,
-    ): StakedSui{
+    ): StakedOct{
         let self = load_system_state_mut(wrapper);
         self.request_add_val_stake(cap, stake, ctx)
     }
@@ -331,8 +331,8 @@ module one_system::one_system {
         ctx: &mut TxContext,
     ) {
         let self = load_system_state_mut(wrapper);
-        let staked_sui = self.request_add_stake_mul_coin(stakes, stake_amount, validator_address, ctx);
-        transfer::public_transfer(staked_sui, ctx.sender());
+        let staked_oct = self.request_add_stake_mul_coin(stakes, stake_amount, validator_address, ctx);
+        transfer::public_transfer(staked_oct, ctx.sender());
     }
 
     public entry fun request_add_val_stake_mul_coin(
@@ -343,17 +343,17 @@ module one_system::one_system {
         ctx: &mut TxContext,
     ){
         let self = load_system_state_mut(wrapper);
-        let staked_sui = self.request_add_val_stake_mul_coin(cap, stakes, stake_amount, ctx);
-        transfer::public_transfer(staked_sui, ctx.sender());
+        let staked_oct = self.request_add_val_stake_mul_coin(cap, stakes, stake_amount, ctx);
+        transfer::public_transfer(staked_oct, ctx.sender());
     }
 
     /// Withdraw stake from a validator's staking pool.
     public entry fun request_withdraw_stake(
         wrapper: &mut SuiSystemState,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
     ) {
-        let (withdrawn_stake,coin_vesting) = request_withdraw_stake_non_entry(wrapper, staked_sui, ctx);
+        let (withdrawn_stake,coin_vesting) = request_withdraw_stake_non_entry(wrapper, staked_oct, ctx);
         transfer::public_transfer(withdrawn_stake.into_coin(ctx), ctx.sender());
         if(coin_vesting.is_some()){
             transfer::public_transfer(coin_vesting.destroy_some(),ctx.sender());
@@ -363,34 +363,34 @@ module one_system::one_system {
     }
 
 
-    /// Convert StakedSui into a FungibleStakedSui object.
-    public fun convert_to_fungible_staked_sui(
+    /// Convert StakedOct into a FungibleStakedOct object.
+    public fun convert_to_fungible_staked_oct(
         wrapper: &mut SuiSystemState,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
-    ): FungibleStakedSui {
+    ): FungibleStakedOct {
         let self = load_system_state_mut(wrapper);
-        self.convert_to_fungible_staked_sui(staked_sui, ctx)
+        self.convert_to_fungible_staked_oct(staked_oct, ctx)
     }
 
-    /// Convert FungibleStakedSui into a StakedSui object.
-    public fun redeem_fungible_staked_sui(
+    /// Convert FungibleStakedOct into a StakedOct object.
+    public fun redeem_fungible_staked_oct(
         wrapper: &mut SuiSystemState,
-        fungible_staked_sui: FungibleStakedSui,
+        fungible_staked_oct: FungibleStakedOct,
         ctx: &TxContext,
     ): Balance<OCT> {
         let self = load_system_state_mut(wrapper);
-        self.redeem_fungible_staked_sui(fungible_staked_sui, ctx)
+        self.redeem_fungible_staked_oct(fungible_staked_oct, ctx)
     }
 
     /// Non-entry version of `request_withdraw_stake` that returns the withdrawn SUI instead of transferring it to the sender.
     public fun request_withdraw_stake_non_entry(
         wrapper: &mut SuiSystemState,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
     ) :(Balance<OCT>,Option<CoinVesting<OCT>>) {
         let self = load_system_state_mut(wrapper);
-        self.request_withdraw_stake(staked_sui, ctx)
+        self.request_withdraw_stake(staked_oct, ctx)
     }
 
     /// Report a validator as a bad or non-performant actor in the system.

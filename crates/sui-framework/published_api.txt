@@ -22,16 +22,16 @@ StakingPool
 PoolTokenExchangeRate
 	public struct
 	0x3::staking_pool
-StakedSui
+StakedOct
 	public struct
 	0x3::staking_pool
-FungibleStakedSui
+FungibleStakedOct
 	public struct
 	0x3::staking_pool
-FungibleStakedSuiData
+FungibleStakedOctData
 	public struct
 	0x3::staking_pool
-FungibleStakedSuiDataKey
+FungibleStakedOctDataKey
 	public struct
 	0x3::staking_pool
 new
@@ -43,19 +43,19 @@ request_add_stake
 request_withdraw_stake
 	public(package) fun
 	0x3::staking_pool
-redeem_fungible_staked_sui
+redeem_fungible_staked_oct
 	public(package) fun
 	0x3::staking_pool
-calculate_fungible_staked_sui_withdraw_amount
+calculate_fungible_staked_oct_withdraw_amount
 	fun
 	0x3::staking_pool
-convert_to_fungible_staked_sui
+convert_to_fungible_staked_oct
 	public(package) fun
 	0x3::staking_pool
 withdraw_from_principal
 	public(package) fun
 	0x3::staking_pool
-unwrap_staked_sui
+unwrap_staked_oct
 	fun
 	0x3::staking_pool
 deposit_rewards
@@ -85,10 +85,10 @@ sui_balance
 pool_id
 	public fun
 	0x3::staking_pool
-fungible_staked_sui_pool_id
+fungible_staked_oct_pool_id
 	public fun
 	0x3::staking_pool
-staked_sui_amount
+staked_oct_amount
 	public fun
 	0x3::staking_pool
 lock
@@ -103,22 +103,22 @@ is_preactive
 is_inactive
 	public fun
 	0x3::staking_pool
-fungible_staked_sui_value
+fungible_staked_oct_value
 	public fun
 	0x3::staking_pool
-split_fungible_staked_sui
+split_fungible_staked_oct
 	public fun
 	0x3::staking_pool
-join_fungible_staked_sui
+join_fungible_staked_oct
 	public fun
 	0x3::staking_pool
 split
 	public fun
 	0x3::staking_pool
-split_staked_sui
+split_staked_oct
 	public entry fun
 	0x3::staking_pool
-join_staked_sui
+join_staked_oct
 	public entry fun
 	0x3::staking_pool
 is_equal_staking_metadata
@@ -169,10 +169,10 @@ StakingRequestEvent
 UnstakingRequestEvent
 	public struct
 	0x3::validator
-ConvertingToFungibleStakedSuiEvent
+ConvertingToFungibleStakedOctEvent
 	public struct
 	0x3::validator
-RedeemingFungibleStakedSuiEvent
+RedeemingFungibleStakedOctEvent
 	public struct
 	0x3::validator
 new_metadata
@@ -199,10 +199,10 @@ request_add_stake
 request_add_stake_no_check
 	public(package) fun
 	0x3::validator
-convert_to_fungible_staked_sui
+convert_to_fungible_staked_oct
 	public(package) fun
 	0x3::validator
-redeem_fungible_staked_sui
+redeem_fungible_staked_oct
 	public(package) fun
 	0x3::validator
 request_add_stake_at_genesis
@@ -547,10 +547,10 @@ request_add_stake
 request_withdraw_stake
 	public(package) fun
 	0x3::validator_set
-convert_to_fungible_staked_sui
+convert_to_fungible_staked_oct
 	public(package) fun
 	0x3::validator_set
-redeem_fungible_staked_sui
+redeem_fungible_staked_oct
 	public(package) fun
 	0x3::validator_set
 request_set_commission_rate
@@ -850,10 +850,10 @@ request_add_val_stake_mul_coin
 request_withdraw_stake
 	public(package) fun
 	0x3::sui_system_state_inner
-convert_to_fungible_staked_sui
+convert_to_fungible_staked_oct
 	public(package) fun
 	0x3::sui_system_state_inner
-redeem_fungible_staked_sui
+redeem_fungible_staked_oct
 	public(package) fun
 	0x3::sui_system_state_inner
 report_validator
@@ -1054,10 +1054,10 @@ request_add_val_stake_mul_coin
 request_withdraw_stake
 	public entry fun
 	0x3::one_system
-convert_to_fungible_staked_sui
+convert_to_fungible_staked_oct
 	public fun
 	0x3::one_system
-redeem_fungible_staked_sui
+redeem_fungible_staked_oct
 	public fun
 	0x3::one_system
 request_withdraw_stake_non_entry

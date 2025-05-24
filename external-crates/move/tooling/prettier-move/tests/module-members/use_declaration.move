@@ -9,7 +9,7 @@ use one::coin::Coin;
 use one::coin::Coin as C;
 use one::coin::{Self as c, Coin as C};
 use one::coin::very_long_function_name_very_long_function_name as short_name;
-use beep::staked_one::StakedSui;
+use beep::staked_one::StakedOct;
 
 use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap, TransferRequest};
 use one::transfer_policy::TransferPolicyCap as cap;

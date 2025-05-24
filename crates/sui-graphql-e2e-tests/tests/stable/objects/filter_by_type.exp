@@ -46,7 +46,7 @@ Response: {
             "asMoveObject": {
               "contents": {
                 "type": {
-                  "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedSui"
+                  "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedOct"
                 }
               }
             }
@@ -57,7 +57,7 @@ Response: {
             "asMoveObject": {
               "contents": {
                 "type": {
-                  "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedSui"
+                  "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedOct"
                 }
               }
             }
@@ -68,7 +68,7 @@ Response: {
             "asMoveObject": {
               "contents": {
                 "type": {
-                  "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedSui"
+                  "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedOct"
                 }
               }
             }

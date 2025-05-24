@@ -477,10 +477,10 @@ describe('GraphQL SuiClient compatibility', () => {
 			owner: toolbox.address(),
 		});
 		const rpc = await toolbox.client.getStakesByIds({
-			stakedSuiIds: [stakes[0].stakes[0].stakedSuiId],
+			stakedOctIds: [stakes[0].stakes[0].stakedOctId],
 		});
 		const graphql = await graphQLClient!.getStakesByIds({
-			stakedSuiIds: [stakes[0].stakes[0].stakedSuiId],
+			stakedOctIds: [stakes[0].stakes[0].stakedOctId],
 		});
 
 		expect(graphql).toEqual(rpc);

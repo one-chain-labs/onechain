@@ -9,7 +9,7 @@ module one_system::staking_pool {
     use one::bag::Bag;
     use one::bag;
 
-    /// StakedSui objects cannot be split to below this amount.
+    /// StakedOct objects cannot be split to below this amount.
     const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 SUI
 
     const EInsufficientPoolTokenBalance: u64 = 0;
@@ -24,14 +24,14 @@ module one_system::staking_pool {
     const ETokenBalancesDoNotMatchExchangeRate: u64 = 9;
     const EDelegationToInactivePool: u64 = 10;
     const EDeactivationOfInactivePool: u64 = 11;
-    const EIncompatibleStakedSui: u64 = 12;
+    const EIncompatibleStakedOct: u64 = 12;
     const EWithdrawalInSameEpoch: u64 = 13;
     const EPoolAlreadyActive: u64 = 14;
     const EPoolNotPreactive: u64 = 15;
     const EActivationOfInactivePool: u64 = 16;
     const EDelegationOfZeroSui: u64 = 17;
-    const EStakedSuiBelowThreshold: u64 = 18;
-    const ECannotMintFungibleStakedSuiYet: u64 = 19;
+    const EStakedOctBelowThreshold: u64 = 18;
+    const ECannotMintFungibleStakedOctYet: u64 = 19;
     const EInvariantFailure: u64 = 20;
 
     /// A staking pool embedded in each validator struct in the system state object.
@@ -44,7 +44,7 @@ module one_system::staking_pool {
         /// `Some(<epoch_number>)` if in-active, and it was de-activated at epoch `<epoch_number>`.
         deactivation_epoch: Option<u64>,
         /// The total number of OCT tokens in this pool, including the OCT in the rewards_pool, as well as in all the principal
-        /// in the `StakedSui` object, updated at epoch boundaries.
+        /// in the `StakedOct` object, updated at epoch boundaries.
         sui_balance: u64,
         /// The epoch stake rewards will be added here at the end of each epoch.
         rewards_pool: Balance<OCT>,
@@ -71,24 +71,24 @@ module one_system::staking_pool {
         pool_token_amount: u64,
     }
 
-    /// A self-custodial object holding the staked SUI tokens.
-    public struct StakedSui has key, store {
+    /// A self-custodial object holding the staked OCT tokens.
+    public struct StakedOct has key, store {
         id: UID,
         /// ID of the staking pool we are staking with.
         pool_id: ID,
         /// The epoch at which the stake becomes active.
         stake_activation_epoch: u64,
-        /// The staked SUI tokens.
+        /// The staked OCT tokens.
         principal: Balance<OCT>,
         /// coin lock
         lock: bool,
     }
 
-    /// An alternative to `StakedSui` that holds the pool token amount instead of the SUI balance.
-    /// StakedSui objects can be converted to FungibleStakedSuis after the initial warmup period.
-    /// The advantage of this is that you can now merge multiple StakedSui objects from different
-    /// activation epochs into a single FungibleStakedSui object.
-    public struct FungibleStakedSui has key, store {
+    /// An alternative to `StakedOct` that holds the pool token amount instead of the SUI balance.
+    /// StakedOct objects can be converted to FungibleStakedOcts after the initial warmup period.
+    /// The advantage of this is that you can now merge multiple StakedOct objects from different
+    /// activation epochs into a single FungibleStakedOct object.
+    public struct FungibleStakedOct has key, store {
         id: UID,
         /// ID of the staking pool we are staking with.
         pool_id: ID,
@@ -97,16 +97,16 @@ module one_system::staking_pool {
     }
 
     /// Holds useful information
-    public struct FungibleStakedSuiData has key, store {
+    public struct FungibleStakedOctData has key, store {
         id: UID,
-        /// fungible_staked_sui supply
+        /// fungible_staked_oct supply
         total_supply: u64,
         /// principal balance. Rewards are withdrawn from the reward pool
         principal: Balance<OCT>,
     }
 
     // === dynamic field keys ===
-    public struct FungibleStakedSuiDataKey has copy, store, drop {}
+    public struct FungibleStakedOctDataKey has copy, store, drop {}
 
     // ==== initializer ====
 
@@ -137,11 +137,11 @@ module one_system::staking_pool {
         stake_activation_epoch: u64,
         lock: bool,
         ctx: &mut TxContext
-    ) : StakedSui {
+    ) : StakedOct {
         let sui_amount = stake.value();
         assert!(!is_inactive(pool), EDelegationToInactivePool);
         assert!(sui_amount > 0, EDelegationOfZeroSui);
-        let staked_sui = StakedSui {
+        let staked_oct = StakedOct {
             id: object::new(ctx),
             pool_id: object::id(pool),
             stake_activation_epoch,
@@ -149,7 +149,7 @@ module one_system::staking_pool {
             lock,
         };
         pool.pending_stake = pool.pending_stake + sui_amount;
-        staked_sui
+        staked_oct
     }
 
     /// Request to withdraw the given stake plus rewards from a staking pool.
@@ -157,19 +157,19 @@ module one_system::staking_pool {
     /// A proportional amount of pool token withdraw is recorded and processed at epoch change time.
     public(package) fun request_withdraw_stake(
         pool: &mut StakingPool,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &TxContext
     ) : Balance<OCT> {
         // stake is inactive
-        if (staked_sui.stake_activation_epoch > ctx.epoch()) {
-            let principal = unwrap_staked_sui(staked_sui);
+        if (staked_oct.stake_activation_epoch > ctx.epoch()) {
+            let principal = unwrap_staked_oct(staked_oct);
             pool.pending_stake = pool.pending_stake - principal.value();
 
             return principal
         };
 
         let (pool_token_withdraw_amount, mut principal_withdraw) =
-            withdraw_from_principal(pool, staked_sui);
+            withdraw_from_principal(pool, staked_oct);
         let principal_withdraw_amount = principal_withdraw.value();
 
         let rewards_withdraw = withdraw_rewards(
@@ -188,32 +188,32 @@ module one_system::staking_pool {
         principal_withdraw
     }
 
-    public(package) fun redeem_fungible_staked_sui(
+    public(package) fun redeem_fungible_staked_oct(
         pool: &mut StakingPool,
-        fungible_staked_sui: FungibleStakedSui,
+        fungible_staked_oct: FungibleStakedOct,
         ctx: &TxContext
     ) : Balance<OCT> {
-        let FungibleStakedSui { id, pool_id, value } = fungible_staked_sui;
+        let FungibleStakedOct { id, pool_id, value } = fungible_staked_oct;
         assert!(pool_id == object::id(pool), EWrongPool);
 
         object::delete(id);
 
         let latest_exchange_rate = pool_token_exchange_rate_at_epoch(pool, tx_context::epoch(ctx));
-        let fungible_staked_sui_data: &mut FungibleStakedSuiData = bag::borrow_mut(
+        let fungible_staked_oct_data: &mut FungibleStakedOctData = bag::borrow_mut(
             &mut pool.extra_fields,
-            FungibleStakedSuiDataKey {}
+            FungibleStakedOctDataKey {}
         );
 
-        let (principal_amount, rewards_amount) = calculate_fungible_staked_sui_withdraw_amount(
+        let (principal_amount, rewards_amount) = calculate_fungible_staked_oct_withdraw_amount(
             latest_exchange_rate,
             value,
-            balance::value(&fungible_staked_sui_data.principal),
-            fungible_staked_sui_data.total_supply
+            balance::value(&fungible_staked_oct_data.principal),
+            fungible_staked_oct_data.total_supply
         );
 
-        fungible_staked_sui_data.total_supply = fungible_staked_sui_data.total_supply - value;
+        fungible_staked_oct_data.total_supply = fungible_staked_oct_data.total_supply - value;
 
-        let mut sui_out = balance::split(&mut fungible_staked_sui_data.principal, principal_amount);
+        let mut sui_out = balance::split(&mut fungible_staked_oct_data.principal, principal_amount);
         balance::join(
             &mut sui_out,
             balance::split(&mut pool.rewards_pool, rewards_amount)
@@ -227,52 +227,52 @@ module one_system::staking_pool {
 
     /// written in separate function so i can test with random values
     /// returns (principal_withdraw_amount, rewards_withdraw_amount)
-    fun calculate_fungible_staked_sui_withdraw_amount(
+    fun calculate_fungible_staked_oct_withdraw_amount(
         latest_exchange_rate: PoolTokenExchangeRate,
-        fungible_staked_sui_value: u64,
-        fungible_staked_sui_data_principal_amount: u64, // fungible_staked_sui_data.principal.value()
-        fungible_staked_sui_data_total_supply: u64, // fungible_staked_sui_data.total_supply
+        fungible_staked_oct_value: u64,
+        fungible_staked_oct_data_principal_amount: u64, // fungible_staked_oct_data.principal.value()
+        fungible_staked_oct_data_total_supply: u64, // fungible_staked_oct_data.total_supply
     ) : (u64, u64) {
-        // 1. if the entire FungibleStakedSuiData supply is redeemed, how much sui should we receive?
-        let total_sui_amount = get_sui_amount(&latest_exchange_rate, fungible_staked_sui_data_total_supply);
+        // 1. if the entire FungibleStakedOctData supply is redeemed, how much sui should we receive?
+        let total_sui_amount = get_sui_amount(&latest_exchange_rate, fungible_staked_oct_data_total_supply);
 
         // min with total_sui_amount to prevent underflow
-        let fungible_staked_sui_data_principal_amount = std::u64::min(
-            fungible_staked_sui_data_principal_amount,
+        let fungible_staked_oct_data_principal_amount = std::u64::min(
+            fungible_staked_oct_data_principal_amount,
             total_sui_amount
         );
 
         // 2. how much do we need to withdraw from the rewards pool?
-        let total_rewards = total_sui_amount - fungible_staked_sui_data_principal_amount;
+        let total_rewards = total_sui_amount - fungible_staked_oct_data_principal_amount;
 
-        // 3. proportionally withdraw from both wrt the fungible_staked_sui_value.
-        let principal_withdraw_amount = ((fungible_staked_sui_value as u128)
-            * (fungible_staked_sui_data_principal_amount as u128)
-            / (fungible_staked_sui_data_total_supply as u128)) as u64;
+        // 3. proportionally withdraw from both wrt the fungible_staked_oct_value.
+        let principal_withdraw_amount = ((fungible_staked_oct_value as u128)
+            * (fungible_staked_oct_data_principal_amount as u128)
+            / (fungible_staked_oct_data_total_supply as u128)) as u64;
 
-        let rewards_withdraw_amount = ((fungible_staked_sui_value as u128)
+        let rewards_withdraw_amount = ((fungible_staked_oct_value as u128)
             * (total_rewards as u128)
-            / (fungible_staked_sui_data_total_supply as u128)) as u64;
+            / (fungible_staked_oct_data_total_supply as u128)) as u64;
 
         // invariant check, just in case
-        let expected_sui_amount = get_sui_amount(&latest_exchange_rate, fungible_staked_sui_value);
+        let expected_sui_amount = get_sui_amount(&latest_exchange_rate, fungible_staked_oct_value);
         assert!(principal_withdraw_amount + rewards_withdraw_amount <= expected_sui_amount, EInvariantFailure);
 
         (principal_withdraw_amount, rewards_withdraw_amount)
     }
 
-    /// Convert the given staked SUI to an FungibleStakedSui object
-    public(package) fun convert_to_fungible_staked_sui(
+    /// Convert the given staked OCT to an FungibleStakedOct object
+    public(package) fun convert_to_fungible_staked_oct(
         pool: &mut StakingPool,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext
-    ) : FungibleStakedSui {
-        let StakedSui { id, pool_id, stake_activation_epoch, principal ,lock:_} = staked_sui;
+    ) : FungibleStakedOct {
+        let StakedOct { id, pool_id, stake_activation_epoch, principal ,lock:_} = staked_oct;
 
         assert!(pool_id == object::id(pool), EWrongPool);
         assert!(
             tx_context::epoch(ctx) >= stake_activation_epoch,
-            ECannotMintFungibleStakedSuiYet
+            ECannotMintFungibleStakedOctYet
         );
 
         object::delete(id);
@@ -288,11 +288,11 @@ module one_system::staking_pool {
             balance::value(&principal)
         );
 
-        if (!bag::contains(&pool.extra_fields, FungibleStakedSuiDataKey {})) {
+        if (!bag::contains(&pool.extra_fields, FungibleStakedOctDataKey {})) {
             bag::add(
                 &mut pool.extra_fields,
-                FungibleStakedSuiDataKey {},
-                FungibleStakedSuiData {
+                FungibleStakedOctDataKey {},
+                FungibleStakedOctData {
                     id: object::new(ctx),
                     total_supply: pool_token_amount,
                     principal
@@ -300,34 +300,34 @@ module one_system::staking_pool {
             );
         }
         else {
-            let fungible_staked_sui_data: &mut FungibleStakedSuiData = bag::borrow_mut(
+            let fungible_staked_oct_data: &mut FungibleStakedOctData = bag::borrow_mut(
                 &mut pool.extra_fields,
-                FungibleStakedSuiDataKey {}
+                FungibleStakedOctDataKey {}
             );
-            fungible_staked_sui_data.total_supply = fungible_staked_sui_data.total_supply + pool_token_amount;
-            balance::join(&mut fungible_staked_sui_data.principal, principal);
+            fungible_staked_oct_data.total_supply = fungible_staked_oct_data.total_supply + pool_token_amount;
+            balance::join(&mut fungible_staked_oct_data.principal, principal);
         };
 
-        FungibleStakedSui {
+        FungibleStakedOct {
             id: object::new(ctx),
             pool_id,
             value: pool_token_amount,
         }
     }
 
-    /// Withdraw the principal SUI stored in the StakedSui object, and calculate the corresponding amount of pool
+    /// Withdraw the principal SUI stored in the StakedOct object, and calculate the corresponding amount of pool
     /// tokens using exchange rate at staking epoch.
     /// Returns values are amount of pool tokens withdrawn and withdrawn principal portion of SUI.
     public(package) fun withdraw_from_principal(
         pool: &StakingPool,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
     ) : (u64, Balance<OCT>) {
 
         // Check that the stake information matches the pool.
-        assert!(staked_sui.pool_id == object::id(pool), EWrongPool);
+        assert!(staked_oct.pool_id == object::id(pool), EWrongPool);
 
-        let exchange_rate_at_staking_epoch = pool_token_exchange_rate_at_epoch(pool, staked_sui.stake_activation_epoch);
-        let principal_withdraw = unwrap_staked_sui(staked_sui);
+        let exchange_rate_at_staking_epoch = pool_token_exchange_rate_at_epoch(pool, staked_oct.stake_activation_epoch);
+        let principal_withdraw = unwrap_staked_oct(staked_oct);
         let pool_token_withdraw_amount = get_token_amount(
 		&exchange_rate_at_staking_epoch,
 		principal_withdraw.value()
@@ -339,20 +339,20 @@ module one_system::staking_pool {
         )
     }
 
-    fun unwrap_staked_sui(staked_sui: StakedSui): Balance<OCT> {
-        let StakedSui {
+    fun unwrap_staked_oct(staked_oct: StakedOct): Balance<OCT> {
+        let StakedOct {
             id,
             pool_id: _,
             stake_activation_epoch: _,
             principal,
             lock: _,
-        } = staked_sui;
+        } = staked_oct;
         object::delete(id);
         principal
     }
 
-    /// Allows calling `.into_balance()` on `StakedSui` to invoke `unwrap_staked_sui`
-    public use fun unwrap_staked_sui as StakedSui.into_balance;
+    /// Allows calling `.into_balance()` on `StakedOct` to invoke `unwrap_staked_oct`
+    public use fun unwrap_staked_oct as StakedOct.into_balance;
 
     // ==== functions called at epoch boundaries ===
 
@@ -398,7 +398,7 @@ module one_system::staking_pool {
     ///     2. Using the above number and the given `principal_withdraw_amount`, calculates the rewards portion of the
     ///        stake we should withdraw.
     ///     3. Withdraws the rewards portion from the rewards pool at the current exchange rate. We only withdraw the rewards
-    ///        portion because the principal portion was already taken out of the staker's self custodied StakedSui.
+    ///        portion because the principal portion was already taken out of the staker's self custodied StakedOct.
     fun withdraw_rewards(
         pool: &mut StakingPool,
         principal_withdraw_amount: u64,
@@ -449,20 +449,20 @@ module one_system::staking_pool {
 
     public fun sui_balance(pool: &StakingPool): u64 { pool.sui_balance }
 
-    public fun pool_id(staked_sui: &StakedSui): ID { staked_sui.pool_id }
+    public fun pool_id(staked_oct: &StakedOct): ID { staked_oct.pool_id }
 
-    public use fun fungible_staked_sui_pool_id as FungibleStakedSui.pool_id;
-    public fun fungible_staked_sui_pool_id(fungible_staked_sui: &FungibleStakedSui): ID { fungible_staked_sui.pool_id }
+    public use fun fungible_staked_oct_pool_id as FungibleStakedOct.pool_id;
+    public fun fungible_staked_oct_pool_id(fungible_staked_oct: &FungibleStakedOct): ID { fungible_staked_oct.pool_id }
 
-    public fun staked_sui_amount(staked_sui: &StakedSui): u64 { staked_sui.principal.value() }
+    public fun staked_oct_amount(staked_oct: &StakedOct): u64 { staked_oct.principal.value() }
 
-    public fun lock(staked_sui:&StakedSui):bool{staked_sui.lock}
+    public fun lock(staked_oct:&StakedOct):bool{staked_oct.lock}
 
-    /// Allows calling `.amount()` on `StakedSui` to invoke `staked_sui_amount`
-    public use fun staked_sui_amount as StakedSui.amount;
+    /// Allows calling `.amount()` on `StakedOct` to invoke `staked_oct_amount`
+    public use fun staked_oct_amount as StakedOct.amount;
 
-    public fun stake_activation_epoch(staked_sui: &StakedSui): u64 {
-        staked_sui.stake_activation_epoch
+    public fun stake_activation_epoch(staked_oct: &StakedOct): u64 {
+        staked_oct.stake_activation_epoch
     }
 
     /// Returns true if the input staking pool is preactive.
@@ -475,29 +475,29 @@ module one_system::staking_pool {
         pool.deactivation_epoch.is_some()
     }
 
-    public use fun fungible_staked_sui_value as FungibleStakedSui.value;
-    public fun fungible_staked_sui_value(fungible_staked_sui: &FungibleStakedSui): u64 { fungible_staked_sui.value }
+    public use fun fungible_staked_oct_value as FungibleStakedOct.value;
+    public fun fungible_staked_oct_value(fungible_staked_oct: &FungibleStakedOct): u64 { fungible_staked_oct.value }
 
-    public use fun split_fungible_staked_sui as FungibleStakedSui.split;
-    public fun split_fungible_staked_sui(
-        fungible_staked_sui: &mut FungibleStakedSui,
+    public use fun split_fungible_staked_oct as FungibleStakedOct.split;
+    public fun split_fungible_staked_oct(
+        fungible_staked_oct: &mut FungibleStakedOct,
         split_amount: u64,
         ctx: &mut TxContext
-    ): FungibleStakedSui {
-        assert!(split_amount <= fungible_staked_sui.value, EInsufficientPoolTokenBalance);
+    ): FungibleStakedOct {
+        assert!(split_amount <= fungible_staked_oct.value, EInsufficientPoolTokenBalance);
 
-        fungible_staked_sui.value = fungible_staked_sui.value - split_amount;
+        fungible_staked_oct.value = fungible_staked_oct.value - split_amount;
 
-        FungibleStakedSui {
+        FungibleStakedOct {
             id: object::new(ctx),
-            pool_id: fungible_staked_sui.pool_id,
+            pool_id: fungible_staked_oct.pool_id,
             value: split_amount,
         }
     }
 
-    public use fun join_fungible_staked_sui as FungibleStakedSui.join;
-    public fun join_fungible_staked_sui(self: &mut FungibleStakedSui, other: FungibleStakedSui) {
-        let FungibleStakedSui { id, pool_id, value } = other;
+    public use fun join_fungible_staked_oct as FungibleStakedOct.join;
+    public fun join_fungible_staked_oct(self: &mut FungibleStakedOct, other: FungibleStakedOct) {
+        let FungibleStakedOct { id, pool_id, value } = other;
         assert!(self.pool_id == pool_id, EWrongPool);
 
         object::delete(id);
@@ -505,17 +505,17 @@ module one_system::staking_pool {
         self.value = self.value + value;
     }
 
-    /// Split StakedSui `self` to two parts, one with principal `split_amount`,
+    /// Split StakedOct `self` to two parts, one with principal `split_amount`,
     /// and the remaining principal is left in `self`.
-    /// All the other parameters of the StakedSui like `stake_activation_epoch` or `pool_id` remain the same.
-    public fun split(self: &mut StakedSui, split_amount: u64, ctx: &mut TxContext): StakedSui {
+    /// All the other parameters of the StakedOct like `stake_activation_epoch` or `pool_id` remain the same.
+    public fun split(self: &mut StakedOct, split_amount: u64, ctx: &mut TxContext): StakedOct {
         let original_amount = self.principal.value();
         assert!(split_amount <= original_amount, EInsufficientSuiTokenBalance);
         let remaining_amount = original_amount - split_amount;
         // Both resulting parts should have at least MIN_STAKING_THRESHOLD.
-        assert!(remaining_amount >= MIN_STAKING_THRESHOLD, EStakedSuiBelowThreshold);
-        assert!(split_amount >= MIN_STAKING_THRESHOLD, EStakedSuiBelowThreshold);
-        StakedSui {
+        assert!(remaining_amount >= MIN_STAKING_THRESHOLD, EStakedOctBelowThreshold);
+        assert!(split_amount >= MIN_STAKING_THRESHOLD, EStakedOctBelowThreshold);
+        StakedOct {
             id: object::new(ctx),
             pool_id: self.pool_id,
             stake_activation_epoch: self.stake_activation_epoch,
@@ -524,20 +524,20 @@ module one_system::staking_pool {
         }
     }
 
-    /// Split the given StakedSui to the two parts, one with principal `split_amount`,
+    /// Split the given StakedOct to the two parts, one with principal `split_amount`,
     /// transfer the newly split part to the sender address.
-    public entry fun split_staked_sui(stake: &mut StakedSui, split_amount: u64, ctx: &mut TxContext) {
+    public entry fun split_staked_oct(stake: &mut StakedOct, split_amount: u64, ctx: &mut TxContext) {
         transfer::transfer(split(stake, split_amount, ctx), ctx.sender());
     }
 
-    /// Allows calling `.split_to_sender()` on `StakedSui` to invoke `split_staked_sui`
-    public use fun split_staked_sui as StakedSui.split_to_sender;
+    /// Allows calling `.split_to_sender()` on `StakedOct` to invoke `split_staked_oct`
+    public use fun split_staked_oct as StakedOct.split_to_sender;
 
-    /// Consume the staked sui `other` and add its value to `self`.
+    /// Consume the staked oct `other` and add its value to `self`.
     /// Aborts if some of the staking parameters are incompatible (pool id, stake activation epoch, etc.)
-    public entry fun join_staked_sui(self: &mut StakedSui, other: StakedSui) {
-        assert!(is_equal_staking_metadata(self, &other), EIncompatibleStakedSui);
-        let StakedSui {
+    public entry fun join_staked_oct(self: &mut StakedOct, other: StakedOct) {
+        assert!(is_equal_staking_metadata(self, &other), EIncompatibleStakedOct);
+        let StakedOct {
             id,
             pool_id: _,
             stake_activation_epoch: _,
@@ -549,11 +549,11 @@ module one_system::staking_pool {
         self.principal.join(principal);
     }
 
-    /// Allows calling `.join()` on `StakedSui` to invoke `join_staked_sui`
-    public use fun join_staked_sui as StakedSui.join;
+    /// Allows calling `.join()` on `StakedOct` to invoke `join_staked_oct`
+    public use fun join_staked_oct as StakedOct.join;
 
-    /// Returns true if all the staking parameters of the staked sui except the principal are identical
-    public fun is_equal_staking_metadata(self: &StakedSui, other: &StakedSui): bool {
+    /// Returns true if all the staking parameters of the staked oct except the principal are identical
+    public fun is_equal_staking_metadata(self: &StakedOct, other: &StakedOct): bool {
         (self.pool_id == other.pool_id) &&
         (self.stake_activation_epoch == other.stake_activation_epoch) &&
         (self.lock == other.lock)
@@ -645,16 +645,16 @@ module one_system::staking_pool {
 
     // ==== test-related functions ====
 
-    // Given the `staked_sui` receipt calculate the current rewards (in terms of SUI) for it.
+    // Given the `staked_oct` receipt calculate the current rewards (in terms of SUI) for it.
     #[test_only]
     public fun calculate_rewards(
         pool: &StakingPool,
-        staked_sui: &StakedSui,
+        staked_oct: &StakedOct,
         current_epoch: u64,
     ): u64 {
-        let staked_amount = staked_sui_amount(staked_sui);
+        let staked_amount = staked_oct_amount(staked_oct);
         let pool_token_withdraw_amount = {
-            let exchange_rate_at_staking_epoch = pool_token_exchange_rate_at_epoch(pool, staked_sui.stake_activation_epoch);
+            let exchange_rate_at_staking_epoch = pool_token_exchange_rate_at_epoch(pool, staked_oct.stake_activation_epoch);
             get_token_amount(&exchange_rate_at_staking_epoch, staked_amount)
         };
 
@@ -671,24 +671,24 @@ module one_system::staking_pool {
     }
 
     #[test_only]
-    public(package) fun fungible_staked_sui_data(pool: &StakingPool): &FungibleStakedSuiData {
-        bag::borrow(&pool.extra_fields, FungibleStakedSuiDataKey {})
+    public(package) fun fungible_staked_oct_data(pool: &StakingPool): &FungibleStakedOctData {
+        bag::borrow(&pool.extra_fields, FungibleStakedOctDataKey {})
     }
 
     #[test_only]
-    public use fun fungible_staked_sui_data_total_supply as FungibleStakedSuiData.total_supply;
+    public use fun fungible_staked_oct_data_total_supply as FungibleStakedOctData.total_supply;
 
     #[test_only]
-    public(package) fun fungible_staked_sui_data_total_supply(fungible_staked_sui_data: &FungibleStakedSuiData): u64 {
-        fungible_staked_sui_data.total_supply
+    public(package) fun fungible_staked_oct_data_total_supply(fungible_staked_oct_data: &FungibleStakedOctData): u64 {
+        fungible_staked_oct_data.total_supply
     }
 
     #[test_only]
-    public use fun fungible_staked_sui_data_principal_value as FungibleStakedSuiData.principal_value;
+    public use fun fungible_staked_oct_data_principal_value as FungibleStakedOctData.principal_value;
 
     #[test_only]
-    public(package) fun fungible_staked_sui_data_principal_value(fungible_staked_sui_data: &FungibleStakedSuiData): u64 {
-        fungible_staked_sui_data.principal.value()
+    public(package) fun fungible_staked_oct_data_principal_value(fungible_staked_oct_data: &FungibleStakedOctData): u64 {
+        fungible_staked_oct_data.principal.value()
     }
 
     #[test_only]
@@ -697,12 +697,12 @@ module one_system::staking_pool {
     }
 
     #[test_only]
-    public(package) fun create_fungible_staked_sui_for_testing(
+    public(package) fun create_fungible_staked_oct_for_testing(
         self: &StakingPool,
         value: u64,
         ctx: &mut TxContext
-    ) : FungibleStakedSui {
-        FungibleStakedSui {
+    ) : FungibleStakedOct {
+        FungibleStakedOct {
             id: object::new(ctx),
             pool_id: object::id(self),
             value,
@@ -712,22 +712,22 @@ module one_system::staking_pool {
     // ==== tests ====
 
     #[random_test]
-    fun test_calculate_fungible_staked_sui_withdraw_amount(
+    fun test_calculate_fungible_staked_oct_withdraw_amount(
         mut total_sui_amount: u64,
         // these are all in basis points
         mut pool_token_frac: u16,
-        mut fungible_staked_sui_data_total_supply_frac: u16,
-        mut fungible_staked_sui_data_principal_frac: u16,
-        mut fungible_staked_sui_value_bps: u16
+        mut fungible_staked_oct_data_total_supply_frac: u16,
+        mut fungible_staked_oct_data_principal_frac: u16,
+        mut fungible_staked_oct_value_bps: u16
     ) {
         use std::u128::max;
 
         total_sui_amount = std::u64::max(total_sui_amount, 1);
 
         pool_token_frac = pool_token_frac % 10000;
-        fungible_staked_sui_data_total_supply_frac = fungible_staked_sui_data_total_supply_frac % 10000;
-        fungible_staked_sui_data_principal_frac = fungible_staked_sui_data_principal_frac % 10000;
-        fungible_staked_sui_value_bps = fungible_staked_sui_value_bps % 10000;
+        fungible_staked_oct_data_total_supply_frac = fungible_staked_oct_data_total_supply_frac % 10000;
+        fungible_staked_oct_data_principal_frac = fungible_staked_oct_data_principal_frac % 10000;
+        fungible_staked_oct_value_bps = fungible_staked_oct_value_bps % 10000;
 
 
         let total_pool_token_amount = max(
@@ -740,27 +740,27 @@ module one_system::staking_pool {
             pool_token_amount: total_pool_token_amount as u64,
         };
 
-        let fungible_staked_sui_data_total_supply = max(
-            total_pool_token_amount * (fungible_staked_sui_data_total_supply_frac as u128) / 10000,
+        let fungible_staked_oct_data_total_supply = max(
+            total_pool_token_amount * (fungible_staked_oct_data_total_supply_frac as u128) / 10000,
             1
         );
-        let fungible_staked_sui_value = fungible_staked_sui_data_total_supply
-            * (fungible_staked_sui_value_bps as u128) / 10000;
+        let fungible_staked_oct_value = fungible_staked_oct_data_total_supply
+            * (fungible_staked_oct_value_bps as u128) / 10000;
 
-        let max_principal = get_sui_amount(&exchange_rate, fungible_staked_sui_data_total_supply as u64);
-        let fungible_staked_sui_data_principal_amount = max(
-            (max_principal as u128) * (fungible_staked_sui_data_principal_frac as u128) / 10000,
+        let max_principal = get_sui_amount(&exchange_rate, fungible_staked_oct_data_total_supply as u64);
+        let fungible_staked_oct_data_principal_amount = max(
+            (max_principal as u128) * (fungible_staked_oct_data_principal_frac as u128) / 10000,
             1
         );
 
-        let (principal_amount, rewards_amount) = calculate_fungible_staked_sui_withdraw_amount(
+        let (principal_amount, rewards_amount) = calculate_fungible_staked_oct_withdraw_amount(
             exchange_rate,
-            fungible_staked_sui_value as u64,
-            fungible_staked_sui_data_principal_amount as u64,
-            fungible_staked_sui_data_total_supply as u64,
+            fungible_staked_oct_value as u64,
+            fungible_staked_oct_data_principal_amount as u64,
+            fungible_staked_oct_data_total_supply as u64,
         );
 
-        let expected_out = get_sui_amount(&exchange_rate, fungible_staked_sui_value as u64);
+        let expected_out = get_sui_amount(&exchange_rate, fungible_staked_oct_value as u64);
 
         assert!(principal_amount + rewards_amount <= expected_out, 0);
 

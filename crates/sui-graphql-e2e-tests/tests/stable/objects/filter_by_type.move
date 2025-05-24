@@ -21,7 +21,7 @@
 
 //# run-graphql
 {
-  objects(filter: {type: "0x3::staking_pool::StakedSui"}) {
+  objects(filter: {type: "0x3::staking_pool::StakedOct"}) {
     edges {
       node {
         asMoveObject {

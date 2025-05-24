@@ -3,7 +3,7 @@
 
 query getStakes($owner: SuiAddress!, $limit: Int, $cursor: String) {
 	address(address: $owner) {
-		stakedSuis(first: $limit, after: $cursor) {
+		stakedOcts(first: $limit, after: $cursor) {
 			pageInfo {
 				hasNextPage
 				endCursor
@@ -23,7 +23,7 @@ query getStakesByIds($ids: [SuiAddress!]!, $limit: Int, $cursor: String) {
 		}
 		nodes {
 			asMoveObject {
-				asStakedSui {
+				asStakedOct {
 					...RPC_STAKE_FIELDS
 				}
 			}
@@ -31,7 +31,7 @@ query getStakesByIds($ids: [SuiAddress!]!, $limit: Int, $cursor: String) {
 	}
 }
 
-fragment RPC_STAKE_FIELDS on StakedSui {
+fragment RPC_STAKE_FIELDS on StakedOct {
 	principal
 	activatedEpoch {
 		epochId

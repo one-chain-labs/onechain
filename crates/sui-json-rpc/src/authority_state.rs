@@ -34,7 +34,7 @@ use sui_types::{
     effects::TransactionEffects,
     error::{SuiError, UserInputError},
     event::EventID,
-    governance::StakedSui,
+    governance::StakedOct,
     messages_checkpoint::{
         CheckpointContents,
         CheckpointContentsDigest,
@@ -160,7 +160,7 @@ pub trait StateRead: Send + Sync {
     ) -> StateReadResult<Option<ObjectID>>;
 
     // governance_api
-    async fn get_staked_sui(&self, owner: SuiAddress) -> StateReadResult<Vec<StakedSui>>;
+    async fn get_staked_oct(&self, owner: SuiAddress) -> StateReadResult<Vec<StakedOct>>;
     fn get_system_state(&self) -> StateReadResult<SuiSystemState>;
     fn get_or_latest_committee(&self, epoch: Option<BigInt<u64>>) -> StateReadResult<Committee>;
 
@@ -365,8 +365,8 @@ impl StateRead for AuthorityState {
         Ok(self.get_dynamic_field_object_id(owner, name_type, name_bcs_bytes)?)
     }
 
-    async fn get_staked_sui(&self, owner: SuiAddress) -> StateReadResult<Vec<StakedSui>> {
-        Ok(self.get_move_objects(owner, MoveObjectType::staked_sui()).await?)
+    async fn get_staked_oct(&self, owner: SuiAddress) -> StateReadResult<Vec<StakedOct>> {
+        Ok(self.get_move_objects(owner, MoveObjectType::staked_oct()).await?)
     }
 
     fn get_system_state(&self) -> StateReadResult<SuiSystemState> {

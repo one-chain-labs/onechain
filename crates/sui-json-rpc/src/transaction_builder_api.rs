@@ -261,11 +261,11 @@ impl TransactionBuilderServer for TransactionBuilderApi {
     async fn request_withdraw_stake(
         &self,
         signer: SuiAddress,
-        staked_sui: ObjectID,
+        staked_oct: ObjectID,
         gas: Option<ObjectID>,
         gas_budget: BigInt<u64>,
     ) -> RpcResult<TransactionBlockBytes> {
-        Ok(TransactionBlockBytes::from_data(self.0.request_withdraw_stake(signer, staked_sui, gas, *gas_budget).await?)?)
+        Ok(TransactionBlockBytes::from_data(self.0.request_withdraw_stake(signer, staked_oct, gas, *gas_budget).await?)?)
     }
 }
 

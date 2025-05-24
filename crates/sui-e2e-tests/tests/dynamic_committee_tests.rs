@@ -246,9 +246,9 @@ mod add_stake {
         }
 
         async fn pre_epoch_post_condition(&mut self, runner: &StressTestRunner, effects: &TransactionEffects) {
-            // Assert that a `StakedSui` object matching the amount delegated is created.
-            // Assert that this staked sui
-            let object = runner.get_created_object_of_type_name(effects, "StakedSui").await.unwrap();
+            // Assert that a `StakedOct` object matching the amount delegated is created.
+            // Assert that this staked oct
+            let object = runner.get_created_object_of_type_name(effects, "StakedOct").await.unwrap();
             let state = runner.state();
             let cache = state.get_backing_package_store();
             let epoch_store = state.load_epoch_store_one_call_per_task();

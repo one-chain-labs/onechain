@@ -309,7 +309,7 @@ mod tests {
             "0x2::coin::Coin",
             "0x2::coin::Coin<0x2::oct::OCT>",
             "vector<u256>",
-            "vector<0x3::staking_pool::StakedSui>",
+            "vector<0x3::staking_pool::StakedOct>",
         ]
         .into_iter();
 
@@ -322,7 +322,7 @@ mod tests {
             0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin
             0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>
             vector<u256>
-            vector<0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedSui>"#]];
+            vector<0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedOct>"#]];
         expect.assert_eq(&filters.join("\n"))
     }
 
@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn test_invalid_function_filters() {
         for invalid_function_filter in
-            ["0x2::coin::Coin<0x2::oct::OCT>", "vector<u256>", "vector<0x3::staking_pool::StakedSui>"]
+            ["0x2::coin::Coin<0x2::oct::OCT>", "vector<u256>", "vector<0x3::staking_pool::StakedOct>"]
         {
             assert!(FqNameFilter::from_str(invalid_function_filter).is_err());
         }
@@ -396,7 +396,7 @@ mod tests {
             "0x2::coin::Coin",
             "0x2::coin::Coin<0x2::oct::OCT>",
             "vector<u256>",
-            "vector<0x3::staking_pool::StakedSui>",
+            "vector<0x3::staking_pool::StakedOct>",
         ] {
             assert!(ModuleFilter::from_str(invalid_module_filter).is_err());
         }

@@ -13,7 +13,7 @@ Response: {
           "cursor": "IJdddv7ctEE+DF5quWpbQy6Gbh1zoREdiDCwOweZutarAAAAAAAAAAA=",
           "node": {
             "asMoveObject": {
-              "asStakedSui": {
+              "asStakedOct": {
                 "principal": "20000000000000000"
               }
             }
@@ -22,7 +22,7 @@ Response: {
       ]
     },
     "address": {
-      "stakedSuis": {
+      "stakedOcts": {
         "edges": []
       }
     }
@@ -63,7 +63,7 @@ Response: {
           "cursor": "IAIBJktCWLXHqadKvg7cMsx5K2wvGEif2hRpCOa1abMjAgAAAAAAAAA=",
           "node": {
             "asMoveObject": {
-              "asStakedSui": {
+              "asStakedOct": {
                 "principal": "40000",
                 "poolId": "0x878df22326187cc356dbb27f6e28c99770a9a6b75db447d28d2523976e5e451d"
               }
@@ -74,7 +74,7 @@ Response: {
           "cursor": "IIfCdVF/ksapbQZhjXV6RV32ZC1RPOn4asTmI03lIcvOAgAAAAAAAAA=",
           "node": {
             "asMoveObject": {
-              "asStakedSui": {
+              "asStakedOct": {
                 "principal": "10000000000",
                 "poolId": "0x878df22326187cc356dbb27f6e28c99770a9a6b75db447d28d2523976e5e451d"
               }
@@ -85,7 +85,7 @@ Response: {
           "cursor": "IJdddv7ctEE+DF5quWpbQy6Gbh1zoREdiDCwOweZutarAgAAAAAAAAA=",
           "node": {
             "asMoveObject": {
-              "asStakedSui": {
+              "asStakedOct": {
                 "principal": "20000000000000000",
                 "poolId": "0x878df22326187cc356dbb27f6e28c99770a9a6b75db447d28d2523976e5e451d"
               }
@@ -95,7 +95,7 @@ Response: {
       ]
     },
     "address": {
-      "stakedSuis": {
+      "stakedOcts": {
         "edges": [
           {
             "cursor": "IIfCdVF/ksapbQZhjXV6RV32ZC1RPOn4asTmI03lIcvOAgAAAAAAAAA=",

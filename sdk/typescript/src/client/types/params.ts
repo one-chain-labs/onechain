@@ -273,7 +273,7 @@ export interface GetStakesParams {
 }
 /** Return one or more [DelegatedStake]. If a Stake was withdrawn its status will be Unstaked. */
 export interface GetStakesByIdsParams {
-	stakedSuiIds: string[];
+	stakedOctIds: string[];
 }
 /** Return total supply for a coin */
 export interface GetTotalSupplyParams {
@@ -502,8 +502,8 @@ export interface UnsafeRequestAddStakeParams {
 export interface UnsafeRequestWithdrawStakeParams {
 	/** the transaction signer's Sui address */
 	signer: string;
-	/** StakedSui object ID */
-	stakedSui: string;
+	/** StakedOct object ID */
+	stakedOct: string;
 	/**
 	 * gas object to be used in this transaction, node will pick one from the signer's possession if not
 	 * provided

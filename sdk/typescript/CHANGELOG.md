@@ -906,7 +906,7 @@
   please use `getTransactions` instead
 - 9b29bef37: Pass blake2b hash to signer API
 - 8700809b5: Add a new `getCheckpoints` endpoint that returns a paginated list of checkpoints.
-- 5c3b00cde: Add object id to staking pool and pool id to staked sui.
+- 5c3b00cde: Add object id to staking pool and pool id to staked oct.
 - 01272ab7d: Remove deprecated `getCheckpointContents`, `getCheckpointContentsByDigest`,
   `getCheckpointSummary` and `getCheckpointSummaryByDigest` methods.
 - 9822357d6: Add getStakesByIds to get DelegatedStake queried by id

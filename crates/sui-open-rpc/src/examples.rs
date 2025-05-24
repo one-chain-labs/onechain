@@ -1149,7 +1149,7 @@ impl RpcExampleProvider {
                 staking_pool: ObjectID::new(self.rng.gen()),
                 stakes: vec![
                     Stake {
-                        staked_sui_id: ObjectID::new(self.rng.gen()),
+                        staked_oct_id: ObjectID::new(self.rng.gen()),
                         stake_request_epoch: 62,
                         stake_active_epoch: 63,
                         principal,
@@ -1157,7 +1157,7 @@ impl RpcExampleProvider {
                         status: StakeStatus::Active { estimated_reward: (principal as f64 * 0.0026) as u64 },
                     },
                     Stake {
-                        staked_sui_id: ObjectID::new(self.rng.gen()),
+                        staked_oct_id: ObjectID::new(self.rng.gen()),
                         stake_request_epoch: 142,
                         stake_active_epoch: 143,
                         principal,
@@ -1170,7 +1170,7 @@ impl RpcExampleProvider {
                 validator_address: SuiAddress::from(ObjectID::new(self.rng.gen())),
                 staking_pool: ObjectID::new(self.rng.gen()),
                 stakes: vec![Stake {
-                    staked_sui_id: ObjectID::new(self.rng.gen()),
+                    staked_oct_id: ObjectID::new(self.rng.gen()),
                     stake_request_epoch: 244,
                     stake_active_epoch: 245,
                     principal,
@@ -1196,7 +1196,7 @@ impl RpcExampleProvider {
             staking_pool: ObjectID::new(self.rng.gen()),
             stakes: vec![
                 Stake {
-                    staked_sui_id: stake1,
+                    staked_oct_id: stake1,
                     stake_request_epoch: 62,
                     stake_active_epoch: 63,
                     principal,
@@ -1204,7 +1204,7 @@ impl RpcExampleProvider {
                     status: StakeStatus::Active { estimated_reward: (principal as f64 * 0.0026) as u64 },
                 },
                 Stake {
-                    staked_sui_id: stake2,
+                    staked_oct_id: stake2,
                     stake_request_epoch: 244,
                     stake_active_epoch: 245,
                     principal,
@@ -1215,7 +1215,7 @@ impl RpcExampleProvider {
         };
         Examples::new("suix_getStakesByIds", vec![ExamplePairing::new(
             "Returns the staking information for the address the request provides.",
-            vec![("staked_sui_ids", json!(vec![stake1, stake2]))],
+            vec![("staked_oct_ids", json!(vec![stake1, stake2]))],
             json!(result),
         )])
     }

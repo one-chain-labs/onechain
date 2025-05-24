@@ -1188,7 +1188,7 @@ Response: {
                     "asMoveObject": {
                       "contents": {
                         "type": {
-                          "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedSui"
+                          "repr": "0x0000000000000000000000000000000000000000000000000000000000000003::staking_pool::StakedOct"
                         },
                         "json": {
                           "id": "0x938454a8d15e26afabb58f703ec6709d8831a613d30f7bfa8a17edc1327eadd7",

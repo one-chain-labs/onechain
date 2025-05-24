@@ -117,7 +117,7 @@ async fn get_sub_account_balances(
                 for stake in &stakes.stakes {
                     if let StakeStatus::Active { .. } = stake.status {
                         amounts.push(SubBalance {
-                            stake_id: stake.staked_sui_id,
+                            stake_id: stake.staked_oct_id,
                             validator: stakes.validator_address,
                             value: stake.principal as i128,
                         });
@@ -132,7 +132,7 @@ async fn get_sub_account_balances(
                 for stake in &stakes.stakes {
                     if let StakeStatus::Pending = stake.status {
                         amounts.push(SubBalance {
-                            stake_id: stake.staked_sui_id,
+                            stake_id: stake.staked_oct_id,
                             validator: stakes.validator_address,
                             value: stake.principal as i128,
                         });
@@ -148,7 +148,7 @@ async fn get_sub_account_balances(
                 for stake in &stakes.stakes {
                     if let StakeStatus::Active { estimated_reward } = stake.status {
                         amounts.push(SubBalance {
-                            stake_id: stake.staked_sui_id,
+                            stake_id: stake.staked_oct_id,
                             validator: stakes.validator_address,
                             value: estimated_reward as i128,
                         });

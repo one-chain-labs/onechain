@@ -27,8 +27,8 @@ title: Module `0x3::sui_system_state_inner`
 -  [Function `request_add_stake_mul_coin`](#0x3_sui_system_state_inner_request_add_stake_mul_coin)
 -  [Function `request_add_val_stake_mul_coin`](#0x3_sui_system_state_inner_request_add_val_stake_mul_coin)
 -  [Function `request_withdraw_stake`](#0x3_sui_system_state_inner_request_withdraw_stake)
--  [Function `convert_to_fungible_staked_sui`](#0x3_sui_system_state_inner_convert_to_fungible_staked_sui)
--  [Function `redeem_fungible_staked_sui`](#0x3_sui_system_state_inner_redeem_fungible_staked_sui)
+-  [Function `convert_to_fungible_staked_oct`](#0x3_sui_system_state_inner_convert_to_fungible_staked_oct)
+-  [Function `redeem_fungible_staked_oct`](#0x3_sui_system_state_inner_redeem_fungible_staked_oct)
 -  [Function `report_validator`](#0x3_sui_system_state_inner_report_validator)
 -  [Function `undo_report_validator`](#0x3_sui_system_state_inner_undo_report_validator)
 -  [Function `report_validator_impl`](#0x3_sui_system_state_inner_report_validator_impl)
@@ -1285,7 +1285,7 @@ This function is used to set new commission rate for candidate validators
 Add stake to a validator's staking pool.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake">request_add_stake</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, validator_address: <b>address</b>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake">request_add_stake</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, validator_address: <b>address</b>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -1299,7 +1299,7 @@ Add stake to a validator's staking pool.
     stake: Coin&lt;OCT&gt;,
     validator_address: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
-) : StakedSui {
+) : StakedOct {
     self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake">request_add_stake</a>(
         validator_address,
         stake.into_balance(),
@@ -1319,7 +1319,7 @@ Add stake to a validator's staking pool.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_val_stake">request_add_val_stake</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, cap: &<a href="validator_cap.md#0x3_validator_cap_UnverifiedValidatorOperationCap">validator_cap::UnverifiedValidatorOperationCap</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_val_stake">request_add_val_stake</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, cap: &<a href="validator_cap.md#0x3_validator_cap_UnverifiedValidatorOperationCap">validator_cap::UnverifiedValidatorOperationCap</a>, stake: <a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -1333,7 +1333,7 @@ Add stake to a validator's staking pool.
     cap: &UnverifiedValidatorOperationCap,
     stake: Coin&lt;OCT&gt;,
     ctx: &<b>mut</b> TxContext,
-) : StakedSui{
+) : StakedOct{
 
     self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake">request_add_stake</a>(
         *cap.unverified_operation_cap_address(),
@@ -1356,7 +1356,7 @@ Add stake to a validator's staking pool.
 Add stake to a validator's staking pool using multiple coins.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake_mul_coin">request_add_stake_mul_coin</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, stakes: <a href="../move-stdlib/vector.md#0x1_vector">vector</a>&lt;<a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;, stake_amount: <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../move-stdlib/u64.md#0x1_u64">u64</a>&gt;, validator_address: <b>address</b>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake_mul_coin">request_add_stake_mul_coin</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, stakes: <a href="../move-stdlib/vector.md#0x1_vector">vector</a>&lt;<a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;, stake_amount: <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../move-stdlib/u64.md#0x1_u64">u64</a>&gt;, validator_address: <b>address</b>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -1371,7 +1371,7 @@ Add stake to a validator's staking pool using multiple coins.
     stake_amount: <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../move-stdlib/u64.md#0x1_u64">u64</a>&gt;,
     validator_address: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
-) : StakedSui {
+) : StakedOct {
     <b>let</b> <a href="../one-framework/balance.md#0x2_balance">balance</a> = <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_extract_coin_balance">extract_coin_balance</a>(stakes, stake_amount, ctx);
     self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake">request_add_stake</a>(validator_address, <a href="../one-framework/balance.md#0x2_balance">balance</a>, <b>false</b>,ctx)
 }
@@ -1387,7 +1387,7 @@ Add stake to a validator's staking pool using multiple coins.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_val_stake_mul_coin">request_add_val_stake_mul_coin</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, cap: &<a href="validator_cap.md#0x3_validator_cap_UnverifiedValidatorOperationCap">validator_cap::UnverifiedValidatorOperationCap</a>, stakes: <a href="../move-stdlib/vector.md#0x1_vector">vector</a>&lt;<a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;, stake_amount: <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../move-stdlib/u64.md#0x1_u64">u64</a>&gt;, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_val_stake_mul_coin">request_add_val_stake_mul_coin</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, cap: &<a href="validator_cap.md#0x3_validator_cap_UnverifiedValidatorOperationCap">validator_cap::UnverifiedValidatorOperationCap</a>, stakes: <a href="../move-stdlib/vector.md#0x1_vector">vector</a>&lt;<a href="../one-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;, stake_amount: <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../move-stdlib/u64.md#0x1_u64">u64</a>&gt;, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -1402,7 +1402,7 @@ Add stake to a validator's staking pool using multiple coins.
     stakes: <a href="../move-stdlib/vector.md#0x1_vector">vector</a>&lt;Coin&lt;OCT&gt;&gt;,
     stake_amount: <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../move-stdlib/u64.md#0x1_u64">u64</a>&gt;,
     ctx: &<b>mut</b> TxContext,
-) : StakedSui {
+) : StakedOct {
     <b>let</b> <a href="../one-framework/balance.md#0x2_balance">balance</a> = <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_extract_coin_balance">extract_coin_balance</a>(stakes, stake_amount, ctx);
     self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_add_stake">request_add_stake</a>(*cap.unverified_operation_cap_address(), <a href="../one-framework/balance.md#0x2_balance">balance</a>, <b>false</b>,ctx)
 }
@@ -1419,7 +1419,7 @@ Add stake to a validator's staking pool using multiple coins.
 Withdraw some portion of a stake from a validator's staking pool.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_withdraw_stake">request_withdraw_stake</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, staked_sui: <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): (<a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../one-framework/coin_vesting.md#0x2_coin_vesting_CoinVesting">coin_vesting::CoinVesting</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_withdraw_stake">request_withdraw_stake</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, staked_oct: <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): (<a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;, <a href="../move-stdlib/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../one-framework/coin_vesting.md#0x2_coin_vesting_CoinVesting">coin_vesting::CoinVesting</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;&gt;)
 </code></pre>
 
 
@@ -1430,10 +1430,10 @@ Withdraw some portion of a stake from a validator's staking pool.
 
 <pre><code><b>public</b>(package) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_withdraw_stake">request_withdraw_stake</a>(
     self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">SuiSystemStateInnerV2</a>,
-    staked_sui: StakedSui,
+    staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
 ) :  (Balance&lt;OCT&gt;,Option&lt;CoinVesting&lt;OCT&gt;&gt;){
-    self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_withdraw_stake">request_withdraw_stake</a>(staked_sui, ctx)
+    self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_request_withdraw_stake">request_withdraw_stake</a>(staked_oct, ctx)
 }
 </code></pre>
 
@@ -1441,13 +1441,13 @@ Withdraw some portion of a stake from a validator's staking pool.
 
 </details>
 
-<a name="0x3_sui_system_state_inner_convert_to_fungible_staked_sui"></a>
+<a name="0x3_sui_system_state_inner_convert_to_fungible_staked_oct"></a>
 
-## Function `convert_to_fungible_staked_sui`
+## Function `convert_to_fungible_staked_oct`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, staked_sui: <a href="staking_pool.md#0x3_staking_pool_StakedSui">staking_pool::StakedSui</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_FungibleStakedSui">staking_pool::FungibleStakedSui</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, staked_oct: <a href="staking_pool.md#0x3_staking_pool_StakedOct">staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="staking_pool.md#0x3_staking_pool_FungibleStakedOct">staking_pool::FungibleStakedOct</a>
 </code></pre>
 
 
@@ -1456,12 +1456,12 @@ Withdraw some portion of a stake from a validator's staking pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(
+<pre><code><b>public</b>(package) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(
     self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">SuiSystemStateInnerV2</a>,
-    staked_sui: StakedSui,
+    staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
-) : FungibleStakedSui {
-    self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_convert_to_fungible_staked_sui">convert_to_fungible_staked_sui</a>(staked_sui, ctx)
+) : FungibleStakedOct {
+    self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(staked_oct, ctx)
 }
 </code></pre>
 
@@ -1469,13 +1469,13 @@ Withdraw some portion of a stake from a validator's staking pool.
 
 </details>
 
-<a name="0x3_sui_system_state_inner_redeem_fungible_staked_sui"></a>
+<a name="0x3_sui_system_state_inner_redeem_fungible_staked_oct"></a>
 
-## Function `redeem_fungible_staked_sui`
+## Function `redeem_fungible_staked_oct`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, fungible_staked_sui: <a href="staking_pool.md#0x3_staking_pool_FungibleStakedSui">staking_pool::FungibleStakedSui</a>, ctx: &<a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">sui_system_state_inner::SuiSystemStateInnerV2</a>, fungible_staked_oct: <a href="staking_pool.md#0x3_staking_pool_FungibleStakedOct">staking_pool::FungibleStakedOct</a>, ctx: &<a href="../one-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../one-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../one-framework/oct.md#0x2_oct_OCT">oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -1484,12 +1484,12 @@ Withdraw some portion of a stake from a validator's staking pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(
+<pre><code><b>public</b>(package) <b>fun</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(
     self: &<b>mut</b> <a href="sui_system_state_inner.md#0x3_sui_system_state_inner_SuiSystemStateInnerV2">SuiSystemStateInnerV2</a>,
-    fungible_staked_sui: FungibleStakedSui,
+    fungible_staked_oct: FungibleStakedOct,
     ctx: &TxContext,
 ) : Balance&lt;OCT&gt; {
-    self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_redeem_fungible_staked_sui">redeem_fungible_staked_sui</a>(fungible_staked_sui, ctx)
+    self.validators.<a href="sui_system_state_inner.md#0x3_sui_system_state_inner_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(fungible_staked_oct, ctx)
 }
 </code></pre>
 

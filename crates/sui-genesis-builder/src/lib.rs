@@ -42,7 +42,7 @@ use sui_types::{
     epoch_data::EpochData,
     gas::SuiGasStatus,
     gas_coin::GasCoin,
-    governance::StakedSui,
+    governance::StakedOct,
     id::UID,
     in_memory_storage::InMemoryStorage,
     inner_temporary_store::InnerTemporaryStore,
@@ -358,17 +358,17 @@ impl Builder {
             .iter()
             .filter_map(|o| GasCoin::try_from(o).ok().map(|g| (o.id(), (o, g))))
             .collect();
-        let mut staked_sui_objects: BTreeMap<ObjectID, (&Object, StakedSui)> = unsigned_genesis
+        let mut staked_oct_objects: BTreeMap<ObjectID, (&Object, StakedOct)> = unsigned_genesis
             .objects()
             .iter()
-            .filter_map(|o| StakedSui::try_from(o).ok().map(|s| (o.id(), (o, s))))
+            .filter_map(|o| StakedOct::try_from(o).ok().map(|s| (o.id(), (o, s))))
             .collect();
 
         for allocation in token_distribution_schedule.allocations {
             if let Some(staked_with_validator) = allocation.staked_with_validator {
                 let staking_pool_id =
                     *address_to_pool_id.get(&staked_with_validator).expect("staking pool should exist");
-                let staked_sui_object_id = staked_sui_objects
+                let staked_oct_object_id = staked_oct_objects
                     .iter()
                     .find(|(_k, (o, s))| {
                         let Owner::AddressOwner(owner) = &o.owner else {
@@ -380,11 +380,11 @@ impl Builder {
                     })
                     .map(|(k, _)| *k)
                     .expect("all allocations should be present");
-                let staked_sui_object = staked_sui_objects.remove(&staked_sui_object_id).unwrap();
-                assert_eq!(staked_sui_object.0.owner, Owner::AddressOwner(allocation.recipient_address));
-                assert_eq!(staked_sui_object.1.principal(), allocation.amount_mist);
-                assert_eq!(staked_sui_object.1.pool_id(), staking_pool_id);
-                assert_eq!(staked_sui_object.1.activation_epoch(), 0);
+                let staked_oct_object = staked_oct_objects.remove(&staked_oct_object_id).unwrap();
+                assert_eq!(staked_oct_object.0.owner, Owner::AddressOwner(allocation.recipient_address));
+                assert_eq!(staked_oct_object.1.principal(), allocation.amount_mist);
+                assert_eq!(staked_oct_object.1.pool_id(), staking_pool_id);
+                assert_eq!(staked_oct_object.1.activation_epoch(), 0);
             } else {
                 let gas_object_id = gas_objects
                     .iter()
@@ -406,7 +406,7 @@ impl Builder {
         // All Gas and staked objects should be accounted for
         if !self.parameters.allow_insertion_of_extra_objects {
             assert!(gas_objects.is_empty());
-            assert!(staked_sui_objects.is_empty());
+            assert!(staked_oct_objects.is_empty());
         }
 
         let committee = system_state.get_current_epoch_committee();

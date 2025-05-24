@@ -8,7 +8,7 @@ use sui_types::{
     base_types::ObjectID,
     coin::CoinMetadata,
     gas_coin::{GasCoin, MIST_PER_OCT, TOTAL_SUPPLY_MIST},
-    governance::StakedSui,
+    governance::StakedOct,
     move_package::MovePackage,
     object::{MoveObject, Owner},
     sui_system_state::SuiValidatorGenesis,
@@ -16,12 +16,12 @@ use sui_types::{
 
 const STR_ALL: &str = "All";
 const STR_EXIT: &str = "Exit";
-const STR_SUI: &str = "Sui";
-const STR_STAKED_SUI: &str = "StakedSui";
+const STR_SUI: &str = "OCT";
+const STR_STAKED_OCT: &str = "StakedOct";
 const STR_PACKAGE: &str = "Package";
 const STR_COIN_METADATA: &str = "CoinMetadata";
 const STR_OTHER: &str = "Other";
-const STR_SUI_DISTRIBUTION: &str = "Sui Distribution";
+const STR_SUI_DISTRIBUTION: &str = "OCT Distribution";
 const STR_OBJECTS: &str = "Objects";
 const STR_VALIDATORS: &str = "Validators";
 
@@ -49,7 +49,7 @@ pub(crate) fn examine_genesis_checkpoint(genesis: UnsignedGenesis) {
     let mut owner_map = BTreeMap::new();
     let mut package_map = BTreeMap::new();
     let mut sui_map = BTreeMap::new();
-    let mut staked_sui_map = BTreeMap::new();
+    let mut staked_oct_map = BTreeMap::new();
     let mut coin_metadata_map = BTreeMap::new();
     let mut other_object_map = BTreeMap::new();
 
@@ -67,14 +67,14 @@ pub(crate) fn examine_genesis_checkpoint(genesis: UnsignedGenesis) {
                     sui_map.insert(object.id(), gas);
                 } else if let Ok(coin_metadata) = CoinMetadata::try_from(object) {
                     coin_metadata_map.insert(object.id(), coin_metadata);
-                } else if let Ok(staked_sui) = StakedSui::try_from(object) {
+                } else if let Ok(staked_oct) = StakedOct::try_from(object) {
                     let entry = sui_distribution.entry(object.owner.to_string()).or_default();
-                    entry.insert(object_id_str, (STR_STAKED_SUI, staked_sui.principal()));
+                    entry.insert(object_id_str, (STR_STAKED_OCT, staked_oct.principal()));
                     // Assert pool id is associated with a knonw validator.
-                    let validator = validator_pool_id_map.get(&staked_sui.pool_id()).unwrap();
-                    assert_eq!(validator.staking_pool.id, staked_sui.pool_id());
+                    let validator = validator_pool_id_map.get(&staked_oct.pool_id()).unwrap();
+                    assert_eq!(validator.staking_pool.id, staked_oct.pool_id());
 
-                    staked_sui_map.insert(object.id(), staked_sui);
+                    staked_oct_map.insert(object.id(), staked_oct);
                 } else {
                     other_object_map.insert(object.id(), move_object);
                 }
@@ -106,7 +106,7 @@ pub(crate) fn examine_genesis_checkpoint(genesis: UnsignedGenesis) {
                     &validator_pool_id_map,
                     &package_map,
                     &sui_map,
-                    &staked_sui_map,
+                    &staked_oct_map,
                     &coin_metadata_map,
                     &other_object_map,
                 );
@@ -154,11 +154,11 @@ fn examine_object(
     validator_pool_id_map: &BTreeMap<ObjectID, &SuiValidatorGenesis>,
     package_map: &BTreeMap<ObjectID, &MovePackage>,
     sui_map: &BTreeMap<ObjectID, GasCoin>,
-    staked_sui_map: &BTreeMap<ObjectID, StakedSui>,
+    staked_oct_map: &BTreeMap<ObjectID, StakedOct>,
     coin_metadata_map: &BTreeMap<ObjectID, CoinMetadata>,
     other_object_map: &BTreeMap<ObjectID, &MoveObject>,
 ) {
-    let object_options: Vec<&str> = vec![STR_SUI, STR_STAKED_SUI, STR_COIN_METADATA, STR_PACKAGE, STR_OTHER, STR_EXIT];
+    let object_options: Vec<&str> = vec![STR_SUI, STR_STAKED_OCT, STR_COIN_METADATA, STR_PACKAGE, STR_OTHER, STR_EXIT];
     loop {
         let ans =
             Select::new("Select one object category to examine ('Exit' to return to Main):", object_options.clone())
@@ -169,13 +169,13 @@ fn examine_object(
                 for gas_coin in sui_map.values() {
                     display_sui(gas_coin, owner_map);
                 }
-                print_divider("Sui");
+                print_divider("OCT");
             }
-            Ok(name) if name == STR_STAKED_SUI => {
-                for staked_sui_coin in staked_sui_map.values() {
-                    display_staked_sui(staked_sui_coin, validator_pool_id_map, owner_map);
+            Ok(name) if name == STR_STAKED_OCT => {
+                for staked_oct_coin in staked_oct_map.values() {
+                    display_staked_oct(staked_oct_coin, validator_pool_id_map, owner_map);
                 }
-                print_divider(STR_STAKED_SUI);
+                print_divider(STR_STAKED_OCT);
             }
             Ok(name) if name == STR_PACKAGE => {
                 for package in package_map.values() {
@@ -211,28 +211,28 @@ fn examine_object(
 
 fn examine_total_supply(sui_distribution: &BTreeMap<String, BTreeMap<String, (&str, u64)>>, print: bool) {
     let mut total_sui = 0;
-    let mut total_staked_sui = 0;
+    let mut total_staked_oct = 0;
     for (owner, coins) in sui_distribution {
         let mut amount_sum = 0;
         for (owner, value) in coins.values() {
             amount_sum += value;
-            if *owner == STR_STAKED_SUI {
-                total_staked_sui += value;
+            if *owner == STR_STAKED_OCT {
+                total_staked_oct += value;
             }
         }
         total_sui += amount_sum;
         if print {
             println!("Owner {:?}", owner);
-            println!("Total Amount of Sui/StakedSui Owned: {amount_sum} MIST or {} SUI:", amount_sum / MIST_PER_OCT);
+            println!("Total Amount of OCT/StakedOct Owned: {amount_sum} MIST or {} OCT:", amount_sum / MIST_PER_OCT);
             println!("{:#?}\n", coins);
         }
     }
     assert_eq!(total_sui, TOTAL_SUPPLY_MIST);
     // Always print this.
-    println!("Total Supply of Sui: {total_sui} MIST or {} SUI", total_sui / MIST_PER_OCT);
-    println!("Total Amount of StakedSui: {total_staked_sui} MIST or {} SUI\n", total_staked_sui / MIST_PER_OCT);
+    println!("Total Supply of OCT: {total_sui} MIST or {} OCT", total_sui / MIST_PER_OCT);
+    println!("Total Amount of StakedOct: {total_staked_oct} MIST or {} OCT\n", total_staked_oct / MIST_PER_OCT);
     if print {
-        print_divider("Sui Distribution");
+        print_divider("OCT Distribution");
     }
 }
 
@@ -249,11 +249,11 @@ fn display_validator(validator: &SuiValidatorGenesis) {
     println!("Staking Pool ID: {}", validator.staking_pool.id);
     println!("Staking Pool Activation Epoch: {:?}", validator.staking_pool.activation_epoch);
     println!("Staking Pool Deactivation Epoch: {:?}", validator.staking_pool.deactivation_epoch);
-    println!("Staking Pool Sui Balance: {:?}", validator.staking_pool.sui_balance);
+    println!("Staking Pool OCT Balance: {:?}", validator.staking_pool.sui_balance);
     println!("Rewards Pool: {}", validator.staking_pool.rewards_pool.value());
     println!("Pool Token Balance: {}", validator.staking_pool.pool_token_balance);
     println!("Pending Delegation: {}", validator.staking_pool.pending_stake);
-    println!("Pending Total Sui Withdraw: {}", validator.staking_pool.pending_total_sui_withdraw);
+    println!("Pending Total OCT Withdraw: {}", validator.staking_pool.pending_total_sui_withdraw);
     println!("Pendign Pool Token Withdraw: {}", validator.staking_pool.pending_pool_token_withdraw);
     println!("Exchange Rates ID: {}", validator.staking_pool.exchange_rates.id);
     println!("Exchange Rates Size: {}", validator.staking_pool.exchange_rates.size);
@@ -266,15 +266,15 @@ fn display_sui(gas_coin: &GasCoin, owner_map: &BTreeMap<ObjectID, Owner>) {
     println!("Owner: {}\n", owner_map.get(gas_coin.id()).unwrap());
 }
 
-fn display_staked_sui(
-    staked_sui: &StakedSui,
+fn display_staked_oct(
+    staked_oct: &StakedOct,
     validator_pool_id_map: &BTreeMap<ObjectID, &SuiValidatorGenesis>,
     owner_map: &BTreeMap<ObjectID, Owner>,
 ) {
-    let validator = validator_pool_id_map.get(&staked_sui.pool_id()).unwrap();
-    println!("{:#?}", staked_sui);
+    let validator = validator_pool_id_map.get(&staked_oct.pool_id()).unwrap();
+    println!("{:#?}", staked_oct);
     println!("Staked to Validator: {}", validator.verified_metadata().name);
-    println!("Owner: {}\n", owner_map.get(&staked_sui.id()).unwrap());
+    println!("Owner: {}\n", owner_map.get(&staked_oct.id()).unwrap());
 }
 
 fn print_divider(title: &str) {

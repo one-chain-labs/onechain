@@ -578,9 +578,9 @@ async fn test_staking() -> Result<(), anyhow::Error> {
         .await?;
     assert_eq!(5, objects.data.len());
 
-    // Check StakedSui object before test
-    let staked_sui: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
-    assert!(staked_sui.is_empty());
+    // Check StakedOct object before test
+    let staked_oct: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
+    assert!(staked_oct.is_empty());
 
     let validator = http_client.get_latest_sui_system_state().await?.active_validators[0].sui_address;
 
@@ -603,12 +603,12 @@ async fn test_staking() -> Result<(), anyhow::Error> {
         .await?;
 
     // Check DelegatedStake object
-    let staked_sui: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
-    assert_eq!(1, staked_sui.len());
-    assert_eq!(1000000000, staked_sui[0].stakes[0].principal);
-    assert!(matches!(staked_sui[0].stakes[0].status, StakeStatus::Pending));
-    let staked_sui_copy = http_client.get_stakes_by_ids(vec![staked_sui[0].stakes[0].staked_sui_id]).await?;
-    assert_eq!(staked_sui[0].stakes[0].staked_sui_id, staked_sui_copy[0].stakes[0].staked_sui_id);
+    let staked_oct: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
+    assert_eq!(1, staked_oct.len());
+    assert_eq!(1000000000, staked_oct[0].stakes[0].principal);
+    assert!(matches!(staked_oct[0].stakes[0].status, StakeStatus::Pending));
+    let staked_oct_copy = http_client.get_stakes_by_ids(vec![staked_oct[0].stakes[0].staked_oct_id]).await?;
+    assert_eq!(staked_oct[0].stakes[0].staked_oct_id, staked_oct_copy[0].stakes[0].staked_oct_id);
     Ok(())
 }
 
@@ -623,9 +623,9 @@ async fn test_unstaking() -> Result<(), anyhow::Error> {
     let coins: CoinPage = http_client.get_coins(address, None, None, None).await?;
     assert_eq!(5, coins.data.len());
 
-    // Check StakedSui object before test
-    let staked_sui: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
-    assert!(staked_sui.is_empty());
+    // Check StakedOct object before test
+    let staked_oct: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
+    assert!(staked_oct.is_empty());
 
     let validator = http_client.get_latest_sui_system_state().await?.active_validators[0].sui_address;
 
@@ -655,26 +655,26 @@ async fn test_unstaking() -> Result<(), anyhow::Error> {
             .await?;
     }
     // Check DelegatedStake object
-    let staked_sui: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
-    assert_eq!(1, staked_sui.len());
-    assert_eq!(1000000000, staked_sui[0].stakes[0].principal);
+    let staked_oct: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
+    assert_eq!(1, staked_oct.len());
+    assert_eq!(1000000000, staked_oct[0].stakes[0].principal);
 
     sleep(Duration::from_millis(10000)).await;
 
-    let staked_sui_copy = http_client
+    let staked_oct_copy = http_client
         .get_stakes_by_ids(vec![
-            staked_sui[0].stakes[0].staked_sui_id,
-            staked_sui[0].stakes[1].staked_sui_id,
-            staked_sui[0].stakes[2].staked_sui_id,
+            staked_oct[0].stakes[0].staked_oct_id,
+            staked_oct[0].stakes[1].staked_oct_id,
+            staked_oct[0].stakes[2].staked_oct_id,
         ])
         .await?;
 
-    assert!(matches!(&staked_sui_copy[0].stakes[0].status, StakeStatus::Active { estimated_reward: _ }));
-    assert!(matches!(&staked_sui_copy[0].stakes[1].status, StakeStatus::Active { estimated_reward: _ }));
-    assert!(matches!(&staked_sui_copy[0].stakes[2].status, StakeStatus::Active { estimated_reward: _ }));
+    assert!(matches!(&staked_oct_copy[0].stakes[0].status, StakeStatus::Active { estimated_reward: _ }));
+    assert!(matches!(&staked_oct_copy[0].stakes[1].status, StakeStatus::Active { estimated_reward: _ }));
+    assert!(matches!(&staked_oct_copy[0].stakes[2].status, StakeStatus::Active { estimated_reward: _ }));
 
     let transaction_bytes: TransactionBlockBytes = http_client
-        .request_withdraw_stake(address, staked_sui_copy[0].stakes[2].staked_sui_id, None, 1_000_000.into())
+        .request_withdraw_stake(address, staked_oct_copy[0].stakes[2].staked_oct_id, None, 1_000_000.into())
         .await?;
     let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
 
@@ -691,17 +691,17 @@ async fn test_unstaking() -> Result<(), anyhow::Error> {
 
     sleep(Duration::from_millis(20000)).await;
 
-    let staked_sui_copy = http_client
+    let staked_oct_copy = http_client
         .get_stakes_by_ids(vec![
-            staked_sui[0].stakes[0].staked_sui_id,
-            staked_sui[0].stakes[1].staked_sui_id,
-            staked_sui[0].stakes[2].staked_sui_id,
+            staked_oct[0].stakes[0].staked_oct_id,
+            staked_oct[0].stakes[1].staked_oct_id,
+            staked_oct[0].stakes[2].staked_oct_id,
         ])
         .await?;
 
-    assert!(matches!(&staked_sui_copy[0].stakes[0].status, StakeStatus::Active { estimated_reward: _ }));
-    assert!(matches!(&staked_sui_copy[0].stakes[1].status, StakeStatus::Active { estimated_reward: _ }));
-    assert!(matches!(&staked_sui_copy[0].stakes[2].status, StakeStatus::Unstaked));
+    assert!(matches!(&staked_oct_copy[0].stakes[0].status, StakeStatus::Active { estimated_reward: _ }));
+    assert!(matches!(&staked_oct_copy[0].stakes[1].status, StakeStatus::Active { estimated_reward: _ }));
+    assert!(matches!(&staked_oct_copy[0].stakes[2].status, StakeStatus::Unstaked));
     Ok(())
 }
 
@@ -717,9 +717,9 @@ async fn test_staking_multiple_coins() -> Result<(), anyhow::Error> {
 
     let genesis_coin_amount = coins.data[0].balance;
 
-    // Check StakedSui object before test
-    let staked_sui: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
-    assert!(staked_sui.is_empty());
+    // Check StakedOct object before test
+    let staked_oct: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
+    assert!(staked_oct.is_empty());
 
     let validator = http_client.get_latest_sui_system_state().await?.active_validators[0].sui_address;
     // Delegate some SUI
@@ -755,10 +755,10 @@ async fn test_staking_multiple_coins() -> Result<(), anyhow::Error> {
     assert_eq!(dryrun_response.input, executed_response.transaction.unwrap().data);
 
     // Check DelegatedStake object
-    let staked_sui: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
-    assert_eq!(1, staked_sui.len());
-    assert_eq!(1000000000, staked_sui[0].stakes[0].principal);
-    assert!(matches!(staked_sui[0].stakes[0].status, StakeStatus::Pending));
+    let staked_oct: Vec<DelegatedStake> = http_client.get_stakes(address).await?;
+    assert_eq!(1, staked_oct.len());
+    assert_eq!(1000000000, staked_oct[0].stakes[0].principal);
+    assert!(matches!(staked_oct[0].stakes[0].status, StakeStatus::Pending));
 
     // Coins should be merged into one and returned to the sender.
     let coins: CoinPage = http_client.get_coins(address, None, None, None).await?;

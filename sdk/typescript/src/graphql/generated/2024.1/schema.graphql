@@ -83,9 +83,9 @@ type Address implements IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this address.
+	The `0x3::staking_pool::StakedOct` objects owned by this address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this address.
 	"""
@@ -467,9 +467,9 @@ type Coin implements IMoveObject & IObject & IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object.
+	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -626,9 +626,9 @@ type CoinMetadata implements IMoveObject & IObject & IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object.
+	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -1425,9 +1425,9 @@ interface IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object or address.
+	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -1759,9 +1759,9 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object.
+	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -1856,9 +1856,9 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	"""
 	asCoin: Coin
 	"""
-	Attempts to convert the Move object into a `0x3::staking_pool::StakedSui`.
+	Attempts to convert the Move object into a `0x3::staking_pool::StakedOct`.
 	"""
-	asStakedSui: StakedSui
+	asStakedOct: StakedOct
 	"""
 	Attempts to convert the Move object into a `0x2::coin::CoinMetadata`.
 	"""
@@ -1936,12 +1936,12 @@ type MovePackage implements IObject & IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this package.
+	The `0x3::staking_pool::StakedOct` objects owned by this package.
 	
 	Note that objects owned by a package are inaccessible, because packages are immutable and
 	cannot be owned by an address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2266,9 +2266,9 @@ type Object implements IObject & IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object.
+	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2611,9 +2611,9 @@ type Owner implements IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object or address.
+	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -3220,9 +3220,9 @@ type StakeSubsidy {
 }
 
 """
-Represents a `0x3::staking_pool::StakedSui` Move object on-chain.
+Represents a `0x3::staking_pool::StakedOct` Move object on-chain.
 """
-type StakedSui implements IMoveObject & IObject & IOwner {
+type StakedOct implements IMoveObject & IObject & IOwner {
 	address: SuiAddress!
 	"""
 	Objects owned by this object, optionally `filter`-ed.
@@ -3244,9 +3244,9 @@ type StakedSui implements IMoveObject & IObject & IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object.
+	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -3371,7 +3371,7 @@ type StakedSui implements IMoveObject & IObject & IOwner {
 	estimatedReward: BigInt
 }
 
-type StakedSuiConnection {
+type StakedOctConnection {
 	"""
 	Information to aid in pagination.
 	"""
@@ -3379,21 +3379,21 @@ type StakedSuiConnection {
 	"""
 	A list of edges.
 	"""
-	edges: [StakedSuiEdge!]!
+	edges: [StakedOctEdge!]!
 	"""
 	A list of nodes.
 	"""
-	nodes: [StakedSui!]!
+	nodes: [StakedOct!]!
 }
 
 """
 An edge in a connection.
 """
-type StakedSuiEdge {
+type StakedOctEdge {
 	"""
 	The item at the end of the edge
 	"""
-	node: StakedSui!
+	node: StakedOct!
 	"""
 	A cursor for use in pagination
 	"""
@@ -3446,9 +3446,9 @@ type SuinsRegistration implements IMoveObject & IObject & IOwner {
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedSui` objects owned by this object.
+	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""

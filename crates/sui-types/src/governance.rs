@@ -42,14 +42,14 @@ pub const VALIDATOR_VERY_LOW_STAKE_THRESHOLD_MIST: u64 = 15_000_000 * MIST_PER_O
 pub const VALIDATOR_LOW_STAKE_GRACE_PERIOD: u64 = 7;
 
 pub const STAKING_POOL_MODULE_NAME: &IdentStr = ident_str!("staking_pool");
-pub const STAKED_SUI_STRUCT_NAME: &IdentStr = ident_str!("StakedSui");
+pub const STAKED_OCT_STRUCT_NAME: &IdentStr = ident_str!("StakedOct");
 
 pub const ADD_STAKE_MUL_COIN_FUN_NAME: &IdentStr = ident_str!("request_add_stake_mul_coin");
 pub const ADD_STAKE_FUN_NAME: &IdentStr = ident_str!("request_add_stake");
 pub const WITHDRAW_STAKE_FUN_NAME: &IdentStr = ident_str!("request_withdraw_stake");
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
-pub struct StakedSui {
+pub struct StakedOct {
     id: UID,
     pool_id: ID,
     stake_activation_epoch: u64,
@@ -57,20 +57,20 @@ pub struct StakedSui {
     lock: bool,
 }
 
-impl StakedSui {
+impl StakedOct {
     pub fn type_() -> StructTag {
         StructTag {
             address: SUI_SYSTEM_ADDRESS,
             module: STAKING_POOL_MODULE_NAME.to_owned(),
-            name: STAKED_SUI_STRUCT_NAME.to_owned(),
+            name: STAKED_OCT_STRUCT_NAME.to_owned(),
             type_params: vec![],
         }
     }
 
-    pub fn is_staked_sui(s: &StructTag) -> bool {
+    pub fn is_staked_oct(s: &StructTag) -> bool {
         s.address == SUI_SYSTEM_ADDRESS
             && s.module.as_ident_str() == STAKING_POOL_MODULE_NAME
-            && s.name.as_ident_str() == STAKED_SUI_STRUCT_NAME
+            && s.name.as_ident_str() == STAKED_OCT_STRUCT_NAME
             && s.type_params.is_empty()
     }
 
@@ -100,21 +100,21 @@ impl StakedSui {
     }
 }
 
-impl TryFrom<&Object> for StakedSui {
+impl TryFrom<&Object> for StakedOct {
     type Error = SuiError;
 
     fn try_from(object: &Object) -> Result<Self, Self::Error> {
         match &object.data {
             Data::Move(o) => {
-                if o.type_().is_staked_sui() {
+                if o.type_().is_staked_oct() {
                     return bcs::from_bytes(o.contents()).map_err(|err| SuiError::TypeError {
-                        error: format!("Unable to deserialize StakedSui object: {:?}", err),
+                        error: format!("Unable to deserialize StakedOct object: {:?}", err),
                     });
                 }
             }
             Data::Package(_) => {}
         }
 
-        Err(SuiError::TypeError { error: format!("Object type is not a StakedSui: {:?}", object) })
+        Err(SuiError::TypeError { error: format!("Object type is not a StakedOct: {:?}", object) })
     }
 }

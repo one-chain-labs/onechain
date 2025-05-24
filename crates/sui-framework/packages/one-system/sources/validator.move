@@ -8,7 +8,7 @@ module one_system::validator {
     use one::balance::Balance;
     use one::oct::OCT;
     use one_system::validator_cap::{Self, ValidatorOperationCap};
-    use one_system::staking_pool::{Self, PoolTokenExchangeRate, StakedSui, StakingPool, FungibleStakedSui};
+    use one_system::staking_pool::{Self, PoolTokenExchangeRate, StakedOct, StakingPool, FungibleStakedOct};
     use std::string::String;
     use one::url::Url;
     use one::url;
@@ -68,8 +68,8 @@ module one_system::validator {
 
     const EOnlyValidatorStake: u64 = 201;
     const EValidatorStakeClosed: u64 = 202;
-    const EStakedSuiIsLock: u64 = 203;
-    const EStakedSuiNotLock: u64 = 204;
+    const EStakedOctIsLock: u64 = 203;
+    const EStakedOctNotLock: u64 = 204;
 
     // TODO: potentially move this value to onchain config.
     const MAX_COMMISSION_RATE: u64 = 10_000; // Max rate is 100%, which is 10000 base points
@@ -174,18 +174,18 @@ module one_system::validator {
         reward_amount: u64,
     }
 
-    /// Event emitted when a staked SUI is converted to a fungible staked SUI.
-    public struct ConvertingToFungibleStakedSuiEvent has copy, drop {
+    /// Event emitted when a staked OCT is converted to a fungible staked OCT.
+    public struct ConvertingToFungibleStakedOctEvent has copy, drop {
         pool_id: ID,
         stake_activation_epoch: u64,
-        staked_sui_principal_amount: u64,
-        fungible_staked_sui_amount: u64,
+        staked_oct_principal_amount: u64,
+        fungible_staked_oct_amount: u64,
     }
 
-    /// Event emitted when a fungible staked SUI is redeemed.
-    public struct RedeemingFungibleStakedSuiEvent has copy, drop {
+    /// Event emitted when a fungible staked OCT is redeemed.
+    public struct RedeemingFungibleStakedOctEvent has copy, drop {
         pool_id: ID,
-        fungible_staked_sui_amount: u64,
+        fungible_staked_oct_amount: u64,
         sui_amount: u64,
     }
 
@@ -327,7 +327,7 @@ module one_system::validator {
         staker_address: address,
         is_validator: bool,
         ctx: &mut TxContext,
-    ): StakedSui {
+    ): StakedOct {
         if (self.only_validator_staking) {
             assert!(is_validator, EOnlyValidatorStake);
         }else {
@@ -347,11 +347,11 @@ module one_system::validator {
         staker_address: address,
         is_validator: bool,
         ctx: &mut TxContext,
-    ) : StakedSui {
+    ) : StakedOct {
         let stake_amount = stake.value();
         assert!(stake_amount > 0, EInvalidStakeAmount);
         let stake_epoch = ctx.epoch() + 1;
-        let staked_sui = self.staking_pool.request_add_stake(stake, stake_epoch, is_validator, ctx);
+        let staked_oct = self.staking_pool.request_add_stake(stake, stake_epoch, is_validator, ctx);
         // Process stake right away if staking pool is preactive.
         if (self.staking_pool.is_preactive()) {
             self.staking_pool.process_pending_stake();
@@ -367,47 +367,47 @@ module one_system::validator {
                 amount: stake_amount,
             }
         );
-        staked_sui
+        staked_oct
     }
 
-    public(package) fun convert_to_fungible_staked_sui(
+    public(package) fun convert_to_fungible_staked_oct(
         self: &mut Validator,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
-    ): FungibleStakedSui {
-        assert!(!staked_sui.lock(), EStakedSuiIsLock);
-        let stake_activation_epoch = staked_sui.stake_activation_epoch();
-        let staked_sui_principal_amount = staked_sui.staked_sui_amount();
+    ): FungibleStakedOct {
+        assert!(!staked_oct.lock(), EStakedOctIsLock);
+        let stake_activation_epoch = staked_oct.stake_activation_epoch();
+        let staked_oct_principal_amount = staked_oct.staked_oct_amount();
 
-        let fungible_staked_sui = self.staking_pool.convert_to_fungible_staked_sui(staked_sui, ctx);
+        let fungible_staked_oct = self.staking_pool.convert_to_fungible_staked_oct(staked_oct, ctx);
 
         event::emit(
-            ConvertingToFungibleStakedSuiEvent {
+            ConvertingToFungibleStakedOctEvent {
                 pool_id: self.staking_pool_id(),
                 stake_activation_epoch,
-                staked_sui_principal_amount,
-                fungible_staked_sui_amount: fungible_staked_sui.value(),
+                staked_oct_principal_amount,
+                fungible_staked_oct_amount: fungible_staked_oct.value(),
             }
         );
 
-        fungible_staked_sui
+        fungible_staked_oct
     }
 
-    public(package) fun redeem_fungible_staked_sui(
+    public(package) fun redeem_fungible_staked_oct(
         self: &mut Validator,
-        fungible_staked_sui: FungibleStakedSui,
+        fungible_staked_oct: FungibleStakedOct,
         ctx: &TxContext,
     ): Balance<OCT> {
-        let fungible_staked_sui_amount = fungible_staked_sui.value();
+        let fungible_staked_oct_amount = fungible_staked_oct.value();
 
-        let sui = self.staking_pool.redeem_fungible_staked_sui(fungible_staked_sui, ctx);
+        let sui = self.staking_pool.redeem_fungible_staked_oct(fungible_staked_oct, ctx);
 
         self.next_epoch_stake = self.next_epoch_stake - sui.value();
 
         event::emit(
-            RedeemingFungibleStakedSuiEvent {
+            RedeemingFungibleStakedOctEvent {
                 pool_id: self.staking_pool_id(),
-                fungible_staked_sui_amount,
+                fungible_staked_oct_amount,
                 sui_amount: sui.value(),
             }
         );
@@ -427,14 +427,14 @@ module one_system::validator {
         let stake_amount = stake.value();
         assert!(stake_amount > 0, EInvalidStakeAmount);
 
-        let staked_sui = self.staking_pool.request_add_stake(
+        let staked_oct = self.staking_pool.request_add_stake(
             stake,
             0, // epoch 0 -- genesis
             lock,
             ctx
         );
 
-        transfer::public_transfer(staked_sui, staker_address);
+        transfer::public_transfer(staked_oct, staker_address);
 
         // Process stake right away
         self.staking_pool.process_pending_stake();
@@ -444,13 +444,13 @@ module one_system::validator {
     /// Request to withdraw stake from the validator's staking pool, processed at the end of the epoch.
     public(package) fun request_withdraw_stake(
         self: &mut Validator,
-        staked_sui: StakedSui,
+        staked_oct: StakedOct,
         ctx: &mut TxContext,
     ): (Balance<OCT>, Option<CoinVesting<OCT>>) {
-        let lock = staked_sui.lock();
-        let principal_amount = staked_sui.staked_sui_amount();
-        let stake_activation_epoch = staked_sui.stake_activation_epoch();
-        let mut withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_sui, ctx);
+        let lock = staked_oct.lock();
+        let principal_amount = staked_oct.staked_oct_amount();
+        let stake_activation_epoch = staked_oct.stake_activation_epoch();
+        let mut withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_oct, ctx);
         let withdraw_amount = withdrawn_stake.value();
         let reward_amount = withdraw_amount - principal_amount;
         self.next_epoch_stake = self.next_epoch_stake - withdraw_amount;

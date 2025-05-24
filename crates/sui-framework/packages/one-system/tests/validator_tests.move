@@ -10,7 +10,7 @@ module one_system::validator_tests {
     use one::test_scenario;
     use one::test_utils;
     use one::url;
-    use one_system::staking_pool::StakedSui;
+    use one_system::staking_pool::StakedOct;
     use one_system::validator::{Self, Validator};
 
     const VALID_NET_PUBKEY: vector<u8> = vector[171, 2, 39, 3, 139, 105, 166, 171, 153, 151, 102, 197, 151, 186, 140, 116, 114, 90, 213, 225, 20, 167, 60, 69, 203, 12, 180, 198, 9, 217, 117, 38];
@@ -84,7 +84,7 @@ module one_system::validator_tests {
         // Check that after destroy, the original stake still exists.
          scenario.next_tx(sender);
          {
-             let stake = scenario.take_from_sender<StakedSui>();
+             let stake = scenario.take_from_sender<StakedOct>();
              assert!(stake.amount() == 10_000_000_000);
              scenario.return_to_sender(stake);
          };
@@ -112,8 +112,8 @@ module one_system::validator_tests {
 
         scenario.next_tx(sender);
         {
-            let coin_ids = scenario.ids_for_sender<StakedSui>();
-            let stake = scenario.take_from_sender_by_id<StakedSui>(coin_ids[0]);
+            let coin_ids = scenario.ids_for_sender<StakedOct>();
+            let stake = scenario.take_from_sender_by_id<StakedOct>(coin_ids[0]);
             let ctx = scenario.ctx();
             let (withdrawn_balance,coin_vesting) = validator.request_withdraw_stake(stake, ctx);
             coin_vesting.destroy_none();

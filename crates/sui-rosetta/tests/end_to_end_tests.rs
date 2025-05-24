@@ -32,7 +32,7 @@ use crate::rosetta_client::RosettaEndpoint;
 mod rosetta_client;
 
 #[tokio::test]
-async fn test_get_staked_sui() {
+async fn test_get_staked_oct() {
     let test_cluster = TestClusterBuilder::new().build().await;
     let address = test_cluster.get_address_0();
     let client = test_cluster.wallet.get_client().await.unwrap();

@@ -1079,7 +1079,7 @@ module one_system::sui_system_tests {
     }
 
     #[test]
-    fun test_convert_to_fungible_staked_sui_and_redeem() {
+    fun test_convert_to_fungible_staked_oct_and_redeem() {
         let mut scenario_val = test_scenario::begin(@0x0);
         let scenario = &mut scenario_val;
         // Epoch duration is set to be 42 here.
@@ -1100,27 +1100,27 @@ module one_system::sui_system_tests {
         scenario.next_tx(@0x0);
         let mut system_state = scenario.take_shared<SuiSystemState>();
 
-        let staked_sui = system_state.request_add_stake_non_entry(
+        let staked_oct = system_state.request_add_stake_non_entry(
             coin::mint_for_testing(100_000_000_000, scenario.ctx()),
             @0x1,
             scenario.ctx()
         );
 
-        assert!(staked_sui.amount() == 100_000_000_000, 0);
+        assert!(staked_oct.amount() == 100_000_000_000, 0);
 
         test_scenario::return_shared(system_state);
         advance_epoch(scenario);
 
         let mut system_state = scenario.take_shared<SuiSystemState>();
-        let fungible_staked_sui = system_state.convert_to_fungible_staked_sui(
-            staked_sui,
+        let fungible_staked_oct = system_state.convert_to_fungible_staked_oct(
+            staked_oct,
             scenario.ctx()
         );
 
-        assert!(fungible_staked_sui.value() == 100_000_000_000, 0);
+        assert!(fungible_staked_oct.value() == 100_000_000_000, 0);
 
-        let sui = system_state.redeem_fungible_staked_sui(
-            fungible_staked_sui,
+        let sui = system_state.redeem_fungible_staked_oct(
+            fungible_staked_oct,
             scenario.ctx()
         );
 

@@ -3,16 +3,16 @@
 
 module prettier::other {
     fun other() {
-        let mut fungible_staked_sui_1 = staking_pool.create_fungible_staked_sui_for_testing(
+        let mut fungible_staked_oct_1 = staking_pool.create_fungible_staked_oct_for_testing(
             100_000_000_000,
             scenario.ctx(),
         );
-        let fungible_staked_sui_2 = staking_pool.create_fungible_staked_sui_for_testing(
+        let fungible_staked_oct_2 = staking_pool.create_fungible_staked_oct_for_testing(
             200_000_000_000,
             scenario.ctx(),
         );
 
-        fungible_staked_sui_1.join(fungible_staked_sui_2);
+        fungible_staked_oct_1.join(fungible_staked_oct_2);
 
         // expected to break on the argument list
         let new_id = validator_cap::new_unverified_validator_operation_cap_and_transfer(

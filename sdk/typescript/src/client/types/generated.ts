@@ -822,16 +822,16 @@ export type StakeObject =
 			principal: string;
 			stakeActiveEpoch: string;
 			stakeRequestEpoch: string;
-			/** ID of the StakedSui receipt object. */
-			stakedSuiId: string;
+			/** ID of the StakedOct receipt object. */
+			stakedOctId: string;
 			status: 'Pending';
 	  }
 	| {
 			principal: string;
 			stakeActiveEpoch: string;
 			stakeRequestEpoch: string;
-			/** ID of the StakedSui receipt object. */
-			stakedSuiId: string;
+			/** ID of the StakedOct receipt object. */
+			stakedOctId: string;
 			estimatedReward: string;
 			status: 'Active';
 	  }
@@ -839,8 +839,8 @@ export type StakeObject =
 			principal: string;
 			stakeActiveEpoch: string;
 			stakeRequestEpoch: string;
-			/** ID of the StakedSui receipt object. */
-			stakedSuiId: string;
+			/** ID of the StakedOct receipt object. */
+			stakedOctId: string;
 			status: 'Unstaked';
 	  };
 export interface SuiActiveJwk {

@@ -5,12 +5,12 @@
 
 //# run-graphql
 { # Initial query yields only the validator's stake
-  objects(filter: { type: "0x3::staking_pool::StakedSui" }) {
+  objects(filter: { type: "0x3::staking_pool::StakedOct" }) {
     edges {
       cursor
       node {
         asMoveObject {
-          asStakedSui {
+          asStakedOct {
             principal
           }
         }
@@ -19,7 +19,7 @@
   }
 
   address(address: "@{C}") {
-    stakedSuis {
+    stakedOcts {
       edges {
         cursor
         node {
@@ -41,13 +41,13 @@
 //# advance-epoch
 
 //# run-graphql
-{ # This query should pick up the recently Staked SUI as well.
-  objects(filter: { type: "0x3::staking_pool::StakedSui" }) {
+{ # This query should pick up the recently Staked OCT as well.
+  objects(filter: { type: "0x3::staking_pool::StakedOct" }) {
     edges {
       cursor
       node {
         asMoveObject {
-          asStakedSui {
+          asStakedOct {
             principal
             poolId
           }
@@ -57,7 +57,7 @@
   }
 
   address(address: "@{C}") {
-    stakedSuis {
+    stakedOcts {
       edges {
         cursor
         node {

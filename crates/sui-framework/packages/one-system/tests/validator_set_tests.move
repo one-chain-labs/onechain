@@ -5,7 +5,7 @@
 module one_system::validator_set_tests {
     use one::balance;
     use one::coin;
-    use one_system::staking_pool::StakedSui;
+    use one_system::staking_pool::StakedOct;
     use one_system::validator::{Self, Validator, staking_pool_id};
     use one_system::validator_set::{Self, ValidatorSet, active_validator_addresses};
     use one::test_scenario::{Self, Scenario};
@@ -386,7 +386,7 @@ module one_system::validator_set_tests {
         // Withdraw the stake from @0x4.
         scenario.next_tx(@0x42);
         {
-            let stake = scenario.take_from_sender<StakedSui>();
+            let stake = scenario.take_from_sender<StakedOct>();
             let ctx = scenario.ctx();
             let (withdrawn_balance, coin_vesting) = validator_set.request_withdraw_stake(
                 stake,

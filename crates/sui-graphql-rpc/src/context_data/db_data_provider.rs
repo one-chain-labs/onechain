@@ -7,9 +7,9 @@ use crate::{
 };
 use std::{collections::BTreeMap, time::Duration};
 use sui_indexer::{apis::GovernanceReadApi, db::ConnectionPoolConfig, indexer_reader::IndexerReader};
-use sui_json_rpc_types::Stake as RpcStakedSui;
+use sui_json_rpc_types::Stake as RpcStakedOct;
 use sui_types::{
-    governance::StakedSui as NativeStakedSui,
+    governance::StakedOct as NativeStakedOct,
     sui_system_state::sui_system_state_summary::SuiSystemStateSummary as NativeSuiSystemStateSummary,
 };
 
@@ -58,9 +58,9 @@ impl PgManager {
         }
     }
 
-    /// Make a request to the RPC for its representations of the staked sui we parsed out of the
+    /// Make a request to the RPC for its representations of the staked oct we parsed out of the
     /// object.  Used to implement fields that are implemented in JSON-RPC but not GraphQL (yet).
-    pub(crate) async fn fetch_rpc_staked_sui(&self, stake: NativeStakedSui) -> Result<RpcStakedSui, Error> {
+    pub(crate) async fn fetch_rpc_staked_oct(&self, stake: NativeStakedOct) -> Result<RpcStakedOct, Error> {
         let governance_api = GovernanceReadApi::new(self.inner.clone());
 
         let mut delegated_stakes = governance_api

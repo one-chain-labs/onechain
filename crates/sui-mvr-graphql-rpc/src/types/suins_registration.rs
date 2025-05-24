@@ -17,7 +17,7 @@ use super::{
     move_value::MoveValue,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedSui,
+    stake::StakedOct,
     string_input::impl_string_input,
     sui_address::SuiAddress,
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
@@ -144,16 +144,16 @@ impl SuinsRegistration {
         OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
-    pub(crate) async fn staked_suis(
+    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(&self.super_.super_).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
