@@ -25,8 +25,7 @@ const STR_SUI_DISTRIBUTION: &str = "OCT Distribution";
 const STR_OBJECTS: &str = "Objects";
 const STR_VALIDATORS: &str = "Validators";
 
-#[allow(clippy::or_fun_call)]
-pub(crate) fn examine_genesis_checkpoint(genesis: UnsignedGenesis) {
+pub fn examine_genesis_checkpoint(genesis: UnsignedGenesis) {
     let system_object = genesis.sui_system_object().into_genesis_version_for_tooling();
 
     // Prepare Validator info

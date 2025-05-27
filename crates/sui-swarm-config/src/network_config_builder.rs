@@ -10,7 +10,7 @@ use std::{
 
 use rand::rngs::OsRng;
 use sui_config::{
-    genesis::{TokenAllocation, TokenDistributionScheduleBuilder},
+    genesis::{TokenAllocation, TokenDistributionSchedule, TokenDistributionScheduleBuilder},
     node::AuthorityOverloadConfig,
     ExecutionCacheConfig,
 };
@@ -92,6 +92,7 @@ pub struct ConfigBuilder<R = OsRng> {
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
     state_accumulator_v2_enabled_config: Option<StateAccumulatorV2EnabledConfig>,
+    custom_distribution_schedule: Option<TokenDistributionSchedule>,
 }
 
 impl ConfigBuilder {
@@ -116,6 +117,7 @@ impl ConfigBuilder {
             max_submit_position: None,
             submit_delay_step_override_millis: None,
             state_accumulator_v2_enabled_config: None,
+            custom_distribution_schedule: None,
         }
     }
 
@@ -269,6 +271,11 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
+    pub fn with_custom_distribution_schedule(mut self, schedule: TokenDistributionSchedule) -> Self {
+        self.custom_distribution_schedule = Some(schedule);
+        self
+    }
+
     pub fn rng<N: rand::RngCore + rand::CryptoRng>(self, rng: N) -> ConfigBuilder<N> {
         ConfigBuilder {
             rng: Some(rng),
@@ -288,6 +295,7 @@ impl<R> ConfigBuilder<R> {
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
             state_accumulator_v2_enabled_config: self.state_accumulator_v2_enabled_config,
+            custom_distribution_schedule: self.custom_distribution_schedule,
         }
     }
 
@@ -366,7 +374,9 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
 
         let (account_keys, allocations) = genesis_config.generate_accounts(&mut rng).unwrap();
 
-        let token_distribution_schedule = {
+        let token_distribution_schedule = if let Some(schedule) = self.custom_distribution_schedule {
+            schedule
+        } else {
             let mut builder = TokenDistributionScheduleBuilder::new();
             for allocation in allocations {
                 builder.add_allocation(allocation);
