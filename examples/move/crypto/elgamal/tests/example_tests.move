@@ -5,7 +5,7 @@
 module elgamal::tests;
 
 use elgamal::example;
-use sui::{bls12381::{Self, Scalar, G1}, group_ops::Element, random, test_utils::assert_eq};
+use one::{bls12381::{Self, Scalar, G1}, group_ops::Element, random, test_utils::assert_eq};
 
 #[test]
 fun test_elgamal_equality() {

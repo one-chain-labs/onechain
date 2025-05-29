@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui_system::validator {
+module one_system::validator {
     use std::ascii;
 
-    use sui::tx_context::TxContext;
+    use one::tx_context::TxContext;
     use std::string::{Self, String};
-    use sui::bag::{Self, Bag};
-    use sui::balance::{Self, Balance};
-    use sui::oct::OCT;
+    use one::bag::{Self, Bag};
+    use one::balance::{Self, Balance};
+    use one::oct::OCT;
 
     public struct ValidatorMetadata has store {
         sui_address: address,

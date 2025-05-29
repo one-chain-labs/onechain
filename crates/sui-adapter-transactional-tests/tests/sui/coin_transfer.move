@@ -11,12 +11,12 @@
 
 //# view-object 1,0
 
-//# run sui::pay::split_and_transfer --type-args sui::oct::OCT --args object(1,0) 10 @A --sender B
+//# run one::pay::split_and_transfer --type-args one::oct::OCT --args object(1,0) 10 @A --sender B
 
 //# view-object 1,0
 
 //# view-object 3,0
 
-//# run sui::pay::split_and_transfer --type-args sui::oct::OCT --args object(1,0) 0 @C --sender A
+//# run one::pay::split_and_transfer --type-args one::oct::OCT --args object(1,0) 0 @C --sender A
 
 //# view-object 1,0

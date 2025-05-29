@@ -5,10 +5,10 @@
 module locked_stake::locked_stake_tests;
 
 use locked_stake::{epoch_time_lock, locked_stake as ls};
-use sui::{balance, coin, test_scenario, test_utils::{assert_eq, destroy}, vec_map};
-use sui_system::{
+use one::{balance, coin, test_scenario, test_utils::{assert_eq, destroy}, vec_map};
+use one_system::{
     governance_test_utils::{advance_epoch, set_up_sui_system_state},
-    sui_system::{Self, SuiSystemState}
+    one_system::{Self, SuiSystemState}
 };
 
 const MIST_PER_OCT: u64 = 1_000_000_000;
@@ -63,7 +63,7 @@ fun test_deposit_stake_unstake() {
     let ctx = test_scenario::ctx(scenario);
 
     // Create a StakedOct object and add it to the LockedStake object.
-    let staked_oct = sui_system::request_add_stake_non_entry(
+    let staked_oct = one_system::request_add_stake_non_entry(
         &mut system_state,
         coin::mint_for_testing(20 * MIST_PER_OCT, ctx),
         @0x2,

@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2024.beta"
 
 [dependencies]
-Sui = { local = "../../../../../sui-framework/packages/sui-framework" }
+One = { local = "../../../../../sui-framework/packages/one-framework" }
 
 [addresses]
 tto =  "0x0"

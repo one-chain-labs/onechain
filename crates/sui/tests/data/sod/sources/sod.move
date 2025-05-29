@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module sod::sod {
-    use sui::object::{Self, UID};
-    use sui::tx_context::TxContext;
-    use sui::transfer;
+    use one::object::{Self, UID};
+    use one::tx_context::TxContext;
+    use one::transfer;
 
     public struct A has key, store {
         id: UID,

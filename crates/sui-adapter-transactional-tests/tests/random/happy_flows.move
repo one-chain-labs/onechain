@@ -5,8 +5,8 @@
 
 //# publish --sender A
 module test::random {
-    use sui::clock::Clock;
-    use sui::random::Random;
+    use one::clock::Clock;
+    use one::random::Random;
 
     public struct Obj has key, store {
         id: object::UID,

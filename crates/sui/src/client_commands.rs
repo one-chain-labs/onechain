@@ -2362,7 +2362,7 @@ pub async fn execute_dry_run(
 /// overhead
 ///
 /// This gas estimate is computed exactly as in the TypeScript SDK
-/// <https://github.com/MystenLabs/sui/blob/3c4369270605f78a243842098b7029daf8d883d9/sdk/typescript/src/transactions/TransactionBlock.ts#L845-L858>
+/// <https://github.com/one-chain-labs/onechain/blob/3c4369270605f78a243842098b7029daf8d883d9/sdk/typescript/src/transactions/TransactionBlock.ts#L845-L858>
 pub async fn estimate_gas_budget(
     context: &mut WalletContext,
     signer: SuiAddress,

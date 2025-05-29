@@ -5,8 +5,9 @@ published-at = "0xe0"
 edition = "2024.beta"
 
 [dependencies]
-Sui = { local = "../sui" }
+One = { local = "../sui" }
 StdLib = { local = "../std" }
 
 [addresses]
 e = "0xe0"
+one = "0x2"

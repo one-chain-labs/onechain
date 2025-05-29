@@ -18,7 +18,7 @@
 module owned_no_tto::cash_register;
 
 use common::identified_payment::{Self, IdentifiedPayment};
-use sui::{coin::{Self, Coin}, event, oct::OCT};
+use one::{coin::{Self, Coin}, event, oct::OCT};
 
 public struct PaymentProcessed has copy, drop { payment_id: u64, amount: u64 }
 

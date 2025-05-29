@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module random::random_test {
-    use sui::object::UID;
-    use sui::object;
-    use sui::tx_context::TxContext;
-    use sui::transfer;
-    use sui::random;
+    use one::object::UID;
+    use one::object;
+    use one::tx_context::TxContext;
+    use one::transfer;
+    use one::random;
 
 
     // Test transactions that use the same shared object, sometimes with Random and sometimes without.

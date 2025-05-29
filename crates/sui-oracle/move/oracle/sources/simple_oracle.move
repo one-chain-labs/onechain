@@ -6,10 +6,10 @@ module oracle::simple_oracle {
     use std::string::String;
 
     use oracle::data::{Self, Data};
-    use sui::clock::{Self, Clock};
-    use sui::dynamic_field as df;
-    use sui::table;
-    use sui::table::Table;
+    use one::clock::{Self, Clock};
+    use one::dynamic_field as df;
+    use one::table;
+    use one::table::Table;
 
     const ESenderNotOracle: u64 = 0;
     const ETickerNotExists: u64 = 1;

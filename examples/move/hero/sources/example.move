@@ -5,7 +5,7 @@
 /// associated logic.
 module hero::example;
 
-use sui::{balance::{Self, Balance}, coin::{Self, Coin}, event, oct::OCT};
+use one::{balance::{Self, Balance}, coin::{Self, Coin}, event, oct::OCT};
 
 /// Our hero!
 public struct Hero has key, store {
@@ -299,7 +299,7 @@ public fun take_payment(admin: &Admin, game: &mut Game, ctx: &mut TxContext): Co
 
 // === Tests ===
 #[test_only]
-use sui::test_scenario as ts;
+use one::test_scenario as ts;
 
 #[test]
 fun slay_boar_test() {

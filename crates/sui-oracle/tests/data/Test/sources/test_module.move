@@ -14,11 +14,11 @@ module test::test_module {
     use oracle::meta_oracle;
     use oracle::simple_oracle;
     use oracle::simple_oracle::SimpleOracle;
-    use sui::object;
-    use sui::object::UID;
-    use sui::transfer;
-    use sui::tx_context;
-    use sui::tx_context::TxContext;
+    use one::object;
+    use one::object::UID;
+    use one::transfer;
+    use one::tx_context;
+    use one::tx_context::TxContext;
 
     public struct MockUSD has key, store {
         id: UID,

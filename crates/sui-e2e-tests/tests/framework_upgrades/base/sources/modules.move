@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui_system::msim_extra_1 {
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+module one_system::msim_extra_1 {
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 
     public struct Type has drop {
         x: u64,

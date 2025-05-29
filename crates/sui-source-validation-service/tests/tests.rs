@@ -129,7 +129,7 @@ async fn test_end_to_end() -> anyhow::Result<()> {
     //////////////////////////
     let config = Config {
         packages: vec![PackageSource::Repository(RepositorySource {
-            repository: "https://github.com/mystenlabs/sui".into(),
+            repository: "https://github.com/one-chain-labs/onechain".into(),
             branches: vec![Branch {
                 branch: "main".into(),
                 paths: vec![Package { path: "move-stdlib".into(), watch: None }],
@@ -326,15 +326,15 @@ fn test_parse_package_config() -> anyhow::Result<()> {
 [[packages]]
 source = "Repository"
 [packages.values]
-repository = "https://github.com/mystenlabs/sui"
+repository = "https://github.com/one-chain-labs/onechain"
 network = "mainnet"
 [[packages.values.branches]]
-branch = "framework/mainnet"
+branch = "main"
 paths = [
   { path = "crates/sui-framework/packages/deepbook", watch = "0xdee9" },
   { path = "crates/sui-framework/packages/move-stdlib", watch = "0x1" },
-  { path = "crates/sui-framework/packages/sui-framework", watch = "0x2" },
-  { path = "crates/sui-framework/packages/sui-system", watch = "0x3" }
+  { path = "crates/sui-framework/packages/one-framework", watch = "0x2" },
+  { path = "crates/sui-framework/packages/one-system", watch = "0x3" }
 ]
 
     [[packages]]
@@ -352,13 +352,13 @@ paths = [
             packages: [
                 Repository(
                     RepositorySource {
-                        repository: "https://github.com/mystenlabs/sui",
+                        repository: "https://github.com/one-chain-labs/onechain",
                         network: Some(
                             Mainnet,
                         ),
                         branches: [
                             Branch {
-                                branch: "framework/mainnet",
+                                branch: "main",
                                 paths: [
                                     Package {
                                         path: "crates/sui-framework/packages/deepbook",
@@ -373,13 +373,13 @@ paths = [
                                         ),
                                     },
                                     Package {
-                                        path: "crates/sui-framework/packages/sui-framework",
+                                        path: "crates/sui-framework/packages/one-framework",
                                         watch: Some(
                                             0x0000000000000000000000000000000000000000000000000000000000000002,
                                         ),
                                     },
                                     Package {
-                                        path: "crates/sui-framework/packages/sui-system",
+                                        path: "crates/sui-framework/packages/one-system",
                                         watch: Some(
                                             0x0000000000000000000000000000000000000000000000000000000000000003,
                                         ),

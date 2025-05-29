@@ -4,7 +4,7 @@
 /// A flash loan that works for any Coin type
 module flash_lender::example;
 
-use sui::{balance::{Self, Balance}, coin::{Self, Coin}};
+use one::{balance::{Self, Balance}, coin::{Self, Coin}};
 
 /// A shared object offering flash loans to any buyer willing to pay `fee`.
 public struct FlashLender<phantom T> has key {
@@ -163,9 +163,9 @@ public fun update_fee<T>(self: &mut FlashLender<T>, admin: &AdminCap, new_fee: u
 
 // === Tests ===
 #[test_only]
-use sui::oct::OCT;
+use one::oct::OCT;
 #[test_only]
-use sui::test_scenario as ts;
+use one::test_scenario as ts;
 
 #[test_only]
 const ADMIN: address = @0xAD;

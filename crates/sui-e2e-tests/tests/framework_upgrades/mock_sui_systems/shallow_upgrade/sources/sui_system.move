@@ -1,18 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui_system::sui_system {
+module one_system::one_system {
     use std::vector;
 
-    use sui::balance::Balance;
-    use sui::object::UID;
-    use sui::oct::OCT;
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
-    use sui::dynamic_field;
+    use one::balance::Balance;
+    use one::object::UID;
+    use one::oct::OCT;
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
+    use one::dynamic_field;
 
-    use sui_system::validator::Validator;
-    use sui_system::sui_system_state_inner::{Self, SuiSystemStateInner, SuiSystemStateInnerV2};
+    use one_system::validator::Validator;
+    use one_system::sui_system_state_inner::{Self, SuiSystemStateInner, SuiSystemStateInnerV2};
 
     public struct SuiSystemState has key {
         id: UID,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module move_test_code::regulated_coin {
-    use sui::coin;
+    use one::coin;
 
     public struct REGULATED_COIN has drop {}
 

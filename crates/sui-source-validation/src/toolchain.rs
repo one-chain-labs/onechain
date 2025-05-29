@@ -175,7 +175,7 @@ fn download_and_compile(
         // Check the platform and proceed if we can download a binary. If not, the user should follow error instructions to sideload the binary.
         // Download if binary does not exist.
         let mainnet_url = format!(
-            "https://github.com/MystenLabs/sui/releases/download/mainnet-v{compiler_version}/sui-mainnet-v{compiler_version}-{platform}.tgz",
+            "https://github.com/one-chain-labs/onechain/releases/download/mainnet-v{compiler_version}/one-mainnet-v{compiler_version}-{platform}.tgz",
         );
 
         println!(
@@ -197,7 +197,7 @@ fn download_and_compile(
                     "DOWNLOADING".bold().green(),
                     compiler_version.yellow()
                 );
-                let testnet_url = format!("https://github.com/MystenLabs/sui/releases/download/testnet-v{compiler_version}/sui-testnet-v{compiler_version}-{platform}.tgz");
+                let testnet_url = format!("https://github.com/one-chain-labs/onechain/releases/download/testnet-v{compiler_version}/one-testnet-v{compiler_version}-{platform}.tgz");
                 ureq::get(&testnet_url).call()?
             }
             Err(e) => return Err(e.into()),

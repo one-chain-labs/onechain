@@ -5,7 +5,7 @@
 module slot_machine::tests;
 
 use slot_machine::example;
-use sui::{
+use one::{
     coin::{Self, Coin},
     random::{Self, update_randomness_state_for_testing, Random},
     oct::OCT,

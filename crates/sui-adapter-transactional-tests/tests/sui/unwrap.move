@@ -9,7 +9,7 @@
 //# publish
 
 module test::object_basics {
-    use sui::event;
+    use one::event;
 
     public struct Object has key, store {
         id: UID,

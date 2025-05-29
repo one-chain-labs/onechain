@@ -4,7 +4,7 @@
 #[test_only]
 module tic_tac_toe::owned_tests;
 
-use sui::{test_scenario::{Self as ts, Scenario}, transfer::Receiving};
+use one::{test_scenario::{Self as ts, Scenario}, transfer::Receiving};
 use tic_tac_toe::owned as ttt;
 
 const ADMIN: address = @0xAD;

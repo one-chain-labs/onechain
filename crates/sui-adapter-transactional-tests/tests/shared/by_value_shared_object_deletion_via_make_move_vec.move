@@ -6,8 +6,8 @@
 //# publish
 
 module t2::o2 {
-    use sui::oct::OCT;
-    use sui::coin::{Self, Coin};
+    use one::oct::OCT;
+    use one::coin::{Self, Coin};
 
     public struct Obj2 has key, store {
         id: UID,

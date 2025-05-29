@@ -58,7 +58,7 @@ module basics::counter {
 #[test_only]
 module basics::counter_test {
     use basics::counter::{Self, Counter};
-    use sui::test_scenario as ts;
+    use one::test_scenario as ts;
 
     #[test]
     fun test_counter() {

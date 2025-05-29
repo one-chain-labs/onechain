@@ -13,7 +13,7 @@
 
 //# publish
 module Test::M1 {
-    use sui::dynamic_field as field;
+    use one::dynamic_field as field;
     use std::string::{String, utf8};
 
     public struct Parent has key, store {

@@ -52,7 +52,7 @@ Create a file called `settings.json` that contains all the configuration paramet
   ],
   "specs": "m5d.8xlarge",
   "repository": {
-    "url": "https://github.com/MystenLabs/sui.git",
+    "url": "https://github.com/one-chain-labs/onechain.git",
     "commit": "main"
   },
   "results_directory": "./results",
@@ -140,12 +140,12 @@ When a testbed is deployed the EC2 instances are tagged with the `testbed_id` as
 all the EC2 instances on the dictated by the configuration regions. To successfully run the benchmark all the listed instances should be in status
 `Running`. If there is any instance in different state , ex `Terminated` , then the above error will arise. Please pay attention that if you `destroy` a deployment
 and then immediately `deploy` a new one under the same `testbed_id`, then it is possible to have a mix of instances with status `Running` and `Terminated`, as AWS does not immediately
-delete the `Terminated` instances. That can eventually cause the above false positive error as well. It is advised in this case to use a different `testbed_id`  to ensure that 
+delete the `Terminated` instances. That can eventually cause the above false positive error as well. It is advised in this case to use a different `testbed_id`  to ensure that
 there is no overlap between instances.
 
 ### I am getting an error "Not enough instances: missing X instances" when running a benchmark
-In the common case to successfully run a benchmark we need to have enough instances available to run 
-* the required validators  
+In the common case to successfully run a benchmark we need to have enough instances available to run
+* the required validators
 * the grafana dashboard
 * the benchmarking clients
 

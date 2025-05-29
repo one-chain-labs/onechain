@@ -26,7 +26,7 @@ use sui_types::{
 };
 
 /// This example walks through the Rust SDK use case described in
-/// https://github.com/MystenLabs/sui/blob/main/docs/content/guides/developer/sui-101/sign-and-send-txn.mdx
+/// https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/sui-101/sign-and-send-txn.mdx
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     // set up OneChain client for the desired network.

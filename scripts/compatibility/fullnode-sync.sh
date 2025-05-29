@@ -19,11 +19,11 @@ trap cleanup EXIT
 
 while getopts "hvn:e:p:t:" OPT; do
     case $OPT in
-        p) 
+        p)
             SUI_BIN_PATH=$OPTARG ;;
         v)
             LOG_LEVEL="sui=debug,error"
-            VERBOSE="--verbose" 
+            VERBOSE="--verbose"
             ;;
         n)
             NETWORK=$OPTARG ;;
@@ -62,7 +62,7 @@ fi
 
 if [[ ! -f "${SUI_RUN_PATH}/genesis.blob" ]]; then
     echo "Copying genesis.blob for ${NETWORK}"
-    curl -fLJO https://github.com/MystenLabs/sui-genesis/raw/main/${NETWORK}/genesis.blob
+    curl -fLJO https://github.com/one-chain-labs/one-genesis/raw/main/${NETWORK}/genesis.blob
     mv ./genesis.blob ${SUI_RUN_PATH}/genesis.blob
     echo "Done"
 fi
@@ -88,7 +88,7 @@ p2p-config:
       peer-id: c88742f46e66a11cb8c84aca488065661401ef66f726cb9afeb8a5786d83456e
 EOM
     fi
-    
+
     echo "Done"
 fi
 

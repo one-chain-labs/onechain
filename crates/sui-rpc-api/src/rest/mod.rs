@@ -126,11 +126,11 @@ pub fn info(version: &'static str) -> openapiv3::v3_1::Info {
     use openapiv3::v3_1::{Contact, License};
 
     openapiv3::v3_1::Info {
-        title: "Sui Node Api".to_owned(),
-        description: Some("REST Api for interacting with the Sui Blockchain".to_owned()),
+        title: "One Node Api".to_owned(),
+        description: Some("REST Api for interacting with the One Blockchain".to_owned()),
         contact: Some(Contact {
-            name: Some("Mysten Labs".to_owned()),
-            url: Some("https://github.com/MystenLabs/sui".to_owned()),
+            name: Some("OneChain Labs".to_owned()),
+            url: Some("https://github.com/one-chain-labs/onechain".to_owned()),
             ..Default::default()
         }),
         license: Some(License {

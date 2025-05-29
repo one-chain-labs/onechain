@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module move_building_blocks::limits {
-    use sui::object::UID;
-    use sui::object;
-    use sui::tx_context::TxContext;
+    use one::object::UID;
+    use one::object;
+    use one::tx_context::TxContext;
     use std::vector;
-    use sui::transfer;
-    use sui::tx_context;
-    use sui::dynamic_field;
+    use one::transfer;
+    use one::tx_context;
+    use one::dynamic_field;
 
     public struct ObjectWithVector has key, store {
         id: UID,

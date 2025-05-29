@@ -10,24 +10,24 @@
 
 module test::m {
     public struct S has key, store {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 
     public struct R has key {
-        id: sui::object::UID,
+        id: one::object::UID,
         s: S,
     }
 
     public entry fun create(ctx: &mut TxContext) {
-        let parent = sui::object::new(ctx);
-        let child = S { id: sui::object::new(ctx) };
-        sui::transfer::transfer(R { id: parent, s: child }, tx_context::sender(ctx))
+        let parent = one::object::new(ctx);
+        let child = S { id: one::object::new(ctx) };
+        one::transfer::transfer(R { id: parent, s: child }, tx_context::sender(ctx))
     }
 
     public entry fun unwrap_and_transfer(r: R, ctx: &mut TxContext) {
         let R { id, s } = r;
-        sui::object::delete(id);
-        sui::transfer::transfer(s, tx_context::sender(ctx));
+        one::object::delete(id);
+        one::transfer::transfer(s, tx_context::sender(ctx));
     }
 }
 

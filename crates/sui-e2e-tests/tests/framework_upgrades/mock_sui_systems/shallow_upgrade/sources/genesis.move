@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui_system::genesis {
+module one_system::genesis {
     use std::vector;
-    use sui::balance::{Self, Balance};
-    use sui::object::UID;
-    use sui::oct::OCT;
-    use sui::tx_context::{Self, TxContext};
+    use one::balance::{Self, Balance};
+    use one::object::UID;
+    use one::oct::OCT;
+    use one::tx_context::{Self, TxContext};
     use std::option::Option;
 
-    use sui_system::sui_system;
-    use sui_system::validator;
+    use one_system::one_system;
+    use one_system::validator;
 
     public struct GenesisValidatorMetadata has drop, copy {
         name: vector<u8>,
@@ -113,7 +113,7 @@ module sui_system::genesis {
             i = i + 1;
         };
 
-        sui_system::create(
+        one_system::create(
             sui_system_state_id,
             validators,
             sui_supply,     // storage_fund

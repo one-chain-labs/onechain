@@ -5,7 +5,7 @@
 
 //# publish --sender A
 module test::fake {
-    use sui::coin;
+    use one::coin;
 
     public struct FAKE has drop {}
 
@@ -33,7 +33,7 @@ module test::fake {
 
 
 //# programmable --sender A --inputs object(1,2) 100 @A
-//> 0: sui::coin::mint<test::fake::FAKE>(Input(0), Input(1));
+//> 0: one::coin::mint<test::fake::FAKE>(Input(0), Input(1));
 //> TransferObjects([Result(0)], Input(2))
 
 //# create-checkpoint

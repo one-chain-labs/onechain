@@ -3,7 +3,7 @@
 
 module basics::clock;
 
-use sui::{clock::Clock, event};
+use one::{clock::Clock, event};
 
 public struct TimeEvent has copy, drop, store {
     timestamp_ms: u64,

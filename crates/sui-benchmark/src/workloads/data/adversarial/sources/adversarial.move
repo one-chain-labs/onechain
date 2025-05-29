@@ -3,12 +3,12 @@
 
 module adversarial::adversarial {
     use std::vector;
-    use sui::bcs;
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer;
-    use sui::event;
-    use sui::dynamic_field::{add, borrow};
+    use one::bcs;
+    use one::object::{Self, UID};
+    use one::tx_context::{Self, TxContext};
+    use one::transfer;
+    use one::event;
+    use one::dynamic_field::{add, borrow};
     use std::string::Self;
     use std::ascii;
 
@@ -39,7 +39,7 @@ module adversarial::adversarial {
             contents: vector[r, r, r, g, g]
         }
     }
-    
+
     public struct S has key, store {
         id: UID,
         contents: vector<u8>
@@ -126,7 +126,7 @@ module adversarial::adversarial {
             vector::push_back(&mut top_level, contents);
             n = n - 1;
         };
-    }    
+    }
 
     public struct Obj has key, store {
         id: object::UID,
@@ -315,7 +315,7 @@ module adversarial::adversarial {
         vector::push_back(&mut contents, string::from_ascii(ascii::string(arg_125)));
         vector::push_back(&mut contents, string::from_ascii(ascii::string(arg_126)));
         vector::push_back(&mut contents, string::from_ascii(ascii::string(arg_127)));
-    }   
+    }
 
 
     /// Initialize object to be used for dynamic field opers

@@ -5,7 +5,7 @@
 
 //# publish
 module Test::f {
-    use sui::event;
+    use one::event;
 
     public enum F has copy, drop {
         V1,

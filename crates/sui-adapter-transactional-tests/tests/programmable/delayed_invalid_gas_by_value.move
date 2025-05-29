@@ -14,10 +14,10 @@ module test::m1 {
 
 //# programmable --sender A --inputs @A
 //> TransferObjects([Gas], Input(0));
-//> test::m1::take<sui::coin::Coin<sui::oct::OCT>>(Gas)
+//> test::m1::take<one::coin::Coin<one::oct::OCT>>(Gas)
 
 //# programmable
-//> test::m1::imm<sui::coin::Coin<sui::oct::OCT>>(Gas, Gas)
+//> test::m1::imm<one::coin::Coin<one::oct::OCT>>(Gas, Gas)
 
 //# programmable
-//> test::m1::mut_<sui::coin::Coin<sui::oct::OCT>>(Gas, Gas)
+//> test::m1::mut_<one::coin::Coin<one::oct::OCT>>(Gas, Gas)

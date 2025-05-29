@@ -6,7 +6,7 @@
 /// the ability to modify those objects.
 module trusted_swap::example;
 
-use sui::{balance::{Self, Balance}, coin::{Self, Coin}, oct::OCT};
+use one::{balance::{Self, Balance}, coin::{Self, Coin}, oct::OCT};
 
 public struct Object has key, store {
     id: UID,
@@ -78,7 +78,7 @@ public fun execute_swap(s1: SwapRequest, s2: SwapRequest): Balance<OCT> {
 
 // === Tests ===
 #[test_only]
-use sui::test_scenario as ts;
+use one::test_scenario as ts;
 
 #[test]
 fun successful_swap() {

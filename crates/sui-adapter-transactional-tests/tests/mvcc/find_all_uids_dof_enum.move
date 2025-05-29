@@ -8,11 +8,11 @@
 //# publish
 
 module test::m {
-    use sui::dynamic_object_field as ofield;
+    use one::dynamic_object_field as ofield;
 
     public struct S has key, store {
         id: UID,
-        other: EnumWrapper, 
+        other: EnumWrapper,
         wrapped: Wrapped,
         many: vector<Wrapped>,
     }

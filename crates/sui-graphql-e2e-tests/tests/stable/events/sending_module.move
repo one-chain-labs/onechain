@@ -17,7 +17,7 @@ module P::M0 {
   }
 
   public fun emit() {
-    sui::event::emit(Event { value: 42 })
+    one::event::emit(Event { value: 42 })
   }
 }
 

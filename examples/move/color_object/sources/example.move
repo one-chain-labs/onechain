@@ -44,7 +44,7 @@ public fun update(object: &mut ColorObject, red: u8, green: u8, blue: u8) {
 
 // === Tests ===
 #[test_only]
-use sui::test_scenario as ts;
+use one::test_scenario as ts;
 
 // === Tests covered in Chapter 1 ===
 

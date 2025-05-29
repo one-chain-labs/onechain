@@ -4,7 +4,7 @@
 #[lint_allow(coin_field)]
 module common::identified_payment;
 
-use sui::{coin::{Self, Coin}, dynamic_field, event, oct::OCT, transfer::Receiving};
+use one::{coin::{Self, Coin}, dynamic_field, event, oct::OCT, transfer::Receiving};
 
 const ENotEarmarkedForSender: u64 = 0;
 
@@ -113,7 +113,7 @@ public fun transfer(earmarked: EarmarkedPayment, to: address) {
 
 /// An example of a custom receiving rule -- this behaves in a similar manner
 /// to custom transfer rules: if the object is `key` only , the
-/// `sui::transfer::receive` function can only be called on the object from
+/// `one::transfer::receive` function can only be called on the object from
 /// within the same module that defined that object.
 ///
 /// In this case `EarmarkedPayment` is defined with `key` only, so this is

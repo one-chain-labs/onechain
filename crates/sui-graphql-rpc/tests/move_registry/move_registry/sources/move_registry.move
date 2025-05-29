@@ -5,8 +5,8 @@ module move_registry::move_registry;
 
 use move_registry::name;
 use std::string::String;
-use sui::dynamic_field as df;
-use sui::vec_map::{Self, VecMap};
+use one::dynamic_field as df;
+use one::vec_map::{Self, VecMap};
 
 public struct AppInfo has copy, store, drop {
     package_info_id: Option<ID>,

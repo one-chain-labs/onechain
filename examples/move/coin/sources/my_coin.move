@@ -3,7 +3,7 @@
 
 module examples::my_coin;
 
-use sui::coin::{Self, TreasuryCap};
+use one::coin::{Self, TreasuryCap};
 
 // The type identifier of coin. The coin will have a type
 // tag of kind: `Coin<package_object::mycoin::MYCOIN>`

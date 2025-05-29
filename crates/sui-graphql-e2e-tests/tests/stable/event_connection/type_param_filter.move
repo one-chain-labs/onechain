@@ -5,7 +5,7 @@
 
 //# publish
 module Test::M1 {
-    use sui::event;
+    use one::event;
 
     public struct T1 has copy, drop {}
     public struct T2 has copy, drop {}

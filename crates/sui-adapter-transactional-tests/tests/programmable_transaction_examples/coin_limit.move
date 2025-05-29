@@ -5,8 +5,8 @@
 
 //# publish
 module test::m1 {
-    use sui::coin::{Self, Coin};
-    use sui::oct::OCT;
+    use one::coin::{Self, Coin};
+    use one::oct::OCT;
 
     public struct CoolMarker has key, store { id: UID }
 

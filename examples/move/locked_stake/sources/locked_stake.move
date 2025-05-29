@@ -4,8 +4,8 @@
 module locked_stake::locked_stake;
 
 use locked_stake::epoch_time_lock::{Self, EpochTimeLock};
-use sui::{balance::{Self, Balance}, coin, oct::OCT, vec_map::{Self, VecMap}};
-use sui_system::{staking_pool::StakedOct, sui_system::{Self, SuiSystemState}};
+use one::{balance::{Self, Balance}, coin, oct::OCT, vec_map::{Self, VecMap}};
+use one_system::{staking_pool::StakedOct, one_system::{Self, SuiSystemState}};
 
 const EInsufficientBalance: u64 = 0;
 const EStakeObjectNonExistent: u64 = 1;
@@ -63,7 +63,7 @@ public fun stake(
     ctx: &mut TxContext,
 ) {
     assert!(balance::value(&ls.sui) >= amount, EInsufficientBalance);
-    let stake = sui_system::request_add_stake_non_entry(
+    let stake = one_system::request_add_stake_non_entry(
         sui_system,
         coin::from_balance(balance::split(&mut ls.sui, amount), ctx),
         validator_address,
@@ -84,7 +84,12 @@ public fun unstake(
 ): u64 {
     assert!(vec_map::contains(&ls.staked_oct, &staked_oct_id), EStakeObjectNonExistent);
     let (_, stake) = vec_map::remove(&mut ls.staked_oct, &staked_oct_id);
-    let sui_balance = sui_system::request_withdraw_stake_non_entry(sui_system, stake, ctx);
+    let (sui_balance, coin_vesting) = one_system::request_withdraw_stake_non_entry(sui_system, stake, ctx);
+    if(coin_vesting.is_some()){
+        transfer::public_transfer(coin_vesting.destroy_some(),ctx.sender());
+    }else {
+        coin_vesting.destroy_none();
+    };
     let amount = balance::value(&sui_balance);
     deposit_sui(ls, sui_balance);
     amount

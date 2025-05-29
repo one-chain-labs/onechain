@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module move_building_blocks::objects {
-    use sui::object::UID;
+    use one::object::UID;
     use std::option::Option;
-    use sui::table::Table;
-    use sui::tx_context::TxContext;
-    use sui::object;
+    use one::table::Table;
+    use one::tx_context::TxContext;
+    use one::object;
     use std::option;
-    use sui::table;
-    use sui::transfer;
-    use sui::tx_context;
+    use one::table;
+    use one::transfer;
+    use one::tx_context;
 
     public struct Object has key, store {
         id: UID,
@@ -115,7 +115,7 @@ module move_building_blocks::objects {
             delete_child(child);
         }
     }
-    
+
     public fun delete(object: Object) {
         let Object { id, mut wrapped, table } = object;
         object::delete(id);

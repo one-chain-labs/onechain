@@ -286,7 +286,7 @@ fun expire_jwks(
     min_epoch: u64,
     ctx: &TxContext,
 ) {
-    // This will only be called by sui_system::advance_epoch
+    // This will only be called by one_system::advance_epoch
     assert!(ctx.sender() == @0x0, ENotSystemAddress);
 
     let inner = load_inner_mut(self);

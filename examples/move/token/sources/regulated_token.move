@@ -30,7 +30,7 @@ module examples::regulated_token {
         denylist_rule::Denylist,
         limiter_rule::{Self as limiter, Limiter}
     };
-    use sui::{
+    use one::{
         coin::{Self, TreasuryCap},
         token::{Self, TokenPolicy, TokenPolicyCap},
         tx_context::sender,
@@ -118,7 +118,7 @@ module examples::regulated_token_tests {
         limiter_rule as limiter,
         regulated_token::set_rules
     };
-    use sui::{
+    use one::{
         coin,
         token::{Self, TokenPolicy, TokenPolicyCap},
         token_test_utils::{Self as test, TEST}

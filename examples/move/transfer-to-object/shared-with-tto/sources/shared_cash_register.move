@@ -5,7 +5,7 @@ module shared_with_tto::shared_cash_register;
 
 use common::identified_payment::{Self, IdentifiedPayment, EarmarkedPayment};
 use std::string::String;
-use sui::{coin::Coin, oct::OCT, transfer::Receiving, vec_set::{Self, VecSet}};
+use one::{coin::Coin, oct::OCT, transfer::Receiving, vec_set::{Self, VecSet}};
 
 const EInvalidOwner: u64 = 0;
 const ENotAuthorized: u64 = 2;

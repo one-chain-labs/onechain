@@ -5,9 +5,9 @@
 
 //# publish --sender A
 module Test::boars {
-    use sui::package;
-    use sui::url::{Self, Url};
-    use sui::display;
+    use one::package;
+    use one::url::{Self, Url};
+    use one::display;
     use std::string::{utf8, String};
 
     /// For when a witness type passed is not an OTW.

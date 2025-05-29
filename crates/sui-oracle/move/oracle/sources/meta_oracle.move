@@ -8,8 +8,8 @@ module oracle::meta_oracle {
     use oracle::data::{Self, Data};
     use oracle::decimal_value::DecimalValue;
     use oracle::simple_oracle::SimpleOracle;
-    use sui::bcs;
-    use sui::math;
+    use one::bcs;
+    use one::math;
 
     #[test_only]
     use oracle::decimal_value;

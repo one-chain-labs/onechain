@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//# init --protocol-version 51 --simulator --accounts C --custom-validator-account 
+//# init --protocol-version 51 --simulator --accounts C --custom-validator-account
 
 // Run a few transactions and check that the system state storage fund is correctly reported
 // for historical epochs
@@ -15,7 +15,7 @@
 //> SplitCoins(Gas, [Input(0)]);
 //> TransferObjects([Result(0)], Input(1))
 
-//# run 0x3::sui_system::request_add_stake --args object(0x5) object(3,0) @validator_0 --sender C
+//# run 0x3::one_system::request_add_stake --args object(0x5) object(3,0) @validator_0 --sender C
 
 //# create-checkpoint
 
@@ -33,7 +33,7 @@
 
 //# advance-epoch
 
-//# run 0x3::sui_system::request_withdraw_stake --args object(0x5) object(4,0) --sender C
+//# run 0x3::one_system::request_withdraw_stake --args object(0x5) object(4,0) --sender C
 
 //# create-checkpoint
 
@@ -104,5 +104,5 @@
       totalObjectStorageRebates
       nonRefundableBalance
     }
-  } 
+  }
 }

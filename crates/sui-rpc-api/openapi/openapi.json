@@ -1,11 +1,11 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Sui Node Api",
-    "description": "REST Api for interacting with the Sui Blockchain",
+    "title": "One Node Api",
+    "description": "REST Api for interacting with the One Blockchain",
     "contact": {
-      "name": "Mysten Labs",
-      "url": "https://github.com/MystenLabs/sui"
+      "name": "OneChain Labs",
+      "url": "https://github.com/one-chain-labs/onechain"
     },
     "license": {
       "name": "Apache 2.0",
@@ -3501,6 +3501,10 @@
           }
         }
       },
+      "Hex": {
+        "description": "Hex string encoding.",
+        "type": "string"
+      },
       "IdOperation": {
         "type": "string",
         "enum": [
@@ -4567,9 +4571,26 @@
         "title": "StructTag",
         "description": "A Move StructTag",
         "examples": [
-          "0x2::coin::Coin<0x2::oct::OCT>"
+          "0x2::coin::Coin<0x2::sui::SUI>"
         ],
         "type": "string"
+      },
+      "SuiAddress": {
+        "$ref": "#/components/schemas/Hex"
+      },
+      "SupperCommitteeSummary": {
+        "type": "object",
+        "required": [
+          "proposal_list"
+        ],
+        "properties": {
+          "proposal_list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectId"
+            }
+          }
+        }
       },
       "SystemPackage": {
         "type": "object",
@@ -4612,6 +4633,7 @@
           "inactive_pools_size",
           "max_validator_count",
           "min_validator_joining_stake",
+          "only_trusted_validator",
           "pending_active_validators_id",
           "pending_active_validators_size",
           "pending_removals",
@@ -4632,8 +4654,10 @@
           "staking_pool_mappings_size",
           "storage_fund_non_refundable_balance",
           "storage_fund_total_object_storage_rebates",
+          "supper_committee",
           "system_state_version",
           "total_stake",
+          "trusted_validators",
           "validator_candidates_id",
           "validator_candidates_size",
           "validator_low_stake_grace_period",
@@ -4705,6 +4729,9 @@
             "description": "Lower-bound on the amount of stake required to become a validator.",
             "type": "string",
             "format": "u64"
+          },
+          "only_trusted_validator": {
+            "type": "boolean"
           },
           "pending_active_validators_id": {
             "description": "ID of the object that contains the list of new validators that will join at the end of the epoch.",
@@ -4794,7 +4821,7 @@
             "format": "u64"
           },
           "staking_pool_mappings_id": {
-            "description": "ID of the object that maps from staking pool's ID to the sui address of a validator.",
+            "description": "ID of the object that maps from staking pool's ID to the OneChain address of a validator.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ObjectId"
@@ -4816,6 +4843,9 @@
             "type": "string",
             "format": "u64"
           },
+          "supper_committee": {
+            "$ref": "#/components/schemas/SupperCommitteeSummary"
+          },
           "system_state_version": {
             "description": "The current version of the system state data structure type.",
             "type": "string",
@@ -4825,6 +4855,12 @@
             "description": "Total amount of stake from all active validators at the beginning of the epoch.",
             "type": "string",
             "format": "u64"
+          },
+          "trusted_validators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuiAddress"
+            }
           },
           "validator_candidates_id": {
             "description": "ID of the object that stores preactive validators, mapping their addresses to their `Validator` structs.",
@@ -6192,6 +6228,7 @@
           "next_epoch_commission_rate",
           "next_epoch_gas_price",
           "next_epoch_stake",
+          "only_validator_staking",
           "operation_cap_id",
           "p2p_address",
           "pending_pool_token_withdraw",
@@ -6202,6 +6239,7 @@
           "project_url",
           "proof_of_possession_bytes",
           "protocol_public_key",
+          "revenue_receiving_address",
           "rewards_pool",
           "staking_pool_id",
           "staking_pool_sui_balance",
@@ -6291,6 +6329,9 @@
           "next_epoch_worker_public_key": {
             "$ref": "#/components/schemas/Ed25519PublicKey"
           },
+          "only_validator_staking": {
+            "type": "boolean"
+          },
           "operation_cap_id": {
             "$ref": "#/components/schemas/ObjectId"
           },
@@ -6328,6 +6369,9 @@
           },
           "protocol_public_key": {
             "$ref": "#/components/schemas/Bls12381PublicKey"
+          },
+          "revenue_receiving_address": {
+            "$ref": "#/components/schemas/Address"
           },
           "rewards_pool": {
             "description": "The epoch stake rewards will be added here at the end of each epoch.",

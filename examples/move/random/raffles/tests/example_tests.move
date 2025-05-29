@@ -5,7 +5,7 @@
 module raffles::tests;
 
 use raffles::{example1, example2};
-use sui::{
+use one::{
     clock,
     coin::{Self, Coin},
     random::{Self, update_randomness_state_for_testing, Random},

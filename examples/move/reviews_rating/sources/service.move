@@ -5,7 +5,7 @@ module reviews_rating::service;
 
 use reviews_rating::{moderator::Moderator, review::{Self, Review}};
 use std::string::String;
-use sui::{
+use one::{
     balance::{Self, Balance},
     clock::Clock,
     coin::{Self, Coin},

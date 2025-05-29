@@ -3,7 +3,7 @@
 
 module dynamic_fields::example;
 
-use sui::dynamic_object_field as ofield;
+use one::dynamic_object_field as ofield;
 
 public struct Parent has key {
     id: UID,
@@ -48,7 +48,7 @@ public fun delete_child(parent: &mut Parent) {
 
 // === Tests ===
 #[test_only]
-use sui::test_scenario;
+use one::test_scenario;
 
 #[test]
 fun test_add_delete() {

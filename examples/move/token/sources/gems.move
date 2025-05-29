@@ -6,7 +6,7 @@
 /// with SUI.
 module examples::sword {
     use examples::gem::GEM;
-    use sui::token::{Self, Token, ActionRequest};
+    use one::token::{Self, Token, ActionRequest};
 
     /// Trying to purchase a sword with an incorrect amount.
     const EWrongAmount: u64 = 0;
@@ -28,7 +28,7 @@ module examples::sword {
 /// SUI and used to buy swords (in the `sword` module).
 module examples::gem {
     use std::{option::none, string::{Self, String}};
-    use sui::{
+    use one::{
         balance::{Self, Balance},
         coin::{Self, Coin, TreasuryCap},
         oct::OCT,

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module tto::M4 {
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer::{Self, Receiving};
+    use one::object::{Self, UID};
+    use one::tx_context::{Self, TxContext};
+    use one::transfer::{Self, Receiving};
 
     public struct A has key, store {
         id: UID,
@@ -42,12 +42,12 @@ module tto::M4 {
 
     public entry fun aborter(_parent: &mut A, _x: Receiving<B>) { abort 0 }
 
-    public entry fun receive_abort(parent: &mut A, x: Receiving<B>) { 
+    public entry fun receive_abort(parent: &mut A, x: Receiving<B>) {
         let _b = transfer::receive(&mut parent.id, x);
         abort 0
     }
 
-    public entry fun receive_type_mismatch(parent: &mut A, x: Receiving<A>) { 
+    public entry fun receive_type_mismatch(parent: &mut A, x: Receiving<A>) {
         let _b: A = transfer::receive(&mut parent.id, x);
         abort 0
     }
