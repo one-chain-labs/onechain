@@ -123,7 +123,7 @@ impl Indexer {
         info!("Starting data ingestion executor...");
         let futures = executors.into_iter().map(|(executor, exit_receiver)| {
             executor.run(
-                config.sources.data_ingestion_path.clone().unwrap_or(tempfile::tempdir().unwrap().into_path()),
+                config.sources.data_ingestion_path.clone().unwrap_or(tempfile::tempdir().unwrap().keep()),
                 config.sources.remote_store_url.as_ref().map(|url| url.as_str().to_owned()),
                 vec![],
                 extra_reader_options.clone(),

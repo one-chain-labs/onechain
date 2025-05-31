@@ -229,7 +229,7 @@ pub async fn create_sui_indexer(
         config.remote_store_url.clone(),
         sui_client,
         config.concurrency as usize,
-        config.checkpoints_path.clone().map(|p| p.into()).unwrap_or(tempfile::tempdir()?.into_path()),
+        config.checkpoints_path.clone().map(|p| p.into()).unwrap_or(tempfile::tempdir()?.keep()),
         config.sui_bridge_genesis_checkpoint,
         ingestion_metrics,
         metrics.clone().boxed(),

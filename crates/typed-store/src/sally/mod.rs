@@ -43,7 +43,7 @@
 //!     let mut table = ExampleTable::init(SallyDBOptions::TestDB);
 //!     insert_key_vals(&table).await;
 //!     // switch to rocksdb backend
-//!     let primary_path = tempfile::tempdir().expect("Failed to open db path").into_path();
+//!     let primary_path = tempfile::tempdir().expect("Failed to open db path").keep();
 //!     table = ExampleTable::init(SallyDBOptions::RocksDB((primary_path, MetricConf::default(), RocksDBAccessType::Primary, None, None)));
 //!     insert_key_vals(&table).await;
 //!     Ok(())

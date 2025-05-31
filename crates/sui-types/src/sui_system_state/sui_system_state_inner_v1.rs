@@ -330,12 +330,12 @@ impl ValidatorV1 {
                     id: staking_pool_id,
                     activation_epoch: staking_pool_activation_epoch,
                     deactivation_epoch: staking_pool_deactivation_epoch,
-                    sui_balance: staking_pool_sui_balance,
+                    oct_balance: staking_pool_oct_balance,
                     rewards_pool,
                     pool_token_balance,
                     exchange_rates: Table { id: exchange_rates_id, size: exchange_rates_size },
                     pending_stake,
-                    pending_total_sui_withdraw,
+                    pending_total_oct_withdraw,
                     pending_pool_token_withdraw,
                     extra_fields: _,
                 },
@@ -375,13 +375,13 @@ impl ValidatorV1 {
             staking_pool_id,
             staking_pool_activation_epoch,
             staking_pool_deactivation_epoch,
-            staking_pool_sui_balance,
+            staking_pool_oct_balance,
             rewards_pool: rewards_pool.value(),
             pool_token_balance,
             exchange_rates_id,
             exchange_rates_size,
             pending_stake,
-            pending_total_sui_withdraw,
+            pending_total_oct_withdraw,
             pending_pool_token_withdraw,
             commission_rate,
             next_epoch_stake,
@@ -397,12 +397,12 @@ pub struct StakingPoolV1 {
     pub id: ObjectID,
     pub activation_epoch: Option<u64>,
     pub deactivation_epoch: Option<u64>,
-    pub sui_balance: u64,
+    pub oct_balance: u64,
     pub rewards_pool: Balance,
     pub pool_token_balance: u64,
     pub exchange_rates: Table,
     pub pending_stake: u64,
-    pub pending_total_sui_withdraw: u64,
+    pub pending_total_oct_withdraw: u64,
     pub pending_pool_token_withdraw: u64,
     pub extra_fields: Bag,
 }
@@ -467,7 +467,7 @@ pub struct SuiSystemStateInnerV1 {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct StakeSubsidyV1 {
-    /// Balance of SUI set aside for stake subsidies that will be drawn down over time.
+    /// Balance of OCT set aside for stake subsidies that will be drawn down over time.
     pub balance: Balance,
 
     /// Count of the number of times stake subsidies have been distributed.

@@ -46,13 +46,7 @@ async fn main() -> Result<()> {
     let worker_pool = WorkerPool::new_with_reducer(ArchivalWorker, "archival".to_string(), 1, Box::new(reducer));
     executor.register(worker_pool).await?;
     executor
-        .run(
-            tempfile::tempdir()?.into_path(),
-            Some(config.remote_store_url),
-            vec![],
-            ReaderOptions::default(),
-            exit_receiver,
-        )
+        .run(tempfile::tempdir()?.keep(), Some(config.remote_store_url), vec![], ReaderOptions::default(), exit_receiver)
         .await?;
     Ok(())
 }

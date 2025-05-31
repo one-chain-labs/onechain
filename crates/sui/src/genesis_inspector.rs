@@ -209,7 +209,7 @@ fn examine_object(
 }
 
 fn examine_total_supply(sui_distribution: &BTreeMap<String, BTreeMap<String, (&str, u64)>>, print: bool) {
-    let mut total_sui = 0;
+    let mut total_oct = 0;
     let mut total_staked_oct = 0;
     for (owner, coins) in sui_distribution {
         let mut amount_sum = 0;
@@ -219,16 +219,16 @@ fn examine_total_supply(sui_distribution: &BTreeMap<String, BTreeMap<String, (&s
                 total_staked_oct += value;
             }
         }
-        total_sui += amount_sum;
+        total_oct += amount_sum;
         if print {
             println!("Owner {:?}", owner);
             println!("Total Amount of OCT/StakedOct Owned: {amount_sum} MIST or {} OCT:", amount_sum / MIST_PER_OCT);
             println!("{:#?}\n", coins);
         }
     }
-    assert_eq!(total_sui, TOTAL_SUPPLY_MIST);
+    assert_eq!(total_oct, TOTAL_SUPPLY_MIST);
     // Always print this.
-    println!("Total Supply of OCT: {total_sui} MIST or {} OCT", total_sui / MIST_PER_OCT);
+    println!("Total Supply of OCT: {total_oct} MIST or {} OCT", total_oct / MIST_PER_OCT);
     println!("Total Amount of StakedOct: {total_staked_oct} MIST or {} OCT\n", total_staked_oct / MIST_PER_OCT);
     if print {
         print_divider("OCT Distribution");
@@ -248,11 +248,11 @@ fn display_validator(validator: &SuiValidatorGenesis) {
     println!("Staking Pool ID: {}", validator.staking_pool.id);
     println!("Staking Pool Activation Epoch: {:?}", validator.staking_pool.activation_epoch);
     println!("Staking Pool Deactivation Epoch: {:?}", validator.staking_pool.deactivation_epoch);
-    println!("Staking Pool OCT Balance: {:?}", validator.staking_pool.sui_balance);
+    println!("Staking Pool OCT Balance: {:?}", validator.staking_pool.oct_balance);
     println!("Rewards Pool: {}", validator.staking_pool.rewards_pool.value());
     println!("Pool Token Balance: {}", validator.staking_pool.pool_token_balance);
     println!("Pending Delegation: {}", validator.staking_pool.pending_stake);
-    println!("Pending Total OCT Withdraw: {}", validator.staking_pool.pending_total_sui_withdraw);
+    println!("Pending Total OCT Withdraw: {}", validator.staking_pool.pending_total_oct_withdraw);
     println!("Pendign Pool Token Withdraw: {}", validator.staking_pool.pending_pool_token_withdraw);
     println!("Exchange Rates ID: {}", validator.staking_pool.exchange_rates.id);
     println!("Exchange Rates Size: {}", validator.staking_pool.exchange_rates.size);

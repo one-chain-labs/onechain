@@ -1849,7 +1849,7 @@ async fn init_sim_executor(
         reference_gas_price,
         None,
     );
-    let data_ingestion_path = tempdir().unwrap().into_path();
+    let data_ingestion_path = tempdir().unwrap().keep();
     sim.set_data_ingestion_path(data_ingestion_path.clone());
 
     let cluster =

@@ -195,7 +195,7 @@ impl Validator {
     }
 
     /// The validator's current exchange object. The exchange rate is used to determine
-    /// the amount of SUI tokens that each past SUI staker can withdraw in the future.
+    /// the amount of OCT tokens that each past OCT staker can withdraw in the future.
     #[graphql(deprecation = "The exchange object is a wrapped object. Access its dynamic fields through \
         the `exchangeRatesTable` query.")]
     async fn exchange_rates(&self) -> Result<Option<MoveObject>> {
@@ -204,7 +204,7 @@ impl Validator {
 
     /// A wrapped object containing the validator's exchange rates. This is a table from epoch
     /// number to `PoolTokenExchangeRate` value. The exchange rate is used to determine the amount
-    /// of SUI tokens that each past SUI staker can withdraw in the future.
+    /// of OCT tokens that each past OCT staker can withdraw in the future.
     async fn exchange_rates_table(&self) -> Result<Option<Owner>> {
         Ok(Some(Owner {
             address: self.validator_summary.exchange_rates_id.into(),
@@ -223,9 +223,9 @@ impl Validator {
         self.validator_summary.staking_pool_activation_epoch.map(UInt53::from)
     }
 
-    /// The total number of SUI tokens in this pool.
-    async fn staking_pool_sui_balance(&self) -> Option<BigInt> {
-        Some(BigInt::from(self.validator_summary.staking_pool_sui_balance))
+    /// The total number of OCT tokens in this pool.
+    async fn staking_pool_oct_balance(&self) -> Option<BigInt> {
+        Some(BigInt::from(self.validator_summary.staking_pool_oct_balance))
     }
 
     /// The epoch stake rewards will be added here at the end of each epoch.
@@ -244,8 +244,8 @@ impl Validator {
     }
 
     /// Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
-    async fn pending_total_sui_withdraw(&self) -> Option<BigInt> {
-        Some(BigInt::from(self.validator_summary.pending_total_sui_withdraw))
+    async fn pending_total_oct_withdraw(&self) -> Option<BigInt> {
+        Some(BigInt::from(self.validator_summary.pending_total_oct_withdraw))
     }
 
     /// Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
@@ -270,7 +270,7 @@ impl Validator {
         Some(self.validator_summary.commission_rate)
     }
 
-    /// The total number of SUI tokens in this pool plus
+    /// The total number of OCT tokens in this pool plus
     /// the pending stake amount for this epoch.
     async fn next_epoch_stake(&self) -> Option<BigInt> {
         Some(BigInt::from(self.validator_summary.next_epoch_stake))

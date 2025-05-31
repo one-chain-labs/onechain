@@ -80,7 +80,7 @@ impl AuthorityStoreMetrics {
         Self {
             sui_conservation_check_latency: register_int_gauge_with_registry!(
                 "sui_conservation_check_latency",
-                "Number of seconds took to scan all live objects in the store for SUI conservation check",
+                "Number of seconds took to scan all live objects in the store for OCT conservation check",
                 registry,
             )
             .unwrap(),
@@ -98,7 +98,7 @@ impl AuthorityStoreMetrics {
             .unwrap(),
             sui_conservation_imbalance: register_int_gauge_with_registry!(
                 "sui_conservation_imbalance",
-                "Total amount of SUI in the network - 10B * 10^9. This delta shows the amount of imbalance",
+                "Total amount of OCT in the network - 10B * 10^9. This delta shows the amount of imbalance",
                 registry,
             )
             .unwrap(),
@@ -144,7 +144,7 @@ pub struct AuthorityStore {
 
     indirect_objects_threshold: usize,
 
-    /// Whether to enable expensive SUI conservation check at epoch boundaries.
+    /// Whether to enable expensive OCT conservation check at epoch boundaries.
     enable_epoch_sui_conservation_check: bool,
 
     metrics: AuthorityStoreMetrics,
@@ -1257,12 +1257,12 @@ impl AuthorityStore {
         }
 
         let executor = old_epoch_store.executor();
-        info!("Starting SUI conservation check. This may take a while..");
+        info!("Starting OCT conservation check. This may take a while..");
         let cur_time = Instant::now();
         let mut pending_objects = vec![];
         let mut count = 0;
         let mut size = 0;
-        let (mut total_sui, mut total_storage_rebate) = thread::scope(|s| {
+        let (mut total_oct, mut total_storage_rebate) = thread::scope(|s| {
             let pending_tasks = FuturesUnordered::new();
             for o in self.iter_live_object_set(false) {
                 match o {
@@ -1276,18 +1276,18 @@ impl AuthorityStore {
                             pending_tasks.push(s.spawn(move || {
                                 let mut layout_resolver = executor.type_layout_resolver(Box::new(type_layout_store));
                                 let mut total_storage_rebate = 0;
-                                let mut total_sui = 0;
+                                let mut total_oct = 0;
                                 for object in task_objects {
                                     total_storage_rebate += object.storage_rebate;
-                                    // get_total_sui includes storage rebate, however all storage rebate is
+                                    // get_total_oct includes storage rebate, however all storage rebate is
                                     // also stored in the storage fund, so we need to subtract it here.
-                                    total_sui +=
-                                        object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+                                    total_oct +=
+                                        object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
                                 }
                                 if count % 50_000_000 == 0 {
                                     info!("Processed {} objects", count);
                                 }
-                                (total_sui, total_storage_rebate)
+                                (total_oct, total_storage_rebate)
                             }));
                         }
                     }
@@ -1304,7 +1304,7 @@ impl AuthorityStore {
         let mut layout_resolver = executor.type_layout_resolver(Box::new(type_layout_store));
         for object in pending_objects {
             total_storage_rebate += object.storage_rebate;
-            total_sui += object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            total_oct += object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
         }
         info!("Scanned {} live objects, took {:?}", count, cur_time.elapsed());
         self.metrics.sui_conservation_live_object_count.set(count as i64);
@@ -1314,18 +1314,18 @@ impl AuthorityStore {
         // It is safe to call this function because we are in the middle of reconfiguration.
         let system_state = self
             .get_sui_system_state_object_unsafe()
-            .expect("Reading sui system state object cannot fail")
+            .expect("Reading oct system state object cannot fail")
             .into_sui_system_state_summary();
         let storage_fund_balance = system_state.storage_fund_total_object_storage_rebates;
         info!(
-            "Total SUI amount in the network: {}, storage fund balance: {}, total storage rebate: {} at beginning of epoch {}",
-            total_sui, storage_fund_balance, total_storage_rebate, system_state.epoch
+            "Total OCT amount in the network: {}, storage fund balance: {}, total storage rebate: {} at beginning of epoch {}",
+            total_oct, storage_fund_balance, total_storage_rebate, system_state.epoch
         );
 
         let imbalance = (storage_fund_balance as i64) - (total_storage_rebate as i64);
         self.metrics.sui_conservation_storage_fund.set(storage_fund_balance as i64);
         self.metrics.sui_conservation_storage_fund_imbalance.set(imbalance);
-        self.metrics.sui_conservation_imbalance.set((total_sui as i128 - TOTAL_SUPPLY_MIST as i128) as i64);
+        self.metrics.sui_conservation_imbalance.set((total_oct as i128 - TOTAL_SUPPLY_MIST as i128) as i64);
 
         if let Some(expected_imbalance) =
             self.perpetual_tables.expected_storage_fund_imbalance.get(&()).expect("DB read cannot fail")
@@ -1343,21 +1343,21 @@ impl AuthorityStore {
             self.perpetual_tables.expected_storage_fund_imbalance.insert(&(), &imbalance).expect("DB write cannot fail");
         }
 
-        if let Some(expected_sui) =
+        if let Some(expected_oct) =
             self.perpetual_tables.expected_network_sui_amount.get(&()).expect("DB read cannot fail")
         {
             fp_ensure!(
-                total_sui == expected_sui,
+                total_oct == expected_oct,
                 SuiError::from(
                     format!(
-                        "Inconsistent state detected at epoch {}: total sui: {}, expecting {}",
-                        system_state.epoch, total_sui, expected_sui
+                        "Inconsistent state detected at epoch {}: total oct: {}, expecting {}",
+                        system_state.epoch, total_oct, expected_oct
                     )
                     .as_str()
                 )
             );
         } else {
-            self.perpetual_tables.expected_network_sui_amount.insert(&(), &total_sui).expect("DB write cannot fail");
+            self.perpetual_tables.expected_network_sui_amount.insert(&(), &total_oct).expect("DB write cannot fail");
         }
 
         Ok(())

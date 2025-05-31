@@ -36,7 +36,7 @@ use crate::{
 /// [Rosetta API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networklist)
 pub async fn list(Extension(env): Extension<SuiEnv>) -> Result<NetworkListResponse, Error> {
     Ok(NetworkListResponse {
-        network_identifiers: vec![NetworkIdentifier { blockchain: "sui".to_string(), network: env }],
+        network_identifiers: vec![NetworkIdentifier { blockchain: "one".to_string(), network: env }],
     })
 }
 
@@ -59,7 +59,7 @@ pub async fn status(
             peer_id: ObjectID::from(validator.sui_address).into(),
             metadata: Some(json!({
                 "public_key": Hex::from_bytes(&validator.protocol_pubkey_bytes),
-                "stake_amount": validator.staking_pool_sui_balance,
+                "stake_amount": validator.staking_pool_oct_balance,
             })),
         })
         .collect();

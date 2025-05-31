@@ -429,8 +429,8 @@ prometheus-http-query = { version = "0.8", default-features = false, features = 
     "rustls-tls",
 ] }
 prometheus-parse = { git = "https://github.com/asonnino/prometheus-parser.git", rev = "75334db" }
-proptest = "1.1.0"
-proptest-derive = "0.3.0"
+proptest = "1.6.0"
+proptest-derive = "0.5.1"
 prost = "0.13"
 prost-build = "0.13"
 prost-types = "0.13.1"

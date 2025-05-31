@@ -19,9 +19,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
-/// This is the JSON-RPC type for the SUI system state object.
+/// This is the JSON-RPC type for the OCT system state object.
 /// It flattens all fields to make them top-level fields such that it as minimum
-/// dependencies to the internal data structures of the SUI system state type.
+/// dependencies to the internal data structures of the OCT system state type.
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -125,7 +125,7 @@ pub struct SuiSystemStateSummary {
     pub validator_low_stake_grace_period: u64,
 
     // Stake subsidy information
-    /// Balance of SUI set aside for stake subsidies that will be drawn down over time.
+    /// Balance of OCT set aside for stake subsidies that will be drawn down over time.
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "Readable<BigInt<u64>, _>")]
     pub stake_subsidy_balance: u64,
@@ -218,7 +218,7 @@ impl SuiSystemStateSummary {
     }
 }
 
-/// This is the JSON-RPC type for the SUI validator. It flattens all inner structures
+/// This is the JSON-RPC type for the OCT validator. It flattens all inner structures
 /// to top-level fields so that they are decoupled from the internal definitions.
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
@@ -297,10 +297,10 @@ pub struct SuiValidatorSummary {
     #[schemars(with = "Option<BigInt<u64>>")]
     #[serde_as(as = "Option<Readable<BigInt<u64>, _>>")]
     pub staking_pool_deactivation_epoch: Option<u64>,
-    /// The total number of SUI tokens in this pool.
+    /// The total number of OCT tokens in this pool.
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "Readable<BigInt<u64>, _>")]
-    pub staking_pool_sui_balance: u64,
+    pub staking_pool_oct_balance: u64,
     /// The epoch stake rewards will be added here at the end of each epoch.
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "Readable<BigInt<u64>, _>")]
@@ -316,7 +316,7 @@ pub struct SuiValidatorSummary {
     /// Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "Readable<BigInt<u64>, _>")]
-    pub pending_total_sui_withdraw: u64,
+    pub pending_total_oct_withdraw: u64,
     /// Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "Readable<BigInt<u64>, _>")]
@@ -412,11 +412,11 @@ impl Default for SuiValidatorSummary {
             staking_pool_id: ObjectID::ZERO,
             staking_pool_activation_epoch: None,
             staking_pool_deactivation_epoch: None,
-            staking_pool_sui_balance: 0,
+            staking_pool_oct_balance: 0,
             rewards_pool: 0,
             pool_token_balance: 0,
             pending_stake: 0,
-            pending_total_sui_withdraw: 0,
+            pending_total_oct_withdraw: 0,
             pending_pool_token_withdraw: 0,
             exchange_rates_id: ObjectID::ZERO,
             exchange_rates_size: 0,

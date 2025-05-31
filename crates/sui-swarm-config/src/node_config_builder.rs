@@ -133,7 +133,7 @@ impl ValidatorConfigBuilder {
 
     pub fn build(self, validator: ValidatorGenesisConfig, genesis: sui_config::genesis::Genesis) -> NodeConfig {
         let key_path = get_key_path(&validator.key_pair);
-        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().into_path());
+        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().keep());
         let db_path = config_directory.join(AUTHORITIES_DB_NAME).join(key_path.clone());
 
         let network_address = validator.network_address;
@@ -394,7 +394,7 @@ impl FullnodeConfigBuilder {
         let ip = validator_config.network_address.to_socket_addr().unwrap().ip().to_string();
 
         let key_path = get_key_path(&validator_config.key_pair);
-        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().into_path());
+        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().keep());
 
         let p2p_config = {
             let seed_peers = network_config

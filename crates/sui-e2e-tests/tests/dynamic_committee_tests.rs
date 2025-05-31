@@ -132,16 +132,16 @@ impl StressTestRunner {
             let object_opt = state.get_object_store().get_object_by_key(&obj_ref.0, obj_ref.1);
             let Some(object) = object_opt else { continue };
             let struct_tag = object.struct_tag().unwrap();
-            let total_sui = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_SUI: {total_sui}");
+            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
         }
 
         println!("MUTATED:");
         for (obj_ref, _) in effects.mutated() {
             let object = state.get_object_store().get_object_by_key(&obj_ref.0, obj_ref.1).unwrap();
             let struct_tag = object.struct_tag().unwrap();
-            let total_sui = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_SUI: {total_sui}");
+            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
         }
 
         println!("SHARED:");
@@ -149,8 +149,8 @@ impl StressTestRunner {
             let (obj_id, version) = kind.id_and_version();
             let object = state.get_object_store().get_object_by_key(&obj_id, version).unwrap();
             let struct_tag = object.struct_tag().unwrap();
-            let total_sui = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_SUI: {total_sui}");
+            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
         }
     }
 
@@ -253,7 +253,7 @@ mod add_stake {
             let cache = state.get_backing_package_store();
             let epoch_store = state.load_epoch_store_one_call_per_task();
             let mut layout_resolver = epoch_store.executor().type_layout_resolver(Box::new(cache.as_ref()));
-            let staked_amount = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            let staked_amount = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
             assert_eq!(staked_amount, self.stake_amount);
             assert_eq!(object.owner.get_owner_address().unwrap(), self.sender);
             runner.display_effects(effects);

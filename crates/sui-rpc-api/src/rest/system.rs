@@ -167,7 +167,7 @@ pub struct SystemStateSummary {
     pub validator_low_stake_grace_period: u64,
 
     // Stake subsidy information
-    /// Balance of SUI set aside for stake subsidies that will be drawn down over time.
+    /// Balance of OCT set aside for stake subsidies that will be drawn down over time.
     #[serde_as(as = "sui_types::sui_serde::BigInt<u64>")]
     #[schemars(with = "U64")]
     pub stake_subsidy_balance: u64,
@@ -304,10 +304,10 @@ pub struct ValidatorSummary {
     #[serde_as(as = "Option<sui_types::sui_serde::BigInt<u64>>")]
     #[schemars(with = "Option<U64>")]
     pub staking_pool_deactivation_epoch: Option<u64>,
-    /// The total number of SUI tokens in this pool.
+    /// The total number of OCT tokens in this pool.
     #[serde_as(as = "sui_types::sui_serde::BigInt<u64>")]
     #[schemars(with = "U64")]
-    pub staking_pool_sui_balance: u64,
+    pub staking_pool_oct_balance: u64,
     /// The epoch stake rewards will be added here at the end of each epoch.
     #[serde_as(as = "sui_types::sui_serde::BigInt<u64>")]
     #[schemars(with = "U64")]
@@ -323,7 +323,7 @@ pub struct ValidatorSummary {
     /// Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
     #[serde_as(as = "sui_types::sui_serde::BigInt<u64>")]
     #[schemars(with = "U64")]
-    pub pending_total_sui_withdraw: u64,
+    pub pending_total_oct_withdraw: u64,
     /// Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
     #[serde_as(as = "sui_types::sui_serde::BigInt<u64>")]
     #[schemars(with = "U64")]
@@ -372,11 +372,11 @@ impl From<sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSum
             staking_pool_id,
             staking_pool_activation_epoch,
             staking_pool_deactivation_epoch,
-            staking_pool_sui_balance,
+            staking_pool_oct_balance,
             rewards_pool,
             pool_token_balance,
             pending_stake,
-            pending_total_sui_withdraw,
+            pending_total_oct_withdraw,
             pending_pool_token_withdraw,
             exchange_rates_id,
             exchange_rates_size,
@@ -419,11 +419,11 @@ impl From<sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSum
             staking_pool_id: staking_pool_id.into(),
             staking_pool_activation_epoch,
             staking_pool_deactivation_epoch,
-            staking_pool_sui_balance,
+            staking_pool_oct_balance,
             rewards_pool,
             pool_token_balance,
             pending_stake,
-            pending_total_sui_withdraw,
+            pending_total_oct_withdraw,
             pending_pool_token_withdraw,
             exchange_rates_id: exchange_rates_id.into(),
             exchange_rates_size,

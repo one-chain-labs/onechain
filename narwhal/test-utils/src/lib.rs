@@ -102,7 +102,7 @@ pub fn get_protocol_config(version_number: u64) -> ProtocolConfig {
 }
 
 pub fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").into_path()
+    tempfile::tempdir().expect("Failed to open temporary directory").keep()
 }
 
 pub fn ensure_test_environment() {

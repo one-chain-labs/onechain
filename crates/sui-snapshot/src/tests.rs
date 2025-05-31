@@ -18,7 +18,7 @@ use sui_types::{
 use tempfile::tempdir;
 
 fn temp_dir() -> std::path::PathBuf {
-    tempdir().expect("Failed to open temporary directory").into_path()
+    tempdir().expect("Failed to open temporary directory").keep()
 }
 
 pub fn insert_keys(db: &AuthorityPerpetualTables, total_unique_object_ids: u64) -> Result<(), anyhow::Error> {

@@ -105,7 +105,7 @@ async fn basic_flow() {
 }
 
 fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").into_path()
+    tempfile::tempdir().expect("Failed to open temporary directory").keep()
 }
 
 fn create_executor_bundle() -> ExecutorBundle {

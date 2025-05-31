@@ -121,7 +121,7 @@ pub struct NodeConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics: Option<MetricsConfig>,
 
-    /// In a `sui-node` binary, this is set to SupportedProtocolVersions::SYSTEM_DEFAULT
+    /// In a `one-node` binary, this is set to SupportedProtocolVersions::SYSTEM_DEFAULT
     /// in sui-node/src/main.rs. It is present in the config so that it can be changed by tests in
     /// order to test protocol upgrades.
     #[serde(skip)]
@@ -662,18 +662,18 @@ pub struct CheckpointExecutorConfig {
 pub struct ExpensiveSafetyCheckConfig {
     /// If enabled, at epoch boundary, we will check that the storage
     /// fund balance is always identical to the sum of the storage
-    /// rebate of all live objects, and that the total SUI in the network remains
+    /// rebate of all live objects, and that the total OCT in the network remains
     /// the same.
     #[serde(default)]
     enable_epoch_sui_conservation_check: bool,
 
-    /// If enabled, we will check that the total SUI in all input objects of a tx
-    /// (both the Move part and the storage rebate) matches the total SUI in all
+    /// If enabled, we will check that the total OCT in all input objects of a tx
+    /// (both the Move part and the storage rebate) matches the total OCT in all
     /// output objects of the tx + gas fees
     #[serde(default)]
     enable_deep_per_tx_sui_conservation_check: bool,
 
-    /// Disable epoch SUI conservation check even when we are running in debug mode.
+    /// Disable epoch OCT conservation check even when we are running in debug mode.
     #[serde(default)]
     force_disable_epoch_sui_conservation_check: bool,
 

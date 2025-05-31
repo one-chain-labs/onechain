@@ -13,7 +13,7 @@ use std::{
 use futures::future::try_join_all;
 use russh::{
     client::{self, Msg},
-    keys::{load_secret_key, ssh_key, PrivateKeyWithHashAlg, PublicKey},
+    keys::{load_secret_key, PrivateKeyWithHashAlg},
     Channel,
 };
 use tokio::{task::JoinHandle, time::sleep};
