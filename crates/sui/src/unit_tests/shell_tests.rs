@@ -30,7 +30,7 @@ fn test_completion_cache_key() {
 #[test]
 fn test_substitute_env_variables() {
     let random_id = ObjectID::random().to_string();
-    env::set_var("OBJECT_ID", random_id.clone());
+    unsafe { env::set_var("OBJECT_ID", random_id.clone()) };
 
     let test_string_1 = "$OBJECT_ID".to_string();
     assert_eq!(random_id, substitute_env_variables(test_string_1));
@@ -39,7 +39,7 @@ fn test_substitute_env_variables() {
     assert_eq!(format!("{random_id}/SOME_DIRECTORY"), substitute_env_variables(test_string_2));
     // Make sure variable with the same beginnings won't get substituted incorrectly
     let random_id_2 = ObjectID::random().to_string();
-    env::set_var("OBJECT_ID_2", random_id_2.clone());
+    unsafe { env::set_var("OBJECT_ID_2", random_id_2.clone()) };
     let test_string_3 = "$OBJECT_ID_2".to_string();
     assert_eq!(random_id_2, substitute_env_variables(test_string_3));
 

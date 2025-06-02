@@ -600,9 +600,9 @@ impl KeyToolCommand {
             KeyToolCommand::Import { alias, input_string, key_scheme, derivation_path } => {
                 if Hex::decode(&input_string).is_ok() {
                     return Err(anyhow!(
-                        "Sui Keystore and Sui Wallet no longer support importing 
-                    private key as Hex, if you are sure your private key is encoded in Hex, use 
-                    `sui keytool convert $HEX` to convert first then import the Bech32 encoded 
+                        "Sui Keystore and Sui Wallet no longer support importing
+                    private key as Hex, if you are sure your private key is encoded in Hex, use
+                    `sui keytool convert $HEX` to convert first then import the Bech32 encoded
                     private key starting with `suiprivkey`."
                     ));
                 }
@@ -921,7 +921,7 @@ impl KeyToolCommand {
                 let jwt_randomness = if fixed {
                     "100681567828351849884072155819400689117".to_string()
                 } else {
-                    let random_bytes = rand::thread_rng().gen::<[u8; 16]>();
+                    let random_bytes = rand::thread_rng().r#gen::<[u8; 16]>();
                     let jwt_random_bytes = BigUint::from_bytes_be(&random_bytes);
                     jwt_random_bytes.to_string()
                 };

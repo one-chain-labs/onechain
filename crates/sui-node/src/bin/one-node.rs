@@ -3,14 +3,13 @@
 
 use clap::{ArgGroup, Parser};
 use std::{path::PathBuf, sync::Arc, time::Duration};
-use tokio::{sync::broadcast, time::sleep};
+use tokio::sync::broadcast;
 use tracing::{error, info};
 
 use mysten_common::sync::async_once_cell::AsyncOnceCell;
 use one_node::metrics;
 use sui_config::{node::RunWithRange, Config, NodeConfig};
 use sui_core::runtime::SuiRuntimes;
-use sui_telemetry::send_telemetry_event;
 use sui_types::{
     committee::EpochId,
     messages_checkpoint::CheckpointSequenceNumber,
