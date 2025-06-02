@@ -227,7 +227,7 @@ jobs:
         run: |
           echo "sui_tag=$(echo ${{ env.TAG_NAME }} | sed s/'refs\/tags\/'//)" >> $GITHUB_ENV
           echo "versionless_tag=$(echo ${{ env.TAG_NAME }} | sed s/'refs\/tags\/'// | sed s/'testnet\-v'//)" >> $GITHUB_ENV
-      - uses: mislav/bump-homebrew-formula-action@b3327118b2153c82da63fd9cbf58942146ee99f0 # pin@v3
+      - uses: mislav/bump-homebrew-formula-action@ecd3ec7bf4fa4ecbdaa0c379850187374d076eaa # pin@v3
         with:
           formula-name: sui
           create-pullrequest: true
