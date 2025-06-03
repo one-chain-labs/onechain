@@ -404,7 +404,7 @@ mod tests {
         let registry = Registry::new();
 
         let temp_dir = TempDir::new().unwrap();
-        let parameters = Parameters { db_path: temp_dir.into_path(), ..Default::default() };
+        let parameters = Parameters { db_path: temp_dir.keep(), ..Default::default() };
         let txn_verifier = NoopTransactionVerifier {};
 
         let own_index = committee.to_authority_index(0).unwrap();
