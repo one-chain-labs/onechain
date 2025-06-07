@@ -186,7 +186,7 @@ fn download_and_compile(
 
         let mut response = match ureq::get(&mainnet_url).call() {
             Ok(response) => response,
-            Err(ureq::Error::Status(404, _)) => {
+            Err(ureq::Error::StatusCode(404)) => {
                 println!(
                     "{} sui mainnet compiler {} not available, attempting to download testnet compiler release...",
                     "WARNING".bold().yellow(),
@@ -201,7 +201,7 @@ fn download_and_compile(
                 ureq::get(&testnet_url).call()?
             }
             Err(e) => return Err(e.into()),
-        }.into_reader();
+        }.into_body().into_reader();
 
         let dest_tarball = dest_version.join(format!("{}.tgz", compiler_version));
         debug!("tarball destination: {} ", dest_tarball.display());

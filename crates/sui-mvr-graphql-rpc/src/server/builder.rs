@@ -42,7 +42,7 @@ use crate::{
     },
 };
 use async_graphql::{
-    extensions::{ApolloTracing, ExtensionFactory, Tracing},
+    extensions::{ApolloTracing, ExtensionFactory},
     EmptySubscription,
     Schema,
     SchemaBuilder,
@@ -424,10 +424,6 @@ impl ServerBuilder {
 
         if config.internal_features.query_timeout {
             builder = builder.extension(Timeout);
-        }
-
-        if config.internal_features.tracing {
-            builder = builder.extension(Tracing);
         }
 
         if config.internal_features.apollo_tracing {

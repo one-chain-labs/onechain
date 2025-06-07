@@ -6,7 +6,10 @@ use std::{ops::Range, path::PathBuf};
 use anyhow::{anyhow, Result};
 use arrow_array::{Array, Int32Array};
 use clap::*;
-use gcp_bigquery_client::{model::query_request::QueryRequest, Client};
+use gcp_bigquery_client::{
+    model::{query_request::QueryRequest, query_response::ResultSet},
+    Client,
+};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use object_store::path::Path;
 use serde::{Deserialize, Serialize};
@@ -237,7 +240,8 @@ impl BQMaxCheckpointReader {
 #[async_trait::async_trait]
 impl MaxCheckpointReader for BQMaxCheckpointReader {
     async fn max_checkpoint(&self) -> Result<i64> {
-        let mut result = self.client.job().query(&self.project_id, QueryRequest::new(&self.query)).await?;
+        let resp = self.client.job().query(&self.project_id, QueryRequest::new(&self.query)).await?;
+        let mut result = ResultSet::new_from_query_response(resp);
         if result.next_row() {
             let max_checkpoint = result.get_i64(0)?.ok_or(anyhow!("No rows returned"))?;
             Ok(max_checkpoint)

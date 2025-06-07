@@ -194,13 +194,13 @@ impl BlockManager {
 
         // TODO: report blocks_to_reject to peers.
         for (block_ref, block) in blocks_to_reject {
-            let hostname = self.context.committee.authority(block_ref.author).hostname.clone();
+            let hostname = self.context.committee.authority(block_ref.author).hostname.as_str();
 
             self.context
                 .metrics
                 .node_metrics
                 .invalid_blocks
-                .with_label_values(&[&hostname, "accept_block", "InvalidAncestors"])
+                .with_label_values(&[hostname, "accept_block", "InvalidAncestors"])
                 .inc();
             warn!("Invalid block {:?} is rejected", block);
         }

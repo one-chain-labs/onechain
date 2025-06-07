@@ -41,12 +41,15 @@ use url::Url;
 struct MyUserValidationMethod {}
 #[async_trait::async_trait]
 impl UserValidationMethod for MyUserValidationMethod {
-    async fn check_user_presence(&self) -> bool {
-        true
-    }
+    type PasskeyItem = Passkey;
 
-    async fn check_user_verification(&self) -> bool {
-        true
+    async fn check_user<'a>(
+        &self,
+        _credential: Option<&'a Self::PasskeyItem>,
+        presence: bool,
+        verification: bool,
+    ) -> Result<passkey_authenticator::UserCheck, passkey_types::ctap2::Ctap2Error> {
+        Ok(passkey_authenticator::UserCheck { presence, verification })
     }
 
     fn is_verification_enabled(&self) -> Option<bool> {

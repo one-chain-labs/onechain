@@ -328,7 +328,7 @@ mod tests {
         b.report(40);
         tokio::time::sleep(Duration::from_millis(1500)).await;
         let gather = registry.gather();
-        let gather: HashMap<_, _> = gather.into_iter().map(|f| (f.get_name().to_string(), f)).collect();
+        let gather: HashMap<_, _> = gather.into_iter().map(|f| (f.name().to_string(), f)).collect();
         let hist = gather.get("test").unwrap();
         let sum = gather.get("test_sum").unwrap();
         let count = gather.get("test_count").unwrap();
@@ -352,11 +352,11 @@ mod tests {
             .get_metric()
             .iter()
             .map(|m| {
-                let value = m.get_gauge().get_value();
+                let value = m.get_gauge().value();
                 let mut key = String::new();
                 for label in m.get_label() {
                     key.push_str("::");
-                    key.push_str(label.get_value());
+                    key.push_str(label.value());
                 }
                 (key, value)
             })
@@ -368,11 +368,11 @@ mod tests {
             .get_metric()
             .iter()
             .map(|m| {
-                let value = m.get_counter().get_value();
+                let value = m.get_counter().value();
                 let mut key = String::new();
                 for label in m.get_label() {
                     key.push_str("::");
-                    key.push_str(label.get_value());
+                    key.push_str(label.value());
                 }
                 (key, value)
             })

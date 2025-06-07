@@ -217,7 +217,7 @@ impl Cluster {
         for authority in self.authorities().await {
             let primary = authority.primary().await;
             if let Some(metric) = primary.metric("last_committed_round").await {
-                let value = metric.get_gauge().get_value();
+                let value = metric.get_gauge().value();
 
                 authorities_latest_commit.insert(primary.id, value);
 
@@ -286,7 +286,7 @@ impl PrimaryNodeDetails {
         let (_registry_id, registry) = self.node.registry().await.unwrap();
         let metrics = registry.gather();
 
-        let metric = metrics.into_iter().find(|m| m.get_name() == name);
+        let metric = metrics.into_iter().find(|m| m.name() == name);
         metric.map(|m| m.get_metric().first().unwrap().clone())
     }
 

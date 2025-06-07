@@ -741,7 +741,7 @@ impl Core {
         let mut excluded_ancestors = Vec::new();
 
         for (score, ancestor) in temp_excluded_ancestors.into_iter() {
-            let block_hostname = &self.context.committee.authority(ancestor.author()).hostname;
+            let block_hostname = self.context.committee.authority(ancestor.author()).hostname.as_str();
             if !parent_round_quorum.reached_threshold(&self.context.committee) && ancestor.round() == quorum_round {
                 debug!("Including temporarily excluded strong link ancestor {ancestor} with score {score} to propose for round {clock_round}");
                 parent_round_quorum.add(ancestor.author(), &self.context.committee);
@@ -1398,12 +1398,12 @@ mod test {
                 C -> [-A2],
                 D -> [-A2],
             },
-            Round 4 : { 
+            Round 4 : {
                 B -> [-A3],
                 C -> [-A3],
                 D -> [-A3],
             },
-            Round 5 : { 
+            Round 5 : {
                 A -> [A3, B4, C4, D4]
                 B -> [*],
                 C -> [*],

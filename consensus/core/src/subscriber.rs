@@ -112,7 +112,7 @@ impl<C: NetworkClient, S: NetworkService> Subscriber<C, S> {
         const INITIAL_RETRY_INTERVAL: Duration = Duration::from_millis(100);
         const MAX_RETRY_INTERVAL: Duration = Duration::from_secs(10);
         const RETRY_INTERVAL_MULTIPLIER: f32 = 1.2;
-        let peer_hostname = &context.committee.authority(peer).hostname;
+        let peer_hostname = context.committee.authority(peer).hostname.as_str();
         let mut retries: i64 = 0;
         let mut delay = INITIAL_RETRY_INTERVAL;
         'subscription: loop {

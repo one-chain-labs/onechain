@@ -440,7 +440,7 @@ impl Proposer {
                 (max_delay_timed_out || ((enough_digests || min_delay_timed_out) && advance)) && enough_parents;
 
             debug!(
-                "Proposer loop starts: round={} enough_parents={} enough_digests={} advance={} max_delay_timed_out={} min_delay_timed_out={} should_create_header={}", 
+                "Proposer loop starts: round={} enough_parents={} enough_digests={} advance={} max_delay_timed_out={} min_delay_timed_out={} should_create_header={}",
                 self.round, enough_parents, enough_digests, advance, max_delay_timed_out, min_delay_timed_out, should_create_header
             );
 
@@ -659,14 +659,14 @@ impl Proposer {
                     debug!("Proposer advance={} round={}", advance, self.round);
 
                     let round_type = if self.round % 2 == 0 {
-                        "even"
+                        String::from("even")
                     } else {
-                        "odd"
+                        String::from("odd")
                     };
 
                     self.metrics
                         .proposer_ready_to_advance
-                        .with_label_values(&[&advance.to_string(), round_type])
+                        .with_label_values(&[&advance.to_string(), &round_type])
                         .inc();
                 }
 

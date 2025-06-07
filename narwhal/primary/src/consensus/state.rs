@@ -166,7 +166,7 @@ impl ConsensusState {
             .or_insert_with(|| certificate.round());
         self.last_round = self.last_round.update(certificate.round(), self.gc_depth);
 
-        self.metrics.last_committed_round.with_label_values(&[]).set(self.last_round.committed_round as i64);
+        self.metrics.last_committed_round.with_label_values(&[] as &[&str]).set(self.last_round.committed_round as i64);
         let elapsed = certificate.metadata().created_at.elapsed().as_secs_f64();
         self.metrics.certificate_commit_latency.observe(certificate.metadata().created_at.elapsed().as_secs_f64());
 
@@ -411,7 +411,7 @@ impl Consensus {
 
                     self.metrics
                         .consensus_dag_rounds
-                        .with_label_values(&[])
+                        .with_label_values(&[] as &[&str])
                         .set(self.state.dag.len() as i64);
                 },
 

@@ -91,7 +91,7 @@ tokio.workspace = true
 async-trait.workspace = true
 p256.workspace = true
 passkey-client.workspace = true
-passkey-authenticator.workspace = true
+passkey-authenticator= { workspace = true, features = ["testable"] }
 
 [[bench]]
 name = "accumulator_bench"

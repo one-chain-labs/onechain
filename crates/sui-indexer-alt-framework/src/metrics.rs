@@ -659,7 +659,7 @@ fn counter_with_labels(desc: &Desc, values: &[(&str, &str, f64)]) -> MetricFamil
         l.set_value(label.to_string());
 
         m.set_counter(c);
-        m.mut_label().push(l);
+        m.take_label().push(l);
         mf.mut_metric().push(m);
     }
 

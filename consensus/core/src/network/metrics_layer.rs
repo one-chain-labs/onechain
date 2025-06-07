@@ -84,7 +84,7 @@ impl MetricsResponseCallback {
     }
 
     pub(crate) fn on_error<E>(self, _error: &E) {
-        self.metrics.errors.with_label_values(&[&self.route, "unknown"]).inc();
+        self.metrics.errors.with_label_values(&[self.route.as_str(), "unknown"]).inc();
     }
 }
 

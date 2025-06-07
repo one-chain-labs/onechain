@@ -1021,7 +1021,7 @@ where
                                 debug!(?tx_digest, name=?concise_name, weight, "Error processing transaction from validator: {:?}", err);
                                 self.metrics
                                     .process_tx_errors
-                                    .with_label_values(&[&display_name, err.as_ref()])
+                                    .with_label_values(&[display_name.as_str(), err.as_ref()])
                                     .inc();
                                 Self::record_rpc_error_maybe(self.metrics.clone(), &display_name, &err);
                                 let (retryable, categorized) = err.is_retryable();
@@ -1113,7 +1113,7 @@ where
 
     fn record_rpc_error_maybe(metrics: Arc<AuthAggMetrics>, display_name: &String, error: &SuiError) {
         if let SuiError::RpcError(_message, code) = error {
-            metrics.total_rpc_err.with_label_values(&[display_name, code.as_str()]).inc();
+            metrics.total_rpc_err.with_label_values(&[display_name.as_str(), code.as_str()]).inc();
         }
     }
 
@@ -1489,7 +1489,7 @@ where
                             debug!(?tx_digest, name=?concise_name, "Error processing certificate from validator: {:?}", err);
                             metrics
                                 .process_cert_errors
-                                .with_label_values(&[&display_name, err.as_ref()])
+                                .with_label_values(&[display_name.as_str(), err.as_ref()])
                                 .inc();
                             Self::record_rpc_error_maybe(metrics, &display_name, &err);
                             let (retryable, categorized) = err.is_retryable();

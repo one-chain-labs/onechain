@@ -144,7 +144,7 @@ impl AncestorStateManager {
         authority_high_quorum_round: u32,
         network_high_quorum_round: u32,
     ) {
-        let block_hostname = &self.context.committee.authority(authority_id).hostname;
+        let block_hostname = self.context.committee.authority(authority_id).hostname.as_str();
         let mut ancestor_info = self.state_map[authority_id].clone();
 
         if ancestor_info.is_locked(self.propagation_score_update_count, self.quorum_round_update_count) {
@@ -237,7 +237,7 @@ impl AncestorStateManager {
     }
 
     /// Calculate the network's high quorum round.
-    /// The authority high quorum round is the lowest round higher or equal to rounds  
+    /// The authority high quorum round is the lowest round higher or equal to rounds
     /// from a quorum of authorities. The network high quorum round is using the high
     /// quorum round of each authority as reported by the [`RoundProber`] and then
     /// finding the high quroum round of those high quorum rounds.

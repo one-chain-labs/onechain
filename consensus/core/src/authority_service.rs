@@ -76,7 +76,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
     async fn handle_send_block(&self, peer: AuthorityIndex, serialized_block: Bytes) -> ConsensusResult<()> {
         fail_point_async!("consensus-rpc-response");
 
-        let peer_hostname = &self.context.committee.authority(peer).hostname;
+        let peer_hostname = self.context.committee.authority(peer).hostname.as_str();
 
         // TODO: dedup block verifications, here and with fetched blocks.
         let signed_block: SignedBlock = bcs::from_bytes(&serialized_block).map_err(ConsensusError::MalformedBlock)?;
@@ -93,7 +93,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             info!("Block with wrong authority from {}: {}", peer, e);
             return Err(e);
         }
-        let peer_hostname = &self.context.committee.authority(peer).hostname;
+        let peer_hostname = self.context.committee.authority(peer).hostname.as_str();
 
         // Reject blocks failing validations.
         if let Err(e) = self.block_verifier.verify(&signed_block) {

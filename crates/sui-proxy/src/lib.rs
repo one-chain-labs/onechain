@@ -39,7 +39,6 @@ mod tests {
     use crate::{admin::CertKeyPair, config::RemoteWriteConfig, peers::SuiNodeProvider};
     use axum::{http::StatusCode, routing::post, Router};
     use prometheus::{Encoder, PROTOBUF_FORMAT};
-    use protobuf::RepeatedField;
     use std::{net::TcpListener, time::Duration};
     use sui_tls::{ClientCertVerifier, TlsAcceptor};
 
@@ -144,15 +143,10 @@ mod tests {
             public_key: client_pub_key.to_owned(),
         });
 
-        let mf = create_metric_family(
-            "foo_metric",
-            "some help this is",
-            None,
-            RepeatedField::from_vec(vec![create_metric_counter(
-                RepeatedField::from_vec(create_labels(vec![("some", "label")])),
-                create_counter(2046.0),
-            )]),
-        );
+        let mf = create_metric_family("foo_metric", "some help this is", None, vec![create_metric_counter(
+            create_labels(vec![("some", "label")]),
+            create_counter(2046.0),
+        )]);
 
         let mut buf = vec![];
         let encoder = prometheus::ProtobufEncoder::new();
@@ -171,7 +165,7 @@ mod tests {
         assert_eq!(status, reqwest::StatusCode::CREATED);
     }
 
-    /// this is a long test to ensure we are timing out clients that are slow  
+    /// this is a long test to ensure we are timing out clients that are slow
     #[tokio::test]
     async fn test_client_timeout() {
         // generate self-signed certificates
@@ -240,15 +234,10 @@ mod tests {
             public_key: client_pub_key.to_owned(),
         });
 
-        let mf = create_metric_family(
-            "foo_metric",
-            "some help this is",
-            None,
-            RepeatedField::from_vec(vec![create_metric_counter(
-                RepeatedField::from_vec(create_labels(vec![("some", "label")])),
-                create_counter(2046.0),
-            )]),
-        );
+        let mf = create_metric_family("foo_metric", "some help this is", None, vec![create_metric_counter(
+            create_labels(vec![("some", "label")]),
+            create_counter(2046.0),
+        )]);
 
         let mut buf = vec![];
         let encoder = prometheus::ProtobufEncoder::new();

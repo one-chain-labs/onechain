@@ -510,13 +510,13 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         }
 
         let metrics = &context.metrics.node_metrics;
-        let peer_hostname = &context.committee.authority(peer_index).hostname;
+        let peer_hostname = context.committee.authority(peer_index).hostname.as_str();
         metrics
             .synchronizer_fetched_blocks_by_peer
             .with_label_values(&[peer_hostname, sync_method])
             .inc_by(blocks.len() as u64);
         for block in &blocks {
-            let block_hostname = &context.committee.authority(block.author()).hostname;
+            let block_hostname = context.committee.authority(block.author()).hostname.as_str();
             metrics.synchronizer_fetched_blocks_by_authority.with_label_values(&[block_hostname, sync_method]).inc();
         }
 
@@ -569,13 +569,13 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
             if let Err(e) = block_verifier.verify(&signed_block) {
                 // TODO: we might want to use a different metric to track the invalid "served" blocks
                 // from the invalid "proposed" ones.
-                let hostname = context.committee.authority(peer_index).hostname.clone();
+                let hostname = context.committee.authority(peer_index).hostname.as_str();
 
                 context
                     .metrics
                     .node_metrics
                     .invalid_blocks
-                    .with_label_values(&[&hostname, "synchronizer", e.clone().name()])
+                    .with_label_values(&[hostname, "synchronizer", e.clone().name()])
                     .inc();
                 warn!("Invalid block received from {}: {}", peer_index, e);
                 return Err(e);
@@ -671,12 +671,12 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
                                     for serialized_block in blocks {
                                         let signed_block = bcs::from_bytes(&serialized_block).map_err(ConsensusError::MalformedBlock)?;
                                         block_verifier.verify(&signed_block).tap_err(|err|{
-                                            let hostname = context.committee.authority(authority_index).hostname.clone();
+                                            let hostname = context.committee.authority(authority_index).hostname.as_str();
                                             context
                                                 .metrics
                                                 .node_metrics
                                                 .invalid_blocks
-                                                .with_label_values(&[&hostname, "synchronizer_own_block", err.clone().name()])
+                                                .with_label_values(&[hostname, "synchronizer_own_block", err.clone().name()])
                                                 .inc();
                                             warn!("Invalid block received from {}: {}", authority_index, err);
                                         })?;

@@ -831,17 +831,21 @@ impl ConsensusAdapter {
         // we want to record the num of retries when reporting latency but to avoid label
         // cardinality we do some simple bucketing to give us a good enough idea of how
         // many retries happened associated with the latency.
+        let retries_string;
         let bucket = match retries {
-            0..=10 => retries.to_string(), // just report the retry count as is
-            11..=20 => "between_10_and_20".to_string(),
-            21..=50 => "between_20_and_50".to_string(),
-            51..=100 => "between_50_and_100".to_string(),
-            _ => "over_100".to_string(),
+            0..=10 => {
+                retries_string = retries.to_string();
+                retries_string.as_str()
+            } // just report the retry count as is
+            11..=20 => "between_10_and_20",
+            21..=50 => "between_20_and_50",
+            51..=100 => "between_50_and_100",
+            _ => "over_100",
         };
 
         self.metrics
             .sequencing_acknowledge_latency
-            .with_label_values(&[&bucket, tx_type])
+            .with_label_values(&[bucket, tx_type])
             .observe(ack_start.elapsed().as_secs_f64());
 
         status_waiter
@@ -1072,7 +1076,7 @@ impl<'a> Drop for InflightDropGuard<'a> {
         self.adapter
             .metrics
             .sequencing_certificate_latency
-            .with_label_values(&[&position, self.tx_type, processed_method])
+            .with_label_values(&[position.as_str(), self.tx_type, processed_method])
             .observe(latency.as_secs_f64());
 
         // Only sample latency after consensus quorum is up. Otherwise, the wait for consensus

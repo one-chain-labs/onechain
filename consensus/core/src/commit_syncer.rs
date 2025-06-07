@@ -8,7 +8,7 @@
 //! network disruptions, host crash, or other reasons. Authorities fell behind need to catch up to
 //! the quorum to be able to vote on the latest leaders. So efficient synchronization is necessary
 //! to minimize the impact of temporary disruptions and maintain smooth operations of the network.
-//!  
+//!
 //! CommitSyncer achieves efficient synchronization by relying on the following: when blocks
 //! are included in commits with >= 2f+1 certifiers by stake, these blocks must have passed
 //! verifications on some honest validators, so re-verifying them is unnecessary. In fact, the
@@ -375,25 +375,25 @@ impl<C: NetworkClient> CommitSyncer<C> {
                         return (commit_range.end(), commits, blocks);
                     }
                     Ok(Err(e)) => {
-                        let hostname = inner.context.committee.authority(authority).hostname.clone();
+                        let hostname = inner.context.committee.authority(authority).hostname.as_str();
                         warn!("Failed to fetch {commit_range:?} from {hostname}: {}", e);
                         inner
                             .context
                             .metrics
                             .node_metrics
                             .commit_sync_fetch_once_errors
-                            .with_label_values(&[&hostname, e.name()])
+                            .with_label_values(&[hostname, e.name()])
                             .inc();
                     }
                     Err(_) => {
-                        let hostname = inner.context.committee.authority(authority).hostname.clone();
+                        let hostname = inner.context.committee.authority(authority).hostname.as_str();
                         warn!("Timed out fetching {commit_range:?} from {authority}",);
                         inner
                             .context
                             .metrics
                             .node_metrics
                             .commit_sync_fetch_once_errors
-                            .with_label_values(&[&hostname, "FetchTimeout"])
+                            .with_label_values(&[hostname, "FetchTimeout"])
                             .inc();
                     }
                 }
@@ -491,7 +491,7 @@ impl<C: NetworkClient> CommitSyncer<C> {
             if forward_drift == 0 {
                 continue;
             };
-            let peer_hostname = &inner.context.committee.authority(target_authority).hostname;
+            let peer_hostname = inner.context.committee.authority(target_authority).hostname.as_str();
             inner
                 .context
                 .metrics

@@ -104,20 +104,17 @@ pub struct SafeClientMetrics {
 impl SafeClientMetrics {
     pub fn new(metrics_base: &SafeClientMetricsBase, validator_address: AuthorityName) -> Self {
         let validator_address = validator_address.to_string();
+        let va = validator_address.as_str();
 
-        let total_requests_handle_transaction_info_request = metrics_base
-            .total_requests_by_address_method
-            .with_label_values(&[&validator_address, "handle_transaction_info_request"]);
-        let total_ok_responses_handle_transaction_info_request = metrics_base
-            .total_responses_by_address_method
-            .with_label_values(&[&validator_address, "handle_transaction_info_request"]);
+        let total_requests_handle_transaction_info_request =
+            metrics_base.total_requests_by_address_method.with_label_values(&[va, "handle_transaction_info_request"]);
+        let total_ok_responses_handle_transaction_info_request =
+            metrics_base.total_responses_by_address_method.with_label_values(&[va, "handle_transaction_info_request"]);
 
-        let total_requests_handle_object_info_request = metrics_base
-            .total_requests_by_address_method
-            .with_label_values(&[&validator_address, "handle_object_info_request"]);
-        let total_ok_responses_handle_object_info_request = metrics_base
-            .total_responses_by_address_method
-            .with_label_values(&[&validator_address, "handle_object_info_request"]);
+        let total_requests_handle_object_info_request =
+            metrics_base.total_requests_by_address_method.with_label_values(&[va, "handle_object_info_request"]);
+        let total_ok_responses_handle_object_info_request =
+            metrics_base.total_responses_by_address_method.with_label_values(&[va, "handle_object_info_request"]);
 
         let handle_transaction_latency = metrics_base.latency.with_label_values(&["handle_transaction"]);
         let handle_certificate_latency = metrics_base.latency.with_label_values(&["handle_certificate"]);
