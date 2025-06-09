@@ -9,7 +9,7 @@ use std::{fs::create_dir_all, io::Write, path::Path};
 const SUI_PKG_NAME: &str = "One";
 
 // Use testnet by default. Probably want to add options to make this configurable later
-const SUI_PKG_PATH: &str = "{ git = \"https://github.com/one-chain-labs/onechain.git\", subdir = \"crates/sui-framework/packages/sui-framework\", rev = \"main\" }";
+const SUI_PKG_PATH: &str = "{ git = \"https://github.com/one-chain-labs/onechain.git\", subdir = \"crates/sui-framework/packages/one-framework\", rev = \"main\" }";
 
 #[derive(Parser)]
 #[group(id = "sui-move-new")]
