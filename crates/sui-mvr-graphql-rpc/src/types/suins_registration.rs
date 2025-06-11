@@ -38,8 +38,8 @@ use sui_indexer::models::objects::StoredHistoryObject;
 use sui_json_rpc::name_service::{Domain as NativeDomain, NameRecord, NameServiceConfig, NameServiceError};
 use sui_types::{base_types::SuiAddress as NativeSuiAddress, dynamic_field::Field, id::UID};
 
-const MOD_REGISTRATION: &IdentStr = ident_str!("suins_registration");
-const TYP_REGISTRATION: &IdentStr = ident_str!("SuinsRegistration");
+const MOD_REGISTRATION: &IdentStr = ident_str!("onens_registration");
+const TYP_REGISTRATION: &IdentStr = ident_str!("OnensRegistration");
 
 /// Represents the "core" of the name service (e.g. the on-chain registry and reverse registry). It
 /// doesn't contain any fields because we look them up based on the `NameServiceConfig`.
