@@ -138,10 +138,10 @@ impl NameServiceConfig {
 
     // Create a config based on the package and object ids published on mainnet
     pub fn mainnet() -> Self {
-        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0x55e5d42181bff5db6587c0fa0268e8e79c948d3960e729baa02785a9f7008725";
-        const MAINNET_NS_REGISTRY_ID: &str = "0xc1f3b47886471363d3a5ef352bf00db53269a1f9fe5a8211b87614da5af9ec21";
+        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0xb518b15510de80320a046288ca391a2a06b8aa4ca979287549edc123dbe8313f";
+        const MAINNET_NS_REGISTRY_ID: &str = "0x7bd439c354340ced161f29bbd9ee8c4799402fb83ec43eec0277a356e68878cf";
         const MAINNET_NS_REVERSE_REGISTRY_ID: &str =
-            "0x83b34ff1aeb4a11a983133625479abdec2820e2cbeafe11b8b817944a223586d";
+            "0x3040c34cff1bc755e9a58a0b14973648757cbed4826ff2cd8a20df292f3547b7";
 
         let package_address = SuiAddress::from_str(MAINNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(MAINNET_NS_REGISTRY_ID).unwrap();
