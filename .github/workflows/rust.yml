@@ -146,7 +146,7 @@ jobs:
         run: |
           cargo doc --workspace --no-deps
       - name: Install cargo-hakari, and cache the binary
-        uses: baptiste0928/cargo-install@1cd874a5478fdca35d868ccc74640c5aabbb8f1b # pin@v3.0.0
+        uses: baptiste0928/cargo-install@e38323ef017552d7f7af73a3f4db467f278310ed # pin@v3.3.1
         with:
           crate: cargo-hakari
           locked: true
@@ -156,7 +156,7 @@ jobs:
         run: |
           ./scripts/execution_layer.py generate-lib
       - name: Install diesel CLI, and cache the binary
-        uses: baptiste0928/cargo-install@1cd874a5478fdca35d868ccc74640c5aabbb8f1b # pin@v3.0.0
+        uses: baptiste0928/cargo-install@e38323ef017552d7f7af73a3f4db467f278310ed # pin@v3.3.1
         with:
           crate: diesel_cli
           locked: true
@@ -391,7 +391,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.sui_repo_ref || github.ref }}
       - name: Install cargo-hakari, and cache the binary
-        uses: baptiste0928/cargo-install@1cd874a5478fdca35d868ccc74640c5aabbb8f1b # pin@v3.0.0
+        uses: baptiste0928/cargo-install@e38323ef017552d7f7af73a3f4db467f278310ed # pin@v3.3.1
         with:
           crate: cargo-hakari
           locked: true
