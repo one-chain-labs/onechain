@@ -228,10 +228,10 @@ Visit the official [PostgreSQL website](https://wiki.postgresql.org/wiki/Main_Pa
 Once you have installed all the prerequisites, you can build OneChain binaries. The simplest and direct way to build OneChain binaries is to use the `cargo` command.
 
 ```sh
-cargo install --locked --git https://github.com/one-chain-labs/onechain.git one_chain  --features tracing
+cargo install --locked --git https://github.com/one-chain-labs/onechain.git one  --features tracing
 ```
 
-and then you can get the OneChain binary installed in `$HOME/.cargo/bin/one_chain`, you can move it to any directory you want, make sure the directory is in your PATH.
+and then you can get the OneChain binary installed in `$HOME/.cargo/bin/one`, you can move it to any directory you want, make sure the directory is in your PATH.
 
 If you want to run a node version of OneChain, you can use the following command to build it:
 
@@ -260,10 +260,10 @@ You can [request test OCT tokens](#request-test-tokens) through the OneChain [de
 To connect the OneChain client to a network, run the following command:
 
 ```sh
-one_chain client
+one client
 ```
 
-If you receive the `one_chain-client` help output in the console, you already have a client.yaml file. See [Connect to a custom RPC endpoint](#connect-to-a-custom-rpc-endpoint) to add a new environment alias or to switch the currently active network.
+If you receive the `one client` help output in the console, you already have a client.yaml file. See [Connect to a custom RPC endpoint](#connect-to-a-custom-rpc-endpoint) to add a new environment alias or to switch the currently active network.
 
 The first time you start OneChain client without having a client.yaml file, the console displays the following message:
 
@@ -301,12 +301,12 @@ Secret Recovery Phrase : [cap wheat many line human lazy few solid bored proud s
 
 ##### Connect to a custom RPC endpoint {/* {#connect-to-a-custom-rpc-endpoint} */}
 
-If you previously installed a OneChain client that connected to a OneChain network, or created a local network, you can modify your existing client.yaml file to change the configured RPC endpoint. The `one_chain client` commands that relate to environments read from and write to the client.yaml file.
+If you previously installed a OneChain client that connected to a OneChain network, or created a local network, you can modify your existing client.yaml file to change the configured RPC endpoint. The `one client` commands that relate to environments read from and write to the client.yaml file.
 
 To check currently available environment aliases, run the following command:
 
 ```sh
-$ one_chain client envs
+$ one client envs
 ```
 
 The command outputs the available environment aliases, with `(active)` denoting the currently active network.
@@ -322,13 +322,13 @@ The command outputs the available environment aliases, with `(active)` denoting 
 To add a new alias for a custom RPC endpoint, run the following command. Replace values in `<` `>` with values for your installation:
 
 ```sh
-$ one_chain client new-env --alias <ALIAS> --rpc <RPC-SERVER-URL>
+$ one client new-env --alias <ALIAS> --rpc <RPC-SERVER-URL>
 ```
 
 To switch the active network, run the following command:
 
 ```sh
-$ one_chain client switch --env <ALIAS>
+$ one client switch --env <ALIAS>
 ```
 
 If you encounter an issue, delete the OneChain configuration directory (`~/.one/one_config`) and reinstall the latest binaries and then retry.
@@ -347,13 +347,13 @@ One of the most straightforward ways to obtain a OneChain address for first-time
 
 #### Command line interface {/* {#command-line-interface} */}
 
-If you are using the OneChain command line interface (CLI) to interact with the OneChain network, you can use the `one_chain client` command to generate a new address. By default, when the OneChain CLI runs for the first time it will prompt you to set up your local wallet, and then it generates one OneChain address and the associated secret recovery phrase. Make sure you write down the secret recovery phrase and store it in a safe place.
+If you are using the OneChain command line interface (CLI) to interact with the OneChain network, you can use the `one client` command to generate a new address. By default, when the OneChain CLI runs for the first time it will prompt you to set up your local wallet, and then it generates one OneChain address and the associated secret recovery phrase. Make sure you write down the secret recovery phrase and store it in a safe place.
 
-To generate a new OneChain address use `one_chain client new-address ed25519`, which specifies the keypair scheme flag to be of type `ed25519`.
+To generate a new OneChain address use `one client new-address ed25519`, which specifies the keypair scheme flag to be of type `ed25519`.
 
 For more information, see the [OneChain Client CLI](../../../references/cli/client.mdx) documentation.
 
-To see all the generated addresses in the local wallet on your machine, run `one_chain keytool list`. For more information about the keytool options, see the [OneChain Keytool CLI](../../../references/cli/keytool.mdx) documentation.
+To see all the generated addresses in the local wallet on your machine, run `one keytool list`. For more information about the keytool options, see the [OneChain Keytool CLI](../../../references/cli/keytool.mdx) documentation.
 
 :::danger
 
@@ -367,7 +367,7 @@ To request test tokens, you can use the OneChain faucet. The faucet is a service
 
 #### through CLI {/* {#through-cli} */}
 
-If you are using the Devnet or Testnet networks, you can use the [OneChain CLI](../../../references/cli/client.mdx) to request tokens for your address. The `one_chain client faucet` uses the active network and active address that is currently set in the OneChain CLI by default, but you can specify custom data through the following two arguments:
+If you are using the Devnet or Testnet networks, you can use the [OneChain CLI](../../../references/cli/client.mdx) to request tokens for your address. The `one client faucet` uses the active network and active address that is currently set in the OneChain CLI by default, but you can specify custom data through the following two arguments:
 
 - `--address` argument to provide a specific address (or its alias),
 - `--url` argument to provide a custom faucet endpoint.
@@ -396,10 +396,10 @@ You use the `move` OneChain CLI command for some instructions.
 
 ### Write a Move Package {/* {#write-a-move-package} */}
 
-To begin, open a terminal or console at the location you plan to store your package. Use the `one_chain move new` command to create an empty Move package with the name `my_first_package`:
+To begin, open a terminal or console at the location you plan to store your package. Use the `one move new` command to create an empty Move package with the name `my_first_package`:
 
 ```sh
-$ one_chain move new my_first_package
+$ one move new my_first_package
 ```
 
 Running the previous command creates a directory with the name you provide (`my_first_package` in this case). The command populates the new directory with a skeleton Move project that consists of a `sources` directory and a `Move.toml` manifest file. Open the manifest with a text editor to review its contents:
@@ -412,7 +412,7 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 # authors = ["..."]			# e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
 [dependencies]
-One = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "main" }
+One = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/one-framework", rev = "main" }
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
@@ -445,15 +445,15 @@ my_first_package = "0x0"
 
 The manifest file contents include available sections of the manifest and comments that provide additional information. In Move, you prepend the hash mark (`#`) to a line to denote a comment.
 
-- **[package]:** Contains metadata for the package. By default, the `one_chain move new` command populates only the `name` value of the metadata. In this case, the example passes `my_first_package` to the command, which becomes the name of the package. You can delete the first `#` of subsequent lines of the `[package]` section to provide values for the other available metadata fields.
-- **[dependencies]:** Lists the other packages that your package depends on to run. By default, the `one_chain move new` command lists the `One` package on GitHub as the lone dependency.
-- **[addresses]:** Declares named addresses that your package uses. By default, the section includes the package you create with the `one_chain move new` command and an address of `0x0`. This value can be left as-is and indicates that [package addresses are automatically managed](../../../../concepts/sui-move-concepts/packages/automated-address-management) when published and upgraded.
+- **[package]:** Contains metadata for the package. By default, the `one move new` command populates only the `name` value of the metadata. In this case, the example passes `my_first_package` to the command, which becomes the name of the package. You can delete the first `#` of subsequent lines of the `[package]` section to provide values for the other available metadata fields.
+- **[dependencies]:** Lists the other packages that your package depends on to run. By default, the `one move new` command lists the `One` package on GitHub as the lone dependency.
+- **[addresses]:** Declares named addresses that your package uses. By default, the section includes the package you create with the `one move new` command and an address of `0x0`. This value can be left as-is and indicates that [package addresses are automatically managed](../../../../concepts/sui-move-concepts/packages/automated-address-management) when published and upgraded.
 - **[dev-dependencies]:** Includes only comments that describe the section.
 - **[dev-addresses]:** Includes only comments that describe the section.
 
 #### Defining the package {/* {#defining-the-package} */}
 
-You have a package now but it doesn't do anything. To make your package useful, you must add logic contained in `.move` source files that define _modules_. The `one_chain move new` command creates a .move file in the `sources` directory that defaults to the same name as your project (`my_first_package.move` in this case). For the purpose of this guide, rename the file to `example.move` and open it with a text editor.
+You have a package now but it doesn't do anything. To make your package useful, you must add logic contained in `.move` source files that define _modules_. The `one move new` command creates a .move file in the `sources` directory that defaults to the same name as your project (`my_first_package.move` in this case). For the purpose of this guide, rename the file to `example.move` and open it with a text editor.
 
 Populate the `example.move` file with the following code:
 
@@ -525,7 +525,7 @@ After you save the file, you have a complete Move package.
 Make sure your terminal or console is in the directory that contains your package (`my_first_package` if you're following along). Use the following command to build your package:
 
 ```sh
-$ one_chain move build
+$ one move build
 ```
 
 A successful build returns a response similar to the following:
@@ -545,10 +545,10 @@ Now that you have designed your asset and its accessor functions, it's time to t
 
 OneChain includes support for the Move testing framework. Using the framework, you can write unit tests that analyze Move code much like test frameworks for other languages, such as the built-in Rust testing framework or the JUnit framework for Java.
 
-An individual Move unit test is encapsulated in a public function that has no parameters, no return values, and has the `#[test]` annotation. The testing framework executes such functions when you call the `one_chain move test` command from the package root (`my_move_package` directory as per the current running example):
+An individual Move unit test is encapsulated in a public function that has no parameters, no return values, and has the `#[test]` annotation. The testing framework executes such functions when you call the `one move test` command from the package root (`my_move_package` directory as per the current running example):
 
 ```sh
-$ one_chain move test
+$ one move test
 ```
 
 If you execute this command for the package created in [Write a Package](./write-package.mdx), you see the following output. Unsurprisingly, the test result has an `OK` status because there are no tests written yet to fail.
@@ -589,7 +589,7 @@ The function passes the dummy context, `ctx`, to the `object::new` function as a
 Now that you have a test function, run the test command again:
 
 ```sh
-$ one_chain move test
+$ one move test
 ```
 
 After running the `test` command, however, you get a compilation error instead of a test result:
@@ -640,14 +640,14 @@ Test result: OK. Total tests: 1; passed: 1; failed: 0
 
 :::tip
 
-Use a filter string to run only a matching subset of the unit tests. With a filter string provided, the `one_chain move test` checks the fully qualified (`<address>::<module_name>::<fn_name>`) name for a match.
+Use a filter string to run only a matching subset of the unit tests. With a filter string provided, the `one move test` checks the fully qualified (`<address>::<module_name>::<fn_name>`) name for a match.
 
 :::
 
 Example:
 
 ```sh
-$ one_chain move test sword
+$ one move test sword
 ```
 
 The previous command runs all tests whose name contains `sword`.
@@ -655,7 +655,7 @@ The previous command runs all tests whose name contains `sword`.
 You can discover more testing options through:
 
 ```sh
-$ one_chain move test -h
+$ one move test -h
 ```
 
 #### Sui-specific testing {/* {#sui-specific-testing} */}
@@ -687,7 +687,7 @@ With the new function included, add another test function to make sure it behave
 ```move
 #[test]
 fun test_sword_transactions() {
-    use sui::test_scenario;
+    use one::test_scenario;
 
     // Create test addresses representing users
     let initial_owner = @0xCAFE;
@@ -767,7 +767,7 @@ For example, the following `init` functions are all valid:
 - `fun init(otw: EXAMPLE, ctx: &TxContext)`
 - `fun init(otw: EXAMPLE, ctx: &mut TxContext)`
 
-While the `one_chain move` command does not support publishing explicitly, you can still test module initializers using the testing framework by dedicating the first transaction to executing the initializer function.
+While the `one move` command does not support publishing explicitly, you can still test module initializers using the testing framework by dedicating the first transaction to executing the initializer function.
 
 The `init` function for the module in the running example creates a `Forge` object.
 
@@ -782,7 +782,7 @@ fun init(ctx: &mut TxContext) {
 }
 ```
 
-The tests you have so far call the `init` function, but the initializer function itself isn't tested to ensure it properly creates a `Forge` object. To test this functionality, add a `new_sword` function to take the forge as a parameter and to update the number of created swords at the end of the function. If this were an actual module, you'd replace the `sword_create` function with `new_sword`. To keep the existing tests from failing, however, we will keep both functions.
+The tests you have so far call the `init` function, but the initializer function itself isn't tested to ensure it properly creates a `Forge` object. To test this functionality, add a `new_sword` function to take the forge as a parameter and to update the number of created swords at the end of the function. If this were an actual module, you'd replace the `swords_create` function with `new_sword`. To keep the existing tests from failing, however, we will keep both functions.
 
 ```move
 public fun new_sword(forge: &mut Forge, magic: u64, strength: u64, ctx: &mut TxContext): Sword {
@@ -800,7 +800,7 @@ Now, create a function to test the module initialization:
 ```move
 #[test]
 fun test_module_init() {
-    use sui::test_scenario;
+    use one::test_scenario;
 
     // Create test addresses representing users
     let admin = @0xAD;
@@ -926,7 +926,7 @@ fun test_sword_create() {
 
 #[test]
 fun test_sword_transactions() {
-		use sui::test_scenario;
+		use one::test_scenario;
 
 		// Create test addresses representing users
 		let initial_owner = @0xCAFE;
@@ -964,7 +964,7 @@ fun test_sword_transactions() {
 
 #[test]
 fun test_module_init() {
-		use sui::test_scenario;
+		use one::test_scenario;
 
 		// Create test addresses representing users
 		let admin = @0xAD;
@@ -1008,7 +1008,7 @@ Before you can call functions in a Move package (beyond an emulated OneChain exe
 To publish your package to the OneChain network, use the `publish` CLI command in the root of your package. You can use the `--gas-budget` flag to set a value for the maximum amount of gas the transaction can cost. If the cost of the transaction is more than the budget you set, the transaction fails and your package doesn't publish, but it's not necessary.
 
 ```sh
-$ one_chain client publish --gas-budget 5000000
+$ one client publish --gas-budget 5000000
 ```
 
 If the publish transaction is successful, your terminal or console responds with the details of the publish transaction separated into sections, including transaction data, transaction effects, transaction block events, object changes, and balance changes.
@@ -1038,14 +1038,14 @@ In the **Object Changes** table, you can find the information about the package 
 Your currently active address now has three objects (or more, if you had objects prior to this example). Assuming you are using a new address, running the `objects` command reveals what those objects are.
 
 ```
-$ one_chain client objects
+$ one client objects
 
 ╭───────────────────────────────────────────────────────────────────────────────────────╮
 │ ╭────────────┬──────────────────────────────────────────────────────────────────────╮ │
 │ │ objectId   │  <OBJECT-ID>                                                         │ │
 │ │ version    │  10                                                                  │ │
 │ │ digest     │  <DIGEST-HASH>                                                       │ │
-│ │ objectType │  <PACKAGE-ID>::my_module::Forge                                      │ │
+│ │ objectType │  <PACKAGE-ID>::example::Forge                                      │ │
 │ ╰────────────┴──────────────────────────────────────────────────────────────────────╯ │
 │ ╭────────────┬──────────────────────────────────────────────────────────────────────╮ │
 │ │ objectId   │  <OBJECT-ID>                                                         │ │
@@ -1081,13 +1081,13 @@ flowchart TB
 
 #### Interact with the package {/* {#interact-with-the-package} */}
 
-Now that the package is on chain, you can call its functions to interact with the package. You can use the `one_chain client call` command to make individual calls to package functions, or you can construct more advanced blocks of transactions using the `one_chain client ptb` command. The `ptb` part of the command stands for [programmable transaction blocks](../../../concepts/transactions/prog-txn-blocks.mdx). In basic terms, PTBs allow you to group commands together in a single transaction for more efficient and cost-effective network activity.
+Now that the package is on chain, you can call its functions to interact with the package. You can use the `one client call` command to make individual calls to package functions, or you can construct more advanced blocks of transactions using the `one client ptb` command. The `ptb` part of the command stands for [programmable transaction blocks](../../../concepts/transactions/prog-txn-blocks.mdx). In basic terms, PTBs allow you to group commands together in a single transaction for more efficient and cost-effective network activity.
 
 ```mermaid
 flowchart TB
-    my_module["my_module::new_sword(&Forge, strength, magic)"]
+    my_module["example::new_sword(&Forge, strength, magic)"]
 
-    one_client["one_chain client"]
+    one_client["one client"]
 
     subgraph OneChain Blockchain
 	my_module
@@ -1100,10 +1100,10 @@ flowchart TB
 For example, you can create a new `Sword` object defined in the package by calling the `new_sword` function in the `my_module` package, and then transfer the `Sword` object to any address:
 
 ```sh
-$ one_chain client ptb \
+$ one client ptb \
 	--assign forge @<FORGE-ID> \
 	--assign to_address @<TO-ADDRESS> \
-	--move-call <PACKAGE-ID>::my_module::new_sword forge 3 3 \
+	--move-call <PACKAGE-ID>::example::new_sword forge 3 3 \
 	--assign sword \
 	--transfer-objects "[sword]" to_address \
 	--gas-budget 20000000
@@ -1120,7 +1120,7 @@ Depending on your shell and operating system, you might need to pass some values
 
 Make sure to replace `<FORGE-ID>`, `<TO-ADDRESS>`, and `<PACKAGE-ID>` with the actual `objectId` of the `Forge` object, the address of the recipient (your address in this case), and the `packageID` of the package, respectively.
 
-After the transaction executes, you can check the status of the `Sword` object by using the `one_chain client objects` command again. Provided you used your address as the `<TO-ADDRESS>`, you should now see a total of four objects:
+After the transaction executes, you can check the status of the `Sword` object by using the `one client objects` command again. Provided you used your address as the `<TO-ADDRESS>`, you should now see a total of four objects:
 
 ```
 ╭───────────────────────────────────────────────────────────────────────────────────────╮
@@ -1128,7 +1128,7 @@ After the transaction executes, you can check the status of the `Sword` object b
 │ │ objectId   │  <OBJECT-ID>                                                         │ │
 │ │ version    │  11                                                                  │ │
 │ │ digest     │  <DIGEST-HASH>                                                       │ │
-│ │ objectType │  <PACKAGE-ID>::my_module::Forge                                      │ │
+│ │ objectType │  <PACKAGE-ID>::example::Forge                                      │ │
 │ ╰────────────┴──────────────────────────────────────────────────────────────────────╯ │
 │ ╭────────────┬──────────────────────────────────────────────────────────────────────╮ │
 │ │ objectId   │  <OBJECT-ID>                                                         │ │
@@ -1140,7 +1140,7 @@ After the transaction executes, you can check the status of the `Sword` object b
 │ │ objectId   │  <OBJECT-ID>                                                         │ │
 │ │ version    │  11                                                                  │ │
 │ │ digest     │  <DIGEST-HASH>                                                       │ │
-│ │ objectType │  <PACKAGE-ID>::my_module::Sword                                      │ │
+│ │ objectType │  <PACKAGE-ID>::example::Sword                                      │ │
 │ ╰────────────┴──────────────────────────────────────────────────────────────────────╯ │
 │ ╭────────────┬──────────────────────────────────────────────────────────────────────╮ │
 │ │ objectId   │  <OBJECT-ID>                                                         │ │
@@ -1207,7 +1207,7 @@ public fun new_sword(
 To see the results, run the module's tests.
 
 ```sh
-$ one_chain move test
+$ one move test
 ```
 
 The response prints out the expected results as the test calls the `new_sword` function.
@@ -1217,8 +1217,8 @@ INCLUDING DEPENDENCY One
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING my_first_package
 Running Move unit tests
-[ PASS    ] 0x0::my_module::test_module_init
-[debug] 0x0::my_module::Forge {
+[ PASS    ] 0x0::example::test_module_init
+[debug] 0x0::example::Forge {
   id: 0x2::object::UID {
     id: 0x2::object::ID {
       bytes: @0x34401905bebdf8c04f3cd5f04f442a39372c8dc321c29edfb4f9cb30b23ab96
@@ -1226,7 +1226,7 @@ Running Move unit tests
   },
   swords_created: 0
 }
-[debug] 0x0::my_module::Forge {
+[debug] 0x0::example::Forge {
   id: 0x2::object::UID {
     id: 0x2::object::ID {
       bytes: @0x34401905bebdf8c04f3cd5f04f442a39372c8dc321c29edfb4f9cb30b23ab96
@@ -1235,7 +1235,7 @@ Running Move unit tests
   swords_created: 1
 }
 Call Stack:
-    [0] 0000000000000000000000000000000000000000000000000000000000000000::my_module::test_module_init
+    [0] 0000000000000000000000000000000000000000000000000000000000000000::example::test_module_init
 
         Code:
             [35] LdU64(7)
@@ -1255,7 +1255,7 @@ Call Stack:
 
 Operand Stack:
 
-[ PASS    ] 0x0::my_module::test_sword_transactions
+[ PASS    ] 0x0::example::test_sword_transactions
 Test result: OK. Total tests: 2; passed: 2; failed: 0
 ```
 
@@ -1353,7 +1353,7 @@ module escrow::lock {
     // === Tests ===
     #[test_only] use sui::coin::{Self, Coin};
     #[test_only] use sui::oct::OCT;
-    #[test_only] use sui::test_scenario::{Self as ts, Scenario};
+    #[test_only] use one::test_scenario::{Self as ts, Scenario};
 
     #[test_only]
     fun test_coin(ts: &mut Scenario): Coin<OCT> {
@@ -1559,7 +1559,7 @@ use sui::coin::{Self, Coin};
 #[test_only]
 use sui::oct::OCT;
 #[test_only]
-use sui::test_scenario::{Self as ts, Scenario};
+use one::test_scenario::{Self as ts, Scenario};
 
 #[test_only]
 use escrow::lock;
@@ -2148,7 +2148,7 @@ use sui::coin::{Self, Coin};
 #[test_only]
 use sui::oct::OCT;
 #[test_only]
-use sui::test_scenario::{Self as ts, Scenario};
+use one::test_scenario::{Self as ts, Scenario};
 
 #[test_only]
 use escrow::lock;
@@ -2778,7 +2778,7 @@ use sui::{clock::Clock, event};
 A call to the previous entry function takes the following form, passing `0x6` as the address for the `Clock` parameter:
 
 ```sh
-$ one_chain client call --package <EXAMPLE> --module 'clock' --function 'access' --args '0x6' --gas-budget <GAS-AMOUNT>
+$ one client call --package <EXAMPLE> --module 'clock' --function 'access' --args '0x6' --gas-budget <GAS-AMOUNT>
 ```
 
 Expect the `Clock` timestamp to change at the rate the network generates checkpoints, which is about **every 1/4 second** with Mysticeti consensus. Find the current network checkpoint rate on this [public dashboard](https://metrics.sui.io/public-dashboards/4ceb11cc210d4025b122294586961169).
@@ -3016,27 +3016,27 @@ Finally, submit the transaction with the signature.
         .await?;
 ```
 
-When using the [OneChain CLI](/references/cli.mdx) for the first time, it creates a local file in `~/.one/keystore` on your machine with a list of private keys (encoded as Base64 encoded `flag || 32-byte-private-key`). You can use any key to sign transactions by specifying its address. Use `one_chain keytool list` to see a list of addresses.
+When using the [OneChain CLI](/references/cli.mdx) for the first time, it creates a local file in `~/.one/keystore` on your machine with a list of private keys (encoded as Base64 encoded `flag || 32-byte-private-key`). You can use any key to sign transactions by specifying its address. Use `one keytool list` to see a list of addresses.
 
 There are three ways to initialize a key:
 
 ```sh
 # generate randomly.
-one_chain client new-address ed25519
-one_chain client new-address secp256k1
-one_chain client new-address secp256r1
+one client new-address ed25519
+one client new-address secp256k1
+one client new-address secp256r1
 
 # import the 32-byte private key to keystore.
-one_chain keytool import "0xd463e11c7915945e86ac2b72d88b8190cfad8ff7b48e7eb892c275a5cf0a3e82" ed25519
-one_chain keytool import "0xd463e11c7915945e86ac2b72d88b8190cfad8ff7b48e7eb892c275a5cf0a3e82" secp256k1
-one_chain keytool import "0xd463e11c7915945e86ac2b72d88b8190cfad8ff7b48e7eb892c275a5cf0a3e82" secp256r1
+one keytool import "0xd463e11c7915945e86ac2b72d88b8190cfad8ff7b48e7eb892c275a5cf0a3e82" ed25519
+one keytool import "0xd463e11c7915945e86ac2b72d88b8190cfad8ff7b48e7eb892c275a5cf0a3e82" secp256k1
+one keytool import "0xd463e11c7915945e86ac2b72d88b8190cfad8ff7b48e7eb892c275a5cf0a3e82" secp256r1
 
 # import the mnemonics (recovery phrase) with derivation path to keystore.
 # $MNEMONICS refers to 12/15/18/21/24 words from the wordlist, e.g. "retire skin goose will hurry this field stadium drastic label husband venture cruel toe wire". Refer to [Keys and Addresses](/concepts/cryptography/transaction-auth/keys-addresses.mdx) for more.
 
-one_chain keytool import "$MNEMONICS" ed25519
-one_chain keytool import "$MNEMONICS" secp256k1
-one_chain keytool import "$MNEMONICS" secp256r1
+one keytool import "$MNEMONICS" ed25519
+one keytool import "$MNEMONICS" secp256k1
+one keytool import "$MNEMONICS" secp256r1
 ```
 
 Create a transfer transaction in the CLI. Set the `$ONE_ADDRESS` to the one corresponding to the keypair used to sign. `$GAS_COIN_ID` refers to the object ID that is owned by the sender to be used as gas. `$GAS_BUDGET` refers to the budget used to execute transaction. Then sign with the private key corresponding to the sender address. `$MNEMONICS` refers to 12/15/18/21/24 words from the wordlist, e.g. "retire skin goose will hurry this field stadium drastic label husband venture cruel toe wire". Refer to [Keys and Addresses](/concepts/cryptography/transaction-auth/keys-addresses.mdx) for more.
@@ -3044,16 +3044,16 @@ Create a transfer transaction in the CLI. Set the `$ONE_ADDRESS` to the one corr
 
 
 ```sh
-$ one_chain client gas
+$ one client gas
 ```
 ```sh
-$ one_chain client transfer-oct --to $ONE_ADDRESS --coin-object-id $GAS_COIN_ID --gas-budget $GAS_BUDGET --serialize-unsigned-transaction
+$ one client transfer-oct --to $ONE_ADDRESS --coin-object-id $GAS_COIN_ID --gas-budget $GAS_BUDGET --serialize-unsigned-transaction
 ```
 ```sh
-$ one_chain keytool sign --address $ONE_ADDRESS --data $TX_BYTES
+$ one keytool sign --address $ONE_ADDRESS --data $TX_BYTES
 ```
 ```sh
-$ one_chain client execute-signed-tx --tx-bytes $TX_BYTES --signatures $SERIALIZED_SIGNATURE
+$ one client execute-signed-tx --tx-bytes $TX_BYTES --signatures $SERIALIZED_SIGNATURE
 ```
 
 ##### Notes {/* {#notes} */}
