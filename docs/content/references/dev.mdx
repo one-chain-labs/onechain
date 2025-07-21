@@ -228,7 +228,9 @@ Visit the official [PostgreSQL website](https://wiki.postgresql.org/wiki/Main_Pa
 Once you have installed all the prerequisites, you can build OneChain binaries. The simplest and direct way to build OneChain binaries is to use the `cargo` command.
 
 ```sh
-cargo install --locked --git https://github.com/one-chain-labs/onechain.git one  --features tracing
+cargo install --locked --git https://github.com/one-chain-labs/onechain.git one_chain  --features tracing
+
+mv ~/.cargo/bin/one_chain ~/.cargo/bin/one
 ```
 
 and then you can get the OneChain binary installed in `$HOME/.cargo/bin/one`, you can move it to any directory you want, make sure the directory is in your PATH.
