@@ -12,7 +12,7 @@ jobs:
       isGraphQlTransport: ${{ (steps.turbo.outputs.packages && contains(fromJson(steps.turbo.outputs.packages), '@mysten/graphql-transport')) }}
       isRust: ${{ steps.diff.outputs.isRust }}
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # Pin v4.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # Pin v5.0.0
       - name: Detect Changes (turbo)
         uses: './.github/actions/turbo-diffs'
         id: turbo
@@ -42,7 +42,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # Pin v4.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # Pin v5.0.0
       - uses: Swatinem/rust-cache@v2
         with:
           cache-all-crates: true
@@ -114,7 +114,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # Pin v4.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # Pin v5.0.0
       - name: Run E2E Test Runner with devnet branch
         uses: './.github/actions/ts-e2e'
         with:
@@ -142,7 +142,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # Pin v4.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # Pin v5.0.0
       - name: Run E2E Test Runner with testnet branch
         uses: './.github/actions/ts-e2e'
         with:
