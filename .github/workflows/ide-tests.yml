@@ -20,7 +20,7 @@ jobs:
       isMoveAutoFormatter: ${{ steps.diff.outputs.isMoveAutoFormatter }}
       isMoveAnalyzerTraceAdapter: ${{ steps.diff.outputs.isMoveAnalyzerTraceAdapter }}
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # Pin v4.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # Pin v5.0.0
       - name: Detect Changes
         uses: './.github/actions/diffs'
         id: diff
@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # Pin v4.1.1
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # Pin v5.0.0
         with:
           ref: ${{ github.event.inputs.sui_repo_ref || github.ref }}
   
@@ -65,7 +65,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # Pin v4.1.1
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # Pin v5.0.0
         with:
           ref: ${{ github.event.inputs.sui_repo_ref || github.ref }}
 
