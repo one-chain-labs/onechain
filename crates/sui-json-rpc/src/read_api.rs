@@ -6,7 +6,12 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use backoff::{future::retry, ExponentialBackoff};
+use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
 use futures::future::join_all;
+use im::hashmap::HashMap as ImHashMap;
+use shared_crypto::intent::{IntentMessage, PersonalMessage};
+use shared_crypto::intent::Intent;
 use indexmap::map::IndexMap;
 use itertools::Itertools;
 use jsonrpsee::{core::RpcResult, RpcModule};
@@ -17,7 +22,7 @@ use move_core_types::{
 };
 use tap::TapFallible;
 use tracing::{debug, error, info, instrument, trace, warn};
-
+use sui_types::authenticator_state::{get_authenticator_state, ActiveJwk};
 use mysten_metrics::{add_server_timing, spawn_monitored_task};
 use sui_core::authority::AuthorityState;
 use sui_json_rpc_api::{
@@ -49,21 +54,25 @@ use sui_json_rpc_types::{
     SuiTransactionBlockEvents,
     SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
+    ZkLoginIntentScope,
+    ZkLoginVerifyResult,
 };
 use sui_open_rpc::Module;
 use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
 use sui_storage::key_value_store::TransactionKeyValueStore;
 use sui_types::{
-    base_types::{ObjectID, SequenceNumber, TransactionDigest},
+    base_types::{ObjectID, SequenceNumber,SuiAddress, TransactionDigest},
     collection_types::VecMap,
-    crypto::AggregateAuthoritySignature,
+    crypto::{AggregateAuthoritySignature,ToFromBytes},
     display::DisplayVersionUpdatedEvent,
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiError, SuiObjectResponseError},
     messages_checkpoint::{CheckpointContents, CheckpointSequenceNumber, CheckpointSummary, CheckpointTimestamp},
     object::{Object, ObjectRead, PastObjectRead},
+    signature::{GenericSignature, VerifyParams},
     sui_serde::BigInt,
-    transaction::{Transaction, TransactionDataAPI},
+    signature_verification::VerifiedDigestCache,
+    transaction::{Transaction,TransactionData, TransactionDataAPI},
 };
 
 use crate::{
@@ -875,6 +884,120 @@ impl ReadApiServer for ReadApi {
             let ci = self.state.get_chain_identifier()?;
             Ok(ci.to_string())
         })
+    }
+
+    #[instrument(skip(self))]
+    async fn verify_zklogin_signature(
+        &self,
+        bytes: String,
+        signature: String,
+        intent_scope: ZkLoginIntentScope,
+        author: SuiAddress,
+    ) -> RpcResult<ZkLoginVerifyResult> {
+        let epoch_store = self.state.load_epoch_store_one_call_per_task();
+        let curr_epoch = epoch_store.epoch();
+        let zklogin_env_native = match self
+            .state
+            .get_chain_identifier()
+            .expect("get chain identifier should not fail")
+            .chain()
+        {
+            sui_protocol_config::Chain::Mainnet | sui_protocol_config::Chain::Testnet => {
+                ZkLoginEnv::Prod
+            }
+            _ => ZkLoginEnv::Test,
+        };
+        let GenericSignature::ZkLoginAuthenticator(zklogin_sig) =
+            GenericSignature::from_bytes(&Base64::decode(&signature).map_err(Error::from)?)
+                .map_err(Error::from)?
+        else {
+            return Err(SuiRpcInputError::GenericNotFound(
+                "Endpoint only supports zkLogin signature".to_string(),
+            )
+            .into());
+        };
+
+        let new_jwks =
+            match get_authenticator_state(self.state.get_object_store()).map_err(Error::from)? {
+                Some(authenticator_state) => authenticator_state.active_jwks,
+                None => {
+                    return Err(SuiRpcInputError::GenericNotFound(
+                        "Authenticator state not found".to_string(),
+                    )
+                    .into());
+                }
+            };
+
+        // construct verify params with active jwks and zklogin_env.
+        let mut oidc_provider_jwks = ImHashMap::new();
+        for active_jwk in new_jwks.iter() {
+            let ActiveJwk { jwk_id, jwk, .. } = active_jwk;
+            match oidc_provider_jwks.entry(jwk_id.clone()) {
+                im::hashmap::Entry::Occupied(_) => {
+                    warn!("JWK with kid {:?} already exists", jwk_id);
+                }
+                im::hashmap::Entry::Vacant(entry) => {
+                    entry.insert(jwk.clone());
+                }
+            }
+        }
+        let verify_params = VerifyParams::new(
+            oidc_provider_jwks,
+            vec![],
+            zklogin_env_native,
+            true,
+            true,
+            Some(30)
+        );
+        match intent_scope {
+            ZkLoginIntentScope::TransactionData => {
+                let tx_data: TransactionData =
+                    bcs::from_bytes(&Base64::decode(&bytes).map_err(Error::from)?)
+                        .map_err(Error::from)?;
+                let intent_msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
+                let sig = GenericSignature::ZkLoginAuthenticator(zklogin_sig);
+                match sig.verify_authenticator(
+                    &intent_msg,
+                    author,
+                    curr_epoch,
+                    &verify_params,
+                    Arc::new(VerifiedDigestCache::new_empty()),
+                ) {
+                    Ok(_) => Ok(ZkLoginVerifyResult {
+                        success: true,
+                        errors: vec![],
+                    }),
+                    Err(e) => Ok(ZkLoginVerifyResult {
+                        success: false,
+                        errors: vec![e.to_string()],
+                    }),
+                }
+            }
+            ZkLoginIntentScope::PersonalMessage => {
+                let data = PersonalMessage {
+                    message: Base64::decode(&bytes).map_err(Error::from)?,
+                };
+                let intent_msg = IntentMessage::new(Intent::personal_message(), data);
+
+                let sig = GenericSignature::ZkLoginAuthenticator(zklogin_sig);
+                match sig.verify_authenticator(
+                    &intent_msg,
+                    author,
+                    curr_epoch,
+                    &verify_params,
+                    Arc::new(VerifiedDigestCache::new_empty()),
+                ) {
+                    Ok(_) => Ok(ZkLoginVerifyResult {
+                        success: true,
+                        errors: vec![],
+                    }),
+                    Err(e) => Ok(ZkLoginVerifyResult {
+                        success: false,
+                        errors: vec![e.to_string()],
+                    }),
+                }
+            }
+        }
     }
 }
 

@@ -5,7 +5,9 @@ use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
 use sui_json_rpc::error::SuiRpcInputError;
 use sui_types::{error::SuiObjectResponseError, object::ObjectRead};
-
+use sui_types::base_types::SuiAddress;
+use sui_json_rpc_types::ZkLoginIntentScope;
+use sui_json_rpc_types::ZkLoginVerifyResult;
 use crate::{errors::IndexerError, indexer_reader::IndexerReader};
 use sui_json_rpc::SuiRpcModule;
 use sui_json_rpc_api::{ReadApiServer, QUERY_MAX_RESULT_LIMIT};
@@ -212,6 +214,16 @@ impl ReadApiServer for ReadApi {
 
     async fn get_chain_identifier(&self) -> RpcResult<String> {
         self.get_chain_identifier().await.map(|id| id.to_string())
+    }
+
+    async fn verify_zklogin_signature(
+        &self,
+        _bytes: String,
+        _signature: String,
+        _intent_scope: ZkLoginIntentScope,
+        _author: SuiAddress,
+    ) -> RpcResult<ZkLoginVerifyResult> {
+        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
     }
 }
 

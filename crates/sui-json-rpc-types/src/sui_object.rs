@@ -1084,3 +1084,20 @@ impl SuiObjectResponseQuery {
         Self { filter: None, options: Some(options) }
     }
 }
+
+#[serde_as]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub enum ZkLoginIntentScope {
+    TransactionData,
+    PersonalMessage,
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "camelCase", rename = "ZkLoginVerifyResult")]
+pub struct ZkLoginVerifyResult {
+    /// The boolean result of the verification. If true, errors should be empty.
+    pub success: bool,
+    /// The errors field captures any verification error
+    pub errors: Vec<String>,
+}
