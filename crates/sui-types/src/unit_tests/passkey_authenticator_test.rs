@@ -4,55 +4,56 @@
 use std::sync::Arc;
 
 use super::to_signing_message;
+use crate::crypto::DefaultHash;
+use crate::passkey_authenticator::{PasskeyAuthenticator, RawPasskeyAuthenticator};
 use crate::{
     base_types::{dbg_addr, ObjectID, SuiAddress},
-    crypto::{DefaultHash, PublicKey, Signature, SignatureScheme},
+    crypto::{PublicKey, Signature, SignatureScheme},
     error::SuiError,
     object::Object,
-    passkey_authenticator::{PasskeyAuthenticator, RawPasskeyAuthenticator},
     signature::GenericSignature,
     signature_verification::VerifiedDigestCache,
     transaction::{TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
 };
-use fastcrypto::{
-    hash::HashFunction,
-    rsa::{Base64UrlUnpadded, Encoding as _},
-    traits::ToFromBytes,
-};
+use fastcrypto::encoding::Base64;
+use fastcrypto::encoding::Encoding;
+use fastcrypto::hash::HashFunction;
+use fastcrypto::rsa::{Base64UrlUnpadded, Encoding as _};
+use fastcrypto::traits::ToFromBytes;
 use p256::pkcs8::DecodePublicKey;
-use passkey_authenticator::{Authenticator, UserValidationMethod};
+use passkey_authenticator::{Authenticator, UserCheck, UserValidationMethod};
 use passkey_client::Client;
 use passkey_types::{
-    ctap2::Aaguid,
+    ctap2::{Aaguid, Ctap2Error},
     rand::random_vec,
     webauthn::{
-        AttestationConveyancePreference,
-        CredentialCreationOptions,
-        CredentialRequestOptions,
-        PublicKeyCredentialCreationOptions,
-        PublicKeyCredentialParameters,
-        PublicKeyCredentialRequestOptions,
-        PublicKeyCredentialRpEntity,
-        PublicKeyCredentialType,
-        PublicKeyCredentialUserEntity,
-        UserVerificationRequirement,
+        AttestationConveyancePreference, CredentialCreationOptions, CredentialRequestOptions,
+        PublicKeyCredentialCreationOptions, PublicKeyCredentialParameters,
+        PublicKeyCredentialRequestOptions, PublicKeyCredentialRpEntity, PublicKeyCredentialType,
+        PublicKeyCredentialUserEntity, UserVerificationRequirement,
     },
-    Bytes,
-    Passkey,
+    Bytes, Passkey,
 };
 use shared_crypto::intent::{Intent, IntentMessage};
+use std::str::FromStr;
 use url::Url;
 
 /// Helper struct to initialize passkey client.
 pub struct MyUserValidationMethod {}
 #[async_trait::async_trait]
 impl UserValidationMethod for MyUserValidationMethod {
-    async fn check_user_presence(&self) -> bool {
-        true
-    }
+    type PasskeyItem = Passkey;
 
-    async fn check_user_verification(&self) -> bool {
-        true
+    async fn check_user<'a>(
+        &self,
+        _credential: Option<&'a Passkey>,
+        presence: bool,
+        verification: bool,
+    ) -> Result<UserCheck, Ctap2Error> {
+        Ok(UserCheck {
+            presence,
+            verification,
+        })
     }
 
     fn is_verification_enabled(&self) -> Option<bool> {
@@ -89,9 +90,14 @@ async fn create_credential_and_sign_test_tx(
 
     // Create credential with the request option.
     let my_webauthn_credential = my_client.register(origin, request, None).await.unwrap();
-    let verifying_key =
-        p256::ecdsa::VerifyingKey::from_public_key_der(my_webauthn_credential.response.public_key.unwrap().as_slice())
-            .unwrap();
+    let verifying_key = p256::ecdsa::VerifyingKey::from_public_key_der(
+        my_webauthn_credential
+            .response
+            .public_key
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
 
     // Derive its compact pubkey from DER format.
     let encoded_point = verifying_key.to_encoded_point(false);
@@ -102,7 +108,7 @@ async fn create_credential_and_sign_test_tx(
     pk_bytes.extend_from_slice(x.unwrap());
     let pk = PublicKey::try_from_bytes(SignatureScheme::PasskeyAuthenticator, &pk_bytes).unwrap();
 
-    // Derives its OneChain address and make a test transaction with it as sender.
+    // Derives its sui address and make a test transaction with it as sender.
     let sender = SuiAddress::from(&pk);
     let recipient = dbg_addr(2);
     let object_id = ObjectID::ZERO;
@@ -136,7 +142,10 @@ async fn create_credential_and_sign_test_tx(
         },
     };
 
-    let authenticated_cred = my_client.authenticate(origin, credential_request, None).await.unwrap();
+    let authenticated_cred = my_client
+        .authenticate(origin, credential_request, None)
+        .await
+        .unwrap();
 
     // Parse the response, gets the signature from der format and normalize it to lower s.
     let sig_bytes_der = authenticated_cred.response.signature.as_slice();
@@ -254,7 +263,12 @@ async fn test_passkey_fails_invalid_json() {
     };
     let res: Result<PasskeyAuthenticator, SuiError> = raw.try_into();
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid client data json".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid client data json".to_string()
+        }
+    );
     const CORRECT_LEN: usize = DefaultHash::OUTPUT_SIZE;
     let client_data_json_too_short = format!(
         r#"{{"type":"webauthn.get", "challenge":"{}","origin":"http://localhost:5173","crossOrigin":false, "unknown": "unknown"}}"#,
@@ -285,8 +299,8 @@ async fn test_passkey_fails_invalid_json() {
         Base64UrlUnpadded::encode_string(&[0; CORRECT_LEN])
     );
     let raw_3 = RawPasskeyAuthenticator {
-        authenticator_data: response.authenticator_data,
-        client_data_json: client_data_json_correct,
+        authenticator_data: response.authenticator_data.clone(),
+        client_data_json: client_data_json_correct.clone(),
         user_signature: Signature::from_bytes(&response.user_sig_bytes).unwrap(),
     };
     let res_3: Result<PasskeyAuthenticator, SuiError> = raw_3.try_into();
@@ -306,7 +320,12 @@ async fn test_passkey_fails_invalid_challenge() {
     };
     let res: Result<PasskeyAuthenticator, SuiError> = raw.try_into();
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid encoded challenge".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid encoded challenge".to_string()
+        }
+    );
 }
 
 #[tokio::test]
@@ -322,59 +341,28 @@ async fn test_passkey_fails_wrong_client_data_type() {
     };
     let res: Result<PasskeyAuthenticator, SuiError> = raw.try_into();
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid client data type".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid client data type".to_string()
+        }
+    );
 }
 
-// #[tokio::test]
-// async fn test_passkey_fails_not_normalized_signature() {
-//     // crafts a particular not normalized signature, fails to verify. this is produced from typescript client https://github.com/joyqvq/sui-webauthn-poc/tree/joy/tx-example
-//     let tx_data: TransactionData = bcs::from_bytes(&Base64::decode("AAAAAHaTZLc0GGZ6RNYAqPC8LWZV7xHO+54zf71arV1MwFUtAcDum6pkbPZZN/iYq0zJpOxiV2wrZAnVU0bnNpOjombGAgAAAAAAAAAgAIiQFrz1abd2rNdo76dQS026yMAS1noA7FiGsggyt9V2k2S3NBhmekTWAKjwvC1mVe8RzvueM3+9Wq1dTMBVLegDAAAAAAAAgIQeAAAAAAAA").unwrap()).unwrap();
-//     let response = PasskeyResponse::<TransactionData> {
-//         user_sig_bytes: Hex::decode("02bbd02ace0bad3b32eb3a891dc5c85e56274f52695d24db41b247ec694d1531d6fe1a5bec11a8063d1eb0512e7971bfd23395c2cb8862f73049d0f78fd204c6d602276d5f3a22f3e698cdd2272a63da8bfdd9344de73312c7f7f9eca21bfc304f2e").unwrap(),
-//         authenticator_data: Hex::decode("49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000").unwrap(),
-//         client_data_json: r#"{"type":"webauthn.get","challenge":"AAAAZgUD1inhS1l9qUfZePaivu6IbIo_SxCGmYcfTwrmcFU","origin":"http://localhost:5173","crossOrigin":false}"#.to_string(),
-//         intent_msg: IntentMessage::new(Intent::sui_transaction(), tx_data),
-//         sender: SuiAddress::from_str("0x769364b73418667a44d600a8f0bc2d6655ef11cefb9e337fbd5aad5d4cc0552d").unwrap()
-//     };
-//     let sig = GenericSignature::PasskeyAuthenticator(
-//         PasskeyAuthenticator::new_for_testing(
-//             response.authenticator_data,
-//             response.client_data_json,
-//             Signature::from_bytes(&response.user_sig_bytes).unwrap(),
-//         )
-//         .unwrap(),
-//     );
-
-//     let res = sig.verify_authenticator(
-//         &response.intent_msg,
-//         response.sender,
-//         0,
-//         &Default::default(),
-//         Arc::new(VerifiedDigestCache::new_empty()),
-//     );
-//     let err = res.unwrap_err();
-//     assert_eq!(
-//         err,
-//         SuiError::InvalidSignature {
-//             error: "Fails to verify".to_string()
-//         }
-//     );
-// }
-
-// #[tokio::test]
-// async fn test_real_passkey_output() {
-//     // response from a real passkey authenticator created in iCloud, from typescript client: https://github.com/joyqvq/sui-webauthn-poc/tree/joy/tx-example
-//     let address =
-//         SuiAddress::from_str("0xac8564f638fbf673fc92eb85b5abe5f7c29bdaa60a4a10329868fbe6c551dda2")
-//             .unwrap();
-//     let sig = GenericSignature::from_bytes(&Base64::decode("BiVJlg3liA6MaHQ0Fw9kdmBbj+SuuaKGMseZXPO6gx2XYx0AAAAAigF7InR5cGUiOiJ3ZWJhdXRobi5nZXQiLCJjaGFsbGVuZ2UiOiJBQUFBdF9taklCMXZiVnBZTTZXVjZZX29peDZKOGFOXzlzYjhTS0ZidWtCZmlRdyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6NTE3MyIsImNyb3NzT3JpZ2luIjpmYWxzZX1iApjskL9Xyfopyg9Av7MSrcchSpfWqAYoJ+qfSId4gNmoQ1YNgj2alDpRIbq9kthmyGY25+k24FrW114PEoy5C+8DPRcOCTtACi3ZywtZ4UILhwV+Suh79rWtbKqDqhBQwxM=").unwrap()).unwrap();
-//     let tx_data: TransactionData = bcs::from_bytes(&Base64::decode("AAAAAKyFZPY4+/Zz/JLrhbWr5ffCm9qmCkoQMpho++bFUd2iAUwOMmeNHuxq2hS4PvO1uivs9exQGefW2wNQAt7tRkkdAgAAAAAAAAAgCsJHAaWbb8oUlZsGdsyW3Atf3d51wBEr9HLkrBF0/UushWT2OPv2c/yS64W1q+X3wpvapgpKEDKYaPvmxVHdougDAAAAAAAAgIQeAAAAAAAA").unwrap()).unwrap();
-//     let res = sig.verify_authenticator(
-//         &IntentMessage::new(Intent::sui_transaction(), tx_data),
-//         address,
-//         0,
-//         &Default::default(),
-//         Arc::new(VerifiedDigestCache::new_empty()),
-//     );
-//     assert!(res.is_ok());
-// }
+#[tokio::test]
+async fn test_real_passkey_output() {
+    // response from a real passkey authenticator created in iCloud, from typescript client: https://passkey-example.vercel.app/ (repo: https://github.com/MystenLabs/passkey-example)
+    let address =
+        SuiAddress::from_str("0x9c0c00e929f08431583dad0e9409b5afb20cdbae0043fa5577f2577dbe88a0db")
+            .unwrap();
+    let sig = GenericSignature::from_bytes(&Base64::decode("BiUL6eJ3+l0jTWmL4buH5lE8Vxe1+ge6xSU0oczBPpmt+h0AAAAAkwF7InR5cGUiOiJ3ZWJhdXRobi5nZXQiLCJjaGFsbGVuZ2UiOiJ5TzEtb3VBczFBRUsyOWd0X1dJTGM4ZndDdlFjMkhEQmEwX2dTU3RpU1FzIiwib3JpZ2luIjoiaHR0cHM6Ly9wYXNza2V5LWV4YW1wbGUudmVyY2VsLmFwcCIsImNyb3NzT3JpZ2luIjpmYWxzZX1iAu0JsgVDVgBZQJhsl9MUZmUfUkNTh1qCg0zNWFrXfTx3NKuakm8Wqaa3qnfo+s9K2KvfYp8jT8BazhK7bi9YSmsCATpOyeWH387SdhY7+172wODmilJnXx5QcaUnR+3QlEM=").unwrap()).unwrap();
+    let tx_data: TransactionData = bcs::from_bytes(&Base64::decode("AAAAAJwMAOkp8IQxWD2tDpQJta+yDNuuAEP6VXfyV32+iKDbARrKzR59iiRcEIbBEBlB283cnWUBeUeKCiMa3UKM6NURNRHQFAAAAAAgVLos3IwH9g4OHDSWiKyUZCvixybPtnDQIeML1f+ErGOcDADpKfCEMVg9rQ6UCbWvsgzbrgBD+lV38ld9voig2+gDAAAAAAAAgIQeAAAAAAAA").unwrap()).unwrap();
+    let res = sig.verify_authenticator(
+        &IntentMessage::new(Intent::sui_transaction(), tx_data),
+        address,
+        0,
+        &Default::default(),
+        Arc::new(VerifiedDigestCache::new_empty()),
+    );
+    assert!(res.is_ok());
+}

@@ -38,7 +38,7 @@ module Test::M {
     }
 
     public entry fun mint_child(v: u64, parent: &mut Obj, ctx: &mut TxContext) {
-        one::dynamic_object_field::add(
+        sui::dynamic_object_field::add(
             &mut parent.id, 0,
             Obj {
                 id: object::new(ctx),

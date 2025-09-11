@@ -1,25 +1,32 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use self::effects_v2::TransactionEffectsV2;
-use crate::{
-    base_types::{ExecutionDigests, ObjectID, ObjectRef, SequenceNumber},
-    committee::{Committee, EpochId},
-    crypto::{default_hash, AuthoritySignInfo, AuthoritySignInfoTrait, AuthorityStrongQuorumSignInfo, EmptySignInfo},
-    digests::{ObjectDigest, TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest},
-    error::SuiResult,
-    event::Event,
-    execution::SharedInput,
-    execution_status::ExecutionStatus,
-    gas::GasCostSummary,
-    message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope},
-    object::Owner,
-    storage::WriteKind,
+pub use self::effects_v2::TransactionEffectsV2;
+use crate::accumulator_event::AccumulatorEvent;
+use crate::base_types::{ExecutionDigests, ObjectID, ObjectRef, SequenceNumber};
+use crate::committee::{Committee, EpochId};
+use crate::crypto::{
+    default_hash, AuthoritySignInfo, AuthoritySignInfoTrait, AuthorityStrongQuorumSignInfo,
+    EmptySignInfo,
 };
-use effects_v1::TransactionEffectsV1;
+use crate::digests::{
+    ObjectDigest, TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest,
+};
+use crate::error::SuiResult;
+use crate::event::Event;
+use crate::execution::SharedInput;
+use crate::execution_status::{ExecutionStatus, MoveLocation};
+use crate::gas::GasCostSummary;
+use crate::message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope};
+use crate::object::Owner;
+use crate::storage::WriteKind;
+pub use effects_v1::TransactionEffectsV1;
 pub use effects_v2::UnchangedSharedKind;
 use enum_dispatch::enum_dispatch;
-pub use object_change::{EffectsObjectChange, ObjectIn, ObjectOut};
+pub use object_change::{
+    AccumulatorAddress, AccumulatorOperation, AccumulatorValue, AccumulatorWriteV1,
+    EffectsObjectChange, ObjectIn, ObjectOut,
+};
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::{Intent, IntentScope};
 use std::collections::{BTreeMap, BTreeSet};
@@ -58,7 +65,6 @@ pub enum TransactionEffects {
 
 impl Message for TransactionEffects {
     type DigestType = TransactionEffectsDigest;
-
     const SCOPE: IntentScope = IntentScope::TransactionEffects;
 
     fn digest(&self) -> Self::DigestType {
@@ -148,7 +154,10 @@ impl TransactionEffects {
     }
 
     pub fn execution_digests(&self) -> ExecutionDigests {
-        ExecutionDigests { transaction: *self.transaction_digest(), effects: self.digest() }
+        ExecutionDigests {
+            transaction: *self.transaction_digest(),
+            effects: self.digest(),
+        }
     }
 
     pub fn estimate_effects_size_upperbound_v1(
@@ -175,7 +184,11 @@ impl TransactionEffects {
         fixed_sizes + approx_change_entry_size + deps_size
     }
 
-    pub fn estimate_effects_size_upperbound_v2(num_writes: usize, num_modifies: usize, num_deps: usize) -> usize {
+    pub fn estimate_effects_size_upperbound_v2(
+        num_writes: usize,
+        num_modifies: usize,
+        num_deps: usize,
+    ) -> usize {
         let fixed_sizes = APPROX_SIZE_OF_EXECUTION_STATUS
             + APPROX_SIZE_OF_EPOCH_ID
             + APPROX_SIZE_OF_GAS_COST_SUMMARY
@@ -199,8 +212,16 @@ impl TransactionEffects {
         self.mutated()
             .into_iter()
             .map(|(r, o)| (r, o, WriteKind::Mutate))
-            .chain(self.created().into_iter().map(|(r, o)| (r, o, WriteKind::Create)))
-            .chain(self.unwrapped().into_iter().map(|(r, o)| (r, o, WriteKind::Unwrap)))
+            .chain(
+                self.created()
+                    .into_iter()
+                    .map(|(r, o)| (r, o, WriteKind::Create)),
+            )
+            .chain(
+                self.unwrapped()
+                    .into_iter()
+                    .map(|(r, o)| (r, o, WriteKind::Unwrap)),
+            )
             .collect()
     }
 
@@ -211,7 +232,11 @@ impl TransactionEffects {
         self.deleted()
             .iter()
             .map(|obj_ref| (*obj_ref, ObjectRemoveKind::Delete))
-            .chain(self.wrapped().iter().map(|obj_ref| (*obj_ref, ObjectRemoveKind::Wrap)))
+            .chain(
+                self.wrapped()
+                    .iter()
+                    .map(|obj_ref| (*obj_ref, ObjectRemoveKind::Wrap)),
+            )
             .collect()
     }
 
@@ -228,7 +253,10 @@ impl TransactionEffects {
 
     /// Return an iterator of mutated objects, but excluding the gas object.
     pub fn mutated_excluding_gas(&self) -> Vec<(ObjectRef, Owner)> {
-        self.mutated().into_iter().filter(|o| o != &self.gas_object()).collect()
+        self.mutated()
+            .into_iter()
+            .filter(|o| o != &self.gas_object())
+            .collect()
     }
 
     pub fn summary_for_debug(&self) -> TransactionEffectsDebugSummary {
@@ -251,24 +279,34 @@ impl TransactionEffects {
 pub enum InputSharedObject {
     Mutate(ObjectRef),
     ReadOnly(ObjectRef),
-    ReadDeleted(ObjectID, SequenceNumber),
-    MutateDeleted(ObjectID, SequenceNumber),
+    ReadConsensusStreamEnded(ObjectID, SequenceNumber),
+    MutateConsensusStreamEnded(ObjectID, SequenceNumber),
     Cancelled(ObjectID, SequenceNumber),
 }
 
 impl InputSharedObject {
     pub fn id_and_version(&self) -> (ObjectID, SequenceNumber) {
-        let oref = self.object_ref();
-        (oref.0, oref.1)
+        match self {
+            InputSharedObject::Mutate(oref) | InputSharedObject::ReadOnly(oref) => (oref.0, oref.1),
+            InputSharedObject::ReadConsensusStreamEnded(id, version)
+            | InputSharedObject::MutateConsensusStreamEnded(id, version) => (*id, *version),
+            InputSharedObject::Cancelled(id, version) => (*id, *version),
+        }
     }
 
+    // NOTE: When `ObjectDigest::OBJECT_DIGEST_DELETED` is returned, the object's consensus stream
+    // has ended, but it may not be deleted.
+    #[deprecated]
     pub fn object_ref(&self) -> ObjectRef {
         match self {
             InputSharedObject::Mutate(oref) | InputSharedObject::ReadOnly(oref) => *oref,
-            InputSharedObject::ReadDeleted(id, version) | InputSharedObject::MutateDeleted(id, version) => {
+            InputSharedObject::ReadConsensusStreamEnded(id, version)
+            | InputSharedObject::MutateConsensusStreamEnded(id, version) => {
                 (*id, *version, ObjectDigest::OBJECT_DIGEST_DELETED)
             }
-            InputSharedObject::Cancelled(id, version) => (*id, *version, ObjectDigest::OBJECT_DIGEST_CANCELLED),
+            InputSharedObject::Cancelled(id, version) => {
+                (*id, *version, ObjectDigest::OBJECT_DIGEST_CANCELLED)
+            }
         }
     }
 }
@@ -279,6 +317,7 @@ pub trait TransactionEffectsAPI {
     fn into_status(self) -> ExecutionStatus;
     fn executed_epoch(&self) -> EpochId;
     fn modified_at_versions(&self) -> Vec<(ObjectID, SequenceNumber)>;
+    fn move_abort(&self) -> Option<(MoveLocation, u64)>;
 
     /// The version assigned to all output objects (apart from packages).
     fn lamport_version(&self) -> SequenceNumber;
@@ -301,8 +340,13 @@ pub trait TransactionEffectsAPI {
     fn deleted(&self) -> Vec<ObjectRef>;
     fn unwrapped_then_deleted(&self) -> Vec<ObjectRef>;
     fn wrapped(&self) -> Vec<ObjectRef>;
+    fn transferred_from_consensus(&self) -> Vec<ObjectRef>;
+    fn transferred_to_consensus(&self) -> Vec<ObjectRef>;
+    fn consensus_owner_changed(&self) -> Vec<ObjectRef>;
 
     fn object_changes(&self) -> Vec<ObjectChange>;
+
+    fn accumulator_events(&self) -> Vec<AccumulatorEvent>;
 
     // TODO: We should consider having this function to return Option.
     // When the gas object is not available (i.e. system transaction), we currently return
@@ -316,14 +360,14 @@ pub trait TransactionEffectsAPI {
 
     fn gas_cost_summary(&self) -> &GasCostSummary;
 
-    fn deleted_mutably_accessed_shared_objects(&self) -> Vec<ObjectID> {
+    fn stream_ended_mutably_accessed_consensus_objects(&self) -> Vec<ObjectID> {
         self.input_shared_objects()
             .into_iter()
             .filter_map(|kind| match kind {
-                InputSharedObject::MutateDeleted(id, _) => Some(id),
+                InputSharedObject::MutateConsensusStreamEnded(id, _) => Some(id),
                 InputSharedObject::Mutate(..)
                 | InputSharedObject::ReadOnly(..)
-                | InputSharedObject::ReadDeleted(..)
+                | InputSharedObject::ReadConsensusStreamEnded(..)
                 | InputSharedObject::Cancelled(..) => None,
             })
             .collect()
@@ -331,6 +375,9 @@ pub trait TransactionEffectsAPI {
 
     /// Returns all root shared objects (i.e. not child object) that are read-only in the transaction.
     fn unchanged_shared_objects(&self) -> Vec<(ObjectID, UnchangedSharedKind)>;
+
+    /// Returns all accumulator updates in the transaction.
+    fn accumulator_updates(&self) -> Vec<(ObjectID, AccumulatorWriteV1)>;
 
     // All of these should be #[cfg(test)], but they are used by tests in other crates, and
     // dependencies don't get built with cfg(test) set as far as I can tell.
@@ -399,11 +446,16 @@ pub type CertifiedTransactionEffects = TransactionEffectsEnvelope<AuthorityStron
 pub type TrustedSignedTransactionEffects = TrustedEnvelope<TransactionEffects, AuthoritySignInfo>;
 pub type VerifiedTransactionEffectsEnvelope<S> = VerifiedEnvelope<TransactionEffects, S>;
 pub type VerifiedSignedTransactionEffects = VerifiedTransactionEffectsEnvelope<AuthoritySignInfo>;
-pub type VerifiedCertifiedTransactionEffects = VerifiedTransactionEffectsEnvelope<AuthorityStrongQuorumSignInfo>;
+pub type VerifiedCertifiedTransactionEffects =
+    VerifiedTransactionEffectsEnvelope<AuthorityStrongQuorumSignInfo>;
 
 impl CertifiedTransactionEffects {
     pub fn verify_authority_signatures(&self, committee: &Committee) -> SuiResult {
-        self.auth_sig().verify_secure(self.data(), Intent::sui_app(IntentScope::TransactionEffects), committee)
+        self.auth_sig().verify_secure(
+            self.data(),
+            Intent::sui_app(IntentScope::TransactionEffects),
+            committee,
+        )
     }
 
     pub fn verify(self, committee: &Committee) -> SuiResult<VerifiedCertifiedTransactionEffects> {

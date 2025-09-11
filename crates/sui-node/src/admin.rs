@@ -11,15 +11,17 @@ use axum::{
 use base64::Engine;
 use humantime::parse_duration;
 use serde::Deserialize;
+use std::sync::Arc;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
-    sync::Arc,
 };
 use sui_types::{
     base_types::AuthorityName,
     crypto::{RandomnessPartialSignature, RandomnessRound, RandomnessSignature},
+    digests::TransactionDigest,
     error::SuiError,
+    traffic_control::TrafficControlReconfigParams,
 };
 use telemetry_subscribers::TracingHandle;
 use tokio::sync::oneshot;
@@ -68,6 +70,13 @@ use tracing::info;
 // Inject a full signature from another node, bypassing validity checks.
 //
 //  $ curl 'http://127.0.0.1:1337/randomness-inject-full-sig?round=123&sigs=base64encodedsig'
+//
+// Get the estimated cost of a transaction
+//
+//  $ curl 'http://127.0.0.1:1337/get-tx-cost?tx=<tx_digest>'
+// Reconfigure traffic control policy
+//
+//  $ curl 'http://127.0.0.1:1337/traffic-control?error_threshold=100&spam_threshold=100&dry_run=true'
 
 const LOGGING_ROUTE: &str = "/logging";
 const TRACING_ROUTE: &str = "/enable-tracing";
@@ -80,6 +89,9 @@ const NODE_CONFIG: &str = "/node-config";
 const RANDOMNESS_PARTIAL_SIGS_ROUTE: &str = "/randomness-partial-sigs";
 const RANDOMNESS_INJECT_PARTIAL_SIGS_ROUTE: &str = "/randomness-inject-partial-sigs";
 const RANDOMNESS_INJECT_FULL_SIG_ROUTE: &str = "/randomness-inject-full-sig";
+const GET_TX_COST_ROUTE: &str = "/get-tx-cost";
+const DUMP_CONSENSUS_TX_COST_ESTIMATES_ROUTE: &str = "/dump-consensus-tx-cost-estimates";
+const TRAFFIC_CONTROL: &str = "/traffic-control";
 
 struct AppState {
     node: Arc<SuiNode>,
@@ -89,21 +101,42 @@ struct AppState {
 pub async fn run_admin_server(node: Arc<SuiNode>, port: u16, tracing_handle: TracingHandle) {
     let filter = tracing_handle.get_log().unwrap();
 
-    let app_state = AppState { node, tracing_handle };
+    let app_state = AppState {
+        node,
+        tracing_handle,
+    };
 
     let app = Router::new()
         .route(LOGGING_ROUTE, get(get_filter))
         .route(CAPABILITIES, get(capabilities))
         .route(NODE_CONFIG, get(node_config))
         .route(LOGGING_ROUTE, post(set_filter))
-        .route(SET_BUFFER_STAKE_ROUTE, post(set_override_protocol_upgrade_buffer_stake))
-        .route(CLEAR_BUFFER_STAKE_ROUTE, post(clear_override_protocol_upgrade_buffer_stake))
+        .route(
+            SET_BUFFER_STAKE_ROUTE,
+            post(set_override_protocol_upgrade_buffer_stake),
+        )
+        .route(
+            CLEAR_BUFFER_STAKE_ROUTE,
+            post(clear_override_protocol_upgrade_buffer_stake),
+        )
         .route(FORCE_CLOSE_EPOCH, post(force_close_epoch))
         .route(TRACING_ROUTE, post(enable_tracing))
         .route(TRACING_RESET_ROUTE, post(reset_tracing))
         .route(RANDOMNESS_PARTIAL_SIGS_ROUTE, get(randomness_partial_sigs))
-        .route(RANDOMNESS_INJECT_PARTIAL_SIGS_ROUTE, post(randomness_inject_partial_sigs))
-        .route(RANDOMNESS_INJECT_FULL_SIG_ROUTE, post(randomness_inject_full_sig))
+        .route(
+            RANDOMNESS_INJECT_PARTIAL_SIGS_ROUTE,
+            post(randomness_inject_partial_sigs),
+        )
+        .route(
+            RANDOMNESS_INJECT_FULL_SIG_ROUTE,
+            post(randomness_inject_full_sig),
+        )
+        .route(GET_TX_COST_ROUTE, get(get_tx_cost))
+        .route(
+            DUMP_CONSENSUS_TX_COST_ESTIMATES_ROUTE,
+            get(dump_consensus_tx_cost_estimates),
+        )
+        .route(TRAFFIC_CONTROL, post(traffic_control))
         .with_state(Arc::new(app_state));
 
     let socket_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
@@ -113,8 +146,15 @@ pub async fn run_admin_server(node: Arc<SuiNode>, port: u16, tracing_handle: Tra
         "starting admin server"
     );
 
-    let listener = tokio::net::TcpListener::bind(&socket_address).await.unwrap();
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&socket_address)
+        .await
+        .unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }
 
 #[derive(Deserialize)]
@@ -130,8 +170,16 @@ struct EnableTracing {
     sample_rate: Option<f64>,
 }
 
-async fn enable_tracing(State(state): State<Arc<AppState>>, query: Query<EnableTracing>) -> (StatusCode, String) {
-    let Query(EnableTracing { filter, duration, trace_file, sample_rate }) = query;
+async fn enable_tracing(
+    State(state): State<Arc<AppState>>,
+    query: Query<EnableTracing>,
+) -> (StatusCode, String) {
+    let Query(EnableTracing {
+        filter,
+        duration,
+        trace_file,
+        sample_rate,
+    }) = query;
 
     let mut response = Vec::new();
 
@@ -179,7 +227,10 @@ async fn enable_tracing(State(state): State<Arc<AppState>>, query: Query<EnableT
 
 async fn reset_tracing(State(state): State<Arc<AppState>>) -> (StatusCode, String) {
     state.tracing_handle.reset_trace();
-    (StatusCode::OK, "tracing filter reset to TRACE_FILTER env var".into())
+    (
+        StatusCode::OK,
+        "tracing filter reset to TRACE_FILTER env var".into(),
+    )
 }
 
 async fn get_filter(State(state): State<Arc<AppState>>) -> (StatusCode, String) {
@@ -189,7 +240,10 @@ async fn get_filter(State(state): State<Arc<AppState>>) -> (StatusCode, String) 
     }
 }
 
-async fn set_filter(State(state): State<Arc<AppState>>, new_filter: String) -> (StatusCode, String) {
+async fn set_filter(
+    State(state): State<Arc<AppState>>,
+    new_filter: String,
+) -> (StatusCode, String) {
     match state.tracing_handle.update_log(&new_filter) {
         Ok(()) => {
             info!(filter =% new_filter, "Log filter updated");
@@ -235,8 +289,14 @@ async fn clear_override_protocol_upgrade_buffer_stake(
 ) -> (StatusCode, String) {
     let Query(Epoch { epoch }) = epoch;
 
-    match state.node.clear_override_protocol_upgrade_buffer_stake(epoch) {
-        Ok(()) => (StatusCode::OK, "protocol upgrade buffer stake cleared\n".to_string()),
+    match state
+        .node
+        .clear_override_protocol_upgrade_buffer_stake(epoch)
+    {
+        Ok(()) => (
+            StatusCode::OK,
+            "protocol upgrade buffer stake cleared\n".to_string(),
+        ),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     }
 }
@@ -253,23 +313,40 @@ async fn set_override_protocol_upgrade_buffer_stake(
 ) -> (StatusCode, String) {
     let Query(SetBufferStake { buffer_bps, epoch }) = buffer_state;
 
-    match state.node.set_override_protocol_upgrade_buffer_stake(epoch, buffer_bps) {
-        Ok(()) => (StatusCode::OK, format!("protocol upgrade buffer stake set to '{}'\n", buffer_bps)),
+    match state
+        .node
+        .set_override_protocol_upgrade_buffer_stake(epoch, buffer_bps)
+    {
+        Ok(()) => (
+            StatusCode::OK,
+            format!("protocol upgrade buffer stake set to '{}'\n", buffer_bps),
+        ),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     }
 }
 
-async fn force_close_epoch(State(state): State<Arc<AppState>>, epoch: Query<Epoch>) -> (StatusCode, String) {
-    let Query(Epoch { epoch: expected_epoch }) = epoch;
+async fn force_close_epoch(
+    State(state): State<Arc<AppState>>,
+    epoch: Query<Epoch>,
+) -> (StatusCode, String) {
+    let Query(Epoch {
+        epoch: expected_epoch,
+    }) = epoch;
     let epoch_store = state.node.state().load_epoch_store_one_call_per_task();
     let actual_epoch = epoch_store.epoch();
     if actual_epoch != expected_epoch {
-        let err = SuiError::WrongEpoch { expected_epoch, actual_epoch };
+        let err = SuiError::WrongEpoch {
+            expected_epoch,
+            actual_epoch,
+        };
         return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string());
     }
 
     match state.node.close_epoch(&epoch_store).await {
-        Ok(()) => (StatusCode::OK, "close_epoch() called successfully\n".to_string()),
+        Ok(()) => (
+            StatusCode::OK,
+            "close_epoch() called successfully\n".to_string(),
+        ),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     }
 }
@@ -279,18 +356,27 @@ struct Round {
     round: u64,
 }
 
-async fn randomness_partial_sigs(State(state): State<Arc<AppState>>, round: Query<Round>) -> (StatusCode, String) {
+async fn randomness_partial_sigs(
+    State(state): State<Arc<AppState>>,
+    round: Query<Round>,
+) -> (StatusCode, String) {
     let Query(Round { round }) = round;
 
     let (tx, rx) = oneshot::channel();
-    state.node.randomness_handle().admin_get_partial_signatures(RandomnessRound(round), tx);
+    state
+        .node
+        .randomness_handle()
+        .admin_get_partial_signatures(RandomnessRound(round), tx);
 
     let sigs = match rx.await {
         Ok(sigs) => sigs,
         Err(err) => return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     };
 
-    let output = format!("{}\n", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sigs));
+    let output = format!(
+        "{}\n",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sigs)
+    );
 
     (StatusCode::OK, output)
 }
@@ -306,7 +392,11 @@ async fn randomness_inject_partial_sigs(
     State(state): State<Arc<AppState>>,
     args: Query<PartialSigsToInject>,
 ) -> (StatusCode, String) {
-    let Query(PartialSigsToInject { hex_authority_name, round, base64_sigs }) = args;
+    let Query(PartialSigsToInject {
+        hex_authority_name,
+        round,
+        base64_sigs,
+    }) = args;
 
     let authority_name = match AuthorityName::from_str(hex_authority_name.as_str()) {
         Ok(authority_name) => authority_name,
@@ -324,12 +414,10 @@ async fn randomness_inject_partial_sigs(
     };
 
     let (tx_result, rx_result) = oneshot::channel();
-    state.node.randomness_handle().admin_inject_partial_signatures(
-        authority_name,
-        RandomnessRound(round),
-        sigs,
-        tx_result,
-    );
+    state
+        .node
+        .randomness_handle()
+        .admin_inject_partial_signatures(authority_name, RandomnessRound(round), sigs, tx_result);
 
     match rx_result.await {
         Ok(Ok(())) => (StatusCode::OK, "partial signatures injected\n".to_string()),
@@ -361,11 +449,77 @@ async fn randomness_inject_full_sig(
     };
 
     let (tx_result, rx_result) = oneshot::channel();
-    state.node.randomness_handle().admin_inject_full_signature(RandomnessRound(round), sig, tx_result);
+    state.node.randomness_handle().admin_inject_full_signature(
+        RandomnessRound(round),
+        sig,
+        tx_result,
+    );
 
     match rx_result.await {
         Ok(Ok(())) => (StatusCode::OK, "full signature injected\n".to_string()),
         Ok(Err(e)) => (StatusCode::BAD_REQUEST, e.to_string()),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+#[derive(Deserialize)]
+struct GetTxCost {
+    tx_digest: String,
+}
+
+async fn get_tx_cost(
+    State(state): State<Arc<AppState>>,
+    args: Query<GetTxCost>,
+) -> (StatusCode, String) {
+    let Query(GetTxCost { tx_digest }) = args;
+    let tx_digest = TransactionDigest::from_str(tx_digest.as_str()).unwrap();
+
+    let Some(transaction) = state
+        .node
+        .state()
+        .get_transaction_cache_reader()
+        .get_transaction_block(&tx_digest)
+    else {
+        return (StatusCode::BAD_REQUEST, "Transaction not found".to_string());
+    };
+
+    let Some(cost) = state
+        .node
+        .state()
+        .load_epoch_store_one_call_per_task()
+        .get_estimated_tx_cost(transaction.transaction_data())
+        .await
+    else {
+        return (StatusCode::BAD_REQUEST, "No estimate available".to_string());
+    };
+
+    (StatusCode::OK, cost.to_string())
+}
+
+async fn dump_consensus_tx_cost_estimates(
+    State(state): State<Arc<AppState>>,
+) -> (StatusCode, String) {
+    let epoch_store = state.node.state().load_epoch_store_one_call_per_task();
+    let estimates = epoch_store.get_consensus_tx_cost_estimates().await;
+    (StatusCode::OK, format!("{:#?}", estimates))
+}
+
+async fn traffic_control(
+    State(state): State<Arc<AppState>>,
+    args: Query<TrafficControlReconfigParams>,
+) -> (StatusCode, String) {
+    let Query(params) = args;
+    match state.node.state().reconfigure_traffic_control(params).await {
+        Ok(updated_state) => (
+            StatusCode::OK,
+            format!(
+                "Traffic control configured with:\n\
+                 Error threshold: {:?}\n\
+                 Spam threshold: {:?}\n\
+                 Dry run: {:?}\n",
+                updated_state.error_threshold, updated_state.spam_threshold, updated_state.dry_run
+            ),
+        ),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     }
 }

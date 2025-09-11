@@ -14,24 +14,42 @@
 //! rules for entrypoints
 
 use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{CompiledModule, FunctionDefinitionIndex, SignatureIndex, SignatureToken, TableIndex},
-    file_format_common::{VERSION_1, VERSION_5},
     IndexKind,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    file_format::{
+        CompiledModule, FunctionDefinitionIndex, SignatureIndex, SignatureToken, TableIndex,
+    },
+    file_format_common::{VERSION_1, VERSION_5},
 };
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 
-pub type FnCheckScriptSignature =
-    fn(&CompiledModule, /* is_entry */ bool, SignatureIndex, Option<SignatureIndex>) -> PartialVMResult<()>;
+pub type FnCheckScriptSignature = fn(
+    &CompiledModule,
+    /* is_entry */ bool,
+    SignatureIndex,
+    Option<SignatureIndex>,
+) -> PartialVMResult<()>;
 
-pub fn verify_module(module: &CompiledModule, check_signature: FnCheckScriptSignature) -> VMResult<()> {
+pub fn verify_module(
+    module: &CompiledModule,
+    check_signature: FnCheckScriptSignature,
+) -> VMResult<()> {
     // important for not breaking old modules
     if module.version < VERSION_5 {
         return Ok(());
     }
 
-    for (idx, _fdef) in module.function_defs().iter().enumerate().filter(|(_idx, fdef)| fdef.is_entry) {
-        verify_module_function_signature(module, FunctionDefinitionIndex(idx as TableIndex), check_signature)?
+    for (idx, _fdef) in module
+        .function_defs()
+        .iter()
+        .enumerate()
+        .filter(|(_idx, fdef)| fdef.is_entry)
+    {
+        verify_module_function_signature(
+            module,
+            FunctionDefinitionIndex(idx as TableIndex),
+            check_signature,
+        )?
     }
     Ok(())
 }
@@ -43,17 +61,19 @@ pub fn verify_module_function_signature_by_name(
     name: &IdentStr,
     check_signature: FnCheckScriptSignature,
 ) -> VMResult<()> {
-    let fdef_opt = module
-        .function_defs()
-        .iter()
-        .enumerate()
-        .find(|(_, fdef)| module.identifier_at(module.function_handle_at(fdef.function).name) == name);
+    let fdef_opt = module.function_defs().iter().enumerate().find(|(_, fdef)| {
+        module.identifier_at(module.function_handle_at(fdef.function).name) == name
+    });
     let (idx, _fdef) = fdef_opt.ok_or_else(|| {
         PartialVMError::new(StatusCode::VERIFICATION_ERROR)
             .with_message("function not found in verify_module_script_function".to_string())
             .finish(Location::Module(module.self_id()))
     })?;
-    verify_module_function_signature(module, FunctionDefinitionIndex(idx as TableIndex), check_signature)
+    verify_module_function_signature(
+        module,
+        FunctionDefinitionIndex(idx as TableIndex),
+        check_signature,
+    )
 }
 
 /// This function checks the extra requirements on the signature of the script visible function
@@ -68,8 +88,17 @@ fn verify_module_function_signature(
     let fhandle = module.function_handle_at(fdef.function);
     let parameters = fhandle.parameters;
     let return_ = fhandle.return_;
-    verify_main_signature_impl(module, fdef.is_entry, parameters, Some(return_), check_signature)
-        .map_err(|e| e.at_index(IndexKind::FunctionDefinition, idx.0).finish(Location::Module(module.self_id())))
+    verify_main_signature_impl(
+        module,
+        fdef.is_entry,
+        parameters,
+        Some(return_),
+        check_signature,
+    )
+    .map_err(|e| {
+        e.at_index(IndexKind::FunctionDefinition, idx.0)
+            .finish(Location::Module(module.self_id()))
+    })
 }
 
 fn verify_main_signature_impl(
@@ -105,7 +134,9 @@ pub fn legacy_script_signature_checks(
     use SignatureToken as S;
     let empty_vec = &vec![];
     let parameters = &module.signature_at(parameters_idx).0;
-    let return_types = return_idx.map(|idx| &module.signature_at(idx).0).unwrap_or(empty_vec);
+    let return_types = return_idx
+        .map(|idx| &module.signature_at(idx).0)
+        .unwrap_or(empty_vec);
     // Check that all `signer` arguments occur before non-`signer` arguments
     // signer is a type that can only be populated by the Move VM. And its value is filled
     // based on the sender of the transaction
@@ -115,11 +146,16 @@ pub fn legacy_script_signature_checks(
             .skip_while(|typ| matches!(typ, S::Reference(inner) if matches!(&**inner, S::Signer)))
             .all(|typ| typ.is_valid_for_constant())
     } else {
-        parameters.iter().skip_while(|typ| matches!(typ, S::Signer)).all(|typ| typ.is_valid_for_constant())
+        parameters
+            .iter()
+            .skip_while(|typ| matches!(typ, S::Signer))
+            .all(|typ| typ.is_valid_for_constant())
     };
     let has_valid_return_type = return_types.is_empty();
     if !all_args_have_valid_type || !has_valid_return_type {
-        Err(PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE))
+        Err(PartialVMError::new(
+            StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+        ))
     } else {
         Ok(())
     }

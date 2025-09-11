@@ -1,45 +1,52 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    abi::{EthBridgeCommittee, EthBridgeConfig, EthBridgeLimiter, EthBridgeVault, EthSuiBridge},
-    config::{default_ed25519_key_pair, BridgeNodeConfig, EthConfig, MetricsConfig, SuiConfig, WatchdogConfig},
-    crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKeyBytes},
-    server::APPLICATION_JSON,
-    types::{AddTokensOnSuiAction, BridgeAction, BridgeCommittee},
+use crate::abi::{
+    EthBridgeCommittee, EthBridgeConfig, EthBridgeLimiter, EthBridgeVault, EthSuiBridge,
 };
+use crate::config::{
+    default_ed25519_key_pair, BridgeNodeConfig, EthConfig, MetricsConfig, SuiConfig, WatchdogConfig,
+};
+use crate::crypto::BridgeAuthorityKeyPair;
+use crate::crypto::BridgeAuthorityPublicKeyBytes;
+use crate::server::APPLICATION_JSON;
+use crate::types::BridgeCommittee;
+use crate::types::{AddTokensOnSuiAction, BridgeAction};
 use anyhow::anyhow;
-use ethers::{
-    core::k256::ecdsa::SigningKey,
-    middleware::SignerMiddleware,
-    prelude::*,
-    providers::{Http, Provider},
-    signers::Wallet,
-    types::Address as EthAddress,
-};
-use fastcrypto::{
-    ed25519::Ed25519KeyPair,
-    encoding::{Encoding, Hex},
-    secp256k1::Secp256k1KeyPair,
-    traits::{EncodeDecodeBase64, KeyPair},
-};
+use ethers::core::k256::ecdsa::SigningKey;
+use ethers::middleware::SignerMiddleware;
+use ethers::prelude::*;
+use ethers::providers::{Http, Provider};
+use ethers::signers::Wallet;
+use ethers::types::Address as EthAddress;
+use fastcrypto::ed25519::Ed25519KeyPair;
+use fastcrypto::encoding::{Encoding, Hex};
+use fastcrypto::secp256k1::Secp256k1KeyPair;
+use fastcrypto::traits::EncodeDecodeBase64;
+use fastcrypto::traits::KeyPair;
 use futures::future::join_all;
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr, sync::Arc};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 use sui_config::Config;
-use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions};
+use sui_json_rpc_types::SuiExecutionStatus;
+use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
+use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_keys::keypair_file::read_key;
 use sui_sdk::wallet_context::WalletContext;
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::SuiAddress,
-    bridge::{BridgeChainId, BRIDGE_MODULE_NAME, BRIDGE_REGISTER_FOREIGN_TOKEN_FUNCTION_NAME},
-    committee::StakeUnit,
-    crypto::{get_key_pair, SuiKeyPair, ToFromBytes},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
-    transaction::{ObjectArg, TransactionData},
-    BRIDGE_PACKAGE_ID,
-};
+use sui_types::base_types::SuiAddress;
+use sui_types::bridge::BridgeChainId;
+use sui_types::bridge::{BRIDGE_MODULE_NAME, BRIDGE_REGISTER_FOREIGN_TOKEN_FUNCTION_NAME};
+use sui_types::committee::StakeUnit;
+use sui_types::crypto::get_key_pair;
+use sui_types::crypto::SuiKeyPair;
+use sui_types::crypto::ToFromBytes;
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary;
+use sui_types::transaction::{ObjectArg, TransactionData};
+use sui_types::BRIDGE_PACKAGE_ID;
 
 pub type EthSigner = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
 
@@ -52,39 +59,64 @@ pub struct EthBridgeContracts<P> {
 }
 
 /// Generate Bridge Authority key (Secp256k1KeyPair) and write to a file as base64 encoded `privkey`.
-pub fn generate_bridge_authority_key_and_write_to_file(path: &PathBuf) -> Result<(), anyhow::Error> {
+pub fn generate_bridge_authority_key_and_write_to_file(
+    path: &PathBuf,
+) -> Result<(), anyhow::Error> {
     let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
     let eth_address = BridgeAuthorityPublicKeyBytes::from(&kp.public).to_eth_address();
-    println!("Corresponding Ethereum address by this ecdsa key: {:?}", eth_address);
+    println!(
+        "Corresponding Ethereum address by this ecdsa key: {:?}",
+        eth_address
+    );
     let sui_address = SuiAddress::from(&kp.public);
-    println!("Corresponding OneChain address by this ecdsa key: {:?}", sui_address);
+    println!(
+        "Corresponding Sui address by this ecdsa key: {:?}",
+        sui_address
+    );
     let base64_encoded = kp.encode_base64();
-    std::fs::write(path, base64_encoded).map_err(|err| anyhow!("Failed to write encoded key to path: {:?}", err))
+    std::fs::write(path, base64_encoded)
+        .map_err(|err| anyhow!("Failed to write encoded key to path: {:?}", err))
 }
 
 /// Generate Bridge Client key (Secp256k1KeyPair or Ed25519KeyPair) and write to a file as base64 encoded `flag || privkey`.
-pub fn generate_bridge_client_key_and_write_to_file(path: &PathBuf, use_ecdsa: bool) -> Result<(), anyhow::Error> {
+pub fn generate_bridge_client_key_and_write_to_file(
+    path: &PathBuf,
+    use_ecdsa: bool,
+) -> Result<(), anyhow::Error> {
     let kp = if use_ecdsa {
         let (_, kp): (_, Secp256k1KeyPair) = get_key_pair();
         let eth_address = BridgeAuthorityPublicKeyBytes::from(&kp.public).to_eth_address();
-        println!("Corresponding Ethereum address by this ecdsa key: {:?}", eth_address);
+        println!(
+            "Corresponding Ethereum address by this ecdsa key: {:?}",
+            eth_address
+        );
         SuiKeyPair::from(kp)
     } else {
         let (_, kp): (_, Ed25519KeyPair) = get_key_pair();
         SuiKeyPair::from(kp)
     };
     let sui_address = SuiAddress::from(&kp.public());
-    println!("Corresponding OneChain address by this key: {:?}", sui_address);
+    println!("Corresponding Sui address by this key: {:?}", sui_address);
 
     let contents = kp.encode_base64();
-    std::fs::write(path, contents).map_err(|err| anyhow!("Failed to write encoded key to path: {:?}", err))
+    std::fs::write(path, contents)
+        .map_err(|err| anyhow!("Failed to write encoded key to path: {:?}", err))
 }
 
 /// Given the address of SuiBridge Proxy, return the addresses of the committee, limiter, vault, and config.
 pub async fn get_eth_contract_addresses<P: ethers::providers::JsonRpcClient + 'static>(
     bridge_proxy_address: EthAddress,
     provider: &Arc<Provider<P>>,
-) -> anyhow::Result<(EthAddress, EthAddress, EthAddress, EthAddress, EthAddress, EthAddress)> {
+) -> anyhow::Result<(
+    EthAddress,
+    EthAddress,
+    EthAddress,
+    EthAddress,
+    EthAddress,
+    EthAddress,
+    EthAddress,
+    EthAddress,
+)> {
     let sui_bridge = EthSuiBridge::new(bridge_proxy_address, provider.clone());
     let committee_address: EthAddress = sui_bridge.committee().call().await?;
     let committee = EthBridgeCommittee::new(committee_address, provider.clone());
@@ -95,8 +127,19 @@ pub async fn get_eth_contract_addresses<P: ethers::providers::JsonRpcClient + 's
     let vault = EthBridgeVault::new(vault_address, provider.clone());
     let weth_address: EthAddress = vault.w_eth().call().await?;
     let usdt_address: EthAddress = bridge_config.token_address_of(4).call().await?;
+    let wbtc_address: EthAddress = bridge_config.token_address_of(1).call().await?;
+    let lbtc_address: EthAddress = bridge_config.token_address_of(6).call().await?;
 
-    Ok((committee_address, limiter_address, vault_address, config_address, weth_address, usdt_address))
+    Ok((
+        committee_address,
+        limiter_address,
+        vault_address,
+        config_address,
+        weth_address,
+        usdt_address,
+        wbtc_address,
+        lbtc_address,
+    ))
 }
 
 /// Given the address of SuiBridge Proxy, return the contracts of the committee, limiter, vault, and config.
@@ -114,7 +157,13 @@ pub async fn get_eth_contracts<P: ethers::providers::JsonRpcClient + 'static>(
     let limiter = EthBridgeLimiter::new(limiter_address, provider.clone());
     let vault = EthBridgeVault::new(vault_address, provider.clone());
     let config = EthBridgeConfig::new(config_address, provider.clone());
-    Ok(EthBridgeContracts { bridge: sui_bridge, committee, limiter, vault, config })
+    Ok(EthBridgeContracts {
+        bridge: sui_bridge,
+        committee,
+        limiter,
+        vault,
+        config,
+    })
 }
 
 /// Read bridge key from a file and print the corresponding information.
@@ -138,13 +187,16 @@ pub fn examine_key(path: &PathBuf, is_validator_key: bool) -> Result<(), anyhow:
             kp.public().as_bytes().to_vec()
         }
     };
-    println!("Corresponding OneChain address: {:?}", sui_address);
+    println!("Corresponding Sui address: {:?}", sui_address);
     println!("Corresponding PublicKey: {:?}", Hex::encode(pubkey));
     Ok(())
 }
 
 /// Generate Bridge Node Config template and write to a file.
-pub fn generate_bridge_node_config_and_write_to_file(path: &PathBuf, run_client: bool) -> Result<(), anyhow::Error> {
+pub fn generate_bridge_node_config_and_write_to_file(
+    path: &PathBuf,
+    run_client: bool,
+) -> Result<(), anyhow::Error> {
     let mut config = BridgeNodeConfig {
         server_listen_port: 9191,
         metrics_port: 9184,
@@ -174,7 +226,8 @@ pub fn generate_bridge_node_config_and_write_to_file(path: &PathBuf, run_client:
         watchdog_config: Some(WatchdogConfig {
             total_supplies: BTreeMap::from_iter(vec![(
                 "eth".to_string(),
-                "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH".to_string(),
+                "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH"
+                    .to_string(),
             )]),
         }),
     };
@@ -186,9 +239,13 @@ pub fn generate_bridge_node_config_and_write_to_file(path: &PathBuf, run_client:
 }
 
 pub async fn get_eth_signer_client(url: &str, private_key_hex: &str) -> anyhow::Result<EthSigner> {
-    let provider = Provider::<Http>::try_from(url).unwrap().interval(std::time::Duration::from_millis(2000));
+    let provider = Provider::<Http>::try_from(url)
+        .unwrap()
+        .interval(std::time::Duration::from_millis(2000));
     let chain_id = provider.get_chainid().await?;
-    let wallet = Wallet::from_str(private_key_hex).unwrap().with_chain_id(chain_id.as_u64());
+    let wallet = Wallet::from_str(private_key_hex)
+        .unwrap()
+        .with_chain_id(chain_id.as_u64());
     Ok(SignerMiddleware::new(provider, wallet))
 }
 
@@ -204,7 +261,11 @@ pub async fn publish_and_register_coins_return_add_coins_on_sui_action(
     assert!(token_prices.len() == token_packages_dir.len());
     let sui_client = wallet_context.get_client().await.unwrap();
     let quorum_driver_api = Arc::new(sui_client.quorum_driver_api().clone());
-    let rgp = sui_client.governance_api().get_reference_gas_price().await.unwrap();
+    let rgp = sui_client
+        .governance_api()
+        .get_reference_gas_price()
+        .await
+        .unwrap();
 
     let senders = wallet_context.get_addresses();
     // We want each sender to deal with one coin
@@ -214,23 +275,27 @@ pub async fn publish_and_register_coins_return_add_coins_on_sui_action(
     let mut publish_tokens_tasks = vec![];
 
     for (token_package_dir, sender) in token_packages_dir.iter().zip(senders.clone()) {
-        let gas = wallet_context.get_one_gas_object_owned_by_address(sender).await.unwrap().unwrap();
-        let tx = TestTransactionBuilder::new(sender, gas, rgp).publish(token_package_dir.to_path_buf()).build();
+        let gas = wallet_context
+            .get_one_gas_object_owned_by_address(sender)
+            .await
+            .unwrap()
+            .unwrap();
+        let tx = TestTransactionBuilder::new(sender, gas, rgp)
+            .publish(token_package_dir.to_path_buf())
+            .build();
         let tx = wallet_context.sign_transaction(&tx);
         let api_clone = quorum_driver_api.clone();
         publish_tokens_tasks.push(tokio::spawn(async move {
-            api_clone
-                .execute_transaction_block(
-                    tx,
-                    SuiTransactionBlockResponseOptions::new()
-                        .with_effects()
-                        .with_input()
-                        .with_events()
-                        .with_object_changes()
-                        .with_balance_changes(),
-                    Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution),
-                )
-                .await
+            api_clone.execute_transaction_block(
+                tx,
+                SuiTransactionBlockResponseOptions::new()
+                    .with_effects()
+                    .with_input()
+                    .with_events()
+                    .with_object_changes()
+                    .with_balance_changes(),
+                Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution),
+            ).await
         }));
     }
     let publish_coin_responses = join_all(publish_tokens_tasks).await;
@@ -239,14 +304,18 @@ pub async fn publish_and_register_coins_return_add_coins_on_sui_action(
     let mut register_tasks = vec![];
     for (response, sender) in publish_coin_responses.into_iter().zip(senders.clone()) {
         let response = response.unwrap().unwrap();
-        assert_eq!(response.effects.unwrap().status(), &SuiExecutionStatus::Success);
+        assert_eq!(
+            response.effects.unwrap().status(),
+            &SuiExecutionStatus::Success
+        );
         let object_changes = response.object_changes.unwrap();
         let mut tc = None;
         let mut type_ = None;
         let mut uc = None;
         let mut metadata = None;
         for object_change in &object_changes {
-            if let o @ sui_json_rpc_types::ObjectChange::Created { object_type, .. } = object_change {
+            if let o @ sui_json_rpc_types::ObjectChange::Created { object_type, .. } = object_change
+            {
                 if object_type.name.as_str().starts_with("TreasuryCap") {
                     assert!(tc.is_none() && type_.is_none());
                     tc = Some(o.clone());
@@ -260,14 +329,21 @@ pub async fn publish_and_register_coins_return_add_coins_on_sui_action(
                 }
             }
         }
-        let (tc, type_, uc, metadata) = (tc.unwrap(), type_.unwrap(), uc.unwrap(), metadata.unwrap());
+        let (tc, type_, uc, metadata) =
+            (tc.unwrap(), type_.unwrap(), uc.unwrap(), metadata.unwrap());
 
         // register with the bridge
         let mut builder = ProgrammableTransactionBuilder::new();
         let bridge_arg = builder.obj(bridge_arg).unwrap();
-        let uc_arg = builder.obj(ObjectArg::ImmOrOwnedObject(uc.object_ref())).unwrap();
-        let tc_arg = builder.obj(ObjectArg::ImmOrOwnedObject(tc.object_ref())).unwrap();
-        let metadata_arg = builder.obj(ObjectArg::ImmOrOwnedObject(metadata.object_ref())).unwrap();
+        let uc_arg = builder
+            .obj(ObjectArg::ImmOrOwnedObject(uc.object_ref()))
+            .unwrap();
+        let tc_arg = builder
+            .obj(ObjectArg::ImmOrOwnedObject(tc.object_ref()))
+            .unwrap();
+        let metadata_arg = builder
+            .obj(ObjectArg::ImmOrOwnedObject(metadata.object_ref()))
+            .unwrap();
         builder.programmable_move_call(
             BRIDGE_PACKAGE_ID,
             BRIDGE_MODULE_NAME.into(),
@@ -276,19 +352,30 @@ pub async fn publish_and_register_coins_return_add_coins_on_sui_action(
             vec![bridge_arg, tc_arg, uc_arg, metadata_arg],
         );
         let pt = builder.finish();
-        let gas = wallet_context.get_one_gas_object_owned_by_address(sender).await.unwrap().unwrap();
+        let gas = wallet_context
+            .get_one_gas_object_owned_by_address(sender)
+            .await
+            .unwrap()
+            .unwrap();
         let tx = TransactionData::new_programmable(sender, vec![gas], pt, 1_000_000_000, rgp);
         let signed_tx = wallet_context.sign_transaction(&tx);
         let api_clone = quorum_driver_api.clone();
         register_tasks.push(async move {
             api_clone
-                .execute_transaction_block(signed_tx, SuiTransactionBlockResponseOptions::new().with_effects(), None)
+                .execute_transaction_block(
+                    signed_tx,
+                    SuiTransactionBlockResponseOptions::new().with_effects(),
+                    None,
+                )
                 .await
         });
         token_type_names.push(type_);
     }
     for response in join_all(register_tasks).await {
-        assert_eq!(response.unwrap().effects.unwrap().status(), &SuiExecutionStatus::Success);
+        assert_eq!(
+            response.unwrap().effects.unwrap().status(),
+            &SuiExecutionStatus::Success
+        );
     }
 
     BridgeAction::AddTokensOnSuiAction(AddTokensOnSuiAction {
@@ -327,12 +414,22 @@ pub async fn get_committee_voting_power_by_name(
     bridge_committee: &Arc<BridgeCommittee>,
     system_state: &SuiSystemStateSummary,
 ) -> BTreeMap<String, StakeUnit> {
-    let mut sui_committee: BTreeMap<_, _> =
-        system_state.active_validators.iter().map(|v| (v.sui_address, v.name.clone())).collect();
+    let mut sui_committee: BTreeMap<_, _> = system_state
+        .active_validators
+        .iter()
+        .map(|v| (v.sui_address, v.name.clone()))
+        .collect();
     bridge_committee
         .members()
         .iter()
-        .map(|v| (sui_committee.remove(&v.1.sui_address).unwrap_or(v.1.base_url.clone()), v.1.voting_power))
+        .map(|v| {
+            (
+                sui_committee
+                    .remove(&v.1.sui_address)
+                    .unwrap_or(v.1.base_url.clone()),
+                v.1.voting_power,
+            )
+        })
         .collect()
 }
 
@@ -342,13 +439,21 @@ pub async fn get_validator_names_by_pub_keys(
     bridge_committee: &Arc<BridgeCommittee>,
     system_state: &SuiSystemStateSummary,
 ) -> BTreeMap<BridgeAuthorityPublicKeyBytes, String> {
-    let mut sui_committee: BTreeMap<_, _> =
-        system_state.active_validators.iter().map(|v| (v.sui_address, v.name.clone())).collect();
+    let mut sui_committee: BTreeMap<_, _> = system_state
+        .active_validators
+        .iter()
+        .map(|v| (v.sui_address, v.name.clone()))
+        .collect();
     bridge_committee
         .members()
         .iter()
         .map(|(name, validator)| {
-            (name.clone(), sui_committee.remove(&validator.sui_address).unwrap_or(validator.base_url.clone()))
+            (
+                name.clone(),
+                sui_committee
+                    .remove(&validator.sui_address)
+                    .unwrap_or(validator.base_url.clone()),
+            )
         })
         .collect()
 }

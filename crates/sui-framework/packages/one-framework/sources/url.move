@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// URL: standard Uniform Resource Locator string
-module one::url;
+module oct::url;
 
 use std::ascii::String;
 
 /// Standard Uniform Resource Locator (URL) string.
-public struct Url has store, copy, drop {
+public struct Url has copy, drop, store {
     // TODO: validate URL format
     url: String,
 }

@@ -1,31 +1,38 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::Range;
 use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
+use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::RunQueryDsl;
 use sui_indexer_alt_framework::{
-    db,
     pipeline::{concurrent::Handler, Processor},
+    postgres::{Connection, Db},
+    types::{
+        event::SystemEpochInfoEvent,
+        full_checkpoint_content::CheckpointData,
+        transaction::{TransactionDataAPI, TransactionKind},
+    },
 };
-use sui_types::{
-    event::SystemEpochInfoEvent,
-    full_checkpoint_content::CheckpointData,
-    transaction::{TransactionDataAPI, TransactionKind},
-};
+use sui_indexer_alt_schema::{epochs::StoredEpochEnd, schema::kv_epoch_ends};
 
-use crate::{models::epochs::StoredEpochEnd, schema::kv_epoch_ends};
+use crate::handlers::cp_sequence_numbers::epoch_interval;
 
 pub(crate) struct KvEpochEnds;
 
 impl Processor for KvEpochEnds {
-    type Value = StoredEpochEnd;
-
     const NAME: &'static str = "kv_epoch_ends";
 
+    type Value = StoredEpochEnd;
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData { checkpoint_summary, transactions, .. } = checkpoint.as_ref();
+        let CheckpointData {
+            checkpoint_summary,
+            transactions,
+            ..
+        } = checkpoint.as_ref();
 
         let Some(end_of_epoch) = checkpoint_summary.end_of_epoch_data.as_ref() else {
             return Ok(vec![]);
@@ -58,7 +65,11 @@ impl Processor for KvEpochEnds {
             .events
             .iter()
             .flat_map(|events| &events.data)
-            .find_map(|event| event.is_system_epoch_info_event().then(|| bcs::from_bytes(&event.contents)))
+            .find_map(|event| {
+                event
+                    .is_system_epoch_info_event()
+                    .then(|| bcs::from_bytes(&event.contents))
+            })
             .transpose()
             .context("Failed to deserialize SystemEpochInfoEvent")?
         {
@@ -111,9 +122,173 @@ impl Processor for KvEpochEnds {
 
 #[async_trait::async_trait]
 impl Handler for KvEpochEnds {
+    type Store = Db;
+
     const MIN_EAGER_ROWS: usize = 1;
 
-    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(kv_epoch_ends::table).values(values).on_conflict_do_nothing().execute(conn).await?)
+    async fn commit<'a>(values: &[Self::Value], conn: &mut Connection<'a>) -> Result<usize> {
+        Ok(diesel::insert_into(kv_epoch_ends::table)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?)
+    }
+
+    async fn prune<'a>(
+        &self,
+        from: u64,
+        to_exclusive: u64,
+        conn: &mut Connection<'a>,
+    ) -> Result<usize> {
+        let Range {
+            start: from_epoch,
+            end: to_epoch,
+        } = epoch_interval(conn, from..to_exclusive).await?;
+        if from_epoch < to_epoch {
+            let filter = kv_epoch_ends::table
+                .filter(kv_epoch_ends::epoch.between(from_epoch as i64, to_epoch as i64 - 1));
+            Ok(diesel::delete(filter).execute(conn).await?)
+        } else {
+            Ok(0)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+    use sui_indexer_alt_framework::{
+        types::test_checkpoint_data_builder::TestCheckpointDataBuilder, Indexer,
+    };
+    use sui_indexer_alt_schema::MIGRATIONS;
+
+    use crate::handlers::cp_sequence_numbers::CpSequenceNumbers;
+
+    async fn get_all_kv_epoch_ends(conn: &mut Connection<'_>) -> Result<Vec<StoredEpochEnd>> {
+        let result = kv_epoch_ends::table
+            .order_by(kv_epoch_ends::epoch.asc())
+            .load(conn)
+            .await?;
+        Ok(result)
+    }
+
+    async fn get_epoch_num_of_all_kv_epoch_ends(conn: &mut Connection<'_>) -> Result<Vec<i64>> {
+        let epochs = get_all_kv_epoch_ends(conn).await?;
+        Ok(epochs.iter().map(|e| e.epoch).collect())
+    }
+
+    #[tokio::test]
+    pub async fn test_kv_epoch_ends_safe_mode() {
+        let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
+        let mut conn = indexer.store().connect().await.unwrap();
+
+        let mut builder = TestCheckpointDataBuilder::new(0);
+        let checkpoint = Arc::new(builder.advance_epoch(true));
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+
+        let epochs = get_all_kv_epoch_ends(&mut conn).await.unwrap();
+        assert_eq!(epochs.len(), 1);
+        assert!(epochs[0].safe_mode);
+        assert_eq!(epochs[0].total_gas_fees, None);
+
+        let checkpoint = Arc::new(builder.advance_epoch(false));
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+
+        let epochs = get_all_kv_epoch_ends(&mut conn).await.unwrap();
+        assert_eq!(epochs.len(), 2);
+        assert!(!epochs[1].safe_mode);
+        assert_eq!(epochs[1].total_gas_fees, Some(0));
+    }
+
+    #[tokio::test]
+    pub async fn test_kv_epoch_ends_same_epoch() {
+        let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
+        let mut conn = indexer.store().connect().await.unwrap();
+
+        // Test that there is nothing to commit while we haven't reached epoch end.
+        let mut builder = TestCheckpointDataBuilder::new(0);
+        let checkpoint = Arc::new(builder.build_checkpoint());
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        assert_eq!(values.len(), 0);
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        let checkpoint = Arc::new(builder.build_checkpoint());
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        assert_eq!(values.len(), 0);
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        // When the advance epoch tx is detected, there should be an entry to commit.
+        let checkpoint = Arc::new(builder.advance_epoch(false));
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        assert_eq!(values.len(), 1);
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        // Afterwards, kv_epoch_ends should not have anything to commit until the next advance epoch
+        // tx.
+        let checkpoint = Arc::new(builder.build_checkpoint());
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        assert_eq!(values.len(), 0);
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        let checkpoint = Arc::new(builder.build_checkpoint());
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        assert_eq!(values.len(), 0);
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        let epochs = get_epoch_num_of_all_kv_epoch_ends(&mut conn).await.unwrap();
+        assert_eq!(epochs, vec![0]);
+
+        let rows_pruned = KvEpochEnds.prune(0, 4, &mut conn).await.unwrap();
+        let epochs = get_epoch_num_of_all_kv_epoch_ends(&mut conn).await.unwrap();
+        assert_eq!(epochs.len(), 0);
+        assert_eq!(rows_pruned, 1);
+    }
+
+    #[tokio::test]
+    pub async fn test_kv_epoch_ends_advance_multiple_epochs() {
+        let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
+        let mut conn = indexer.store().connect().await.unwrap();
+
+        // Advance epoch three times, 0, 1, 2
+        let mut builder = TestCheckpointDataBuilder::new(0);
+        let checkpoint = Arc::new(builder.advance_epoch(false));
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        let checkpoint = Arc::new(builder.advance_epoch(false));
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        let checkpoint = Arc::new(builder.advance_epoch(false));
+        let values = KvEpochEnds.process(&checkpoint).unwrap();
+        KvEpochEnds::commit(&values, &mut conn).await.unwrap();
+        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
+
+        let epochs = get_epoch_num_of_all_kv_epoch_ends(&mut conn).await.unwrap();
+        assert_eq!(epochs, vec![0, 1, 2]);
+
+        let rows_pruned = KvEpochEnds.prune(0, 2, &mut conn).await.unwrap();
+        let epochs = get_epoch_num_of_all_kv_epoch_ends(&mut conn).await.unwrap();
+        // Only epoch 2 remains, after pruning 0 and 1.
+        assert_eq!(epochs, vec![2]);
+        assert_eq!(rows_pruned, 2);
     }
 }

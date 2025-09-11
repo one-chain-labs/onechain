@@ -5,11 +5,11 @@
 //! This module defines the abstract state for the local safety analysis.
 
 use crate::ability_cache::AbilityCache;
-use move_abstract_interpreter::absint::{AbstractDomain, FunctionContext, JoinResult};
+use crate::absint::{AbstractDomain, FunctionContext, JoinResult};
 use move_binary_format::{
+    CompiledModule,
     errors::{PartialVMError, PartialVMResult},
     file_format::{AbilitySet, CodeOffset, FunctionDefinitionIndex, LocalIndex},
-    CompiledModule,
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
 use move_core_types::vm_status::StatusCode;
@@ -48,17 +48,30 @@ impl AbstractState {
     ) -> PartialVMResult<Self> {
         let num_args = function_context.parameters().len();
         let num_locals = num_args + function_context.locals().len();
-        let local_states = (0..num_locals).map(|i| if i < num_args { Available } else { Unavailable }).collect();
+        let local_states = (0..num_locals)
+            .map(|i| if i < num_args { Available } else { Unavailable })
+            .collect();
 
         let all_local_abilities = function_context
             .parameters()
             .0
             .iter()
             .chain(function_context.locals().0.iter())
-            .map(|st| ability_cache.abilities(Scope::Function, meter, function_context.type_parameters(), st))
+            .map(|st| {
+                ability_cache.abilities(
+                    Scope::Function,
+                    meter,
+                    function_context.type_parameters(),
+                    st,
+                )
+            })
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        Ok(Self { current_function: function_context.index(), local_states, all_local_abilities })
+        Ok(Self {
+            current_function: function_context.index(),
+            local_states,
+            all_local_abilities,
+        })
     }
 
     pub fn local_abilities(&self, idx: LocalIndex) -> AbilitySet {
@@ -87,7 +100,10 @@ impl AbstractState {
     }
 
     pub fn error(&self, status: StatusCode, offset: CodeOffset) -> PartialVMError {
-        PartialVMError::new(status).at_code_offset(self.current_function.unwrap_or(FunctionDefinitionIndex(0)), offset)
+        PartialVMError::new(status).at_code_offset(
+            self.current_function.unwrap_or(FunctionDefinitionIndex(0)),
+            offset,
+        )
     }
 
     fn join_(&self, other: &Self) -> Self {
@@ -119,13 +135,21 @@ impl AbstractState {
             })
             .collect();
 
-        Self { current_function, all_local_abilities, local_states }
+        Self {
+            current_function,
+            all_local_abilities,
+            local_states,
+        }
     }
 }
 
 impl AbstractDomain for AbstractState {
     /// attempts to join state to self and returns the result
-    fn join(&mut self, state: &AbstractState, meter: &mut (impl Meter + ?Sized)) -> PartialVMResult<JoinResult> {
+    fn join(
+        &mut self,
+        state: &AbstractState,
+        meter: &mut (impl Meter + ?Sized),
+    ) -> PartialVMResult<JoinResult> {
         meter.add(Scope::Function, JOIN_COST)?;
         let joined = Self::join_(self, state);
         assert!(self.local_states.len() == joined.local_states.len());

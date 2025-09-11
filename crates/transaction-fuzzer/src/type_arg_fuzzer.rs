@@ -1,25 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{account_address::AccountAddress, identifier::Identifier, language_storage::StructTag};
-use proptest::{arbitrary::*, prelude::*};
+use move_core_types::language_storage::StructTag;
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use proptest::arbitrary::*;
+use proptest::prelude::*;
 
 use sui_core::test_utils::send_and_confirm_transaction;
-use sui_types::{
-    base_types::ObjectID,
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    error::SuiError,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{ProgrammableTransaction, TransactionData, TransactionKind},
-    utils::to_sender_signed_transaction,
-    TypeTag,
-    SUI_FRAMEWORK_PACKAGE_ID,
-};
+use sui_types::base_types::ObjectID;
+use sui_types::effects::{TransactionEffects, TransactionEffectsAPI};
+use sui_types::error::SuiError;
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{ProgrammableTransaction, TransactionData, TransactionKind};
+use sui_types::utils::to_sender_signed_transaction;
+use sui_types::{TypeTag, SUI_FRAMEWORK_PACKAGE_ID};
 
-use crate::{
-    account_universe::AccountCurrent,
-    executor::{assert_is_acceptable_result, Executor},
-};
+use crate::account_universe::AccountCurrent;
+use crate::executor::{assert_is_acceptable_result, Executor};
 
 const GAS_PRICE: u64 = 700;
 const GAS: u64 = 1_000_000 * GAS_PRICE;
@@ -53,25 +50,45 @@ pub fn gen_nested_type_tag() -> impl Strategy<Value = TypeTag> {
 }
 
 pub fn gen_struct_tag() -> impl Strategy<Value = StructTag> {
-    (any::<AccountAddress>(), any::<Identifier>(), any::<Identifier>(), any::<Vec<TypeTag>>())
-        .prop_map(|(address, module, name, type_params)| StructTag { address, module, name, type_params })
+    (
+        any::<AccountAddress>(),
+        any::<Identifier>(),
+        any::<Identifier>(),
+        any::<Vec<TypeTag>>(),
+    )
+        .prop_map(|(address, module, name, type_params)| StructTag {
+            address,
+            module,
+            name,
+            type_params,
+        })
 }
 
-pub fn generate_valid_type_factory_tags(type_factory_addr: ObjectID) -> impl Strategy<Value = TypeTag> {
-    let leaf =
-        prop_oneof![base_type_factory_tag_gen(type_factory_addr), nested_type_factory_tag_gen(type_factory_addr),];
+pub fn generate_valid_type_factory_tags(
+    type_factory_addr: ObjectID,
+) -> impl Strategy<Value = TypeTag> {
+    let leaf = prop_oneof![
+        base_type_factory_tag_gen(type_factory_addr),
+        nested_type_factory_tag_gen(type_factory_addr),
+    ];
 
-    leaf.prop_recursive(8, 6, 10, move |inner| prop_oneof![inner.prop_map(|x| TypeTag::Vector(Box::new(x))),])
+    leaf.prop_recursive(8, 6, 10, move |inner| {
+        prop_oneof![inner.prop_map(|x| TypeTag::Vector(Box::new(x))),]
+    })
 }
 
-pub fn generate_valid_and_invalid_type_factory_tags(type_factory_addr: ObjectID) -> impl Strategy<Value = TypeTag> {
+pub fn generate_valid_and_invalid_type_factory_tags(
+    type_factory_addr: ObjectID,
+) -> impl Strategy<Value = TypeTag> {
     let leaf = prop_oneof![
         any::<TypeTag>(),
         base_type_factory_tag_gen(type_factory_addr),
         nested_type_factory_tag_gen(type_factory_addr),
     ];
 
-    leaf.prop_recursive(8, 6, 10, move |inner| prop_oneof![inner.prop_map(|x| TypeTag::Vector(Box::new(x))),])
+    leaf.prop_recursive(8, 6, 10, move |inner| {
+        prop_oneof![inner.prop_map(|x| TypeTag::Vector(Box::new(x))),]
+    })
 }
 
 pub fn base_type_factory_tag_gen(addr: ObjectID) -> impl Strategy<Value = TypeTag> {
@@ -98,7 +115,11 @@ pub fn nested_type_factory_tag_gen(addr: ObjectID) -> impl Strategy<Value = Type
     })
 }
 
-pub fn type_factory_pt_for_tags(package_id: ObjectID, type_tags: Vec<TypeTag>, len: usize) -> ProgrammableTransaction {
+pub fn type_factory_pt_for_tags(
+    package_id: ObjectID,
+    type_tags: Vec<TypeTag>,
+    len: usize,
+) -> ProgrammableTransaction {
     let mut builder = ProgrammableTransactionBuilder::new();
     builder
         .move_call(
@@ -140,7 +161,15 @@ pub fn run_pt_effects(
     let gas_object = account.new_gas_object(exec);
     let gas_object_ref = gas_object.compute_object_reference();
     let kind = TransactionKind::ProgrammableTransaction(pt);
-    let tx_data = TransactionData::new(kind, account.initial_data.account.address, gas_object_ref, GAS, GAS_PRICE);
+    let tx_data = TransactionData::new(
+        kind,
+        account.initial_data.account.address,
+        gas_object_ref,
+        GAS,
+        GAS_PRICE,
+    );
     let signed_txn = to_sender_signed_transaction(tx_data, &account.initial_data.account.key);
-    exec.rt.block_on(send_and_confirm_transaction(&exec.state, None, signed_txn)).map(|(_, effects)| effects.into_data())
+    exec.rt
+        .block_on(send_and_confirm_transaction(&exec.state, None, signed_txn))
+        .map(|(_, effects)| effects.into_data())
 }

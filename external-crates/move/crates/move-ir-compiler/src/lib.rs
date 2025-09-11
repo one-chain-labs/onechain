@@ -27,10 +27,16 @@ pub struct Compiler<'a> {
 
 impl<'a> Compiler<'a> {
     pub fn new(deps: Vec<&'a CompiledModule>) -> Self {
-        Self { deps, named_addresses: BTreeMap::new() }
+        Self {
+            deps,
+            named_addresses: BTreeMap::new(),
+        }
     }
 
-    pub fn with_named_addresses(mut self, named_addresses: BTreeMap<String, AccountAddress>) -> Self {
+    pub fn with_named_addresses(
+        mut self,
+        named_addresses: BTreeMap<String, AccountAddress>,
+    ) -> Self {
         self.named_addresses.extend(named_addresses);
         self
     }
@@ -40,18 +46,10 @@ impl<'a> Compiler<'a> {
         Ok(self.compile_mod(code)?.0)
     }
 
-    /// Compiles the module into a serialized form.
-    pub fn into_module_blob(self, code: &str) -> Result<Vec<u8>> {
-        let compiled_module = self.compile_mod(code)?.0;
-
-        let mut serialized_module = Vec::<u8>::new();
-        compiled_module.serialize_with_version(compiled_module.version, &mut serialized_module)?;
-        Ok(serialized_module)
-    }
-
     fn compile_mod(self, code: &str) -> Result<(CompiledModule, SourceMap)> {
         let parsed_module = parse_module_with_named_addresses(code, &self.named_addresses)?;
-        let (compiled_module, source_map) = compile_module(parsed_module, self.deps.iter().copied())?;
+        let (compiled_module, source_map) =
+            compile_module(parsed_module, self.deps.iter().copied())?;
         Ok((compiled_module, source_map))
     }
 }

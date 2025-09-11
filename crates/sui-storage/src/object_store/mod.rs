@@ -5,7 +5,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use object_store::{path::Path, DynObjectStore, ObjectMeta};
+use object_store::path::Path;
+use object_store::{DynObjectStore, ObjectMeta, ObjectStore};
 use std::sync::Arc;
 
 pub mod http;
@@ -31,29 +32,48 @@ macro_rules! as_ref_get_ext_impl {
 as_ref_get_ext_impl!(Arc<dyn ObjectStoreGetExt>);
 as_ref_get_ext_impl!(Box<dyn ObjectStoreGetExt>);
 
-#[async_trait]
-impl ObjectStoreGetExt for Arc<DynObjectStore> {
-    async fn get_bytes(&self, src: &Path) -> Result<Bytes> {
-        self.get(src)
-            .await
-            .map_err(|e| anyhow!("Failed to get file {} with error: {:?}", src, e))?
-            .bytes()
-            .await
-            .map_err(|e| anyhow!("Failed to collect GET result for file {} into bytes with error: {:?}", src, e))
-    }
+macro_rules! as_ref_get_impl {
+    ($type:ty) => {
+        #[async_trait]
+        impl ObjectStoreGetExt for $type {
+            async fn get_bytes(&self, src: &Path) -> Result<Bytes> {
+                self.get(src)
+                    .await
+                    .map_err(|e| anyhow!("Failed to get file {} with error: {:?}", src, e))?
+                    .bytes()
+                    .await
+                    .map_err(|e| {
+                        anyhow!(
+                            "Failed to collect GET result for file {} into bytes with error: {:?}",
+                            src,
+                            e
+                        )
+                    })
+            }
+        }
+    };
 }
+
+as_ref_get_impl!(Arc<dyn ObjectStore>);
+as_ref_get_impl!(Box<dyn ObjectStore>);
 
 #[async_trait]
 pub trait ObjectStoreListExt: Send + Sync + 'static {
     /// List the objects at the given path in object store
-    async fn list_objects(&self, src: Option<&Path>) -> BoxStream<'_, object_store::Result<ObjectMeta>>;
+    async fn list_objects(
+        &self,
+        src: Option<&Path>,
+    ) -> BoxStream<'_, object_store::Result<ObjectMeta>>;
 }
 
 macro_rules! as_ref_list_ext_impl {
     ($type:ty) => {
         #[async_trait]
         impl ObjectStoreListExt for $type {
-            async fn list_objects(&self, src: Option<&Path>) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
+            async fn list_objects(
+                &self,
+                src: Option<&Path>,
+            ) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
                 self.as_ref().list_objects(src).await
             }
         }
@@ -65,7 +85,10 @@ as_ref_list_ext_impl!(Box<dyn ObjectStoreListExt>);
 
 #[async_trait]
 impl ObjectStoreListExt for Arc<DynObjectStore> {
-    async fn list_objects(&self, src: Option<&Path>) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
+    async fn list_objects(
+        &self,
+        src: Option<&Path>,
+    ) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
         self.list(src)
     }
 }

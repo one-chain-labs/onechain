@@ -6,8 +6,7 @@ use std::sync::Arc;
 use async_graphql::{
     extensions::{Extension, ExtensionContext, ExtensionFactory, NextParseQuery},
     parser::types::{Directive, ExecutableDocument, Selection},
-    Positioned,
-    ServerResult,
+    Positioned, ServerResult,
 };
 use async_graphql_value::Variables;
 use async_trait::async_trait;
@@ -81,11 +80,17 @@ fn check_directives(directives: &[Positioned<Directive>]) -> ServerResult<()> {
     for directive in directives {
         let name = &directive.node.name.node;
         if !ALLOWED_DIRECTIVES.contains(&name.as_str()) {
-            let supported: Vec<_> = ALLOWED_DIRECTIVES.iter().map(|s| format!("`@{s}`")).collect();
+            let supported: Vec<_> = ALLOWED_DIRECTIVES
+                .iter()
+                .map(|s| format!("`@{s}`"))
+                .collect();
 
             return Err(graphql_error_at_pos(
                 code::BAD_USER_INPUT,
-                format!("Directive `@{name}` is not supported. Supported directives are {}", supported.join(", "),),
+                format!(
+                    "Directive `@{name}` is not supported. Supported directives are {}",
+                    supported.join(", "),
+                ),
                 directive.pos,
             ));
         }

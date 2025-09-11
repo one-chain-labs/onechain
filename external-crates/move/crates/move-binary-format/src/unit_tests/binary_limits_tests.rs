@@ -3,17 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    CompiledModule,
     binary_config::{BinaryConfig, TableConfig},
     errors::BinaryLoaderResult,
     file_format::*,
-    CompiledModule,
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+};
 // Add simple proptest tests
 // use proptest::prelude::*;
 
 // Serialize a `CompiledModule` and deserialize with a given config (round trip)
-fn deserialize(module: &CompiledModule, binary_config: &BinaryConfig) -> BinaryLoaderResult<CompiledModule> {
+fn deserialize(
+    module: &CompiledModule,
+    binary_config: &BinaryConfig,
+) -> BinaryLoaderResult<CompiledModule> {
     // serialize the module
     let mut bytes = vec![];
     module.serialize(&mut bytes).unwrap();
@@ -90,7 +95,10 @@ fn binary_limits_test() {
     check_limit!(
         module_test,
         module_handles,
-        ModuleHandle { address: AddressIdentifierIndex::new(0), name: IdentifierIndex::new(0) },
+        ModuleHandle {
+            address: AddressIdentifierIndex::new(0),
+            name: IdentifierIndex::new(0)
+        },
         &binary_config,
         "MODULE_HANDLES"
     );
@@ -138,32 +146,56 @@ fn binary_limits_test() {
     check_limit!(
         module_test,
         function_instantiations,
-        FunctionInstantiation { handle: FunctionHandleIndex(0), type_parameters: SignatureIndex(0) },
+        FunctionInstantiation {
+            handle: FunctionHandleIndex(0),
+            type_parameters: SignatureIndex(0),
+        },
         &binary_config,
         "FUNCTION_INST"
     );
 
     // SIGNATURES
     let module_test = &mut module.clone();
-    check_limit!(module_test, signatures, Signature(vec![]), &binary_config, "SIGNATURES");
+    check_limit!(
+        module_test,
+        signatures,
+        Signature(vec![]),
+        &binary_config,
+        "SIGNATURES"
+    );
 
     // CONSTANT_POOL
     let module_test = &mut module.clone();
     check_limit!(
         module_test,
         constant_pool,
-        Constant { type_: SignatureToken::U64, data: vec![0; 8] },
+        Constant {
+            type_: SignatureToken::U64,
+            data: vec![0; 8],
+        },
         &binary_config,
         "CONSTANT_POOL"
     );
 
     // IDENTIFIERS
     let module_test = &mut module.clone();
-    check_limit!(module_test, identifiers, Identifier::new("ident").unwrap(), &binary_config, "IDENTIFIERS");
+    check_limit!(
+        module_test,
+        identifiers,
+        Identifier::new("ident").unwrap(),
+        &binary_config,
+        "IDENTIFIERS"
+    );
 
     // ADDRESS_IDENTIFIERS
     let module_test = &mut module.clone();
-    check_limit!(module_test, address_identifiers, AccountAddress::random(), &binary_config, "ADDRESS_IDENTIFIERS");
+    check_limit!(
+        module_test,
+        address_identifiers,
+        AccountAddress::random(),
+        &binary_config,
+        "ADDRESS_IDENTIFIERS"
+    );
 
     // STRUCT_DEFS
     let module_test = &mut module.clone();
@@ -199,7 +231,10 @@ fn binary_limits_test() {
     check_limit!(
         module_test,
         struct_def_instantiations,
-        StructDefInstantiation { def: StructDefinitionIndex(0), type_parameters: SignatureIndex(0) },
+        StructDefInstantiation {
+            def: StructDefinitionIndex(0),
+            type_parameters: SignatureIndex(0),
+        },
         &binary_config,
         "STRUCT_DEF_INST"
     );
@@ -217,7 +252,10 @@ fn binary_limits_test() {
         enum_defs,
         EnumDefinition {
             enum_handle: DatatypeHandleIndex(0),
-            variants: vec![VariantDefinition { variant_name: IdentifierIndex(0), fields: vec![] }]
+            variants: vec![VariantDefinition {
+                variant_name: IdentifierIndex(0),
+                fields: vec![],
+            }]
         },
         &binary_config,
         "ENUM_DEFS"
@@ -233,12 +271,18 @@ fn binary_limits_test() {
     });
     module_test.enum_defs.push(EnumDefinition {
         enum_handle: DatatypeHandleIndex(0),
-        variants: vec![VariantDefinition { variant_name: IdentifierIndex(0), fields: vec![] }],
+        variants: vec![VariantDefinition {
+            variant_name: IdentifierIndex(0),
+            fields: vec![],
+        }],
     });
     check_limit!(
         module_test,
         enum_def_instantiations,
-        EnumDefInstantiation { def: EnumDefinitionIndex(0), type_parameters: SignatureIndex(0) },
+        EnumDefInstantiation {
+            def: EnumDefinitionIndex(0),
+            type_parameters: SignatureIndex(0),
+        },
         &binary_config,
         "ENUM_DEF_INST"
     );
@@ -260,7 +304,11 @@ fn binary_limits_test() {
             visibility: Visibility::Public,
             is_entry: false,
             acquires_global_resources: vec![],
-            code: Some(CodeUnit { locals: SignatureIndex(0), code: vec![Bytecode::Ret], jump_tables: vec![] }),
+            code: Some(CodeUnit {
+                locals: SignatureIndex(0),
+                code: vec![Bytecode::Ret],
+                jump_tables: vec![],
+            }),
         },
         &binary_config,
         "FUNCTION_DEFS"
@@ -284,7 +332,10 @@ fn binary_limits_test() {
     check_limit!(
         module_test,
         field_handles,
-        FieldHandle { owner: StructDefinitionIndex(0), field: 0 },
+        FieldHandle {
+            owner: StructDefinitionIndex(0),
+            field: 0,
+        },
         &binary_config,
         "FIELD_HANDLE"
     );
@@ -304,11 +355,17 @@ fn binary_limits_test() {
             signature: TypeSignature(SignatureToken::Bool),
         }]),
     });
-    module_test.field_handles.push(FieldHandle { owner: StructDefinitionIndex(0), field: 0 });
+    module_test.field_handles.push(FieldHandle {
+        owner: StructDefinitionIndex(0),
+        field: 0,
+    });
     check_limit!(
         module_test,
         field_instantiations,
-        FieldInstantiation { handle: FieldHandleIndex(0), type_parameters: SignatureIndex(0) },
+        FieldInstantiation {
+            handle: FieldHandleIndex(0),
+            type_parameters: SignatureIndex(0),
+        },
         &binary_config,
         "FIELD_INST"
     );
@@ -325,13 +382,19 @@ fn binary_limits_test() {
         enum_handle: DatatypeHandleIndex(0),
         variants: vec![VariantDefinition {
             variant_name: IdentifierIndex(0),
-            fields: vec![FieldDefinition { name: IdentifierIndex(0), signature: TypeSignature(SignatureToken::Bool) }],
+            fields: vec![FieldDefinition {
+                name: IdentifierIndex(0),
+                signature: TypeSignature(SignatureToken::Bool),
+            }],
         }],
     });
     check_limit!(
         module_test,
         variant_handles,
-        VariantHandle { enum_def: EnumDefinitionIndex(0), variant: 0 },
+        VariantHandle {
+            enum_def: EnumDefinitionIndex(0),
+            variant: 0,
+        },
         &binary_config,
         "VARIANT_HANDLE"
     );
@@ -348,16 +411,25 @@ fn binary_limits_test() {
         enum_handle: DatatypeHandleIndex(0),
         variants: vec![VariantDefinition {
             variant_name: IdentifierIndex(0),
-            fields: vec![FieldDefinition { name: IdentifierIndex(0), signature: TypeSignature(SignatureToken::Bool) }],
+            fields: vec![FieldDefinition {
+                name: IdentifierIndex(0),
+                signature: TypeSignature(SignatureToken::Bool),
+            }],
         }],
     });
     module_test
         .enum_def_instantiations
-        .push(EnumDefInstantiation { def: EnumDefinitionIndex(0), type_parameters: SignatureIndex(0) });
+        .push(EnumDefInstantiation {
+            def: EnumDefinitionIndex(0),
+            type_parameters: SignatureIndex(0),
+        });
     check_limit!(
         module_test,
         variant_instantiation_handles,
-        VariantInstantiationHandle { enum_def: EnumDefInstantiationIndex(0), variant: 0 },
+        VariantInstantiationHandle {
+            enum_def: EnumDefInstantiationIndex(0),
+            variant: 0,
+        },
         &binary_config,
         "VARIANT_INST"
     );
@@ -367,7 +439,10 @@ fn binary_limits_test() {
     check_limit!(
         module_test,
         friend_decls,
-        ModuleHandle { address: AddressIdentifierIndex::new(0), name: IdentifierIndex::new(0) },
+        ModuleHandle {
+            address: AddressIdentifierIndex::new(0),
+            name: IdentifierIndex::new(0)
+        },
         &binary_config,
         "FRIEND_DECLS"
     );

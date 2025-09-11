@@ -7,12 +7,11 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 criterion.workspace = true
 once_cell.workspace = true
-criterion-cpu-time.workspace = true
 
 move-core-types.workspace = true
 move-compiler.workspace = true

@@ -2,10 +2,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_abstract_interpreter::control_flow_graph::{BlockId, ControlFlowGraph, VMControlFlowGraph};
+use move_abstract_interpreter::control_flow_graph::{
+    BlockId, ControlFlowGraph, VMControlFlowGraph,
+};
 use move_binary_format::{
     errors::PartialVMResult,
-    file_format::{AbilitySet, Bytecode, CodeOffset, CodeUnit, FunctionDefinitionIndex, FunctionHandle, Signature},
+    file_format::{
+        AbilitySet, Bytecode, CodeOffset, CodeUnit, FunctionDefinitionIndex, FunctionHandle,
+        Signature,
+    },
     CompiledModule,
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
@@ -26,7 +31,11 @@ pub struct FunctionContext<'a> {
 /// Trait for finite-height abstract domains. Infinite height domains would require a more complex
 /// trait with widening and a partial order.
 pub trait AbstractDomain: Clone + Sized {
-    fn join(&mut self, other: &Self, meter: &mut (impl Meter + ?Sized)) -> PartialVMResult<JoinResult>;
+    fn join(
+        &mut self,
+        other: &Self,
+        meter: &mut (impl Meter + ?Sized),
+    ) -> PartialVMResult<JoinResult>;
 }
 
 #[derive(Debug)]
@@ -126,7 +135,10 @@ pub trait AbstractInterpreter: TransferFunctions {
                             JoinResult::Changed => {
                                 // If the cur->successor is a back edge, jump back to the beginning
                                 // of the loop, instead of the normal next block
-                                if function_context.cfg().is_back_edge(block_id, *successor_block_id) {
+                                if function_context
+                                    .cfg()
+                                    .is_back_edge(block_id, *successor_block_id)
+                                {
                                     meter.add(Scope::Function, PER_BACKEDGE_COST)?;
                                     next_block_candidate = Some(*successor_block_id);
                                     break;
@@ -137,7 +149,12 @@ pub trait AbstractInterpreter: TransferFunctions {
                     None => {
                         // Haven't visited the next block yet. Use the post of the current block as
                         // its pre
-                        inv_map.insert(*successor_block_id, BlockInvariant { pre: post_state.clone() });
+                        inv_map.insert(
+                            *successor_block_id,
+                            BlockInvariant {
+                                pre: post_state.clone(),
+                            },
+                        );
                     }
                 }
             }

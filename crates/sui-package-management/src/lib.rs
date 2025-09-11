@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Context};
-use std::{
-    collections::HashMap,
-    fs::File,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use move_core_types::account_address::AccountAddress;
 use move_package::{
@@ -19,6 +17,8 @@ use move_symbol_pool::Symbol;
 use sui_json_rpc_types::{get_new_package_obj_from_response, SuiTransactionBlockResponse};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
+
+pub mod system_package_versions;
 
 const PUBLISHED_AT_MANIFEST_FIELD: &str = "published-at";
 
@@ -39,14 +39,16 @@ pub enum PublishedAtError {
         "Conflicting 'published-at' addresses between Move.toml -- {id_manifest} -- and \
          Move.lock -- {id_lock}"
     )]
-    Conflict { id_lock: ObjectID, id_manifest: ObjectID },
+    Conflict {
+        id_lock: ObjectID,
+        id_manifest: ObjectID,
+    },
 }
 
-/// Update the `Move.lock` file with automated address management info.
-/// Expects a wallet context, the publish or upgrade command, its response.
-/// The `Move.lock` principally file records the published address (i.e., package ID) of
-/// a package under an environment determined by the wallet context config. See the
-/// `ManagedPackage` type in the lock file for a complete spec.
+/// Update the `Move.lock` file with automated address management info. Expects a wallet context,
+/// the publish or upgrade command, and its response. The `Move.lock` file principally records the
+/// published address (i.e., package ID) of a package under an environment determined by the wallet
+/// context config. See the `ManagedPackage` type in the lock file for a complete spec.
 pub async fn update_lock_file(
     context: &WalletContext,
     command: LockCommand,
@@ -62,7 +64,33 @@ pub async fn update_lock_file(
         .get_chain_identifier()
         .await
         .context("Network issue: couldn't determine chain identifier for updating Move.lock")?;
+    let env = context.config.get_active_env().context(
+        "Could not resolve environment from active wallet context. \
+         Try ensure `one client active-env` is valid.",
+    )?;
+    update_lock_file_for_chain_env(
+        &chain_identifier,
+        &env.alias,
+        command,
+        install_dir,
+        lock_file,
+        response,
+    )
+    .await
+}
 
+/// Update the `Move.lock` file with automated address management info. Expects a chain identifier,
+/// env alias, the publish or upgrade command, and its response. The `Move.lock` file principally
+/// records the published address (i.e., package ID) of a package under an environment in the given
+/// chain. See the `ManagedPackage` type in the lock file for a complete spec.
+pub async fn update_lock_file_for_chain_env(
+    chain_identifier: &str,
+    env_alias: &str,
+    command: LockCommand,
+    install_dir: Option<PathBuf>,
+    lock_file: Option<PathBuf>,
+    response: &SuiTransactionBlockResponse,
+) -> Result<(), anyhow::Error> {
     let (original_id, version, _) = get_new_package_obj_from_response(response).context(
         "Expected a valid published package response but didn't see \
          one when attempting to update the `Move.lock`.",
@@ -70,29 +98,25 @@ pub async fn update_lock_file(
     let Some(lock_file) = lock_file else {
         bail!(
             "Expected a `Move.lock` file to exist after publishing \
-             package, but none found. Consider running `one_chain move build` to \
+             package, but none found. Consider running `one move build` to \
              generate the `Move.lock` file in the package directory."
         )
     };
     let install_dir = install_dir.unwrap_or(PathBuf::from("."));
-    let env = context.config.get_active_env().context(
-        "Could not resolve environment from active wallet context. \
-         Try ensure `one_chain client active-env` is valid.",
-    )?;
 
     let mut lock = LockFile::from(install_dir.clone(), &lock_file)?;
     match command {
         LockCommand::Publish => lock_file::schema::update_managed_address(
             &mut lock,
-            &env.alias,
+            env_alias,
             lock_file::schema::ManagedAddressUpdate::Published {
-                chain_id: chain_identifier,
+                chain_id: chain_identifier.to_string(),
                 original_id: original_id.to_string(),
             },
         ),
         LockCommand::Upgrade => lock_file::schema::update_managed_address(
             &mut lock,
-            &env.alias,
+            env_alias,
             lock_file::schema::ManagedAddressUpdate::Upgraded {
                 latest_id: original_id.to_string(),
                 version: version.into(),
@@ -119,8 +143,9 @@ pub fn set_package_id(
     let Ok(mut lock_file) = File::open(lock_file_path.clone()) else {
         return Ok(None);
     };
-    let managed_package =
-        ManagedPackage::read(&mut lock_file).ok().and_then(|m| m.into_iter().find(|(_, v)| v.chain_id == *chain_id));
+    let managed_package = ManagedPackage::read(&mut lock_file)
+        .ok()
+        .and_then(|m| m.into_iter().find(|(_, v)| v.chain_id == *chain_id));
     let Some((env, v)) = managed_package else {
         return Ok(None);
     };
@@ -141,7 +166,10 @@ pub fn set_package_id(
 /// Else, we resolve from the `Move.lock`, where addresses are automatically
 /// managed. If conflicting IDs are found in the `Move.lock` vs. `Move.toml`, a
 /// "Conflict" error message returns.
-pub fn resolve_published_id(package: &Package, chain_id: Option<String>) -> Result<ObjectID, PublishedAtError> {
+pub fn resolve_published_id(
+    package: &Package,
+    chain_id: Option<String>,
+) -> Result<ObjectID, PublishedAtError> {
     // Look up a valid `published-at` in the `Move.toml` first, which we'll
     // return if the Move.lock does not manage addresses.
     let published_id_in_manifest = manifest_published_at(package);
@@ -159,11 +187,15 @@ pub fn resolve_published_id(package: &Package, chain_id: Option<String>) -> Resu
     };
 
     // Find the environment and ManagedPackage data for this chain_id.
-    let id_in_lock_for_chain_id = lock_published_at(ManagedPackage::read(&mut lock_file).ok(), chain_id.as_ref());
+    let id_in_lock_for_chain_id =
+        lock_published_at(ManagedPackage::read(&mut lock_file).ok(), chain_id.as_ref());
 
     match (id_in_lock_for_chain_id, published_id_in_manifest) {
         (Ok(id_lock), Ok(id_manifest)) if id_lock != id_manifest => {
-            Err(PublishedAtError::Conflict { id_lock, id_manifest })
+            Err(PublishedAtError::Conflict {
+                id_lock,
+                id_manifest,
+            })
         }
 
         (Ok(id), _) | (_, Ok(id)) => Ok(id),
@@ -176,12 +208,17 @@ pub fn resolve_published_id(package: &Package, chain_id: Option<String>) -> Resu
 }
 
 fn manifest_published_at(package: &Package) -> Result<ObjectID, PublishedAtError> {
-    let Some(value) = package.source_package.package.custom_properties.get(&Symbol::from(PUBLISHED_AT_MANIFEST_FIELD))
+    let Some(value) = package
+        .source_package
+        .package
+        .custom_properties
+        .get(&Symbol::from(PUBLISHED_AT_MANIFEST_FIELD))
     else {
         return Err(PublishedAtError::NotPresent);
     };
 
-    let id = ObjectID::from_str(value.as_str()).map_err(|_| PublishedAtError::Invalid(value.clone()))?;
+    let id =
+        ObjectID::from_str(value.as_str()).map_err(|_| PublishedAtError::Invalid(value.clone()))?;
 
     if id == ObjectID::ZERO {
         Err(PublishedAtError::NotPresent)
@@ -198,7 +235,10 @@ fn lock_published_at(
         return Err(PublishedAtError::NotPresent);
     };
 
-    let managed_package = lock.into_values().find(|v| v.chain_id == *chain_id).ok_or(PublishedAtError::NotPresent)?;
+    let managed_package = lock
+        .into_values()
+        .find(|v| v.chain_id == *chain_id)
+        .ok_or(PublishedAtError::NotPresent)?;
 
     let id = ObjectID::from_str(managed_package.latest_published_id.as_str())
         .map_err(|_| PublishedAtError::Invalid(managed_package.latest_published_id.clone()))?;

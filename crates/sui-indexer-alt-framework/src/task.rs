@@ -1,18 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{future::Future, iter, panic, pin::pin};
+use std::{future::Future, panic, pin::pin, time::Duration};
 
-use futures::{
-    future::{self, Either},
-    stream::{Stream, StreamExt},
-};
-use tokio::{
-    signal,
-    sync::oneshot,
-    task::{JoinHandle, JoinSet},
-};
-use tokio_util::sync::CancellationToken;
+use futures::stream::{Stream, StreamExt};
+use tokio::{task::JoinSet, time::sleep};
 
 /// Extension trait introducing `try_for_each_spawned` to all streams.
 pub trait TrySpawnStreamExt: Stream {
@@ -44,7 +36,11 @@ pub trait TrySpawnStreamExt: Stream {
 }
 
 impl<S: Stream + Sized + 'static> TrySpawnStreamExt for S {
-    async fn try_for_each_spawned<Fut, F, E>(self, limit: impl Into<Option<usize>>, mut f: F) -> Result<(), E>
+    async fn try_for_each_spawned<Fut, F, E>(
+        self,
+        limit: impl Into<Option<usize>>,
+        mut f: F,
+    ) -> Result<(), E>
     where
         Fut: Future<Output = Result<(), E>> + Send + 'static,
         F: FnMut(Self::Item) -> Fut,
@@ -126,44 +122,37 @@ impl<S: Stream + Sized + 'static> TrySpawnStreamExt for S {
     }
 }
 
-/// Manages cleanly exiting the process, either because one of its constituent services has stopped
-/// or because an interrupt signal was sent to the process.
+/// Wraps a future with slow/stuck detection using `tokio::select!`
 ///
-/// Returns the exit values from all services that exited successfully.
-pub async fn graceful_shutdown<T>(
-    services: impl IntoIterator<Item = JoinHandle<T>>,
-    cancel: CancellationToken,
-) -> Vec<T> {
-    // If the service is naturalling winding down, we don't need to wait for an interrupt signal.
-    // This channel is used to short-circuit the await in that case.
-    let (cancel_ctrl_c_tx, cancel_ctrl_c_rx) = oneshot::channel();
+/// This implementation races the future against a timer. If the timer expires first, the callback
+/// is executed (exactly once) but the future continues to run. This approach can detect stuck
+/// futures that never wake their waker.
+pub async fn with_slow_future_monitor<F, C>(
+    future: F,
+    threshold: Duration,
+    callback: C,
+) -> F::Output
+where
+    F: Future,
+    C: FnOnce(),
+{
+    // The select! macro needs to take a reference to the future, which requires it to be pinned
+    tokio::pin!(future);
 
-    let interrupt = async {
-        tokio::select! {
-            _ = cancel_ctrl_c_rx => {}
-            _ = cancel.cancelled() => {}
-            _ = signal::ctrl_c() => cancel.cancel(),
+    tokio::select! {
+        result = &mut future => {
+            // Future completed before timeout
+            return result;
         }
+        _ = sleep(threshold) => {
+            // Timeout elapsed - fire the warning
+            callback();
+        }
+    }
 
-        None
-    };
-
-    let interrupt = pin!(interrupt);
-    let futures: Vec<_> = services
-        .into_iter()
-        .map(|s| Either::Left(Box::pin(async move { s.await.ok() })))
-        .chain(iter::once(Either::Right(interrupt)))
-        .collect();
-
-    // Wait for the first service to finish, or for an interrupt signal.
-    let (first, _, rest) = future::select_all(futures).await;
-    let _ = cancel_ctrl_c_tx.send(());
-
-    // Wait for the remaining services to finish.
-    let mut results = vec![];
-    results.extend(first);
-    results.extend(future::join_all(rest).await.into_iter().flatten());
-    results
+    // If we get here, the timeout fired but the future is still running. Continue waiting for the
+    // future to complete
+    future.await
 }
 
 #[cfg(test)]
@@ -171,18 +160,35 @@ mod tests {
     use std::{
         sync::{
             atomic::{AtomicUsize, Ordering},
-            Arc,
-            Mutex,
+            Arc, Mutex,
         },
         time::Duration,
     };
 
     use futures::stream;
+    use tokio::time::timeout;
 
     use super::*;
 
+    #[derive(Clone)]
+    struct Counter(Arc<AtomicUsize>);
+
+    impl Counter {
+        fn new() -> Self {
+            Self(Arc::new(AtomicUsize::new(0)))
+        }
+
+        fn increment(&self) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+
+        fn count(&self) -> usize {
+            self.0.load(Ordering::Relaxed)
+        }
+    }
+
     #[tokio::test]
-    async fn explicit_sequential_iteration() {
+    async fn for_each_explicit_sequential_iteration() {
         let actual = Arc::new(Mutex::new(vec![]));
         let result = stream::iter(0..20)
             .try_for_each_spawned(1, |i| {
@@ -203,7 +209,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn concurrent_iteration() {
+    async fn for_each_concurrent_iteration() {
         let actual = Arc::new(AtomicUsize::new(0));
         let result = stream::iter(0..100)
             .try_for_each_spawned(16, |i| {
@@ -223,7 +229,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn implicit_unlimited_iteration() {
+    async fn for_each_implicit_unlimited_iteration() {
         let actual = Arc::new(AtomicUsize::new(0));
         let result = stream::iter(0..100)
             .try_for_each_spawned(None, |i| {
@@ -243,7 +249,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn explicit_unlimited_iteration() {
+    async fn for_each_explicit_unlimited_iteration() {
         let actual = Arc::new(AtomicUsize::new(0));
         let result = stream::iter(0..100)
             .try_for_each_spawned(0, |i| {
@@ -263,7 +269,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn max_concurrency() {
+    async fn for_each_max_concurrency() {
         #[derive(Default, Debug)]
         struct Jobs {
             max: AtomicUsize,
@@ -293,7 +299,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn error_propagation() {
+    async fn for_each_error_propagation() {
         let actual = Arc::new(Mutex::new(vec![]));
         let result = stream::iter(0..100)
             .try_for_each_spawned(None, |i| {
@@ -318,12 +324,114 @@ mod tests {
 
     #[tokio::test]
     #[should_panic]
-    async fn panic_propagation() {
+    async fn for_each_panic_propagation() {
         let _ = stream::iter(0..100)
             .try_for_each_spawned(None, |i| async move {
                 assert!(i < 42);
                 Ok::<(), ()>(())
             })
             .await;
+    }
+
+    #[tokio::test]
+    async fn slow_monitor_callback_called_once_when_threshold_exceeded() {
+        let c = Counter::new();
+
+        let result = with_slow_future_monitor(
+            async {
+                sleep(Duration::from_millis(200)).await;
+                42 // Return a value to verify completion
+            },
+            Duration::from_millis(100),
+            || c.increment(),
+        )
+        .await;
+
+        assert_eq!(c.count(), 1);
+        assert_eq!(result, 42);
+    }
+
+    #[tokio::test]
+    async fn slow_monitor_callback_not_called_when_threshold_not_exceeded() {
+        let c = Counter::new();
+
+        let result = with_slow_future_monitor(
+            async {
+                sleep(Duration::from_millis(50)).await;
+                42 // Return a value to verify completion
+            },
+            Duration::from_millis(200),
+            || c.increment(),
+        )
+        .await;
+
+        assert_eq!(c.count(), 0);
+        assert_eq!(result, 42);
+    }
+
+    #[tokio::test]
+    async fn slow_monitor_error_propagation() {
+        let c = Counter::new();
+
+        let result: Result<i32, &str> = with_slow_future_monitor(
+            async {
+                sleep(Duration::from_millis(150)).await;
+                Err("Something went wrong")
+            },
+            Duration::from_millis(100),
+            || c.increment(),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Something went wrong");
+        assert_eq!(c.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn slow_monitor_error_propagation_without_callback() {
+        let c = Counter::new();
+
+        let result: Result<i32, &str> = with_slow_future_monitor(
+            async {
+                sleep(Duration::from_millis(50)).await;
+                Err("Quick error")
+            },
+            Duration::from_millis(200),
+            || c.increment(),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Quick error");
+        assert_eq!(c.count(), 0);
+    }
+
+    #[tokio::test]
+    async fn slow_monitor_stuck_future_detection() {
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::task::{Context, Poll};
+
+        // A future that returns Pending but never wakes the waker
+        struct StuckFuture;
+        impl Future for StuckFuture {
+            type Output = ();
+            fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+                Poll::Pending
+            }
+        }
+
+        let c = Counter::new();
+
+        // Even though StuckFuture never wakes, our monitor will detect it!
+        let monitored =
+            with_slow_future_monitor(StuckFuture, Duration::from_millis(200), || c.increment());
+
+        // Use a timeout to prevent the test from hanging
+        timeout(Duration::from_secs(2), monitored)
+            .await
+            .unwrap_err();
+        assert_eq!(c.count(), 1);
     }
 }

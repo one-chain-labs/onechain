@@ -18,7 +18,7 @@
 
 //# publish --sender A
 module P0::fake {
-    use one::coin;
+    use sui::coin;
 
     public struct FAKE has drop {}
 
@@ -48,7 +48,7 @@ module P0::fake {
 //# create-checkpoint
 
 //# programmable --sender A --inputs object(1,5) 100 object(1,1)
-//> 0: one::coin::mint<P0::fake::FAKE>(Input(0), Input(1));
+//> 0: sui::coin::mint<P0::fake::FAKE>(Input(0), Input(1));
 //> MergeCoins(Input(2), [Result(0)]);
 
 //# create-checkpoint

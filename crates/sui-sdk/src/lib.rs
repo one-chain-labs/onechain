@@ -4,8 +4,8 @@
 //! The Sui Rust SDK
 //!
 //! It aims at providing a similar SDK functionality like the one existing for
-//! [TypeScript](https://github.com/one-chain-labs/onechain/tree/main/sdk/typescript/).
-//! Sui Rust SDK builds on top of the [JSON RPC API](https://docs.onelabs.cc/jsonrpc)
+//! [TypeScript](https://github.com/MystenLabs/sui/tree/main/sdk/typescript/).
+//! Sui Rust SDK builds on top of the [JSON RPC API](https://docs.sui.io/sui-jsonrpc)
 //! and therefore many of the return types are the ones specified in [sui_types].
 //!
 //! The API is split in several parts corresponding to different functionalities
@@ -68,58 +68,57 @@
 //! ## Examples
 //!
 //! For detailed examples, please check the APIs docs and the examples folder
-//! in the [main repository](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk/examples).
+//! in the [main repository](https://github.com/MystenLabs/sui/tree/main/crates/sui-sdk/examples).
 
-use std::{
-    fmt::{Debug, Formatter},
-    sync::Arc,
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use base64::Engine;
-use jsonrpsee::{
-    core::client::ClientT,
-    http_client::{HeaderMap, HeaderValue, HttpClient, HttpClientBuilder},
-    rpc_params,
-    ws_client::{WsClient, WsClientBuilder},
-};
+use jsonrpsee::core::client::ClientT;
+use jsonrpsee::http_client::{HeaderMap, HeaderValue, HttpClient, HttpClientBuilder};
+use jsonrpsee::rpc_params;
+use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
+use reqwest::header::HeaderName;
 use serde_json::Value;
 
 use move_core_types::language_storage::StructTag;
 pub use sui_json as json;
-use sui_json_rpc_api::{CLIENT_SDK_TYPE_HEADER, CLIENT_SDK_VERSION_HEADER, CLIENT_TARGET_API_VERSION_HEADER};
+use sui_json_rpc_api::{
+    CLIENT_SDK_TYPE_HEADER, CLIENT_SDK_VERSION_HEADER, CLIENT_TARGET_API_VERSION_HEADER,
+};
 pub use sui_json_rpc_types as rpc_types;
 use sui_json_rpc_types::{
-    ObjectsPage,
-    SuiObjectDataFilter,
-    SuiObjectDataOptions,
-    SuiObjectResponse,
+    ObjectsPage, SuiObjectDataFilter, SuiObjectDataOptions, SuiObjectResponse,
     SuiObjectResponseQuery,
 };
 use sui_transaction_builder::{DataReader, TransactionBuilder};
 pub use sui_types as types;
 use sui_types::base_types::{ObjectID, ObjectInfo, SuiAddress};
 
-use crate::{
-    apis::{CoinReadApi, EventApi, GovernanceApi, QuorumDriverApi, ReadApi},
-    error::{Error, SuiRpcResult},
-};
+use crate::apis::{CoinReadApi, EventApi, GovernanceApi, QuorumDriverApi, ReadApi};
+use crate::error::{Error, SuiRpcResult};
 
 pub mod apis;
 pub mod error;
 pub mod json_rpc_error;
 pub mod sui_client_config;
+pub mod verify_personal_message_signature;
 pub mod wallet_context;
 
 pub const SUI_COIN_TYPE: &str = "0x2::oct::OCT";
 pub const SUI_LOCAL_NETWORK_URL: &str = "http://127.0.0.1:9000";
 pub const SUI_LOCAL_NETWORK_URL_0: &str = "http://0.0.0.0:9000";
-pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/gas";
+pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/v2/gas";
 pub const SUI_DEVNET_URL: &str = "https://rpc-devnet.onelabs.cc:443";
 pub const SUI_TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
+pub const SUI_MAINNET_URL: &str = "https://rpc-mainnet.onelabs.cc:443";
 
-/// A OneChain client builder for connecting to the OneChain network
+/// A Sui client builder for connecting to the Sui network
 ///
 /// By default the `maximum concurrent requests` is set to 256 and
 /// the `request timeout` is set to 60 seconds. These can be adjusted using the
@@ -144,20 +143,22 @@ pub const SUI_TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
 /// ```
 pub struct SuiClientBuilder {
     request_timeout: Duration,
-    max_concurrent_requests: usize,
+    max_concurrent_requests: Option<usize>,
     ws_url: Option<String>,
     ws_ping_interval: Option<Duration>,
     basic_auth: Option<(String, String)>,
+    headers: Option<HashMap<String, String>>,
 }
 
 impl Default for SuiClientBuilder {
     fn default() -> Self {
         Self {
             request_timeout: Duration::from_secs(60),
-            max_concurrent_requests: 256,
+            max_concurrent_requests: None,
             ws_url: None,
             ws_ping_interval: None,
             basic_auth: None,
+            headers: None,
         }
     }
 }
@@ -171,7 +172,7 @@ impl SuiClientBuilder {
 
     /// Set the max concurrent requests allowed
     pub fn max_concurrent_requests(mut self, max_concurrent_requests: usize) -> Self {
-        self.max_concurrent_requests = max_concurrent_requests;
+        self.max_concurrent_requests = Some(max_concurrent_requests);
         self
     }
 
@@ -190,6 +191,12 @@ impl SuiClientBuilder {
     /// Set the basic auth credentials for the HTTP client
     pub fn basic_auth(mut self, username: impl AsRef<str>, password: impl AsRef<str>) -> Self {
         self.basic_auth = Some((username.as_ref().to_string(), password.as_ref().to_string()));
+        self
+    }
+
+    /// Set custom headers for the HTTP client
+    pub fn custom_headers(mut self, headers: HashMap<String, String>) -> Self {
+        self.headers = Some(headers);
         self
     }
 
@@ -218,11 +225,15 @@ impl SuiClientBuilder {
             // in rust, the client version is the same as the target api version
             HeaderValue::from_static(client_version),
         );
-        headers.insert(CLIENT_SDK_VERSION_HEADER, HeaderValue::from_static(client_version));
+        headers.insert(
+            CLIENT_SDK_VERSION_HEADER,
+            HeaderValue::from_static(client_version),
+        );
         headers.insert(CLIENT_SDK_TYPE_HEADER, HeaderValue::from_static("rust"));
 
         if let Some((username, password)) = self.basic_auth {
-            let auth = base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", username, password));
+            let auth = base64::engine::general_purpose::STANDARD
+                .encode(format!("{}:{}", username, password));
             headers.insert(
                 "authorization",
                 // reqwest::header::AUTHORIZATION,
@@ -230,15 +241,31 @@ impl SuiClientBuilder {
             );
         }
 
+        if let Some(custom_headers) = self.headers {
+            for (key, value) in custom_headers {
+                let header_name = HeaderName::from_str(&key)
+                    .map_err(|e| Error::CustomHeadersError(e.to_string()))?;
+
+                let header_value = HeaderValue::from_str(&value)
+                    .map_err(|e| Error::CustomHeadersError(e.to_string()))?;
+                headers.insert(header_name, header_value);
+            }
+        }
+
         let ws = if let Some(url) = self.ws_url {
             let mut builder = WsClientBuilder::default()
-                .max_request_body_size(2 << 30)
-                .max_concurrent_requests(self.max_concurrent_requests)
+                .max_request_size(2 << 30)
                 .set_headers(headers.clone())
                 .request_timeout(self.request_timeout);
 
             if let Some(duration) = self.ws_ping_interval {
-                builder = builder.ping_interval(duration)
+                builder = builder.enable_ws_ping(
+                    jsonrpsee::ws_client::PingConfig::new().ping_interval(duration),
+                );
+            }
+
+            if let Some(max_concurrent_requests) = self.max_concurrent_requests {
+                builder = builder.max_concurrent_requests(max_concurrent_requests);
             }
 
             builder.build(url).await.ok()
@@ -246,12 +273,16 @@ impl SuiClientBuilder {
             None
         };
 
-        let http = HttpClientBuilder::default()
-            .max_request_body_size(2 << 30)
-            .max_concurrent_requests(self.max_concurrent_requests)
+        let mut http_builder = HttpClientBuilder::default()
+            .max_request_size(2 << 30)
             .set_headers(headers.clone())
-            .request_timeout(self.request_timeout)
-            .build(http)?;
+            .request_timeout(self.request_timeout);
+
+        if let Some(max_concurrent_requests) = self.max_concurrent_requests {
+            http_builder = http_builder.max_concurrent_requests(max_concurrent_requests);
+        }
+
+        let http = http_builder.build(http)?;
 
         let info = Self::get_server_info(&http, &ws).await?;
 
@@ -264,7 +295,15 @@ impl SuiClientBuilder {
         let coin_read_api = CoinReadApi::new(api.clone());
         let governance_api = GovernanceApi::new(api.clone());
 
-        Ok(SuiClient { api, transaction_builder, read_api, coin_read_api, event_api, quorum_driver_api, governance_api })
+        Ok(SuiClient {
+            api,
+            transaction_builder,
+            read_api,
+            coin_read_api,
+            event_api,
+            quorum_driver_api,
+            governance_api,
+        })
     }
 
     /// Returns a [SuiClient] object that is ready to interact with the local
@@ -338,15 +377,43 @@ impl SuiClientBuilder {
         self.build(SUI_TESTNET_URL).await
     }
 
+    /// Returns a [SuiClient] object that is ready to interact with the Sui mainnet.
+    ///
+    /// For connecting to a custom URI, use the `build` function instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use sui_sdk::SuiClientBuilder;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), anyhow::Error> {
+    ///     let sui = SuiClientBuilder::default()
+    ///         .build_mainnet()
+    ///         .await?;
+    ///
+    ///     println!("{:?}", sui.api_version());
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn build_mainnet(self) -> SuiRpcResult<SuiClient> {
+        self.build(SUI_MAINNET_URL).await
+    }
+
     /// Return the server information as a `ServerInfo` structure.
     ///
     /// Fails with an error if it cannot call the RPC discover.
-    async fn get_server_info(http: &HttpClient, ws: &Option<WsClient>) -> Result<ServerInfo, Error> {
+    async fn get_server_info(
+        http: &HttpClient,
+        ws: &Option<WsClient>,
+    ) -> Result<ServerInfo, Error> {
         let rpc_spec: Value = http.request("rpc.discover", rpc_params![]).await?;
         let version = rpc_spec
             .pointer("/info/version")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| Error::DataError("Fail parsing server version from rpc.discover endpoint.".into()))?;
+            .ok_or_else(|| {
+                Error::DataError("Fail parsing server version from rpc.discover endpoint.".into())
+            })?;
         let rpc_methods = Self::parse_methods(&rpc_spec)?;
 
         let subscriptions = if let Some(ws) = ws {
@@ -357,16 +424,28 @@ impl SuiClientBuilder {
         } else {
             Vec::new()
         };
-        Ok(ServerInfo { rpc_methods, subscriptions, version: version.to_string() })
+        Ok(ServerInfo {
+            rpc_methods,
+            subscriptions,
+            version: version.to_string(),
+        })
     }
 
     fn parse_methods(server_spec: &Value) -> Result<Vec<String>, Error> {
         let methods = server_spec
             .pointer("/methods")
             .and_then(|methods| methods.as_array())
-            .ok_or_else(|| Error::DataError("Fail parsing server information from rpc.discover endpoint.".into()))?;
+            .ok_or_else(|| {
+                Error::DataError(
+                    "Fail parsing server information from rpc.discover endpoint.".into(),
+                )
+            })?;
 
-        Ok(methods.iter().flat_map(|method| method["name"].as_str()).map(|s| s.into()).collect())
+        Ok(methods
+            .iter()
+            .flat_map(|method| method["name"].as_str())
+            .map(|s| s.into())
+            .collect())
     }
 }
 
@@ -423,7 +502,11 @@ pub(crate) struct RpcClient {
 
 impl Debug for RpcClient {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RPC client. Http: {:?}, Websocket: {:?}", self.http, self.ws)
+        write!(
+            f,
+            "RPC client. Http: {:?}, Websocket: {:?}",
+            self.http, self.ws
+        )
     }
 }
 
@@ -517,16 +600,30 @@ impl DataReader for ReadApi {
         let mut result = vec![];
         let query = Some(SuiObjectResponseQuery {
             filter: Some(SuiObjectDataFilter::StructType(object_type)),
-            options: Some(SuiObjectDataOptions::new().with_previous_transaction().with_type().with_owner()),
+            options: Some(
+                SuiObjectDataOptions::new()
+                    .with_previous_transaction()
+                    .with_type()
+                    .with_owner(),
+            ),
         });
 
         let mut has_next = true;
         let mut cursor = None;
 
         while has_next {
-            let ObjectsPage { data, next_cursor, has_next_page } =
-                self.get_owned_objects(address, query.clone(), cursor, None).await?;
-            result.extend(data.iter().map(|r| r.clone().try_into()).collect::<Result<Vec<_>, _>>()?);
+            let ObjectsPage {
+                data,
+                next_cursor,
+                has_next_page,
+            } = self
+                .get_owned_objects(address, query.clone(), cursor, None)
+                .await?;
+            result.extend(
+                data.iter()
+                    .map(|r| r.clone().try_into())
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
             cursor = next_cursor;
             has_next = has_next_page;
         }

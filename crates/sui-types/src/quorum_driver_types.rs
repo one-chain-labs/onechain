@@ -4,16 +4,17 @@
 
 use std::collections::BTreeMap;
 
-use crate::{
-    base_types::{AuthorityName, EpochId, ObjectRef, TransactionDigest},
-    committee::StakeUnit,
-    crypto::{AuthorityStrongQuorumSignInfo, ConciseAuthorityPublicKeyBytes},
-    effects::{CertifiedTransactionEffects, TransactionEffects, TransactionEvents, VerifiedCertifiedTransactionEffects},
-    error::SuiError,
-    messages_checkpoint::CheckpointSequenceNumber,
-    object::Object,
-    transaction::{Transaction, VerifiedTransaction},
+use crate::base_types::{AuthorityName, EpochId, ObjectRef, TransactionDigest};
+use crate::committee::StakeUnit;
+use crate::crypto::{AuthorityStrongQuorumSignInfo, ConciseAuthorityPublicKeyBytes};
+use crate::effects::{
+    CertifiedTransactionEffects, TransactionEffects, TransactionEvents,
+    VerifiedCertifiedTransactionEffects,
 };
+use crate::error::SuiError;
+use crate::messages_checkpoint::CheckpointSequenceNumber;
+use crate::object::Object;
+use crate::transaction::{Transaction, VerifiedTransaction};
 use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 use thiserror::Error;
@@ -23,7 +24,8 @@ pub type QuorumDriverResult = Result<QuorumDriverResponse, QuorumDriverError>;
 pub type QuorumDriverEffectsQueueResult =
     Result<(Transaction, QuorumDriverResponse), (TransactionDigest, QuorumDriverError)>;
 
-pub const NON_RECOVERABLE_ERROR_MSG: &str = "Transaction has non recoverable errors from at least 1/3 of validators";
+pub const NON_RECOVERABLE_ERROR_MSG: &str =
+    "Transaction has non recoverable errors from at least 1/3 of validators";
 
 /// Client facing errors regarding transaction submission via Quorum Driver.
 /// Every invariant needs detailed documents to instruct client handling.
@@ -34,14 +36,10 @@ pub enum QuorumDriverError {
     #[error("Invalid user signature: {0}.")]
     InvalidUserSignature(SuiError),
     #[error(
-        "Failed to sign transaction by a quorum of validators because of locked objects: {:?}, retried a conflicting transaction {:?}, success: {:?}",
-        conflicting_txes,
-        .retried_tx_status.map(|(tx, success)| tx),
-        .retried_tx_status.map(|(tx, success)| success),
+        "Failed to sign transaction by a quorum of validators because of locked objects: {conflicting_txes:?}",
     )]
     ObjectsDoubleUsed {
         conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)>,
-        retried_tx_status: Option<(TransactionDigest, bool)>,
     },
     #[error("Transaction timed out before reaching finality")]
     TimeoutBeforeFinality,
@@ -50,11 +48,25 @@ pub enum QuorumDriverError {
     #[error("{NON_RECOVERABLE_ERROR_MSG}: {errors:?}.")]
     NonRecoverableTransactionError { errors: GroupedErrors },
     #[error("Transaction is not processed because {overloaded_stake} of validators by stake are overloaded with certificates pending execution.")]
-    SystemOverload { overloaded_stake: StakeUnit, errors: GroupedErrors },
+    SystemOverload {
+        overloaded_stake: StakeUnit,
+        errors: GroupedErrors,
+    },
     #[error("Transaction is already finalized but with different user signatures")]
     TxAlreadyFinalizedWithDifferentUserSignatures,
     #[error("Transaction is not processed because {overload_stake} of validators are overloaded and asked client to retry after {retry_after_secs}.")]
-    SystemOverloadRetryAfter { overload_stake: StakeUnit, errors: GroupedErrors, retry_after_secs: u64 },
+    SystemOverloadRetryAfter {
+        overload_stake: StakeUnit,
+        errors: GroupedErrors,
+        retry_after_secs: u64,
+    },
+
+    // Wrapped error from Transaction Driver.
+    #[error("Transaction processing failed. Retriable with new attempts: {retriable}. Details: {details}")]
+    TransactionFailed { retriable: bool, details: String },
+
+    #[error("Transaction is already being processed in transaction orchestrator (most likely by quorum driver), wait for results")]
+    PendingExecutionInTransactionOrchestrator,
 }
 
 pub type GroupedErrors = Vec<(SuiError, StakeUnit, Vec<ConciseAuthorityPublicKeyBytes>)>;
@@ -92,7 +104,13 @@ pub type IsTransactionExecutedLocally = bool;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ExecuteTransactionResponse {
-    EffectsCert(Box<(FinalizedEffects, TransactionEvents, IsTransactionExecutedLocally)>),
+    EffectsCert(
+        Box<(
+            FinalizedEffects,
+            TransactionEvents,
+            IsTransactionExecutedLocally,
+        )>,
+    ),
 }
 
 #[derive(Clone, Debug)]
@@ -155,7 +173,10 @@ pub struct FinalizedEffects {
 impl FinalizedEffects {
     pub fn new_from_effects_cert(effects_cert: CertifiedTransactionEffects) -> Self {
         let (data, sig) = effects_cert.into_data_and_sig();
-        Self { effects: data, finality_info: EffectsFinalityInfo::Certified(sig) }
+        Self {
+            effects: data,
+            finality_info: EffectsFinalityInfo::Certified(sig),
+        }
     }
 
     pub fn epoch(&self) -> EpochId {

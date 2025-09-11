@@ -6,7 +6,7 @@ use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{
-    collections::{hash_map, BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, hash_map},
     path::PathBuf,
     sync::Arc,
 };
@@ -83,11 +83,19 @@ impl MappedFiles {
             file_mapping.insert(fhash, id);
             file_name_mapping.insert(fhash, PathBuf::from(fname.as_str()));
         }
-        Self { files: simple_files, file_mapping, file_name_mapping }
+        Self {
+            files: simple_files,
+            file_mapping,
+            file_name_mapping,
+        }
     }
 
     pub fn empty() -> Self {
-        Self { files: SimpleFiles::new(), file_mapping: HashMap::new(), file_name_mapping: BTreeMap::new() }
+        Self {
+            files: SimpleFiles::new(),
+            file_mapping: HashMap::new(),
+            file_name_mapping: BTreeMap::new(),
+        }
     }
 
     fn extend_(&mut self, other: Self, allow_duplicates: bool) {
@@ -100,7 +108,10 @@ impl MappedFiles {
                 debug_assert!(false, "Found a file without a path entry");
                 continue;
             };
-            debug_assert!(allow_duplicates || !self.file_mapping.contains_key(&file_hash), "Found a repeat file hash");
+            debug_assert!(
+                allow_duplicates || !self.file_mapping.contains_key(&file_hash),
+                "Found a repeat file hash"
+            );
             let fname = format!("{}", path.to_string_lossy());
             self.add(file_hash, fname.into(), file.source().clone());
         }
@@ -117,12 +128,16 @@ impl MappedFiles {
     pub fn add(&mut self, fhash: FileHash, fname: FileName, source: Arc<str>) {
         let id = self.files.add(fname, source);
         self.file_mapping.insert(fhash, id);
-        self.file_name_mapping.insert(fhash, PathBuf::from(fname.as_str()));
+        self.file_name_mapping
+            .insert(fhash, PathBuf::from(fname.as_str()));
     }
 
     pub fn get(&self, fhash: &FileHash) -> Option<(Symbol, Arc<str>)> {
         let file_id = self.file_mapping.get(fhash)?;
-        self.files.get(*file_id).ok().map(|file| (*file.name(), file.source().clone()))
+        self.files
+            .get(*file_id)
+            .ok()
+            .map(|file| (*file.name(), file.source().clone()))
     }
 
     /// Find a file hash for a path buffer. Note this is inefficient.
@@ -152,9 +167,9 @@ impl MappedFiles {
         &self.file_name_mapping
     }
 
-    pub fn filename(&self, fhash: &FileHash) -> &str {
+    pub fn filename(&self, fhash: &FileHash) -> Symbol {
         let file_id = self.file_mapping().get(fhash).unwrap();
-        self.files().get(*file_id).unwrap().name()
+        *self.files().get(*file_id).unwrap().name()
     }
 
     pub fn file_path(&self, fhash: &FileHash) -> &PathBuf {
@@ -194,11 +209,13 @@ impl MappedFiles {
     }
 
     pub fn file_start_position_opt(&self, loc: &Loc) -> Option<FilePosition> {
-        self.position_opt(loc).map(|posn| FilePosition::new(posn.file_hash, posn.start))
+        self.position_opt(loc)
+            .map(|posn| FilePosition::new(posn.file_hash, posn.start))
     }
 
     pub fn file_end_position_opt(&self, loc: &Loc) -> Option<FilePosition> {
-        self.position_opt(loc).map(|posn| FilePosition::new(posn.file_hash, posn.end))
+        self.position_opt(loc)
+            .map(|posn| FilePosition::new(posn.file_hash, posn.end))
     }
 
     pub fn file_size(&self, fhash: &FileHash) -> usize {
@@ -234,20 +251,34 @@ impl MappedFiles {
         let file_hash = loc.file_hash();
         let start = loc.start() as usize;
         let end = loc.end() as usize;
-        let posn = FileByteSpan { byte_span: ByteSpan { start, end }, file_hash };
+        let posn = FileByteSpan {
+            byte_span: ByteSpan { start, end },
+            file_hash,
+        };
         Some(posn)
     }
 
     pub fn lsp_range_opt(&self, loc: &Loc) -> Option<lsp_types::Range> {
         let position = self.position_opt(loc)?;
-        Some(lsp_types::Range { start: position.start.into(), end: position.end.into() })
+        Some(lsp_types::Range {
+            start: position.start.into(),
+            end: position.end.into(),
+        })
     }
 
     /// Given a line number and character number (both 0-indexed) in the file return the `Loc` for
     /// the line. Note that the end byte is exclusive in the resultant `Loc`.
-    pub fn line_char_offset_to_loc_opt(&self, file_hash: FileHash, line_offset: u32, char_offset: u32) -> Option<Loc> {
+    pub fn line_char_offset_to_loc_opt(
+        &self,
+        file_hash: FileHash,
+        line_offset: u32,
+        char_offset: u32,
+    ) -> Option<Loc> {
         let file_id = self.file_mapping().get(&file_hash)?;
-        let line_range = self.files().line_range(*file_id, line_offset as usize).ok()?;
+        let line_range = self
+            .files()
+            .line_range(*file_id, line_offset as usize)
+            .ok()?;
         let offset = line_range.start as u32 + char_offset;
         Some(Loc::new(file_hash, offset, offset + 1))
     }
@@ -256,7 +287,11 @@ impl MappedFiles {
     pub fn line_to_loc_opt(&self, file_hash: &FileHash, line_number: usize) -> Option<Loc> {
         let file_id = self.file_mapping().get(file_hash)?;
         let line_range = self.files().line_range(*file_id, line_number).ok()?;
-        Some(Loc::new(*file_hash, line_range.start as u32, line_range.end as u32))
+        Some(Loc::new(
+            *file_hash,
+            line_range.start as u32,
+            line_range.end as u32,
+        ))
     }
 
     /// Given a location `Loc` return a new loc only for source with leading and trailing
@@ -278,7 +313,11 @@ impl MappedFiles {
     }
 
     /// Given a file_hash `file` and a byte index `byte_index`, compute its `Position`.
-    pub fn byte_index_to_position_opt(&self, file: &FileHash, byte_index: ByteIndex) -> Option<Position> {
+    pub fn byte_index_to_position_opt(
+        &self,
+        file: &FileHash,
+        byte_index: ByteIndex,
+    ) -> Option<Position> {
         let file_id = self.file_hash_to_file_id(file)?;
         let byte_position = self.files().location(file_id, byte_index as usize).ok()?;
         let result = Position {
@@ -304,7 +343,10 @@ pub struct MappedFilesIter<'a> {
 
 impl<'a> MappedFilesIter<'a> {
     fn new(mapped_files: &'a MappedFiles) -> Self {
-        MappedFilesIter { mapped_files, keys_iter: mapped_files.file_mapping.iter() }
+        MappedFilesIter {
+            mapped_files,
+            keys_iter: mapped_files.file_mapping.iter(),
+        }
     }
 }
 
@@ -322,8 +364,8 @@ impl<'a> Iterator for MappedFilesIter<'a> {
 }
 
 impl<'a> IntoIterator for &'a MappedFiles {
-    type IntoIter = MappedFilesIter<'a>;
     type Item = (&'a FileHash, (&'a Symbol, &'a Arc<str>));
+    type IntoIter = MappedFilesIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         MappedFilesIter::new(self)
@@ -336,7 +378,10 @@ impl<'a> IntoIterator for &'a MappedFiles {
 
 impl FilePosition {
     pub fn new(file_hash: FileHash, position: Position) -> Self {
-        FilePosition { file_hash, position }
+        FilePosition {
+            file_hash,
+            position,
+        }
     }
 
     pub fn file_hash(&self) -> FileHash {
@@ -362,7 +407,11 @@ impl FilePositionSpan {
 
 impl Position {
     pub fn empty() -> Self {
-        Position { line_offset: 0, column_offset: 0, byte_offset: 0 }
+        Position {
+            line_offset: 0,
+            column_offset: 0,
+            byte_offset: 0,
+        }
     }
 
     /// User-facing (1-indexed) line
@@ -398,7 +447,10 @@ impl Position {
 #[allow(clippy::from_over_into)]
 impl Into<lsp_types::Position> for FilePosition {
     fn into(self) -> lsp_types::Position {
-        lsp_types::Position::new(self.position.line_offset() as u32, self.position.column_offset() as u32)
+        lsp_types::Position::new(
+            self.position.line_offset() as u32,
+            self.position.column_offset() as u32,
+        )
     }
 }
 

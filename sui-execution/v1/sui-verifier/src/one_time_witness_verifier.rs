@@ -16,29 +16,24 @@
 //! - its only instance in existence is passed as an argument to the module initializer
 //! - it is never instantiated anywhere in its defining module
 use move_binary_format::file_format::{
-    Ability,
-    AbilitySet,
-    Bytecode,
-    CompiledModule,
-    DatatypeHandle,
-    FunctionDefinition,
-    FunctionHandle,
-    SignatureToken,
-    StructDefinition,
+    Ability, AbilitySet, Bytecode, CompiledModule, DatatypeHandle, FunctionDefinition,
+    FunctionHandle, SignatureToken, StructDefinition,
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
+use sui_types::bridge::BRIDGE_SUPPORTED_ASSET;
 use sui_types::{
     base_types::{TX_CONTEXT_MODULE_NAME, TX_CONTEXT_STRUCT_NAME},
-    bridge::BRIDGE_SUPPORTED_ASSET,
     error::ExecutionError,
     move_package::{is_test_fun, FnInfoMap},
-    BRIDGE_ADDRESS,
-    SUI_FRAMEWORK_ADDRESS,
+    BRIDGE_ADDRESS, SUI_FRAMEWORK_ADDRESS,
 };
 
 use crate::{verification_failure, INIT_FN_NAME};
 
-pub fn verify_module(module: &CompiledModule, fn_info_map: &FnInfoMap) -> Result<(), ExecutionError> {
+pub fn verify_module(
+    module: &CompiledModule,
+    fn_info_map: &FnInfoMap,
+) -> Result<(), ExecutionError> {
     // When verifying test functions, a check preventing by-hand instantiation of one-time withess
     // is disabled
 
@@ -53,7 +48,9 @@ pub fn verify_module(module: &CompiledModule, fn_info_map: &FnInfoMap) -> Result
         return Ok(());
     }
 
-    if BRIDGE_SUPPORTED_ASSET.iter().any(|token| ModuleId::new(BRIDGE_ADDRESS, ident_str!(token).to_owned()) == self_id)
+    if BRIDGE_SUPPORTED_ASSET
+        .iter()
+        .any(|token| ModuleId::new(BRIDGE_ADDRESS, ident_str!(token).to_owned()) == self_id)
     {
         return Ok(());
     }
@@ -74,7 +71,8 @@ pub fn verify_module(module: &CompiledModule, fn_info_map: &FnInfoMap) -> Result
                 if field_count == 1 && def.field(0).unwrap().signature.0 == SignatureToken::Bool {
                     // a single boolean field means that we found a one-time witness candidate -
                     // make sure that the remaining properties hold
-                    verify_one_time_witness(module, struct_name, struct_handle).map_err(verification_failure)?;
+                    verify_one_time_witness(module, struct_name, struct_handle)
+                        .map_err(verification_failure)?;
                     // if we reached this point, it means we have a legitimate one-time witness type
                     // candidate and we have to make sure that both the init function's signature
                     // reflects this and that this type is not instantiated in any function of the
@@ -105,7 +103,8 @@ pub fn verify_module(module: &CompiledModule, fn_info_map: &FnInfoMap) -> Result
             // witness type candidate and if instantiation does not happen in test code
 
             if !is_test_fun(fn_name, module, fn_info_map) {
-                verify_no_instantiations(module, fn_def, candidate_name, def).map_err(verification_failure)?;
+                verify_no_instantiations(module, fn_def, candidate_name, def)
+                    .map_err(verification_failure)?;
             }
         }
     }
@@ -165,12 +164,19 @@ fn verify_init_one_time_witness(
 }
 
 // Checks if a given SignatureToken represents a one-time witness type struct
-fn is_one_time_witness(view: &CompiledModule, tok: &SignatureToken, candidate_handle: &DatatypeHandle) -> bool {
+fn is_one_time_witness(
+    view: &CompiledModule,
+    tok: &SignatureToken,
+    candidate_handle: &DatatypeHandle,
+) -> bool {
     matches!(tok, SignatureToken::Datatype(idx) if view.datatype_handle_at(*idx) == candidate_handle)
 }
 
 /// Checks if this module's `init` function has a single parameter of TxContext type only
-fn verify_init_single_param(module: &CompiledModule, fn_handle: &FunctionHandle) -> Result<(), String> {
+fn verify_init_single_param(
+    module: &CompiledModule,
+    fn_handle: &FunctionHandle,
+) -> Result<(), String> {
     let fn_sig = module.signature_at(fn_handle.parameters);
     if fn_sig.len() != 1 {
         return Err(format!(

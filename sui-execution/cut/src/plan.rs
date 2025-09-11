@@ -2,21 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Context, Result};
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    env,
-    fmt,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::env;
+use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use toml::value::Value;
 use toml_edit::{self, Document, Item};
 
-use crate::{
-    args::Args,
-    path::{deep_copy, normalize_path, path_relative_to, shortest_new_prefix},
-};
+use crate::args::Args;
+use crate::path::{deep_copy, normalize_path, path_relative_to, shortest_new_prefix};
 
 /// Description of where packages should be copied to, what their new names should be, and whether
 /// they should be added to the `workspace` `members` or `exclude` fields.
@@ -111,7 +107,13 @@ impl CutPlan {
         }
 
         impl Walker {
-            fn walk(&mut self, src: &Path, dst: &Path, suffix: &Option<String>, mut fresh_parent: bool) -> Result<()> {
+            fn walk(
+                &mut self,
+                src: &Path,
+                dst: &Path,
+                suffix: &Option<String>,
+                mut fresh_parent: bool,
+            ) -> Result<()> {
                 self.try_insert_package(src, dst, suffix)
                     .with_context(|| format!("Failed to plan copy for {}", src.display()))?;
 
@@ -133,13 +135,23 @@ impl CutPlan {
                         continue;
                     }
 
-                    self.walk(&src.join(entry.file_name()), &dst.join(entry.file_name()), suffix, fresh_parent)?;
+                    self.walk(
+                        &src.join(entry.file_name()),
+                        &dst.join(entry.file_name()),
+                        suffix,
+                        fresh_parent,
+                    )?;
                 }
 
                 Ok(())
             }
 
-            fn try_insert_package(&mut self, src: &Path, dst: &Path, suffix: &Option<String>) -> Result<()> {
+            fn try_insert_package(
+                &mut self,
+                src: &Path,
+                dst: &Path,
+                suffix: &Option<String>,
+            ) -> Result<()> {
                 let toml = src.join("Cargo.toml");
 
                 let Some(pkg_name) = package_name(toml)? else {
@@ -150,8 +162,11 @@ impl CutPlan {
                     return Ok(());
                 }
 
-                let mut dst_name =
-                    suffix.as_ref().and_then(|s| pkg_name.strip_suffix(s)).unwrap_or(&pkg_name).to_string();
+                let mut dst_name = suffix
+                    .as_ref()
+                    .and_then(|s| pkg_name.strip_suffix(s))
+                    .unwrap_or(&pkg_name)
+                    .to_string();
 
                 dst_name.push('-');
                 dst_name.push_str(&self.feature);
@@ -161,12 +176,19 @@ impl CutPlan {
                     bail!(Error::ExistingPackage(pkg_name, dst_path));
                 }
 
-                self.planned_packages.insert(pkg_name, CutPackage {
-                    dst_name,
-                    dst_path,
-                    src_path: src.to_path_buf(),
-                    ws_state: if let Some(ws) = &self.ws { ws.state(src)? } else { WorkspaceState::Unknown },
-                });
+                self.planned_packages.insert(
+                    pkg_name,
+                    CutPackage {
+                        dst_name,
+                        dst_path,
+                        src_path: src.to_path_buf(),
+                        ws_state: if let Some(ws) = &self.ws {
+                            ws.state(src)?
+                        } else {
+                            WorkspaceState::Unknown
+                        },
+                    },
+                );
 
                 Ok(())
             }
@@ -174,15 +196,19 @@ impl CutPlan {
 
         let mut walker = Walker {
             feature: args.feature,
-            ws: if args.workspace_update { Some(Workspace::read(&root)?) } else { None },
+            ws: if args.workspace_update {
+                Some(Workspace::read(&root)?)
+            } else {
+                None
+            },
             planned_packages: BTreeMap::new(),
             pending_packages: args.packages.into_iter().collect(),
             make_directories: BTreeSet::new(),
         };
 
         for dir in args.directories {
-            let src_path =
-                fs::canonicalize(&dir.src).with_context(|| format!("Canonicalizing {} failed", dir.src.display()))?;
+            let src_path = fs::canonicalize(&dir.src)
+                .with_context(|| format!("Canonicalizing {} failed", dir.src.display()))?;
 
             // Remove redundant `..` components from the destination path to avoid creating
             // directories we may not need at the destination.  E.g. a destination path of
@@ -190,18 +216,23 @@ impl CutPlan {
             //   foo/../bar
             //
             // Should only create the directory `bar`, not also the directory `foo`.
-            let dst_path =
-                normalize_path(&dir.dst).with_context(|| format!("Normalizing {} failed", dir.dst.display()))?;
+            let dst_path = normalize_path(&dir.dst)
+                .with_context(|| format!("Normalizing {} failed", dir.dst.display()))?;
 
             // Check whether any parent directories need to be made as part of this iteration of the
             // cut.
-            let fresh_parent = shortest_new_prefix(&dst_path).map_or(false, |pfx| {
+            let fresh_parent = shortest_new_prefix(&dst_path).is_some_and(|pfx| {
                 walker.make_directories.insert(pfx);
                 true
             });
 
             walker
-                .walk(&fs::canonicalize(dir.src)?, &dst_path, &dir.suffix, fresh_parent)
+                .walk(
+                    &fs::canonicalize(dir.src)?,
+                    &dst_path,
+                    &dir.suffix,
+                    fresh_parent,
+                )
                 .with_context(|| format!("Failed to find packages in {}", src_path.display()))?;
         }
 
@@ -210,7 +241,11 @@ impl CutPlan {
             eprintln!("WARNING: Package '{pending}' not found during scan.");
         }
 
-        let Walker { planned_packages: packages, make_directories: directories, .. } = walker;
+        let Walker {
+            planned_packages: packages,
+            make_directories: directories,
+            ..
+        } = walker;
 
         //  Check for conflicts in the resulting plan
         let mut rev_name = HashMap::new();
@@ -226,7 +261,11 @@ impl CutPlan {
             }
         }
 
-        Ok(Self { root, packages, directories })
+        Ok(Self {
+            root,
+            packages,
+            directories,
+        })
     }
 
     /// Copy the packages according to this plan.  On success, all the packages will be copied to
@@ -237,11 +276,11 @@ impl CutPlan {
             self.rollback();
         })
     }
-
     fn execute_(&self) -> Result<()> {
         for (name, package) in &self.packages {
-            self.copy_package(package)
-                .with_context(|| format!("Failed to copy package '{name}' to '{}'.", package.dst_name))?
+            self.copy_package(package).with_context(|| {
+                format!("Failed to copy package '{name}' to '{}'.", package.dst_name)
+            })?
         }
 
         for package in self.packages.values() {
@@ -251,13 +290,16 @@ impl CutPlan {
 
         // Update the workspace at the end, so that if there is any problem before that, rollback
         // will leave the state clean.
-        self.update_workspace().context("Failed to update [workspace].")
+        self.update_workspace()
+            .context("Failed to update [workspace].")
     }
 
     /// Copy the contents of `package` from its `src_path` to its `dst_path`, unchanged.
     fn copy_package(&self, package: &CutPackage) -> Result<()> {
         // Copy everything in the directory as-is, except for any "target" directories
-        deep_copy(&package.src_path, &package.dst_path, &mut |src| src.is_file() || !src.ends_with("target"))?;
+        deep_copy(&package.src_path, &package.dst_path, &mut |src| {
+            src.is_file() || !src.ends_with("target")
+        })?;
 
         Ok(())
     }
@@ -332,7 +374,11 @@ impl CutPlan {
 
         // If the dep has an explicit package name, use that as the key for finding package
         // information, rather than the field name of the dep.
-        let dep_pkg = self.packages.get(dep.get("package").and_then(Item::as_str).unwrap_or_else(|| dep_name.get()));
+        let dep_pkg = self.packages.get(
+            dep.get("package")
+                .and_then(Item::as_str)
+                .unwrap_or_else(|| dep_name.get()),
+        );
 
         // Only path-based dependencies need to be updated.
         let Some(path) = dep.get_mut("path") else {
@@ -393,14 +439,18 @@ impl CutPlan {
             };
         }
 
-        if let Some(members) =
-            toml.get_mut("workspace").and_then(|w| w.get_mut("members")).and_then(|m| m.as_array_mut())
+        if let Some(members) = toml
+            .get_mut("workspace")
+            .and_then(|w| w.get_mut("members"))
+            .and_then(|m| m.as_array_mut())
         {
             format_array_of_strings("members", members)?
         }
 
-        if let Some(exclude) =
-            toml.get_mut("workspace").and_then(|w| w.get_mut("exclude")).and_then(|m| m.as_array_mut())
+        if let Some(exclude) = toml
+            .get_mut("workspace")
+            .and_then(|w| w.get_mut("exclude"))
+            .and_then(|m| m.as_array_mut())
         {
             format_array_of_strings("exclude", exclude)?
         }
@@ -437,10 +487,10 @@ impl Workspace {
             bail!(Error::NoWorkspace(path));
         };
 
-        let members =
-            toml_path_array_to_set(root.as_ref(), workspace, "members").context("Failed to read workspace.members")?;
-        let exclude =
-            toml_path_array_to_set(root.as_ref(), workspace, "exclude").context("Failed to read workspace.exclude")?;
+        let members = toml_path_array_to_set(root.as_ref(), workspace, "members")
+            .context("Failed to read workspace.members")?;
+        let exclude = toml_path_array_to_set(root.as_ref(), workspace, "exclude")
+            .context("Failed to read workspace.exclude")?;
 
         Ok(Self { members, exclude })
     }
@@ -463,7 +513,12 @@ impl fmt::Display for CutPlan {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Copying packages in: {}", self.root.display())?;
 
-        fn write_package(root: &Path, name: &str, pkg: &CutPackage, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn write_package(
+            root: &Path,
+            name: &str,
+            pkg: &CutPackage,
+            f: &mut fmt::Formatter<'_>,
+        ) -> fmt::Result {
             let dst_path = pkg.dst_path.strip_prefix(root).unwrap_or(&pkg.dst_path);
 
             let src_path = pkg.src_path.strip_prefix(root).unwrap_or(&pkg.src_path);
@@ -527,20 +582,29 @@ fn discover_root(mut cwd: PathBuf) -> Option<PathBuf> {
 ///
 /// Fails if the field does not exist, does not consist of all strings, or if a path fails to
 /// canonicalize.
-fn toml_path_array_to_set<P: AsRef<Path>>(root: P, table: &Value, field: &'static str) -> Result<HashSet<PathBuf>> {
+fn toml_path_array_to_set<P: AsRef<Path>>(
+    root: P,
+    table: &Value,
+    field: &'static str,
+) -> Result<HashSet<PathBuf>> {
     let mut set = HashSet::new();
 
     let Some(array) = table.get(field) else {
         return Ok(set);
     };
-    let Some(array) = array.as_array() else { bail!(Error::NotAStringArray(field)) };
+    let Some(array) = array.as_array() else {
+        bail!(Error::NotAStringArray(field))
+    };
 
     for val in array {
         let Some(path) = val.as_str() else {
             bail!(Error::NotAStringArray(field));
         };
 
-        set.insert(fs::canonicalize(root.as_ref().join(path)).with_context(|| format!("Canonicalizing path '{path}'"))?);
+        set.insert(
+            fs::canonicalize(root.as_ref().join(path))
+                .with_context(|| format!("Canonicalizing path '{path}'"))?,
+        );
     }
 
     Ok(set)
@@ -612,7 +676,9 @@ mod tests {
     use super::*;
 
     use expect_test::expect;
-    use std::{fmt, fs, path::PathBuf};
+    use std::fmt;
+    use std::fs;
+    use std::path::PathBuf;
     use tempfile::tempdir;
 
     #[test]
@@ -653,7 +719,7 @@ mod tests {
         let root = discover_root(cut.clone()).unwrap();
 
         let sui_execution = root.join("sui-execution");
-        let move_vm_types = root.join("external-crates/move/crates/move-vm-types");
+        let move_core_types = root.join("external-crates/move/crates/move-core-types");
 
         let ws = Workspace::read(&root).unwrap();
 
@@ -662,7 +728,7 @@ mod tests {
 
         // Other examples
         assert!(ws.members.contains(&sui_execution));
-        assert!(ws.exclude.contains(&move_vm_types));
+        assert!(ws.exclude.contains(&move_core_types));
     }
 
     #[test]
@@ -743,7 +809,11 @@ mod tests {
                     dst: cut.join("../exec-cut"),
                     suffix: Some("-latest".to_string()),
                 },
-                Directory { src: cut.clone(), dst: cut.join("../cut-cut"), suffix: None },
+                Directory {
+                    src: cut.clone(),
+                    dst: cut.join("../cut-cut"),
+                    suffix: None,
+                },
                 Directory {
                     src: cut.join("../../external-crates/move/crates/move-core-types"),
                     dst: cut.join("../cut-move-core-types"),
@@ -841,7 +911,11 @@ mod tests {
                     dst: cut.join("../feature"),
                     suffix: Some("-latest".to_string()),
                 },
-                Directory { src: cut.clone(), dst: cut.join("../feature/cut"), suffix: None },
+                Directory {
+                    src: cut.clone(),
+                    dst: cut.join("../feature/cut"),
+                    suffix: None,
+                },
                 Directory {
                     src: cut.join("../../external-crates/move"),
                     dst: cut.join("../feature/move"),
@@ -922,7 +996,11 @@ mod tests {
             workspace_update: true,
             feature: "feature".to_string(),
             root: Some(tmp.path().to_owned()),
-            directories: vec![Directory { src: tmp.path().to_owned(), dst: tmp.path().join("cut"), suffix: None }],
+            directories: vec![Directory {
+                src: tmp.path().to_owned(),
+                dst: tmp.path().join("cut"),
+                suffix: None,
+            }],
             packages: vec!["foo".to_string()],
         })
         .unwrap_err();
@@ -939,9 +1017,17 @@ mod tests {
 
         fs::write(tmp.path().join("Cargo.toml"), "[workspace]").unwrap();
 
-        fs::write(tmp.path().join("foo/bar-latest/Cargo.toml"), r#"package.name = "bar-latest""#).unwrap();
+        fs::write(
+            tmp.path().join("foo/bar-latest/Cargo.toml"),
+            r#"package.name = "bar-latest""#,
+        )
+        .unwrap();
 
-        fs::write(tmp.path().join("baz/bar/Cargo.toml"), r#"package.name = "bar""#).unwrap();
+        fs::write(
+            tmp.path().join("baz/bar/Cargo.toml"),
+            r#"package.name = "bar""#,
+        )
+        .unwrap();
 
         let err = CutPlan::discover(Args {
             dry_run: false,
@@ -954,13 +1040,18 @@ mod tests {
                     dst: tmp.path().join("cut"),
                     suffix: Some("-latest".to_string()),
                 },
-                Directory { src: tmp.path().join("baz"), dst: tmp.path().join("cut"), suffix: None },
+                Directory {
+                    src: tmp.path().join("baz"),
+                    dst: tmp.path().join("cut"),
+                    suffix: None,
+                },
             ],
             packages: vec!["bar-latest".to_string(), "bar".to_string()],
         })
         .unwrap_err();
 
-        expect!["Packages 'bar-latest' and 'bar' map to the same cut package name"].assert_eq(&format!("{:#}", err));
+        expect!["Packages 'bar-latest' and 'bar' map to the same cut package name"]
+            .assert_eq(&format!("{:#}", err));
     }
 
     #[test]
@@ -971,9 +1062,17 @@ mod tests {
 
         fs::write(tmp.path().join("Cargo.toml"), "[workspace]").unwrap();
 
-        fs::write(tmp.path().join("foo/bar/Cargo.toml"), r#"package.name = "foo-bar""#).unwrap();
+        fs::write(
+            tmp.path().join("foo/bar/Cargo.toml"),
+            r#"package.name = "foo-bar""#,
+        )
+        .unwrap();
 
-        fs::write(tmp.path().join("baz/bar/Cargo.toml"), r#"package.name = "baz-bar""#).unwrap();
+        fs::write(
+            tmp.path().join("baz/bar/Cargo.toml"),
+            r#"package.name = "baz-bar""#,
+        )
+        .unwrap();
 
         let err = CutPlan::discover(Args {
             dry_run: false,
@@ -981,14 +1080,23 @@ mod tests {
             feature: "feature".to_string(),
             root: Some(tmp.path().to_owned()),
             directories: vec![
-                Directory { src: tmp.path().join("foo"), dst: tmp.path().join("cut"), suffix: None },
-                Directory { src: tmp.path().join("baz"), dst: tmp.path().join("cut"), suffix: None },
+                Directory {
+                    src: tmp.path().join("foo"),
+                    dst: tmp.path().join("cut"),
+                    suffix: None,
+                },
+                Directory {
+                    src: tmp.path().join("baz"),
+                    dst: tmp.path().join("cut"),
+                    suffix: None,
+                },
             ],
             packages: vec!["foo-bar".to_string(), "baz-bar".to_string()],
         })
         .unwrap_err();
 
-        expect!["Packages 'foo-bar' and 'baz-bar' map to the same cut package path"].assert_eq(&format!("{:#}", err));
+        expect!["Packages 'foo-bar' and 'baz-bar' map to the same cut package path"]
+            .assert_eq(&format!("{:#}", err));
     }
 
     #[test]
@@ -999,16 +1107,28 @@ mod tests {
 
         fs::write(tmp.path().join("Cargo.toml"), "[workspace]").unwrap();
 
-        fs::write(tmp.path().join("foo/bar/Cargo.toml"), r#"package.name = "foo-bar""#).unwrap();
+        fs::write(
+            tmp.path().join("foo/bar/Cargo.toml"),
+            r#"package.name = "foo-bar""#,
+        )
+        .unwrap();
 
-        fs::write(tmp.path().join("baz/bar/Cargo.toml"), r#"package.name = "baz-bar""#).unwrap();
+        fs::write(
+            tmp.path().join("baz/bar/Cargo.toml"),
+            r#"package.name = "baz-bar""#,
+        )
+        .unwrap();
 
         let err = CutPlan::discover(Args {
             dry_run: false,
             workspace_update: true,
             feature: "feature".to_string(),
             root: Some(tmp.path().to_owned()),
-            directories: vec![Directory { src: tmp.path().join("foo"), dst: tmp.path().join("baz"), suffix: None }],
+            directories: vec![Directory {
+                src: tmp.path().join("foo"),
+                dst: tmp.path().join("baz"),
+                suffix: None,
+            }],
             packages: vec!["foo-bar".to_string()],
         })
         .unwrap_err();
@@ -1038,7 +1158,11 @@ mod tests {
         )
         .unwrap();
 
-        fs::write(root.join("crates/foo/Cargo.toml"), r#"package.name = "foo-latest""#).unwrap();
+        fs::write(
+            root.join("crates/foo/Cargo.toml"),
+            r#"package.name = "foo-latest""#,
+        )
+        .unwrap();
 
         fs::write(
             root.join("crates/bar/Cargo.toml"),
@@ -1089,7 +1213,11 @@ mod tests {
         )
         .unwrap();
 
-        fs::write(root.join("crates/quy/Cargo.toml"), [r#"[package]"#, r#"name = "quy""#].join("\n")).unwrap();
+        fs::write(
+            root.join("crates/quy/Cargo.toml"),
+            [r#"[package]"#, r#"name = "quy""#].join("\n"),
+        )
+        .unwrap();
 
         let plan = CutPlan::discover(Args {
             dry_run: false,
@@ -1101,7 +1229,12 @@ mod tests {
                 dst: root.join("cut"),
                 suffix: Some("-latest".to_owned()),
             }],
-            packages: vec!["foo-latest".to_string(), "bar".to_string(), "baz".to_string(), "qux".to_string()],
+            packages: vec![
+                "foo-latest".to_string(),
+                "bar".to_string(),
+                "baz".to_string(),
+                "qux".to_string(),
+            ],
         })
         .unwrap();
 
@@ -1183,7 +1316,11 @@ mod tests {
                     dst: cut.join("../exec-cut"),
                     suffix: Some("-latest".to_string()),
                 },
-                Directory { src: cut.clone(), dst: cut.join("../cut-cut"), suffix: None },
+                Directory {
+                    src: cut.clone(),
+                    dst: cut.join("../cut-cut"),
+                    suffix: None,
+                },
                 Directory {
                     src: cut.join("../../external-crates/move/crates/move-core-types"),
                     dst: cut.join("../cut-move-core-types"),
@@ -1249,13 +1386,20 @@ mod tests {
 
     /// Read multiple files into one string.
     fn read_files<P: AsRef<Path>>(paths: impl IntoIterator<Item = P>) -> String {
-        let contents: Vec<_> = paths.into_iter().map(|p| fs::read_to_string(p).unwrap()).collect();
+        let contents: Vec<_> = paths
+            .into_iter()
+            .map(|p| fs::read_to_string(p).unwrap())
+            .collect();
 
         contents.join("\n---\n")
     }
 
     fn scrub_path<P: AsRef<Path>>(x: &str, p: P) -> String {
-        let path0 = fs::canonicalize(&p).unwrap().into_os_string().into_string().unwrap();
+        let path0 = fs::canonicalize(&p)
+            .unwrap()
+            .into_os_string()
+            .into_string()
+            .unwrap();
 
         let path1 = p.as_ref().as_os_str().to_os_string().into_string().unwrap();
 

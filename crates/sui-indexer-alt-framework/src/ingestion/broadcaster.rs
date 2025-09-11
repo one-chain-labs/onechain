@@ -1,15 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::future::try_join_all;
 use std::sync::Arc;
-use sui_types::full_checkpoint_content::CheckpointData;
+
+use futures::future::try_join_all;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-use crate::{ingestion::error::Error, task::TrySpawnStreamExt};
+use crate::{
+    ingestion::error::Error, task::TrySpawnStreamExt,
+    types::full_checkpoint_content::CheckpointData,
+};
 
 use super::{client::IngestionClient, IngestionConfig};
 
@@ -44,7 +47,12 @@ pub(super) fn broadcaster(
                 async move {
                     // Repeatedly retry if the checkpoint is not found, assuming that we are at the
                     // tip of the network and it will become available soon.
-                    let checkpoint = client.wait_for(cp, retry_interval, &cancel).await?;
+                    let checkpoint = tokio::select! {
+                        cp = client.wait_for(cp, retry_interval) => cp?,
+                        _ = cancel.cancelled() => {
+                            return Err(Error::Cancelled);
+                        }
+                    };
 
                     let futures = subscribers.iter().map(|s| s.send(checkpoint.clone()));
                     if try_join_all(futures).await.is_err() {

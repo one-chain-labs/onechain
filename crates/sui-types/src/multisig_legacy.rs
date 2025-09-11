@@ -74,7 +74,9 @@ impl AsRef<[u8]> for MultiSigLegacy {
 /// Necessary trait for [struct SenderSignedData].
 impl PartialEq for MultiSigLegacy {
     fn eq(&self, other: &Self) -> bool {
-        self.sigs == other.sigs && self.bitmap == other.bitmap && self.multisig_pk == other.multisig_pk
+        self.sigs == other.sigs
+            && self.bitmap == other.bitmap
+            && self.multisig_pk == other.multisig_pk
     }
 }
 
@@ -94,10 +96,12 @@ impl AuthenticatorTrait for MultiSigLegacy {
         epoch_id: EpochId,
         max_epoch_upper_bound_delta: Option<u64>,
     ) -> Result<(), SuiError> {
-        let multisig: MultiSig = self
-            .clone()
-            .try_into()
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid legacy multisig".to_string() })?;
+        let multisig: MultiSig =
+            self.clone()
+                .try_into()
+                .map_err(|_| SuiError::InvalidSignature {
+                    error: "Invalid legacy multisig".to_string(),
+                })?;
         multisig.verify_user_authenticator_epoch(epoch_id, max_epoch_upper_bound_delta)
     }
 
@@ -111,10 +115,12 @@ impl AuthenticatorTrait for MultiSigLegacy {
     where
         T: Serialize,
     {
-        let multisig: MultiSig = self
-            .clone()
-            .try_into()
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid legacy multisig".to_string() })?;
+        let multisig: MultiSig =
+            self.clone()
+                .try_into()
+                .map_err(|_| SuiError::InvalidSignature {
+                    error: "Invalid legacy multisig".to_string(),
+                })?;
         multisig.verify_claims(value, author, aux_verify_data, zklogin_inputs_cache)
     }
 }
@@ -134,9 +140,9 @@ impl TryFrom<MultiSigLegacy> for MultiSig {
 
 impl TryFrom<MultiSigPublicKeyLegacy> for MultiSigPublicKey {
     type Error = FastCryptoError;
-
     fn try_from(multisig: MultiSigPublicKeyLegacy) -> Result<Self, Self::Error> {
-        let multisig_pk_legacy = MultiSigPublicKey::insecure_new(multisig.pk_map, multisig.threshold).validate()?;
+        let multisig_pk_legacy =
+            MultiSigPublicKey::insecure_new(multisig.pk_map, multisig.threshold).validate()?;
         Ok(multisig_pk_legacy)
     }
 }
@@ -156,29 +162,43 @@ pub fn bitmap_to_u16(roaring: RoaringBitmap) -> Result<u16, FastCryptoError> {
 
 impl MultiSigLegacy {
     /// This combines a list of [enum Signature] `flag || signature || pk` to a MultiSig.
-    pub fn combine(full_sigs: Vec<GenericSignature>, multisig_pk: MultiSigPublicKeyLegacy) -> Result<Self, SuiError> {
+    pub fn combine(
+        full_sigs: Vec<GenericSignature>,
+        multisig_pk: MultiSigPublicKeyLegacy,
+    ) -> Result<Self, SuiError> {
         multisig_pk
             .validate()
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid multisig public key".to_string() })?;
+            .map_err(|_| SuiError::InvalidSignature {
+                error: "Invalid multisig public key".to_string(),
+            })?;
 
         if full_sigs.len() > multisig_pk.pk_map.len() || full_sigs.is_empty() {
-            return Err(SuiError::InvalidSignature { error: "Invalid number of signatures".to_string() });
+            return Err(SuiError::InvalidSignature {
+                error: "Invalid number of signatures".to_string(),
+            });
         }
         let mut bitmap = RoaringBitmap::new();
         let mut sigs = Vec::with_capacity(full_sigs.len());
         for s in full_sigs {
             let pk = s.to_public_key()?;
-            let inserted = bitmap.insert(
-                multisig_pk
-                    .get_index(&pk)
-                    .ok_or(SuiError::IncorrectSigner { error: format!("pk does not exist: {:?}", pk) })?,
-            );
+            let inserted = bitmap.insert(multisig_pk.get_index(&pk).ok_or(
+                SuiError::IncorrectSigner {
+                    error: format!("pk does not exist: {:?}", pk),
+                },
+            )?);
             if !inserted {
-                return Err(SuiError::InvalidSignature { error: "Duplicate sigature".to_string() });
+                return Err(SuiError::InvalidSignature {
+                    error: "Duplicate signature".to_string(),
+                });
             }
             sigs.push(s.to_compressed()?);
         }
-        Ok(MultiSigLegacy { sigs, bitmap, multisig_pk, bytes: OnceCell::new() })
+        Ok(MultiSigLegacy {
+            sigs,
+            bitmap,
+            multisig_pk,
+            bytes: OnceCell::new(),
+        })
     }
 
     pub fn validate(&self) -> Result<(), FastCryptoError> {
@@ -208,10 +228,12 @@ impl MultiSigLegacy {
 impl ToFromBytes for MultiSigLegacy {
     fn from_bytes(bytes: &[u8]) -> Result<MultiSigLegacy, FastCryptoError> {
         // The first byte matches the flag of MultiSig.
-        if bytes.first().ok_or(FastCryptoError::InvalidInput)? != &SignatureScheme::MultiSig.flag() {
+        if bytes.first().ok_or(FastCryptoError::InvalidInput)? != &SignatureScheme::MultiSig.flag()
+        {
             return Err(FastCryptoError::InvalidInput);
         }
-        let multisig: MultiSigLegacy = bcs::from_bytes(&bytes[1..]).map_err(|_| FastCryptoError::InvalidInput)?;
+        let multisig: MultiSigLegacy =
+            bcs::from_bytes(&bytes[1..]).map_err(|_| FastCryptoError::InvalidInput)?;
         multisig.validate()?;
         Ok(multisig)
     }
@@ -234,7 +256,10 @@ fn serialize_pk_map<S>(pk_map: &[(PublicKey, WeightUnit)], serializer: S) -> Res
 where
     S: Serializer,
 {
-    let pk_weight_arr: Vec<(String, WeightUnit)> = pk_map.iter().map(|(pk, w)| (pk.encode_base64(), *w)).collect();
+    let pk_weight_arr: Vec<(String, WeightUnit)> = pk_map
+        .iter()
+        .map(|(pk, w)| (pk.encode_base64(), *w))
+        .collect();
 
     let mut seq = serializer.serialize_seq(Some(pk_weight_arr.len()))?;
     for (pk_string, w) in pk_weight_arr {
@@ -253,29 +278,46 @@ where
     pk_weight_arr
         .into_iter()
         .map(|(s, w)| {
-            let pk = <PublicKey as EncodeDecodeBase64>::decode_base64(&s).map_err(|e| Error::custom(e.to_string()))?;
+            let pk = <PublicKey as EncodeDecodeBase64>::decode_base64(&s)
+                .map_err(|e| Error::custom(e.to_string()))?;
             Ok((pk, w))
         })
         .collect()
 }
 
 impl MultiSigPublicKeyLegacy {
-    pub fn new(pks: Vec<PublicKey>, weights: Vec<WeightUnit>, threshold: ThresholdUnit) -> Result<Self, SuiError> {
+    pub fn new(
+        pks: Vec<PublicKey>,
+        weights: Vec<WeightUnit>,
+        threshold: ThresholdUnit,
+    ) -> Result<Self, SuiError> {
         if pks.is_empty()
             || weights.is_empty()
             || threshold == 0
             || pks.len() != weights.len()
             || pks.len() > MAX_SIGNER_IN_MULTISIG
             || weights.iter().any(|w| *w == 0)
-            || weights.iter().map(|w| *w as ThresholdUnit).sum::<ThresholdUnit>() < threshold
+            || weights
+                .iter()
+                .map(|w| *w as ThresholdUnit)
+                .sum::<ThresholdUnit>()
+                < threshold
         {
-            return Err(SuiError::InvalidSignature { error: "Invalid multisig public key construction".to_string() });
+            return Err(SuiError::InvalidSignature {
+                error: "Invalid multisig public key construction".to_string(),
+            });
         }
-        Ok(MultiSigPublicKeyLegacy { pk_map: pks.into_iter().zip(weights).collect(), threshold })
+        Ok(MultiSigPublicKeyLegacy {
+            pk_map: pks.into_iter().zip(weights).collect(),
+            threshold,
+        })
     }
 
     pub fn get_index(&self, pk: &PublicKey) -> Option<u32> {
-        self.pk_map.iter().position(|x| &x.0 == pk).map(|x| x as u32)
+        self.pk_map
+            .iter()
+            .position(|x| &x.0 == pk)
+            .map(|x| x as u32)
     }
 
     pub fn threshold(&self) -> &ThresholdUnit {

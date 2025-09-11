@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::*;
 use crate::crypto::bcs_signable_test::Foo;
-use proptest::{collection, prelude::*};
+use proptest::collection;
+use proptest::prelude::*;
 
 #[test]
 fn serde_keypair() {
     let skp = SuiKeyPair::Ed25519(Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32])));
     let encoded = skp.encode().unwrap();
-    assert_eq!(encoded, "suiprivkey1qzdlfxn2qa2lj5uprl8pyhexs02sg2wrhdy7qaq50cqgnffw4c2477kg9h3");
+    assert_eq!(
+        encoded,
+        "suiprivkey1qzdlfxn2qa2lj5uprl8pyhexs02sg2wrhdy7qaq50cqgnffw4c2477kg9h3"
+    );
     let decoded = SuiKeyPair::decode(&encoded).unwrap();
     assert_eq!(skp, decoded);
 }
@@ -17,13 +21,22 @@ fn serde_keypair() {
 fn serde_pubkey() {
     let skp = SuiKeyPair::Ed25519(get_key_pair().1);
     let ser = serde_json::to_string(&skp.public()).unwrap();
-    assert_eq!(ser, format!("{{\"Ed25519\":\"{}\"}}", Base64::encode(skp.public().as_ref())));
+    assert_eq!(
+        ser,
+        format!(
+            "{{\"Ed25519\":\"{}\"}}",
+            Base64::encode(skp.public().as_ref())
+        )
+    );
 }
 
 #[test]
 fn serde_round_trip_authority_quorum_sign_info() {
-    let info =
-        AuthorityQuorumSignInfo::<true> { epoch: 0, signature: Default::default(), signers_map: RoaringBitmap::new() };
+    let info = AuthorityQuorumSignInfo::<true> {
+        epoch: 0,
+        signature: Default::default(),
+        signers_map: RoaringBitmap::new(),
+    };
     let ser = serde_json::to_string(&info).unwrap();
     println!("{}", ser);
     let schema = schemars::schema_for!(AuthorityQuorumSignInfo<true>);
@@ -65,7 +78,9 @@ fn public_key_equality() {
 
 #[test]
 fn test_proof_of_possession() {
-    let address = SuiAddress::from_str("0x1a4623343cd42be47d67314fce0ad042f3c82685544bc91d8c11d24e74ba7357").unwrap();
+    let address =
+        SuiAddress::from_str("0x1a4623343cd42be47d67314fce0ad042f3c82685544bc91d8c11d24e74ba7357")
+            .unwrap();
     let kp: AuthorityKeyPair = get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
     let pop = generate_proof_of_possession(&kp, address);
     let mut msg = vec![];

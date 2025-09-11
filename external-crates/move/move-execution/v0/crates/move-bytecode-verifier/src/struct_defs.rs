@@ -7,7 +7,9 @@
 //! each module in isolation guarantees that there is no structural recursion globally.
 use move_binary_format::{
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{CompiledModule, DatatypeHandleIndex, SignatureToken, StructDefinitionIndex, TableIndex},
+    file_format::{
+        CompiledModule, DatatypeHandleIndex, SignatureToken, StructDefinitionIndex, TableIndex,
+    },
     internals::ModuleIndex,
     IndexKind,
 };
@@ -59,7 +61,10 @@ impl<'a> StructDefGraphBuilder<'a> {
             handle_to_def.insert(sh_idx, StructDefinitionIndex(idx as TableIndex));
         }
 
-        Self { module, handle_to_def }
+        Self {
+            module,
+            handle_to_def,
+        }
     }
 
     fn build(self) -> PartialVMResult<DiGraphMap<StructDefinitionIndex, ()>> {
@@ -69,8 +74,9 @@ impl<'a> StructDefGraphBuilder<'a> {
             self.add_struct_defs(&mut neighbors, sd_idx)?
         }
 
-        let edges =
-            neighbors.into_iter().flat_map(|(parent, children)| children.into_iter().map(move |child| (parent, child)));
+        let edges = neighbors
+            .into_iter()
+            .flat_map(|(parent, children)| children.into_iter().map(move |child| (parent, child)));
         Ok(DiGraphMap::from_edges(edges))
     }
 
@@ -107,19 +113,27 @@ impl<'a> StructDefGraphBuilder<'a> {
             | T::Signer
             | T::TypeParameter(_) => (),
             T::Reference(_) | T::MutableReference(_) => {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Reference field when checking recursive structs".to_owned()))
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Reference field when checking recursive structs".to_owned()),
+                )
             }
             T::Vector(inner) => self.add_signature_token(neighbors, cur_idx, inner)?,
             T::Datatype(sh_idx) => {
                 if let Some(struct_def_idx) = self.handle_to_def.get(sh_idx) {
-                    neighbors.entry(cur_idx).or_default().insert(*struct_def_idx);
+                    neighbors
+                        .entry(cur_idx)
+                        .or_default()
+                        .insert(*struct_def_idx);
                 }
             }
             T::DatatypeInstantiation(s) => {
                 let (sh_idx, inners) = &**s;
                 if let Some(struct_def_idx) = self.handle_to_def.get(sh_idx) {
-                    neighbors.entry(cur_idx).or_default().insert(*struct_def_idx);
+                    neighbors
+                        .entry(cur_idx)
+                        .or_default()
+                        .insert(*struct_def_idx);
                 }
                 for t in inners {
                     self.add_signature_token(neighbors, cur_idx, t)?

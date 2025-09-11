@@ -1,6 +1,6 @@
 // cannot assign to UID reference
 module a::m {
-    use one::object::UID;
+    use sui::object::UID;
 
     struct Foo has key {
         id: UID,
@@ -13,7 +13,7 @@ module a::m {
 
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

@@ -3,34 +3,54 @@
 
 use super::*;
 
-use super::{
-    authority_tests::{init_state_with_ids, send_and_confirm_transaction},
-    move_integration_tests::build_and_try_publish_test_package,
-};
-use crate::authority::{
-    authority_tests::init_state_with_ids_and_object_basics,
-    test_authority_builder::TestAuthorityBuilder,
-};
-use move_core_types::{account_address::AccountAddress, ident_str};
+use super::authority_tests::{init_state_with_ids, send_and_confirm_transaction};
+use super::move_integration_tests::build_and_try_publish_test_package;
+use crate::authority::authority_tests::init_state_with_ids_and_object_basics;
+use crate::authority::test_authority_builder::TestAuthorityBuilder;
+use move_core_types::account_address::AccountAddress;
+use move_core_types::ident_str;
 use once_cell::sync::Lazy;
 use sui_protocol_config::ProtocolConfig;
+use sui_types::crypto::AccountKeyPair;
+use sui_types::effects::TransactionEvents;
+use sui_types::execution_status::{ExecutionFailureStatus, ExecutionStatus};
+use sui_types::gas_coin::GasCoin;
+use sui_types::object::GAS_VALUE_FOR_TESTING;
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::utils::to_sender_signed_transaction;
 use sui_types::{
-    base_types::dbg_addr,
-    crypto::{get_key_pair, AccountKeyPair},
-    effects::TransactionEvents,
-    execution_status::{ExecutionFailureStatus, ExecutionStatus},
-    gas_coin::GasCoin,
-    object::GAS_VALUE_FOR_TESTING,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    utils::to_sender_signed_transaction,
+    base_types::{dbg_addr, FullObjectRef},
+    crypto::get_key_pair,
 };
 
 // The cost table is used only to get the max budget available which is not dependent on
 // the gas price
-static MAX_GAS_BUDGET: Lazy<u64> = Lazy::new(|| ProtocolConfig::get_for_max_version_UNSAFE().max_tx_gas());
+static MAX_GAS_BUDGET: Lazy<u64> =
+    Lazy::new(|| ProtocolConfig::get_for_max_version_UNSAFE().max_tx_gas());
 // MIN_GAS_BUDGET_PRE_RGP has to be multiplied by the RGP to get the proper minimum
 static MIN_GAS_BUDGET_PRE_RGP: Lazy<u64> =
     Lazy::new(|| ProtocolConfig::get_for_max_version_UNSAFE().base_tx_cost_fixed());
+
+#[test]
+fn test_gas_invariants() {
+    let max_tx_gas = ProtocolConfig::get_for_max_version_UNSAFE().max_tx_gas();
+    assert!(
+        DEV_INSPECT_GAS_COIN_VALUE >= max_tx_gas,
+        "DEV_INSPECT_GAS_COIN_VALUE {} cannot be less than max_tx_gas {}",
+        DEV_INSPECT_GAS_COIN_VALUE,
+        max_tx_gas
+    );
+
+    let max_gas_price = ProtocolConfig::get_for_max_version_UNSAFE().max_gas_price();
+    let base_tx_cost_fixed = ProtocolConfig::get_for_max_version_UNSAFE().base_tx_cost_fixed();
+    assert!(
+        max_gas_price * base_tx_cost_fixed <= max_tx_gas,
+        "max_gas_price {} * base_tx_cost_fixed {} > max_tx_gas {}",
+        max_gas_price,
+        base_tx_cost_fixed,
+        max_tx_gas
+    );
+}
 
 #[tokio::test]
 async fn test_tx_less_than_minimum_gas_budget() {
@@ -40,10 +60,13 @@ async fn test_tx_less_than_minimum_gas_budget() {
     let budget = *MIN_GAS_BUDGET_PRE_RGP - 1;
     let result = execute_transfer(*MAX_GAS_BUDGET, budget, false, true).await;
 
-    assert_eq!(UserInputError::try_from(result.response.unwrap_err()).unwrap(), UserInputError::GasBudgetTooLow {
-        gas_budget: budget * result.rgp,
-        min_budget: *MIN_GAS_BUDGET_PRE_RGP * result.rgp,
-    });
+    assert_eq!(
+        UserInputError::try_from(result.response.unwrap_err()).unwrap(),
+        UserInputError::GasBudgetTooLow {
+            gas_budget: budget * result.rgp,
+            min_budget: *MIN_GAS_BUDGET_PRE_RGP * result.rgp,
+        }
+    );
 }
 
 #[tokio::test]
@@ -54,10 +77,13 @@ async fn test_tx_more_than_maximum_gas_budget() {
     let budget = *MAX_GAS_BUDGET + 1;
     let result = execute_transfer(*MAX_GAS_BUDGET, budget, false, false).await;
 
-    assert_eq!(UserInputError::try_from(result.response.unwrap_err()).unwrap(), UserInputError::GasBudgetTooHigh {
-        gas_budget: budget,
-        max_budget: *MAX_GAS_BUDGET
-    });
+    assert_eq!(
+        UserInputError::try_from(result.response.unwrap_err()).unwrap(),
+        UserInputError::GasBudgetTooHigh {
+            gas_budget: budget,
+            max_budget: *MAX_GAS_BUDGET
+        }
+    );
 }
 
 //
@@ -105,7 +131,13 @@ async fn publish_move_random_package(
     .await;
     let effects = response.1.into_data();
     assert!(effects.status().is_ok());
-    effects.created().iter().find(|(_, owner)| matches!(owner, Owner::Immutable)).unwrap().0 .0
+    effects
+        .created()
+        .iter()
+        .find(|(_, owner)| matches!(owner, Owner::Immutable))
+        .unwrap()
+        .0
+         .0
 }
 
 async fn check_oog_transaction<F>(
@@ -122,7 +154,11 @@ where
     F: FnOnce(&GasCostSummary, u64, u64) -> SuiResult,
 {
     // initial system with given gas coins
-    let gas_amount: u64 = if budget < 10_000_000_000 { 10_000_000_000 } else { budget };
+    let gas_amount: u64 = if budget < 10_000_000_000 {
+        10_000_000_000
+    } else {
+        budget
+    };
     let gas_coins = make_gas_coins(sender, gas_amount, coin_num);
     let gas_coin_ids: Vec<_> = gas_coins.iter().map(|obj| obj.id()).collect();
     let authority_state = TestAuthorityBuilder::new().build().await;
@@ -134,14 +170,27 @@ where
     let gas_coin = Object::with_id_owner_gas_for_testing(gas_object_id, sender, gas_amount);
     authority_state.insert_genesis_object(gas_coin).await;
     // touch gas coins so that `storage_rebate` is set (not 0 as in genesis)
-    touch_gas_coins(&authority_state, sender, &sender_key, sender, &gas_coin_ids, gas_object_id).await;
+    touch_gas_coins(
+        &authority_state,
+        sender,
+        &sender_key,
+        sender,
+        &gas_coin_ids,
+        gas_object_id,
+    )
+    .await;
     // publish move module
-    let package = publish_move_random_package(&authority_state, &sender, &sender_key, &gas_object_id).await;
+    let package =
+        publish_move_random_package(&authority_state, &sender, &sender_key, &gas_object_id).await;
 
     // call move entry function
     let mut gas_coin_refs = vec![];
     for coin_id in &gas_coin_ids {
-        let coin_ref = authority_state.get_object(coin_id).await.unwrap().compute_object_reference();
+        let coin_ref = authority_state
+            .get_object(coin_id)
+            .await
+            .unwrap()
+            .compute_object_reference();
         gas_coin_refs.push(coin_ref);
     }
     let module = ident_str!("move_random").to_owned();
@@ -161,10 +210,17 @@ where
 
     // sign and execute transaction
     let tx = to_sender_signed_transaction(data, &sender_key);
-    let effects = send_and_confirm_transaction(&authority_state, tx).await.unwrap().1.into_data();
+    let effects = send_and_confirm_transaction(&authority_state, tx)
+        .await
+        .unwrap()
+        .1
+        .into_data();
 
     // check effects
-    assert_eq!(effects.status().clone().unwrap_err().0, ExecutionFailureStatus::InsufficientGas);
+    assert_eq!(
+        effects.status().clone().unwrap_err().0,
+        ExecutionFailureStatus::InsufficientGas
+    );
     // gas object in effects is first coin in vector of coins
     assert_eq!(gas_coin_ids[0], effects.gas_object().0 .0);
     //  gas at position 0 mutated
@@ -172,7 +228,10 @@ where
     // extra coins are deleted
     assert_eq!(effects.deleted().len() as u64, coin_num - 1);
     for gas_coin_id in &gas_coin_ids[1..] {
-        assert!(effects.deleted().iter().any(|deleted| deleted.0 == *gas_coin_id));
+        assert!(effects
+            .deleted()
+            .iter()
+            .any(|deleted| deleted.0 == *gas_coin_id));
     }
     let gas_ref = effects.gas_object().0;
     let gas_object = authority_state.get_object(&gas_ref.0).await.unwrap();
@@ -189,12 +248,20 @@ fn make_gas_coins(owner: SuiAddress, gas_amount: u64, coin_num: u64) -> Vec<Obje
     let coin_balance = gas_amount / coin_num;
     for _ in 1..coin_num {
         let gas_object_id = ObjectID::random();
-        objects.push(Object::with_id_owner_gas_for_testing(gas_object_id, owner, coin_balance));
+        objects.push(Object::with_id_owner_gas_for_testing(
+            gas_object_id,
+            owner,
+            coin_balance,
+        ));
     }
     // in case integer division dropped something, make a coin with whatever is left
     let amount_left = gas_amount - (coin_balance * (coin_num - 1));
     let gas_object_id = ObjectID::random();
-    objects.push(Object::with_id_owner_gas_for_testing(gas_object_id, owner, amount_left));
+    objects.push(Object::with_id_owner_gas_for_testing(
+        gas_object_id,
+        owner,
+        amount_left,
+    ));
     objects
 }
 
@@ -209,17 +276,29 @@ async fn touch_gas_coins(
 ) {
     let mut builder = ProgrammableTransactionBuilder::new();
     for coin_id in coin_ids {
-        let coin_ref = authority_state.get_object(coin_id).await.unwrap().compute_object_reference();
-        builder.transfer_object(recipient, coin_ref).unwrap();
+        let coin_ref = authority_state
+            .get_object(coin_id)
+            .await
+            .unwrap()
+            .compute_object_reference();
+        builder
+            .transfer_object(recipient, FullObjectRef::from_fastpath_ref(coin_ref))
+            .unwrap();
     }
     let pt = builder.finish();
     let kind = TransactionKind::ProgrammableTransaction(pt);
-    let gas_object_ref = authority_state.get_object(&gas_object_id).await.unwrap().compute_object_reference();
+    let gas_object_ref = authority_state
+        .get_object(&gas_object_id)
+        .await
+        .unwrap()
+        .compute_object_reference();
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
     let data = TransactionData::new(kind, sender, gas_object_ref, 100_000_000, rgp);
     let tx = to_sender_signed_transaction(data, sender_key);
 
-    send_and_confirm_transaction(authority_state, tx).await.unwrap();
+    send_and_confirm_transaction(authority_state, tx)
+        .await
+        .unwrap();
 }
 
 // - OOG computation, storage ok
@@ -318,7 +397,10 @@ async fn test_computation_ok_oog_storage_minimal_ok_one_coin() -> SuiResult {
         sender,
         sender_key,
         "storage_heavy",
-        vec![CallArg::Pure(bcs::to_bytes(&(100_u64)).unwrap()), CallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            CallArg::Pure(bcs::to_bytes(&(100_u64)).unwrap()),
+            CallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
         BUDGET,
         GAS_PRICE,
         1,
@@ -347,7 +429,10 @@ async fn test_computation_ok_oog_storage_minimal_ok_multi_coins() -> SuiResult {
         sender,
         sender_key,
         "storage_heavy",
-        vec![CallArg::Pure(bcs::to_bytes(&(100_u64)).unwrap()), CallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            CallArg::Pure(bcs::to_bytes(&(100_u64)).unwrap()),
+            CallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
         BUDGET,
         GAS_PRICE,
         5,
@@ -376,7 +461,10 @@ async fn test_computation_ok_oog_storage_final_one_coin() -> SuiResult {
         sender,
         sender_key,
         "storage_heavy",
-        vec![CallArg::Pure(bcs::to_bytes(&(100_u64)).unwrap()), CallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            CallArg::Pure(bcs::to_bytes(&(100_u64)).unwrap()),
+            CallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
         BUDGET,
         GAS_PRICE,
         1,
@@ -413,7 +501,11 @@ async fn test_native_transfer_sufficient_gas() -> SuiResult {
     // This test does a native transfer with sufficient gas budget and balance.
     // It's expected to succeed. We check that gas was charged properly.
     let result = execute_transfer(*MAX_GAS_BUDGET, *MAX_GAS_BUDGET, true, false).await;
-    let effects = result.response.unwrap().into_effects_for_testing().into_data();
+    let effects = result
+        .response
+        .unwrap()
+        .into_effects_for_testing()
+        .into_data();
     let gas_cost = effects.gas_cost_summary();
     assert!(gas_cost.net_gas_usage() as u64 > *MIN_GAS_BUDGET_PRE_RGP);
     assert!(gas_cost.computation_cost > 0);
@@ -421,22 +513,42 @@ async fn test_native_transfer_sufficient_gas() -> SuiResult {
     // Removing genesis object does not have rebate.
     assert_eq!(gas_cost.storage_rebate, 0);
 
-    let gas_object = result.authority_state.get_object(&result.gas_object_id).await.unwrap();
-    assert_eq!(GasCoin::try_from(&gas_object)?.value(), *MAX_GAS_BUDGET - gas_cost.gas_used());
+    let gas_object = result
+        .authority_state
+        .get_object(&result.gas_object_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        GasCoin::try_from(&gas_object)?.value(),
+        *MAX_GAS_BUDGET - gas_cost.gas_used()
+    );
     Ok(())
 }
 
 #[tokio::test]
 async fn test_native_transfer_gas_price_is_used() {
-    let result = execute_transfer_with_price(*MAX_GAS_BUDGET, *MAX_GAS_BUDGET, 1, true, false).await;
-    let effects = result.response.unwrap().into_effects_for_testing().into_data();
+    let result =
+        execute_transfer_with_price(*MAX_GAS_BUDGET, *MAX_GAS_BUDGET, 1, true, false).await;
+    let effects = result
+        .response
+        .unwrap()
+        .into_effects_for_testing()
+        .into_data();
     let gas_summary_1 = effects.gas_cost_summary();
 
-    let result = execute_transfer_with_price(*MAX_GAS_BUDGET, *MAX_GAS_BUDGET, 2, true, false).await;
-    let effects = result.response.unwrap().into_effects_for_testing().into_data();
+    let result =
+        execute_transfer_with_price(*MAX_GAS_BUDGET, *MAX_GAS_BUDGET, 2, true, false).await;
+    let effects = result
+        .response
+        .unwrap()
+        .into_effects_for_testing()
+        .into_data();
     let gas_summary_2 = effects.gas_cost_summary();
 
-    assert_eq!(gas_summary_1.computation_cost * 2, gas_summary_2.computation_cost);
+    assert_eq!(
+        gas_summary_1.computation_cost * 2,
+        gas_summary_2.computation_cost
+    );
 
     // test overflow with insufficient gas
     let gas_balance = *MAX_GAS_BUDGET - 1;
@@ -449,7 +561,7 @@ async fn test_native_transfer_gas_price_is_used() {
 }
 
 #[tokio::test]
-async fn test_transfer_sui_insufficient_gas() {
+async fn test_transfer_oct_insufficient_gas() {
     let (sender, sender_key): (_, AccountKeyPair) = get_key_pair();
     let recipient = dbg_addr(2);
     let authority_state = TestAuthorityBuilder::new().build().await;
@@ -465,14 +577,30 @@ async fn test_transfer_sui_insufficient_gas() {
         builder.finish()
     };
     let kind = TransactionKind::ProgrammableTransaction(pt);
-    let data = TransactionData::new(kind, sender, gas_object_ref, *MIN_GAS_BUDGET_PRE_RGP * rgp, rgp);
+    let data = TransactionData::new(
+        kind,
+        sender,
+        gas_object_ref,
+        *MIN_GAS_BUDGET_PRE_RGP * rgp,
+        rgp,
+    );
     let tx = to_sender_signed_transaction(data, &sender_key);
 
-    let effects = send_and_confirm_transaction(&authority_state, tx).await.unwrap().1.into_data();
+    let effects = send_and_confirm_transaction(&authority_state, tx)
+        .await
+        .unwrap()
+        .1
+        .into_data();
     // We expect this to fail due to insufficient gas.
-    assert_eq!(*effects.status(), ExecutionStatus::new_failure(ExecutionFailureStatus::InsufficientGas, None));
+    assert_eq!(
+        *effects.status(),
+        ExecutionStatus::new_failure(ExecutionFailureStatus::InsufficientGas, None)
+    );
     // Ensure that the owner of the object did not change if the transfer failed.
-    assert_eq!(effects.mutated()[0].1.get_address_owner_address().unwrap(), sender);
+    assert_eq!(
+        effects.mutated()[0].1.get_address_owner_address().unwrap(),
+        sender
+    );
 }
 
 /// - All gas coins should be owned by an address (not shared or immutable)
@@ -495,8 +623,13 @@ async fn test_invalid_gas_owners() {
 
     let shared_object = init_object(Object::shared_for_testing()).await;
     let immutable_object = init_object(Object::immutable_for_testing()).await;
-    let id_owned_object = init_object(Object::with_object_owner_for_testing(ObjectID::random(), gas_object3.0)).await;
-    let non_sender_owned_object = init_object(Object::with_owner_for_testing(SuiAddress::ZERO)).await;
+    let id_owned_object = init_object(Object::with_object_owner_for_testing(
+        ObjectID::random(),
+        gas_object3.0,
+    ))
+    .await;
+    let non_sender_owned_object =
+        init_object(Object::with_owner_for_testing(SuiAddress::ZERO)).await;
 
     async fn test(
         good_gas_object: ObjectRef,
@@ -526,21 +659,55 @@ async fn test_invalid_gas_owners() {
     }
 
     assert_eq!(
-        test(gas_object1, shared_object, sender, &sender_key, &authority_state).await,
+        test(
+            gas_object1,
+            shared_object,
+            sender,
+            &sender_key,
+            &authority_state
+        )
+        .await,
         UserInputError::GasObjectNotOwnedObject {
-            owner: Owner::Shared { initial_shared_version: OBJECT_START_VERSION }
+            owner: Owner::Shared {
+                initial_shared_version: OBJECT_START_VERSION
+            }
         }
     );
     assert_eq!(
-        test(gas_object2, immutable_object, sender, &sender_key, &authority_state).await,
-        UserInputError::GasObjectNotOwnedObject { owner: Owner::Immutable }
+        test(
+            gas_object2,
+            immutable_object,
+            sender,
+            &sender_key,
+            &authority_state
+        )
+        .await,
+        UserInputError::GasObjectNotOwnedObject {
+            owner: Owner::Immutable
+        }
     );
     assert_eq!(
-        test(gas_object3, id_owned_object, sender, &sender_key, &authority_state).await,
-        UserInputError::GasObjectNotOwnedObject { owner: Owner::ObjectOwner(gas_object3.0.into()) }
+        test(
+            gas_object3,
+            id_owned_object,
+            sender,
+            &sender_key,
+            &authority_state
+        )
+        .await,
+        UserInputError::GasObjectNotOwnedObject {
+            owner: Owner::ObjectOwner(gas_object3.0.into())
+        }
     );
     assert!(matches!(
-        test(gas_object4, non_sender_owned_object, sender, &sender_key, &authority_state).await,
+        test(
+            gas_object4,
+            non_sender_owned_object,
+            sender,
+            &sender_key,
+            &authority_state
+        )
+        .await,
         UserInputError::IncorrectUserSignature { .. }
     ))
 }
@@ -553,8 +720,15 @@ async fn test_native_transfer_insufficient_gas_reading_objects() {
     let balance = *MIN_GAS_BUDGET_PRE_RGP + 1;
     let result = execute_transfer(*MAX_GAS_BUDGET, balance, true, true).await;
     // The transaction should still execute to effects, but with execution status as failure.
-    let effects = result.response.unwrap().into_effects_for_testing().into_data();
-    assert_eq!(effects.into_status().unwrap_err().0, ExecutionFailureStatus::InsufficientGas);
+    let effects = result
+        .response
+        .unwrap()
+        .into_effects_for_testing()
+        .into_data();
+    assert_eq!(
+        effects.into_status().unwrap_err().0,
+        ExecutionFailureStatus::InsufficientGas
+    );
 }
 
 #[tokio::test]
@@ -564,13 +738,27 @@ async fn test_native_transfer_insufficient_gas_execution() {
     // execution phase, and hence gas object will still be mutated and all budget
     // will be charged.
     let result = execute_transfer(*MAX_GAS_BUDGET, *MAX_GAS_BUDGET, true, false).await;
-    let total_gas = result.response.unwrap().into_effects_for_testing().data().gas_cost_summary().gas_used();
+    let total_gas = result
+        .response
+        .unwrap()
+        .into_effects_for_testing()
+        .data()
+        .gas_cost_summary()
+        .gas_used();
     let budget = total_gas - 1;
     let result = execute_transfer(budget, budget, true, false).await;
-    let effects = result.response.unwrap().into_effects_for_testing().into_data();
+    let effects = result
+        .response
+        .unwrap()
+        .into_effects_for_testing()
+        .into_data();
     // Transaction failed for out of gas so charge is same as budget
     assert!(effects.gas_cost_summary().gas_used() == budget);
-    let gas_object = result.authority_state.get_object(&result.gas_object_id).await.unwrap();
+    let gas_object = result
+        .authority_state
+        .get_object(&result.gas_object_id)
+        .await
+        .unwrap();
     let gas_coin = GasCoin::try_from(&gas_object).unwrap();
     assert_eq!(gas_coin.value(), 0);
     // After a failed transfer, the version should have been incremented,
@@ -579,7 +767,10 @@ async fn test_native_transfer_insufficient_gas_execution() {
     assert_eq!(version, gas_object.version());
     assert_eq!(owner, gas_object.owner);
 
-    assert_eq!(effects.into_status().unwrap_err().0, ExecutionFailureStatus::InsufficientGas,);
+    assert_eq!(
+        effects.into_status().unwrap_err().0,
+        ExecutionFailureStatus::InsufficientGas,
+    );
 }
 
 #[tokio::test]
@@ -608,13 +799,21 @@ async fn test_publish_gas() -> anyhow::Result<()> {
     let gas_object = authority_state.get_object(&gas_object_id).await.unwrap();
     let gas_size = gas_object.object_size_for_gas_metering();
     let expected_gas_balance = GAS_VALUE_FOR_TESTING - gas_cost.net_gas_usage() as u64;
-    assert_eq!(GasCoin::try_from(&gas_object)?.value(), expected_gas_balance,);
+    assert_eq!(
+        GasCoin::try_from(&gas_object)?.value(),
+        expected_gas_balance,
+    );
 
     // Create a transaction with budget DELTA less than the gas cost required.
     let total_gas_used = gas_cost.net_gas_usage() as u64;
     let config = ProtocolConfig::get_for_max_version_UNSAFE();
-    let delta: u64 = gas_size as u64 * config.obj_data_cost_refundable() * config.storage_gas_price() + 1000;
-    let budget = if delta < total_gas_used { total_gas_used - delta } else { total_gas_used - 10 };
+    let delta: u64 =
+        gas_size as u64 * config.obj_data_cost_refundable() * config.storage_gas_price() + 1000;
+    let budget = if delta < total_gas_used {
+        total_gas_used - delta
+    } else {
+        total_gas_used - 10
+    };
     // Run the transaction again with 1 less than the required budget.
     let response = build_and_try_publish_test_package(
         &authority_state,
@@ -637,7 +836,10 @@ async fn test_publish_gas() -> anyhow::Result<()> {
 
     let gas_object = authority_state.get_object(&gas_object_id).await.unwrap();
     let expected_gas_balance = expected_gas_balance - gas_cost.net_gas_usage() as u64;
-    assert_eq!(GasCoin::try_from(&gas_object)?.value(), expected_gas_balance,);
+    assert_eq!(
+        GasCoin::try_from(&gas_object)?.value(),
+        expected_gas_balance,
+    );
 
     Ok(())
 }
@@ -680,7 +882,10 @@ async fn test_move_call_gas() -> SuiResult {
     assert_eq!(gas_cost.storage_rebate, 0);
     let gas_object = authority_state.get_object(&gas_object_id).await.unwrap();
     let expected_gas_balance = GAS_VALUE_FOR_TESTING - gas_cost.net_gas_usage() as u64;
-    assert_eq!(GasCoin::try_from(&gas_object)?.value(), expected_gas_balance,);
+    assert_eq!(
+        GasCoin::try_from(&gas_object)?.value(),
+        expected_gas_balance,
+    );
 
     // This is the total amount of storage cost paid. We will use this
     // to check if we get back the same amount of rebate latter.
@@ -694,7 +899,9 @@ async fn test_move_call_gas() -> SuiResult {
         ident_str!("delete").to_owned(),
         vec![],
         gas_object.compute_object_reference(),
-        vec![CallArg::Object(ObjectArg::ImmOrOwnedObject(created_object_ref))],
+        vec![CallArg::Object(ObjectArg::ImmOrOwnedObject(
+            created_object_ref,
+        ))],
         *MAX_GAS_BUDGET,
         rgp,
     )
@@ -709,7 +916,10 @@ async fn test_move_call_gas() -> SuiResult {
     // rebate without charging.
     assert!(gas_cost.storage_cost > 0 && gas_cost.storage_cost < gas_cost.storage_rebate);
     // Check that we have storage rebate is less or equal to the previous one + non refundable
-    assert_eq!(gas_cost.storage_rebate + gas_cost.non_refundable_storage_fee, prev_storage_cost);
+    assert_eq!(
+        gas_cost.storage_rebate + gas_cost.non_refundable_storage_fee,
+        prev_storage_cost
+    );
     Ok(())
 }
 
@@ -731,11 +941,21 @@ async fn test_tx_gas_coins_input_coins() {
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
 
     // create coins for transaction
-    let gas_coins = (0..250).map(|_| Object::with_owner_for_testing(sender)).collect::<Vec<_>>();
-    let gas_coin_refs = gas_coins.iter().map(|obj| obj.compute_object_reference()).collect::<Vec<_>>();
+    let gas_coins = (0..250)
+        .map(|_| Object::with_owner_for_testing(sender))
+        .collect::<Vec<_>>();
+    let gas_coin_refs = gas_coins
+        .iter()
+        .map(|obj| obj.compute_object_reference())
+        .collect::<Vec<_>>();
     authority_state.insert_genesis_objects(&gas_coins).await;
-    let coins = (0..260).map(|_| Object::with_owner_for_testing(sender)).collect::<Vec<_>>();
-    let coin_refs = coins.iter().map(|obj| obj.compute_object_reference()).collect::<Vec<_>>();
+    let coins = (0..260)
+        .map(|_| Object::with_owner_for_testing(sender))
+        .collect::<Vec<_>>();
+    let coin_refs = coins
+        .iter()
+        .map(|obj| obj.compute_object_reference())
+        .collect::<Vec<_>>();
     authority_state.insert_genesis_objects(&coins).await;
     let coin = Object::with_owner_for_testing(sender);
     let coin_ref = coin.compute_object_reference();
@@ -771,11 +991,23 @@ async fn test_tx_gas_coins_input_coins() {
             rgp,
         );
         let tx = to_sender_signed_transaction(data, sender_key);
-        send_and_confirm_transaction(authority_state, tx).await.unwrap().1.into_data()
+        send_and_confirm_transaction(authority_state, tx)
+            .await
+            .unwrap()
+            .1
+            .into_data()
     }
 
-    let effects =
-        run_merge(&authority_state, sender, &sender_key, gas_coin_refs.clone(), coin_ref, coin_refs.clone(), rgp).await;
+    let effects = run_merge(
+        &authority_state,
+        sender,
+        &sender_key,
+        gas_coin_refs.clone(),
+        coin_ref,
+        coin_refs.clone(),
+        rgp,
+    )
+    .await;
     assert!(effects.status().is_ok());
 }
 
@@ -807,7 +1039,11 @@ async fn execute_transfer_with_price(
     let recipient = dbg_addr(2);
     let authority_state = init_state_with_ids(vec![(sender, object_id)]).await;
     let rgp = authority_state.reference_gas_price_for_testing().unwrap() * rgp_multiple;
-    let gas_budget = if min_budget_pre_rgp { gas_budget * rgp } else { gas_budget };
+    let gas_budget = if min_budget_pre_rgp {
+        gas_budget * rgp
+    } else {
+        gas_budget
+    };
     let epoch_store = authority_state.load_epoch_store_one_call_per_task();
     let gas_object_id = ObjectID::random();
     let gas_object = Object::with_id_owner_gas_for_testing(gas_object_id, sender, gas_balance);
@@ -817,7 +1053,12 @@ async fn execute_transfer_with_price(
 
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_object(recipient, object.compute_object_reference()).unwrap();
+        builder
+            .transfer_object(
+                recipient,
+                FullObjectRef::from_fastpath_ref(object.compute_object_reference()),
+            )
+            .unwrap();
         builder.finish()
     };
     let kind = TransactionKind::ProgrammableTransaction(pt);
@@ -825,13 +1066,104 @@ async fn execute_transfer_with_price(
     let tx = to_sender_signed_transaction(data, &sender_key);
 
     let response = if run_confirm {
-        send_and_confirm_transaction(&authority_state, tx).await.map(|(cert, effects)| {
-            TransactionStatus::Executed(Some(cert.into_sig()), effects, TransactionEvents::default())
-        })
+        send_and_confirm_transaction(&authority_state, tx)
+            .await
+            .map(|(cert, effects)| {
+                TransactionStatus::Executed(
+                    Some(cert.into_sig()),
+                    effects,
+                    TransactionEvents::default(),
+                )
+            })
     } else {
         let tx = epoch_store.verify_transaction(tx).unwrap();
 
-        authority_state.handle_transaction(&epoch_store, tx).await.map(|r| r.status)
+        authority_state
+            .handle_transaction(&epoch_store, tx)
+            .await
+            .map(|r| r.status)
     };
-    TransferResult { authority_state, gas_object_id, response, rgp }
+    TransferResult {
+        authority_state,
+        gas_object_id,
+        response,
+        rgp,
+    }
+}
+
+#[tokio::test]
+async fn test_gas_price_capping_for_aborted_transactions() {
+    let (sender, sender_key): (_, AccountKeyPair) = get_key_pair();
+    let authority_state = TestAuthorityBuilder::new().build().await;
+
+    let protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
+
+    let max_gas_price_for_aborted_transactions = protocol_config
+        .max_gas_price_rgp_factor_for_aborted_transactions()
+        * authority_state.reference_gas_price_for_testing().unwrap();
+
+    // Test with gas price higher than max_gas_price_aborted_transactions
+    let high_gas_price = max_gas_price_for_aborted_transactions * 2; // Set to 2x cap
+    let budget = high_gas_price * 1000; // Sufficient budget
+
+    // Create gas coins
+    let gas_amount = budget * 10;
+    let gas_object_id = ObjectID::random();
+    let gas_coin = Object::with_id_owner_gas_for_testing(gas_object_id, sender, gas_amount);
+    authority_state.insert_genesis_object(gas_coin).await;
+
+    // Publish the move_random package
+    let package =
+        publish_move_random_package(&authority_state, &sender, &sender_key, &gas_object_id).await;
+
+    // Create a transaction that will abort
+    let gas_coin_ref = authority_state
+        .get_object(&gas_object_id)
+        .await
+        .unwrap()
+        .compute_object_reference();
+
+    let data = TransactionData::new_move_call_with_gas_coins(
+        sender,
+        package,
+        ident_str!("move_random").to_owned(),
+        ident_str!("always_abort").to_owned(),
+        vec![],
+        vec![gas_coin_ref],
+        vec![],
+        budget,
+        high_gas_price,
+    )
+    .unwrap();
+
+    // sign and execute transaction
+    let tx = to_sender_signed_transaction(data, &sender_key);
+    let effects = send_and_confirm_transaction(&authority_state, tx)
+        .await
+        .unwrap()
+        .1
+        .into_data();
+
+    // check effects
+    assert!(matches!(
+        effects.status().clone().unwrap_err().0,
+        ExecutionFailureStatus::MoveAbort(_, 42)
+    ));
+
+    // Check that the gas cost is capped
+    let gas_cost = effects.gas_cost_summary();
+
+    // We round up gas used to the nearest gas_rounding_step as defined in protocol config
+    let gas_used_pre_gas_price = 1; //simulate cheap txn
+    let gas_used = ((gas_used_pre_gas_price / protocol_config.gas_rounding_step()) + 1)
+        * protocol_config.gas_rounding_step();
+
+    // The computation cost should be capped at max_gas_price_aborted_transactions
+    // rather than using the full high_gas_price
+    let expected_max_computation_cost = gas_used * max_gas_price_for_aborted_transactions; // bucket cost * capped price
+    assert!(gas_cost.computation_cost <= expected_max_computation_cost);
+
+    // The computation cost should be less than what it would be with full gas price
+    let uncapped_computation_cost = gas_used * high_gas_price; // bucket cost * full price
+    assert!(gas_cost.computation_cost < uncapped_computation_cost);
 }

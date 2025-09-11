@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{cmp::Ordering, fmt::Display};
 
-use consensus_core::{BlockAPI, CommitDigest, TransactionIndex, VerifiedBlock};
+use consensus_core::{BlockAPI, CommitDigest, VerifiedBlock};
+use consensus_types::block::{BlockRef, TransactionIndex};
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
     digests::ConsensusCommitDigest,
@@ -30,7 +31,7 @@ pub(crate) trait ConsensusCommitAPI: Display {
     fn commit_sub_dag_index(&self) -> u64;
 
     /// Returns all accepted and rejected transactions per block in the commit in deterministic order.
-    fn transactions(&self) -> Vec<(AuthorityIndex, Vec<ParsedTransaction>)>;
+    fn transactions(&self) -> Vec<(BlockRef, Vec<ParsedTransaction>)>;
 
     /// Returns the digest of consensus output.
     fn consensus_digest(&self, protocol_config: &ProtocolConfig) -> ConsensusCommitDigest;
@@ -39,7 +40,12 @@ pub(crate) trait ConsensusCommitAPI: Display {
 impl ConsensusCommitAPI for consensus_core::CommittedSubDag {
     fn reputation_score_sorted_desc(&self) -> Option<Vec<(AuthorityIndex, u64)>> {
         if !self.reputation_scores_desc.is_empty() {
-            Some(self.reputation_scores_desc.iter().map(|(id, score)| (id.value() as AuthorityIndex, *score)).collect())
+            Some(
+                self.reputation_scores_desc
+                    .iter()
+                    .map(|(id, score)| (id.value() as AuthorityIndex, *score))
+                    .collect(),
+            )
         } else {
             None
         }
@@ -62,12 +68,19 @@ impl ConsensusCommitAPI for consensus_core::CommittedSubDag {
         self.commit_ref.index.into()
     }
 
-    fn transactions(&self) -> Vec<(AuthorityIndex, Vec<ParsedTransaction>)> {
+    fn transactions(&self) -> Vec<(BlockRef, Vec<ParsedTransaction>)> {
+        let no_transaction = vec![];
         self.blocks
             .iter()
-            .zip(self.rejected_transactions_by_block.iter())
-            .map(|(block, rejected_transactions)| {
-                (block.author().value() as AuthorityIndex, parse_block_transactions(block, rejected_transactions))
+            .map(|block| {
+                let rejected_transactions = self
+                    .rejected_transactions_by_block
+                    .get(&block.reference())
+                    .unwrap_or(&no_transaction);
+                (
+                    block.reference(),
+                    parse_block_transactions(block, rejected_transactions),
+                )
             })
             .collect()
     }

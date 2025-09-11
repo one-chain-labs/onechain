@@ -5,9 +5,11 @@ use async_graphql::*;
 use move_binary_format::file_format::AbilitySet;
 use move_core_types::{annotated_value as A, language_storage::TypeTag};
 use serde::{Deserialize, Serialize};
-use sui_types::{base_types::MoveObjectType, type_input::TypeInput};
+use sui_types::base_types::MoveObjectType;
+use sui_types::type_input::TypeInput;
 
-use crate::{data::package_resolver::PackageResolver, error::Error};
+use crate::data::package_resolver::PackageResolver;
+use crate::error::Error;
 
 use super::open_move_type::MoveAbility;
 
@@ -143,8 +145,10 @@ impl MoveType {
     /// Structured representation of the "shape" of values that match this type. May return no
     /// layout if the type is invalid.
     async fn layout(&self, ctx: &Context<'_>) -> Result<Option<MoveTypeLayout>> {
-        let resolver: &PackageResolver =
-            ctx.data().map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string())).extend()?;
+        let resolver: &PackageResolver = ctx
+            .data()
+            .map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string()))
+            .extend()?;
 
         let Some(layout) = self.layout_impl(resolver).await.extend()? else {
             return Ok(None);
@@ -155,8 +159,10 @@ impl MoveType {
 
     /// The abilities this concrete type has. Returns no abilities if the type is invalid.
     async fn abilities(&self, ctx: &Context<'_>) -> Result<Option<Vec<MoveAbility>>> {
-        let resolver: &PackageResolver =
-            ctx.data().map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string())).extend()?;
+        let resolver: &PackageResolver = ctx
+            .data()
+            .map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string()))
+            .extend()?;
 
         let Some(abilities) = self.abilities_impl(resolver).await.extend()? else {
             return Ok(None);
@@ -171,8 +177,11 @@ impl MoveType {
         MoveTypeSignature::try_from(self.native.clone())
     }
 
-    pub(crate) async fn layout_impl(&self, resolver: &PackageResolver) -> Result<Option<A::MoveTypeLayout>, Error> {
-        let Ok(tag) = self.native.as_type_tag() else {
+    pub(crate) async fn layout_impl(
+        &self,
+        resolver: &PackageResolver,
+    ) -> Result<Option<A::MoveTypeLayout>, Error> {
+        let Ok(tag) = self.native.to_type_tag() else {
             return Ok(None);
         };
 
@@ -184,8 +193,11 @@ impl MoveType {
         })?))
     }
 
-    pub(crate) async fn abilities_impl(&self, resolver: &PackageResolver) -> Result<Option<AbilitySet>, Error> {
-        let Ok(tag) = self.native.as_type_tag() else {
+    pub(crate) async fn abilities_impl(
+        &self,
+        resolver: &PackageResolver,
+    ) -> Result<Option<AbilitySet>, Error> {
+        let Ok(tag) = self.native.to_type_tag() else {
             return Ok(None);
         };
 
@@ -242,7 +254,11 @@ impl TryFrom<TypeInput> for MoveTypeSignature {
                 package: s.address.to_canonical_string(/* with_prefix */ true),
                 module: s.module,
                 type_: s.name,
-                type_parameters: s.type_params.into_iter().map(Self::try_from).collect::<Result<Vec<_>, _>>()?,
+                type_parameters: s
+                    .type_params
+                    .into_iter()
+                    .map(Self::try_from)
+                    .collect::<Result<Vec<_>, _>>()?,
             },
         })
     }
@@ -285,10 +301,15 @@ impl TryFrom<A::MoveEnumLayout> for MoveEnumLayout {
             for field in variant_fields {
                 field_layouts.push(MoveFieldLayout::try_from(field)?);
             }
-            variant_layouts.push(MoveVariantLayout { name: name.to_string(), layout: field_layouts });
+            variant_layouts.push(MoveVariantLayout {
+                name: name.to_string(),
+                layout: field_layouts,
+            });
         }
 
-        Ok(MoveEnumLayout { variants: variant_layouts })
+        Ok(MoveEnumLayout {
+            variants: variant_layouts,
+        })
     }
 }
 
@@ -298,7 +319,11 @@ impl TryFrom<A::MoveStructLayout> for MoveStructLayout {
     fn try_from(layout: A::MoveStructLayout) -> Result<Self, Error> {
         Ok(Self {
             type_: layout.type_.to_canonical_string(/* with_prefix */ true),
-            fields: layout.fields.into_iter().map(MoveFieldLayout::try_from).collect::<Result<_, _>>()?,
+            fields: layout
+                .fields
+                .into_iter()
+                .map(MoveFieldLayout::try_from)
+                .collect::<Result<_, _>>()?,
         })
     }
 }
@@ -307,7 +332,10 @@ impl TryFrom<A::MoveFieldLayout> for MoveFieldLayout {
     type Error = Error;
 
     fn try_from(layout: A::MoveFieldLayout) -> Result<Self, Error> {
-        Ok(Self { name: layout.name.to_string(), layout: layout.layout.try_into()? })
+        Ok(Self {
+            name: layout.name.to_string(),
+            layout: layout.layout.try_into()?,
+        })
     }
 }
 

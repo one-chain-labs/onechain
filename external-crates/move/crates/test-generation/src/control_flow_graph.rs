@@ -4,7 +4,7 @@
 
 use crate::abstract_state::{AbstractValue, BorrowState};
 use move_binary_format::file_format::{AbilitySet, Bytecode, Signature, SignatureToken};
-use rand::{rngs::StdRng, Rng};
+use rand::{Rng, rngs::StdRng};
 use std::collections::{HashMap, VecDeque};
 use tracing::debug;
 
@@ -29,7 +29,11 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     pub fn new() -> BasicBlock {
-        BasicBlock { locals_in: HashMap::new(), locals_out: HashMap::new(), instructions: Vec::new() }
+        BasicBlock {
+            locals_in: HashMap::new(),
+            locals_out: HashMap::new(),
+            instructions: Vec::new(),
+        }
     }
 
     /// Get the locals coming into the block
@@ -63,7 +67,12 @@ impl CFG {
     /// Construct a control flow graph that contains empty basic blocks with set incoming
     /// and outgoing locals.
     /// Currently the control flow graph is acyclic.
-    pub fn new(rng: &mut StdRng, locals: &[SignatureToken], parameters: &Signature, target_blocks: BlockIDSize) -> CFG {
+    pub fn new(
+        rng: &mut StdRng,
+        locals: &[SignatureToken],
+        parameters: &Signature,
+        target_blocks: BlockIDSize,
+    ) -> CFG {
         assert!(target_blocks > 0, "The CFG must haave at least one block");
         let mut basic_blocks: HashMap<BlockIDSize, BasicBlock> = HashMap::new();
         // Generate basic blocks
@@ -121,7 +130,10 @@ impl CFG {
         debug!("Edges: {:?}", edges);
 
         // Build the CFG
-        let mut cfg = CFG { basic_blocks, edges };
+        let mut cfg = CFG {
+            basic_blocks,
+            edges,
+        };
         // Assign locals to basic blocks
         debug_assert!(target_blocks == 0 || !cfg.basic_blocks.is_empty());
         CFG::add_locals(&mut cfg, rng, locals, parameters.0.len());
@@ -178,7 +190,10 @@ impl CFG {
 
     /// Merge the outgoing locals of a set of blocks
     fn merge_locals(&self, block_ids: Vec<BlockIDSize>) -> BlockLocals {
-        assert!(!block_ids.is_empty(), "Cannot merge locals of empty block list");
+        assert!(
+            !block_ids.is_empty(),
+            "Cannot merge locals of empty block list"
+        );
         let first_basic_block = self.basic_blocks.get(&block_ids[0]);
         // Implication of preconditon
         debug_assert!(first_basic_block.is_some());
@@ -225,24 +240,41 @@ impl CFG {
     /// Add the incoming and outgoing locals for each basic block in the control flow graph.
     /// Currently the incoming and outgoing locals are the same for each block.
     fn add_locals(cfg: &mut CFG, rng: &mut StdRng, locals: &[SignatureToken], args_len: usize) {
-        debug_assert!(!cfg.basic_blocks.is_empty(), "Cannot add locals to empty cfg");
+        debug_assert!(
+            !cfg.basic_blocks.is_empty(),
+            "Cannot add locals to empty cfg"
+        );
         debug!("add locals: {:#?}", locals);
         for block_id in 0..cfg.basic_blocks.len() {
             let cfg_copy = cfg.clone();
-            let basic_block = cfg.basic_blocks.get_mut(&(block_id as BlockIDSize)).unwrap();
+            let basic_block = cfg
+                .basic_blocks
+                .get_mut(&(block_id as BlockIDSize))
+                .unwrap();
             if cfg_copy.num_parents(block_id as BlockIDSize) == 0 {
                 basic_block.locals_in = locals
                     .iter()
                     .enumerate()
                     .map(|(i, token)| {
-                        let borrow_state = if i < args_len { BorrowState::Available } else { BorrowState::Unavailable };
-                        (i, (AbstractValue::new_value(token.clone(), AbilitySet::PRIMITIVES), borrow_state))
+                        let borrow_state = if i < args_len {
+                            BorrowState::Available
+                        } else {
+                            BorrowState::Unavailable
+                        };
+                        (
+                            i,
+                            (
+                                AbstractValue::new_value(token.clone(), AbilitySet::PRIMITIVES),
+                                borrow_state,
+                            ),
+                        )
                     })
                     .collect();
             } else {
                 // Implication of precondition
                 debug_assert!(!cfg_copy.basic_blocks.is_empty());
-                basic_block.locals_in = cfg_copy.merge_locals(cfg_copy.get_parent_ids(block_id as BlockIDSize));
+                basic_block.locals_in =
+                    cfg_copy.merge_locals(cfg_copy.get_parent_ids(block_id as BlockIDSize));
             }
             basic_block.locals_out = CFG::vary_locals(rng, basic_block.locals_in.clone());
         }
@@ -267,7 +299,10 @@ impl CFG {
             } else if !child_ids.is_empty() {
                 // We construct the CFG such that blocks have either 0, 1, or 2
                 // children.
-                unreachable!("Invalid number of children for basic block {:?}", child_ids.len());
+                unreachable!(
+                    "Invalid number of children for basic block {:?}",
+                    child_ids.len()
+                );
             }
             // This operation is expensive but is performed just when
             // serializing the module.
@@ -282,7 +317,10 @@ impl CFG {
     /// Get the serialized code offset of a basic block based on its position in the serialized
     /// instruction sequence.
     fn get_block_offset(cfg: &CFG, block_order: &[BlockIDSize], block_id: BlockIDSize) -> u16 {
-        assert!((0..block_id).all(|id| cfg.basic_blocks.get(&id).is_some()), "Error: Invalid block_id given");
+        assert!(
+            (0..block_id).all(|id| cfg.basic_blocks.get(&id).is_some()),
+            "Error: Invalid block_id given"
+        );
         let mut offset: u16 = 0;
         for i in block_order {
             if *i == block_id {
@@ -298,7 +336,10 @@ impl CFG {
     /// Serialize the control flow graph into a sequence of instructions. Set the offsets of branch
     /// instructions appropriately.
     pub fn serialize(&mut self) -> Vec<Bytecode> {
-        assert!(!self.basic_blocks.is_empty(), "Error: CFG has no basic blocks");
+        assert!(
+            !self.basic_blocks.is_empty(),
+            "Error: CFG has no basic blocks"
+        );
         let cfg_copy = self.clone();
         let mut bytecode: Vec<Bytecode> = Vec::new();
         let block_order = self.serialize_block_order();
@@ -308,7 +349,10 @@ impl CFG {
             debug_assert!(block.is_some());
             let block = block.unwrap();
             // All basic blocks should have instructions filled in at this point
-            assert!(!block.instructions.is_empty(), "Error: block created with no instructions",);
+            assert!(
+                !block.instructions.is_empty(),
+                "Error: block created with no instructions",
+            );
             let last_instruction_index = block.instructions.len() - 1;
             let child_ids = cfg_copy.get_children_ids(*block_id);
             if child_ids.len() == 2 {
@@ -321,9 +365,10 @@ impl CFG {
                     Some(Bytecode::BrFalse(_)) => {
                         block.instructions[last_instruction_index] = Bytecode::BrFalse(offset);
                     }
-                    _ => {
-                        unreachable!("Error: unsupported two target jump instruction, {:#?}", block.instructions.last())
-                    }
+                    _ => unreachable!(
+                        "Error: unsupported two target jump instruction, {:#?}",
+                        block.instructions.last()
+                    ),
                 };
             } else if child_ids.len() == 1 {
                 let offset = CFG::get_block_offset(&cfg_copy, &block_order, child_ids[0]);
@@ -331,9 +376,10 @@ impl CFG {
                     Some(Bytecode::Branch(_)) => {
                         block.instructions[last_instruction_index] = Bytecode::Branch(offset);
                     }
-                    _ => {
-                        unreachable!("Error: unsupported one target jump instruction, {:#?}", block.instructions.last())
-                    }
+                    _ => unreachable!(
+                        "Error: unsupported one target jump instruction, {:#?}",
+                        block.instructions.last()
+                    ),
                 }
             }
             bytecode.extend(block.instructions.clone());

@@ -1,10 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    key_derive::{derive_key_pair_from_path, generate_new_key},
-    random_names::{random_name, random_names},
-};
+use crate::key_derive::{derive_key_pair_from_path, generate_new_key};
+use crate::key_identity::KeyIdentity;
+use crate::random_names::{random_name, random_names};
 use anyhow::{anyhow, bail, ensure, Context};
 use bip32::DerivationPath;
 use bip39::{Language, Mnemonic, Seed};
@@ -12,25 +11,17 @@ use rand::{rngs::StdRng, SeedableRng};
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use shared_crypto::intent::{Intent, IntentMessage};
-use std::{
-    collections::{BTreeMap, HashSet},
-    fmt::{Display, Formatter, Write},
-    fs,
-    fs::File,
-    io::BufReader,
-    path::{Path, PathBuf},
-};
-use sui_types::{
-    base_types::SuiAddress,
-    crypto::{
-        enum_dispatch,
-        get_key_pair_from_rng,
-        EncodeDecodeBase64,
-        PublicKey,
-        Signature,
-        SignatureScheme,
-        SuiKeyPair,
-    },
+use std::collections::{BTreeMap, HashSet};
+use std::fmt::Write;
+use std::fmt::{Display, Formatter};
+use std::fs;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
+use sui_types::base_types::SuiAddress;
+use sui_types::crypto::get_key_pair_from_rng;
+use sui_types::crypto::{
+    enum_dispatch, EncodeDecodeBase64, PublicKey, Signature, SignatureScheme, SuiKeyPair,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -41,66 +32,105 @@ pub enum Keystore {
 }
 #[enum_dispatch]
 pub trait AccountKeystore: Send + Sync {
-    fn add_key(&mut self, alias: Option<String>, keypair: SuiKeyPair) -> Result<(), anyhow::Error>;
-    fn keys(&self) -> Vec<PublicKey>;
-    fn get_key(&self, address: &SuiAddress) -> Result<&SuiKeyPair, anyhow::Error>;
-
-    fn sign_hashed(&self, address: &SuiAddress, msg: &[u8]) -> Result<Signature, signature::Error>;
-
-    fn sign_secure<T>(&self, address: &SuiAddress, msg: &T, intent: Intent) -> Result<Signature, signature::Error>
-    where
-        T: Serialize;
-    fn addresses(&self) -> Vec<SuiAddress> {
-        self.keys().iter().map(|k| k.into()).collect()
-    }
-    fn addresses_with_alias(&self) -> Vec<(&SuiAddress, &Alias)>;
-    fn aliases(&self) -> Vec<&Alias>;
-    fn aliases_mut(&mut self) -> Vec<&mut Alias>;
-    fn alias_names(&self) -> Vec<&str> {
-        self.aliases().into_iter().map(|a| a.alias.as_str()).collect()
-    }
-    /// Get alias of address
-    fn get_alias_by_address(&self, address: &SuiAddress) -> Result<String, anyhow::Error>;
-    fn get_address_by_alias(&self, alias: String) -> Result<&SuiAddress, anyhow::Error>;
-    /// Check if an alias exists by its name
-    fn alias_exists(&self, alias: &str) -> bool {
-        self.alias_names().contains(&alias)
-    }
-
-    fn create_alias(&self, alias: Option<String>) -> Result<String, anyhow::Error>;
-
-    fn update_alias(&mut self, old_alias: &str, new_alias: Option<&str>) -> Result<String, anyhow::Error>;
-
-    // Internal function. Use update_alias instead
-    fn update_alias_value(&mut self, old_alias: &str, new_alias: Option<&str>) -> Result<String, anyhow::Error> {
-        if !self.alias_exists(old_alias) {
-            bail!("The provided alias {old_alias} does not exist");
-        }
-        let new_alias_name = match new_alias {
-            Some(x) => validate_alias(x)?,
-            None => random_name(&self.alias_names().into_iter().map(|x| x.to_string()).collect::<HashSet<_>>()),
-        };
-        for a in self.aliases_mut() {
-            if a.alias == old_alias {
-                let pk = &a.public_key_base64;
-                *a = Alias { alias: new_alias_name.clone(), public_key_base64: pk.clone() };
-            }
-        }
-        Ok(new_alias_name)
-    }
-
-    fn generate_and_add_new_key(
+    /// Generate a new keypair and add it into the keystore.
+    fn generate(
         &mut self,
         key_scheme: SignatureScheme,
         alias: Option<String>,
         derivation_path: Option<DerivationPath>,
         word_length: Option<String>,
     ) -> Result<(SuiAddress, String, SignatureScheme), anyhow::Error> {
-        let (address, kp, scheme, phrase) = generate_new_key(key_scheme, derivation_path, word_length)?;
-        self.add_key(alias, kp)?;
+        let (address, kp, scheme, phrase) =
+            generate_new_key(key_scheme, derivation_path, word_length)?;
+        self.import(alias, kp)?;
         Ok((address, phrase, scheme))
     }
 
+    /// Import a keypair into the keystore.
+    fn import(&mut self, alias: Option<String>, keypair: SuiKeyPair) -> Result<(), anyhow::Error>;
+    /// Remove a keypair from the keystore by its address.
+    fn remove(&mut self, address: SuiAddress) -> Result<(), anyhow::Error>;
+    /// Return an array of `PublicKey`, consisting of every public key in the keystore.
+    fn entries(&self) -> Vec<PublicKey>;
+    /// Return `SuiKeyPair` for the given address.
+    fn export(&self, address: &SuiAddress) -> Result<&SuiKeyPair, anyhow::Error>;
+
+    /// Sign a hash with the keypair corresponding to the given address.
+    fn sign_hashed(&self, address: &SuiAddress, msg: &[u8]) -> Result<Signature, signature::Error>;
+
+    /// Sign a message with the keypair corresponding to the given address with the given intent.
+    fn sign_secure<T>(
+        &self,
+        address: &SuiAddress,
+        msg: &T,
+        intent: Intent,
+    ) -> Result<Signature, signature::Error>
+    where
+        T: Serialize;
+
+    /// Return an array of `SuiAddress`, consisting of every address in the keystore.
+    fn addresses(&self) -> Vec<SuiAddress> {
+        self.entries().iter().map(|k| k.into()).collect()
+    }
+    /// Return an array of (&SuiAddress, &Alias), consisting of every address and its corresponding alias in the keystore.
+    fn addresses_with_alias(&self) -> Vec<(&SuiAddress, &Alias)>;
+    /// Return an array of `Alias`, consisting of every alias stored. Each alias corresponds to a key.
+    fn aliases(&self) -> Vec<&Alias>;
+    /// Mutable references to each alias in the keystore.
+    fn aliases_mut(&mut self) -> Vec<&mut Alias>;
+    /// Get the alias of an address.
+    fn get_alias(&self, address: &SuiAddress) -> Result<String, anyhow::Error>;
+    /// Check if an alias exists by its name
+    fn alias_exists(&self, alias: &str) -> bool {
+        self.aliases().iter().any(|a| a.alias == alias)
+    }
+
+    /// Get address by its identity: a type which is either an address or an alias.
+    fn get_by_identity(&self, key_identity: KeyIdentity) -> Result<SuiAddress, anyhow::Error> {
+        match key_identity {
+            KeyIdentity::Address(addr) => Ok(addr),
+            KeyIdentity::Alias(alias) => Ok(*self
+                .addresses_with_alias()
+                .iter()
+                .find(|(_, a)| a.alias == alias)
+                .ok_or_else(|| anyhow!("Cannot resolve alias {alias} to an address"))?
+                .0),
+        }
+    }
+
+    /// Returns an alias string. Optional string can be passed, checks for duplicates
+    fn create_alias(&self, alias: Option<String>) -> Result<String, anyhow::Error>;
+
+    /// Updates the alias of an existing keypair.
+    fn update_alias(
+        &mut self,
+        old_alias: &str,
+        new_alias: Option<&str>,
+    ) -> Result<String, anyhow::Error>;
+
+    // Internal function. Use update_alias instead
+    fn update_alias_value(
+        &mut self,
+        old_alias: &str,
+        new_alias: Option<&str>,
+    ) -> Result<String, anyhow::Error> {
+        if !self.aliases().iter().any(|a| a.alias == old_alias) {
+            bail!("The provided alias {old_alias} does not exist");
+        }
+        let new_alias_name = self.create_alias(new_alias.map(str::to_string))?;
+        for a in self.aliases_mut() {
+            if a.alias == old_alias {
+                let pk = &a.public_key_base64;
+                *a = Alias {
+                    alias: new_alias_name.clone(),
+                    public_key_base64: pk.clone(),
+                };
+            }
+        }
+        Ok(new_alias_name)
+    }
+
+    /// Import from a mnemonic phrase.
     fn import_from_mnemonic(
         &mut self,
         phrase: &str,
@@ -113,7 +143,7 @@ pub trait AccountKeystore: Send + Sync {
         let seed = Seed::new(&mnemonic, "");
         match derive_key_pair_from_path(seed.as_bytes(), derivation_path, &key_scheme) {
             Ok((address, kp)) => {
-                self.add_key(alias, kp)?;
+                self.import(alias, kp)?;
                 Ok(address)
             }
             Err(e) => Err(anyhow!("error getting keypair {:?}", e)),
@@ -156,7 +186,13 @@ impl Serialize for FileBasedKeystore {
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.path.as_ref().unwrap_or(&PathBuf::default()).to_str().unwrap_or(""))
+        serializer.serialize_str(
+            self.path
+                .as_ref()
+                .unwrap_or(&PathBuf::default())
+                .to_str()
+                .unwrap_or(""),
+        )
     }
 }
 
@@ -166,7 +202,8 @@ impl<'de> Deserialize<'de> for FileBasedKeystore {
         D: Deserializer<'de>,
     {
         use serde::de::Error;
-        FileBasedKeystore::new(&PathBuf::from(String::deserialize(deserializer)?)).map_err(D::Error::custom)
+        FileBasedKeystore::new(&PathBuf::from(String::deserialize(deserializer)?))
+            .map_err(D::Error::custom)
     }
 }
 
@@ -174,29 +211,46 @@ impl AccountKeystore for FileBasedKeystore {
     fn sign_hashed(&self, address: &SuiAddress, msg: &[u8]) -> Result<Signature, signature::Error> {
         Ok(Signature::new_hashed(
             msg,
-            self.keys
-                .get(address)
-                .ok_or_else(|| signature::Error::from_source(format!("Cannot find key for address: [{address}]")))?,
+            self.keys.get(address).ok_or_else(|| {
+                signature::Error::from_source(format!("Cannot find key for address: [{address}]"))
+            })?,
         ))
     }
-
-    fn sign_secure<T>(&self, address: &SuiAddress, msg: &T, intent: Intent) -> Result<Signature, signature::Error>
+    fn sign_secure<T>(
+        &self,
+        address: &SuiAddress,
+        msg: &T,
+        intent: Intent,
+    ) -> Result<Signature, signature::Error>
     where
         T: Serialize,
     {
         Ok(Signature::new_secure(
             &IntentMessage::new(intent, msg),
-            self.keys
-                .get(address)
-                .ok_or_else(|| signature::Error::from_source(format!("Cannot find key for address: [{address}]")))?,
+            self.keys.get(address).ok_or_else(|| {
+                signature::Error::from_source(format!("Cannot find key for address: [{address}]"))
+            })?,
         ))
     }
 
-    fn add_key(&mut self, alias: Option<String>, keypair: SuiKeyPair) -> Result<(), anyhow::Error> {
+    fn import(&mut self, alias: Option<String>, keypair: SuiKeyPair) -> Result<(), anyhow::Error> {
         let address: SuiAddress = (&keypair.public()).into();
         let alias = self.create_alias(alias)?;
-        self.aliases.insert(address, Alias { alias, public_key_base64: keypair.public().encode_base64() });
+        self.aliases.insert(
+            address,
+            Alias {
+                alias,
+                public_key_base64: keypair.public().encode_base64(),
+            },
+        );
         self.keys.insert(address, keypair);
+        self.save()?;
+        Ok(())
+    }
+
+    fn remove(&mut self, address: SuiAddress) -> Result<(), anyhow::Error> {
+        self.aliases.remove(&address);
+        self.keys.remove(&address);
         self.save()?;
         Ok(())
     }
@@ -215,7 +269,7 @@ impl AccountKeystore for FileBasedKeystore {
         self.aliases.values_mut().collect()
     }
 
-    fn keys(&self) -> Vec<PublicKey> {
+    fn entries(&self) -> Vec<PublicKey> {
         self.keys.values().map(|key| key.public()).collect()
     }
 
@@ -225,31 +279,29 @@ impl AccountKeystore for FileBasedKeystore {
     fn create_alias(&self, alias: Option<String>) -> Result<String, anyhow::Error> {
         match alias {
             Some(a) if self.alias_exists(&a) => {
+                //} aliases.values().any(|x| x.alias == a) => {
                 bail!("Alias {a} already exists. Please choose another alias.")
             }
             Some(a) => validate_alias(&a),
-            None => Ok(random_name(&self.alias_names().into_iter().map(|x| x.to_string()).collect::<HashSet<_>>())),
+            None => Ok(random_name(
+                &self
+                    .aliases()
+                    .into_iter()
+                    .map(|x| x.alias.to_string())
+                    .collect::<HashSet<_>>(),
+            )),
         }
     }
 
-    /// Get the address by its alias
-    fn get_address_by_alias(&self, alias: String) -> Result<&SuiAddress, anyhow::Error> {
-        self.addresses_with_alias()
-            .iter()
-            .find(|x| x.1.alias == alias)
-            .ok_or_else(|| anyhow!("Cannot resolve alias {alias} to an address"))
-            .map(|x| x.0)
-    }
-
     /// Get the alias if it exists, or return an error if it does not exist.
-    fn get_alias_by_address(&self, address: &SuiAddress) -> Result<String, anyhow::Error> {
+    fn get_alias(&self, address: &SuiAddress) -> Result<String, anyhow::Error> {
         match self.aliases.get(address) {
             Some(alias) => Ok(alias.alias.clone()),
             None => bail!("Cannot find alias for address {address}"),
         }
     }
 
-    fn get_key(&self, address: &SuiAddress) -> Result<&SuiKeyPair, anyhow::Error> {
+    fn export(&self, address: &SuiAddress) -> Result<&SuiKeyPair, anyhow::Error> {
         match self.keys.get(address) {
             Some(key) => Ok(key),
             None => Err(anyhow!("Cannot find key for address: [{address}]")),
@@ -258,7 +310,11 @@ impl AccountKeystore for FileBasedKeystore {
 
     /// Updates an old alias to the new alias and saves it to the alias file.
     /// If the new_alias is None, it will generate a new random alias.
-    fn update_alias(&mut self, old_alias: &str, new_alias: Option<&str>) -> Result<String, anyhow::Error> {
+    fn update_alias(
+        &mut self,
+        old_alias: &str,
+        new_alias: Option<&str>,
+    ) -> Result<String, anyhow::Error> {
         let new_alias_name = self.update_alias_value(old_alias, new_alias)?;
         self.save_aliases()?;
         Ok(new_alias_name)
@@ -268,11 +324,13 @@ impl AccountKeystore for FileBasedKeystore {
 impl FileBasedKeystore {
     pub fn new(path: &PathBuf) -> Result<Self, anyhow::Error> {
         let keys = if path.exists() {
-            let reader = BufReader::new(
-                File::open(path).with_context(|| format!("Cannot open the keystore file: {}", path.display()))?,
-            );
-            let kp_strings: Vec<String> = serde_json::from_reader(reader)
-                .with_context(|| format!("Cannot deserialize the keystore file: {}", path.display(),))?;
+            let reader =
+                BufReader::new(File::open(path).with_context(|| {
+                    format!("Cannot open the keystore file: {}", path.display())
+                })?);
+            let kp_strings: Vec<String> = serde_json::from_reader(reader).with_context(|| {
+                format!("Cannot deserialize the keystore file: {}", path.display(),)
+            })?;
             kp_strings
                 .iter()
                 .map(|kpstr| {
@@ -290,13 +348,19 @@ impl FileBasedKeystore {
         aliases_path.set_extension("aliases");
 
         let aliases = if aliases_path.exists() {
-            let reader = BufReader::new(
-                File::open(&aliases_path)
-                    .with_context(|| format!("Cannot open aliases file in keystore: {}", aliases_path.display()))?,
-            );
+            let reader = BufReader::new(File::open(&aliases_path).with_context(|| {
+                format!(
+                    "Cannot open aliases file in keystore: {}",
+                    aliases_path.display()
+                )
+            })?);
 
-            let aliases: Vec<Alias> = serde_json::from_reader(reader)
-                .with_context(|| format!("Cannot deserialize aliases file in keystore: {}", aliases_path.display(),))?;
+            let aliases: Vec<Alias> = serde_json::from_reader(reader).with_context(|| {
+                format!(
+                    "Cannot deserialize aliases file in keystore: {}",
+                    aliases_path.display(),
+                )
+            })?;
 
             aliases
                 .into_iter()
@@ -305,7 +369,13 @@ impl FileBasedKeystore {
                     key.map(|k| (Into::<SuiAddress>::into(&k), alias))
                 })
                 .collect::<Result<BTreeMap<_, _>, _>>()
-                .map_err(|e| anyhow!("Invalid aliases file in keystore: {}. {}", aliases_path.display(), e))?
+                .map_err(|e| {
+                    anyhow!(
+                        "Invalid aliases file in keystore: {}. {}",
+                        aliases_path.display(),
+                        e
+                    )
+                })?
         } else if keys.is_empty() {
             BTreeMap::new()
         } else {
@@ -315,16 +385,31 @@ impl FileBasedKeystore {
                 .zip(names)
                 .map(|((sui_address, skp), alias)| {
                     let public_key_base64 = skp.public().encode_base64();
-                    (*sui_address, Alias { alias, public_key_base64 })
+                    (
+                        *sui_address,
+                        Alias {
+                            alias,
+                            public_key_base64,
+                        },
+                    )
                 })
                 .collect::<BTreeMap<_, _>>();
             let aliases_store = serde_json::to_string_pretty(&aliases.values().collect::<Vec<_>>())
-                .with_context(|| format!("Cannot serialize aliases to file in keystore: {}", aliases_path.display()))?;
+                .with_context(|| {
+                    format!(
+                        "Cannot serialize aliases to file in keystore: {}",
+                        aliases_path.display()
+                    )
+                })?;
             fs::write(aliases_path, aliases_store)?;
             aliases
         };
 
-        Ok(Self { keys, aliases, path: Some(path.to_path_buf()) })
+        Ok(Self {
+            keys,
+            aliases,
+            path: Some(path.to_path_buf()),
+        })
     }
 
     pub fn set_path(&mut self, path: &Path) {
@@ -333,8 +418,14 @@ impl FileBasedKeystore {
 
     pub fn save_aliases(&self) -> Result<(), anyhow::Error> {
         if let Some(path) = &self.path {
-            let aliases_store = serde_json::to_string_pretty(&self.aliases.values().collect::<Vec<_>>())
-                .with_context(|| format!("Cannot serialize aliases to file in keystore: {}", path.display()))?;
+            let aliases_store =
+                serde_json::to_string_pretty(&self.aliases.values().collect::<Vec<_>>())
+                    .with_context(|| {
+                        format!(
+                            "Cannot serialize aliases to file in keystore: {}",
+                            path.display()
+                        )
+                    })?;
 
             let mut aliases_path = path.clone();
             aliases_path.set_extension("aliases");
@@ -348,8 +439,14 @@ impl FileBasedKeystore {
     /// $SUI_ADDRESS can be found with `sui keytool list`. Or use `sui keytool convert $BASE64_STR`
     pub fn save_keystore(&self) -> Result<(), anyhow::Error> {
         if let Some(path) = &self.path {
-            let store = serde_json::to_string_pretty(&self.keys.values().map(|k| k.encode_base64()).collect::<Vec<_>>())
-                .with_context(|| format!("Cannot serialize keystore to file: {}", path.display()))?;
+            let store = serde_json::to_string_pretty(
+                &self
+                    .keys
+                    .values()
+                    .map(|k| k.encode_base64())
+                    .collect::<Vec<_>>(),
+            )
+            .with_context(|| format!("Cannot serialize keystore to file: {}", path.display()))?;
             fs::write(path, store)?;
         }
         Ok(())
@@ -376,33 +473,53 @@ impl AccountKeystore for InMemKeystore {
     fn sign_hashed(&self, address: &SuiAddress, msg: &[u8]) -> Result<Signature, signature::Error> {
         Ok(Signature::new_hashed(
             msg,
-            self.keys
-                .get(address)
-                .ok_or_else(|| signature::Error::from_source(format!("Cannot find key for address: [{address}]")))?,
+            self.keys.get(address).ok_or_else(|| {
+                signature::Error::from_source(format!("Cannot find key for address: [{address}]"))
+            })?,
         ))
     }
-
-    fn sign_secure<T>(&self, address: &SuiAddress, msg: &T, intent: Intent) -> Result<Signature, signature::Error>
+    fn sign_secure<T>(
+        &self,
+        address: &SuiAddress,
+        msg: &T,
+        intent: Intent,
+    ) -> Result<Signature, signature::Error>
     where
         T: Serialize,
     {
         Ok(Signature::new_secure(
             &IntentMessage::new(intent, msg),
-            self.keys
-                .get(address)
-                .ok_or_else(|| signature::Error::from_source(format!("Cannot find key for address: [{address}]")))?,
+            self.keys.get(address).ok_or_else(|| {
+                signature::Error::from_source(format!("Cannot find key for address: [{address}]"))
+            })?,
         ))
     }
 
-    fn add_key(&mut self, alias: Option<String>, keypair: SuiKeyPair) -> Result<(), anyhow::Error> {
+    fn import(&mut self, alias: Option<String>, keypair: SuiKeyPair) -> Result<(), anyhow::Error> {
         let address: SuiAddress = (&keypair.public()).into();
-        let alias = alias
-            .unwrap_or_else(|| random_name(&self.aliases().iter().map(|x| x.alias.clone()).collect::<HashSet<_>>()));
+        let alias = alias.unwrap_or_else(|| {
+            random_name(
+                &self
+                    .aliases()
+                    .iter()
+                    .map(|x| x.alias.clone())
+                    .collect::<HashSet<_>>(),
+            )
+        });
 
         let public_key_base64 = keypair.public().encode_base64();
-        let alias = Alias { alias, public_key_base64 };
+        let alias = Alias {
+            alias,
+            public_key_base64,
+        };
         self.aliases.insert(address, alias);
         self.keys.insert(address, keypair);
+        Ok(())
+    }
+
+    fn remove(&mut self, address: SuiAddress) -> Result<(), anyhow::Error> {
+        self.aliases.remove(&address);
+        self.keys.remove(&address);
         Ok(())
     }
 
@@ -411,15 +528,15 @@ impl AccountKeystore for InMemKeystore {
         self.aliases.values().collect()
     }
 
+    fn entries(&self) -> Vec<PublicKey> {
+        self.keys.values().map(|key| key.public()).collect()
+    }
+
     fn addresses_with_alias(&self) -> Vec<(&SuiAddress, &Alias)> {
         self.aliases.iter().collect::<Vec<_>>()
     }
 
-    fn keys(&self) -> Vec<PublicKey> {
-        self.keys.values().map(|key| key.public()).collect()
-    }
-
-    fn get_key(&self, address: &SuiAddress) -> Result<&SuiKeyPair, anyhow::Error> {
+    fn export(&self, address: &SuiAddress) -> Result<&SuiKeyPair, anyhow::Error> {
         match self.keys.get(address) {
             Some(key) => Ok(key),
             None => Err(anyhow!("Cannot find key for address: [{address}]")),
@@ -427,20 +544,11 @@ impl AccountKeystore for InMemKeystore {
     }
 
     /// Get alias of address
-    fn get_alias_by_address(&self, address: &SuiAddress) -> Result<String, anyhow::Error> {
+    fn get_alias(&self, address: &SuiAddress) -> Result<String, anyhow::Error> {
         match self.aliases.get(address) {
             Some(alias) => Ok(alias.alias.clone()),
             None => bail!("Cannot find alias for address {address}"),
         }
-    }
-
-    /// Get the address by its alias
-    fn get_address_by_alias(&self, alias: String) -> Result<&SuiAddress, anyhow::Error> {
-        self.addresses_with_alias()
-            .iter()
-            .find(|x| x.1.alias == alias)
-            .ok_or_else(|| anyhow!("Cannot resolve alias {alias} to an address"))
-            .map(|x| x.0)
     }
 
     /// This function returns an error if the provided alias already exists. If the alias
@@ -452,7 +560,13 @@ impl AccountKeystore for InMemKeystore {
                 bail!("Alias {a} already exists. Please choose another alias.")
             }
             Some(a) => validate_alias(&a),
-            None => Ok(random_name(&self.alias_names().into_iter().map(|x| x.to_string()).collect::<HashSet<_>>())),
+            None => Ok(random_name(
+                &self
+                    .aliases()
+                    .iter()
+                    .map(|x| x.alias.to_string())
+                    .collect::<HashSet<_>>(),
+            )),
         }
     }
 
@@ -462,7 +576,11 @@ impl AccountKeystore for InMemKeystore {
 
     /// Updates an old alias to the new alias. If the new_alias is None,
     /// it will generate a new random alias.
-    fn update_alias(&mut self, old_alias: &str, new_alias: Option<&str>) -> Result<String, anyhow::Error> {
+    fn update_alias(
+        &mut self,
+        old_alias: &str,
+        new_alias: Option<&str>,
+    ) -> Result<String, anyhow::Error> {
         self.update_alias_value(old_alias, new_alias)
     }
 }
@@ -480,7 +598,13 @@ impl InMemKeystore {
             .zip(random_names(HashSet::new(), keys.len()))
             .map(|((sui_address, skp), alias)| {
                 let public_key_base64 = skp.public().encode_base64();
-                (*sui_address, Alias { alias, public_key_base64 })
+                (
+                    *sui_address,
+                    Alias {
+                        alias,
+                        public_key_base64,
+                    },
+                )
             })
             .collect::<BTreeMap<_, _>>();
 

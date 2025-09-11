@@ -113,34 +113,70 @@ impl FunctionTargetProcessor for MutationTester {
         for bc in code {
             match bc {
                 Call(ref attrid, ref indices, Operation::Add, ref srcs, ref dests) => {
-                    let call = Call(*attrid, (*indices).clone(), Operation::Sub, (*srcs).clone(), (*dests).clone());
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Sub,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
                     let mv = m.add_sub;
 
                     let result = if mv > 0 { mv - 1 } else { mv };
-                    let mm = MutationManager { add_sub: result, ..*m };
+                    let mm = MutationManager {
+                        add_sub: result,
+                        ..*m
+                    };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
                 }
                 Call(ref attrid, ref indices, Operation::Sub, ref srcs, ref dests) => {
-                    let call = Call(*attrid, (*indices).clone(), Operation::Add, (*srcs).clone(), (*dests).clone());
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Add,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
                     let mv = m.sub_add;
 
                     let result = if mv > 0 { mv - 1 } else { mv };
-                    let mm = MutationManager { sub_add: result, ..*m };
+                    let mm = MutationManager {
+                        sub_add: result,
+                        ..*m
+                    };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
                 }
                 Call(ref attrid, ref indices, Operation::Mul, ref srcs, ref dests) => {
-                    let call = Call(*attrid, (*indices).clone(), Operation::Div, (*srcs).clone(), (*dests).clone());
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Div,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
                     let mv = m.mul_div;
 
                     let result = if mv > 0 { mv - 1 } else { mv };
-                    let mm = MutationManager { mul_div: result, ..*m };
+                    let mm = MutationManager {
+                        mul_div: result,
+                        ..*m
+                    };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
                 }
                 Call(ref attrid, ref indices, Operation::Div, ref srcs, ref dests) => {
-                    let call = Call(*attrid, (*indices).clone(), Operation::Mul, (*srcs).clone(), (*dests).clone());
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Mul,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
                     let mv = m.mul_div;
                     let result = if mv > 0 { mv - 1 } else { mv };
-                    let mm = MutationManager { div_mul: result, ..*m };
+                    let mm = MutationManager {
+                        div_mul: result,
+                        ..*m
+                    };
                     builder.emit(mutate_arith(call, mv, global_env, mm, bc));
                 }
                 _ => {

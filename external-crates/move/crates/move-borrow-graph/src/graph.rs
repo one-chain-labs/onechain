@@ -28,7 +28,10 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
 
     /// Returns the graph size, that is the number of nodes + number of edges
     pub fn graph_size(&self) -> usize {
-        self.0.values().map(|r| 1 + r.borrowed_by.0.values().map(|e| e.len()).sum::<usize>()).sum()
+        self.0
+            .values()
+            .map(|r| 1 + r.borrowed_by.0.values().map(|e| e.len()).sum::<usize>())
+            .sum()
     }
 
     /// checks if the given reference is mutable or not
@@ -39,7 +42,11 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
     /// Adds a new reference to the borrow graph
     /// Fails if the id is already in use
     pub fn new_ref(&mut self, id: RefID, mutable: bool) {
-        assert!(self.0.insert(id, Ref::new(mutable)).is_none(), "ref {} exists", id.0)
+        assert!(
+            self.0.insert(id, Ref::new(mutable)).is_none(),
+            "ref {} exists",
+            id.0
+        )
     }
 
     /// Return the references borrowing the `id` reference
@@ -47,7 +54,10 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
     /// `BTreeMap<RefID, Loc>` represents all of the "full" or "epsilon" borrows (non field borrows)
     /// `BTreeMap<Lbl, BTreeMap<RefID, Loc>>)` represents the field borrows, collected over the
     /// first label
-    pub fn borrowed_by(&self, id: RefID) -> (BTreeMap<RefID, Loc>, BTreeMap<Lbl, BTreeMap<RefID, Loc>>) {
+    pub fn borrowed_by(
+        &self,
+        id: RefID,
+    ) -> (BTreeMap<RefID, Loc>, BTreeMap<Lbl, BTreeMap<RefID, Loc>>) {
         let borrowed_by = &self.0.get(&id).unwrap().borrowed_by;
         let mut full_borrows: BTreeMap<RefID, Loc> = BTreeMap::new();
         let mut field_borrows: BTreeMap<Lbl, BTreeMap<RefID, Loc>> = BTreeMap::new();
@@ -56,7 +66,10 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
             for edge in edges {
                 match edge.path.first() {
                     None => full_borrows.insert(borrower, edge.loc),
-                    Some(f) => field_borrows.entry(f.clone()).or_default().insert(borrower, edge.loc),
+                    Some(f) => field_borrows
+                        .entry(f.clone())
+                        .or_default()
+                        .insert(borrower, edge.loc),
                 };
             }
         }
@@ -66,7 +79,10 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
     /// Return the edges between parent and child
     pub fn between_edges(&self, parent: RefID, child: RefID) -> Vec<(Loc, Path<Lbl>, bool)> {
         let edges = &self.0.get(&parent).unwrap().borrowed_by.0[&child];
-        edges.iter().map(|edge| (edge.loc, edge.path.clone(), edge.strong)).collect()
+        edges
+            .iter()
+            .map(|edge| (edge.loc, edge.path.clone(), edge.strong))
+            .collect()
     }
 
     /// Return the outgoing edges from id
@@ -104,7 +120,13 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
     }
 
     /// Add a strong (exact) field borrow from `parent_id` to `child_id` at field `field`
-    pub fn add_strong_field_borrow(&mut self, loc: Loc, parent_id: RefID, field: Lbl, child_id: RefID) {
+    pub fn add_strong_field_borrow(
+        &mut self,
+        loc: Loc,
+        parent_id: RefID,
+        field: Lbl,
+        child_id: RefID,
+    ) {
         self.factor(parent_id, loc, vec![field], child_id)
     }
 
@@ -116,19 +138,37 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
 
     /// Add a weak (prefix) field borrow from `parent_id` to `child_id` at field `field`
     /// i.e. `child_id` might be borrowing from ANY field in `parent_id` rooted at `field`
-    pub fn add_weak_field_borrow(&mut self, loc: Loc, parent_id: RefID, field: Lbl, child_id: RefID) {
+    pub fn add_weak_field_borrow(
+        &mut self,
+        loc: Loc,
+        parent_id: RefID,
+        field: Lbl,
+        child_id: RefID,
+    ) {
         self.add_path(parent_id, loc, false, vec![field], child_id)
     }
 
     fn add_edge(&mut self, parent_id: RefID, edge: BorrowEdge<Loc, Lbl>, child_id: RefID) {
         assert!(parent_id != child_id);
         let parent = self.0.get_mut(&parent_id).unwrap();
-        parent.borrowed_by.0.entry(child_id).or_insert_with(BorrowEdgeSet::new).insert(edge);
+        parent
+            .borrowed_by
+            .0
+            .entry(child_id)
+            .or_insert_with(BorrowEdgeSet::new)
+            .insert(edge);
         let child = self.0.get_mut(&child_id).unwrap();
         child.borrows_from.insert(parent_id);
     }
 
-    fn add_path(&mut self, parent_id: RefID, loc: Loc, strong: bool, path: Path<Lbl>, child_id: RefID) {
+    fn add_path(
+        &mut self,
+        parent_id: RefID,
+        loc: Loc,
+        strong: bool,
+        path: Path<Lbl>,
+        child_id: RefID,
+    ) {
         let edge = BorrowEdge { strong, path, loc };
         self.add_edge(parent_id, edge, child_id)
     }
@@ -157,7 +197,13 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
         }
 
         for child_id in cleanup_ids {
-            assert!(self.0.get_mut(child_id).unwrap().borrows_from.remove(&parent_id));
+            assert!(
+                self.0
+                    .get_mut(child_id)
+                    .unwrap()
+                    .borrows_from
+                    .remove(&parent_id)
+            );
         }
 
         for (child_id, parent_to_child_edge) in needs_factored {
@@ -170,7 +216,13 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
                 child_id,
             )
         }
-        self.add_path(parent_id, loc, /* strong */ true, path, intermediate_id);
+        self.add_path(
+            parent_id,
+            loc,
+            /* strong */ true,
+            path,
+            intermediate_id,
+        );
         debug_assert!(self.check_invariant());
     }
 
@@ -183,7 +235,11 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
     /// After the release, `parent` borrowed by `child`
     pub fn release(&mut self, id: RefID) -> usize {
         debug_assert!(self.check_invariant());
-        let Ref { borrowed_by, borrows_from, .. } = self.0.remove(&id).unwrap();
+        let Ref {
+            borrowed_by,
+            borrows_from,
+            ..
+        } = self.0.remove(&id).unwrap();
         let mut released_edges = 0;
         for parent_ref_id in borrows_from.into_iter() {
             let parent = self.0.get_mut(&parent_ref_id).unwrap();
@@ -192,7 +248,12 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
                 for (child_ref_id, child_edges) in &borrowed_by.0 {
                     for child_edge in child_edges {
                         released_edges += 1;
-                        self.splice_out_intermediate(parent_ref_id, &parent_edge, *child_ref_id, child_edge)
+                        self.splice_out_intermediate(
+                            parent_ref_id,
+                            &parent_edge,
+                            *child_ref_id,
+                            child_edge,
+                        )
                     }
                 }
             }
@@ -246,7 +307,11 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
                 for other_edge in other_edges {
                     let found_match = self_borrowed_by
                         .get(child_id)
-                        .map(|parent_to_child| parent_to_child.iter().any(|self_edge| self_edge.leq(other_edge)))
+                        .map(|parent_to_child| {
+                            parent_to_child
+                                .iter()
+                                .any(|self_edge| self_edge.leq(other_edge))
+                        })
                         .unwrap_or(false);
                     if !found_match {
                         assert!(parent_id != child_id);
@@ -322,19 +387,34 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
     /// corresponds to a reference
     fn id_consistency(&self) -> bool {
         let contains_id = |id| self.0.contains_key(id);
-        self.0.values().all(|r| r.borrowed_by.0.keys().all(contains_id) && r.borrows_from.iter().all(contains_id))
+        self.0.values().all(|r| {
+            r.borrowed_by.0.keys().all(contains_id) && r.borrows_from.iter().all(contains_id)
+        })
     }
 
     /// Checks that for every edge in borrowed_by there is a flipped edge in borrows_from
     /// And vice versa
     //// i.e. verifies the "back edges" in the borrow graph
     fn edge_consistency(&self) -> bool {
-        let parent_to_child_consistency = |cur_parent, child| self.0[child].borrows_from.contains(cur_parent);
-        let child_to_parent_consistency = |cur_child, parent| self.0[parent].borrowed_by.0.contains_key(cur_child);
+        let parent_to_child_consistency =
+            |cur_parent, child| self.0[child].borrows_from.contains(cur_parent);
+        let child_to_parent_consistency =
+            |cur_child, parent| self.0[parent].borrowed_by.0.contains_key(cur_child);
         self.0.iter().all(|(id, r)| {
-            let borrowed_by_is_bounded = r.borrowed_by.0.values().all(|edges| edges.len() <= MAX_EDGE_SET_SIZE);
-            let borrowed_by_is_consistent = r.borrowed_by.0.keys().all(|c| parent_to_child_consistency(id, c));
-            let borrows_from_is_consistent = r.borrows_from.iter().all(|p| child_to_parent_consistency(id, p));
+            let borrowed_by_is_bounded = r
+                .borrowed_by
+                .0
+                .values()
+                .all(|edges| edges.len() <= MAX_EDGE_SET_SIZE);
+            let borrowed_by_is_consistent = r
+                .borrowed_by
+                .0
+                .keys()
+                .all(|c| parent_to_child_consistency(id, c));
+            let borrows_from_is_consistent = r
+                .borrows_from
+                .iter()
+                .all(|p| child_to_parent_consistency(id, p));
             borrowed_by_is_bounded && borrowed_by_is_consistent && borrows_from_is_consistent
         })
     }
@@ -342,7 +422,8 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
     /// Checks that no reference borrows from itself
     fn no_self_loops(&self) -> bool {
         self.0.iter().all(|(id, r)| {
-            r.borrowed_by.0.keys().all(|to_id| id != to_id) && r.borrows_from.iter().all(|from_id| id != from_id)
+            r.borrowed_by.0.keys().all(|to_id| id != to_id)
+                && r.borrows_from.iter().all(|from_id| id != from_id)
         })
     }
 
@@ -367,7 +448,10 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
         Lbl: std::fmt::Display,
     {
         fn path_to_string<Lbl: std::fmt::Display>(p: &PathSlice<Lbl>) -> String {
-            p.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(".")
+            p.iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>()
+                .join(".")
         }
 
         for (id, ref_info) in &self.0 {
@@ -377,7 +461,14 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
             for (borrower, edges) in &ref_info.borrowed_by.0 {
                 for edge in edges {
                     let edisp = if edge.strong { "=" } else { "-" };
-                    println!("{} {}{}{}> {}", id.0, edisp, path_to_string(&edge.path), edisp, borrower.0,);
+                    println!(
+                        "{} {}{}{}> {}",
+                        id.0,
+                        edisp,
+                        path_to_string(&edge.path),
+                        edisp,
+                        borrower.0,
+                    );
                 }
             }
             for parent in &ref_info.borrows_from {

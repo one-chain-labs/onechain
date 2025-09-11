@@ -1,16 +1,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{self, ensure, Context};
+use anyhow::{self, Context, ensure};
 use clap::*;
 use move_core_types::identifier::Identifier;
 use move_package::source_package::layout::SourcePackageLayout;
-use std::{
-    fmt::Display,
-    fs::create_dir_all,
-    io::{BufRead, BufReader, Write},
-    path::Path,
-};
+use std::io::{BufRead, BufReader};
+use std::{fmt::Display, fs::create_dir_all, io::Write, path::Path};
 
 pub const MOVE_STDLIB_ADDR_NAME: &str = "std";
 pub const MOVE_STDLIB_ADDR_VALUE: &str = "0x1";
@@ -26,7 +22,12 @@ pub struct New {
 
 impl New {
     pub fn execute_with_defaults(self, path: Option<&Path>) -> anyhow::Result<()> {
-        self.execute(path, std::iter::empty::<(&str, &str)>(), std::iter::empty::<(&str, &str)>(), "")
+        self.execute(
+            path,
+            std::iter::empty::<(&str, &str)>(),
+            std::iter::empty::<(&str, &str)>(),
+            "",
+        )
     }
 
     pub fn execute(
@@ -40,8 +41,8 @@ impl New {
 
         ensure!(
             Identifier::is_valid(&self.name),
-            "Invalid package name. Package name must start with a lowercase letter \
-                     and consist only of lowercase letters, numbers, and underscores."
+            "Invalid package name. Package name must start with a letter or underscore \
+                     and consist only of letters, numbers, and underscores."
         );
 
         let path = path.unwrap_or_else(|| Path::new(&self.name));
@@ -54,7 +55,7 @@ impl New {
 
     /// add `build/*` to `{path}/.gitignore` if it doesn't already have it
     fn write_gitignore(&self, path: &Path) -> anyhow::Result<()> {
-        let gitignore_entry = "build/*";
+        let gitignore_entry = "build/*\n.trace\n.coverage*";
 
         let mut file = std::fs::OpenOptions::new()
             .create(true)

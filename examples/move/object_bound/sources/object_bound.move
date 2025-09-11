@@ -9,7 +9,7 @@
 /// used to receive and then send the object back to its object-owner.
 module obo::object_bound;
 
-use one::transfer::Receiving;
+use sui::transfer::Receiving;
 
 /// Trying to return a different object than the one that was borrowed.
 const EDontMessWithMe: u64 = 0;

@@ -15,7 +15,7 @@ pub mod vector;
 mod helpers;
 
 use move_core_types::account_address::AccountAddress;
-use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
+use move_vm_runtime::native_functions::{NativeFunctionTable, make_table_from_iter};
 
 #[derive(Debug, Clone)]
 pub struct GasParameters {
@@ -42,8 +42,12 @@ impl GasParameters {
                 },
             },
             debug: debug::GasParameters {
-                print: debug::PrintGasParameters { base_cost: 0.into() },
-                print_stack_trace: debug::PrintStackTraceGasParameters { base_cost: 0.into() },
+                print: debug::PrintGasParameters {
+                    base_cost: 0.into(),
+                },
+                print_stack_trace: debug::PrintStackTraceGasParameters {
+                    base_cost: 0.into(),
+                },
             },
             hash: hash::GasParameters {
                 sha2_256: hash::Sha2_256GasParameters {
@@ -58,13 +62,24 @@ impl GasParameters {
                 },
             },
             type_name: type_name::GasParameters {
-                get: type_name::GetGasParameters { base: 0.into(), per_byte: 0.into() },
+                get: type_name::GetGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
             },
-            signer: signer::GasParameters { borrow_address: signer::BorrowAddressGasParameters { base: 0.into() } },
+            signer: signer::GasParameters {
+                borrow_address: signer::BorrowAddressGasParameters { base: 0.into() },
+            },
             string: string::GasParameters {
-                check_utf8: string::CheckUtf8GasParameters { base: 0.into(), per_byte: 0.into() },
+                check_utf8: string::CheckUtf8GasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
                 is_char_boundary: string::IsCharBoundaryGasParameters { base: 0.into() },
-                sub_string: string::SubStringGasParameters { base: 0.into(), per_byte: 0.into() },
+                sub_string: string::SubStringGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
                 index_of: string::IndexOfGasParameters {
                     base: 0.into(),
                     per_byte_pattern: 0.into(),
@@ -74,7 +89,10 @@ impl GasParameters {
             vector: vector::GasParameters {
                 empty: vector::EmptyGasParameters { base: 0.into() },
                 length: vector::LengthGasParameters { base: 0.into() },
-                push_back: vector::PushBackGasParameters { base: 0.into(), legacy_per_abstract_memory_unit: 0.into() },
+                push_back: vector::PushBackGasParameters {
+                    base: 0.into(),
+                    legacy_per_abstract_memory_unit: 0.into(),
+                },
                 borrow: vector::BorrowGasParameters { base: 0.into() },
                 pop_back: vector::PopBackGasParameters { base: 0.into() },
                 destroy_empty: vector::DestroyEmptyGasParameters { base: 0.into() },
@@ -82,11 +100,9 @@ impl GasParameters {
             },
             #[cfg(feature = "testing")]
             unit_test: unit_test::GasParameters {
-                create_signers_for_testing: unit_test::CreateSignersForTestingGasParameters {
+                poison: unit_test::PoisonGasParameters {
                     base_cost: 0.into(),
-                    unit_cost: 0.into(),
                 },
-                poison: unit_test::PoisonGasParameters { base_cost: 0.into() },
             },
         }
     }
@@ -106,14 +122,14 @@ impl GasParameters {
             string,
             type_name,
             vector,
-            signer: signer::GasParameters { borrow_address: signer::BorrowAddressGasParameters { base: 0.into() } },
+            signer: signer::GasParameters {
+                borrow_address: signer::BorrowAddressGasParameters { base: 0.into() },
+            },
             #[cfg(feature = "testing")]
             unit_test: unit_test::GasParameters {
-                create_signers_for_testing: unit_test::CreateSignersForTestingGasParameters {
+                poison: unit_test::PoisonGasParameters {
                     base_cost: 0.into(),
-                    unit_cost: 0.into(),
                 },
-                poison: unit_test::PoisonGasParameters { base_cost: 0.into() },
             },
         }
     }
@@ -128,7 +144,9 @@ pub fn all_natives(
 
     macro_rules! add_natives {
         ($module_name: expr, $natives: expr) => {
-            natives.extend($natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)));
+            natives.extend(
+                $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
+            );
         };
     }
 
@@ -138,7 +156,10 @@ pub fn all_natives(
     add_natives!("string", string::make_all(gas_params.string));
     add_natives!("type_name", type_name::make_all(gas_params.type_name));
     add_natives!("vector", vector::make_all(gas_params.vector));
-    add_natives!("debug", debug::make_all(debug_is_silent, gas_params.debug, move_std_addr));
+    add_natives!(
+        "debug",
+        debug::make_all(debug_is_silent, gas_params.debug, move_std_addr)
+    );
     #[cfg(feature = "testing")]
     {
         add_natives!("unit_test", unit_test::make_all(gas_params.unit_test));

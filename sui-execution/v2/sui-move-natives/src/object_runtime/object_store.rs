@@ -3,7 +3,9 @@
 
 use crate::object_runtime::get_all_uids;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{annotated_value as A, effects::Op, runtime_value as R, vm_status::StatusCode};
+use move_core_types::{
+    annotated_value as A, effects::Op, runtime_value as R, vm_status::StatusCode,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, StructRef, Value},
@@ -82,7 +84,7 @@ pub(crate) enum ObjectResult<V> {
 
 type LoadedWithMetadataResult<V> = Option<(V, DynamicallyLoadedObjectMetadata)>;
 
-impl<'a> Inner<'a> {
+impl Inner<'_> {
     fn receive_object_from_store(
         &self,
         owner: ObjectID,
@@ -92,17 +94,21 @@ impl<'a> Inner<'a> {
         let child_opt = self
             .resolver
             .get_object_received_at_version(&owner, &child, version, self.current_epoch_id)
-            .map_err(|msg| PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!("{msg}")))?;
+            .map_err(|msg| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!("{msg}"))
+            })?;
         let obj_opt = if let Some(object) = child_opt {
             // guard against bugs in `receive_object_at_version`: if it returns a child object such that
             // C.parent != parent, we raise an invariant violation since that should be checked by
             // `receive_object_at_version`.
             if object.owner != Owner::AddressOwner(owner.into()) {
-                return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                    "Bad owner for {child}. \
+                return Err(
+                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                        "Bad owner for {child}. \
                         Expected owner {owner} but found owner {}",
-                    object.owner
-                )));
+                        object.owner
+                    )),
+                );
             }
             let loaded_metadata = DynamicallyLoadedObjectMetadata {
                 version,
@@ -117,18 +123,22 @@ impl<'a> Inner<'a> {
             // should raise an invariant violation since it should be checked by
             // `receive_object_at_version`.
             if object.version() != version {
-                return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                    "Bad version for {child}. \
+                return Err(
+                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                        "Bad version for {child}. \
                         Expected version {version} but found version {}",
-                    object.version()
-                )));
+                        object.version()
+                    )),
+                );
             }
             match object.into_inner().data {
                 Data::Package(_) => {
-                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                        "Mismatched object type for {child}. \
+                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(
+                        format!(
+                            "Mismatched object type for {child}. \
                                 Expected a Move object but found a Move package"
-                    )))
+                        ),
+                    ))
                 }
                 Data::Move(mo @ MoveObject { .. }) => Some((mo, loaded_metadata)),
             }
@@ -153,41 +163,46 @@ impl<'a> Inner<'a> {
             let child_opt = self
                 .resolver
                 .read_child_object(&parent, &child, parents_root_version)
-                .map_err(|msg| PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!("{msg}")))?;
+                .map_err(|msg| {
+                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!("{msg}"))
+                })?;
             let obj_opt = if let Some(object) = child_opt {
                 // if there was no root version, guard against reading a child object. A newly
                 // created parent should not have a child in storage
                 if !had_parent_root_version {
-                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
-                        .with_message(format!("A new parent {parent} should not have a child object {child}.")));
+                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(
+                        format!("A new parent {parent} should not have a child object {child}."),
+                    ));
                 }
                 // guard against bugs in `read_child_object`: if it returns a child object such that
                 // C.parent != parent, we raise an invariant violation
                 match &object.owner {
                     Owner::ObjectOwner(id) => {
                         if ObjectID::from(*id) != parent {
-                            return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                                "Bad owner for {child}. \
-                                Expected owner {parent} but found owner {id}"
-                            )));
+                            return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(
+                                format!("Bad owner for {child}. \
+                                Expected owner {parent} but found owner {id}")
+                            ))
                         }
                     }
                     Owner::AddressOwner(_) | Owner::Immutable | Owner::Shared { .. } => {
-                        return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                            "Bad owner for {child}. \
-                            Expected an id owner {parent} but found an address, immutable, or shared owner"
-                        )))
+                        return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(
+                            format!("Bad owner for {child}. \
+                            Expected an id owner {parent} but found an address, immutable, or shared owner")
+                        ))
                     }
-                    Owner::ConsensusV2 { .. } => {
-                        unimplemented!("ConsensusV2 does not exist for this execution version")
+                    Owner::ConsensusAddressOwner { .. } => {
+                        unimplemented!("ConsensusAddressOwner does not exist for this execution version")
                     }
                 };
                 match object.data {
                     Data::Package(_) => {
-                        return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                            "Mismatched object type for {child}. \
+                        return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(
+                            format!(
+                                "Mismatched object type for {child}. \
                                 Expected a Move object but found a Move package"
-                        )))
+                            ),
+                        ))
                     }
                     Data::Move(_) => Some(object),
                 }
@@ -199,22 +214,34 @@ impl<'a> Inner<'a> {
                 self.is_metered,
                 cached_objects_count,
                 self.protocol_config.object_runtime_max_num_cached_objects(),
-                self.protocol_config.object_runtime_max_num_cached_objects_system_tx(),
+                self.protocol_config
+                    .object_runtime_max_num_cached_objects_system_tx(),
                 self.metrics.excessive_object_runtime_cached_objects
             ) {
                 return Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
-                    .with_message(format!("Object runtime cached objects limit ({} entries) reached", lim))
-                    .with_sub_status(VMMemoryLimitExceededSubStatusCode::OBJECT_RUNTIME_CACHE_LIMIT_EXCEEDED as u64));
+                    .with_message(format!(
+                        "Object runtime cached objects limit ({} entries) reached",
+                        lim
+                    ))
+                    .with_sub_status(
+                        VMMemoryLimitExceededSubStatusCode::OBJECT_RUNTIME_CACHE_LIMIT_EXCEEDED
+                            as u64,
+                    ));
             };
 
             e.insert(obj_opt);
         }
-        Ok(self.cached_objects.get(&child).unwrap().as_ref().map(|obj| {
-            obj.data
+        Ok(self
+            .cached_objects
+            .get(&child)
+            .unwrap()
+            .as_ref()
+            .map(|obj| {
+                obj.data
                     .try_as_move()
                     // unwrap safe because we only insert Move objects
                     .unwrap()
-        }))
+            }))
     }
 
     fn fetch_object_impl(
@@ -227,7 +254,13 @@ impl<'a> Inner<'a> {
         child_move_type: MoveObjectType,
     ) -> PartialVMResult<ObjectResult<(Type, MoveObjectType, GlobalValue)>> {
         let obj = match self.get_or_fetch_object_from_store(parent, child)? {
-            None => return Ok(ObjectResult::Loaded((child_ty.clone(), child_move_type, GlobalValue::none()))),
+            None => {
+                return Ok(ObjectResult::Loaded((
+                    child_ty.clone(),
+                    child_move_type,
+                    GlobalValue::none(),
+                )))
+            }
             Some(obj) => obj,
         };
         // object exists, but the type does not match
@@ -238,23 +271,27 @@ impl<'a> Inner<'a> {
         let obj_contents = obj.contents();
         let v = match Value::simple_deserialize(obj_contents, child_ty_layout) {
             Some(v) => v,
-            None => {
-                return Err(PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
-                    .with_message(format!("Failed to deserialize object {child} with type {child_move_type}",)))
-            }
+            None => return Err(
+                PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE).with_message(
+                    format!("Failed to deserialize object {child} with type {child_move_type}",),
+                ),
+            ),
         };
-        let global_value = match GlobalValue::cached(v) {
-            Ok(gv) => gv,
-            Err(e) => {
-                return Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
-                    .with_message(format!("Object {child} did not deserialize to a struct Value. Error: {e}")))
-            }
-        };
+        let global_value =
+            match GlobalValue::cached(v) {
+                Ok(gv) => gv,
+                Err(e) => {
+                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(
+                        format!("Object {child} did not deserialize to a struct Value. Error: {e}"),
+                    ))
+                }
+            };
         // Find all UIDs inside of the value and update the object parent maps
-        let contained_uids = get_all_uids(child_ty_fully_annotated_layout, obj_contents).map_err(|e| {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message(format!("Failed to find UIDs. ERROR: {e}"))
-        })?;
+        let contained_uids =
+            get_all_uids(child_ty_fully_annotated_layout, obj_contents).map_err(|e| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("Failed to find UIDs. ERROR: {e}"))
+            })?;
         let parents_root_version = self.root_version.get(&parent).copied();
         if let Some(v) = parents_root_version {
             debug_assert!(contained_uids.contains(&child));
@@ -266,7 +303,11 @@ impl<'a> Inner<'a> {
                 }
             }
         }
-        Ok(ObjectResult::Loaded((child_ty.clone(), child_move_type, global_value)))
+        Ok(ObjectResult::Loaded((
+            child_ty.clone(),
+            child_move_type,
+            global_value,
+        )))
     }
 }
 
@@ -284,11 +325,18 @@ fn deserialize_move_object(
     let value = match Value::simple_deserialize(obj.contents(), child_ty_layout) {
         Some(v) => v,
         None => {
-            return Err(PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
-                .with_message(format!("Failed to deserialize object {child_id} with type {child_move_type}",)))
+            return Err(
+                PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE).with_message(
+                    format!("Failed to deserialize object {child_id} with type {child_move_type}",),
+                ),
+            )
         }
     };
-    Ok(ObjectResult::Loaded((child_ty.clone(), child_move_type, value)))
+    Ok(ObjectResult::Loaded((
+        child_ty.clone(),
+        child_move_type,
+        value,
+    )))
 }
 
 impl<'a> ChildObjectStore<'a> {
@@ -327,37 +375,52 @@ impl<'a> ChildObjectStore<'a> {
         child_fully_annotated_layout: &A::MoveTypeLayout,
         child_move_type: MoveObjectType,
     ) -> PartialVMResult<LoadedWithMetadataResult<ObjectResult<Value>>> {
-        let Some((obj, obj_meta)) = self.inner.receive_object_from_store(parent, child, child_version)? else {
+        let Some((obj, obj_meta)) =
+            self.inner
+                .receive_object_from_store(parent, child, child_version)?
+        else {
             return Ok(None);
         };
 
-        Ok(Some(match deserialize_move_object(&obj, child_ty, child_layout, child_move_type)? {
-            ObjectResult::MismatchedType => (ObjectResult::MismatchedType, obj_meta),
-            ObjectResult::Loaded((_, _, v)) => {
-                // Find all UIDs inside of the value and update the object parent maps with the contained
-                // UIDs in the received value. They should all have an upper bound version as the receiving object.
-                // Only do this if we successfully load the object though.
-                let contained_uids = get_all_uids(child_fully_annotated_layout, obj.contents()).map_err(|e| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("Failed to find UIDs for receiving object. ERROR: {e}"))
-                })?;
-                for id in contained_uids {
-                    self.inner.root_version.insert(id, child_version);
-                    if id != child {
-                        let prev = self.inner.wrapped_object_containers.insert(id, child);
-                        debug_assert!(prev.is_none())
+        Ok(Some(
+            match deserialize_move_object(&obj, child_ty, child_layout, child_move_type)? {
+                ObjectResult::MismatchedType => (ObjectResult::MismatchedType, obj_meta),
+                ObjectResult::Loaded((_, _, v)) => {
+                    // Find all UIDs inside of the value and update the object parent maps with the contained
+                    // UIDs in the received value. They should all have an upper bound version as the receiving object.
+                    // Only do this if we successfully load the object though.
+                    let contained_uids = get_all_uids(child_fully_annotated_layout, obj.contents())
+                        .map_err(|e| {
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                                .with_message(format!(
+                                    "Failed to find UIDs for receiving object. ERROR: {e}"
+                                ))
+                        })?;
+                    for id in contained_uids {
+                        self.inner.root_version.insert(id, child_version);
+                        if id != child {
+                            let prev = self.inner.wrapped_object_containers.insert(id, child);
+                            debug_assert!(prev.is_none())
+                        }
                     }
+                    (ObjectResult::Loaded(v), obj_meta)
                 }
-                (ObjectResult::Loaded(v), obj_meta)
-            }
-        }))
+            },
+        ))
     }
 
-    pub(super) fn object_exists(&mut self, parent: ObjectID, child: ObjectID) -> PartialVMResult<bool> {
+    pub(super) fn object_exists(
+        &mut self,
+        parent: ObjectID,
+        child: ObjectID,
+    ) -> PartialVMResult<bool> {
         if let Some(child_object) = self.store.get(&child) {
             return child_object.value.exists();
         }
-        Ok(self.inner.get_or_fetch_object_from_store(parent, child)?.is_some())
+        Ok(self
+            .inner
+            .get_or_fetch_object_from_store(parent, child)?
+            .is_some())
     }
 
     pub(super) fn object_exists_and_has_type(
@@ -404,18 +467,31 @@ impl<'a> ChildObjectStore<'a> {
                 if let LimitThresholdCrossed::Hard(_, lim) = check_limit_by_meter!(
                     self.is_metered,
                     store_entries_count,
-                    self.inner.protocol_config.object_runtime_max_num_store_entries(),
-                    self.inner.protocol_config.object_runtime_max_num_store_entries_system_tx(),
+                    self.inner
+                        .protocol_config
+                        .object_runtime_max_num_store_entries(),
+                    self.inner
+                        .protocol_config
+                        .object_runtime_max_num_store_entries_system_tx(),
                     self.inner.metrics.excessive_object_runtime_store_entries
                 ) {
                     return Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
-                        .with_message(format!("Object runtime store limit ({} entries) reached", lim))
+                        .with_message(format!(
+                            "Object runtime store limit ({} entries) reached",
+                            lim
+                        ))
                         .with_sub_status(
-                            VMMemoryLimitExceededSubStatusCode::OBJECT_RUNTIME_STORE_LIMIT_EXCEEDED as u64,
+                            VMMemoryLimitExceededSubStatusCode::OBJECT_RUNTIME_STORE_LIMIT_EXCEEDED
+                                as u64,
                         ));
                 };
 
-                e.insert(ChildObject { owner: parent, ty, move_type, value })
+                e.insert(ChildObject {
+                    owner: parent,
+                    ty,
+                    move_type,
+                    value,
+                })
             }
             btree_map::Entry::Occupied(e) => {
                 let child_object = e.into_mut();
@@ -439,30 +515,46 @@ impl<'a> ChildObjectStore<'a> {
         if let LimitThresholdCrossed::Hard(_, lim) = check_limit_by_meter!(
             self.is_metered,
             self.store.len(),
-            self.inner.protocol_config.object_runtime_max_num_store_entries(),
-            self.inner.protocol_config.object_runtime_max_num_store_entries_system_tx(),
+            self.inner
+                .protocol_config
+                .object_runtime_max_num_store_entries(),
+            self.inner
+                .protocol_config
+                .object_runtime_max_num_store_entries_system_tx(),
             self.inner.metrics.excessive_object_runtime_store_entries
         ) {
             return Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
-                .with_message(format!("Object runtime store limit ({} entries) reached", lim))
-                .with_sub_status(VMMemoryLimitExceededSubStatusCode::OBJECT_RUNTIME_STORE_LIMIT_EXCEEDED as u64));
+                .with_message(format!(
+                    "Object runtime store limit ({} entries) reached",
+                    lim
+                ))
+                .with_sub_status(
+                    VMMemoryLimitExceededSubStatusCode::OBJECT_RUNTIME_STORE_LIMIT_EXCEEDED as u64,
+                ));
         };
 
         let mut value = if let Some(ChildObject { ty, value, .. }) = self.store.remove(&child) {
             if value.exists()? {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    "Duplicate addition of a child object. \
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "Duplicate addition of a child object. \
                             The previous value cannot be dropped. Indicates possible duplication \
                             of objects as an object was fetched more than once from two different \
                             parents, yet was not removed from one first"
-                        .to_string(),
-                ));
+                                .to_string(),
+                        ),
+                );
             }
             if self.inner.protocol_config.loaded_child_object_format() {
                 // double check format did not change
-                if !self.inner.protocol_config.loaded_child_object_format_type() && child_ty != &ty {
+                if !self.inner.protocol_config.loaded_child_object_format_type() && child_ty != &ty
+                {
                     let msg = format!("Type changed for child {child} when setting the value back");
-                    return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg));
+                    return Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(msg),
+                    );
                 }
                 value
             } else {
@@ -472,10 +564,18 @@ impl<'a> ChildObjectStore<'a> {
             GlobalValue::none()
         };
         if let Err((e, _)) = value.move_to(child_value) {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message(format!("Unable to set value for child {child}, with error {e}",)));
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!("Unable to set value for child {child}, with error {e}",),
+                ),
+            );
         }
-        let child_object = ChildObject { owner: parent, ty: child_ty.clone(), move_type: child_move_type, value };
+        let child_object = ChildObject {
+            owner: parent,
+            ty: child_ty.clone(),
+            move_type: child_move_type,
+            value,
+        };
         self.store.insert(child, child_object);
         Ok(())
     }
@@ -493,7 +593,12 @@ impl<'a> ChildObjectStore<'a> {
         std::mem::take(&mut self.store)
             .into_iter()
             .filter_map(|(id, child_object)| {
-                let ChildObject { owner, ty, move_type: _, value } = child_object;
+                let ChildObject {
+                    owner,
+                    ty,
+                    move_type: _,
+                    value,
+                } = child_object;
                 let effect = value.into_effect()?;
                 let child_effect = ChildObjectEffect { owner, ty, effect };
                 Some((id, child_effect))
@@ -507,8 +612,14 @@ impl<'a> ChildObjectStore<'a> {
             if !child_exists {
                 None
             } else {
-                let copied_child_value =
-                    child_object.value.borrow_global().unwrap().value_as::<StructRef>().unwrap().read_ref().unwrap();
+                let copied_child_value = child_object
+                    .value
+                    .borrow_global()
+                    .unwrap()
+                    .value_as::<StructRef>()
+                    .unwrap()
+                    .read_ref()
+                    .unwrap();
                 Some((id, &child_object.ty, copied_child_value))
             }
         })

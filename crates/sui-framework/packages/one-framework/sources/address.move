@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[defines_primitive(address)]
-module one::address;
+module oct::address;
 
 use std::ascii;
 use std::bcs;
 use std::string;
-use one::hex;
+use sui::hex;
 
 /// Allows calling `.to_id()` on an address to get its `ID`.
-public use fun one::object::id_from_address as address.to_id;
+public use fun sui::object::id_from_address as address.to_id;
 
 /// The length of an address, in bytes
 const LENGTH: u64 = 32;

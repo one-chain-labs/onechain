@@ -1,6 +1,6 @@
 // cannot directly call init
 module a::m {
-    use one::tx_context;
+    use sui::tx_context;
     fun init(_ctx: &mut tx_context::TxContext) {
         abort 0
     }
@@ -10,6 +10,6 @@ module a::m {
     }
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

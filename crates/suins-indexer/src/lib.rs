@@ -9,15 +9,18 @@ use dotenvy::dotenv;
 use std::env;
 
 use diesel::{ConnectionError, ConnectionResult};
-use diesel_async::{
-    pooled_connection::{bb8::Pool, AsyncDieselConnectionManager, ManagerConfig},
-    AsyncPgConnection,
-};
-use futures_util::{future::BoxFuture, FutureExt};
+use diesel_async::pooled_connection::bb8::Pool;
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::pooled_connection::ManagerConfig;
+use diesel_async::AsyncPgConnection;
+use futures_util::future::BoxFuture;
+use futures_util::FutureExt;
 use std::time::Duration;
 
-pub type PgConnectionPool = diesel_async::pooled_connection::bb8::Pool<diesel_async::AsyncPgConnection>;
-pub type PgPoolConnection<'a> = diesel_async::pooled_connection::bb8::PooledConnection<'a, AsyncPgConnection>;
+pub type PgConnectionPool =
+    diesel_async::pooled_connection::bb8::Pool<diesel_async::AsyncPgConnection>;
+pub type PgPoolConnection<'a> =
+    diesel_async::pooled_connection::bb8::PooledConnection<'a, AsyncPgConnection>;
 
 pub async fn get_connection_pool() -> PgConnectionPool {
     dotenv().ok();
@@ -27,7 +30,10 @@ pub async fn get_connection_pool() -> PgConnectionPool {
     let mut config = ManagerConfig::default();
     config.custom_setup = Box::new(establish_connection);
 
-    let manager = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new_with_config(database_url, config);
+    let manager = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new_with_config(
+        database_url,
+        config,
+    );
 
     Pool::builder()
         .connection_timeout(Duration::from_secs(30))
@@ -44,8 +50,9 @@ fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConne
             .with_custom_certificate_verifier(std::sync::Arc::new(SkipServerCertCheck))
             .with_no_client_auth();
         let tls = tokio_postgres_rustls::MakeRustlsConnect::new(rustls_config);
-        let (client, conn) =
-            tokio_postgres::connect(config, tls).await.map_err(|e| ConnectionError::BadConnection(e.to_string()))?;
+        let (client, conn) = tokio_postgres::connect(config, tls)
+            .await
+            .map_err(|e| ConnectionError::BadConnection(e.to_string()))?;
         tokio::spawn(async move {
             if let Err(e) = conn.await {
                 eprintln!("Database connection: {e}");
@@ -57,7 +64,9 @@ fn establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConne
 }
 
 fn root_certs() -> rustls::RootCertStore {
-    rustls::RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.to_vec() }
+    rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    }
 }
 
 /// Skip performing any verification of a server's cert in order to temporarily match the default

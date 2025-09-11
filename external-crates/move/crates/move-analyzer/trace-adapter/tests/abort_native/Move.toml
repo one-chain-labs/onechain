@@ -3,8 +3,8 @@ name = "abort_native"
 edition = "2024.beta"
 
 [dependencies]
-One = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/one-framework", rev = "main" }
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
 
 [addresses]
 abort_native = "0x0"
-one = "0x2"
+Sui = "0x2"

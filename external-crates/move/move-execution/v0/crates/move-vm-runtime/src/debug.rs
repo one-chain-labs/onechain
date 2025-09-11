@@ -59,7 +59,6 @@ impl DebugCommand {
 
 impl FromStr for DebugCommand {
     type Err = String;
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use DebugCommand::*;
         let s = s.trim();
@@ -91,7 +90,11 @@ impl FromStr for DebugCommand {
         Err(format!(
             "Unrecognized command: {}\nAvailable commands: {}",
             s,
-            Self::commands().iter().map(|command| command.debug_string()).collect::<Vec<_>>().join(", ")
+            Self::commands()
+                .iter()
+                .map(|command| command.debug_string())
+                .collect::<Vec<_>>()
+                .join(", ")
         ))
     }
 }
@@ -104,11 +107,19 @@ pub(crate) struct DebugContext {
 
 impl DebugContext {
     pub(crate) fn new() -> Self {
-        Self { breakpoints: BTreeSet::new(), should_take_input: true }
+        Self {
+            breakpoints: BTreeSet::new(),
+            should_take_input: true,
+        }
     }
 
     fn delete_breakpoint_at_index(&mut self, breakpoint: &str) {
-        let index = breakpoint.strip_prefix("at_index").unwrap().trim().parse::<usize>().unwrap();
+        let index = breakpoint
+            .strip_prefix("at_index")
+            .unwrap()
+            .trim()
+            .parse::<usize>()
+            .unwrap();
         self.breakpoints = self
             .breakpoints
             .iter()
@@ -117,7 +128,13 @@ impl DebugContext {
             .collect();
     }
 
-    fn print_stack(function_desc: &Function, locals: &Locals, pc: u16, interp: &Interpreter, resolver: &Loader) {
+    fn print_stack(
+        function_desc: &Function,
+        locals: &Locals,
+        pc: u16,
+        interp: &Interpreter,
+        resolver: &Loader,
+    ) {
         let function_string = function_desc.pretty_string();
         let mut s = String::new();
         interp.debug_print_stack_trace(&mut s, resolver).unwrap();
@@ -156,15 +173,25 @@ impl DebugContext {
         let breakpoint_hit = self
             .breakpoints
             .get(&function_string)
-            .or_else(|| self.breakpoints.iter().find(|bp| instr_string[..].starts_with(bp.as_str())))
+            .or_else(|| {
+                self.breakpoints
+                    .iter()
+                    .find(|bp| instr_string[..].starts_with(bp.as_str()))
+            })
             .or_else(|| self.breakpoints.get(&pc.to_string()));
 
         if self.should_take_input || breakpoint_hit.is_some() {
             self.should_take_input = true;
             if let Some(bp_match) = breakpoint_hit {
-                println!("Breakpoint {} hit with instruction {}", bp_match, instr_string);
+                println!(
+                    "Breakpoint {} hit with instruction {}",
+                    bp_match, instr_string
+                );
             }
-            println!("function >> {}\ninstruction >> {:?}\nprogram counter >> {}", function_string, instr, pc);
+            println!(
+                "function >> {}\ninstruction >> {:?}\nprogram counter >> {}",
+                function_string, instr, pc
+            );
             Self::print_stack(function_desc, locals, pc, interp, resolver);
             loop {
                 print!("> ");
@@ -182,7 +209,8 @@ impl DebugContext {
                                 self.should_take_input = false;
                                 break;
                             }
-                            DebugCommand::Breakpoint(breakpoint) | DebugCommand::BreakpointSC(breakpoint) => {
+                            DebugCommand::Breakpoint(breakpoint)
+                            | DebugCommand::BreakpointSC(breakpoint) => {
                                 self.breakpoints.insert(breakpoint.to_string());
                             }
                             DebugCommand::DeleteBreakpoint(breakpoint) => {
@@ -192,9 +220,11 @@ impl DebugContext {
                                     self.breakpoints.remove(&breakpoint);
                                 }
                             }
-                            DebugCommand::PrintBreakpoints => {
-                                self.breakpoints.iter().enumerate().for_each(|(i, bp)| println!("[{}] {}", i, bp))
-                            }
+                            DebugCommand::PrintBreakpoints => self
+                                .breakpoints
+                                .iter()
+                                .enumerate()
+                                .for_each(|(i, bp)| println!("[{}] {}", i, bp)),
                             DebugCommand::PrintStack => {
                                 Self::print_stack(function_desc, locals, pc, interp, resolver);
                             }

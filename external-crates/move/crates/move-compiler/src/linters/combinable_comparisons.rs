@@ -64,7 +64,8 @@ simple_visitor!(
         let E::BinopExp(l2, op_r, _, r2) = &outer_r.exp.value else {
             return false;
         };
-        let Some((outer, inner_l, inner_r)) = binop_case(outer_bop, l1, op_l, r1, l2, op_r, r2) else {
+        let Some((outer, inner_l, inner_r)) = binop_case(outer_bop, l1, op_l, r1, l2, op_r, r2)
+        else {
             return false;
         };
         let simplification = simplify(outer, inner_l, inner_r);
@@ -201,7 +202,14 @@ fn binop_case(
     Some((outer, inner_l, inner_r))
 }
 
-fn operand_case(l1: &T::Exp, op1: CmpOp, r1: &T::Exp, l2: &T::Exp, op2: CmpOp, r2: &T::Exp) -> Option<(CmpOp, CmpOp)> {
+fn operand_case(
+    l1: &T::Exp,
+    op1: CmpOp,
+    r1: &T::Exp,
+    l2: &T::Exp,
+    op2: CmpOp,
+    r2: &T::Exp,
+) -> Option<(CmpOp, CmpOp)> {
     if same_value_exp(l1, l2) && same_value_exp(r1, r2) {
         Some((op1, op2))
     } else if same_value_exp(l1, r2) && same_value_exp(r1, l2) {
@@ -213,13 +221,17 @@ fn operand_case(l1: &T::Exp, op1: CmpOp, r1: &T::Exp, l2: &T::Exp, op2: CmpOp, r
 
 impl std::fmt::Display for CmpOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            CmpOp::Eq => "==",
-            CmpOp::Neq => "!=",
-            CmpOp::Lt => "<",
-            CmpOp::Gt => ">",
-            CmpOp::Le => "<=",
-            CmpOp::Ge => ">=",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                CmpOp::Eq => "==",
+                CmpOp::Neq => "!=",
+                CmpOp::Lt => "<",
+                CmpOp::Gt => ">",
+                CmpOp::Le => "<=",
+                CmpOp::Ge => ">=",
+            }
+        )
     }
 }

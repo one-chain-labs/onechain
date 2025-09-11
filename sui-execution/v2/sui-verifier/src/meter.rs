@@ -18,10 +18,11 @@ impl SuiVerifierMeterBounds {
 
         let new_ticks = self.ticks.saturating_add(ticks);
         if new_ticks >= max_ticks {
-            return Err(PartialVMError::new(StatusCode::PROGRAM_TOO_COMPLEX).with_message(format!(
-                "program too complex. Ticks exceeded `{}` will exceed limits: `{} current + {} new > {} max`)",
-                self.name, self.ticks, ticks, max_ticks
-            )));
+            return Err(PartialVMError::new(StatusCode::PROGRAM_TOO_COMPLEX)
+                    .with_message(format!(
+                        "program too complex. Ticks exceeded `{}` will exceed limits: `{} current + {} new > {} max`)",
+                        self.name, self.ticks, ticks, max_ticks
+                    )));
         }
         self.ticks = new_ticks;
         Ok(())
@@ -38,10 +39,18 @@ pub struct SuiVerifierMeter {
 impl SuiVerifierMeter {
     pub fn new(config: MeterConfig) -> Self {
         Self {
-            transaction_bounds: SuiVerifierMeterBounds { name: "<unknown>".to_string(), ticks: 0, max_ticks: None },
+            transaction_bounds: SuiVerifierMeterBounds {
+                name: "<unknown>".to_string(),
+                ticks: 0,
+                max_ticks: None,
+            },
 
             // Not used for now to keep backward compat
-            package_bounds: SuiVerifierMeterBounds { name: "<unknown>".to_string(), ticks: 0, max_ticks: None },
+            package_bounds: SuiVerifierMeterBounds {
+                name: "<unknown>".to_string(),
+                ticks: 0,
+                max_ticks: None,
+            },
             module_bounds: SuiVerifierMeterBounds {
                 name: "<unknown>".to_string(),
                 ticks: 0,

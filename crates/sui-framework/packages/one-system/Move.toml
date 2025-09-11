@@ -9,4 +9,4 @@ MoveStdlib = { local = "../move-stdlib" }
 One = { local = "../one-framework" }
 
 [addresses]
-one_system = "0x3"
+sui_system = "0x3"

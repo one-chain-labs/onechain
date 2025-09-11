@@ -10,28 +10,19 @@
 
 mod abstract_state;
 
+use crate::absint::{FunctionContext, TransferFunctions, analyze_function};
 use crate::reference_safety::abstract_state::STEP_BASE_COST;
 use abstract_state::{AbstractState, AbstractValue};
-use move_abstract_interpreter::absint::{AbstractInterpreter, FunctionContext, TransferFunctions};
 use move_abstract_stack::AbstractStack;
 use move_binary_format::{
+    CompiledModule,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode,
-        CodeOffset,
-        FunctionDefinitionIndex,
-        FunctionHandle,
-        IdentifierIndex,
-        SignatureIndex,
-        SignatureToken,
-        StructDefinition,
-        StructFieldInformation,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
+        SignatureIndex, SignatureToken, StructDefinition, StructFieldInformation,
         VariantDefinition,
     },
-    safe_assert,
-    safe_unwrap,
-    safe_unwrap_err,
-    CompiledModule,
+    safe_assert, safe_unwrap, safe_unwrap_err,
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
 use move_core_types::vm_status::StatusCode;
@@ -53,7 +44,12 @@ impl<'a> ReferenceSafetyAnalysis<'a> {
         function_context: &'a FunctionContext<'a>,
         name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
     ) -> Self {
-        Self { module, function_context, name_def_map, stack: AbstractStack::new() }
+        Self {
+            module,
+            function_context,
+            name_def_map,
+            stack: AbstractStack::new(),
+        }
     }
 
     fn push(&mut self, v: AbstractValue) -> PartialVMResult<()> {
@@ -76,7 +72,7 @@ pub(crate) fn verify<'a>(
     let initial_state = AbstractState::new(function_context);
 
     let mut verifier = ReferenceSafetyAnalysis::new(module, function_context, name_def_map);
-    verifier.analyze_function(initial_state, function_context, meter)
+    analyze_function(function_context, meter, &mut verifier, initial_state)
 }
 
 fn call(
@@ -87,7 +83,12 @@ fn call(
     meter: &mut (impl Meter + ?Sized),
 ) -> PartialVMResult<()> {
     let parameters = verifier.module.signature_at(function_handle.parameters);
-    let arguments = parameters.0.iter().map(|_| verifier.stack.pop().unwrap()).rev().collect();
+    let arguments = parameters
+        .0
+        .iter()
+        .map(|_| verifier.stack.pop().unwrap())
+        .rev()
+        .collect();
 
     let acquired_resources = match verifier.name_def_map.get(&function_handle.name) {
         Some(idx) => {
@@ -116,7 +117,10 @@ fn num_fields(struct_def: &StructDefinition) -> usize {
     }
 }
 
-fn pack_struct(verifier: &mut ReferenceSafetyAnalysis, struct_def: &StructDefinition) -> PartialVMResult<()> {
+fn pack_struct(
+    verifier: &mut ReferenceSafetyAnalysis,
+    struct_def: &StructDefinition,
+) -> PartialVMResult<()> {
     for _ in 0..num_fields(struct_def) {
         safe_assert!(safe_unwrap_err!(verifier.stack.pop()).is_value())
     }
@@ -125,14 +129,20 @@ fn pack_struct(verifier: &mut ReferenceSafetyAnalysis, struct_def: &StructDefini
     Ok(())
 }
 
-fn unpack_struct(verifier: &mut ReferenceSafetyAnalysis, struct_def: &StructDefinition) -> PartialVMResult<()> {
+fn unpack_struct(
+    verifier: &mut ReferenceSafetyAnalysis,
+    struct_def: &StructDefinition,
+) -> PartialVMResult<()> {
     safe_assert!(safe_unwrap_err!(verifier.stack.pop()).is_value());
     // TODO maybe call state.value_for
     verifier.push_n(AbstractValue::NonReference, num_fields(struct_def) as u64)?;
     Ok(())
 }
 
-fn pack_enum_variant(verifier: &mut ReferenceSafetyAnalysis, variant_def: &VariantDefinition) -> PartialVMResult<()> {
+fn pack_enum_variant(
+    verifier: &mut ReferenceSafetyAnalysis,
+    variant_def: &VariantDefinition,
+) -> PartialVMResult<()> {
     for _ in 0..variant_def.fields.len() {
         safe_assert!(safe_unwrap_err!(verifier.stack.pop()).is_value())
     }
@@ -141,17 +151,25 @@ fn pack_enum_variant(verifier: &mut ReferenceSafetyAnalysis, variant_def: &Varia
     Ok(())
 }
 
-fn unpack_enum_variant(verifier: &mut ReferenceSafetyAnalysis, variant_def: &VariantDefinition) -> PartialVMResult<()> {
+fn unpack_enum_variant(
+    verifier: &mut ReferenceSafetyAnalysis,
+    variant_def: &VariantDefinition,
+) -> PartialVMResult<()> {
     safe_assert!(safe_unwrap_err!(verifier.stack.pop()).is_value());
     // TODO maybe call state.value_for
     verifier.push_n(AbstractValue::NonReference, variant_def.fields.len() as u64)?;
     Ok(())
 }
 
-fn vec_element_type(verifier: &mut ReferenceSafetyAnalysis, idx: SignatureIndex) -> PartialVMResult<SignatureToken> {
+fn vec_element_type(
+    verifier: &mut ReferenceSafetyAnalysis,
+    idx: SignatureIndex,
+) -> PartialVMResult<SignatureToken> {
     match verifier.module.signature_at(idx).0.first() {
         Some(ty) => Ok(ty.clone()),
-        None => Err(PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)),
+        None => Err(PartialVMError::new(
+            StatusCode::VERIFIER_INVARIANT_VIOLATION,
+        )),
     }
 }
 
@@ -175,7 +193,12 @@ fn execute_inner(
             let value = state.move_loc(offset, *local, meter)?;
             verifier.push(value)?
         }
-        Bytecode::StLoc(local) => state.st_loc(offset, *local, safe_unwrap_err!(verifier.stack.pop()), meter)?,
+        Bytecode::StLoc(local) => state.st_loc(
+            offset,
+            *local,
+            safe_unwrap_err!(verifier.stack.pop()),
+            meter,
+        )?,
 
         Bytecode::FreezeRef => {
             let id = safe_unwrap!(safe_unwrap_err!(verifier.stack.pop()).ref_id());
@@ -307,7 +330,9 @@ fn execute_inner(
             state.release_value(safe_unwrap_err!(verifier.stack.pop()), meter)?;
         }
 
-        Bytecode::LdTrue | Bytecode::LdFalse => verifier.push(state.value_for(&SignatureToken::Bool))?,
+        Bytecode::LdTrue | Bytecode::LdFalse => {
+            verifier.push(state.value_for(&SignatureToken::Bool))?
+        }
         Bytecode::LdU8(_) => verifier.push(state.value_for(&SignatureToken::U8))?,
         Bytecode::LdU16(_) => verifier.push(state.value_for(&SignatureToken::U16))?,
         Bytecode::LdU32(_) => verifier.push(state.value_for(&SignatureToken::U32))?,
@@ -419,7 +444,9 @@ fn execute_inner(
         }
         Bytecode::PackVariant(vidx) => {
             let handle = verifier.module.variant_handle_at(*vidx);
-            let variant_def = verifier.module.variant_def_at(handle.enum_def, handle.variant);
+            let variant_def = verifier
+                .module
+                .variant_def_at(handle.enum_def, handle.variant);
             pack_enum_variant(verifier, variant_def)?
         }
         Bytecode::PackVariantGeneric(vidx) => {
@@ -430,7 +457,9 @@ fn execute_inner(
         }
         Bytecode::UnpackVariant(vidx) => {
             let handle = verifier.module.variant_handle_at(*vidx);
-            let variant_def = verifier.module.variant_def_at(handle.enum_def, handle.variant);
+            let variant_def = verifier
+                .module
+                .variant_def_at(handle.enum_def, handle.variant);
             unpack_enum_variant(verifier, variant_def)?
         }
         Bytecode::UnpackVariantGeneric(vidx) => {
@@ -441,10 +470,20 @@ fn execute_inner(
         }
         Bytecode::UnpackVariantImmRef(vidx) => {
             let handle = verifier.module.variant_handle_at(*vidx);
-            let variant_def = verifier.module.variant_def_at(handle.enum_def, handle.variant);
+            let variant_def = verifier
+                .module
+                .variant_def_at(handle.enum_def, handle.variant);
             let id = safe_unwrap!(safe_unwrap_err!(verifier.stack.pop()).ref_id());
             for val in state
-                .unpack_enum_variant_ref(offset, handle.enum_def, handle.variant, variant_def, false, id, meter)?
+                .unpack_enum_variant_ref(
+                    offset,
+                    handle.enum_def,
+                    handle.variant,
+                    variant_def,
+                    false,
+                    id,
+                    meter,
+                )?
                 .into_iter()
             {
                 verifier.push(val)?
@@ -452,10 +491,20 @@ fn execute_inner(
         }
         Bytecode::UnpackVariantMutRef(vidx) => {
             let handle = verifier.module.variant_handle_at(*vidx);
-            let variant_def = verifier.module.variant_def_at(handle.enum_def, handle.variant);
+            let variant_def = verifier
+                .module
+                .variant_def_at(handle.enum_def, handle.variant);
             let id = safe_unwrap!(safe_unwrap_err!(verifier.stack.pop()).ref_id());
             for val in state
-                .unpack_enum_variant_ref(offset, handle.enum_def, handle.variant, variant_def, true, id, meter)?
+                .unpack_enum_variant_ref(
+                    offset,
+                    handle.enum_def,
+                    handle.variant,
+                    variant_def,
+                    true,
+                    id,
+                    meter,
+                )?
                 .into_iter()
             {
                 verifier.push(val)?
@@ -467,7 +516,15 @@ fn execute_inner(
             let variant_def = verifier.module.variant_def_at(enum_def.def, handle.variant);
             let id = safe_unwrap!(safe_unwrap_err!(verifier.stack.pop()).ref_id());
             for val in state
-                .unpack_enum_variant_ref(offset, enum_def.def, handle.variant, variant_def, false, id, meter)?
+                .unpack_enum_variant_ref(
+                    offset,
+                    enum_def.def,
+                    handle.variant,
+                    variant_def,
+                    false,
+                    id,
+                    meter,
+                )?
                 .into_iter()
             {
                 verifier.push(val)?
@@ -479,19 +536,28 @@ fn execute_inner(
             let variant_def = verifier.module.variant_def_at(enum_def.def, handle.variant);
             let id = safe_unwrap!(safe_unwrap_err!(verifier.stack.pop()).ref_id());
             for val in state
-                .unpack_enum_variant_ref(offset, enum_def.def, handle.variant, variant_def, true, id, meter)?
+                .unpack_enum_variant_ref(
+                    offset,
+                    enum_def.def,
+                    handle.variant,
+                    variant_def,
+                    true,
+                    id,
+                    meter,
+                )?
                 .into_iter()
             {
                 verifier.push(val)?
             }
         }
-        Bytecode::VariantSwitch(_) => state.release_value(safe_unwrap_err!(verifier.stack.pop()), meter)?,
+        Bytecode::VariantSwitch(_) => {
+            state.release_value(safe_unwrap_err!(verifier.stack.pop()), meter)?
+        }
     };
     Ok(())
 }
 
-impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {
-    type Error = PartialVMError;
+impl TransferFunctions for ReferenceSafetyAnalysis<'_> {
     type State = AbstractState;
 
     fn execute(
@@ -499,7 +565,7 @@ impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {
         state: &mut Self::State,
         bytecode: &Bytecode,
         index: CodeOffset,
-        last_index: CodeOffset,
+        (_first_index, last_index): (CodeOffset, CodeOffset),
         meter: &mut (impl Meter + ?Sized),
     ) -> PartialVMResult<()> {
         execute_inner(self, state, bytecode, index, meter)?;
@@ -510,5 +576,3 @@ impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {
         Ok(())
     }
 }
-
-impl<'a> AbstractInterpreter for ReferenceSafetyAnalysis<'a> {}

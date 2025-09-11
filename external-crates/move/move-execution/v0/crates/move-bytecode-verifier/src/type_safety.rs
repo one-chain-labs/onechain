@@ -13,21 +13,9 @@ use move_abstract_stack::AbstractStack;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet,
-        Bytecode,
-        CodeOffset,
-        CompiledModule,
-        DatatypeHandleIndex,
-        FieldHandleIndex,
-        FunctionDefinitionIndex,
-        FunctionHandle,
-        LocalIndex,
-        Signature,
-        SignatureToken,
-        SignatureToken as ST,
-        StructDefinition,
-        StructDefinitionIndex,
-        StructFieldInformation,
+        AbilitySet, Bytecode, CodeOffset, CompiledModule, DatatypeHandleIndex, FieldHandleIndex,
+        FunctionDefinitionIndex, FunctionHandle, LocalIndex, Signature, SignatureToken,
+        SignatureToken as ST, StructDefinition, StructDefinitionIndex, StructFieldInformation,
     },
     safe_unwrap_err,
 };
@@ -44,7 +32,11 @@ const TYPE_NODE_COST: u128 = 30;
 
 impl<'a> Locals<'a> {
     fn new(parameters: &'a Signature, locals: &'a Signature) -> Self {
-        Self { param_count: parameters.len(), parameters, locals }
+        Self {
+            param_count: parameters.len(),
+            parameters,
+            locals,
+        }
     }
 
     fn local_at(&self, i: LocalIndex) -> &SignatureToken {
@@ -67,7 +59,12 @@ struct TypeSafetyChecker<'a> {
 impl<'a> TypeSafetyChecker<'a> {
     fn new(resolver: &'a CompiledModule, function_context: &'a FunctionContext<'a>) -> Self {
         let locals = Locals::new(function_context.parameters(), function_context.locals());
-        Self { resolver, function_context, locals, stack: AbstractStack::new() }
+        Self {
+            resolver,
+            function_context,
+            locals,
+            stack: AbstractStack::new(),
+        }
     }
 
     fn local_at(&self, i: LocalIndex) -> &SignatureToken {
@@ -75,35 +72,66 @@ impl<'a> TypeSafetyChecker<'a> {
     }
 
     fn abilities(&self, t: &SignatureToken) -> PartialVMResult<AbilitySet> {
-        self.resolver.abilities(t, self.function_context.type_parameters())
+        self.resolver
+            .abilities(t, self.function_context.type_parameters())
     }
 
     fn error(&self, status: StatusCode, offset: CodeOffset) -> PartialVMError {
-        PartialVMError::new(status)
-            .at_code_offset(self.function_context.index().unwrap_or(FunctionDefinitionIndex(0)), offset)
+        PartialVMError::new(status).at_code_offset(
+            self.function_context
+                .index()
+                .unwrap_or(FunctionDefinitionIndex(0)),
+            offset,
+        )
     }
 
-    fn push(&mut self, meter: &mut (impl Meter + ?Sized), ty: SignatureToken) -> PartialVMResult<()> {
+    fn push(
+        &mut self,
+        meter: &mut (impl Meter + ?Sized),
+        ty: SignatureToken,
+    ) -> PartialVMResult<()> {
         self.charge_ty(meter, &ty)?;
         safe_unwrap_err!(self.stack.push(ty));
         Ok(())
     }
 
-    fn push_n(&mut self, meter: &mut (impl Meter + ?Sized), ty: SignatureToken, n: u64) -> PartialVMResult<()> {
+    fn push_n(
+        &mut self,
+        meter: &mut (impl Meter + ?Sized),
+        ty: SignatureToken,
+        n: u64,
+    ) -> PartialVMResult<()> {
         self.charge_ty(meter, &ty)?;
         safe_unwrap_err!(self.stack.push_n(ty, n));
         Ok(())
     }
 
-    fn charge_ty(&mut self, meter: &mut (impl Meter + ?Sized), ty: &SignatureToken) -> PartialVMResult<()> {
+    fn charge_ty(
+        &mut self,
+        meter: &mut (impl Meter + ?Sized),
+        ty: &SignatureToken,
+    ) -> PartialVMResult<()> {
         self.charge_ty_(meter, ty, 1)
     }
 
-    fn charge_ty_(&mut self, meter: &mut (impl Meter + ?Sized), ty: &SignatureToken, n: u64) -> PartialVMResult<()> {
-        meter.add_items(Scope::Function, TYPE_NODE_COST, ty.preorder_traversal().count() * (n as usize))
+    fn charge_ty_(
+        &mut self,
+        meter: &mut (impl Meter + ?Sized),
+        ty: &SignatureToken,
+        n: u64,
+    ) -> PartialVMResult<()> {
+        meter.add_items(
+            Scope::Function,
+            TYPE_NODE_COST,
+            ty.preorder_traversal().count() * (n as usize),
+        )
     }
 
-    fn charge_tys(&mut self, meter: &mut (impl Meter + ?Sized), tys: &[SignatureToken]) -> PartialVMResult<()> {
+    fn charge_tys(
+        &mut self,
+        meter: &mut (impl Meter + ?Sized),
+        tys: &[SignatureToken],
+    ) -> PartialVMResult<()> {
         for ty in tys {
             self.charge_ty(meter, ty)?
         }
@@ -166,7 +194,14 @@ fn borrow_field(
         }
     };
     let field_type = Box::new(instantiate(&field_def.signature.0, type_args));
-    verifier.push(meter, if mut_ { ST::MutableReference(field_type) } else { ST::Reference(field_type) })?;
+    verifier.push(
+        meter,
+        if mut_ {
+            ST::MutableReference(field_type)
+        } else {
+            ST::Reference(field_type)
+        },
+    )?;
     Ok(())
 }
 
@@ -186,7 +221,11 @@ fn borrow_loc(
 
     verifier.push(
         meter,
-        if mut_ { ST::MutableReference(Box::new(loc_signature)) } else { ST::Reference(Box::new(loc_signature)) },
+        if mut_ {
+            ST::MutableReference(Box::new(loc_signature))
+        } else {
+            ST::Reference(Box::new(loc_signature))
+        },
     )?;
     Ok(())
 }
@@ -214,7 +253,11 @@ fn borrow_global(
     let struct_type = materialize_type(struct_def.struct_handle, type_args);
     verifier.push(
         meter,
-        if mut_ { ST::MutableReference(Box::new(struct_type)) } else { ST::Reference(Box::new(struct_type)) },
+        if mut_ {
+            ST::MutableReference(Box::new(struct_type))
+        } else {
+            ST::Reference(Box::new(struct_type))
+        },
     )?;
     Ok(())
 }
@@ -315,13 +358,19 @@ fn exists(
 ) -> PartialVMResult<()> {
     let struct_type = materialize_type(struct_def.struct_handle, type_args);
     if !verifier.abilities(&struct_type)?.has_key() {
-        return Err(verifier.error(StatusCode::EXISTS_WITHOUT_KEY_ABILITY_OR_BAD_ARGUMENT, offset));
+        return Err(verifier.error(
+            StatusCode::EXISTS_WITHOUT_KEY_ABILITY_OR_BAD_ARGUMENT,
+            offset,
+        ));
     }
 
     let operand = safe_unwrap_err!(verifier.stack.pop());
     if operand != ST::Address {
         // TODO better error here
-        return Err(verifier.error(StatusCode::EXISTS_WITHOUT_KEY_ABILITY_OR_BAD_ARGUMENT, offset));
+        return Err(verifier.error(
+            StatusCode::EXISTS_WITHOUT_KEY_ABILITY_OR_BAD_ARGUMENT,
+            offset,
+        ));
     }
 
     verifier.push(meter, ST::Bool)?;
@@ -396,8 +445,11 @@ fn borrow_vector_element(
         Some(ty) if &ty == declared_element_type => ty,
         _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
     };
-    let element_ref_type =
-        if mut_ref_only { ST::MutableReference(Box::new(element_type)) } else { ST::Reference(Box::new(element_type)) };
+    let element_ref_type = if mut_ref_only {
+        ST::MutableReference(Box::new(element_type))
+    } else {
+        ST::Reference(Box::new(element_type))
+    };
     verifier.push(meter, element_ref_type)?;
 
     Ok(())
@@ -412,7 +464,9 @@ fn verify_instr(
     match bytecode {
         Bytecode::Pop => {
             let operand = safe_unwrap_err!(verifier.stack.pop());
-            let abilities = verifier.resolver.abilities(&operand, verifier.function_context.type_parameters());
+            let abilities = verifier
+                .resolver
+                .abilities(&operand, verifier.function_context.type_parameters());
             if !abilities?.has_drop() {
                 return Err(verifier.error(StatusCode::POP_WITHOUT_DROP_ABILITY, offset));
             }
@@ -459,9 +513,14 @@ fn verify_instr(
             }
         }
 
-        Bytecode::MutBorrowField(field_handle_index) => {
-            borrow_field(verifier, meter, offset, true, *field_handle_index, &Signature(vec![]))?
-        }
+        Bytecode::MutBorrowField(field_handle_index) => borrow_field(
+            verifier,
+            meter,
+            offset,
+            true,
+            *field_handle_index,
+            &Signature(vec![]),
+        )?,
 
         Bytecode::MutBorrowFieldGeneric(field_inst_index) => {
             let field_inst = verifier.resolver.field_instantiation_at(*field_inst_index);
@@ -470,9 +529,14 @@ fn verify_instr(
             borrow_field(verifier, meter, offset, true, field_inst.handle, type_inst)?
         }
 
-        Bytecode::ImmBorrowField(field_handle_index) => {
-            borrow_field(verifier, meter, offset, false, *field_handle_index, &Signature(vec![]))?
-        }
+        Bytecode::ImmBorrowField(field_handle_index) => borrow_field(
+            verifier,
+            meter,
+            offset,
+            false,
+            *field_handle_index,
+            &Signature(vec![]),
+        )?,
 
         Bytecode::ImmBorrowFieldGeneric(field_inst_index) => {
             let field_inst = verifier.resolver.field_instantiation_at(*field_inst_index);
@@ -516,7 +580,14 @@ fn verify_instr(
 
         Bytecode::CopyLoc(idx) => {
             let local_signature = verifier.local_at(*idx).clone();
-            if !verifier.resolver.abilities(&local_signature, verifier.function_context.type_parameters())?.has_copy() {
+            if !verifier
+                .resolver
+                .abilities(
+                    &local_signature,
+                    verifier.function_context.type_parameters(),
+                )?
+                .has_copy()
+            {
                 return Err(verifier.error(StatusCode::COPYLOC_WITHOUT_COPY_ABILITY, offset));
             }
             verifier.push(meter, local_signature)?
@@ -546,7 +617,13 @@ fn verify_instr(
 
         Bytecode::Pack(idx) => {
             let struct_definition = verifier.resolver.struct_def_at(*idx);
-            pack(verifier, meter, offset, struct_definition, &Signature(vec![]))?
+            pack(
+                verifier,
+                meter,
+                offset,
+                struct_definition,
+                &Signature(vec![]),
+            )?
         }
 
         Bytecode::PackGeneric(idx) => {
@@ -559,7 +636,13 @@ fn verify_instr(
 
         Bytecode::Unpack(idx) => {
             let struct_definition = verifier.resolver.struct_def_at(*idx);
-            unpack(verifier, meter, offset, struct_definition, &Signature(vec![]))?
+            unpack(
+                verifier,
+                meter,
+                offset,
+                struct_definition,
+                &Signature(vec![]),
+            )?
         }
 
         Bytecode::UnpackGeneric(idx) => {
@@ -575,7 +658,9 @@ fn verify_instr(
             match operand {
                 ST::Reference(inner) | ST::MutableReference(inner) => {
                     if !verifier.abilities(&inner)?.has_copy() {
-                        return Err(verifier.error(StatusCode::READREF_WITHOUT_COPY_ABILITY, offset));
+                        return Err(
+                            verifier.error(StatusCode::READREF_WITHOUT_COPY_ABILITY, offset)
+                        );
                     }
                     verifier.push(meter, *inner)?;
                 }
@@ -588,7 +673,11 @@ fn verify_instr(
             let val_operand = safe_unwrap_err!(verifier.stack.pop());
             let ref_inner_signature = match ref_operand {
                 ST::MutableReference(inner) => *inner,
-                _ => return Err(verifier.error(StatusCode::WRITEREF_NO_MUTABLE_REFERENCE_ERROR, offset)),
+                _ => {
+                    return Err(
+                        verifier.error(StatusCode::WRITEREF_NO_MUTABLE_REFERENCE_ERROR, offset)
+                    )
+                }
             };
             if !verifier.abilities(&ref_inner_signature)?.has_drop() {
                 return Err(verifier.error(StatusCode::WRITEREF_WITHOUT_DROP_ABILITY, offset));
@@ -751,7 +840,11 @@ fn verify_instr(
         Bytecode::VecPack(idx, num) => {
             let element_type = &verifier.resolver.signature_at(*idx).0[0];
             if let Some(num_to_pop) = NonZeroU64::new(*num) {
-                let is_mismatched = verifier.stack.pop_eq_n(num_to_pop).map(|t| element_type != &t).unwrap_or(true);
+                let is_mismatched = verifier
+                    .stack
+                    .pop_eq_n(num_to_pop)
+                    .map(|t| element_type != &t)
+                    .unwrap_or(true);
                 if is_mismatched {
                     return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
                 }
@@ -855,8 +948,10 @@ fn verify_instr(
         | Bytecode::UnpackVariantMutRef(_)
         | Bytecode::UnpackVariantGenericMutRef(_)
         | Bytecode::VariantSwitch(_) => {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Unexpected variant opcode in version 0".to_string()));
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Unexpected variant opcode in version 0".to_string()),
+            );
         }
     };
     Ok(())
@@ -895,7 +990,13 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
         Datatype(idx) => Datatype(*idx),
         DatatypeInstantiation(s) => {
             let (idx, struct_type_args) = &**s;
-            DatatypeInstantiation(Box::new((*idx, struct_type_args.iter().map(|ty| instantiate(ty, subst)).collect())))
+            DatatypeInstantiation(Box::new((
+                *idx,
+                struct_type_args
+                    .iter()
+                    .map(|ty| instantiate(ty, subst))
+                    .collect(),
+            )))
         }
         Reference(ty) => Reference(Box::new(instantiate(ty, subst))),
         MutableReference(ty) => MutableReference(Box::new(instantiate(ty, subst))),
@@ -908,7 +1009,10 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
     }
 }
 
-fn get_vector_element_type(vector_ref_ty: SignatureToken, mut_ref_only: bool) -> Option<SignatureToken> {
+fn get_vector_element_type(
+    vector_ref_ty: SignatureToken,
+    mut_ref_only: bool,
+) -> Option<SignatureToken> {
     use SignatureToken::*;
     match vector_ref_ty {
         Reference(referred_type) => {

@@ -6,7 +6,7 @@ use crate::file_format::{Constant, SignatureToken};
 use move_core_types::account_address::AccountAddress;
 use proptest::{
     arbitrary::any,
-    collection::{btree_set, vec, SizeRange},
+    collection::{SizeRange, btree_set, vec},
     strategy::Strategy,
 };
 
@@ -27,7 +27,10 @@ impl ConstantPoolGen {
         byte_array_count: impl Into<SizeRange>,
     ) -> impl Strategy<Value = Self> {
         // get unique sets of addresses and vector<U8> (empty vector allowed)
-        (btree_set(any::<AccountAddress>(), address_count), btree_set(vec(any::<u8>(), 0..=20), byte_array_count))
+        (
+            btree_set(any::<AccountAddress>(), address_count),
+            btree_set(vec(any::<u8>(), 0..=20), byte_array_count),
+        )
             .prop_map(|(addresses, byte_arrays)| Self {
                 addresses: addresses.into_iter().collect(),
                 byte_arrays: byte_arrays.into_iter().collect(),
@@ -38,7 +41,10 @@ impl ConstantPoolGen {
     pub fn constant_pool(self) -> Vec<Constant> {
         let mut constants = vec![];
         for address in self.addresses {
-            constants.push(Constant { type_: SignatureToken::Address, data: address.to_vec() });
+            constants.push(Constant {
+                type_: SignatureToken::Address,
+                data: address.to_vec(),
+            });
         }
         for mut byte_array in self.byte_arrays {
             // TODO: below is a trick to make serialization easy (size being one byte)
@@ -49,7 +55,10 @@ impl ConstantPoolGen {
             }
             byte_array.push(byte_array.len() as u8);
             byte_array.reverse();
-            constants.push(Constant { type_: SignatureToken::Vector(Box::new(SignatureToken::U8)), data: byte_array });
+            constants.push(Constant {
+                type_: SignatureToken::Vector(Box::new(SignatureToken::U8)),
+                data: byte_array,
+            });
         }
         constants
     }

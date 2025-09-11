@@ -26,7 +26,7 @@ binary stored in a different location.
 If you want to build, test, and trace Move code using the extension, you must install the `sui` binary on
 your machine - see [here](https://docs.sui.io/guides/developer/getting-started/sui-install) for
 instructions. The extension assumes that the `sui` binary is in your system path, but you can set
-its custom location location using VSCode's settings (`⌘` + `,` on macOS, or use the menu item *Code >
+its custom location using VSCode's settings (`⌘` + `,` on macOS, or use the menu item *Code >
 Preferences > Settings*). Search for the `move.sui.path` user setting, set it to the new location of
 the `sui` binary, and restart VSCode.
 
@@ -49,7 +49,7 @@ This can be done in two steps:
 as prerequisites for Sui installation - for Linux, macOS and Windows these prerequisites and
 their installation instructions can be found
 [here](https://docs.sui.io/guides/developer/getting-started/sui-install#additional-prerequisites-by-operating-system)
-2. Invoke `cargo install --git https://github.com/one-chain-labs/onechain sui-move-lsp` to install the
+2. Invoke `cargo install --git https://github.com/MystenLabs/sui sui-move-lsp` to install the
 `move-analyzer` language server in your Cargo binary directory, which is typically located
 in the `~/.cargo/bin` (macOS/Linux) or `C:\Users\USER\.cargo\bin` (Windows) directory.
 3. Copy the move-analyzer binary to `~/.sui/bin` (macOS/Linux) or `C:\Users\USER\.sui\bin`
@@ -89,7 +89,7 @@ Move source file (a file with a `.move` file extension) and:
   `>`, `)`, or `}` -- will be highlighted.
 - As you type, the editor will offer completion suggestions, in particular:
   - struct field name and method name suggestions following `.` being typed
-  - suggestions following `::` being typed
+  - suggestions following `::` being typed (including auto-imports)
   - code snippets to complete `init` function and object type definitions
 - If the opened Move source file is located within a buildable project (a `Move.toml` file can be
   found in one of its parent directories), the following advanced features will also be available:
@@ -102,6 +102,8 @@ Move source file (a file with a `.move` file extension) and:
   - inlay hints:
     - types: local declarations, lambda parameters, variant and struct pattern matching
     - parameter names at function calls
+  - auto-fixes:
+    - unbound types and functions (auto-import or full qualification)
 - If the opened Move source file is located within a buildable project, and you have the `sui`
   binary installed, you can build and (locally)
   test this project using `Move: Build a Move package` and `Move: Test a Move package` commands from

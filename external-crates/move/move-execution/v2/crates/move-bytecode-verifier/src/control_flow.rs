@@ -51,12 +51,17 @@ pub fn verify_function<'a>(
 }
 
 /// Check to make sure that the bytecode vector is non-empty and ends with a branching instruction.
-fn verify_fallthrough(current_function_opt: Option<FunctionDefinitionIndex>, code: &CodeUnit) -> PartialVMResult<()> {
+fn verify_fallthrough(
+    current_function_opt: Option<FunctionDefinitionIndex>,
+    code: &CodeUnit,
+) -> PartialVMResult<()> {
     let current_function = current_function_opt.unwrap_or(FunctionDefinitionIndex(0));
     match code.code.last() {
         None => Err(PartialVMError::new(StatusCode::EMPTY_CODE_UNIT)),
-        Some(last) if !last.is_unconditional_branch() => Err(PartialVMError::new(StatusCode::INVALID_FALL_THROUGH)
-            .at_code_offset(current_function, (code.code.len() - 1) as CodeOffset)),
+        Some(last) if !last.is_unconditional_branch() => {
+            Err(PartialVMError::new(StatusCode::INVALID_FALL_THROUGH)
+                .at_code_offset(current_function, (code.code.len() - 1) as CodeOffset))
+        }
         Some(_) => Ok(()),
     }
 }
@@ -93,7 +98,9 @@ fn verify_reducibility<'a>(
     verifier_config: &VerifierConfig,
     function_context: &'a FunctionContext<'a>,
 ) -> PartialVMResult<()> {
-    let current_function = function_context.index().unwrap_or(FunctionDefinitionIndex(0));
+    let current_function = function_context
+        .index()
+        .unwrap_or(FunctionDefinitionIndex(0));
     let err = move |code: StatusCode, offset: CodeOffset| {
         Err(PartialVMError::new(code).at_code_offset(current_function, offset))
     };

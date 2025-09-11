@@ -1,34 +1,33 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{fmt::Debug, str::FromStr};
+use std::fmt::Debug;
+use std::str::FromStr;
 
-use axum::{
-    response::{IntoResponse, Response},
-    Json,
-};
+use axum::response::{IntoResponse, Response};
+use axum::Json;
 use fastcrypto::encoding::Hex;
-use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::Error as DeError;
+use serde::{Deserialize, Serializer};
+use serde::{Deserializer, Serialize};
 use serde_json::Value;
-use strum_macros::{EnumIter, EnumString};
+use strum_macros::EnumIter;
+use strum_macros::EnumString;
 
 use sui_sdk::rpc_types::{SuiExecutionStatus, SuiTransactionBlockKind};
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
-    crypto::{PublicKey as SuiPublicKey, SignatureScheme},
-    governance::{ADD_STAKE_FUN_NAME, WITHDRAW_STAKE_FUN_NAME},
-    messages_checkpoint::CheckpointDigest,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    sui_system_state::SUI_SYSTEM_MODULE_NAME,
-    transaction::{Argument, CallArg, Command, ObjectArg, TransactionData},
-    SUI_SYSTEM_PACKAGE_ID,
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest};
+use sui_types::crypto::PublicKey as SuiPublicKey;
+use sui_types::crypto::SignatureScheme;
+use sui_types::governance::{ADD_STAKE_FUN_NAME, WITHDRAW_STAKE_FUN_NAME};
+use sui_types::messages_checkpoint::CheckpointDigest;
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::sui_system_state::SUI_SYSTEM_MODULE_NAME;
+use sui_types::transaction::{Argument, CallArg, Command, ObjectArg, TransactionData};
+use sui_types::SUI_SYSTEM_PACKAGE_ID;
 
-use crate::{
-    errors::{Error, ErrorType},
-    operations::Operations,
-    SUI,
-};
+use crate::errors::{Error, ErrorType};
+use crate::operations::Operations;
+use crate::SUI;
 
 #[cfg(test)]
 #[path = "unit_tests/types_tests.rs"]
@@ -42,7 +41,9 @@ pub struct NetworkIdentifier {
     pub network: SuiEnv,
 }
 
-#[derive(Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy, EnumString)]
+#[derive(
+    Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy, EnumString,
+)]
 #[strum(serialize_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum SuiEnv {
@@ -53,9 +54,14 @@ pub enum SuiEnv {
 }
 
 impl SuiEnv {
-    pub fn check_network_identifier(&self, network_identifier: &NetworkIdentifier) -> Result<(), Error> {
+    pub fn check_network_identifier(
+        &self,
+        network_identifier: &NetworkIdentifier,
+    ) -> Result<(), Error> {
         if &network_identifier.blockchain != "sui" {
-            return Err(Error::UnsupportedBlockchain(network_identifier.blockchain.clone()));
+            return Err(Error::UnsupportedBlockchain(
+                network_identifier.blockchain.clone(),
+            ));
         }
         if &network_identifier.network != self {
             return Err(Error::UnsupportedNetwork(network_identifier.network));
@@ -86,7 +92,10 @@ pub enum SubAccountType {
 
 impl From<SuiAddress> for AccountIdentifier {
     fn from(address: SuiAddress) -> Self {
-        AccountIdentifier { address, sub_account: None }
+        AccountIdentifier {
+            address,
+            sub_account: None,
+        }
     }
 }
 
@@ -192,20 +201,28 @@ pub struct SubBalance {
 
 impl Amount {
     pub fn new(value: i128, currency: Option<Currency>) -> Self {
-        Self { value, currency: currency.unwrap_or_default(), metadata: None }
+        Self {
+            value,
+            currency: currency.unwrap_or_default(),
+            metadata: None,
+        }
     }
-
     pub fn new_from_sub_balances(sub_balances: Vec<SubBalance>) -> Self {
         let value = sub_balances.iter().map(|b| b.value).sum();
 
-        Self { value, currency: Currency::default(), metadata: Some(AmountMetadata { sub_balances }) }
+        Self {
+            value,
+            currency: Currency::default(),
+            metadata: Some(AmountMetadata { sub_balances }),
+        }
     }
 }
 
 mod str_format {
     use std::str::FromStr;
 
-    use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+    use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S>(value: &i128, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -248,8 +265,17 @@ pub struct Coin {
 impl From<sui_sdk::rpc_types::Coin> for Coin {
     fn from(coin: sui_sdk::rpc_types::Coin) -> Self {
         Self {
-            coin_identifier: CoinIdentifier { identifier: CoinID { id: coin.coin_object_id, version: coin.version } },
-            amount: Amount { value: coin.balance as i128, currency: SUI.clone(), metadata: None },
+            coin_identifier: CoinIdentifier {
+                identifier: CoinID {
+                    id: coin.coin_object_id,
+                    version: coin.version,
+                },
+            },
+            amount: Amount {
+                value: coin.balance as i128,
+                currency: SUI.clone(),
+                metadata: None,
+            },
         }
     }
 }
@@ -281,8 +307,10 @@ impl<'de> Deserialize<'de> for CoinID {
     {
         let s = String::deserialize(deserializer)?;
 
-        let (id, version) =
-            s.split_at(s.find(':').ok_or_else(|| D::Error::custom(format!("Malformed Coin id [{s}].")))?);
+        let (id, version) = s.split_at(
+            s.find(':')
+                .ok_or_else(|| D::Error::custom(format!("Malformed Coin id [{s}].")))?,
+        );
         let version = version.trim_start_matches(':');
         let id = ObjectID::from_hex_literal(id).map_err(D::Error::custom)?;
         let version = SequenceNumber::from_u64(u64::from_str(version).map_err(D::Error::custom)?);
@@ -294,7 +322,10 @@ impl<'de> Deserialize<'de> for CoinID {
 #[test]
 fn test_coin_id_serde() {
     let id = ObjectID::random();
-    let coin_id = CoinID { id, version: SequenceNumber::from_u64(10) };
+    let coin_id = CoinID {
+        id,
+        version: SequenceNumber::from_u64(10),
+    };
     let s = serde_json::to_string(&coin_id).unwrap();
     assert_eq!(format!("\"{}:{}\"", id, 10), s);
 
@@ -342,20 +373,26 @@ pub struct PublicKey {
 impl From<SuiPublicKey> for PublicKey {
     fn from(pk: SuiPublicKey) -> Self {
         match pk {
-            SuiPublicKey::Ed25519(k) => {
-                PublicKey { hex_bytes: Hex::from_bytes(&k.0), curve_type: CurveType::Edwards25519 }
-            }
-            SuiPublicKey::Secp256k1(k) => {
-                PublicKey { hex_bytes: Hex::from_bytes(&k.0), curve_type: CurveType::Secp256k1 }
-            }
-            SuiPublicKey::Secp256r1(k) => {
-                PublicKey { hex_bytes: Hex::from_bytes(&k.0), curve_type: CurveType::Secp256r1 }
-            }
+            SuiPublicKey::Ed25519(k) => PublicKey {
+                hex_bytes: Hex::from_bytes(&k.0),
+                curve_type: CurveType::Edwards25519,
+            },
+            SuiPublicKey::Secp256k1(k) => PublicKey {
+                hex_bytes: Hex::from_bytes(&k.0),
+                curve_type: CurveType::Secp256k1,
+            },
+            SuiPublicKey::Secp256r1(k) => PublicKey {
+                hex_bytes: Hex::from_bytes(&k.0),
+                curve_type: CurveType::Secp256r1,
+            },
             SuiPublicKey::ZkLogin(k) => PublicKey {
                 hex_bytes: Hex::from_bytes(&k.0),
                 curve_type: CurveType::ZkLogin, // inaccurate but added for completeness.
             },
-            SuiPublicKey::Passkey(k) => PublicKey { hex_bytes: Hex::from_bytes(&k.0), curve_type: CurveType::Secp256r1 },
+            SuiPublicKey::Passkey(k) => PublicKey {
+                hex_bytes: Hex::from_bytes(&k.0),
+                curve_type: CurveType::Secp256r1,
+            },
         }
     }
 }
@@ -419,7 +456,7 @@ pub enum OperationType {
     StakeReward,
     StakePrinciple,
     // sui-rosetta supported operation type
-    PaySui,
+    PayOct,
     PayCoin,
     Stake,
     WithdrawStake,
@@ -431,6 +468,7 @@ pub enum OperationType {
     AuthenticatorStateUpdate,
     RandomnessStateUpdate,
     EndOfEpochTransaction,
+    ProgrammableSystemTransaction,
 }
 
 impl From<&SuiTransactionBlockKind> for OperationType {
@@ -440,11 +478,25 @@ impl From<&SuiTransactionBlockKind> for OperationType {
             SuiTransactionBlockKind::Genesis(_) => OperationType::Genesis,
             SuiTransactionBlockKind::ConsensusCommitPrologue(_)
             | SuiTransactionBlockKind::ConsensusCommitPrologueV2(_)
-            | SuiTransactionBlockKind::ConsensusCommitPrologueV3(_) => OperationType::ConsensusCommitPrologue,
-            SuiTransactionBlockKind::ProgrammableTransaction(_) => OperationType::ProgrammableTransaction,
-            SuiTransactionBlockKind::AuthenticatorStateUpdate(_) => OperationType::AuthenticatorStateUpdate,
-            SuiTransactionBlockKind::RandomnessStateUpdate(_) => OperationType::RandomnessStateUpdate,
-            SuiTransactionBlockKind::EndOfEpochTransaction(_) => OperationType::EndOfEpochTransaction,
+            | SuiTransactionBlockKind::ConsensusCommitPrologueV3(_)
+            | SuiTransactionBlockKind::ConsensusCommitPrologueV4(_) => {
+                OperationType::ConsensusCommitPrologue
+            }
+            SuiTransactionBlockKind::ProgrammableTransaction(_) => {
+                OperationType::ProgrammableTransaction
+            }
+            SuiTransactionBlockKind::AuthenticatorStateUpdate(_) => {
+                OperationType::AuthenticatorStateUpdate
+            }
+            SuiTransactionBlockKind::RandomnessStateUpdate(_) => {
+                OperationType::RandomnessStateUpdate
+            }
+            SuiTransactionBlockKind::EndOfEpochTransaction(_) => {
+                OperationType::EndOfEpochTransaction
+            }
+            SuiTransactionBlockKind::ProgrammableSystemTransaction(_) => {
+                OperationType::ProgrammableSystemTransaction
+            }
         }
     }
 }
@@ -458,7 +510,10 @@ pub struct OperationIdentifier {
 
 impl From<u64> for OperationIdentifier {
     fn from(index: u64) -> Self {
-        OperationIdentifier { index, network_index: None }
+        OperationIdentifier {
+            index,
+            network_index: None,
+        }
     }
 }
 
@@ -863,7 +918,7 @@ pub struct PrefundedAccount {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum InternalOperation {
-    PaySui {
+    PayOct {
         sender: SuiAddress,
         recipients: Vec<SuiAddress>,
         amounts: Vec<u64>,
@@ -889,22 +944,29 @@ pub enum InternalOperation {
 impl InternalOperation {
     pub fn sender(&self) -> SuiAddress {
         match self {
-            InternalOperation::PaySui { sender, .. }
+            InternalOperation::PayOct { sender, .. }
             | InternalOperation::PayCoin { sender, .. }
             | InternalOperation::Stake { sender, .. }
             | InternalOperation::WithdrawStake { sender, .. } => *sender,
         }
     }
-
     /// Combine with ConstructionMetadata to form the TransactionData
     pub fn try_into_data(self, metadata: ConstructionMetadata) -> Result<TransactionData, Error> {
         let pt = match self {
-            Self::PaySui { recipients, amounts, .. } => {
+            Self::PayOct {
+                recipients,
+                amounts,
+                ..
+            } => {
                 let mut builder = ProgrammableTransactionBuilder::new();
                 builder.pay_oct(recipients, amounts)?;
                 builder.finish()
             }
-            Self::PayCoin { recipients, amounts, .. } => {
+            Self::PayCoin {
+                recipients,
+                amounts,
+                ..
+            } => {
                 let mut builder = ProgrammableTransactionBuilder::new();
                 builder.pay(metadata.objects.clone(), recipients, amounts)?;
                 let currency_str = serde_json::to_string(&metadata.currency.unwrap()).unwrap();
@@ -918,7 +980,9 @@ impl InternalOperation {
                 builder.pure(currency_str)?;
                 builder.finish()
             }
-            InternalOperation::Stake { validator, amount, .. } => {
+            InternalOperation::Stake {
+                validator, amount, ..
+            } => {
                 let mut builder = ProgrammableTransactionBuilder::new();
 
                 // [WORKAROUND] - this is a hack to work out if the staking ops is for a selected amount or None amount (whole wallet).
@@ -929,7 +993,8 @@ impl InternalOperation {
                     let state = builder.input(CallArg::SUI_SYSTEM_MUT)?;
                     (validator, state, amount)
                 } else {
-                    let amount = builder.pure(metadata.total_coin_value as u64 - metadata.budget)?;
+                    let amount =
+                        builder.pure(metadata.total_coin_value as u64 - metadata.budget)?;
                     let state = builder.input(CallArg::SUI_SYSTEM_MUT)?;
                     let validator = builder.input(CallArg::Pure(bcs::to_bytes(&validator)?))?;
                     (validator, state, amount)
@@ -976,6 +1041,12 @@ impl InternalOperation {
             }
         };
 
-        Ok(TransactionData::new_programmable(metadata.sender, metadata.coins, pt, metadata.budget, metadata.gas_price))
+        Ok(TransactionData::new_programmable(
+            metadata.sender,
+            metadata.coins,
+            pt,
+            metadata.budget,
+            metadata.gas_price,
+        ))
     }
 }

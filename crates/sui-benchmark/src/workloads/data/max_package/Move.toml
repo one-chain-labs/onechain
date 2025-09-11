@@ -4,8 +4,8 @@ version = "0.0.1"
 edition = "2024.beta"
 
 [dependencies]
-One = { local = "../../../../../sui-framework/packages/one-framework" }
+Sui = { local = "../../../../../sui-framework/packages/sui-framework" }
 
 [addresses]
 max_package =  "0x0"
-one =  "0000000000000000000000000000000000000000000000000000000000000002"
+sui =  "0000000000000000000000000000000000000000000000000000000000000002"

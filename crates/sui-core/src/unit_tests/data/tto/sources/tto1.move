@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module tto::M1 {
-    use one::object::{Self, UID};
-    use one::tx_context::{Self, TxContext};
-    use one::transfer::{Self, Receiving};
-    use one::dynamic_object_field;
+    use sui::object::{Self, UID};
+    use sui::tx_context::{Self, TxContext};
+    use sui::transfer::{Self, Receiving};
+    use sui::dynamic_object_field;
 
     public struct A has key, store {
         id: UID,
@@ -16,7 +16,7 @@ module tto::M1 {
     }
 
     public struct C has key {
-        id: UID,
+        id: UID, 
         wrapped: B,
     }
 

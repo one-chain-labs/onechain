@@ -1,7 +1,7 @@
 // invalid, a reference to vector of objects
 
 module a::m {
-    use one::object;
+    use sui::object;
 
     struct S has key { id: object::UID }
 
@@ -11,7 +11,7 @@ module a::m {
 
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

@@ -2,33 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use axum::middleware::{self, Next};
-use std::{
-    collections::BTreeMap,
-    ffi::OsString,
-    fmt,
-    fs,
-    net::TcpListener,
-    path::{Path, PathBuf},
-    process::Command,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::collections::BTreeMap;
+use std::fmt;
+use std::net::TcpListener;
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
+use std::{ffi::OsString, fs, path::Path, process::Command};
+use sui_package_management::system_package_versions::latest_system_packages;
 use tokio::sync::oneshot::Sender;
 
 use anyhow::{anyhow, bail};
-use axum::{
-    extract::{Query, State},
-    response::{IntoResponse, Response},
-    routing::get,
-    Extension,
-    Json,
-    Router,
-};
-use hyper::{
-    http::{HeaderName, HeaderValue, Method},
-    HeaderMap,
-    StatusCode,
-};
+use axum::extract::{Query, State};
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
+use axum::Extension;
+use axum::{Json, Router};
+use hyper::http::{HeaderName, HeaderValue, Method};
+use hyper::{HeaderMap, StatusCode};
 use mysten_metrics::RegistryService;
 use prometheus::{register_int_counter_with_registry, IntCounter, Registry};
 use serde::{Deserialize, Serialize};
@@ -40,17 +31,19 @@ use move_core_types::account_address::AccountAddress;
 use move_package::{BuildConfig as MoveBuildConfig, LintFlag};
 use move_symbol_pool::Symbol;
 use sui_move::manage_package::resolve_lock_file_path;
-use sui_move_build::{BuildConfig, SuiPackageHooks};
-use sui_sdk::{rpc_types::SuiTransactionBlockEffects, types::base_types::ObjectID, SuiClientBuilder};
+use sui_move_build::{implicit_deps, BuildConfig, SuiPackageHooks};
+use sui_sdk::rpc_types::SuiTransactionBlockEffects;
+use sui_sdk::types::base_types::ObjectID;
+use sui_sdk::SuiClientBuilder;
 use sui_source_validation::{BytecodeSourceVerifier, ValidationMode};
 
 pub const HOST_PORT_ENV: &str = "HOST_PORT";
 pub const SUI_SOURCE_VALIDATION_VERSION_HEADER: &str = "x-sui-source-validation-version";
 pub const SUI_SOURCE_VALIDATION_VERSION: &str = "0.1";
 
-pub const MAINNET_URL: &str = "https://fullnode.mainnet.sui.io:443";
-pub const TESTNET_URL: &str = "https://fullnode.testnet.sui.io:443";
-pub const DEVNET_URL: &str = "https://fullnode.devnet.sui.io:443";
+pub const MAINNET_URL: &str = "https://rpc-mainnet.onelabs.cc:443";
+pub const TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
+pub const DEVNET_URL: &str = "https://rpc-devnet.onelabs.cc:443";
 pub const LOCALNET_URL: &str = "http://127.0.0.1:9000";
 
 pub const MAINNET_WS_URL: &str = "wss://rpc.mainnet.sui.io:443";
@@ -133,12 +126,16 @@ pub enum Network {
 
 impl fmt::Display for Network {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            Network::Mainnet => "mainnet",
-            Network::Testnet => "testnet",
-            Network::Devnet => "devnet",
-            Network::Localnet => "localnet",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Network::Mainnet => "mainnet",
+                Network::Testnet => "testnet",
+                Network::Devnet => "devnet",
+                Network::Localnet => "localnet",
+            }
+        )
     }
 }
 
@@ -163,9 +160,11 @@ pub async fn verify_package(
     };
     let client = SuiClientBuilder::default().build(network_url).await?;
     let chain_id = client.read_api().get_chain_identifier().await?;
-    let mut config = resolve_lock_file_path(MoveBuildConfig::default(), Some(package_path.as_ref()))?;
+    let mut config =
+        resolve_lock_file_path(MoveBuildConfig::default(), Some(package_path.as_ref()))?;
     config.lint_flag = LintFlag::LEVEL_NONE;
     config.silence_warnings = true;
+    config.implicit_dependencies = implicit_deps(latest_system_packages());
     let build_config = BuildConfig {
         config,
         run_bytecode_verifier: false, /* no need to run verifier if code is on-chain */
@@ -208,9 +207,12 @@ pub fn parse_config(config_path: impl AsRef<Path>) -> anyhow::Result<Config> {
 
 pub fn repo_name_from_url(url: &str) -> anyhow::Result<String> {
     let repo_url = Url::parse(url)?;
-    let mut components =
-        repo_url.path_segments().ok_or_else(|| anyhow!("Could not discover repository path in url {url}"))?;
-    let repo_name = components.next_back().ok_or_else(|| anyhow!("Could not discover repository name in url {url}"))?;
+    let mut components = repo_url
+        .path_segments()
+        .ok_or_else(|| anyhow!("Could not discover repository path in url {url}"))?;
+    let repo_name = components
+        .next_back()
+        .ok_or_else(|| anyhow!("Could not discover repository name in url {url}"))?;
     Ok(repo_name.to_string())
 }
 
@@ -228,7 +230,10 @@ impl CloneCommand {
         let repo_name = repo_name_from_url(&p.repository)?;
         let network = p.network.clone().unwrap_or_default().to_string();
         let sanitized_branch = b.branch.replace('/', "__");
-        let dest = dest.join(network).join(format!("{repo_name}__{sanitized_branch}")).into_os_string();
+        let dest = dest
+            .join(network)
+            .join(format!("{repo_name}__{sanitized_branch}"))
+            .into_os_string();
 
         macro_rules! ostr {
             ($arg:expr) => {
@@ -250,9 +255,18 @@ impl CloneCommand {
         args.push(cmd_args);
 
         // Args to sparse checkout the package set
-        let mut cmd_args: Vec<OsString> =
-            vec![ostr!("-C"), dest.clone(), ostr!("sparse-checkout"), ostr!("set"), ostr!("--no-cone")];
-        let path_args: Vec<OsString> = b.paths.iter().map(|p| OsString::from(p.path.clone())).collect();
+        let mut cmd_args: Vec<OsString> = vec![
+            ostr!("-C"),
+            dest.clone(),
+            ostr!("sparse-checkout"),
+            ostr!("set"),
+            ostr!("--no-cone"),
+        ];
+        let path_args: Vec<OsString> = b
+            .paths
+            .iter()
+            .map(|p| OsString::from(p.path.clone()))
+            .collect();
         cmd_args.extend_from_slice(&path_args);
         args.push(cmd_args);
 
@@ -260,15 +274,21 @@ impl CloneCommand {
         let cmd_args: Vec<OsString> = vec![ostr!("-C"), dest, ostr!("checkout")];
         args.push(cmd_args);
 
-        Ok(Self { args, repo_url: p.repository.clone() })
+        Ok(Self {
+            args,
+            repo_url: p.repository.clone(),
+        })
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
         for args in &self.args {
-            let result = Command::new("git")
-                .args(args)
-                .output()
-                .map_err(|_| anyhow!("Error cloning {} with command `git {:#?}`", self.repo_url, args))?;
+            let result = Command::new("git").args(args).output().map_err(|_| {
+                anyhow!(
+                    "Error cloning {} with command `git {:#?}`",
+                    self.repo_url,
+                    args
+                )
+            })?;
             if !result.status.success() {
                 bail!(
                     "Nonzero exit status when cloning {} with command `git {:#?}`. \
@@ -289,7 +309,12 @@ pub async fn clone_repositories(repos: Vec<&RepositorySource>, dir: &Path) -> an
     for p in &repos {
         for b in &p.branches {
             let command = CloneCommand::new(p, b, dir)?;
-            info!("cloning {}:{} to {}", &p.repository, &b.branch, dir.display());
+            info!(
+                "cloning {}:{} to {}",
+                &p.repository,
+                &b.branch,
+                dir.display()
+            );
             let t = tokio::spawn(async move { command.run().await });
             tasks.push(t);
         }
@@ -301,7 +326,10 @@ pub async fn clone_repositories(repos: Vec<&RepositorySource>, dir: &Path) -> an
     Ok(())
 }
 
-pub async fn initialize(config: &Config, dir: &Path) -> anyhow::Result<(NetworkLookup, NetworkLookup)> {
+pub async fn initialize(
+    config: &Config,
+    dir: &Path,
+) -> anyhow::Result<(NetworkLookup, NetworkLookup)> {
     let mut repos = vec![];
     for s in &config.packages {
         match s {
@@ -322,8 +350,13 @@ pub async fn sources_list(sources: &NetworkLookup) -> NetworkLookup {
         for (address, symbols) in addresses {
             let mut symbol_map = SourceLookup::new();
             for (symbol, source_info) in symbols {
-                symbol_map
-                    .insert(*symbol, SourceInfo { path: source_info.path.file_name().unwrap().into(), source: None });
+                symbol_map.insert(
+                    *symbol,
+                    SourceInfo {
+                        path: source_info.path.file_name().unwrap().into(),
+                        source: None,
+                    },
+                );
             }
             address_map.insert(*address, symbol_map);
         }
@@ -348,7 +381,10 @@ pub async fn verify_packages(config: &Config, dir: &Path) -> anyhow::Result<Netw
                             .join(p.path.clone())
                             .clone();
                         let network = r.network.clone().unwrap_or_default();
-                        let t = tokio::spawn(async move { verify_package(&network, package_path).await });
+                        let t =
+                            tokio::spawn(
+                                async move { verify_package(&network, package_path).await },
+                            );
                         tasks.push(t)
                     }
                 }
@@ -357,7 +393,8 @@ pub async fn verify_packages(config: &Config, dir: &Path) -> anyhow::Result<Netw
                 for p in &packages_dir.paths {
                     let package_path = PathBuf::from(p.path.clone());
                     let network = packages_dir.network.clone().unwrap_or_default();
-                    let t = tokio::spawn(async move { verify_package(&network, package_path).await });
+                    let t =
+                        tokio::spawn(async move { verify_package(&network, package_path).await });
                     tasks.push(t)
                 }
             }
@@ -412,7 +449,9 @@ pub async fn serve(app_state: Arc<RwLock<AppState>>) -> anyhow::Result<()> {
         .layer(
             ServiceBuilder::new()
                 .layer(
-                    tower_http::cors::CorsLayer::new().allow_methods([Method::GET]).allow_origin(tower_http::cors::Any),
+                    tower_http::cors::CorsLayer::new()
+                        .allow_methods([Method::GET])
+                        .allow_origin(tower_http::cors::Any),
                 )
                 .layer(middleware::from_fn(check_version_header)),
         )
@@ -444,36 +483,66 @@ pub struct ErrorResponse {
 
 async fn api_route(
     State(app_state): State<Arc<RwLock<AppState>>>,
-    Query(Request { network, address, module }): Query<Request>,
+    Query(Request {
+        network,
+        address,
+        module,
+    }): Query<Request>,
 ) -> impl IntoResponse {
     debug!("request network={network}&address={address}&module={module}");
     let symbol = Symbol::from(module);
     let Ok(address) = AccountAddress::from_hex_literal(&address) else {
         let error = format!("Invalid hex address {address}");
-        return (StatusCode::BAD_REQUEST, Json(ErrorResponse { error }).into_response());
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse { error }).into_response(),
+        );
     };
 
     let app_state = app_state.read().unwrap();
     if let Some(metrics) = &app_state.metrics {
         metrics.total_requests_received.inc();
     }
-    let source_result = app_state.sources.get(&network).and_then(|n| n.get(&address)).and_then(|a| a.get(&symbol));
-    if let Some(SourceInfo { source: Some(source), .. }) = source_result {
-        (StatusCode::OK, Json(SourceResponse { source: source.to_owned() }).into_response())
+    let source_result = app_state
+        .sources
+        .get(&network)
+        .and_then(|n| n.get(&address))
+        .and_then(|a| a.get(&symbol));
+    if let Some(SourceInfo {
+        source: Some(source),
+        ..
+    }) = source_result
+    {
+        (
+            StatusCode::OK,
+            Json(SourceResponse {
+                source: source.to_owned(),
+            })
+            .into_response(),
+        )
     } else {
         (
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
-                error: format!("No source found for {symbol} at address {address} on network {network}"),
+                error: format!(
+                    "No source found for {symbol} at address {address} on network {network}"
+                ),
             })
             .into_response(),
         )
     }
 }
 
-async fn check_version_header(headers: HeaderMap, req: hyper::Request<axum::body::Body>, next: Next) -> Response {
-    let version =
-        headers.get(SUI_SOURCE_VALIDATION_VERSION_HEADER).as_ref().and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+async fn check_version_header(
+    headers: HeaderMap,
+    req: hyper::Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    let version = headers
+        .get(SUI_SOURCE_VALIDATION_VERSION_HEADER)
+        .as_ref()
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
 
     match version {
         Some(v) if v != SUI_SOURCE_VALIDATION_VERSION => {
@@ -486,7 +555,12 @@ async fn check_version_header(headers: HeaderMap, req: hyper::Request<axum::body
                 HeaderName::from_static(SUI_SOURCE_VALIDATION_VERSION_HEADER),
                 HeaderValue::from_static(SUI_SOURCE_VALIDATION_VERSION),
             );
-            return (StatusCode::BAD_REQUEST, headers, Json(ErrorResponse { error }).into_response()).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                headers,
+                Json(ErrorResponse { error }).into_response(),
+            )
+                .into_response();
         }
         _ => (),
     }
@@ -500,7 +574,10 @@ async fn check_version_header(headers: HeaderMap, req: hyper::Request<axum::body
 
 async fn list_route(State(app_state): State<Arc<RwLock<AppState>>>) -> impl IntoResponse {
     let app_state = app_state.read().unwrap();
-    (StatusCode::OK, Json(app_state.sources_list.clone()).into_response())
+    (
+        StatusCode::OK,
+        Json(app_state.sources_list.clone()).into_response(),
+    )
 }
 
 pub struct SourceServiceMetrics {
@@ -525,8 +602,9 @@ pub fn start_prometheus_server(listener: TcpListener) -> RegistryService {
 
     let registry_service = RegistryService::new(registry);
 
-    let app =
-        Router::new().route(METRICS_ROUTE, get(mysten_metrics::metrics)).layer(Extension(registry_service.clone()));
+    let app = Router::new()
+        .route(METRICS_ROUTE, get(mysten_metrics::metrics))
+        .layer(Extension(registry_service.clone()));
 
     tokio::spawn(async move {
         listener.set_nonblocking(true).unwrap();

@@ -15,7 +15,10 @@ pub struct Service {
 
 impl Default for Service {
     fn default() -> Self {
-        Service { id: "".to_string(), r#type: "service_reference".to_string() }
+        Service {
+            id: "".to_string(),
+            r#type: "service_reference".to_string(),
+        }
     }
 }
 
@@ -28,7 +31,10 @@ pub struct Body {
 
 impl Default for Body {
     fn default() -> Self {
-        Body { r#type: "incident_body".to_string(), details: "".to_string() }
+        Body {
+            r#type: "incident_body".to_string(),
+            details: "".to_string(),
+        }
     }
 }
 
@@ -67,10 +73,17 @@ pub struct Pagerduty {
 
 impl Pagerduty {
     pub fn new(api_key: String) -> Self {
-        Pagerduty { client: Arc::new(reqwest::Client::new()), api_key }
+        Pagerduty {
+            client: Arc::new(reqwest::Client::new()),
+            api_key,
+        }
     }
 
-    pub async fn create_incident(&self, from: &str, incident: CreateIncident) -> anyhow::Result<()> {
+    pub async fn create_incident(
+        &self,
+        from: &str,
+        incident: CreateIncident,
+    ) -> anyhow::Result<()> {
         let token = format!("Token token={}", self.api_key);
 
         let response = self
@@ -85,15 +98,23 @@ impl Pagerduty {
             .await?;
         // Check if the status code is in the range of 200-299
         if response.status().is_success() {
-            info!("Created incident with key: {:?}", incident.incident.incident_key);
+            info!(
+                "Created incident with key: {:?}",
+                incident.incident.incident_key
+            );
             Ok(())
         } else {
             let status = response.status();
             let text = response.text().await?;
             if status.is_client_error()
-                && text.contains("Open incident with matching dedup key already exists on this service")
+                && text.contains(
+                    "Open incident with matching dedup key already exists on this service",
+                )
             {
-                info!("Incident already exists with key: {}", incident.incident.incident_key);
+                info!(
+                    "Incident already exists with key: {}",
+                    incident.incident.incident_key
+                );
                 Ok(())
             } else {
                 Err(anyhow!("Failed to create incident: {}", text))

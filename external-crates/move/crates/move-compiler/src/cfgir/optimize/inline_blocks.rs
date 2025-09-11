@@ -7,7 +7,7 @@ use move_proc_macros::growing_stack;
 use crate::{
     cfgir::{
         ast::remap_labels,
-        cfg::{MutForwardCFG, CFG},
+        cfg::{CFG, MutForwardCFG},
     },
     diagnostics::DiagnosticReporter,
     expansion::ast::Mutability,
@@ -47,7 +47,11 @@ fn find_single_target_labels(start: Label, blocks: &BasicBlocks) -> BTreeSet<Lab
     counts.insert(start, 1);
     for block in blocks.values() {
         match &block.back().unwrap().value {
-            C::JumpIf { cond: _cond, if_true, if_false } => {
+            C::JumpIf {
+                cond: _cond,
+                if_true,
+                if_false,
+            } => {
                 *counts.entry(*if_true).or_insert(0) += 1;
                 *counts.entry(*if_false).or_insert(0) += 1
             }
@@ -55,11 +59,19 @@ fn find_single_target_labels(start: Label, blocks: &BasicBlocks) -> BTreeSet<Lab
             _ => (),
         }
     }
-    counts.into_iter().filter(|(_, count)| *count == 1).map(|(lbl, _)| lbl).collect()
+    counts
+        .into_iter()
+        .filter(|(_, count)| *count == 1)
+        .map(|(lbl, _)| lbl)
+        .collect()
 }
 
 #[allow(clippy::needless_collect)]
-fn inline_single_target_blocks(single_jump_targets: &BTreeSet<Label>, start: Label, blocks: &mut BasicBlocks) -> bool {
+fn inline_single_target_blocks(
+    single_jump_targets: &BTreeSet<Label>,
+    start: Label,
+    blocks: &mut BasicBlocks,
+) -> bool {
     //cleanup of needless_collect would result in mut and non mut borrows, and compilation warning.
     let labels_vec = blocks.keys().cloned().collect::<Vec<_>>();
     let mut labels = labels_vec.into_iter();
@@ -114,7 +126,11 @@ fn inline_single_target_blocks(single_jump_targets: &BTreeSet<Label>, start: Lab
 ///
 /// After:
 ///   B: block_a; block_b
-fn remap_to_last_target(mut remapping: BTreeMap<Label, Label>, start: Label, blocks: &mut BasicBlocks) {
+fn remap_to_last_target(
+    mut remapping: BTreeMap<Label, Label>,
+    start: Label,
+    blocks: &mut BasicBlocks,
+) {
     // The start block can't be relabelled in the current CFG API.
     // But it does not need to be since it will always be the first block, thus it will not run
     // into issues in the bytecode verifier

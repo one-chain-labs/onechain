@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use camino::Utf8PathBuf;
-use std::{env, fs};
+use std::env;
+use std::fs;
 use telemetry_subscribers::TelemetryConfig;
 use tracing::{debug, info};
 
@@ -37,7 +38,11 @@ fn reload() {
         if entry.file_name().starts_with(log_file_prefix) {
             let logs = fs::read_to_string(entry.path()).unwrap();
 
-            assert!(logs.contains("Should be able to see this"), "logs: {}", logs);
+            assert!(
+                logs.contains("Should be able to see this"),
+                "logs: {}",
+                logs
+            );
             assert!(!logs.contains("This won't be captured"), "logs: {}", logs);
             assert!(logs.contains("Now you can see this!"), "logs: {}", logs);
 

@@ -33,7 +33,12 @@ pub trait Meter {
     fn add(&mut self, scope: Scope, units: u128) -> PartialVMResult<()>;
 
     /// Adds the number of items.
-    fn add_items(&mut self, scope: Scope, units_per_item: u128, items: usize) -> PartialVMResult<()> {
+    fn add_items(
+        &mut self,
+        scope: Scope,
+        units_per_item: u128,
+        items: usize,
+    ) -> PartialVMResult<()> {
         if items == 0 {
             return Ok(());
         }

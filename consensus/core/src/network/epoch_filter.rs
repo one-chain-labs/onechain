@@ -15,7 +15,9 @@ pub struct AllowedEpoch {
 
 impl AllowedEpoch {
     pub fn new(epoch: String) -> Self {
-        Self { allowed_epoch: epoch }
+        Self {
+            allowed_epoch: epoch,
+        }
     }
 }
 
@@ -23,17 +25,19 @@ impl AuthorizeRequest for AllowedEpoch {
     fn authorize(&self, request: &mut Request<Bytes>) -> Result<(), Response<Bytes>> {
         use anemo::types::response::{IntoResponse, StatusCode};
 
-        let epoch = request
-            .headers()
-            .get(EPOCH_HEADER_KEY)
-            .ok_or_else(|| Status::new_with_message(StatusCode::BadRequest, "missing epoch header").into_response())?;
+        let epoch = request.headers().get(EPOCH_HEADER_KEY).ok_or_else(|| {
+            Status::new_with_message(StatusCode::BadRequest, "missing epoch header").into_response()
+        })?;
 
         if self.allowed_epoch == *epoch {
             Ok(())
         } else {
             Err(Status::new_with_message(
                 StatusCode::BadRequest,
-                format!("request from epoch {:?} does not match current epoch {:?}", epoch, self.allowed_epoch),
+                format!(
+                    "request from epoch {:?} does not match current epoch {:?}",
+                    epoch, self.allowed_epoch
+                ),
             )
             .into_response())
         }
@@ -57,7 +61,13 @@ mod tests {
         let mut svc = ServiceBuilder::new().layer(auth_layer).service_fn(echo);
 
         // Unable to query requesters PeerId
-        let response = svc.ready().await.unwrap().call(Request::new(Bytes::from("foobar"))).await.unwrap();
+        let response = svc
+            .ready()
+            .await
+            .unwrap()
+            .call(Request::new(Bytes::from("foobar")))
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::BadRequest);
 
         // Previous Epoch Request

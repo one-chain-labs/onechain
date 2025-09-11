@@ -10,7 +10,7 @@
 //# publish
 module a::m {
 
-use one::dynamic_object_field::{add, borrow, borrow_mut, remove};
+use sui::dynamic_object_field::{add, borrow, borrow_mut, remove};
 
 public struct Obj has key, store {
     id: UID,
@@ -42,7 +42,7 @@ fun destroy(counter: Counter): u64 {
 
 entry fun create(ctx: &mut TxContext) {
     let id = object::new(ctx);
-    one::transfer::public_transfer(Obj { id }, ctx.sender())
+    sui::transfer::public_transfer(Obj { id }, ctx.sender())
 }
 
 entry fun add_counter(obj: &mut Obj, ctx: &mut TxContext) {

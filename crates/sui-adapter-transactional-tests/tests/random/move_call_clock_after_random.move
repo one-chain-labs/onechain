@@ -5,8 +5,8 @@
 
 //# publish --sender A
 module test::random {
-    use one::clock::Clock;
-    use one::random::Random;
+    use sui::clock::Clock;
+    use sui::random::Random;
 
     public fun use_clock(_clock: &Clock) {}
     public fun use_random(_random: &Random) {}

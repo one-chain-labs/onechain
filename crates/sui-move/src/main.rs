@@ -58,9 +58,16 @@ async fn main() {
     //         .init(),
     // };
 
-    let _guard =
-        telemetry_subscribers::TelemetryConfig::new().with_log_file(&format!("{bin_name}.log")).with_env().init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new()
+        .with_log_file(&format!("{bin_name}.log"))
+        .with_env()
+        .init();
     debug!("Sui-Move CLI version: {VERSION}");
 
-    exit_main!(execute_move_command(args.package_path.as_deref(), args.build_config, args.cmd));
+    exit_main!(execute_move_command(
+        args.package_path.as_deref(),
+        args.build_config,
+        args.cmd,
+        None,
+    ));
 }

@@ -10,7 +10,7 @@ use std::{
     fmt::Formatter,
 };
 
-use move_binary_format::{file_format::TypeParameterIndex, normalized::Type as MType};
+use move_binary_format::file_format::TypeParameterIndex;
 use move_core_types::language_storage::{StructTag, TypeTag};
 
 use crate::{
@@ -86,18 +86,18 @@ impl PrimitiveType {
     }
 
     /// Attempt to convert this type into a normalized::Type
-    pub fn into_normalized_type(self) -> Option<MType> {
+    pub fn into_type_tag(self) -> Option<TypeTag> {
         use PrimitiveType::*;
         Some(match self {
-            Bool => MType::Bool,
-            U8 => MType::U8,
-            U16 => MType::U16,
-            U32 => MType::U32,
-            U64 => MType::U64,
-            U128 => MType::U128,
-            U256 => MType::U256,
-            Address => MType::Address,
-            Signer => MType::Signer,
+            Bool => TypeTag::Bool,
+            U8 => TypeTag::U8,
+            U16 => TypeTag::U16,
+            U32 => TypeTag::U32,
+            U64 => TypeTag::U64,
+            U128 => TypeTag::U128,
+            U256 => TypeTag::U256,
+            Address => TypeTag::Address,
+            Signer => TypeTag::Signer,
             Num | Range | EventStore => return None,
         })
     }
@@ -186,10 +186,12 @@ impl Type {
             )
         )
     }
-
     /// Returns true if this is an address or signer type.
     pub fn is_signer_or_address(&self) -> bool {
-        matches!(self, Type::Primitive(PrimitiveType::Signer) | Type::Primitive(PrimitiveType::Address))
+        matches!(
+            self,
+            Type::Primitive(PrimitiveType::Signer) | Type::Primitive(PrimitiveType::Address)
+        )
     }
 
     /// Return true if this is an account address
@@ -213,7 +215,11 @@ impl Type {
             // references cannot be a type argument
             Type::Reference(..) => false,
             // spec types cannot be a type argument
-            Type::Fun(..) | Type::TypeDomain(..) | Type::ResourceDomain(..) | Type::Var(..) | Type::Error => false,
+            Type::Fun(..)
+            | Type::TypeDomain(..)
+            | Type::ResourceDomain(..)
+            | Type::Var(..)
+            | Type::Error => false,
         }
     }
 
@@ -305,9 +311,13 @@ impl Type {
                     self.clone()
                 }
             }
-            Type::Reference(is_mut, bt) => Type::Reference(*is_mut, Box::new(bt.replace(params, subs))),
+            Type::Reference(is_mut, bt) => {
+                Type::Reference(*is_mut, Box::new(bt.replace(params, subs)))
+            }
             Type::Datatype(mid, sid, args) => Type::Datatype(*mid, *sid, replace_vec(args)),
-            Type::Fun(args, result) => Type::Fun(replace_vec(args), Box::new(result.replace(params, subs))),
+            Type::Fun(args, result) => {
+                Type::Fun(replace_vec(args), Box::new(result.replace(params, subs)))
+            }
             Type::Tuple(args) => Type::Tuple(replace_vec(args)),
             Type::Vector(et) => Type::Vector(Box::new(et.replace(params, subs))),
             Type::TypeDomain(et) => Type::TypeDomain(Box::new(et.replace(params, subs))),
@@ -379,52 +389,38 @@ impl Type {
             _ => {}
         }
     }
-
-    /// Attempt to convert this type into a normalized::Type
-    pub fn into_datatype_ty(self, env: &GlobalEnv) -> Option<MType> {
-        use Type::*;
-        match self {
-            Datatype(mid, sid, ts) => env.get_datatype(mid, sid, &ts),
+    /// Attempt to convert this type into a language_storage::StructTag
+    pub fn into_struct_tag(self, env: &GlobalEnv) -> Option<StructTag> {
+        match self.into_type_tag(env)? {
+            TypeTag::Struct(tag) => Some(*tag),
             _ => None,
         }
     }
 
-    /// Attempt to convert this type into a normalized::Type
-    pub fn into_normalized_type(self, env: &GlobalEnv) -> Option<MType> {
-        use Type::*;
-        match self {
-            Primitive(p) => Some(p.into_normalized_type().expect("Invariant violation: unexpected spec primitive")),
-            Datatype(mid, sid, ts) => env.get_datatype(mid, sid, &ts),
-            Vector(et) => Some(MType::Vector(Box::new(
-                et.into_normalized_type(env)
-                    .expect("Invariant violation: vector type argument contains incomplete, tuple, or spec type"),
-            ))),
-            Reference(r, t) => {
-                if r {
-                    Some(MType::MutableReference(Box::new(
-                        t.into_normalized_type(env)
-                            .expect("Invariant violation: reference type contains incomplete, tuple, or spec type"),
-                    )))
-                } else {
-                    Some(MType::Reference(Box::new(
-                        t.into_normalized_type(env)
-                            .expect("Invariant violation: reference type contains incomplete, tuple, or spec type"),
-                    )))
-                }
-            }
-            TypeParameter(idx) => Some(MType::TypeParameter(idx)),
-            Tuple(..) | Error | Fun(..) | TypeDomain(..) | ResourceDomain(..) | Var(..) => None,
-        }
-    }
-
-    /// Attempt to convert this type into a language_storage::StructTag
-    pub fn into_struct_tag(self, env: &GlobalEnv) -> Option<StructTag> {
-        self.into_datatype_ty(env)?.into_struct_tag()
-    }
-
     /// Attempt to convert this type into a language_storage::TypeTag
     pub fn into_type_tag(self, env: &GlobalEnv) -> Option<TypeTag> {
-        self.into_normalized_type(env)?.into_type_tag()
+        use Type::*;
+        match self {
+            Primitive(p) => Some(
+                p.into_type_tag()
+                    .expect("Invariant violation: unexpected spec primitive"),
+            ),
+            Datatype(mid, sid, ts) => Some(TypeTag::Struct(Box::new(
+                env.get_struct_tag(mid, sid, &ts)?,
+            ))),
+            Vector(et) => Some(TypeTag::Vector(Box::new(et.into_type_tag(env).expect(
+                "Invariant violation: vector type argument contains \
+                     incomplete, tuple, or spec type",
+            )))),
+            TypeParameter(_)
+            | Reference(_, _)
+            | Tuple(..)
+            | Error
+            | Fun(..)
+            | TypeDomain(..)
+            | ResourceDomain(..)
+            | Var(..) => None,
+        }
     }
 
     /// Create a `Type` from `t`
@@ -441,10 +437,14 @@ impl Type {
             TypeTag::Address => Primitive(PrimitiveType::Address),
             TypeTag::Signer => Primitive(PrimitiveType::Signer),
             TypeTag::Struct(s) => {
-                let qid = env
-                    .find_datatype_by_tag(s)
-                    .unwrap_or_else(|| panic!("Invariant violation: couldn't resolve datatype {:?}", s));
-                let type_args = s.type_params.iter().map(|arg| Self::from_type_tag(arg, env)).collect();
+                let qid = env.find_datatype_by_tag(s).unwrap_or_else(|| {
+                    panic!("Invariant violation: couldn't resolve datatype {:?}", s)
+                });
+                let type_args = s
+                    .type_params
+                    .iter()
+                    .map(|arg| Self::from_type_tag(arg, env))
+                    .collect();
                 Datatype(qid.module_id, qid.id, type_args)
             }
             TypeTag::Vector(type_param) => Vector(Box::new(Self::from_type_tag(type_param, env))),
@@ -513,7 +513,9 @@ pub enum Variance {
 impl Substitution {
     /// Creates a new substitution.
     pub fn new() -> Self {
-        Self { subs: BTreeMap::new() }
+        Self {
+            subs: BTreeMap::new(),
+        }
     }
 
     /// Binds the type variables.
@@ -560,7 +562,12 @@ impl Substitution {
     /// unification. If unification fails, the substitution will be in some intermediate state;
     /// to implement transactional unification, the substitution must be cloned before calling
     /// this.
-    pub fn unify(&mut self, variance: Variance, t1: &Type, t2: &Type) -> Result<Type, TypeUnificationError> {
+    pub fn unify(
+        &mut self,
+        variance: Variance,
+        t1: &Type,
+        t2: &Type,
+    ) -> Result<Type, TypeUnificationError> {
         // Derive the variance level for recursion
         let sub_variance = match variance {
             Variance::Allow => Variance::Allow,
@@ -570,11 +577,21 @@ impl Substitution {
         // it is put back since we need to maintain this information for later phases.
         if let Type::Reference(is_mut, bt1) = t1 {
             // Avoid creating nested references.
-            let t2 = if let Type::Reference(_, bt2) = t2 { bt2.as_ref() } else { t2 };
-            return Ok(Type::Reference(*is_mut, Box::new(self.unify(sub_variance, bt1.as_ref(), t2)?)));
+            let t2 = if let Type::Reference(_, bt2) = t2 {
+                bt2.as_ref()
+            } else {
+                t2
+            };
+            return Ok(Type::Reference(
+                *is_mut,
+                Box::new(self.unify(sub_variance, bt1.as_ref(), t2)?),
+            ));
         }
         if let Type::Reference(is_mut, bt2) = t2 {
-            return Ok(Type::Reference(*is_mut, Box::new(self.unify(sub_variance, t1, bt2.as_ref())?)));
+            return Ok(Type::Reference(
+                *is_mut,
+                Box::new(self.unify(sub_variance, t1, bt2.as_ref())?),
+            ));
         }
 
         // Substitute or assign variables.
@@ -600,7 +617,10 @@ impl Substitution {
                     return Ok(t1.clone());
                 }
                 // All integer types are compatible if co-variance is allowed.
-                if matches!(variance, Variance::Allow | Variance::Shallow) && t1.is_number() && t2.is_number() {
+                if matches!(variance, Variance::Allow | Variance::Shallow)
+                    && t1.is_number()
+                    && t2.is_number()
+                {
                     return Ok(Type::Primitive(PrimitiveType::Num));
                 }
             }
@@ -610,7 +630,12 @@ impl Substitution {
                 }
             }
             (Type::Tuple(ts1), Type::Tuple(ts2)) => {
-                return Ok(Type::Tuple(self.unify_vec(sub_variance, ts1, ts2, "tuples")?));
+                return Ok(Type::Tuple(self.unify_vec(
+                    sub_variance,
+                    ts1,
+                    ts2,
+                    "tuples",
+                )?));
             }
             (Type::Fun(ts1, r1), Type::Fun(ts2, r2)) => {
                 return Ok(Type::Fun(
@@ -620,18 +645,29 @@ impl Substitution {
             }
             (Type::Datatype(m1, s1, ts1), Type::Datatype(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
-                    return Ok(Type::Datatype(*m1, *s1, self.unify_vec(sub_variance, ts1, ts2, "structs")?));
+                    return Ok(Type::Datatype(
+                        *m1,
+                        *s1,
+                        self.unify_vec(sub_variance, ts1, ts2, "structs")?,
+                    ));
                 }
             }
             (Type::Vector(e1), Type::Vector(e2)) => {
                 return Ok(Type::Vector(Box::new(self.unify(sub_variance, e1, e2)?)));
             }
             (Type::TypeDomain(e1), Type::TypeDomain(e2)) => {
-                return Ok(Type::TypeDomain(Box::new(self.unify(sub_variance, e1, e2)?)));
+                return Ok(Type::TypeDomain(Box::new(self.unify(
+                    sub_variance,
+                    e1,
+                    e2,
+                )?)));
             }
             _ => {}
         }
-        Err(TypeUnificationError::TypeMismatch(self.specialize(t1), self.specialize(t2)))
+        Err(TypeUnificationError::TypeMismatch(
+            self.specialize(t1),
+            self.specialize(t2),
+        ))
     }
 
     /// Helper to unify two type vectors.
@@ -643,7 +679,11 @@ impl Substitution {
         item_name: &str,
     ) -> Result<Vec<Type>, TypeUnificationError> {
         if ts1.len() != ts2.len() {
-            return Err(TypeUnificationError::ArityMismatch(item_name.to_owned(), ts1.len(), ts2.len()));
+            return Err(TypeUnificationError::ArityMismatch(
+                item_name.to_owned(),
+                ts1.len(),
+                ts2.len(),
+            ));
         }
         let mut rs = vec![];
         for i in 0..ts1.len() {
@@ -689,7 +729,10 @@ impl Substitution {
             } else {
                 // It is not clear to me whether this can ever occur given we do no global
                 // unification with recursion, but to be on the save side, we have it.
-                Err(TypeUnificationError::CyclicSubstitution(self.specialize(t1), self.specialize(t2)))
+                Err(TypeUnificationError::CyclicSubstitution(
+                    self.specialize(t1),
+                    self.specialize(t2),
+                ))
             }
         } else {
             Ok(None)
@@ -739,7 +782,8 @@ impl TypeUnificationAdapter {
         I: Iterator<Item = &'a Type> + Clone,
     {
         debug_assert!(
-            treat_lhs_type_param_as_var_after_index.is_some() || treat_rhs_type_param_as_var_after_index.is_some(),
+            treat_lhs_type_param_as_var_after_index.is_some()
+                || treat_rhs_type_param_as_var_after_index.is_some(),
             "At least one side of the unification must be treated as variable"
         );
 
@@ -800,7 +844,11 @@ impl TypeUnificationAdapter {
         let types_adapted_lhs = lhs_types.map(|t| t.instantiate(&lhs_inst)).collect();
         let types_adapted_rhs = rhs_types.map(|t| t.instantiate(&rhs_inst)).collect();
 
-        Self { type_vars_map, types_adapted_lhs, types_adapted_rhs }
+        Self {
+            type_vars_map,
+            types_adapted_lhs,
+            types_adapted_rhs,
+        }
     }
 
     /// Create a TypeUnificationAdapter with the goal of unifying a pair of types.
@@ -842,9 +890,18 @@ impl TypeUnificationAdapter {
     /// Consume the TypeUnificationAdapter and produce the unification result. If type unification
     /// is successful, return a pair of instantiations for type parameters on each side which
     /// unify the LHS and RHS respectively. If the LHS and RHS cannot unify, None is returned.
-    pub fn unify(self, variance: Variance, shallow_subst: bool) -> Option<(BTreeMap<u16, Type>, BTreeMap<u16, Type>)> {
+    pub fn unify(
+        self,
+        variance: Variance,
+        shallow_subst: bool,
+    ) -> Option<(BTreeMap<u16, Type>, BTreeMap<u16, Type>)> {
         let mut subst = Substitution::new();
-        match subst.unify_vec(variance, &self.types_adapted_lhs, &self.types_adapted_rhs, "") {
+        match subst.unify_vec(
+            variance,
+            &self.types_adapted_lhs,
+            &self.types_adapted_rhs,
+            "",
+        ) {
             Ok(_) => {
                 let mut inst_lhs = BTreeMap::new();
                 let mut inst_rhs = BTreeMap::new();
@@ -867,7 +924,11 @@ impl TypeUnificationAdapter {
                         }
                         Some(subst_ty) => subst_ty.clone(),
                     };
-                    let inst = if *is_lhs { &mut inst_lhs } else { &mut inst_rhs };
+                    let inst = if *is_lhs {
+                        &mut inst_lhs
+                    } else {
+                        &mut inst_rhs
+                    };
                     inst.insert(*param_idx, subst_ty);
                 }
 
@@ -882,7 +943,11 @@ impl TypeUnificationError {
     pub fn message(&self, display_context: &TypeDisplayContext) -> String {
         match self {
             TypeUnificationError::TypeMismatch(t1, t2) => {
-                format!("expected `{}` but found `{}`", t2.display(display_context), t1.display(display_context),)
+                format!(
+                    "expected `{}` but found `{}`",
+                    t2.display(display_context),
+                    t1.display(display_context),
+                )
             }
             TypeUnificationError::ArityMismatch(item, a1, a2) => {
                 format!("{} have different arity ({} != {})", item, a1, a2)
@@ -995,8 +1060,9 @@ impl TypeInstantiationDerivation {
     where
         I: Iterator<Item = &'a Type> + Clone,
     {
-        let initial_param_insts: Vec<_> =
-            (0..params_arity).map(|idx| Type::TypeParameter(idx as TypeParameterIndex)).collect();
+        let initial_param_insts: Vec<_> = (0..params_arity)
+            .map(|idx| Type::TypeParameter(idx as TypeParameterIndex))
+            .collect();
 
         let mut work_queue = VecDeque::new();
         work_queue.push_back(initial_param_insts);
@@ -1006,11 +1072,23 @@ impl TypeInstantiationDerivation {
                 // refine the memory usage sets with current param instantiations
                 let refined_lhs = lhs_types
                     .clone()
-                    .map(|t| if refine_lhs { t.instantiate(&param_insts) } else { t.clone() })
+                    .map(|t| {
+                        if refine_lhs {
+                            t.instantiate(&param_insts)
+                        } else {
+                            t.clone()
+                        }
+                    })
                     .collect();
                 let refined_rhs = rhs_types
                     .clone()
-                    .map(|t| if refine_rhs { t.instantiate(&param_insts) } else { t.clone() })
+                    .map(|t| {
+                        if refine_rhs {
+                            t.instantiate(&param_insts)
+                        } else {
+                            t.clone()
+                        }
+                    })
                     .collect();
 
                 // find type instantiations for the target parameter index
@@ -1060,7 +1138,7 @@ pub enum TypeDisplayContext<'a> {
     },
 }
 
-impl<'a> TypeDisplayContext<'a> {
+impl TypeDisplayContext<'_> {
     pub fn symbol_pool(&self) -> &SymbolPool {
         match self {
             TypeDisplayContext::WithEnv { env, .. } => env.symbol_pool(),
@@ -1077,11 +1155,14 @@ pub struct TypeDisplay<'a> {
 
 impl Type {
     pub fn display<'a>(&'a self, context: &'a TypeDisplayContext<'a>) -> TypeDisplay<'a> {
-        TypeDisplay { type_: self, context }
+        TypeDisplay {
+            type_: self,
+            context,
+        }
     }
 }
 
-impl<'a> fmt::Display for TypeDisplay<'a> {
+impl fmt::Display for TypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Type::*;
         let comma_list = |f: &mut Formatter<'_>, ts: &[Type]| -> fmt::Result {
@@ -1137,7 +1218,11 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 write!(f, "{}", t.display(self.context))
             }
             TypeParameter(idx) => {
-                if let TypeDisplayContext::WithEnv { env, type_param_names: Some(names) } = self.context {
+                if let TypeDisplayContext::WithEnv {
+                    env,
+                    type_param_names: Some(names),
+                } = self.context
+                {
                     let idx = *idx as usize;
                     if idx < names.len() {
                         write!(f, "{}", names[idx].display(env.symbol_pool()))
@@ -1154,10 +1239,13 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
     }
 }
 
-impl<'a> TypeDisplay<'a> {
+impl TypeDisplay<'_> {
     fn datatype_str(&self, mid: ModuleId, sid: DatatypeId) -> String {
         match self.context {
-            TypeDisplayContext::WithoutEnv { symbol_pool, reverse_datatype_table: reverse_struct_table } => {
+            TypeDisplayContext::WithoutEnv {
+                symbol_pool,
+                reverse_datatype_table: reverse_struct_table,
+            } => {
                 if let Some(sym) = reverse_struct_table.get(&(mid, sid)) {
                     sym.display(symbol_pool).to_string()
                 } else {

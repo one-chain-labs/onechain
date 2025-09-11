@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::format_module_id;
-use colored::{control, Colorize};
+use colored::{Colorize, control};
 use move_binary_format::errors::{ExecutionState, Location, VMError};
 use move_command_line_common::error_bitset::ErrorBitset;
 use move_compiler::{
@@ -54,7 +54,7 @@ pub struct TestFailure {
 pub struct TestRunInfo {
     pub elapsed_time: Duration,
     pub instructions_executed: u64,
-    pub trace: Option<MoveTrace>,
+    pub trace: Option<Vec<u8>>,
 }
 
 type TestRuns<T> = BTreeMap<String, Vec<T>>;
@@ -71,24 +71,32 @@ pub struct TestResults {
     test_plan: TestPlan,
 }
 
-fn write_string_to_file(filepath: &str, content: &str) -> std::io::Result<()> {
+fn write_bytes_to_file(filepath: &str, content: &[u8]) -> std::io::Result<()> {
     let path = Path::new(filepath);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let mut file = std::fs::File::create(path)?;
-    file.write_all(content.as_bytes())?;
+    file.write_all(content)?;
     Ok(())
 }
 
 impl TestRunInfo {
-    pub fn new(elapsed_time: Duration, instructions_executed: u64, trace: Option<MoveTrace>) -> Self {
-        Self { elapsed_time, instructions_executed, trace }
+    pub fn new(
+        elapsed_time: Duration,
+        instructions_executed: u64,
+        trace: Option<MoveTrace>,
+    ) -> Self {
+        Self {
+            elapsed_time,
+            instructions_executed,
+            trace: trace.map(|t| t.into_compressed_json_bytes()),
+        }
     }
 
     pub fn save_trace(&self, path: &str) -> Result<()> {
         if let Some(trace) = &self.trace {
-            write_string_to_file(path, &format!("{}", trace.to_json()))
+            write_bytes_to_file(path, trace)
         } else {
             Ok(())
         }
@@ -101,11 +109,19 @@ impl FailureReason {
     }
 
     pub fn wrong_error(expected: MoveError, actual: MoveError) -> Self {
-        FailureReason::WrongError("Test did not error as expected".to_string(), expected, actual)
+        FailureReason::WrongError(
+            "Test did not error as expected".to_string(),
+            expected,
+            actual,
+        )
     }
 
     pub fn wrong_abort_deprecated(expected: MoveErrorType, actual: MoveError) -> Self {
-        FailureReason::WrongAbortDEPRECATED("Test did not abort with expected code".to_string(), expected, actual)
+        FailureReason::WrongAbortDEPRECATED(
+            "Test did not abort with expected code".to_string(),
+            expected,
+            actual,
+        )
     }
 
     pub fn unexpected_error(error: MoveError) -> Self {
@@ -138,7 +154,9 @@ fn clever_error_line_number_to_loc(test_plan: &TestPlan, vm_error: &VMError) -> 
         Location::Module(module_id) => {
             let source_map = &test_plan.module_info.get(module_id)?.source_map;
             let file_hash = source_map.definition_location.file_hash();
-            let loc = test_plan.mapped_files.line_to_loc_opt(&file_hash, line_number as usize)?;
+            let loc = test_plan
+                .mapped_files
+                .line_to_loc_opt(&file_hash, line_number as usize)?;
             test_plan.mapped_files.trimmed_loc_opt(&loc)
         }
     }
@@ -151,7 +169,12 @@ impl TestFailure {
         vm_error: Option<VMError>,
         prng_seed: Option<u64>,
     ) -> Self {
-        Self { test_run_info, vm_error, failure_reason, prng_seed }
+        Self {
+            test_run_info,
+            vm_error,
+            failure_reason,
+            prng_seed,
+        }
     }
 
     pub fn render_error(&self, test_plan: &TestPlan) -> String {
@@ -161,7 +184,9 @@ impl TestFailure {
             FailureReason::WrongError(message, expected, actual) => {
                 let base_message = format!(
                     "{message}. Expected test {} but instead it {} rooted here",
-                    expected.with_context(&test_plan.module_info).present_tense(),
+                    expected
+                        .with_context(&test_plan.module_info)
+                        .present_tense(),
                     actual.with_context(&test_plan.module_info).past_tense(),
                 );
                 Self::report_error_with_location(test_plan, base_message, &self.vm_error)
@@ -179,9 +204,15 @@ impl TestFailure {
             FailureReason::UnexpectedError(message, error) => {
                 let prefix = match error.0.status_type() {
                     StatusType::Validation => "INTERNAL TEST ERROR: Unexpected Validation Error\n",
-                    StatusType::Verification => "INTERNAL TEST ERROR: Unexpected Verification Error\n",
-                    StatusType::InvariantViolation => "INTERNAL TEST ERROR: INTERNAL VM INVARIANT VIOLATION.\n",
-                    StatusType::Deserialization => "INTERNAL TEST ERROR: Unexpected Deserialization Error\n",
+                    StatusType::Verification => {
+                        "INTERNAL TEST ERROR: Unexpected Verification Error\n"
+                    }
+                    StatusType::InvariantViolation => {
+                        "INTERNAL TEST ERROR: INTERNAL VM INVARIANT VIOLATION.\n"
+                    }
+                    StatusType::Deserialization => {
+                        "INTERNAL TEST ERROR: Unexpected Deserialization Error\n"
+                    }
                     StatusType::Unknown => "INTERNAL TEST ERROR: UNKNOWN ERROR.\n",
                     // execution errors are expected, so no message
                     StatusType::Execution => "",
@@ -209,10 +240,11 @@ impl TestFailure {
                     Some(v) => v,
                     None => return "\tmalformed stack trace (no module)".to_string(),
                 };
-                let function_source_map = match named_module.source_map.get_function_source_map(frame.1) {
-                    Ok(v) => v,
-                    Err(_) => return "\tmalformed stack trace (no source map)".to_string(),
-                };
+                let function_source_map =
+                    match named_module.source_map.get_function_source_map(frame.1) {
+                        Ok(v) => v,
+                        Err(_) => return "\tmalformed stack trace (no source map)".to_string(),
+                    };
                 // unwrap here is a mirror of the same unwrap in report_error_with_location
                 let loc = function_source_map.get_code_location(frame.2).unwrap();
                 let fn_handle_idx = named_module.module.function_def_at(frame.1).function;
@@ -231,14 +263,25 @@ impl TestFailure {
                     }
                 };
                 buf.push_str(
-                    &format!("\t{}::{}({}:{})\n", module_id.name(), fn_name, file_name, formatted_line).to_string(),
+                    &format!(
+                        "\t{}::{}({}:{})\n",
+                        module_id.name(),
+                        fn_name,
+                        file_name,
+                        formatted_line
+                    )
+                    .to_string(),
                 );
             }
         }
         buf
     }
 
-    fn report_error_with_location(test_plan: &TestPlan, base_message: String, vm_error: &Option<VMError>) -> String {
+    fn report_error_with_location(
+        test_plan: &TestPlan,
+        base_message: String,
+        vm_error: &Option<VMError>,
+    ) -> String {
         let report_diagnostics = |mapped_files, diags| {
             diagnostics::report_diagnostics_to_buffer_with_mapped_files(
                 mapped_files,
@@ -255,17 +298,26 @@ impl TestFailure {
         let diags = match vm_error.location() {
             Location::Module(module_id) => {
                 let diag_opt = vm_error.offsets().first().and_then(|(fdef_idx, offset)| {
-                    let function_source_map =
-                        test_plan.module_info.get(module_id)?.source_map.get_function_source_map(*fdef_idx).ok()?;
+                    let function_source_map = test_plan
+                        .module_info
+                        .get(module_id)?
+                        .source_map
+                        .get_function_source_map(*fdef_idx)
+                        .ok()?;
                     let loc = function_source_map.get_code_location(*offset).unwrap();
 
-                    let alternate_location_opt = clever_error_line_number_to_loc(test_plan, vm_error);
-                    let loc = if alternate_location_opt.is_some_and(|alt_loc| !loc.overlaps(&alt_loc)) {
-                        alternate_location_opt.unwrap()
-                    } else {
-                        loc
-                    };
-                    let msg = format!("In this function in {}", format_module_id(&test_plan.module_info, module_id));
+                    let alternate_location_opt =
+                        clever_error_line_number_to_loc(test_plan, vm_error);
+                    let loc =
+                        if alternate_location_opt.is_some_and(|alt_loc| !loc.overlaps(&alt_loc)) {
+                            alternate_location_opt.unwrap()
+                        } else {
+                            loc
+                        };
+                    let msg = format!(
+                        "In this function in {}",
+                        format_module_id(&test_plan.module_info, module_id)
+                    );
                     // TODO(tzakian) maybe migrate off of move-langs diagnostics?
                     Some(Diagnostic::new(
                         diagnostics::codes::Tests::TestFailed,
@@ -276,10 +328,11 @@ impl TestFailure {
                 });
                 match diag_opt {
                     None => base_message,
-                    Some(diag) => {
-                        String::from_utf8(report_diagnostics(&test_plan.mapped_files, Diagnostics::from(vec![diag])))
-                            .unwrap()
-                    }
+                    Some(diag) => String::from_utf8(report_diagnostics(
+                        &test_plan.mapped_files,
+                        Diagnostics::from(vec![diag]),
+                    ))
+                    .unwrap(),
                 }
             }
             _ => base_message,
@@ -307,16 +360,39 @@ impl Default for TestStatistics {
 
 impl TestStatistics {
     pub fn new() -> Self {
-        Self { passed: BTreeMap::new(), failed: BTreeMap::new() }
+        Self {
+            passed: BTreeMap::new(),
+            failed: BTreeMap::new(),
+        }
     }
 
-    pub fn test_failure(&mut self, test_name: String, test_failure: TestFailure, test_plan: &ModuleTestPlan) -> bool {
-        self.failed.entry(test_plan.module_id.clone()).or_default().entry(test_name).or_default().push(test_failure);
+    pub fn test_failure(
+        &mut self,
+        test_name: String,
+        test_failure: TestFailure,
+        test_plan: &ModuleTestPlan,
+    ) -> bool {
+        self.failed
+            .entry(test_plan.module_id.clone())
+            .or_default()
+            .entry(test_name)
+            .or_default()
+            .push(test_failure);
         false
     }
 
-    pub fn test_success(&mut self, test_name: String, test_info: TestRunInfo, test_plan: &ModuleTestPlan) -> bool {
-        self.passed.entry(test_plan.module_id.clone()).or_default().entry(test_name).or_default().push(test_info);
+    pub fn test_success(
+        &mut self,
+        test_name: String,
+        test_info: TestRunInfo,
+        test_plan: &ModuleTestPlan,
+    ) -> bool {
+        self.passed
+            .entry(test_plan.module_id.clone())
+            .or_default()
+            .entry(test_name)
+            .or_default()
+            .push(test_info);
         true
     }
 
@@ -324,7 +400,10 @@ impl TestStatistics {
         for (module_id, test_result) in other.passed {
             let entry = self.passed.entry(module_id).or_default();
             for (function_ident, test_run_info) in test_result {
-                entry.entry(function_ident).or_default().extend(test_run_info);
+                entry
+                    .entry(function_ident)
+                    .or_default()
+                    .extend(test_run_info);
             }
         }
         for (module_id, test_result) in other.failed {
@@ -335,27 +414,42 @@ impl TestStatistics {
     }
 }
 
-fn calculate_run_statistics<'a, I: IntoIterator<Item = &'a TestRunInfo>>(test_results: I) -> (Duration, u64) {
-    test_results.into_iter().fold((Duration::new(0, 0), 0), |(mut acc_time, mut acc_instrs), test_run_info| {
-        acc_time += test_run_info.elapsed_time;
-        acc_instrs += test_run_info.instructions_executed;
-        (acc_time, acc_instrs)
-    })
+fn calculate_run_statistics<'a, I: IntoIterator<Item = &'a TestRunInfo>>(
+    test_results: I,
+) -> (Duration, u64) {
+    test_results.into_iter().fold(
+        (Duration::new(0, 0), 0),
+        |(mut acc_time, mut acc_instrs), test_run_info| {
+            acc_time += test_run_info.elapsed_time;
+            acc_instrs += test_run_info.instructions_executed;
+            (acc_time, acc_instrs)
+        },
+    )
 }
 
 impl TestResults {
     pub fn new(final_statistics: TestStatistics, test_plan: TestPlan) -> Self {
-        Self { final_statistics, test_plan }
+        Self {
+            final_statistics,
+            test_plan,
+        }
     }
 
-    pub fn report_statistics<W: Write>(&self, writer: &Mutex<W>, report_format: &Option<String>) -> Result<()> {
+    pub fn report_statistics<W: Write>(
+        &self,
+        writer: &Mutex<W>,
+        report_format: &Option<String>,
+    ) -> Result<()> {
         if let Some(report_type) = report_format {
             if report_type == "csv" {
                 writeln!(writer.lock().unwrap(), "name,nanos,gas")?;
                 for (module_id, test_results) in self.final_statistics.passed.iter() {
                     for (function_name, test_results) in test_results {
-                        let qualified_function_name =
-                            format!("{}::{}", format_module_id(&self.test_plan.module_info, module_id), function_name,);
+                        let qualified_function_name = format!(
+                            "{}::{}",
+                            format_module_id(&self.test_plan.module_info, module_id),
+                            function_name,
+                        );
                         let (time, instrs_executed) = calculate_run_statistics(test_results);
                         writeln!(
                             writer.lock().unwrap(),
@@ -384,10 +478,14 @@ impl TestResults {
 
         for (module_id, test_results) in self.final_statistics.passed.iter() {
             for (function_name, test_results) in test_results {
-                let qualified_function_name =
-                    format!("{}::{}", format_module_id(&self.test_plan.module_info, module_id), function_name,);
+                let qualified_function_name = format!(
+                    "{}::{}",
+                    format_module_id(&self.test_plan.module_info, module_id),
+                    function_name,
+                );
                 passed_fns.insert(qualified_function_name.clone());
-                max_function_name_size = std::cmp::max(max_function_name_size, qualified_function_name.len());
+                max_function_name_size =
+                    std::cmp::max(max_function_name_size, qualified_function_name.len());
                 let (time, instrs_executed) = calculate_run_statistics(test_results);
                 stats.push((qualified_function_name, time.as_secs_f32(), instrs_executed))
             }
@@ -395,16 +493,26 @@ impl TestResults {
 
         for (module_id, test_failures) in self.final_statistics.failed.iter() {
             for (function_name, test_failure) in test_failures {
-                let qualified_function_name =
-                    format!("{}::{}", format_module_id(&self.test_plan.module_info, module_id), function_name);
+                let qualified_function_name = format!(
+                    "{}::{}",
+                    format_module_id(&self.test_plan.module_info, module_id),
+                    function_name
+                );
                 // If the test is a #[random_test] some of the tests may have passed, and others
                 // failed. We want to mark the any results in the statistics where there is both
                 // successful and failed runs as "failure run" to indicate that these stats are for
                 // the case where the test failed.
-                let also_passed_modifier = if passed_fns.contains(&qualified_function_name) { " (failure)" } else { "" };
-                let qualified_function_name = format!("{qualified_function_name}{also_passed_modifier}");
-                max_function_name_size = std::cmp::max(max_function_name_size, qualified_function_name.len());
-                let (time, instrs_executed) = calculate_run_statistics(test_failure.iter().map(|f| &f.test_run_info));
+                let also_passed_modifier = if passed_fns.contains(&qualified_function_name) {
+                    " (failure)"
+                } else {
+                    ""
+                };
+                let qualified_function_name =
+                    format!("{qualified_function_name}{also_passed_modifier}");
+                max_function_name_size =
+                    std::cmp::max(max_function_name_size, qualified_function_name.len());
+                let (time, instrs_executed) =
+                    calculate_run_statistics(test_failure.iter().map(|f| &f.test_run_info));
                 stats.push((qualified_function_name, time.as_secs_f32(), instrs_executed));
             }
         }
@@ -461,8 +569,16 @@ impl TestResults {
 
     /// Returns `true` if all tests passed, `false` if there was a test failure/timeout
     pub fn summarize<W: Write>(self, writer: &Mutex<W>) -> Result<bool> {
-        let num_failed_tests = self.final_statistics.failed.iter().fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
-        let num_passed_tests = self.final_statistics.passed.iter().fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
+        let num_failed_tests = self
+            .final_statistics
+            .failed
+            .iter()
+            .fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
+        let num_passed_tests = self
+            .final_statistics
+            .passed
+            .iter()
+            .fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
         if !self.final_statistics.failed.is_empty() {
             writeln!(writer.lock().unwrap(), "\nTest failures:\n")?;
             for (module_id, test_failures) in &self.final_statistics.failed {
@@ -486,7 +602,9 @@ impl TestResults {
                         writeln!(
                             writer.lock().unwrap(),
                             "│ {}",
-                            test_failure.render_error(&self.test_plan).replace('\n', "\n│ ")
+                            test_failure
+                                .render_error(&self.test_plan)
+                                .replace('\n', "\n│ ")
                         )?;
                         if let Some(seed) = test_failure.prng_seed {
                             writeln!(writer.lock().unwrap(),
@@ -509,7 +627,11 @@ impl TestResults {
         writeln!(
             writer.lock().unwrap(),
             "Test result: {}. Total tests: {}; passed: {}; failed: {}",
-            if num_failed_tests == 0 { "OK".bold().bright_green() } else { "FAILED".bold().bright_red() },
+            if num_failed_tests == 0 {
+                "OK".bold().bright_green()
+            } else {
+                "FAILED".bold().bright_red()
+            },
             num_passed_tests + num_failed_tests,
             num_passed_tests,
             num_failed_tests

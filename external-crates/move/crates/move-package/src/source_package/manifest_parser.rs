@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{package_hooks, source_package::parsed_manifest as PM};
-use anyhow::{anyhow, bail, format_err, Context, Result};
+use anyhow::{Context, Result, anyhow, bail, format_err};
 use move_compiler::editions::{Edition, Flavor};
 use move_core_types::account_address::{AccountAddress, AccountAddressParseError};
 use move_symbol_pool::symbol::Symbol;
@@ -41,8 +41,8 @@ const REQUIRED_FIELDS: &[&str] = &[PACKAGE_NAME];
 
 pub fn parse_move_manifest_from_file(path: &Path) -> Result<PM::SourceManifest> {
     let toml_path = resolve_move_manifest_path(path);
-    let file_contents =
-        std::fs::read_to_string(toml_path).with_context(|| format!("Unable to find package manifest at {:?}", path))?;
+    let file_contents = std::fs::read_to_string(toml_path)
+        .with_context(|| format!("Unable to find package manifest at {:?}", path))?;
     parse_source_manifest(parse_move_manifest_string(file_contents)?)
 }
 
@@ -61,7 +61,8 @@ pub fn parse_move_manifest_string(manifest_string: String) -> Result<TV> {
 pub fn parse_source_manifest(tval: TV) -> Result<PM::SourceManifest> {
     match tval {
         TV::Table(mut table) => {
-            check_for_required_field_names(&table, REQUIRED_FIELDS).context("Error parsing package manifest")?;
+            check_for_required_field_names(&table, REQUIRED_FIELDS)
+                .context("Error parsing package manifest")?;
             warn_if_unknown_field_names(&table, KNOWN_NAMES);
             let addresses = table
                 .remove(ADDRESSES_NAME)
@@ -96,10 +97,21 @@ pub fn parse_source_manifest(tval: TV) -> Result<PM::SourceManifest> {
                 .transpose()
                 .context("Error parsing '[dev-dependencies]' section of manifest")?
                 .unwrap_or_default();
-            Ok(PM::SourceManifest { package, addresses, dev_address_assignments, build, dependencies, dev_dependencies })
+            Ok(PM::SourceManifest {
+                package,
+                addresses,
+                dev_address_assignments,
+                build,
+                dependencies,
+                dev_dependencies,
+            })
         }
         x => {
-            bail!("Malformed package manifest {}. Expected a table at top level, but encountered a {}", x, x.type_str())
+            bail!(
+                "Malformed package manifest {}. Expected a table at top level, but encountered a {}",
+                x,
+                x.type_str()
+            )
         }
     }
 }
@@ -116,25 +128,32 @@ pub fn parse_package_info(tval: TV) -> Result<PM::PackageInfo> {
                 .chain(hook_names.iter().map(|s| s.as_str()))
                 .collect::<Vec<_>>();
             warn_if_unknown_field_names(&table, known_names.as_slice());
-            let name =
-                table.remove("name").ok_or_else(|| format_err!("'name' is a required field but was not found",))?;
-            let name = name.as_str().ok_or_else(|| format_err!("Package name must be a string"))?;
+            let name = table
+                .remove("name")
+                .ok_or_else(|| format_err!("'name' is a required field but was not found",))?;
+            let name = name
+                .as_str()
+                .ok_or_else(|| format_err!("Package name must be a string"))?;
             let name = PM::PackageName::from(name);
             let license = table.remove("license").map(|x| Symbol::from(x.to_string()));
             let authors = match table.remove("authors") {
                 None => Vec::new(),
                 Some(arr) => {
-                    let unparsed_vec = arr.as_array().ok_or_else(|| format_err!("Invalid author(s) list"))?;
+                    let unparsed_vec = arr
+                        .as_array()
+                        .ok_or_else(|| format_err!("Invalid author(s) list"))?;
                     unparsed_vec
                         .iter()
                         .map(|tval| {
-                            tval.as_str().map(|x| Symbol::from(x.to_string())).ok_or_else(|| {
-                                format_err!(
-                                    "Invalid author '{}' of type {} found. Expected a string.",
-                                    tval.to_string(),
-                                    tval.type_str()
-                                )
-                            })
+                            tval.as_str()
+                                .map(|x| Symbol::from(x.to_string()))
+                                .ok_or_else(|| {
+                                    format_err!(
+                                        "Invalid author '{}' of type {} found. Expected a string.",
+                                        tval.to_string(),
+                                        tval.type_str()
+                                    )
+                                })
                         })
                         .collect::<Result<_>>()?
                 }
@@ -142,14 +161,18 @@ pub fn parse_package_info(tval: TV) -> Result<PM::PackageInfo> {
             let edition = table
                 .remove("edition")
                 .map(|v| {
-                    let s = v.as_str().ok_or_else(|| format_err!("'edition' must be a string"))?;
+                    let s = v
+                        .as_str()
+                        .ok_or_else(|| format_err!("'edition' must be a string"))?;
                     Edition::from_str(s).map_err(|err| format_err!("Invalid 'edition'. {err}"))
                 })
                 .transpose()?;
             let flavor = table
                 .remove("flavor")
                 .map(|v| {
-                    let s = v.as_str().ok_or_else(|| format_err!("'flavor' must be a string"))?;
+                    let s = v
+                        .as_str()
+                        .ok_or_else(|| format_err!("'flavor' must be a string"))?;
                     Flavor::from_str(s).map_err(|err| format_err!("Invalid 'flavor'. {err}"))
                 })
                 .transpose()?;
@@ -157,13 +180,26 @@ pub fn parse_package_info(tval: TV) -> Result<PM::PackageInfo> {
             // supported (also in the presence of hooks) we have warned above.
             let mut custom_properties: BTreeMap<Symbol, String> = Default::default();
             for (name, val) in table {
-                let val_str = val.as_str().ok_or_else(|| format_err!("Field `{}` value must be a string", name))?;
+                let val_str = val
+                    .as_str()
+                    .ok_or_else(|| format_err!("Field `{}` value must be a string", name))?;
                 custom_properties.insert(Symbol::from(name), val_str.to_owned());
             }
 
-            Ok(PM::PackageInfo { name, authors, license, custom_properties, edition, flavor })
+            Ok(PM::PackageInfo {
+                name,
+                authors,
+                license,
+                custom_properties,
+                edition,
+                flavor,
+            })
         }
-        x => bail!("Malformed section in manifest {}. Expected a table, but encountered a {}", x, x.type_str()),
+        x => bail!(
+            "Malformed section in manifest {}. Expected a table, but encountered a {}",
+            x,
+            x.type_str()
+        ),
     }
 }
 
@@ -178,7 +214,11 @@ pub fn parse_dependencies(tval: TV) -> Result<PM::Dependencies> {
             }
             Ok(deps)
         }
-        x => bail!("Malformed section in manifest {}. Expected a table, but encountered a {}", x, x.type_str()),
+        x => bail!(
+            "Malformed section in manifest {}. Expected a table, but encountered a {}",
+            x,
+            x.type_str()
+        ),
     }
 }
 
@@ -186,9 +226,18 @@ pub fn parse_build_info(tval: TV) -> Result<PM::BuildInfo> {
     match tval {
         TV::Table(mut table) => {
             warn_if_unknown_field_names(&table, &["language_version", "arch"]);
-            Ok(PM::BuildInfo { language_version: table.remove("language_version").map(parse_version).transpose()? })
+            Ok(PM::BuildInfo {
+                language_version: table
+                    .remove("language_version")
+                    .map(parse_version)
+                    .transpose()?,
+            })
         }
-        x => bail!("Malformed section in manifest {}. Expected a table, but encountered a {}", x, x.type_str()),
+        x => bail!(
+            "Malformed section in manifest {}. Expected a table, but encountered a {}",
+            x,
+            x.type_str()
+        ),
     }
 }
 
@@ -207,10 +256,10 @@ pub fn parse_addresses(tval: TV) -> Result<PM::AddressDeclarations> {
                         } else if addresses
                             .insert(
                                 ident,
-                                Some(
-                                    parse_address_literal(entry_str)
-                                        .context(format!("Invalid address '{}' encountered.", entry_str))?,
-                                ),
+                                Some(parse_address_literal(entry_str).context(format!(
+                                    "Invalid address '{}' encountered.",
+                                    entry_str
+                                ))?),
                             )
                             .is_some()
                         {
@@ -226,7 +275,11 @@ pub fn parse_addresses(tval: TV) -> Result<PM::AddressDeclarations> {
             }
             Ok(addresses)
         }
-        x => bail!("Malformed section in manifest {}. Expected a table, but encountered a {}", x, x.type_str()),
+        x => bail!(
+            "Malformed section in manifest {}. Expected a table, but encountered a {}",
+            x,
+            x.type_str()
+        ),
     }
 }
 
@@ -239,13 +292,18 @@ pub fn parse_dev_addresses(tval: TV) -> Result<PM::DevAddressDeclarations> {
                 match entry.as_str() {
                     Some(entry_str) => {
                         if entry_str == EMPTY_ADDR_STR {
-                            bail!("Found uninstantiated named address '{}'. All addresses in the '{}' field must be instantiated.",
-                            ident, DEV_ADDRESSES_NAME);
+                            bail!(
+                                "Found uninstantiated named address '{}'. All addresses in the '{}' field must be instantiated.",
+                                ident,
+                                DEV_ADDRESSES_NAME
+                            );
                         } else if addresses
                             .insert(
                                 ident,
-                                parse_address_literal(entry_str)
-                                    .context(format!("Invalid address '{}' encountered.", entry_str))?,
+                                parse_address_literal(entry_str).context(format!(
+                                    "Invalid address '{}' encountered.",
+                                    entry_str
+                                ))?,
                             )
                             .is_some()
                         {
@@ -261,7 +319,11 @@ pub fn parse_dev_addresses(tval: TV) -> Result<PM::DevAddressDeclarations> {
             }
             Ok(addresses)
         }
-        x => bail!("Malformed section in manifest {}. Expected a table, but encountered a {}", x, x.type_str()),
+        x => bail!(
+            "Malformed section in manifest {}. Expected a table, but encountered a {}",
+            x,
+            x.type_str()
+        ),
     }
 }
 
@@ -279,17 +341,25 @@ fn parse_external_resolver_name(resolver_val: &TV) -> Result<Option<Symbol>> {
     };
 
     if table.len() != 1 {
-        bail!("Malformed external resolver declaration for dependency {EXTERNAL_RESOLVER_PREFIX}.{resolver_val}",);
+        bail!(
+            "Malformed external resolver declaration for dependency {EXTERNAL_RESOLVER_PREFIX}.{resolver_val}",
+        );
     }
 
-    let key = table.keys().next().expect("Exactly one key by check above").as_str();
+    let key = table
+        .keys()
+        .next()
+        .expect("Exactly one key by check above")
+        .as_str();
 
     let key_value = table.get(key).ok_or_else(|| {
         format_err!("Malformed external resolver declaration for dependency {EXTERNAL_RESOLVER_PREFIX}.{resolver_val}",)
     })?;
 
     if !key_value.is_str() {
-        bail!("Malformed external resolver declaration for dependency {EXTERNAL_RESOLVER_PREFIX}.{resolver_val}",);
+        bail!(
+            "Malformed external resolver declaration for dependency {EXTERNAL_RESOLVER_PREFIX}.{resolver_val}",
+        );
     }
 
     Ok(Some(Symbol::from(key)))
@@ -300,23 +370,38 @@ pub fn parse_dependency(mut tval: TV) -> Result<PM::Dependency> {
         bail!("Malformed dependency {}", tval);
     };
 
-    if let Some(external_resolver_binary_name) =
-        table.get(EXTERNAL_RESOLVER_PREFIX).and_then(|e| parse_external_resolver_name(e).transpose())
+    if let Some(external_resolver_binary_name) = table
+        .get(EXTERNAL_RESOLVER_PREFIX)
+        .and_then(|e| parse_external_resolver_name(e).transpose())
     {
         return Ok(PM::Dependency::External(external_resolver_binary_name?));
     }
 
-    let subst = table.remove("addr_subst").map(parse_substitution).transpose()?;
+    let subst = table
+        .remove("addr_subst")
+        .map(parse_substitution)
+        .transpose()?;
     let digest = table.remove("digest").map(parse_digest).transpose()?;
-    let dep_override = table.remove("override").map(parse_dep_override).transpose()?.map_or(false, |o| o);
+    let dep_override = table
+        .remove("override")
+        .map(parse_dep_override)
+        .transpose()?
+        .is_some_and(|o| o);
 
-    let kind = match (table.remove("local"), table.remove("subdir"), table.remove("git"), table.remove("id")) {
+    let kind = match (
+        table.remove("local"),
+        table.remove("subdir"),
+        table.remove("git"),
+        table.remove("id"),
+    ) {
         (Some(local), subdir, None, None) => {
             if subdir.is_some() {
                 bail!("'subdir' not supported for local dependencies");
             }
 
-            let Some(local) = local.as_str().map(PathBuf::from) else { bail!("Local source path not a string") };
+            let Some(local) = local.as_str().map(PathBuf::from) else {
+                bail!("Local source path not a string")
+            };
 
             PM::DependencyKind::Local(
                 // with allow_cwd_parent set to true, it never fails
@@ -325,36 +410,59 @@ pub fn parse_dependency(mut tval: TV) -> Result<PM::Dependency> {
         }
 
         (None, subdir, Some(git_url), None) => {
-            let Some(git_rev) = table.remove("rev") else { bail!("Git revision not supplied for dependency") };
+            let Some(git_rev) = table.remove("rev") else {
+                bail!("Git revision not supplied for dependency")
+            };
 
-            let Some(git_rev) = git_rev.as_str().map(Symbol::from) else { bail!("Git revision not a string") };
+            let Some(git_rev) = git_rev.as_str().map(Symbol::from) else {
+                bail!("Git revision not a string")
+            };
 
-            let Some(git_url) = git_url.as_str().map(Symbol::from) else { bail!("Git URL not a string") };
+            let Some(git_url) = git_url.as_str().map(Symbol::from) else {
+                bail!("Git URL not a string")
+            };
 
             let subdir = match subdir {
                 None => PathBuf::new(),
-                Some(path) => path.as_str().map(PathBuf::from).ok_or_else(|| anyhow!("'subdir' not a string"))?,
+                Some(path) => path
+                    .as_str()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("'subdir' not a string"))?,
             };
 
-            PM::DependencyKind::Git(PM::GitInfo { git_url, git_rev, subdir })
+            PM::DependencyKind::Git(PM::GitInfo {
+                git_url,
+                git_rev,
+                subdir,
+            })
         }
 
         (None, None, None, Some(id)) => {
-            let Some(id) = id.as_str().map(Symbol::from) else { bail!("ID not a string") };
+            let Some(id) = id.as_str().map(Symbol::from) else {
+                bail!("ID not a string")
+            };
 
             PM::DependencyKind::OnChain(PM::OnChainInfo { id })
         }
 
         _ => {
             let keys = ["'local'", "'git'", "'r.<external_resolver_binary_name>'"];
-            bail!("must provide exactly one of {} for dependency.", keys.join(" or "))
+            bail!(
+                "must provide exactly one of {} for dependency.",
+                keys.join(" or ")
+            )
         }
     };
 
     // Any fields that are left are unknown
     warn_if_unknown_field_names(table, &[]);
 
-    Ok(PM::Dependency::Internal(PM::InternalDependency { kind, subst, digest, dep_override }))
+    Ok(PM::Dependency::Internal(PM::InternalDependency {
+        kind,
+        subst,
+        digest,
+        dep_override,
+    }))
 }
 
 pub fn parse_substitution(tval: TV) -> Result<PM::Substitution> {
@@ -381,7 +489,11 @@ pub fn parse_substitution(tval: TV) -> Result<PM::Substitution> {
             }
             Ok(subst)
         }
-        x => bail!("Malformed dependency substitution {}. Expected a table, but encountered a {}", x, x.type_str()),
+        x => bail!(
+            "Malformed dependency substitution {}. Expected a table, but encountered a {}",
+            x,
+            x.type_str()
+        ),
     }
 }
 
@@ -389,18 +501,29 @@ fn parse_version(tval: TV) -> Result<PM::Version> {
     let version_str = tval.as_str().unwrap();
     let version_parts = version_str.split('.').collect::<Vec<_>>();
     if version_parts.len() != 3 {
-        bail!("Version is malformed. Versions must be of the form <u64>.<u64>.<u64>, but found '{}'", version_str);
+        bail!(
+            "Version is malformed. Versions must be of the form <u64>.<u64>.<u64>, but found '{}'",
+            version_str
+        );
     }
 
     Ok((
-        version_parts[0].parse::<u64>().context("Invalid major version")?,
-        version_parts[1].parse::<u64>().context("Invalid minor version")?,
-        version_parts[2].parse::<u64>().context("Invalid bugfix version")?,
+        version_parts[0]
+            .parse::<u64>()
+            .context("Invalid major version")?,
+        version_parts[1]
+            .parse::<u64>()
+            .context("Invalid minor version")?,
+        version_parts[2]
+            .parse::<u64>()
+            .context("Invalid bugfix version")?,
     ))
 }
 
 fn parse_digest(tval: TV) -> Result<PM::PackageDigest> {
-    let digest_str = tval.as_str().ok_or_else(|| format_err!("Invalid package digest"))?;
+    let digest_str = tval
+        .as_str()
+        .ok_or_else(|| format_err!("Invalid package digest"))?;
     Ok(PM::PackageDigest::from(digest_str))
 }
 
@@ -425,12 +548,19 @@ fn warn_if_unknown_field_names(table: &toml::map::Map<String, TV>, known_names: 
             "Warning: unknown field name{} found. Expected one of [{}], but found {}",
             if unknown_names.len() > 1 { "s" } else { "" },
             known_names.join(", "),
-            unknown_names.into_iter().map(|x| format!("'{}'", x)).collect::<Vec<_>>().join(", ")
+            unknown_names
+                .into_iter()
+                .map(|x| format!("'{}'", x))
+                .collect::<Vec<_>>()
+                .join(", ")
         );
     }
 }
 
-fn check_for_required_field_names(table: &toml::map::Map<String, TV>, required_fields: &[&str]) -> Result<()> {
+fn check_for_required_field_names(
+    table: &toml::map::Map<String, TV>,
+    required_fields: &[&str],
+) -> Result<()> {
     let mut missing_fields = BTreeSet::new();
 
     for field_name in required_fields {
@@ -443,7 +573,11 @@ fn check_for_required_field_names(table: &toml::map::Map<String, TV>, required_f
         bail!(
             "Required field name{} {} not found",
             if missing_fields.len() > 1 { "s" } else { "" },
-            missing_fields.into_iter().map(|x| format!("'{}'", x)).collect::<Vec<_>>().join(", "),
+            missing_fields
+                .into_iter()
+                .map(|x| format!("'{}'", x))
+                .collect::<Vec<_>>()
+                .join(", "),
         )
     }
 

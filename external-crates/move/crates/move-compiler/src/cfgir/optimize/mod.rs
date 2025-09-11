@@ -17,7 +17,7 @@ use crate::{
     expansion::ast::Mutability,
     hlir::ast::*,
     parser::ast::ConstantName,
-    shared::{unique_map::UniqueMap, CompilationEnv},
+    shared::{CompilationEnv, unique_map::UniqueMap},
 };
 
 pub type Optimization = fn(
@@ -28,8 +28,12 @@ pub type Optimization = fn(
     &mut MutForwardCFG,
 ) -> bool;
 
-const OPTIMIZATIONS: &[Optimization] =
-    &[eliminate_locals::optimize, constant_fold::optimize, simplify_jumps::optimize, inline_blocks::optimize];
+const OPTIMIZATIONS: &[Optimization] = &[
+    eliminate_locals::optimize,
+    constant_fold::optimize,
+    simplify_jumps::optimize,
+    inline_blocks::optimize,
+];
 
 const MOVE_2024_OPTIMIZATIONS: &[Optimization] = &[
     eliminate_locals::optimize,

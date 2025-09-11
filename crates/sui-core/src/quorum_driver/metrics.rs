@@ -3,24 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use prometheus::{
-    register_histogram_vec_with_registry,
-    register_histogram_with_registry,
-    register_int_counter_vec_with_registry,
-    register_int_counter_with_registry,
-    register_int_gauge_with_registry,
-    Histogram,
-    HistogramVec,
-    IntCounter,
-    IntCounterVec,
-    IntGauge,
+    register_histogram_vec_with_registry, register_histogram_with_registry,
+    register_int_counter_vec_with_registry, register_int_counter_with_registry,
+    register_int_gauge_with_registry, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
     Registry,
 };
 
 const FINALITY_LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1,
-    1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4,
-    3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
-    16.0, 17.0, 18.0, 19.0, 20.0, 25.0,
+    0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85,
+    0.9, 0.95, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6,
+    2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5,
+    7.0, 7.5, 8.0, 8.5, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0,
+    25.0,
 ];
 
 #[derive(Clone)]
@@ -34,10 +28,6 @@ pub struct QuorumDriverMetrics {
     // TODO: add histogram of attempt that tx succeeds
     pub(crate) current_requests_in_flight: IntGauge,
 
-    pub(crate) total_err_process_tx_responses_with_nonzero_conflicting_transactions: IntCounter,
-    pub(crate) total_attempts_retrying_conflicting_transaction: IntCounter,
-    pub(crate) total_successful_attempts_retrying_conflicting_transaction: IntCounter,
-    pub(crate) total_times_conflicting_transaction_already_finalized_when_retrying: IntCounter,
     pub(crate) total_retryable_overload_errors: IntCounter,
     pub(crate) transaction_retry_count: Histogram,
     pub(crate) current_transactions_in_retry: IntGauge,
@@ -83,30 +73,6 @@ impl QuorumDriverMetrics {
             current_requests_in_flight: register_int_gauge_with_registry!(
                 "current_requests_in_flight",
                 "Current number of requests being processed in QuorumDriver",
-                registry,
-            )
-            .unwrap(),
-            total_err_process_tx_responses_with_nonzero_conflicting_transactions: register_int_counter_with_registry!(
-                "quorum_driver_total_err_process_tx_responses_with_nonzero_conflicting_transactions",
-                "Total number of err process_tx responses with non empty conflicting transactions",
-                registry,
-            )
-            .unwrap(),
-            total_attempts_retrying_conflicting_transaction: register_int_counter_with_registry!(
-                "quorum_driver_total_attempts_trying_conflicting_transaction",
-                "Total number of attempts to retry a conflicting transaction",
-                registry,
-            )
-            .unwrap(),
-            total_successful_attempts_retrying_conflicting_transaction: register_int_counter_with_registry!(
-                "quorum_driver_total_successful_attempts_trying_conflicting_transaction",
-                "Total number of successful attempts to retry a conflicting transaction",
-                registry,
-            )
-            .unwrap(),
-            total_times_conflicting_transaction_already_finalized_when_retrying: register_int_counter_with_registry!(
-                "quorum_driver_total_times_conflicting_transaction_already_finalized_when_retrying",
-                "Total number of times the conflicting transaction is already finalized when retrying",
                 registry,
             )
             .unwrap(),

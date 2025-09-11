@@ -2,23 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use parking_lot::RwLock;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-use sui_types::{
-    base_types::ObjectID,
-    committee::{Committee, EpochId},
-    error::{SuiError, SuiResult},
-};
-use typed_store::{
-    rocks::{default_db_options, DBMap, DBOptions, MetricConf},
-    rocksdb::Options,
-    traits::{TableSummary, TypedStoreDebug},
-};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use sui_types::base_types::ObjectID;
+use sui_types::committee::{Committee, EpochId};
+use sui_types::error::{SuiError, SuiResult};
+use typed_store::rocks::{default_db_options, DBMap, DBOptions, MetricConf};
+use typed_store::rocksdb::Options;
 
-use typed_store::{DBMapUtils, Map};
+use typed_store::DBMapUtils;
+use typed_store::Map;
 
 use sui_macros::nondeterministic;
 
@@ -41,10 +35,23 @@ fn committee_table_default_config() -> DBOptions {
 
 impl CommitteeStore {
     pub fn new(path: PathBuf, genesis_committee: &Committee, db_options: Option<Options>) -> Self {
-        let tables = CommitteeStoreTables::open_tables_read_write(path, MetricConf::new("committee"), db_options, None);
-        let store = Self { tables, cache: RwLock::new(HashMap::new()) };
-        if store.database_is_empty() {
-            store.init_genesis_committee(genesis_committee.clone()).expect("Init genesis committee data must not fail");
+        let tables = CommitteeStoreTables::open_tables_read_write(
+            path,
+            MetricConf::new("committee"),
+            db_options,
+            None,
+        );
+        let store = Self {
+            tables,
+            cache: RwLock::new(HashMap::new()),
+        };
+        if store
+            .database_is_empty()
+            .expect("CommitteeStore initialization failed")
+        {
+            store
+                .init_genesis_committee(genesis_committee.clone())
+                .expect("Init genesis committee data must not fail");
         }
         store
     }
@@ -67,8 +74,12 @@ impl CommitteeStore {
             // If somehow we already have this committee in the store, they must be the same.
             assert_eq!(&*old_committee, new_committee);
         } else {
-            self.tables.committee_map.insert(&new_committee.epoch, new_committee)?;
-            self.cache.write().insert(new_committee.epoch, Arc::new(new_committee.clone()));
+            self.tables
+                .committee_map
+                .insert(&new_committee.epoch, new_committee)?;
+            self.cache
+                .write()
+                .insert(new_committee.epoch, Arc::new(new_committee.clone()));
         }
         Ok(())
     }
@@ -86,18 +97,18 @@ impl CommitteeStore {
     }
 
     // todo - make use of cache or remove this method
-    pub fn get_latest_committee(&self) -> Committee {
-        self.tables
+    pub fn get_latest_committee(&self) -> SuiResult<Committee> {
+        Ok(self
+            .tables
             .committee_map
-            .unbounded_iter()
-            .skip_to_last()
+            .reversed_safe_iter_with_bounds(None, None)?
             .next()
+            .transpose()?
             // unwrap safe because we guarantee there is at least a genesis epoch
             // when initializing the store.
             .unwrap()
-            .1
+            .1)
     }
-
     /// Return the committee specified by `epoch`. If `epoch` is `None`, return the latest committee.
     // todo - make use of cache or remove this method
     pub fn get_or_latest_committee(&self, epoch: Option<EpochId>) -> SuiResult<Committee> {
@@ -106,15 +117,24 @@ impl CommitteeStore {
                 .get_committee(&epoch)?
                 .ok_or(SuiError::MissingCommitteeAtEpoch(epoch))
                 .map(|c| Committee::clone(&*c))?,
-            None => self.get_latest_committee(),
+            None => self.get_latest_committee()?,
         })
     }
 
     pub fn checkpoint_db(&self, path: &Path) -> SuiResult {
-        self.tables.committee_map.checkpoint_db(path).map_err(Into::into)
+        self.tables
+            .committee_map
+            .checkpoint_db(path)
+            .map_err(Into::into)
     }
 
-    fn database_is_empty(&self) -> bool {
-        self.tables.committee_map.unbounded_iter().next().is_none()
+    fn database_is_empty(&self) -> SuiResult<bool> {
+        Ok(self
+            .tables
+            .committee_map
+            .safe_iter()
+            .next()
+            .transpose()?
+            .is_none())
     }
 }

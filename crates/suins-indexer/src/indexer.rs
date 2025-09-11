@@ -7,7 +7,7 @@ use std::{
 };
 
 use move_core_types::language_storage::StructTag;
-use sui_json_rpc::name_service::{Domain, NameRecord, SubDomainRegistration};
+use sui_name_service::{Domain, NameRecord, SubDomainRegistration};
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     dynamic_field::Field,
@@ -18,7 +18,8 @@ use sui_types::{
 use crate::models::VerifiedDomain;
 
 /// We default to mainnet for both.
-const REGISTRY_TABLE_ID: &str = "0xe64cd9db9f829c6cc405d9790bd71567ae07259855f4fba6f02c84f52298c106";
+const REGISTRY_TABLE_ID: &str =
+    "0xe64cd9db9f829c6cc405d9790bd71567ae07259855f4fba6f02c84f52298c106";
 const NAME_RECORD_TYPE: &str = "0x2::dynamic_field::Field<0xd22b24490e0bae52676651b4f56660a5ff8022a2576e0089f79b3c88d44e08f0::domain::Domain,0xd22b24490e0bae52676651b4f56660a5ff8022a2576e0089f79b3c88d44e08f0::name_record::NameRecord>";
 const SUBDOMAIN_REGISTRATION_TYPE: &str =
     "0x00c2f85e07181b90c140b15c5ce27d863f93c4d9159d2a4e7bdaeb40e286d6f5::subdomain_registration::SubDomainRegistration";
@@ -34,7 +35,11 @@ pub struct SuinsIndexer {
 
 impl std::default::Default for SuinsIndexer {
     fn default() -> Self {
-        Self::new(REGISTRY_TABLE_ID.to_owned(), SUBDOMAIN_REGISTRATION_TYPE.to_owned(), NAME_RECORD_TYPE.to_owned())
+        Self::new(
+            REGISTRY_TABLE_ID.to_owned(),
+            SUBDOMAIN_REGISTRATION_TYPE.to_owned(),
+            NAME_RECORD_TYPE.to_owned(),
+        )
     }
 }
 
@@ -46,22 +51,32 @@ impl SuinsIndexer {
         let name_record_type = StructTag::from_str(&record_type).unwrap();
         let subdomain_wrapper_type = StructTag::from_str(&wrapper_type).unwrap();
 
-        Self { registry_table_id, name_record_type, subdomain_wrapper_type }
+        Self {
+            registry_table_id,
+            name_record_type,
+            subdomain_wrapper_type,
+        }
     }
 
     /// Checks if the object referenced is a subdomain wrapper.
     /// For subdomain wrappers, we're saving the ID of the wrapper object,
     /// to make it easy to locate the NFT (since the base NFT gets wrapped and indexing won't work there).
     pub fn is_subdomain_wrapper(&self, object: &Object) -> bool {
-        object.struct_tag().is_some_and(|tag| tag == self.subdomain_wrapper_type)
+        object
+            .struct_tag()
+            .is_some_and(|tag| tag == self.subdomain_wrapper_type)
     }
 
     // Filter by the dynamic field value type.
     // A valid name record for an object has the type `Field<Domain,NameRecord>,
     // and the parent of it is the `registry` table id.
     pub fn is_name_record(&self, object: &Object) -> bool {
-        object.get_single_owner().is_some_and(|owner| owner == self.registry_table_id)
-            && object.struct_tag().is_some_and(|tag| tag == self.name_record_type)
+        object
+            .get_single_owner()
+            .is_some_and(|owner| owner == self.registry_table_id)
+            && object
+                .struct_tag()
+                .is_some_and(|tag| tag == self.name_record_type)
     }
 
     /// Processes a checkpoint and produces a list of `updates` and a list of `removals`
@@ -90,7 +105,11 @@ impl SuinsIndexer {
         (
             // Convert our name_records & wrappers into a list of updates for the DB.
             checkpoint.prepare_db_updates(),
-            checkpoint.removals.into_iter().map(|id| id.to_string()).collect(),
+            checkpoint
+                .removals
+                .into_iter()
+                .map(|id| id.to_string())
+                .collect(),
         )
     }
 }
@@ -124,8 +143,9 @@ impl SuinsIndexerCheckpoint {
         for object in objects {
             // Parse all the changes to a `NameRecord`
             if config.is_name_record(object) {
-                let name_record: Field<Domain, NameRecord> =
-                    object.to_rust().unwrap_or_else(|| panic!("Failed to parse name record for {:?}", object));
+                let name_record: Field<Domain, NameRecord> = object
+                    .to_rust()
+                    .unwrap_or_else(|| panic!("Failed to parse name record for {:?}", object));
 
                 let id = object.id();
 
@@ -142,16 +162,28 @@ impl SuinsIndexerCheckpoint {
             // that the wrapper will be created on the same checkpoint as the name record and vice versa.
             if config.is_subdomain_wrapper(object) {
                 let sub_domain: SubDomainRegistration = object.to_rust().unwrap();
-                self.subdomain_wrappers.insert(sub_domain.nft.domain_name, sub_domain.id.id.bytes.to_string());
+                self.subdomain_wrappers.insert(
+                    sub_domain.nft.domain_name,
+                    sub_domain.id.id.bytes.to_string(),
+                );
             };
         }
     }
 
     /// Parses a list of the deletions in the checkpoint and adds them to the removals list.
     /// Also removes any name records from the updates, if they ended up being deleted in the same checkpoint.
-    pub fn parse_record_deletions(&mut self, config: &SuinsIndexer, transaction: &CheckpointTransaction) {
+    pub fn parse_record_deletions(
+        &mut self,
+        config: &SuinsIndexer,
+        transaction: &CheckpointTransaction,
+    ) {
         // a list of all the deleted objects in the transaction.
-        let deleted_objects: HashSet<_> = transaction.effects.all_tombstones().into_iter().map(|(id, _)| id).collect();
+        let deleted_objects: HashSet<_> = transaction
+            .effects
+            .all_tombstones()
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
 
         for input in transaction.input_objects.iter() {
             if config.is_name_record(input) && deleted_objects.contains(&input.id()) {
@@ -184,14 +216,19 @@ impl SuinsIndexerCheckpoint {
                 expiration_timestamp_ms: name_record.value.expiration_timestamp_ms as i64,
                 nft_id,
                 target_address: if name_record.value.target_address.is_some() {
-                    Some(SuiAddress::to_string(&name_record.value.target_address.unwrap()))
+                    Some(SuiAddress::to_string(
+                        &name_record.value.target_address.unwrap(),
+                    ))
                 } else {
                     None
                 },
                 // unwrapping must be safe as `value.data` is an on-chain value with VecMap<String,String> type.
                 data: serde_json::to_value(&name_record.value.data).unwrap(),
                 last_checkpoint_updated: self.checkpoint_sequence_number as i64,
-                subdomain_wrapper_id: self.subdomain_wrappers.get(&name_record.name.to_string()).cloned(),
+                subdomain_wrapper_id: self
+                    .subdomain_wrappers
+                    .get(&name_record.name.to_string())
+                    .cloned(),
             });
         }
 

@@ -4,11 +4,11 @@
 /// A module to test coin index.
 module fungible_tokens::managed {
     use std::option;
-    use one::coin::{Self, Coin, TreasuryCap};
-    use one::transfer;
-    use one::object::{Self, UID};
-    use one::table_vec::{Self, TableVec};
-    use one::tx_context::{Self, TxContext};
+    use sui::coin::{Self, Coin, TreasuryCap};
+    use sui::transfer;
+    use sui::object::{Self, UID};
+    use sui::table_vec::{Self, TableVec};
+    use sui::tx_context::{Self, TxContext};
 
     public struct PublicRedEnvelope has key, store {
         id: UID,
@@ -47,7 +47,7 @@ module fungible_tokens::managed {
             i = i + 1;
         }
     }
-
+    
     public entry fun add_to_envelope(
         red_envelopes: &mut PublicRedEnvelope, coin: Coin<MANAGED>,
     ) {
@@ -62,8 +62,8 @@ module fungible_tokens::managed {
     }
 
     public entry fun take_from_envelope_and_burn(
-        treasury_cap: &mut TreasuryCap<MANAGED>,
-        red_envelopes: &mut PublicRedEnvelope,
+        treasury_cap: &mut TreasuryCap<MANAGED>, 
+        red_envelopes: &mut PublicRedEnvelope, 
     ) {
         let coin = table_vec::pop_back(&mut red_envelopes.coins);
         coin::burn(treasury_cap, coin);

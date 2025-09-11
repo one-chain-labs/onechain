@@ -3,37 +3,26 @@
 
 use std::str::FromStr;
 
+use super::cursor::{Page, Target};
 use super::{
-    address::Address,
-    base64::Base64,
-    cursor::{Page, Target},
-    date_time::DateTime,
-    move_module::MoveModule,
-    move_value::MoveValue,
-    transaction_block::TransactionBlock,
+    address::Address, base64::Base64, date_time::DateTime, move_module::MoveModule,
+    move_value::MoveValue, transaction_block::TransactionBlock,
 };
-use crate::{
-    data::{self, Db, DbConnection, QueryExecutor},
-    error::Error,
-    query,
-};
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    *,
-};
+use crate::data::{self, DbConnection, QueryExecutor};
+use crate::query;
+use crate::{data::Db, error::Error};
+use async_graphql::connection::{Connection, CursorType, Edge};
+use async_graphql::*;
 use cursor::EvLookup;
 use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use lookups::{add_bounds, select_emit_module, select_event_type, select_sender};
-use sui_indexer::{
-    models::{events::StoredEvent, transactions::StoredTransaction},
-    schema::{checkpoints, events},
-};
+use sui_indexer::models::{events::StoredEvent, transactions::StoredTransaction};
+use sui_indexer::schema::{checkpoints, events};
+use sui_types::base_types::ObjectID;
+use sui_types::Identifier;
 use sui_types::{
-    base_types::{ObjectID, SuiAddress as NativeSuiAddress},
-    event::Event as NativeEvent,
-    parse_sui_struct_tag,
-    Identifier,
+    base_types::SuiAddress as NativeSuiAddress, event::Event as NativeEvent, parse_sui_struct_tag,
 };
 
 mod cursor;
@@ -99,7 +88,10 @@ impl Event {
             return Ok(None);
         }
 
-        Ok(Some(Address { address: self.native.sender.into(), checkpoint_viewed_at: self.checkpoint_viewed_at }))
+        Ok(Some(Address {
+            address: self.native.sender.into(),
+            checkpoint_viewed_at: self.checkpoint_viewed_at,
+        }))
     }
 
     /// UTC timestamp in milliseconds since epoch (1/1/1970)
@@ -113,12 +105,17 @@ impl Event {
 
     /// The event's contents as a Move value.
     async fn contents(&self) -> Result<MoveValue> {
-        Ok(MoveValue::new(self.native.type_.clone().into(), Base64::from(self.native.contents.clone())))
+        Ok(MoveValue::new(
+            self.native.type_.clone().into(),
+            Base64::from(self.native.contents.clone()),
+        ))
     }
 
     /// The Base64 encoded BCS serialized bytes of the event.
     async fn bcs(&self) -> Result<Base64> {
-        Ok(Base64::from(bcs::to_bytes(&self.native).map_err(|e| Error::Internal(e.to_string()))?))
+        Ok(Base64::from(
+            bcs::to_bytes(&self.native).map_err(|e| Error::Internal(e.to_string()))?,
+        ))
     }
 }
 
@@ -137,10 +134,12 @@ impl Event {
         db: &Db,
         page: Page<Cursor>,
         filter: EventFilter,
+        tx_lo: u64,
         checkpoint_viewed_at: u64,
     ) -> Result<Connection<String, Event>, Error> {
         let cursor_viewed_at = page.validate_cursor_consistency()?;
         let checkpoint_viewed_at = cursor_viewed_at.unwrap_or(checkpoint_viewed_at);
+        let tx_lo = tx_lo as i64;
 
         // Construct tx and ev sequence number query with table-relevant filters, if they exist. The
         // resulting query will look something like `SELECT tx_sequence_number,
@@ -162,6 +161,8 @@ impl Event {
         use checkpoints::dsl;
         let (prev, next, results) = db
             .execute(move |conn| async move {
+                // Get the tx_hi per checkpoint_viewed_at, which is either from watermarks or from
+                // the cursor if the latter is provided.
                 let tx_hi: i64 = conn.first(move || {
                     dsl::checkpoints.select(dsl::network_total_transactions)
                         .filter(dsl::sequence_number.eq(checkpoint_viewed_at as i64))
@@ -169,7 +170,7 @@ impl Event {
 
                 let (prev, next, mut events): (bool, bool, Vec<StoredEvent>) =
                     if let Some(filter_query) =  query_constraint {
-                        let query = add_bounds(filter_query, &filter.transaction_digest, &page, tx_hi);
+                        let query = add_bounds(filter_query, &filter.transaction_digest, &page, tx_lo, tx_hi);
 
                         let (prev, next, results) =
                             page.paginate_raw_query::<EvLookup>(conn, checkpoint_viewed_at, query).await?;
@@ -203,7 +204,7 @@ impl Event {
                     } else {
                         // No filter is provided so we add bounds to the basic `SELECT * FROM
                         // events` query and call it a day.
-                        let query = add_bounds(query!("SELECT * FROM events"), &filter.transaction_digest, &page, tx_hi);
+                        let query = add_bounds(query!("SELECT * FROM events"), &filter.transaction_digest, &page, tx_lo, tx_hi);
                         let (prev, next, events_iter) = page.paginate_raw_query::<StoredEvent>(conn, checkpoint_viewed_at, query).await?;
                         let events = events_iter.collect::<Vec<StoredEvent>>();
                         (prev, next, events)
@@ -226,7 +227,10 @@ impl Event {
         // The "checkpoint viewed at" sets a consistent upper bound for the nested queries.
         for stored in results {
             let cursor = stored.cursor(checkpoint_viewed_at).encode_cursor();
-            conn.edges.push(Edge::new(cursor, Event::try_from_stored_event(stored, checkpoint_viewed_at)?));
+            conn.edges.push(Edge::new(
+                cursor,
+                Event::try_from_stored_event(stored, checkpoint_viewed_at)?,
+            ));
         }
 
         Ok(conn)
@@ -258,27 +262,46 @@ impl Event {
             senders: vec![Some(native_event.sender.to_vec())],
             package: native_event.package_id.to_vec(),
             module: native_event.transaction_module.to_string(),
-            event_type: native_event.type_.to_canonical_string(/* with_prefix */ true),
+            event_type: native_event
+                .type_
+                .to_canonical_string(/* with_prefix */ true),
             bcs: native_event.contents.clone(),
             timestamp_ms: stored_tx.timestamp_ms,
             sender: Some(native_event.sender.to_vec()),
         };
 
-        Ok(Self { stored: Some(stored_event), native: native_event, checkpoint_viewed_at })
+        Ok(Self {
+            stored: Some(stored_event),
+            native: native_event,
+            checkpoint_viewed_at,
+        })
     }
 
-    fn try_from_stored_event(stored: StoredEvent, checkpoint_viewed_at: u64) -> Result<Self, Error> {
+    fn try_from_stored_event(
+        stored: StoredEvent,
+        checkpoint_viewed_at: u64,
+    ) -> Result<Self, Error> {
         let Some(Some(sender_bytes)) = ({ stored.senders.first() }) else {
             return Err(Error::Internal("No senders found for event".to_string()));
         };
-        let sender = NativeSuiAddress::from_bytes(sender_bytes).map_err(|e| Error::Internal(e.to_string()))?;
-        let package_id = ObjectID::from_bytes(&stored.package).map_err(|e| Error::Internal(e.to_string()))?;
-        let type_ = parse_sui_struct_tag(&stored.event_type).map_err(|e| Error::Internal(e.to_string()))?;
-        let transaction_module = Identifier::from_str(&stored.module).map_err(|e| Error::Internal(e.to_string()))?;
+        let sender = NativeSuiAddress::from_bytes(sender_bytes)
+            .map_err(|e| Error::Internal(e.to_string()))?;
+        let package_id =
+            ObjectID::from_bytes(&stored.package).map_err(|e| Error::Internal(e.to_string()))?;
+        let type_ =
+            parse_sui_struct_tag(&stored.event_type).map_err(|e| Error::Internal(e.to_string()))?;
+        let transaction_module =
+            Identifier::from_str(&stored.module).map_err(|e| Error::Internal(e.to_string()))?;
         let contents = stored.bcs.clone();
         Ok(Event {
             stored: Some(stored),
-            native: NativeEvent { sender, package_id, transaction_module, type_, contents },
+            native: NativeEvent {
+                sender,
+                package_id,
+                transaction_module,
+                type_,
+                contents,
+            },
             checkpoint_viewed_at,
         })
     }

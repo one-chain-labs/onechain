@@ -9,25 +9,13 @@ use serde_json::json;
 
 use rosetta_client::start_rosetta_test_server;
 use sui_keys::keystore::AccountKeystore;
-use sui_rosetta::{
-    operations::Operations,
-    types::{
-        ConstructionCombineRequest,
-        ConstructionCombineResponse,
-        ConstructionMetadataRequest,
-        ConstructionMetadataResponse,
-        ConstructionPayloadsRequest,
-        ConstructionPayloadsResponse,
-        ConstructionPreprocessRequest,
-        ConstructionPreprocessResponse,
-        ConstructionSubmitRequest,
-        NetworkIdentifier,
-        PreprocessMetadata,
-        Signature,
-        SignatureType,
-        SuiEnv,
-        TransactionIdentifierResponse,
-    },
+use sui_rosetta::operations::Operations;
+use sui_rosetta::types::{
+    ConstructionCombineRequest, ConstructionCombineResponse, ConstructionMetadataRequest,
+    ConstructionMetadataResponse, ConstructionPayloadsRequest, ConstructionPayloadsResponse,
+    ConstructionPreprocessRequest, ConstructionPreprocessResponse, ConstructionSubmitRequest,
+    NetworkIdentifier, PreprocessMetadata, Signature, SignatureType, SuiEnv,
+    TransactionIdentifierResponse,
 };
 use sui_types::crypto::SuiSignature;
 use test_cluster::TestClusterBuilder;
@@ -70,17 +58,20 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let network_identifier = NetworkIdentifier { blockchain: "sui".to_string(), network: SuiEnv::LocalNet };
+    let network_identifier = NetworkIdentifier {
+        blockchain: "sui".to_string(),
+        network: SuiEnv::LocalNet,
+    };
 
     let ops: Operations = serde_json::from_value(json!(
         [{
             "operation_identifier":{"index":0},
-            "type":"PaySui",
+            "type":"PayOct",
             "account": { "address" : recipient.to_string() },
             "amount" : { "value": "1000000000" , "currency": { "symbol": "SUI", "decimals": 9}}
         },{
             "operation_identifier":{"index":1},
-            "type":"PaySui",
+            "type":"PayOct",
             "account": { "address" : sender.to_string() },
             "amount" : {
                 "value": "-1000000000",
@@ -93,35 +84,46 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
     ))
     .unwrap();
 
-    let metadata = Some(PreprocessMetadata { budget: Some(budget) });
+    let metadata = Some(PreprocessMetadata {
+        budget: Some(budget),
+    });
 
     let preprocess: ConstructionPreprocessResponse = rosetta_client
-        .call(RosettaEndpoint::Preprocess, &ConstructionPreprocessRequest {
-            network_identifier: network_identifier.clone(),
-            operations: ops.clone(),
-            metadata,
-        })
+        .call(
+            RosettaEndpoint::Preprocess,
+            &ConstructionPreprocessRequest {
+                network_identifier: network_identifier.clone(),
+                operations: ops.clone(),
+                metadata,
+            },
+        )
         .await;
     println!("Preprocess : {preprocess:?}");
     assert_eq!(preprocess.options.as_ref().unwrap().budget.unwrap(), budget);
 
     let metadata: ConstructionMetadataResponse = rosetta_client
-        .call(RosettaEndpoint::Metadata, &ConstructionMetadataRequest {
-            network_identifier: network_identifier.clone(),
-            options: preprocess.options,
-            public_keys: vec![],
-        })
+        .call(
+            RosettaEndpoint::Metadata,
+            &ConstructionMetadataRequest {
+                network_identifier: network_identifier.clone(),
+                options: preprocess.options,
+                public_keys: vec![],
+            },
+        )
         .await;
     println!("Metadata : {metadata:?}");
     assert_eq!(metadata.metadata.budget, budget);
 
     let payloads: ConstructionPayloadsResponse = rosetta_client
-        .call(RosettaEndpoint::Payloads, &ConstructionPayloadsRequest {
-            network_identifier: network_identifier.clone(),
-            operations: ops.clone(),
-            metadata: Some(metadata.metadata),
-            public_keys: vec![],
-        })
+        .call(
+            RosettaEndpoint::Payloads,
+            &ConstructionPayloadsRequest {
+                network_identifier: network_identifier.clone(),
+                operations: ops.clone(),
+                metadata: Some(metadata.metadata),
+                public_keys: vec![],
+            },
+        )
         .await;
     println!("Payload : {payloads:?}");
 
@@ -130,28 +132,34 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
     let bytes = Hex::decode(&signing_payload.hex_bytes).unwrap();
     let signer = signing_payload.account_identifier.address;
     let signature = keystore.sign_hashed(&signer, &bytes).unwrap();
-    let public_key = keystore.get_key(&signer).unwrap().public();
+    let public_key = keystore.export(&signer).unwrap().public();
 
     let combine: ConstructionCombineResponse = rosetta_client
-        .call(RosettaEndpoint::Combine, &ConstructionCombineRequest {
-            network_identifier: network_identifier.clone(),
-            unsigned_transaction: payloads.unsigned_transaction,
-            signatures: vec![Signature {
-                signing_payload: signing_payload.clone(),
-                public_key: public_key.into(),
-                signature_type: SignatureType::Ed25519,
-                hex_bytes: Hex::from_bytes(SuiSignature::signature_bytes(&signature)),
-            }],
-        })
+        .call(
+            RosettaEndpoint::Combine,
+            &ConstructionCombineRequest {
+                network_identifier: network_identifier.clone(),
+                unsigned_transaction: payloads.unsigned_transaction,
+                signatures: vec![Signature {
+                    signing_payload: signing_payload.clone(),
+                    public_key: public_key.into(),
+                    signature_type: SignatureType::Ed25519,
+                    hex_bytes: Hex::from_bytes(SuiSignature::signature_bytes(&signature)),
+                }],
+            },
+        )
         .await;
     println!("Combine : {combine:?}");
 
     // Submit
     let submit: TransactionIdentifierResponseResult = rosetta_client
-        .call(RosettaEndpoint::Submit, &ConstructionSubmitRequest {
-            network_identifier,
-            signed_transaction: combine.signed_transaction,
-        })
+        .call(
+            RosettaEndpoint::Submit,
+            &ConstructionSubmitRequest {
+                network_identifier,
+                signed_transaction: combine.signed_transaction,
+            },
+        )
         .await;
     println!("Submit : {submit:?}");
     submit
@@ -173,13 +181,18 @@ async fn test_pay_with_gas_budget_fail() {
     let submit = pay_with_gas_budget(TX_BUDGET_FAIL).await;
     match submit {
         TransactionIdentifierResponseResult::Error(rosetta_submit_gas_error) => {
-            assert_eq!(rosetta_submit_gas_error, RosettaSubmitGasError {
-                code: 11,
-                message: "Transaction dry run error".to_string(),
-                description: None,
-                retriable: false,
-                details: RosettaSubmitGasErrorDetails { error: "InsufficientGas".to_string() }
-            })
+            assert_eq!(
+                rosetta_submit_gas_error,
+                RosettaSubmitGasError {
+                    code: 11,
+                    message: "Transaction dry run error".to_string(),
+                    description: None,
+                    retriable: false,
+                    details: RosettaSubmitGasErrorDetails {
+                        error: "InsufficientGas".to_string()
+                    }
+                }
+            )
         }
         _ => panic!("Expected transaction to fail"),
     }

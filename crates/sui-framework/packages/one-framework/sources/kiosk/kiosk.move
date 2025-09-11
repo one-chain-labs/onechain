@@ -80,15 +80,15 @@
 /// ```
 ///
 /// See `transfer_policy` module for more details on how they function.
-module one::kiosk;
+module oct::kiosk;
 
-use one::balance::{Self, Balance};
-use one::coin::{Self, Coin};
-use one::dynamic_field as df;
-use one::dynamic_object_field as dof;
-use one::event;
-use one::oct::OCT;
-use one::transfer_policy::{Self, TransferPolicy, TransferRequest};
+use sui::balance::{Self, Balance};
+use sui::coin::{Self, Coin};
+use sui::dynamic_field as df;
+use sui::dynamic_object_field as dof;
+use sui::event;
+use sui::oct::OCT;
+use sui::transfer_policy::{Self, TransferPolicy, TransferRequest};
 
 /// Allows calling `cap.kiosk()` to retrieve `for` field from `KioskOwnerCap`.
 public use fun kiosk_owner_cap_for as KioskOwnerCap.kiosk;
@@ -182,16 +182,16 @@ public struct Borrow { kiosk_id: ID, item_id: ID }
 // === Dynamic Field keys ===
 
 /// Dynamic field key for an item placed into the kiosk.
-public struct Item has store, copy, drop { id: ID }
+public struct Item has copy, drop, store { id: ID }
 
 /// Dynamic field key for an active offer to purchase the T. If an
 /// item is listed without a `PurchaseCap`, exclusive is set to `false`.
-public struct Listing has store, copy, drop { id: ID, is_exclusive: bool }
+public struct Listing has copy, drop, store { id: ID, is_exclusive: bool }
 
 /// Dynamic field key which marks that an item is locked in the `Kiosk` and
 /// can't be `take`n. The item then can only be listed / sold via the PurchaseCap.
 /// Lock is released on `purchase`.
-public struct Lock has store, copy, drop { id: ID }
+public struct Lock has copy, drop, store { id: ID }
 
 // === Events ===
 
@@ -233,8 +233,8 @@ public struct ItemDelisted<phantom T: key + store> has copy, drop {
 /// `KioskOwnerCap` and becomes the Owner, the `Kiosk` is shared.
 entry fun default(ctx: &mut TxContext) {
     let (kiosk, cap) = new(ctx);
-    one::transfer::transfer(cap, ctx.sender());
-    one::transfer::share_object(kiosk);
+    sui::transfer::transfer(cap, ctx.sender());
+    sui::transfer::share_object(kiosk);
 }
 
 /// Creates a new `Kiosk` with a matching `KioskOwnerCap`.

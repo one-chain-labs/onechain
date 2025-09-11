@@ -11,8 +11,7 @@ use std::{
 use anemo::{
     rpc::Status,
     types::{response::StatusCode, PeerInfo},
-    PeerId,
-    Response,
+    PeerId, Response,
 };
 use anemo_tower::{
     auth::{AllowedPeers, RequireAuthorizationLayer},
@@ -24,6 +23,7 @@ use arc_swap::ArcSwapOption;
 use async_trait::async_trait;
 use bytes::Bytes;
 use consensus_config::{AuthorityIndex, NetworkKeyPair};
+use consensus_types::block::{BlockRef, Round};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::error::RecvError;
 use tracing::{debug, error, warn};
@@ -36,18 +36,14 @@ use super::{
     connection_monitor::{AnemoConnectionMonitor, ConnectionMonitorHandle},
     epoch_filter::{AllowedEpoch, EPOCH_HEADER_KEY},
     metrics_layer::{MetricsCallbackMaker, MetricsResponseCallback, SizedRequest, SizedResponse},
-    BlockStream,
-    NetworkClient,
-    NetworkManager,
-    NetworkService,
+    BlockStream, ExtendedSerializedBlock, NetworkClient, NetworkManager, NetworkService,
 };
 use crate::{
-    block::{BlockRef, VerifiedBlock},
+    block::VerifiedBlock,
     commit::CommitRange,
     context::Context,
     error::{ConsensusError, ConsensusResult},
     CommitIndex,
-    Round,
 };
 
 /// Implements Anemo RPC client for Consensus.
@@ -60,7 +56,10 @@ impl AnemoClient {
     const GET_CLIENT_INTERVAL: Duration = Duration::from_millis(10);
 
     pub(crate) fn new(context: Arc<Context>) -> Self {
-        Self { context, network: Arc::new(ArcSwapOption::default()) }
+        Self {
+            context,
+            network: Arc::new(ArcSwapOption::default()),
+        }
     }
 
     pub(crate) fn set_network(&self, network: anemo::Network) {
@@ -92,7 +91,9 @@ impl AnemoClient {
         }
 
         let (mut subscriber, _) = network.subscribe().map_err(|e| {
-            ConsensusError::NetworkClientConnection(format!("Cannot subscribe to AnemoNetwork updates: {e:?}"))
+            ConsensusError::NetworkClientConnection(format!(
+                "Cannot subscribe to AnemoNetwork updates: {e:?}"
+            ))
         })?;
 
         let sleep = tokio::time::sleep(timeout);
@@ -130,9 +131,16 @@ impl AnemoClient {
 impl NetworkClient for AnemoClient {
     const SUPPORT_STREAMING: bool = false;
 
-    async fn send_block(&self, peer: AuthorityIndex, block: &VerifiedBlock, timeout: Duration) -> ConsensusResult<()> {
+    async fn send_block(
+        &self,
+        peer: AuthorityIndex,
+        block: &VerifiedBlock,
+        timeout: Duration,
+    ) -> ConsensusResult<()> {
         let mut client = self.get_client(peer, timeout).await?;
-        let request = SendBlockRequest { block: block.serialized().clone() };
+        let request = SendBlockRequest {
+            block: block.serialized().clone(),
+        };
         client
             .send_block(anemo::Request::new(request).with_timeout(timeout))
             .await
@@ -154,6 +162,7 @@ impl NetworkClient for AnemoClient {
         peer: AuthorityIndex,
         block_refs: Vec<BlockRef>,
         highest_accepted_rounds: Vec<Round>,
+        breadth_first: bool,
         timeout: Duration,
     ) -> ConsensusResult<Vec<Bytes>> {
         let mut client = self.get_client(peer, timeout).await?;
@@ -169,9 +178,12 @@ impl NetworkClient for AnemoClient {
                 })
                 .collect(),
             highest_accepted_rounds,
+            breadth_first,
         };
-        let response =
-            client.fetch_blocks(anemo::Request::new(request).with_timeout(timeout)).await.map_err(|e: Status| {
+        let response = client
+            .fetch_blocks(anemo::Request::new(request).with_timeout(timeout))
+            .await
+            .map_err(|e: Status| {
                 if e.status() == StatusCode::RequestTimeout {
                     ConsensusError::NetworkRequestTimeout(format!("fetch_blocks timeout: {e:?}"))
                 } else {
@@ -189,7 +201,10 @@ impl NetworkClient for AnemoClient {
         timeout: Duration,
     ) -> ConsensusResult<(Vec<Bytes>, Vec<Bytes>)> {
         let mut client = self.get_client(peer, timeout).await?;
-        let request = FetchCommitsRequest { start: commit_range.start(), end: commit_range.end() };
+        let request = FetchCommitsRequest {
+            start: commit_range.start(),
+            end: commit_range.end(),
+        };
         let response = client
             .fetch_commits(anemo::Request::new(request).with_timeout(timeout))
             .await
@@ -206,15 +221,18 @@ impl NetworkClient for AnemoClient {
     ) -> ConsensusResult<Vec<Bytes>> {
         let mut client = self.get_client(peer, timeout).await?;
         let request = FetchLatestBlocksRequest { authorities };
-        let response = client.fetch_latest_blocks(anemo::Request::new(request).with_timeout(timeout)).await.map_err(
-            |e: Status| {
+        let response = client
+            .fetch_latest_blocks(anemo::Request::new(request).with_timeout(timeout))
+            .await
+            .map_err(|e: Status| {
                 if e.status() == StatusCode::RequestTimeout {
-                    ConsensusError::NetworkRequestTimeout(format!("fetch_latest_blocks timeout: {e:?}"))
+                    ConsensusError::NetworkRequestTimeout(format!(
+                        "fetch_latest_blocks timeout: {e:?}"
+                    ))
                 } else {
                     ConsensusError::NetworkRequest(format!("fetch_latest_blocks failed: {e:?}"))
                 }
-            },
-        )?;
+            })?;
         let body = response.into_body();
         Ok(body.blocks)
     }
@@ -226,15 +244,18 @@ impl NetworkClient for AnemoClient {
     ) -> ConsensusResult<(Vec<Round>, Vec<Round>)> {
         let mut client = self.get_client(peer, timeout).await?;
         let request = GetLatestRoundsRequest {};
-        let response = client.get_latest_rounds(anemo::Request::new(request).with_timeout(timeout)).await.map_err(
-            |e: Status| {
+        let response = client
+            .get_latest_rounds(anemo::Request::new(request).with_timeout(timeout))
+            .await
+            .map_err(|e: Status| {
                 if e.status() == StatusCode::RequestTimeout {
-                    ConsensusError::NetworkRequestTimeout(format!("get_latest_rounds timeout: {e:?}"))
+                    ConsensusError::NetworkRequestTimeout(format!(
+                        "get_latest_rounds timeout: {e:?}"
+                    ))
                 } else {
                     ConsensusError::NetworkRequest(format!("get_latest_rounds failed: {e:?}"))
                 }
-            },
-        )?;
+            })?;
         let body = response.into_body();
         Ok((body.highest_received, body.highest_accepted))
     }
@@ -273,12 +294,25 @@ impl<S: NetworkService> ConsensusRpc for AnemoServiceProxy<S> {
             ));
         };
         let index = *self.peer_map.get(peer_id).ok_or_else(|| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, "peer not found")
+            anemo::rpc::Status::new_with_message(
+                anemo::types::response::StatusCode::BadRequest,
+                "peer not found",
+            )
         })?;
         let block = request.into_body().block;
-        self.service.handle_send_block(index, block).await.map_err(|e| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, format!("{e}"))
-        })?;
+        let block = ExtendedSerializedBlock {
+            block,
+            excluded_ancestors: vec![],
+        };
+        self.service
+            .handle_send_block(index, block)
+            .await
+            .map_err(|e| {
+                anemo::rpc::Status::new_with_message(
+                    anemo::types::response::StatusCode::BadRequest,
+                    format!("{e}"),
+                )
+            })?;
         Ok(Response::new(SendBlockResponse {}))
     }
 
@@ -293,7 +327,10 @@ impl<S: NetworkService> ConsensusRpc for AnemoServiceProxy<S> {
             ));
         };
         let index = *self.peer_map.get(peer_id).ok_or_else(|| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, "peer not found")
+            anemo::rpc::Status::new_with_message(
+                anemo::types::response::StatusCode::BadRequest,
+                "peer not found",
+            )
         })?;
         let body = request.into_body();
         let block_refs = body
@@ -309,10 +346,16 @@ impl<S: NetworkService> ConsensusRpc for AnemoServiceProxy<S> {
             .collect();
 
         let highest_accepted_rounds = body.highest_accepted_rounds;
-
-        let blocks =
-            self.service.handle_fetch_blocks(index, block_refs, highest_accepted_rounds).await.map_err(|e| {
-                anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, format!("{e}"))
+        let breadth_first = body.breadth_first;
+        let blocks = self
+            .service
+            .handle_fetch_blocks(index, block_refs, highest_accepted_rounds, breadth_first)
+            .await
+            .map_err(|e| {
+                anemo::rpc::Status::new_with_message(
+                    anemo::types::response::StatusCode::BadRequest,
+                    format!("{e}"),
+                )
             })?;
         Ok(Response::new(FetchBlocksResponse { blocks }))
     }
@@ -328,19 +371,34 @@ impl<S: NetworkService> ConsensusRpc for AnemoServiceProxy<S> {
             ));
         };
         let index = *self.peer_map.get(peer_id).ok_or_else(|| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, "peer not found")
+            anemo::rpc::Status::new_with_message(
+                anemo::types::response::StatusCode::BadRequest,
+                "peer not found",
+            )
         })?;
         let request = request.into_body();
-        let (commits, certifier_blocks) =
-            self.service.handle_fetch_commits(index, (request.start..=request.end).into()).await.map_err(|e| {
+        let (commits, certifier_blocks) = self
+            .service
+            .handle_fetch_commits(index, (request.start..=request.end).into())
+            .await
+            .map_err(|e| {
                 anemo::rpc::Status::new_with_message(
                     anemo::types::response::StatusCode::InternalServerError,
                     format!("{e}"),
                 )
             })?;
-        let commits = commits.into_iter().map(|c| c.serialized().clone()).collect();
-        let certifier_blocks = certifier_blocks.into_iter().map(|b| b.serialized().clone()).collect();
-        Ok(Response::new(FetchCommitsResponse { commits, certifier_blocks }))
+        let commits = commits
+            .into_iter()
+            .map(|c| c.serialized().clone())
+            .collect();
+        let certifier_blocks = certifier_blocks
+            .into_iter()
+            .map(|b| b.serialized().clone())
+            .collect();
+        Ok(Response::new(FetchCommitsResponse {
+            commits,
+            certifier_blocks,
+        }))
     }
 
     async fn fetch_latest_blocks(
@@ -354,12 +412,22 @@ impl<S: NetworkService> ConsensusRpc for AnemoServiceProxy<S> {
             ));
         };
         let index = *self.peer_map.get(peer_id).ok_or_else(|| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, "peer not found")
+            anemo::rpc::Status::new_with_message(
+                anemo::types::response::StatusCode::BadRequest,
+                "peer not found",
+            )
         })?;
         let body = request.into_body();
-        let blocks = self.service.handle_fetch_latest_blocks(index, body.authorities).await.map_err(|e| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, format!("{e}"))
-        })?;
+        let blocks = self
+            .service
+            .handle_fetch_latest_blocks(index, body.authorities)
+            .await
+            .map_err(|e| {
+                anemo::rpc::Status::new_with_message(
+                    anemo::types::response::StatusCode::BadRequest,
+                    format!("{e}"),
+                )
+            })?;
         Ok(Response::new(FetchLatestBlocksResponse { blocks }))
     }
 
@@ -374,12 +442,25 @@ impl<S: NetworkService> ConsensusRpc for AnemoServiceProxy<S> {
             ));
         };
         let index = *self.peer_map.get(peer_id).ok_or_else(|| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::BadRequest, "peer not found")
+            anemo::rpc::Status::new_with_message(
+                anemo::types::response::StatusCode::BadRequest,
+                "peer not found",
+            )
         })?;
-        let (highest_received, highest_accepted) = self.service.handle_get_latest_rounds(index).await.map_err(|e| {
-            anemo::rpc::Status::new_with_message(anemo::types::response::StatusCode::InternalServerError, format!("{e}"))
-        })?;
-        Ok(Response::new(GetLatestRoundsResponse { highest_received, highest_accepted }))
+        let (highest_received, highest_accepted) = self
+            .service
+            .handle_get_latest_rounds(index)
+            .await
+            .map_err(|e| {
+                anemo::rpc::Status::new_with_message(
+                    anemo::types::response::StatusCode::InternalServerError,
+                    format!("{e}"),
+                )
+            })?;
+        Ok(Response::new(GetLatestRoundsResponse {
+            highest_received,
+            highest_accepted,
+        }))
     }
 }
 
@@ -421,7 +502,12 @@ impl<S: NetworkService> NetworkManager<S> for AnemoManager {
     }
 
     async fn install_service(&mut self, service: Arc<S>) {
-        self.context.metrics.network_metrics.network_type.with_label_values(&["anemo"]).set(1);
+        self.context
+            .metrics
+            .network_metrics
+            .network_type
+            .with_label_values(&["anemo"])
+            .set(1);
 
         debug!("Starting anemo service");
 
@@ -437,13 +523,25 @@ impl<S: NetworkService> NetworkManager<S> for AnemoManager {
         let epoch_string: String = self.context.committee.epoch().to_string();
         let inbound_network_metrics = self.context.metrics.network_metrics.inbound.clone();
         let outbound_network_metrics = self.context.metrics.network_metrics.outbound.clone();
-        let quinn_connection_metrics = self.context.metrics.network_metrics.quinn_connection_metrics.clone();
-        let all_peer_ids =
-            self.context.committee.authorities().map(|(_i, authority)| PeerId(authority.network_key.to_bytes()));
+        let quinn_connection_metrics = self
+            .context
+            .metrics
+            .network_metrics
+            .quinn_connection_metrics
+            .clone();
+        let all_peer_ids = self
+            .context
+            .committee
+            .authorities()
+            .map(|(_i, authority)| PeerId(authority.network_key.to_bytes()));
 
         let routes = anemo::Router::new()
-            .route_layer(RequireAuthorizationLayer::new(AllowedPeers::new(all_peer_ids)))
-            .route_layer(RequireAuthorizationLayer::new(AllowedEpoch::new(epoch_string.clone())))
+            .route_layer(RequireAuthorizationLayer::new(AllowedPeers::new(
+                all_peer_ids,
+            )))
+            .route_layer(RequireAuthorizationLayer::new(AllowedEpoch::new(
+                epoch_string.clone(),
+            )))
             .add_rpc_service(server);
 
         // TODO: instrument with failpoints.
@@ -457,7 +555,10 @@ impl<S: NetworkService> NetworkManager<S> for AnemoManager {
                 inbound_network_metrics,
                 self.context.parameters.anemo.excessive_message_size,
             )))
-            .layer(SetResponseHeaderLayer::overriding(EPOCH_HEADER_KEY.parse().unwrap(), epoch_string.clone()))
+            .layer(SetResponseHeaderLayer::overriding(
+                EPOCH_HEADER_KEY.parse().unwrap(),
+                epoch_string.clone(),
+            ))
             .service(routes);
 
         let outbound_layer = tower::ServiceBuilder::new()
@@ -470,7 +571,10 @@ impl<S: NetworkService> NetworkManager<S> for AnemoManager {
                 outbound_network_metrics,
                 self.context.parameters.anemo.excessive_message_size,
             )))
-            .layer(SetRequestHeaderLayer::overriding(EPOCH_HEADER_KEY.parse().unwrap(), epoch_string))
+            .layer(SetRequestHeaderLayer::overriding(
+                EPOCH_HEADER_KEY.parse().unwrap(),
+                epoch_string,
+            ))
             .into_inner();
 
         let anemo_config = {
@@ -507,7 +611,9 @@ impl<S: NetworkService> NetworkManager<S> for AnemoManager {
         };
 
         let mut retries_left = 90;
-        let addr = own_address.to_anemo_address().unwrap_or_else(|op| panic!("{op}: {own_address}"));
+        let addr = own_address
+            .to_anemo_address()
+            .unwrap_or_else(|op| panic!("{op}: {own_address}"));
         let private_key_bytes = self.network_keypair.take().unwrap().private_key_bytes();
         let network = loop {
             let network_result = anemo::Network::bind(addr.clone())
@@ -543,18 +649,27 @@ impl<S: NetworkService> NetworkManager<S> for AnemoManager {
                 // But it is possible if supported anemo address formats are updated without a
                 // feature flag.
                 Err(e) => {
-                    error!("Failed to convert {:?} to anemo address: {:?}", authority.address, e);
+                    error!(
+                        "Failed to convert {:?} to anemo address: {:?}",
+                        authority.address, e
+                    );
                     continue;
                 }
             };
-            let peer_info =
-                PeerInfo { peer_id, affinity: anemo::types::PeerAffinity::High, address: vec![peer_address.clone()] };
+            let peer_info = PeerInfo {
+                peer_id,
+                affinity: anemo::types::PeerAffinity::High,
+                address: vec![peer_address.clone()],
+            };
             network.known_peers().insert(peer_info);
             known_peer_ids.insert(peer_id, authority.hostname.clone());
         }
 
-        let connection_monitor_handle =
-            AnemoConnectionMonitor::spawn(network.downgrade(), quinn_connection_metrics, known_peer_ids);
+        let connection_monitor_handle = AnemoConnectionMonitor::spawn(
+            network.downgrade(),
+            quinn_connection_metrics,
+            known_peer_ids,
+        );
 
         self.connection_monitor_handle = Some(connection_monitor_handle);
         self.client.set_network(network.clone());
@@ -573,7 +688,12 @@ impl<S: NetworkService> NetworkManager<S> for AnemoManager {
             connection_monitor_handle.stop().await;
         }
 
-        self.context.metrics.network_metrics.network_type.with_label_values(&["anemo"]).set(0);
+        self.context
+            .metrics
+            .network_metrics
+            .network_type
+            .with_label_values(&["anemo"])
+            .set(0);
     }
 }
 
@@ -612,12 +732,12 @@ impl MakeCallbackHandler for MetricsCallbackMaker {
 }
 
 impl ResponseHandler for MetricsResponseCallback {
-    fn on_response(self, response: &anemo::Response<bytes::Bytes>) {
-        self.on_response(response)
+    fn on_response(mut self, response: &anemo::Response<bytes::Bytes>) {
+        MetricsResponseCallback::on_response(&mut self, response)
     }
 
-    fn on_error<E>(self, err: &E) {
-        self.on_error(err)
+    fn on_error<E>(mut self, err: &E) {
+        MetricsResponseCallback::on_error(&mut self, err)
     }
 }
 
@@ -635,6 +755,7 @@ pub(crate) struct SendBlockResponse {}
 pub(crate) struct FetchBlocksRequest {
     block_refs: Vec<Vec<u8>>,
     highest_accepted_rounds: Vec<Round>,
+    breadth_first: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

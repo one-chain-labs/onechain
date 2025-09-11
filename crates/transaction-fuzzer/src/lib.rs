@@ -9,17 +9,16 @@ pub mod transaction_data_gen;
 pub mod type_arg_fuzzer;
 
 use executor::Executor;
-use proptest::{collection::vec, test_runner::TestRunner};
+use proptest::collection::vec;
+use proptest::test_runner::TestRunner;
 use std::fmt::Debug;
 use sui_protocol_config::ProtocolConfig;
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    crypto::{get_key_pair, AccountKeyPair},
-    digests::TransactionDigest,
-    gas_coin::TOTAL_SUPPLY_MIST,
-    object::{MoveObject, Object, Owner, OBJECT_START_VERSION},
-    transaction::GasData,
-};
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::crypto::get_key_pair;
+use sui_types::crypto::AccountKeyPair;
+use sui_types::digests::TransactionDigest;
+use sui_types::object::{MoveObject, Object, Owner, OBJECT_START_VERSION};
+use sui_types::{gas_coin::TOTAL_SUPPLY_MIST, transaction::GasData};
 
 use proptest::prelude::*;
 use rand::{rngs::StdRng, SeedableRng};
@@ -52,7 +51,9 @@ fn generate_random_gas_data(
     let gas_coin_owners = gas_coin_owners
         .iter()
         .map(|o| match o {
-            Owner::ObjectOwner(_) | Owner::AddressOwner(_) if owned_by_sender => Owner::AddressOwner(sender),
+            Owner::ObjectOwner(_) | Owner::AddressOwner(_) if owned_by_sender => {
+                Owner::AddressOwner(sender)
+            }
             _ => o.clone(),
         })
         .collect::<Vec<_>>();
@@ -64,14 +65,19 @@ fn generate_random_gas_data(
         gas_objects.push(gas_object);
     }
     // Put the remaining balance in the last gas object.
-    let last_gas_object =
-        new_gas_coin_with_balance_and_owner(remaining_gas_balance, gas_coin_owners[num_gas_objects - 1].clone());
+    let last_gas_object = new_gas_coin_with_balance_and_owner(
+        remaining_gas_balance,
+        gas_coin_owners[num_gas_objects - 1].clone(),
+    );
     object_refs.push(last_gas_object.compute_object_reference());
     gas_objects.push(last_gas_object);
 
     assert_eq!(gas_objects.len(), num_gas_objects);
     assert_eq!(
-        gas_objects.iter().map(|o| o.data.try_as_move().unwrap().get_coin_value_unsafe()).sum::<u64>(),
+        gas_objects
+            .iter()
+            .map(|o| o.data.try_as_move().unwrap().get_coin_value_unsafe())
+            .sum::<u64>(),
         total_gas_balance
     );
 
@@ -104,14 +110,16 @@ pub struct GasDataGenConfig {
 impl GasDataGenConfig {
     pub fn owned_by_sender_or_immut() -> Self {
         Self {
-            max_num_gas_objects: ProtocolConfig::get_for_max_version_UNSAFE().max_gas_payment_objects() as usize,
+            max_num_gas_objects: ProtocolConfig::get_for_max_version_UNSAFE()
+                .max_gas_payment_objects() as usize,
             owned_by_sender: true,
         }
     }
 
     pub fn any_owner() -> Self {
         Self {
-            max_num_gas_objects: ProtocolConfig::get_for_max_version_UNSAFE().max_gas_payment_objects() as usize,
+            max_num_gas_objects: ProtocolConfig::get_for_max_version_UNSAFE()
+                .max_gas_payment_objects() as usize,
             owned_by_sender: false,
         }
     }
@@ -122,8 +130,13 @@ impl proptest::arbitrary::Arbitrary for GasDataWithObjects {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
-        (any::<[u8; 32]>(), vec(any::<Owner>(), 1..=params.max_num_gas_objects))
-            .prop_map(move |(seed, owners)| generate_random_gas_data(seed, owners, params.owned_by_sender))
+        (
+            any::<[u8; 32]>(),
+            vec(any::<Owner>(), 1..=params.max_num_gas_objects),
+        )
+            .prop_map(move |(seed, owners)| {
+                generate_random_gas_data(seed, owners, params.owned_by_sender)
+            })
             .boxed()
     }
 }
@@ -143,10 +156,18 @@ pub fn run_proptest<D>(
 ) where
     D: Debug + 'static,
 {
-    let mut runner = TestRunner::new(ProptestConfig { cases: num_test_cases, ..Default::default() });
+    let mut runner = TestRunner::new(ProptestConfig {
+        cases: num_test_cases,
+        ..Default::default()
+    });
     let executor = Executor::new();
-    let strategy_with_authority = strategy.prop_map(|data| TestData { data, executor: executor.clone() });
-    let result = runner.run(&strategy_with_authority, |test_data| test_fn(test_data.data, test_data.executor));
+    let strategy_with_authority = strategy.prop_map(|data| TestData {
+        data,
+        executor: executor.clone(),
+    });
+    let result = runner.run(&strategy_with_authority, |test_data| {
+        test_fn(test_data.data, test_data.executor)
+    });
     if result.is_err() {
         panic!("test failed: {:?}", result);
     }

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    debug_display,
-    diag,
+    debug_display, diag,
     diagnostics::Diagnostic,
     expansion::{
         alias_map_builder::{LeadingAccessEntry, MemberEntry},
@@ -11,7 +10,8 @@ use crate::{
     },
     naming::ast as N,
     parser::ast as P,
-    shared::{string_utils::format_oxford_list, Name},
+    shared::Name,
+    shared::string_utils::format_oxford_list,
     typing::ast as T,
     unit_test::filter_test_members::UNIT_TEST_POISON_FUN_NAME,
 };
@@ -85,8 +85,11 @@ pub struct AliasAutocompleteInfo {
     pub addresses: BTreeMap<Symbol, NumericalAddress>,
     /// Modules that are valid autocompletes
     pub modules: BTreeMap<Symbol, E::ModuleIdent>,
-    /// Members that are valid autocompletes
-    pub members: BTreeSet<(Symbol, E::ModuleIdent, Name)>,
+    /// Members that are valid autocompletes (module
+    /// and symbol representing member name) with a set
+    /// of symbols used in the source code representing
+    /// this member including possible (multiple) aliases
+    pub members: BTreeMap<(E::ModuleIdent, Symbol), BTreeSet<Symbol>>,
     /// Type parameters that are valid autocompletes
     pub type_params: BTreeSet<Symbol>,
 }
@@ -153,7 +156,10 @@ pub enum EllipsisMatchEntries {
 
 impl AutocompleteMethod {
     pub fn new(method_name: Symbol, target_function: (E::ModuleIdent, P::FunctionName)) -> Self {
-        Self { method_name, target_function }
+        Self {
+            method_name,
+            target_function,
+        }
     }
 }
 
@@ -184,8 +190,8 @@ impl IDEInfo {
 }
 
 impl IntoIterator for IDEInfo {
-    type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = (Loc, IDEAnnotation);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.annotations.into_iter()
@@ -198,17 +204,26 @@ impl AliasAutocompleteInfo {
     }
 }
 
-impl From<(BTreeMap<Symbol, LeadingAccessEntry>, BTreeMap<Symbol, MemberEntry>)> for AliasAutocompleteInfo {
+impl
+    From<(
+        BTreeMap<Symbol, LeadingAccessEntry>,
+        BTreeMap<Symbol, MemberEntry>,
+    )> for AliasAutocompleteInfo
+{
     fn from(
-        (leading_names, member_names): (BTreeMap<Symbol, LeadingAccessEntry>, BTreeMap<Symbol, MemberEntry>),
+        (leading_names, member_names): (
+            BTreeMap<Symbol, LeadingAccessEntry>,
+            BTreeMap<Symbol, MemberEntry>,
+        ),
     ) -> Self {
         let mut addresses: BTreeMap<Symbol, NumericalAddress> = BTreeMap::new();
         let mut modules: BTreeMap<Symbol, E::ModuleIdent> = BTreeMap::new();
-        let mut members: BTreeSet<(Symbol, E::ModuleIdent, Name)> = BTreeSet::new();
+        let mut members: BTreeMap<(E::ModuleIdent, Symbol), BTreeSet<Symbol>> = BTreeMap::new();
         let mut type_params: BTreeSet<Symbol> = BTreeSet::new();
 
-        for (symbol, entry) in
-            leading_names.iter().filter(|(symbol, _)| symbol.to_string() != UNIT_TEST_POISON_FUN_NAME.to_string())
+        for (symbol, entry) in leading_names
+            .iter()
+            .filter(|(symbol, _)| symbol.to_string() != UNIT_TEST_POISON_FUN_NAME.to_string())
         {
             match entry {
                 LeadingAccessEntry::Address(addr) => {
@@ -218,7 +233,10 @@ impl From<(BTreeMap<Symbol, LeadingAccessEntry>, BTreeMap<Symbol, MemberEntry>)>
                     modules.insert(*symbol, *mident);
                 }
                 LeadingAccessEntry::Member(mident, name) => {
-                    members.insert((*symbol, *mident, *name));
+                    members
+                        .entry((*mident, name.value))
+                        .or_default()
+                        .insert(*symbol);
                 }
                 LeadingAccessEntry::TypeParam => {
                     type_params.insert(*symbol);
@@ -227,12 +245,16 @@ impl From<(BTreeMap<Symbol, LeadingAccessEntry>, BTreeMap<Symbol, MemberEntry>)>
         }
 
         // The member names shadow, though this should be no issue as they should be identical.
-        for (symbol, entry) in
-            member_names.iter().filter(|(symbol, _)| symbol.to_string() != UNIT_TEST_POISON_FUN_NAME.to_string())
+        for (symbol, entry) in member_names
+            .iter()
+            .filter(|(symbol, _)| symbol.to_string() != UNIT_TEST_POISON_FUN_NAME.to_string())
         {
             match entry {
                 MemberEntry::Member(mident, name) => {
-                    members.insert((*symbol, *mident, *name));
+                    members
+                        .entry((*mident, name.value))
+                        .or_default()
+                        .insert(*symbol);
                 }
                 MemberEntry::TypeParam => {
                     type_params.insert(*symbol);
@@ -240,7 +262,12 @@ impl From<(BTreeMap<Symbol, LeadingAccessEntry>, BTreeMap<Symbol, MemberEntry>)>
             }
         }
 
-        AliasAutocompleteInfo { members, modules, addresses, type_params }
+        AliasAutocompleteInfo {
+            members,
+            modules,
+            addresses,
+            type_params,
+        }
     }
 }
 
@@ -248,7 +275,13 @@ impl From<(Loc, IDEAnnotation)> for Diagnostic {
     fn from((loc, ann): (Loc, IDEAnnotation)) -> Self {
         match ann {
             IDEAnnotation::MacroCallInfo(info) => {
-                let MacroCallInfo { module, name, method_name, type_arguments, by_value_args } = *info;
+                let MacroCallInfo {
+                    module,
+                    name,
+                    method_name,
+                    type_arguments,
+                    by_value_args,
+                } = *info;
                 let mut diag = diag!(IDE::MacroCallInfo, (loc, "macro call info"));
                 diag.add_note(format!("Called {module}::{name}"));
                 if let Some(mname) = method_name {
@@ -268,13 +301,27 @@ impl From<(Loc, IDEAnnotation)> for Diagnostic {
                 diag!(IDE::ExpandedLambda, (loc, "expanded lambda"))
             }
             IDEAnnotation::PathAutocompleteInfo(info) => {
-                let AliasAutocompleteInfo { members, modules, addresses, type_params } = *info;
+                let AliasAutocompleteInfo {
+                    members,
+                    modules,
+                    addresses,
+                    type_params,
+                } = *info;
 
-                let members = members.into_iter().map(|(name, m, f)| format!("{name} -> {m}::{f}"));
-                let member_names = format_oxford_list!(ITER, "or", "'{}'", members);
-                let modules = modules.into_iter().map(|(name, m)| format!("{name} -> {m}"));
+                let members = members
+                    .iter()
+                    .flat_map(|((m, f), names)| {
+                        names.iter().map(move |name| format!("{name} -> {m}::{f}"))
+                    })
+                    .collect::<Vec<_>>();
+                let member_names = format_oxford_list!(ITER, "or", "'{}'", members.iter());
+                let modules = modules
+                    .into_iter()
+                    .map(|(name, m)| format!("{name} -> {m}"));
                 let module_names = format_oxford_list!(ITER, "or", "'{}'", modules);
-                let addrs = addresses.into_iter().map(|(name, a)| format!("{name} -> {a}"));
+                let addrs = addresses
+                    .into_iter()
+                    .map(|(name, a)| format!("{name} -> {a}"));
                 let address_names = format_oxford_list!(ITER, "or", "'{}'", addrs);
                 let type_params = type_params.into_iter().map(|p| format!("{p}"));
                 let type_param_names = format_oxford_list!(ITER, "or", "'{}'", type_params);
@@ -289,12 +336,18 @@ impl From<(Loc, IDEAnnotation)> for Diagnostic {
                 let DotAutocompleteInfo { methods, fields } = *info;
                 let names = methods
                     .into_iter()
-                    .map(|AutocompleteMethod { method_name, target_function: (mident, _) }| {
-                        format!("{mident}::{method_name}")
-                    })
+                    .map(
+                        |AutocompleteMethod {
+                             method_name,
+                             target_function: (mident, _),
+                         }| { format!("{mident}::{method_name}") },
+                    )
                     .chain(fields.into_iter().map(|(n, _)| format!("{n}")))
                     .collect::<Vec<_>>();
-                let msg = format!("Possible dot names: {}", format_oxford_list!("or", "'{}'", names));
+                let msg = format!(
+                    "Possible dot names: {}",
+                    format_oxford_list!("or", "'{}'", names)
+                );
                 diag!(IDE::DotAutocomplete, (loc, msg))
             }
             IDEAnnotation::MissingMatchArms(info) => {
@@ -304,12 +357,16 @@ impl From<(Loc, IDEAnnotation)> for Diagnostic {
             }
             IDEAnnotation::EllipsisMatchEntries(entries) => {
                 let entries = match *entries {
-                    EllipsisMatchEntries::Positional(entries) => {
-                        entries.iter().map(|name| format!("{}", name)).collect::<Vec<_>>().join(", ")
-                    }
-                    EllipsisMatchEntries::Named(entries) => {
-                        entries.iter().map(|name| format!("{}: _", name)).collect::<Vec<_>>().join(", ")
-                    }
+                    EllipsisMatchEntries::Positional(entries) => entries
+                        .iter()
+                        .map(|name| format!("{}", name))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    EllipsisMatchEntries::Named(entries) => entries
+                        .iter()
+                        .map(|name| format!("{}: _", name))
+                        .collect::<Vec<_>>()
+                        .join(", "),
                 };
                 let msg = format!("Ellipsis expansion: {}", entries);
                 diag!(IDE::EllipsisExpansion, (loc, msg))
@@ -325,27 +382,63 @@ impl fmt::Display for PatternSuggestion {
             PS::Wildcard => write!(f, "_"),
             PS::Binder(n) => write!(f, "{n}"),
             PS::Value(v) => write!(f, "{v}"),
-            PS::UnpackPositionalStruct { module, name, field_count } => {
+            PS::UnpackPositionalStruct {
+                module,
+                name,
+                field_count,
+            } => {
                 write!(f, "{module}::{name}")?;
-                let wildcards = std::iter::repeat("_").take(*field_count).collect::<Vec<_>>().join(", ");
+                let wildcards = std::iter::repeat("_")
+                    .take(*field_count)
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 write!(f, "({wildcards})")
             }
-            PS::UnpackPositionalVariant { module, enum_name, variant_name, field_count } => {
+            PS::UnpackPositionalVariant {
+                module,
+                enum_name,
+                variant_name,
+                field_count,
+            } => {
                 write!(f, "{module}::{enum_name}::{variant_name}")?;
-                let wildcards = std::iter::repeat("_").take(*field_count).collect::<Vec<_>>().join(", ");
+                let wildcards = std::iter::repeat("_")
+                    .take(*field_count)
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 write!(f, "({wildcards})")
             }
-            PS::UnpackNamedStruct { module, name, fields } => {
+            PS::UnpackNamedStruct {
+                module,
+                name,
+                fields,
+            } => {
                 write!(f, "{module}::{name} ")?;
-                let field_names = fields.iter().map(|name| format!("{}", name)).collect::<Vec<_>>().join(" , ");
+                let field_names = fields
+                    .iter()
+                    .map(|name| format!("{}", name))
+                    .collect::<Vec<_>>()
+                    .join(" , ");
                 write!(f, "{{ {field_names} }}")
             }
-            PS::UnpackNamedVariant { module, enum_name, variant_name, fields } => {
+            PS::UnpackNamedVariant {
+                module,
+                enum_name,
+                variant_name,
+                fields,
+            } => {
                 write!(f, "{module}::{enum_name}::{variant_name} ")?;
-                let field_names = fields.iter().map(|name| format!("{}", name)).collect::<Vec<_>>().join(" , ");
+                let field_names = fields
+                    .iter()
+                    .map(|name| format!("{}", name))
+                    .collect::<Vec<_>>()
+                    .join(" , ");
                 write!(f, "{{ {field_names} }}")
             }
-            PS::UnpackEmptyVariant { module, enum_name, variant_name } => {
+            PS::UnpackEmptyVariant {
+                module,
+                enum_name,
+                variant_name,
+            } => {
                 write!(f, "{module}::{enum_name}::{variant_name}")
             }
         }

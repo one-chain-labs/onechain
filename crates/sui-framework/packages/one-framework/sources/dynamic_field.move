@@ -8,7 +8,7 @@
 /// the `copy`, `drop`, and `store` abilities, e.g. an integer, a boolean, or a string.
 /// This gives Sui programmers the flexibility to extend objects on-the-fly, and it also serves as a
 /// building block for core collection types
-module one::dynamic_field;
+module oct::dynamic_field;
 
 /// The object already has a dynamic field with this name (with the value and type specified)
 const EFieldAlreadyExists: u64 = 0;

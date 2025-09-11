@@ -4,9 +4,7 @@
 
 use crate::location::*;
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::ModuleId,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     runtime_value::MoveValue,
 };
 use move_symbol_pool::Symbol;
@@ -51,6 +49,8 @@ pub struct ModuleIdent {
 pub struct ModuleDefinition {
     /// The specified binary version of this module if a specific version is required.
     pub specified_version: Option<u32>,
+    /// If this definition is being built in testing mode
+    pub publishable: bool,
     /// The location of this module
     pub loc: Loc,
     /// name and address of the module
@@ -434,7 +434,11 @@ pub enum FunctionCall_ {
     /// functions defined in the host environment
     Builtin(Builtin),
     /// The call of a module defined procedure
-    ModuleFunctionCall { module: ModuleName, name: FunctionName, type_actuals: Vec<Type> },
+    ModuleFunctionCall {
+        module: ModuleName,
+        name: FunctionName,
+        type_actuals: Vec<Type>,
+    },
 }
 /// The type for a function call and its location
 pub type FunctionCall = Spanned<FunctionCall_>;
@@ -481,7 +485,14 @@ pub enum Statement_ {
     /// `n { f_1: x_1, ... , f_j: x_j  } = e`
     Unpack(DatatypeName, Vec<Type>, Fields<Var>, Box<Exp>),
     /// `e::v { f_1: x_1, ... , f_j: x_j  } = e`
-    UnpackVariant(DatatypeName, VariantName, Vec<Type>, Fields<Var>, Box<Exp>, UnpackType),
+    UnpackVariant(
+        DatatypeName,
+        VariantName,
+        Vec<Type>,
+        Fields<Var>,
+        Box<Exp>,
+        UnpackType,
+    ),
     /// `variant_switch (e) [(v1, lbl_1), ..., (v_n, lbl_n)]`
     VariantSwitch(DatatypeName, Vec<(VariantName, BlockLabel)>, Box<Exp>),
 }
@@ -712,7 +723,11 @@ pub enum Bytecode_ {
     VecPopBack(Type),
     VecUnpack(Type, u64),
     VecSwap(Type),
-    ErrorConstant { line_number: u16, constant: Option<ConstantName> },
+    ErrorConstant {
+        line_number: u16,
+        constant: Option<ConstantName>,
+        error_code: Option<u8>,
+    },
     PackVariant(DatatypeName, VariantName, Vec<Type>),
     UnpackVariant(DatatypeName, VariantName, Vec<Type>, UnpackType),
     VariantSwitch(DatatypeName, Vec<(VariantName, BlockLabel)>),
@@ -778,6 +793,7 @@ impl ModuleDefinition {
     pub fn new(
         specified_version: Option<u32>,
         loc: Loc,
+        publishable: bool,
         identifier: ModuleIdent,
         friends: Vec<ModuleIdent>,
         imports: Vec<ImportDefinition>,
@@ -790,6 +806,7 @@ impl ModuleDefinition {
         ModuleDefinition {
             specified_version,
             loc,
+            publishable,
             identifier,
             friends,
             imports,
@@ -810,8 +827,8 @@ impl ModuleDefinition {
 impl Ability {
     pub const COPY: &'static str = "copy";
     pub const DROP: &'static str = "drop";
-    pub const KEY: &'static str = "key";
     pub const STORE: &'static str = "store";
+    pub const KEY: &'static str = "key";
 }
 
 impl QualifiedDatatypeIdent {
@@ -864,8 +881,17 @@ impl StructDefinition_ {
 
     /// Creates a new StructDefinition from the abilities, the string representation of the name,
     /// and the user specified fields, a map from their names to their types
-    pub fn native(abilities: BTreeSet<Ability>, name: Symbol, type_formals: Vec<DatatypeTypeParameter>) -> Self {
-        StructDefinition_ { abilities, name: DatatypeName(name), type_formals, fields: StructDefinitionFields::Native }
+    pub fn native(
+        abilities: BTreeSet<Ability>,
+        name: Symbol,
+        type_formals: Vec<DatatypeTypeParameter>,
+    ) -> Self {
+        StructDefinition_ {
+            abilities,
+            name: DatatypeName(name),
+            type_formals,
+            fields: StructDefinitionFields::Native,
+        }
     }
 }
 
@@ -876,13 +902,21 @@ impl EnumDefinition_ {
         type_formals: Vec<DatatypeTypeParameter>,
         variants: VariantDefinitions,
     ) -> Self {
-        Self { abilities, name: DatatypeName(name), type_formals, variants }
+        Self {
+            abilities,
+            name: DatatypeName(name),
+            type_formals,
+            variants,
+        }
     }
 }
 
 impl VariantDefinition_ {
     pub fn new(name: Symbol, fields: Fields<Type>) -> Self {
-        Self { name: VariantName(name), fields }
+        Self {
+            name: VariantName(name),
+            fields,
+        }
     }
 }
 
@@ -893,7 +927,11 @@ impl FunctionSignature {
         return_type: Vec<Type>,
         type_parameters: Vec<(TypeVar, BTreeSet<Ability>)>,
     ) -> Self {
-        FunctionSignature { formals, return_type, type_formals: type_parameters }
+        FunctionSignature {
+            formals,
+            return_type,
+            type_formals: type_parameters,
+        }
     }
 }
 
@@ -910,14 +948,24 @@ impl Function_ {
         body: FunctionBody,
     ) -> Self {
         let signature = FunctionSignature::new(formals, return_type, type_parameters);
-        Function_ { loc, visibility, is_entry, signature, body }
+        Function_ {
+            loc,
+            visibility,
+            is_entry,
+            signature,
+            body,
+        }
     }
 }
 
 impl FunctionCall_ {
     /// Creates a `FunctionCall::ModuleFunctionCall` variant
     pub fn module_call(module: ModuleName, name: FunctionName, type_actuals: Vec<Type>) -> Self {
-        FunctionCall_::ModuleFunctionCall { module, name, type_actuals }
+        FunctionCall_::ModuleFunctionCall {
+            module,
+            name,
+            type_actuals,
+        }
     }
 
     /// Creates a `FunctionCall::Builtin` variant with no location information
@@ -941,14 +989,19 @@ impl Statement_ {
 impl Block_ {
     /// Creates a new block from a label and a vector of statements.
     pub fn new(label: BlockLabel, statements: Vec<Statement>) -> Self {
-        Self { label, statements: VecDeque::from(statements) }
+        Self {
+            label,
+            statements: VecDeque::from(statements),
+        }
     }
 }
 
 impl Exp_ {
     /// Creates a new address `Exp` with no location information
     pub fn address(addr: AccountAddress) -> Exp {
-        Spanned::unsafe_no_loc(Exp_::Value(Spanned::unsafe_no_loc(CopyableVal_::Address(addr))))
+        Spanned::unsafe_no_loc(Exp_::Value(Spanned::unsafe_no_loc(CopyableVal_::Address(
+            addr,
+        ))))
     }
 
     /// Creates a new value `Exp` with no location information
@@ -998,7 +1051,11 @@ impl Exp_ {
 
     /// Creates a new borrow field `Exp` with no location information
     pub fn borrow(is_mutable: bool, exp: Box<Exp>, field: FieldIdent) -> Exp {
-        Spanned::unsafe_no_loc(Exp_::Borrow { is_mutable, exp, field })
+        Spanned::unsafe_no_loc(Exp_::Borrow {
+            is_mutable,
+            exp,
+            field,
+        })
     }
 
     /// Creates a new copy-local `Exp` with no location information
@@ -1045,17 +1102,24 @@ impl fmt::Display for TypeVar_ {
 
 impl fmt::Display for Ability {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            Ability::Copy => Ability::COPY,
-            Ability::Drop => Ability::DROP,
-            Ability::Store => Ability::STORE,
-            Ability::Key => Ability::KEY,
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Ability::Copy => Ability::COPY,
+                Ability::Drop => Ability::DROP,
+                Ability::Store => Ability::STORE,
+                Ability::Key => Ability::KEY,
+            }
+        )
     }
 }
 
 fn format_constraints(set: &BTreeSet<Ability>) -> String {
-    set.iter().map(|a| format!("{}", a)).collect::<Vec<_>>().join(" + ")
+    set.iter()
+        .map(|a| format!("{}", a))
+        .collect::<Vec<_>>()
+        .join(" + ")
 }
 
 impl fmt::Display for ModuleName {
@@ -1138,7 +1202,11 @@ impl fmt::Display for DatatypeDependency {
         write!(
             f,
             "StructDep({} {}{}",
-            self.abilities.iter().map(|a| format!("{}", a)).collect::<Vec<_>>().join(" "),
+            self.abilities
+                .iter()
+                .map(|a| format!("{}", a))
+                .collect::<Vec<_>>()
+                .join(" "),
             &self.name,
             format_struct_type_formals(&self.type_formals)
         )
@@ -1153,7 +1221,12 @@ impl fmt::Display for FunctionDependency {
 
 impl fmt::Display for StructDefinition_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Struct({}{}, ", self.name, format_struct_type_formals(&self.type_formals))?;
+        writeln!(
+            f,
+            "Struct({}{}, ",
+            self.name,
+            format_struct_type_formals(&self.type_formals)
+        )?;
         match &self.fields {
             StructDefinitionFields::Move { fields } => writeln!(f, "{}", format_fields(fields))?,
             StructDefinitionFields::Native => writeln!(f, "{{native}}")?,
@@ -1164,7 +1237,12 @@ impl fmt::Display for StructDefinition_ {
 
 impl fmt::Display for EnumDefinition_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Enum({}{}, ", self.name, format_struct_type_formals(&self.type_formals))?;
+        writeln!(
+            f,
+            "Enum({}{}, ",
+            self.name,
+            format_struct_type_formals(&self.type_formals)
+        )?;
         for variant in &self.variants {
             writeln!(f, "{}", variant)?;
         }
@@ -1184,7 +1262,13 @@ impl fmt::Display for VariantDefinition_ {
 
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "const {}: {} = {}", &self.name.0, self.signature, format_move_value(&self.value))
+        write!(
+            f,
+            "const {}: {} = {}",
+            &self.name.0,
+            self.signature,
+            format_move_value(&self.value)
+        )
     }
 }
 
@@ -1239,7 +1323,7 @@ impl fmt::Display for ConstantName {
 impl fmt::Display for FunctionBody {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FunctionBody::Move { ref locals, ref code } => {
+            FunctionBody::Move { locals, code } => {
                 for (local, ty) in locals {
                     write!(f, "let {}: {};", local, ty)?;
                 }
@@ -1270,11 +1354,15 @@ impl fmt::Display for FunctionBody {
 // TODO: This function should take an iterator instead.
 fn intersperse<T: fmt::Display>(items: &[T], join: &str) -> String {
     // TODO: Any performance issues here? Could be O(n^2) if not optimized.
-    items.iter().fold(String::new(), |acc, v| format!("{acc}{join}{v}", acc = acc, join = join, v = v))
+    items.iter().fold(String::new(), |acc, v| {
+        format!("{acc}{join}{v}", acc = acc, join = join, v = v)
+    })
 }
 
 fn format_fields<T: fmt::Display>(fields: &[(Field, T)]) -> String {
-    fields.iter().fold(String::new(), |acc, (field, val)| format!("{} {}: {},", acc, field.value, val))
+    fields.iter().fold(String::new(), |acc, (field, val)| {
+        format!("{} {}: {},", acc, field.value, val)
+    })
 }
 
 impl fmt::Display for FunctionSignature {
@@ -1322,7 +1410,12 @@ fn format_struct_type_formals(formals: &[DatatypeTypeParameter]) -> String {
         let formatted = formals
             .iter()
             .map(|(is_phantom, tv, abilities)| {
-                format!("{}{}: {}", if *is_phantom { "phantom " } else { "" }, tv.value, format_constraints(abilities))
+                format!(
+                    "{}{}: {}",
+                    if *is_phantom { "phantom " } else { "" },
+                    tv.value,
+                    format_constraints(abilities)
+                )
             })
             .collect::<Vec<_>>();
         format!("<{}>", intersperse(&formatted, ", "))
@@ -1385,9 +1478,17 @@ impl fmt::Display for FunctionCall_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FunctionCall_::Builtin(fun) => write!(f, "{}", fun),
-            FunctionCall_::ModuleFunctionCall { module, name, type_actuals } => {
-                write!(f, "{}.{}{}", module, name, format_type_actuals(type_actuals))
-            }
+            FunctionCall_::ModuleFunctionCall {
+                module,
+                name,
+                type_actuals,
+            } => write!(
+                f,
+                "{}.{}{}",
+                module,
+                name,
+                format_type_actuals(type_actuals)
+            ),
         }
     }
 }
@@ -1436,7 +1537,12 @@ impl fmt::Display for Statement_ {
                 "{}{} {{ {} }} = {}",
                 n,
                 format_type_actuals(tys),
-                bindings.iter().fold(String::new(), |acc, (field, var)| format!("{} {} : {},", acc, field, var)),
+                bindings
+                    .iter()
+                    .fold(String::new(), |acc, (field, var)| format!(
+                        "{} {} : {},",
+                        acc, field, var
+                    )),
                 e
             ),
             Statement_::UnpackVariant(name, variant_name, tys, bindings, e, unpack_type) => {
@@ -1447,7 +1553,12 @@ impl fmt::Display for Statement_ {
                     name,
                     variant_name,
                     format_type_actuals(tys),
-                    bindings.iter().fold(String::new(), |acc, (field, var)| format!("{} {} : {},", acc, field, var)),
+                    bindings
+                        .iter()
+                        .fold(String::new(), |acc, (field, var)| format!(
+                            "{} {} : {},",
+                            acc, field, var
+                        )),
                     e
                 )
             }
@@ -1459,7 +1570,10 @@ impl fmt::Display for Statement_ {
                     name,
                     lbls.iter()
                         .enumerate()
-                        .fold(String::new(), |acc, (tag, (name, lbl))| format!("{} {}:{} => {},", acc, name, tag, lbl))
+                        .fold(String::new(), |acc, (tag, (name, lbl))| format!(
+                            "{} {}:{} => {},",
+                            acc, name, tag, lbl
+                        ))
                 )
             }
         }
@@ -1494,39 +1608,47 @@ impl fmt::Display for CopyableVal_ {
 
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            UnaryOp::Not => "!",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                UnaryOp::Not => "!",
+            }
+        )
     }
 }
 
 impl fmt::Display for BinOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            BinOp::Add => "+",
-            BinOp::Sub => "-",
-            BinOp::Mul => "*",
-            BinOp::Mod => "%",
-            BinOp::Div => "/",
-            BinOp::BitOr => "|",
-            BinOp::BitAnd => "&",
-            BinOp::Xor => "^",
-            BinOp::Shl => "<<",
-            BinOp::Shr => ">>",
+        write!(
+            f,
+            "{}",
+            match self {
+                BinOp::Add => "+",
+                BinOp::Sub => "-",
+                BinOp::Mul => "*",
+                BinOp::Mod => "%",
+                BinOp::Div => "/",
+                BinOp::BitOr => "|",
+                BinOp::BitAnd => "&",
+                BinOp::Xor => "^",
+                BinOp::Shl => "<<",
+                BinOp::Shr => ">>",
 
-            // Bool ops
-            BinOp::Or => "||",
-            BinOp::And => "&&",
+                // Bool ops
+                BinOp::Or => "||",
+                BinOp::And => "&&",
 
-            // Compare Ops
-            BinOp::Eq => "==",
-            BinOp::Neq => "!=",
-            BinOp::Lt => "<",
-            BinOp::Gt => ">",
-            BinOp::Le => "<=",
-            BinOp::Ge => ">=",
-            BinOp::Subrange => "..",
-        })
+                // Compare Ops
+                BinOp::Eq => "==",
+                BinOp::Neq => "!=",
+                BinOp::Lt => "<",
+                BinOp::Gt => ">",
+                BinOp::Le => "<=",
+                BinOp::Ge => ">=",
+                BinOp::Subrange => "..",
+            }
+        )
     }
 }
 
@@ -1542,11 +1664,22 @@ impl fmt::Display for Exp_ {
                 "{}{}{{{}}}",
                 n,
                 format_type_actuals(tys),
-                s.iter().fold(String::new(), |acc, (field, op)| format!("{} {} : {},", acc, field, op,))
+                s.iter().fold(String::new(), |acc, (field, op)| format!(
+                    "{} {} : {},",
+                    acc, field, op,
+                ))
             ),
-            Exp_::Borrow { is_mutable, exp, field } => {
-                write!(f, "&{}{}.{}", if *is_mutable { "mut " } else { "" }, exp, field)
-            }
+            Exp_::Borrow {
+                is_mutable,
+                exp,
+                field,
+            } => write!(
+                f,
+                "&{}{}.{}",
+                if *is_mutable { "mut " } else { "" },
+                exp,
+                field
+            ),
             Exp_::Move(v) => write!(f, "move({})", v),
             Exp_::Copy(v) => write!(f, "copy({})", v),
             Exp_::BorrowLocal(is_mutable, v) => {
@@ -1567,7 +1700,10 @@ impl fmt::Display for Exp_ {
                     name,
                     variant_name,
                     format_type_actuals(tys),
-                    exps.iter().fold(String::new(), |acc, (field, op)| format!("{} {} : {},", acc, field, op,))
+                    exps.iter().fold(String::new(), |acc, (field, op)| format!(
+                        "{} {} : {},",
+                        acc, field, op,
+                    ))
                 )
             }
         }
@@ -1611,12 +1747,20 @@ impl fmt::Display for Bytecode_ {
             Bytecode_::FreezeRef => write!(f, "FreezeRef"),
             Bytecode_::MutBorrowLoc(v) => write!(f, "MutBorrowLoc {}", v),
             Bytecode_::ImmBorrowLoc(v) => write!(f, "ImmBorrowLoc {}", v),
-            Bytecode_::MutBorrowField(n, tys, field) => {
-                write!(f, "MutBorrowField {}{}.{}", n, format_type_actuals(tys), field)
-            }
-            Bytecode_::ImmBorrowField(n, tys, field) => {
-                write!(f, "ImmBorrowField {}{}.{}", n, format_type_actuals(tys), field)
-            }
+            Bytecode_::MutBorrowField(n, tys, field) => write!(
+                f,
+                "MutBorrowField {}{}.{}",
+                n,
+                format_type_actuals(tys),
+                field
+            ),
+            Bytecode_::ImmBorrowField(n, tys, field) => write!(
+                f,
+                "ImmBorrowField {}{}.{}",
+                n,
+                format_type_actuals(tys),
+                field
+            ),
             Bytecode_::Add => write!(f, "Add"),
             Bytecode_::Sub => write!(f, "Sub"),
             Bytecode_::Mul => write!(f, "Mul"),
@@ -1645,19 +1789,40 @@ impl fmt::Display for Bytecode_ {
             Bytecode_::VecPopBack(ty) => write!(f, "VecPopBack {}", ty),
             Bytecode_::VecUnpack(ty, n) => write!(f, "VecUnpack {} {}", ty, n),
             Bytecode_::VecSwap(ty) => write!(f, "VecSwap {}", ty),
-            Bytecode_::ErrorConstant { line_number, constant } => {
+            Bytecode_::ErrorConstant {
+                line_number,
+                constant,
+                error_code,
+            } => {
                 write!(
                     f,
-                    "ErrorConstant {}:{}",
+                    "ErrorConstant {}:{}:{}",
+                    error_code.unwrap_or(0),
                     line_number,
-                    constant.as_ref().map(|s| s.0.to_string()).unwrap_or("<NONE>".to_owned())
+                    constant
+                        .as_ref()
+                        .map(|s| s.0.to_string())
+                        .unwrap_or("<NONE>".to_owned())
                 )
             }
             Bytecode_::PackVariant(name, variant_name, tys) => {
-                write!(f, "PackVariant {}::{}{}", name, variant_name, format_type_actuals(tys))
+                write!(
+                    f,
+                    "PackVariant {}::{}{}",
+                    name,
+                    variant_name,
+                    format_type_actuals(tys)
+                )
             }
             Bytecode_::UnpackVariant(name, variant_name, tys, unpack_type) => {
-                write!(f, "UnpackVariant {}{}::{}{}", unpack_type, name, variant_name, format_type_actuals(tys))
+                write!(
+                    f,
+                    "UnpackVariant {}{}::{}{}",
+                    unpack_type,
+                    name,
+                    variant_name,
+                    format_type_actuals(tys)
+                )
             }
             Bytecode_::VariantSwitch(name, lbls) => {
                 write!(
@@ -1666,7 +1831,10 @@ impl fmt::Display for Bytecode_ {
                     name,
                     lbls.iter()
                         .enumerate()
-                        .fold(String::new(), |acc, (tag, (name, lbl))| format!("{} {}:{} => {},", acc, name, tag, lbl))
+                        .fold(String::new(), |acc, (tag, (name, lbl))| format!(
+                            "{} {}:{} => {},",
+                            acc, name, tag, lbl
+                        ))
                 )
             }
         }
@@ -1682,7 +1850,11 @@ fn format_move_value(v: &MoveValue) -> String {
         MoveValue::Bool(false) => "false".to_owned(),
         MoveValue::Address(a) => format!("0x{}", a.short_str_lossless()),
         MoveValue::Vector(v) => {
-            let items = v.iter().map(format_move_value).collect::<Vec<_>>().join(", ");
+            let items = v
+                .iter()
+                .map(format_move_value)
+                .collect::<Vec<_>>()
+                .join(", ");
             format!("vector[{}]", items)
         }
         MoveValue::Struct(_) | MoveValue::Signer(_) | MoveValue::Variant(_) => {

@@ -43,10 +43,11 @@ impl Bounds {
             if new_units > max {
                 // TODO: change to a new status PROGRAM_TOO_COMPLEX once this is rolled out. For
                 // now we use an existing code to avoid breaking changes on potential rollback.
-                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED).with_message(format!(
-                    "program too complex (in `{}` with `{} current + {} new > {} max`)",
-                    self.name, self.units, units, max
-                )));
+                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                    .with_message(format!(
+                        "program too complex (in `{}` with `{} current + {} new > {} max`)",
+                        self.name, self.units, units, max
+                    )));
             }
             self.units = new_units;
         }
@@ -57,9 +58,21 @@ impl Bounds {
 impl BoundMeter {
     pub fn new(config: MeterConfig) -> Self {
         Self {
-            pkg_bounds: Bounds { name: "<unknown>".to_string(), units: 0, max: config.max_per_pkg_meter_units },
-            mod_bounds: Bounds { name: "<unknown>".to_string(), units: 0, max: config.max_per_mod_meter_units },
-            fun_bounds: Bounds { name: "<unknown>".to_string(), units: 0, max: config.max_per_fun_meter_units },
+            pkg_bounds: Bounds {
+                name: "<unknown>".to_string(),
+                units: 0,
+                max: config.max_per_pkg_meter_units,
+            },
+            mod_bounds: Bounds {
+                name: "<unknown>".to_string(),
+                units: 0,
+                max: config.max_per_mod_meter_units,
+            },
+            fun_bounds: Bounds {
+                name: "<unknown>".to_string(),
+                units: 0,
+                max: config.max_per_fun_meter_units,
+            },
         }
     }
 

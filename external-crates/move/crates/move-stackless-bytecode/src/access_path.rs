@@ -127,8 +127,14 @@ impl Addr {
 
     /// Create a footprint address from access path `ap`
     pub fn footprint(ap: AccessPath) -> Self {
-        assert!(!ap.root.is_return(), "Attempting to create footprint from return access path");
-        assert!(!ap.root.is_local(), "Attempting to create footprint from local access path");
+        assert!(
+            !ap.root.is_return(),
+            "Attempting to create footprint from return access path"
+        );
+        assert!(
+            !ap.root.is_local(),
+            "Attempting to create footprint from local access path"
+        );
 
         Self::Footprint(ap)
     }
@@ -142,7 +148,12 @@ impl Addr {
     }
 
     /// Convert this address-typed abstract value A into an access path A/mid::sid::types
-    pub fn add_struct_offset(self, mid: &ModuleId, sid: DatatypeId, types: Vec<Type>) -> AccessPath {
+    pub fn add_struct_offset(
+        self,
+        mid: &ModuleId,
+        sid: DatatypeId,
+        types: Vec<Type>,
+    ) -> AccessPath {
         match self {
             Self::Footprint(mut ap) => {
                 // TODO: assert type address?
@@ -181,7 +192,10 @@ impl AbsAddr {
 
     /// Create a footprint address read from formal `temp_index`
     pub fn formal(formal_index: TempIndex, func_env: &FunctionEnv) -> Self {
-        assert!(func_env.is_parameter(formal_index), "Attempting to create formal from local index");
+        assert!(
+            func_env.is_parameter(formal_index),
+            "Attempting to create formal from local index"
+        );
         Self::footprint(AccessPath::from_index(formal_index, func_env))
     }
 
@@ -228,7 +242,11 @@ impl AbsAddr {
     pub fn add_struct_offset(self, mid: &ModuleId, sid: DatatypeId, types: Vec<Type>) -> Self {
         let mut acc = Self::default();
         for v in self.into_iter() {
-            acc.insert(Addr::Footprint(v.add_struct_offset(mid, sid, types.clone())));
+            acc.insert(Addr::Footprint(v.add_struct_offset(
+                mid,
+                sid,
+                types.clone(),
+            )));
         }
         acc
     }
@@ -244,7 +262,10 @@ impl AbsAddr {
                     extended_aps.insert(Addr::Footprint(extended_ap));
                 }
                 Addr::Constant(c) => {
-                    panic!("Type error: address constant {:?} as base for offset {:?}", c, offset)
+                    panic!(
+                        "Type error: address constant {:?} as base for offset {:?}",
+                        c, offset
+                    )
                 }
             }
         }
@@ -307,12 +328,18 @@ impl From<&AccountAddress> for AbsAddr {
 
 impl GlobalKey {
     pub fn new(addr: AbsAddr, mid: &ModuleId, sid: DatatypeId, types: Vec<Type>) -> Self {
-        Self { addr, ty: AbsStructType::new(mid, sid, types) }
+        Self {
+            addr,
+            ty: AbsStructType::new(mid, sid, types),
+        }
     }
 
     /// Create a constant `GlobalKey` using constant `addr` and type `ty`
     pub fn constant(addr: BigUint, ty: AbsStructType) -> Self {
-        Self { addr: AbsAddr::constant(addr), ty }
+        Self {
+            addr: AbsAddr::constant(addr),
+            ty,
+        }
     }
 
     /// Return the abstract address associated with `self`
@@ -339,7 +366,8 @@ impl GlobalKey {
         func_env: &FunctionEnv,
         sub_map: &dyn AccessPathMap<AbsAddr>,
     ) {
-        self.addr.substitute_footprint(actuals, type_actuals, func_env, sub_map);
+        self.addr
+            .substitute_footprint(actuals, type_actuals, func_env, sub_map);
         self.ty.substitute_footprint(type_actuals);
     }
 
@@ -443,7 +471,11 @@ impl Offset {
     pub fn get_type(&self, base: &Type, env: &GlobalEnv) -> Type {
         match (base.skip_reference(), self) {
             (Type::Datatype(mid, sid, types), Offset::Field(f)) => {
-                let field_type = env.get_module(*mid).get_struct(*sid).get_field_by_offset(*f).get_type();
+                let field_type = env
+                    .get_module(*mid)
+                    .get_struct(*sid)
+                    .get_field_by_offset(*f)
+                    .get_type();
                 field_type.instantiate(types)
             }
             (Type::Vector(t), Offset::VectorIndex) => *t.clone(),
@@ -486,7 +518,10 @@ impl Offset {
             | (Type::Var(_), Offset::Global(_)) => {
                 panic!(
                     "get_type warning: Invalid base type {} for offset {:?} in get_type",
-                    base.display(&move_model::ty::TypeDisplayContext::WithEnv { env, type_param_names: None }),
+                    base.display(&move_model::ty::TypeDisplayContext::WithEnv {
+                        env,
+                        type_param_names: None
+                    }),
                     self,
                 )
             }
@@ -515,7 +550,11 @@ impl Offset {
 
     /// Return a wrapper of `self` that implements `Display` using `env`
     pub fn display<'a>(&'a self, base_type: &'a Type, env: &'a GlobalEnv) -> OffsetDisplay<'a> {
-        OffsetDisplay { offset: self, base_type, env }
+        OffsetDisplay {
+            offset: self,
+            base_type,
+            env,
+        }
     }
 }
 
@@ -525,14 +564,22 @@ impl AccessPath {
     }
 
     pub fn new_root(root: Root) -> Self {
-        AccessPath { root, offsets: vec![] }
+        AccessPath {
+            root,
+            offsets: vec![],
+        }
     }
 
     pub fn new_global(addr: AbsAddr, mid: &ModuleId, sid: DatatypeId, types: Vec<Type>) -> Self {
         Self::new_root(Root::Global(GlobalKey::new(addr, mid, sid, types)))
     }
 
-    pub fn new_address_constant(addr: BigUint, mid: &ModuleId, sid: DatatypeId, types: Vec<Type>) -> Self {
+    pub fn new_address_constant(
+        addr: BigUint,
+        mid: &ModuleId,
+        sid: DatatypeId,
+        types: Vec<Type>,
+    ) -> Self {
         Self::new_global(AbsAddr::constant(addr), mid, sid, types)
     }
 
@@ -600,14 +647,20 @@ impl AccessPath {
                         // normalize by converting into a path with a global base instead
                         match &self.offsets[0] {
                             Offset::Global(struct_type) => {
-                                let root = Root::Global(GlobalKey::constant(c.clone(), struct_type.clone()));
+                                let root = Root::Global(GlobalKey::constant(
+                                    c.clone(),
+                                    struct_type.clone(),
+                                ));
                                 let mut new_offsets = vec![];
                                 for v in self.offsets[1..].iter() {
                                     new_offsets.push(v.clone())
                                 }
                                 acc.insert(Addr::footprint(AccessPath::new(root, new_offsets)));
                             }
-                            _ => panic!("Invariant violation: constant root with bad offsets {:?}", self.offsets),
+                            _ => panic!(
+                                "Invariant violation: constant root with bad offsets {:?}",
+                                self.offsets
+                            ),
                         }
                     }
                 }
@@ -650,7 +703,8 @@ impl AccessPath {
                         // We need to adjust the offset from the current access path
                         // to avoid duplicating it (i.e. Formal(0)/0/0 instead of Formal(0)/0)
                         let callee_offsets = Vec::from(&new_offsets[i..new_offsets.len()]);
-                        let new_addrs = AccessPath::new(self.root.clone(), callee_offsets).prepend_addrs(addrs);
+                        let new_addrs =
+                            AccessPath::new(self.root.clone(), callee_offsets).prepend_addrs(addrs);
                         results.join(&new_addrs);
                     }
                 }
@@ -659,7 +713,10 @@ impl AccessPath {
             Root::Global(g) => {
                 let mut new_g = g.clone();
                 new_g.substitute_footprint(actuals, type_actuals, func_env, sub_map);
-                AbsAddr::singleton(Addr::footprint(AccessPath::new(Root::Global(new_g), new_offsets)))
+                AbsAddr::singleton(Addr::footprint(AccessPath::new(
+                    Root::Global(new_g),
+                    new_offsets,
+                )))
             }
             Root::Local(_) | Root::Return(_) => AbsAddr::default(),
         }
@@ -702,7 +759,10 @@ impl AccessPath {
 
 impl AbsStructType {
     pub fn new(mid: &ModuleId, sid: DatatypeId, types: Vec<Type>) -> Self {
-        AbsStructType { base: mid.qualified(sid), types }
+        AbsStructType {
+            base: mid.qualified(sid),
+            types,
+        }
     }
 
     /// Return the concrete type of `self`
@@ -753,15 +813,19 @@ pub struct AbsStructTypeDisplay<'a> {
     env: &'a GlobalEnv,
 }
 
-impl<'a> fmt::Display for AbsStructTypeDisplay<'a> {
+impl fmt::Display for AbsStructTypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.s.normalize(self.env) {
             Some(t) => {
                 write!(f, "{}", t)
             }
             None => {
-                let tctx = TypeDisplayContext::WithEnv { env: self.env, type_param_names: None };
-                let dummy_type = Type::Datatype(self.s.base.module_id, self.s.base.id, self.s.types.clone());
+                let tctx = TypeDisplayContext::WithEnv {
+                    env: self.env,
+                    type_param_names: None,
+                };
+                let dummy_type =
+                    Type::Datatype(self.s.base.module_id, self.s.base.id, self.s.types.clone());
                 write!(f, "{}", dummy_type.display(&tctx))
             }
         }
@@ -773,7 +837,7 @@ pub struct AddrDisplay<'a> {
     env: &'a FunctionEnv<'a>,
 }
 
-impl<'a> fmt::Display for AddrDisplay<'a> {
+impl fmt::Display for AddrDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.addr {
             Addr::Constant(a) => write!(f, "{:#x}", a),
@@ -787,7 +851,7 @@ pub struct AbsAddrDisplay<'a> {
     env: &'a FunctionEnv<'a>,
 }
 
-impl<'a> fmt::Display for AbsAddrDisplay<'a> {
+impl fmt::Display for AbsAddrDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if self.addr.len() == 1 {
             write!(f, "{}", self.addr.iter().next().unwrap().display(self.env))
@@ -808,9 +872,14 @@ pub struct GlobalKeyDisplay<'a> {
     env: &'a FunctionEnv<'a>,
 }
 
-impl<'a> fmt::Display for GlobalKeyDisplay<'a> {
+impl fmt::Display for GlobalKeyDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.g.addr.display(self.env), self.g.ty.display(self.env.module_env.env))
+        write!(
+            f,
+            "{}/{}",
+            self.g.addr.display(self.env),
+            self.g.ty.display(self.env.module_env.env)
+        )
     }
 }
 
@@ -819,7 +888,7 @@ pub struct RootDisplay<'a> {
     env: &'a FunctionEnv<'a>,
 }
 
-impl<'a> fmt::Display for RootDisplay<'a> {
+impl fmt::Display for RootDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.root {
             Root::Global(g) => write!(f, "{}", g.display(self.env)),
@@ -836,7 +905,7 @@ pub struct OffsetDisplay<'a> {
     env: &'a GlobalEnv,
 }
 
-impl<'a> fmt::Display for OffsetDisplay<'a> {
+impl fmt::Display for OffsetDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Offset::*;
         match self.offset {
@@ -857,7 +926,10 @@ impl<'a> fmt::Display for OffsetDisplay<'a> {
                     write!(f, "{}", *fld)
                 }
                 _ => {
-                    panic!("Warning: Invalid base type {:?} for field offset {:?}", self.base_type, self.offset);
+                    panic!(
+                        "Warning: Invalid base type {:?} for field offset {:?}",
+                        self.base_type, self.offset
+                    );
                 }
             },
             VectorIndex => f.write_str("[_]"),
@@ -871,7 +943,7 @@ pub struct AccessPathDisplay<'a> {
     env: &'a FunctionEnv<'a>,
 }
 
-impl<'a> fmt::Display for AccessPathDisplay<'a> {
+impl fmt::Display for AccessPathDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let genv = self.env.module_env.env;
         write!(f, "{}", self.ap.root.display(self.env))?;

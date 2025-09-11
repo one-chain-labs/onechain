@@ -3,7 +3,8 @@
 
 mod utils;
 use futures::stream::StreamExt;
-use sui_sdk::{rpc_types::EventFilter, SuiClientBuilder};
+use sui_sdk::rpc_types::EventFilter;
+use sui_sdk::SuiClientBuilder;
 use utils::{setup_for_write, split_coin_digest};
 
 // This example showcases how to use the Event API.
@@ -34,7 +35,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let ws = SuiClientBuilder::default()
         .ws_url("wss://rpc.testnet.sui.io:443")
-        .build("https://fullnode.testnet.sui.io:443")
+        .build("https://rpc-testnet.onelabs.cc:443")
         .await?;
     println!("WS version {:?}", ws.api_version());
 

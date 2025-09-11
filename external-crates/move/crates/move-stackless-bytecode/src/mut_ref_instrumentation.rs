@@ -37,14 +37,18 @@ impl FunctionTargetProcessor for MutRefInstrumenter {
 
         // Compute &mut parameters.
         let param_count = builder.get_target().get_parameter_count();
-        let mut_ref_params = (0..param_count).filter(|idx| is_mut_ref(&builder, *idx)).collect_vec();
+        let mut_ref_params = (0..param_count)
+            .filter(|idx| is_mut_ref(&builder, *idx))
+            .collect_vec();
 
         // Transform bytecode.
         for bc in std::mem::take(&mut builder.data.code) {
             use Bytecode::*;
             use Operation::*;
             match bc {
-                Assign(attr_id, dest, src, AssignKind::Move) if src < param_count && is_mut_ref(&builder, src) => {
+                Assign(attr_id, dest, src, AssignKind::Move)
+                    if src < param_count && is_mut_ref(&builder, src) =>
+                {
                     // Do not allow a move of a &mut parameter. This would make it hard
                     // to return the right version of it at return. Instead turn this into
                     // a copy, which will ensure any value updated will be written back
@@ -55,7 +59,9 @@ impl FunctionTargetProcessor for MutRefInstrumenter {
                     // Emit traces for &mut params at exit.
                     builder.set_loc_from_attr(attr_id);
                     for added in &mut_ref_params {
-                        builder.emit_with(|id| Call(id, vec![], TraceLocal(*added), vec![*added], None));
+                        builder.emit_with(|id| {
+                            Call(id, vec![], TraceLocal(*added), vec![*added], None)
+                        });
                     }
                     builder.emit(Ret(attr_id, rets));
                 }
@@ -72,5 +78,8 @@ impl FunctionTargetProcessor for MutRefInstrumenter {
 }
 
 fn is_mut_ref(builder: &FunctionDataBuilder<'_>, idx: TempIndex) -> bool {
-    builder.get_target().get_local_type(idx).is_mutable_reference()
+    builder
+        .get_target()
+        .get_local_type(idx)
+        .is_mutable_reference()
 }

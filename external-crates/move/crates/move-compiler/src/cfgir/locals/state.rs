@@ -2,7 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{cfgir::absint::*, expansion::ast::Mutability, hlir::ast::Var, shared::unique_map::UniqueMap};
+use crate::{
+    cfgir::absint::*, expansion::ast::Mutability, hlir::ast::Var, shared::unique_map::UniqueMap,
+};
 use move_ir_types::location::*;
 
 //**************************************************************************************************
@@ -22,7 +24,11 @@ pub enum LocalState {
     // Local has a value
     Available(Loc),
     // Available in some branches but not all. If it is a resource, cannot be assigned
-    MaybeUnavailable { available: Loc, unavailable: Loc, unavailable_reason: UnavailableReason },
+    MaybeUnavailable {
+        available: Loc,
+        unavailable: Loc,
+        unavailable_reason: UnavailableReason,
+    },
 }
 
 impl LocalState {
@@ -45,7 +51,10 @@ impl LocalStates {
         function_arguments: &[(Mutability, Var, T)],
         local_types: &UniqueMap<Var, (Mutability, T)>,
     ) -> Self {
-        let mut states = LocalStates { local_states: UniqueMap::new(), first_assignment: UniqueMap::new() };
+        let mut states = LocalStates {
+            local_states: UniqueMap::new(),
+            first_assignment: UniqueMap::new(),
+        };
         for (var, _) in local_types.key_cloned_iter() {
             let local_state = LocalState::Unavailable(var.loc(), UnavailableReason::Unassigned);
             states.set_state(var, local_state)
@@ -60,7 +69,9 @@ impl LocalStates {
     }
 
     pub fn get_state(&self, local: &Var) -> &LocalState {
-        self.local_states.get(local).unwrap_or_else(|| panic!("ICE: Unable to get state for local {:#?}", local))
+        self.local_states
+            .get(local)
+            .unwrap_or_else(|| panic!("ICE: Unable to get state for local {:#?}", local))
     }
 
     pub fn set_state(&mut self, local: Var, state: LocalState) {
@@ -99,7 +110,10 @@ impl LocalStates {
 impl AbstractDomain for LocalStates {
     fn join(&mut self, other: &Self) -> JoinResult {
         use LocalState as L;
-        let Self { local_states, first_assignment } = other;
+        let Self {
+            local_states,
+            first_assignment,
+        } = other;
         let mut result = JoinResult::Unchanged;
         for (local, other_state) in local_states.key_cloned_iter() {
             match (self.get_state(&local), other_state) {
@@ -123,7 +137,11 @@ impl AbstractDomain for LocalStates {
                     result = JoinResult::Changed;
                     let available = *available;
                     let unavailable = *unavailable;
-                    let state = L::MaybeUnavailable { available, unavailable, unavailable_reason: *reason };
+                    let state = L::MaybeUnavailable {
+                        available,
+                        unavailable,
+                        unavailable_reason: *reason,
+                    };
 
                     self.set_state(local, state)
                 }

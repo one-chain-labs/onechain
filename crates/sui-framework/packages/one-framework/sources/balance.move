@@ -4,10 +4,10 @@
 /// A storable handler for Balances in general. Is used in the `Coin`
 /// module to allow balance operations and can be used to implement
 /// custom coins with `Supply` and `Balance`s.
-module one::balance;
+module oct::balance;
 
 /// Allows calling `.into_coin()` on a `Balance` to turn it into a coin.
-public use fun one::coin::from_balance as Balance.into_coin;
+public use fun sui::coin::from_balance as Balance.into_coin;
 
 /// For when trying to destroy a non-zero balance.
 const ENonZero: u64 = 0;
@@ -139,4 +139,24 @@ public fun destroy_for_testing<T>(self: Balance<T>): u64 {
 /// Create a `Supply` of any coin for testing purposes.
 public fun create_supply_for_testing<T>(): Supply<T> {
     Supply { value: 0 }
+}
+
+// === Test entry points for address balance deposits and withdrawals ===
+
+// TODO: Replace these with the final API
+
+#[allow(unused_function)]
+fun send_to_account<T>(balance: Balance<T>, recipient: address) {
+    let Balance { value } = balance;
+    let accumulator = sui::accumulator::accumulator_address<Balance<T>>(recipient);
+    sui::accumulator::emit_deposit_event<Balance<T>>(accumulator, recipient, value);
+}
+
+#[allow(unused_function)]
+fun withdraw_from_account<T>(amount: u64, ctx: &TxContext): Balance<T> {
+    let owner = ctx.sender();
+    let accumulator = sui::accumulator::accumulator_address<Balance<T>>(owner);
+    let credit = Balance { value: amount };
+    sui::accumulator::emit_withdraw_event<Balance<T>>(accumulator, owner, amount);
+    credit
 }

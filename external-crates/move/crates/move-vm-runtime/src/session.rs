@@ -2,10 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{data_cache::TransactionDataCache, native_extensions::NativeContextExtensions, runtime::VMRuntime};
+use crate::{
+    data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
+    runtime::VMRuntime,
+};
 use move_binary_format::{
     errors::*,
-    file_format::{AbilitySet, LocalIndex},
+    file_format::{AbilitySet, CodeOffset, FunctionDefinitionIndex, LocalIndex},
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -41,7 +44,7 @@ pub struct SerializedReturnValues {
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }
 
-impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
+impl<'r, S: MoveResolver> Session<'r, '_, S> {
     /// Execute a Move function with the given arguments. This is mainly designed for an external
     /// environment to invoke system logic written in Move.
     ///
@@ -97,38 +100,6 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         ty_args: Vec<Type>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-    ) -> VMResult<SerializedReturnValues> {
-        move_vm_profiler::tracing_feature_enabled! {
-            use move_vm_profiler::GasProfiler;
-            if gas_meter.get_profiler_mut().is_none() {
-                gas_meter.set_profiler(GasProfiler::init_default_cfg(
-                    function_name.to_string(),
-                    gas_meter.remaining_gas().into(),
-                ));
-            }
-        }
-
-        let bypass_declared_entry_check = true;
-        self.runtime.execute_function(
-            module,
-            function_name,
-            ty_args,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            &mut self.native_extensions,
-            bypass_declared_entry_check,
-            None,
-        )
-    }
-
-    pub fn execute_function_bypass_visibility_with_tracer_if_enabled(
-        &mut self,
-        module: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: Vec<Type>,
-        args: Vec<impl Borrow<[u8]>>,
-        gas_meter: &mut impl GasMeter,
         tracer: Option<&mut MoveTraceBuilder>,
     ) -> VMResult<SerializedReturnValues> {
         move_vm_profiler::tracing_feature_enabled! {
@@ -141,7 +112,11 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
             }
         }
 
-        let tracer = if cfg!(feature = "tracing") { tracer } else { None };
+        let tracer = if cfg!(feature = "tracing") {
+            tracer
+        } else {
+            None
+        };
 
         let bypass_declared_entry_check = true;
         self.runtime.execute_function(
@@ -195,7 +170,8 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         sender: AccountAddress,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<()> {
-        self.runtime.publish_module_bundle(modules, sender, &mut self.data_cache, gas_meter)
+        self.runtime
+            .publish_module_bundle(modules, sender, &mut self.data_cache, gas_meter)
     }
 
     /// Finish up the session and produce the side effects.
@@ -214,9 +190,17 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
 
     /// Same like `finish`, but also extracts the native context extensions from the session.
     pub fn finish_with_extensions(self) -> (VMResult<(ChangeSet, NativeContextExtensions<'r>)>, S) {
-        let Session { data_cache, native_extensions, .. } = self;
+        let Session {
+            data_cache,
+            native_extensions,
+            ..
+        } = self;
         let (res, remote) = data_cache.into_effects();
-        (res.map(|change_set| (change_set, native_extensions)).map_err(|e| e.finish(Location::Undefined)), remote)
+        (
+            res.map(|change_set| (change_set, native_extensions))
+                .map_err(|e| e.finish(Location::Undefined)),
+            remote,
+        )
     }
 
     /// Load a module, a function, and all of its types into cache
@@ -226,8 +210,12 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         function_name: &IdentStr,
         type_arguments: &[Type],
     ) -> VMResult<LoadedFunctionInstantiation> {
-        let (_, _, _, instantiation) =
-            self.runtime.loader().load_function(module_id, function_name, type_arguments, &self.data_cache)?;
+        let (_, _, _, instantiation) = self.runtime.loader().load_function(
+            module_id,
+            function_name,
+            type_arguments,
+            &self.data_cache,
+        )?;
         Ok(instantiation)
     }
 
@@ -239,7 +227,9 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         module_id: &ModuleId,
         struct_name: &IdentStr,
     ) -> VMResult<(CachedTypeIndex, Arc<CachedDatatype>)> {
-        self.runtime.loader().load_type_by_name(struct_name, module_id, &self.data_cache)
+        self.runtime
+            .loader()
+            .load_type_by_name(struct_name, module_id, &self.data_cache)
     }
 
     pub fn load_type(&self, type_tag: &TypeTag) -> VMResult<Type> {
@@ -247,23 +237,39 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     }
 
     pub fn get_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
-        self.runtime.loader().get_type_layout(type_tag, &self.data_cache)
+        self.runtime
+            .loader()
+            .get_type_layout(type_tag, &self.data_cache)
     }
 
-    pub fn get_fully_annotated_type_layout(&self, type_tag: &TypeTag) -> VMResult<A::MoveTypeLayout> {
-        self.runtime.loader().get_fully_annotated_type_layout(type_tag, &self.data_cache)
+    pub fn get_fully_annotated_type_layout(
+        &self,
+        type_tag: &TypeTag,
+    ) -> VMResult<A::MoveTypeLayout> {
+        self.runtime
+            .loader()
+            .get_fully_annotated_type_layout(type_tag, &self.data_cache)
     }
 
     pub fn type_to_type_layout(&self, ty: &Type) -> VMResult<MoveTypeLayout> {
-        self.runtime.loader().type_to_type_layout(ty).map_err(|e| e.finish(Location::Undefined))
+        self.runtime
+            .loader()
+            .type_to_type_layout(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> VMResult<A::MoveTypeLayout> {
-        self.runtime.loader().type_to_fully_annotated_layout(ty).map_err(|e| e.finish(Location::Undefined))
+        self.runtime
+            .loader()
+            .type_to_fully_annotated_layout(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn get_type_tag(&self, ty: &Type) -> VMResult<TypeTag> {
-        self.runtime.loader().type_to_type_tag(ty).map_err(|e| e.finish(Location::Undefined))
+        self.runtime
+            .loader()
+            .type_to_type_tag(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Fetch a struct type from cache, if the index is in bounds
@@ -274,7 +280,10 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
 
     /// Gets the abilities for this type, at it's particular instantiation
     pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        self.runtime.loader().abilities(ty).map_err(|e| e.finish(Location::Undefined))
+        self.runtime
+            .loader()
+            .abilities(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the remote resolver used by the data store
@@ -300,4 +309,6 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
 pub struct LoadedFunctionInstantiation {
     pub parameters: Vec<Type>,
     pub return_: Vec<Type>,
+    pub instruction_length: CodeOffset,
+    pub definition_index: FunctionDefinitionIndex,
 }

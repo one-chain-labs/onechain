@@ -12,7 +12,12 @@ use move_compiler::{
 };
 
 #[derive(Debug, Parser)]
-#[clap(name = "move-check", about = "Check Move source code, without compiling to bytecode", author, version)]
+#[clap(
+    name = "move-check",
+    about = "Check Move source code, without compiling to bytecode",
+    author,
+    version
+)]
 pub struct Options {
     /// The source files to check
     #[clap(
@@ -53,11 +58,18 @@ pub struct Options {
 }
 
 pub fn main() -> anyhow::Result<()> {
-    let Options { source_files, dependencies, out_dir, flags, named_addresses } = Options::parse();
+    let Options {
+        source_files,
+        dependencies,
+        out_dir,
+        flags,
+        named_addresses,
+    } = Options::parse();
     let named_addr_map = verify_and_create_named_address_mapping(named_addresses)?;
-    let _files = move_compiler::Compiler::from_files(None, source_files, dependencies, named_addr_map)
-        .set_interface_files_dir_opt(out_dir)
-        .set_flags(flags)
-        .check_and_report()?;
+    let _files =
+        move_compiler::Compiler::from_files(None, source_files, dependencies, named_addr_map)
+            .set_interface_files_dir_opt(out_dir)
+            .set_flags(flags)
+            .check_and_report()?;
     Ok(())
 }

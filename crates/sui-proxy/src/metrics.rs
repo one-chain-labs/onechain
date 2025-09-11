@@ -3,15 +3,11 @@
 use axum::{extract::Extension, http::StatusCode, routing::get, Router};
 use mysten_metrics::RegistryService;
 use prometheus::{Registry, TextEncoder};
-use std::{
-    net::TcpListener,
-    sync::{Arc, RwLock},
-};
+use std::net::TcpListener;
+use std::sync::{Arc, RwLock};
 use tower::ServiceBuilder;
-use tower_http::{
-    trace::{DefaultOnResponse, TraceLayer},
-    LatencyUnit,
-};
+use tower_http::trace::{DefaultOnResponse, TraceLayer};
+use tower_http::LatencyUnit;
 use tracing::Level;
 
 const METRICS_ROUTE: &str = "/metrics";
@@ -30,7 +26,9 @@ struct HealthCheck {
 /// considered health.  do not use w/o using an arc+mutex
 impl HealthCheck {
     fn new() -> Self {
-        Self { consumer_operations_submitted: 0.0 }
+        Self {
+            consumer_operations_submitted: 0.0,
+        }
     }
 }
 
@@ -51,8 +49,11 @@ pub fn start_prometheus_server(listener: TcpListener) -> RegistryService {
         .layer(Extension(pod_health_data.clone()))
         .layer(
             ServiceBuilder::new().layer(
-                TraceLayer::new_for_http()
-                    .on_response(DefaultOnResponse::new().level(Level::INFO).latency_unit(LatencyUnit::Seconds)),
+                TraceLayer::new_for_http().on_response(
+                    DefaultOnResponse::new()
+                        .level(Level::INFO)
+                        .latency_unit(LatencyUnit::Seconds),
+                ),
             ),
         );
 
@@ -85,23 +86,33 @@ async fn metrics(
         })
         .next()
     {
-        pod_health.write().expect("unable to write to pod health metrics").consumer_operations_submitted =
-            consumer_operations_submitted;
+        pod_health
+            .write()
+            .expect("unable to write to pod health metrics")
+            .consumer_operations_submitted = consumer_operations_submitted;
     };
     match TextEncoder.encode_to_string(&metric_families) {
         Ok(metrics) => (StatusCode::OK, metrics),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, format!("unable to encode metrics: {error}")),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("unable to encode metrics: {error}"),
+        ),
     }
 }
 
 /// pod_health is called by k8s to know if this service is correctly processing data
 async fn pod_health(Extension(pod_health): Extension<HealthCheckMetrics>) -> (StatusCode, String) {
-    let consumer_operations_submitted =
-        pod_health.read().expect("unable to read pod health metrics").consumer_operations_submitted;
+    let consumer_operations_submitted = pod_health
+        .read()
+        .expect("unable to read pod health metrics")
+        .consumer_operations_submitted;
 
     if consumer_operations_submitted > 0.0 {
         (StatusCode::OK, consumer_operations_submitted.to_string())
     } else {
-        (StatusCode::SERVICE_UNAVAILABLE, consumer_operations_submitted.to_string())
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            consumer_operations_submitted.to_string(),
+        )
     }
 }

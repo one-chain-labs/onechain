@@ -3,17 +3,15 @@
 
 use crate::{
     context::Context,
-    symbols::{on_hover_markup, type_to_ide_string, DefInfo, ModuleDefs, SymbolicatorRunner, Symbols},
+    symbols::{
+        Symbols, def_info::DefInfo, ide_strings::type_to_ide_string, mod_defs::ModuleDefs,
+        requests::on_hover_markup, runner::SymbolicatorRunner,
+    },
 };
-use lsp_server::Request;
+use lsp_server::{Message, Request, Response};
 use lsp_types::{
-    InlayHint,
-    InlayHintKind,
-    InlayHintLabel,
-    InlayHintLabelPart,
-    InlayHintParams,
-    InlayHintTooltip,
-    Position,
+    InlayHint, InlayHintKind, InlayHintLabel, InlayHintLabelPart, InlayHintParams,
+    InlayHintTooltip, Position,
 };
 
 use move_compiler::{naming::ast as N, shared::Identifier};
@@ -35,16 +33,22 @@ pub fn on_inlay_hint_request(context: &Context, request: &Request) {
         vec![]
     };
 
-    let response = lsp_server::Response::new_ok(request.id.clone(), hints);
-    if let Err(err) = context.connection.sender.send(lsp_server::Message::Response(response)) {
-        eprintln!("could not send inlay thing response: {:?}", err);
+    let response = Response::new_ok(request.id.clone(), hints);
+    if let Err(err) = context.connection.sender.send(Message::Response(response)) {
+        eprintln!("could not send inlay hint response: {:?}", err);
     }
 }
 
 fn inlay_hints(context: &Context, fpath: PathBuf) -> Option<Vec<InlayHint>> {
     let symbols_map = &context.symbols.lock().ok()?;
-    let symbols = SymbolicatorRunner::root_dir(&fpath).and_then(|pkg_path| symbols_map.get(&pkg_path))?;
-    inlay_hints_internal(symbols, fpath, context.inlay_type_hints, context.inlay_param_hints)
+    let symbols =
+        SymbolicatorRunner::root_dir(&fpath).and_then(|pkg_path| symbols_map.get(&pkg_path))?;
+    inlay_hints_internal(
+        symbols,
+        fpath,
+        context.inlay_type_hints,
+        context.inlay_param_hints,
+    )
 }
 
 fn inlay_type_hints_internal(symbols: &Symbols, mod_defs: &ModuleDefs, hints: &mut Vec<InlayHint>) {
@@ -55,8 +59,12 @@ fn inlay_type_hints_internal(symbols: &Symbols, mod_defs: &ModuleDefs, hints: &m
                 line: start_position.line_offset() as u32,
                 character: start_position.column_offset() as u32 + n.len() as u32,
             };
-            let colon_label =
-                InlayHintLabelPart { value: ": ".to_string(), tooltip: None, location: None, command: None };
+            let colon_label = InlayHintLabelPart {
+                value: ": ".to_string(),
+                tooltip: None,
+                location: None,
+                command: None,
+            };
             let type_label = InlayHintLabelPart {
                 value: type_to_ide_string(t, /* verbose */ false),
                 tooltip: None,
@@ -78,7 +86,11 @@ fn inlay_type_hints_internal(symbols: &Symbols, mod_defs: &ModuleDefs, hints: &m
     }
 }
 
-fn inlay_param_hints_internal(symbols: &Symbols, mod_defs: &ModuleDefs, hints: &mut Vec<InlayHint>) {
+fn inlay_param_hints_internal(
+    symbols: &Symbols,
+    mod_defs: &ModuleDefs,
+    hints: &mut Vec<InlayHint>,
+) {
     for call_info in mod_defs.call_infos.values() {
         let Some(def_loc) = call_info.def_loc else {
             continue;
@@ -90,13 +102,23 @@ fn inlay_param_hints_internal(symbols: &Symbols, mod_defs: &ModuleDefs, hints: &
             // methods should have at least one argument
             continue;
         };
-        for (sp!(def_loc, name), use_loc) in
-            args.iter().skip(if call_info.dot_call { 1 } else { 0 }).zip(&call_info.arg_locs)
+        for (sp!(def_loc, name), use_loc) in args
+            .iter()
+            .skip(if call_info.dot_call { 1 } else { 0 })
+            .zip(&call_info.arg_locs)
         {
-            let name_label =
-                InlayHintLabelPart { value: name.to_string(), tooltip: None, location: None, command: None };
-            let colon_label =
-                InlayHintLabelPart { value: ": ".to_string(), tooltip: None, location: None, command: None };
+            let name_label = InlayHintLabelPart {
+                value: name.to_string(),
+                tooltip: None,
+                location: None,
+                command: None,
+            };
+            let colon_label = InlayHintLabelPart {
+                value: ": ".to_string(),
+                tooltip: None,
+                location: None,
+                command: None,
+            };
             let position = symbols.files.start_position(use_loc);
             let tooltip = symbols.def_info(def_loc).map(|arg_def_info| {
                 // see doc comment for `additional_type_hint_info` to see
@@ -157,11 +179,17 @@ fn additional_type_hint_info(sp!(_, t): &N::Type, symbols: &Symbols) -> Option<I
         return None;
     };
 
-    let mod_defs = symbols.file_mods.values().flatten().find(|m| m.ident() == &mod_ident.value)?;
+    let mod_defs = symbols
+        .file_mods
+        .values()
+        .flatten()
+        .find(|m| m.ident() == &mod_ident.value)?;
 
     let struct_def = mod_defs.structs().get(&struct_name.value())?;
 
     let struct_def_info = symbols.def_info(&struct_def.name_loc)?;
 
-    Some(InlayHintTooltip::MarkupContent(on_hover_markup(struct_def_info)))
+    Some(InlayHintTooltip::MarkupContent(on_hover_markup(
+        struct_def_info,
+    )))
 }

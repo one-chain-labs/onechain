@@ -5,7 +5,7 @@
 
 //# publish
 module P0::M {
-    use one::dynamic_object_field as dof;
+    use sui::dynamic_object_field as dof;
 
     public struct O has key {
         id: UID,

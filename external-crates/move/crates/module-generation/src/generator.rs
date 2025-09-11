@@ -9,7 +9,7 @@ use move_core_types::account_address::AccountAddress;
 use move_ir_to_bytecode::compiler::compile_module;
 use move_ir_types::{ast::*, location::*};
 use move_symbol_pool::Symbol;
-use rand::{rngs::StdRng, Rng};
+use rand::{Rng, rngs::StdRng};
 use std::{
     collections::{BTreeSet, VecDeque},
     iter::FromIterator,
@@ -82,24 +82,29 @@ pub fn generate_verified_modules(
 pub struct ModuleGenerator<'a> {
     options: ModuleGeneratorOptions,
     current_module: ModuleDefinition,
-    gen: &'a mut StdRng,
+    rng: &'a mut StdRng,
 }
 
 impl<'a> ModuleGenerator<'a> {
     fn index(&mut self, bound: usize) -> usize {
-        self.gen.gen_range(0..bound)
+        self.rng.gen_range(0..bound)
     }
 
     fn identifier(&mut self) -> String {
-        let len = self.gen.gen_range(10..self.options.max_string_size);
-        random_string(self.gen, len)
+        let len = self.rng.gen_range(10..self.options.max_string_size);
+        random_string(self.rng, len)
     }
 
     fn base_type(&mut self, ty_param_context: &[&TypeVar]) -> Type {
         // TODO: Don't generate nested resources for now. Once we allow functions to take resources
         // (and have type parameters of kind Resource or All) then we should revisit this here.
-        let structs: Vec<_> =
-            self.current_module.structs.iter().filter(|s| !s.value.abilities.contains(&Ability::Key)).cloned().collect();
+        let structs: Vec<_> = self
+            .current_module
+            .structs
+            .iter()
+            .filter(|s| !s.value.abilities.contains(&Ability::Key))
+            .cloned()
+            .collect();
 
         let mut end = 5;
         if !ty_param_context.is_empty() {
@@ -142,12 +147,17 @@ impl<'a> ModuleGenerator<'a> {
     }
 
     fn typ(&mut self, ty_param_context: &[(TypeVar, BTreeSet<Ability>)]) -> Type {
-        let typ = self.base_type(&ty_param_context.iter().map(|(tv, _)| tv).collect::<Vec<_>>());
+        let typ = self.base_type(
+            &ty_param_context
+                .iter()
+                .map(|(tv, _)| tv)
+                .collect::<Vec<_>>(),
+        );
         // TODO: Always change the base type to a reference if it's resource type. Then we can
         // allow functions to take resources.
         // if typ.is_nominal_resource { .... }
-        if self.options.references_allowed && self.gen.gen_bool(0.25) {
-            let is_mutable = self.gen.gen_bool(0.25);
+        if self.options.references_allowed && self.rng.gen_bool(0.25) {
+            let is_mutable = self.rng.gen_bool(0.25);
             Spanned::unsafe_no_loc(Type_::Reference(is_mutable, Box::new(typ)))
         } else {
             typ
@@ -211,7 +221,9 @@ impl<'a> ModuleGenerator<'a> {
     }
 
     fn struct_fields(&mut self, ty_params: &[DatatypeTypeParameter]) -> StructDefinitionFields {
-        let num_fields = self.gen.gen_range(self.options.min_fields..self.options.max_fields);
+        let num_fields = self
+            .rng
+            .gen_range(self.options.min_fields..self.options.max_fields);
         let fields: Fields<Type> = init!(num_fields, {
             (
                 Spanned::unsafe_no_loc(Field_(self.identifier().into())),
@@ -226,7 +238,10 @@ impl<'a> ModuleGenerator<'a> {
         let signature = self.function_signature();
         let num_locals = self.index(self.options.max_locals);
         let locals = init!(num_locals, {
-            (Spanned::unsafe_no_loc(Var_(self.identifier().into())), self.typ(&signature.type_formals))
+            (
+                Spanned::unsafe_no_loc(Var_(self.identifier().into())),
+                self.typ(&signature.type_formals),
+            )
         });
         let fun = Function_ {
             loc: Spanned::unsafe_no_loc(()).loc,
@@ -237,20 +252,31 @@ impl<'a> ModuleGenerator<'a> {
                 locals,
                 code: vec![Spanned::unsafe_no_loc(Block_ {
                     label: Spanned::unsafe_no_loc(BlockLabel_(Symbol::from("b0"))),
-                    statements: VecDeque::from(vec![Spanned::unsafe_no_loc(Statement_::return_empty())]),
+                    statements: VecDeque::from(vec![Spanned::unsafe_no_loc(
+                        Statement_::return_empty(),
+                    )]),
                 })],
             },
         };
         let fun_name = FunctionName(self.identifier().into());
-        self.current_module.functions.push((fun_name, Spanned::unsafe_no_loc(fun)));
+        self.current_module
+            .functions
+            .push((fun_name, Spanned::unsafe_no_loc(fun)));
     }
 
     fn struct_def(&mut self, abilities: BTreeSet<Ability>) {
         let name = DatatypeName(self.identifier().into());
         let type_parameters = self.struct_type_parameters();
         let fields = self.struct_fields(&type_parameters);
-        let strct = StructDefinition_ { abilities, name, type_formals: type_parameters, fields };
-        self.current_module.structs.push(Spanned::unsafe_no_loc(strct))
+        let strct = StructDefinition_ {
+            abilities,
+            name,
+            type_formals: type_parameters,
+            fields,
+        };
+        self.current_module
+            .structs
+            .push(Spanned::unsafe_no_loc(strct))
     }
 
     fn imports(callees: &Set<Symbol>) -> Vec<ImportDefinition> {
@@ -264,7 +290,7 @@ impl<'a> ModuleGenerator<'a> {
             .collect()
     }
 
-    fn gen(mut self) -> ModuleDefinition {
+    fn rng(mut self) -> ModuleDefinition {
         let num_structs = self.index(self.options.max_structs) + 1;
         let num_functions = self.index(self.options.max_functions) + 1;
         // TODO: the order of generation here means that functions can't take resources as arguments.
@@ -293,19 +319,23 @@ impl<'a> ModuleGenerator<'a> {
     }
 
     pub fn create(
-        gen: &'a mut StdRng,
+        rng: &'a mut StdRng,
         options: ModuleGeneratorOptions,
         callable_modules: &Set<Symbol>,
     ) -> ModuleDefinition {
         // TODO: Generation of struct and function handles to the `callable_modules`
         let module_name = {
-            let len = gen.gen_range(10..options.max_string_size);
-            random_string(gen, len)
+            let len = rng.gen_range(10..options.max_string_size);
+            random_string(rng, len)
         };
         let current_module = ModuleDefinition {
             specified_version: None,
+            publishable: true,
             loc: Spanned::unsafe_no_loc(0).loc,
-            identifier: ModuleIdent { name: ModuleName(module_name.into()), address: AccountAddress::random() },
+            identifier: ModuleIdent {
+                name: ModuleName(module_name.into()),
+                address: AccountAddress::random(),
+            },
             friends: Vec::new(),
             imports: Self::imports(callable_modules),
             explicit_dependency_declarations: Vec::new(),
@@ -314,6 +344,11 @@ impl<'a> ModuleGenerator<'a> {
             functions: Vec::new(),
             constants: Vec::new(),
         };
-        Self { options, current_module, gen }.gen()
+        Self {
+            options,
+            current_module,
+            rng,
+        }
+        .rng()
     }
 }

@@ -5,36 +5,23 @@ use anyhow::Error;
 use tracing::{info, warn};
 
 use sui_bridge::events::{
-    EmergencyOpEvent,
-    MoveBlocklistValidatorEvent,
-    MoveNewTokenEvent,
-    MoveTokenDepositedEvent,
-    MoveTokenRegistrationEvent,
-    MoveTokenTransferApproved,
-    MoveTokenTransferClaimed,
-    UpdateRouteLimitEvent,
-    UpdateTokenPriceEvent,
+    EmergencyOpEvent, MoveBlocklistValidatorEvent, MoveNewTokenEvent, MoveTokenDepositedEvent,
+    MoveTokenRegistrationEvent, MoveTokenTransferApproved, MoveTokenTransferClaimed,
+    UpdateRouteLimitEvent, UpdateTokenPriceEvent,
 };
-use sui_indexer_builder::{indexer_builder::DataMapper, sui_datasource::CheckpointTxnData};
-use sui_types::{
-    effects::TransactionEffectsAPI,
-    event::Event,
-    execution_status::ExecutionStatus,
-    full_checkpoint_content::CheckpointTransaction,
-    BRIDGE_ADDRESS,
-    SUI_BRIDGE_OBJECT_ID,
-};
+use sui_bridge_schema::models::GovernanceActionType;
+use sui_indexer_builder::indexer_builder::DataMapper;
+use sui_indexer_builder::sui_datasource::CheckpointTxnData;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::event::Event;
+use sui_types::execution_status::ExecutionStatus;
+use sui_types::full_checkpoint_content::CheckpointTransaction;
+use sui_types::{BRIDGE_ADDRESS, SUI_BRIDGE_OBJECT_ID};
 
+use crate::metrics::BridgeIndexerMetrics;
 use crate::{
-    metrics::BridgeIndexerMetrics,
-    BridgeDataSource,
-    GovernanceAction,
-    GovernanceActionType,
-    ProcessedTxnData,
-    SuiTxnError,
-    TokenTransfer,
-    TokenTransferData,
-    TokenTransferStatus,
+    BridgeDataSource, GovernanceAction, ProcessedTxnData, SuiTxnError, TokenTransfer,
+    TokenTransferData, TokenTransferStatus,
 };
 
 /// Data mapper impl
@@ -44,16 +31,24 @@ pub struct SuiBridgeDataMapper {
 }
 
 impl DataMapper<CheckpointTxnData, ProcessedTxnData> for SuiBridgeDataMapper {
-    fn map(&self, (data, checkpoint_num, timestamp_ms): CheckpointTxnData) -> Result<Vec<ProcessedTxnData>, Error> {
-        self.metrics.total_sui_bridge_transactions.inc();
-        if !data.input_objects.iter().any(|obj| obj.id() == SUI_BRIDGE_OBJECT_ID) {
+    fn map(
+        &self,
+        (data, checkpoint_num, timestamp_ms): CheckpointTxnData,
+    ) -> Result<Vec<ProcessedTxnData>, Error> {
+        self.metrics.total_oct_bridge_transactions.inc();
+        if !data
+            .input_objects
+            .iter()
+            .any(|obj| obj.id() == SUI_BRIDGE_OBJECT_ID)
+        {
             return Ok(vec![]);
         }
 
         match &data.events {
             Some(events) => {
                 let token_transfers = events.data.iter().try_fold(vec![], |mut result, ev| {
-                    if let Some(data) = process_sui_event(ev, &data, checkpoint_num, timestamp_ms)? {
+                    if let Some(data) = process_sui_event(ev, &data, checkpoint_num, timestamp_ms)?
+                    {
                         result.push(data);
                     }
                     Ok::<_, anyhow::Error>(result)
@@ -95,7 +90,7 @@ fn process_sui_event(
         match ev.type_.name.as_str() {
             "TokenDepositedEvent" => {
                 info!("Observed Sui Deposit {:?}", ev);
-                // todo: metrics.total_sui_token_deposited.inc();
+                // todo: metrics.total_oct_token_deposited.inc();
                 let move_event: MoveTokenDepositedEvent = bcs::from_bytes(&ev.contents)?;
                 Some(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: move_event.source_chain,
@@ -106,7 +101,7 @@ fn process_sui_event(
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Deposited,
                     gas_usage: tx.effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     is_finalized: true,
                     data: Some(TokenTransferData {
                         destination_chain: move_event.target_chain,
@@ -120,7 +115,7 @@ fn process_sui_event(
             }
             "TokenTransferApproved" => {
                 info!("Observed Sui Approval {:?}", ev);
-                // todo: metrics.total_sui_token_transfer_approved.inc();
+                // todo: metrics.total_oct_token_transfer_approved.inc();
                 let event: MoveTokenTransferApproved = bcs::from_bytes(&ev.contents)?;
                 Some(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -131,14 +126,14 @@ fn process_sui_event(
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Approved,
                     gas_usage: tx.effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     data: None,
                     is_finalized: true,
                 }))
             }
             "TokenTransferClaimed" => {
                 info!("Observed Sui Claim {:?}", ev);
-                // todo: metrics.total_sui_token_transfer_claimed.inc();
+                // todo: metrics.total_oct_token_transfer_claimed.inc();
                 let event: MoveTokenTransferClaimed = bcs::from_bytes(&ev.contents)?;
                 Some(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -149,7 +144,7 @@ fn process_sui_event(
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Claimed,
                     gas_usage: tx.effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     data: None,
                     is_finalized: true,
                 }))
@@ -160,7 +155,7 @@ fn process_sui_event(
 
                 Some(ProcessedTxnData::GovernanceAction(GovernanceAction {
                     nonce: None,
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     tx_digest: tx.transaction.digest().inner().to_vec(),
                     sender: ev.sender.to_vec(),
                     timestamp_ms,
@@ -174,7 +169,7 @@ fn process_sui_event(
 
                 Some(ProcessedTxnData::GovernanceAction(GovernanceAction {
                     nonce: None,
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     tx_digest: tx.transaction.digest().inner().to_vec(),
                     sender: ev.sender.to_vec(),
                     timestamp_ms,
@@ -188,7 +183,7 @@ fn process_sui_event(
 
                 Some(ProcessedTxnData::GovernanceAction(GovernanceAction {
                     nonce: None,
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     tx_digest: tx.transaction.digest().inner().to_vec(),
                     sender: ev.sender.to_vec(),
                     timestamp_ms,
@@ -202,7 +197,7 @@ fn process_sui_event(
 
                 Some(ProcessedTxnData::GovernanceAction(GovernanceAction {
                     nonce: None,
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     tx_digest: tx.transaction.digest().inner().to_vec(),
                     sender: ev.sender.to_vec(),
                     timestamp_ms,
@@ -216,7 +211,7 @@ fn process_sui_event(
 
                 Some(ProcessedTxnData::GovernanceAction(GovernanceAction {
                     nonce: None,
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     tx_digest: tx.transaction.digest().inner().to_vec(),
                     sender: ev.sender.to_vec(),
                     timestamp_ms,
@@ -230,7 +225,7 @@ fn process_sui_event(
 
                 Some(ProcessedTxnData::GovernanceAction(GovernanceAction {
                     nonce: None,
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     tx_digest: tx.transaction.digest().inner().to_vec(),
                     sender: ev.sender.to_vec(),
                     timestamp_ms,
@@ -239,7 +234,7 @@ fn process_sui_event(
                 }))
             }
             _ => {
-                // todo: metrics.total_sui_bridge_txn_other.inc();
+                // todo: metrics.total_oct_bridge_txn_other.inc();
                 warn!("Unexpected event {ev:?}.");
                 None
             }

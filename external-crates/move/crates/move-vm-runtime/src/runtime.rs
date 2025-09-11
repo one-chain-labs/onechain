@@ -12,10 +12,9 @@ use crate::{
     tracing2::tracer::VMTracer,
 };
 use move_binary_format::{
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule, IndexKind,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult, verification_error},
     file_format::{AbilitySet, LocalIndex},
-    CompiledModule,
-    IndexKind,
 };
 use move_bytecode_verifier::script_signature;
 use move_core_types::{
@@ -48,7 +47,9 @@ impl VMRuntime {
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
     ) -> PartialVMResult<Self> {
-        Ok(VMRuntime { loader: Loader::new(NativeFunctions::new(natives)?, vm_config) })
+        Ok(VMRuntime {
+            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+        })
     }
 
     pub fn new_session<'r, S: MoveResolver>(&self, remote: S) -> Session<'r, '_, S> {
@@ -60,7 +61,11 @@ impl VMRuntime {
         remote: S,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_, S> {
-        Session { runtime: self, data_cache: TransactionDataCache::new(remote), native_extensions }
+        Session {
+            runtime: self,
+            data_cache: TransactionDataCache::new(remote),
+            native_extensions,
+        }
     }
 
     pub fn publish_module_bundle(
@@ -74,7 +79,12 @@ impl VMRuntime {
         // used with the `[]` operator
         let compiled_modules = match modules
             .iter()
-            .map(|blob| CompiledModule::deserialize_with_config(blob, &self.loader.vm_config().binary_config))
+            .map(|blob| {
+                CompiledModule::deserialize_with_config(
+                    blob,
+                    &self.loader.vm_config().binary_config,
+                )
+            })
             .collect::<PartialVMResult<Vec<_>>>()
         {
             Ok(modules) => modules,
@@ -102,12 +112,14 @@ impl VMRuntime {
         let mut bundle_unverified = BTreeSet::new();
         for module in &compiled_modules {
             if !bundle_unverified.insert(module.self_id()) {
-                return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME).finish(Location::Undefined));
+                return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)
+                    .finish(Location::Undefined));
             }
         }
 
         // Perform bytecode and loading verification. Modules must be sorted in topological order.
-        self.loader.verify_module_bundle_for_publication(&compiled_modules, data_store)?;
+        self.loader
+            .verify_module_bundle_for_publication(&compiled_modules, data_store)?;
 
         // NOTE: we want to (informally) argue that all modules pass the linking check before being
         // published to the data store.
@@ -163,7 +175,9 @@ impl VMRuntime {
         // none of the module can be published/updated.
         for (module, blob) in compiled_modules.into_iter().zip(modules.into_iter()) {
             let runtime_id = module.self_id();
-            let storage_id = data_store.relocate(&runtime_id).map_err(|e| e.finish(Location::Module(runtime_id)))?;
+            let storage_id = data_store
+                .relocate(&runtime_id)
+                .map_err(|e| e.finish(Location::Module(runtime_id)))?;
 
             data_store.publish_module(&storage_id, blob)?;
         }
@@ -176,7 +190,9 @@ impl VMRuntime {
             Ok(layout) => layout,
             Err(_err) => {
                 warn!("[VM] failed to get layout from type");
-                return Err(PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION));
+                return Err(PartialVMError::new(
+                    StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
+                ));
             }
         };
 
@@ -184,7 +200,9 @@ impl VMRuntime {
             Some(val) => Ok(val),
             None => {
                 warn!("[VM] failed to deserialize argument");
-                Err(PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT))
+                Err(PartialVMError::new(
+                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                ))
             }
         }
     }
@@ -195,11 +213,15 @@ impl VMRuntime {
         serialized_args: Vec<impl Borrow<[u8]>>,
     ) -> PartialVMResult<(Locals, Vec<Value>)> {
         if arg_tys.len() != serialized_args.len() {
-            return Err(PartialVMError::new(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH).with_message(format!(
-                "argument length mismatch: expected {} got {}",
-                arg_tys.len(),
-                serialized_args.len()
-            )));
+            return Err(
+                PartialVMError::new(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH).with_message(
+                    format!(
+                        "argument length mismatch: expected {} got {}",
+                        arg_tys.len(),
+                        serialized_args.len()
+                    ),
+                ),
+            );
         }
 
         // Create a list of dummy locals. Each value stored will be used be borrowed and passed
@@ -215,7 +237,9 @@ impl VMRuntime {
                     dummy_locals.store_loc(
                         idx,
                         self.deserialize_value(inner_t, arg_bytes)?,
-                        self.loader.vm_config().enable_invariant_violation_check_in_swap_loc,
+                        self.loader
+                            .vm_config()
+                            .enable_invariant_violation_check_in_swap_loc,
                     )?;
                     dummy_locals.borrow_loc(idx)
                 }
@@ -225,12 +249,17 @@ impl VMRuntime {
         Ok((dummy_locals, deserialized_args))
     }
 
-    fn serialize_return_value(&self, ty: &Type, value: Value) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
+    fn serialize_return_value(
+        &self,
+        ty: &Type,
+        value: Value,
+    ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
         let (ty, value) = match ty {
             Type::Reference(inner) | Type::MutableReference(inner) => {
                 let ref_value: Reference = value.cast().map_err(|_err| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message("non reference value given for a reference typed return value".to_string())
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
+                        "non reference value given for a reference typed return value".to_string(),
+                    )
                 })?;
                 let inner_value = ref_value.read_ref()?;
                 (&**inner, inner_value)
@@ -238,16 +267,21 @@ impl VMRuntime {
             _ => (ty, value),
         };
 
-        let layout = if self.loader().vm_config().rethrow_serialization_type_layout_errors {
+        let layout = if self
+            .loader()
+            .vm_config()
+            .rethrow_serialization_type_layout_errors
+        {
             self.loader.type_to_type_layout(ty)?
         } else {
             self.loader.type_to_type_layout(ty).map_err(|_err| {
-                PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-                    .with_message("entry point functions cannot have non-serializable return types".to_string())
+                PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
+                    "entry point functions cannot have non-serializable return types".to_string(),
+                )
             })?
         };
 
-        let bytes = value.simple_serialize(&layout).ok_or_else(|| {
+        let bytes = value.typed_serialize(&layout).ok_or_else(|| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("failed to serialize return values".to_string())
         })?;
@@ -260,14 +294,22 @@ impl VMRuntime {
         return_values: Vec<Value>,
     ) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
         if return_types.len() != return_values.len() {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!(
-                "declared {} return types, but got {} return values",
-                return_types.len(),
-                return_values.len()
-            )));
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "declared {} return types, but got {} return values",
+                        return_types.len(),
+                        return_values.len()
+                    ),
+                ),
+            );
         }
 
-        return_types.iter().zip(return_values).map(|(ty, value)| self.serialize_return_value(ty, value)).collect()
+        return_types
+            .iter()
+            .zip(return_values)
+            .map(|(ty, value)| self.serialize_return_value(ty, value))
+            .collect()
     }
 
     fn execute_function_impl(
@@ -295,33 +337,38 @@ impl VMRuntime {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        let (mut dummy_locals, deserialized_args) =
-            self.deserialize_args(arg_types, serialized_args).map_err(|e| e.finish(Location::Undefined))?;
+        let (mut dummy_locals, deserialized_args) = self
+            .deserialize_args(arg_types, serialized_args)
+            .map_err(|e| e.finish(Location::Undefined))?;
         let return_types = return_types
             .into_iter()
             .map(|ty| ty.subst(&ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        let return_values = Interpreter::entrypoint(
+        let return_values = self.execute_function_with_values_impl(
             func,
             ty_args,
             deserialized_args,
             data_store,
             gas_meter,
             extensions,
-            &self.loader,
             tracer,
         )?;
 
-        let serialized_return_values =
-            self.serialize_return_values(&return_types, return_values).map_err(|e| e.finish(Location::Undefined))?;
+        let serialized_return_values = self
+            .serialize_return_values(&return_types, return_values)
+            .map_err(|e| e.finish(Location::Undefined))?;
         let serialized_mut_ref_outputs = mut_ref_args
             .into_iter()
             .map(|(idx, ty)| {
                 // serialize return values first in the case that a value points into this local
-                let local_val =
-                    dummy_locals.move_loc(idx, self.loader.vm_config().enable_invariant_violation_check_in_swap_loc)?;
+                let local_val = dummy_locals.move_loc(
+                    idx,
+                    self.loader
+                        .vm_config()
+                        .enable_invariant_violation_check_in_swap_loc,
+                )?;
                 let (bytes, layout) = self.serialize_return_value(&ty, local_val)?;
                 Ok((idx as LocalIndex, bytes, layout))
             })
@@ -337,6 +384,28 @@ impl VMRuntime {
         })
     }
 
+    fn execute_function_with_values_impl(
+        &self,
+        func: Arc<Function>,
+        ty_args: Vec<Type>,
+        args: Vec<Value>,
+        data_store: &mut impl DataStore,
+        gas_meter: &mut impl GasMeter,
+        extensions: &mut NativeContextExtensions,
+        tracer: &mut Option<VMTracer<'_>>,
+    ) -> VMResult<Vec<Value>> {
+        Interpreter::entrypoint(
+            func,
+            ty_args,
+            args,
+            data_store,
+            gas_meter,
+            extensions,
+            &self.loader,
+            tracer,
+        )
+    }
+
     pub(crate) fn execute_function(
         &self,
         module: &ModuleId,
@@ -349,33 +418,20 @@ impl VMRuntime {
         bypass_declared_entry_check: bool,
         tracer: Option<&mut MoveTraceBuilder>,
     ) -> VMResult<SerializedReturnValues> {
-        use move_binary_format::file_format::SignatureIndex;
-        fn check_is_entry(
-            _resolver: &CompiledModule,
-            is_entry: bool,
-            _parameters_idx: SignatureIndex,
-            _return_idx: Option<SignatureIndex>,
-        ) -> PartialVMResult<()> {
-            if is_entry {
-                Ok(())
-            } else {
-                Err(PartialVMError::new(StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION))
-            }
-        }
-
-        let additional_signature_checks = if bypass_declared_entry_check {
-            move_bytecode_verifier::no_additional_script_signature_checks
-        } else {
-            check_is_entry
-        };
-        // load the function
-        let (compiled, _, func, LoadedFunctionInstantiation { parameters, return_ }) =
-            self.loader.load_function(module, function_name, &type_arguments, data_store)?;
-
-        script_signature::verify_module_function_signature_by_name(
-            compiled.as_ref(),
+        let (
+            func,
+            LoadedFunctionInstantiation {
+                parameters,
+                return_,
+                instruction_length: _,
+                definition_index: _,
+            },
+        ) = self.load_and_check_function(
+            module,
             function_name,
-            additional_signature_checks,
+            &type_arguments,
+            data_store,
+            bypass_declared_entry_check,
         )?;
 
         // execute the function
@@ -392,16 +448,107 @@ impl VMRuntime {
         )
     }
 
+    pub(crate) fn execute_function_with_values(
+        &self,
+        module: &ModuleId,
+        function_name: &IdentStr,
+        type_arguments: Vec<Type>,
+        args: Vec<Value>,
+        data_store: &mut impl DataStore,
+        gas_meter: &mut impl GasMeter,
+        extensions: &mut NativeContextExtensions,
+        bypass_declared_entry_check: bool,
+        tracer: Option<&mut MoveTraceBuilder>,
+    ) -> VMResult<Vec<Value>> {
+        let (func, _) = self.load_and_check_function(
+            module,
+            function_name,
+            &type_arguments,
+            data_store,
+            bypass_declared_entry_check,
+        )?;
+        if func.arg_count() != args.len() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!(
+                        "'{}::{}' has {} arguments, but got {}",
+                        module,
+                        function_name,
+                        func.arg_count(),
+                        args.len()
+                    ))
+                    .finish(Location::Undefined),
+            );
+        }
+
+        // execute the function
+        self.execute_function_with_values_impl(
+            func,
+            type_arguments,
+            args,
+            data_store,
+            gas_meter,
+            extensions,
+            &mut tracer.map(VMTracer::new),
+        )
+    }
+
+    fn load_and_check_function(
+        &self,
+        module: &ModuleId,
+        function_name: &IdentStr,
+        type_arguments: &[Type],
+        data_store: &mut impl DataStore,
+        bypass_declared_entry_check: bool,
+    ) -> VMResult<(Arc<Function>, LoadedFunctionInstantiation)> {
+        use move_binary_format::file_format::SignatureIndex;
+        fn check_is_entry(
+            _resolver: &CompiledModule,
+            is_entry: bool,
+            _parameters_idx: SignatureIndex,
+            _return_idx: Option<SignatureIndex>,
+        ) -> PartialVMResult<()> {
+            if is_entry {
+                Ok(())
+            } else {
+                Err(PartialVMError::new(
+                    StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+                ))
+            }
+        }
+
+        let additional_signature_checks = if bypass_declared_entry_check {
+            move_bytecode_verifier::no_additional_script_signature_checks
+        } else {
+            check_is_entry
+        };
+        // load the function
+        let (compiled, _, func, loaded_instantiation) =
+            self.loader
+                .load_function(module, function_name, type_arguments, data_store)?;
+
+        script_signature::verify_module_function_signature_by_name(
+            compiled.as_ref(),
+            function_name,
+            additional_signature_checks,
+        )?;
+        Ok((func, loaded_instantiation))
+    }
+
     pub(crate) fn loader(&self) -> &Loader {
         &self.loader
     }
 
     pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        self.loader.abilities(ty).map_err(|e| e.finish(Location::Undefined))
+        self.loader
+            .abilities(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn get_type_tag(&self, ty: &Type) -> VMResult<TypeTag> {
-        self.loader.type_to_type_tag(ty).map_err(|e| e.finish(Location::Undefined))
+        self.loader
+            .type_to_type_tag(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn get_type(&self, index: CachedTypeIndex) -> Option<Arc<CachedDatatype>> {
@@ -409,7 +556,9 @@ impl VMRuntime {
     }
 
     pub fn type_to_type_layout(&self, ty: &Type) -> VMResult<MoveTypeLayout> {
-        self.loader.type_to_type_layout(ty).map_err(|e| e.finish(Location::Undefined))
+        self.loader
+            .type_to_type_layout(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn load_type(
@@ -418,7 +567,19 @@ impl VMRuntime {
         struct_name: &IdentStr,
         data_store: &impl DataStore,
     ) -> VMResult<(CachedTypeIndex, Arc<CachedDatatype>)> {
-        self.loader.load_type_by_name(struct_name, module_id, data_store)
+        self.loader
+            .load_type_by_name(struct_name, module_id, data_store)
+    }
+
+    /// Attempt to load a type tag to a `Type` without loading any additional modules.
+    /// This may fail if the type tag is not already loaded in the VM.
+    /// NB: the type tag _must_ be defining ID based.
+    pub fn try_load_cached_type(&self, type_tag: &TypeTag) -> VMResult<Option<Type>> {
+        self.loader.try_load_cached_type(type_tag)
+    }
+
+    pub fn load_type_tag(&self, type_tag: &TypeTag, data_store: &impl DataStore) -> VMResult<Type> {
+        self.loader.load_type(type_tag, data_store)
     }
 
     pub fn execute_function_bypass_visibility(
@@ -430,6 +591,7 @@ impl VMRuntime {
         data_store: &mut impl DataStore,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
+        tracer: Option<&mut MoveTraceBuilder>,
     ) -> VMResult<SerializedReturnValues> {
         move_vm_profiler::tracing_feature_enabled! {
             use move_vm_profiler::GasProfiler;
@@ -451,12 +613,49 @@ impl VMRuntime {
             gas_meter,
             extensions,
             bypass_declared_entry_check,
-            None,
+            tracer,
+        )
+    }
+
+    pub fn execute_function_with_values_bypass_visibility(
+        &self,
+        module: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: Vec<Type>,
+        args: Vec<Value>,
+        data_store: &mut impl DataStore,
+        gas_meter: &mut impl GasMeter,
+        extensions: &mut NativeContextExtensions,
+        tracer: Option<&mut MoveTraceBuilder>,
+    ) -> VMResult<Vec<Value>> {
+        move_vm_profiler::tracing_feature_enabled! {
+            use move_vm_profiler::GasProfiler;
+            if gas_meter.get_profiler_mut().is_none() {
+                gas_meter.set_profiler(GasProfiler::init_default_cfg(
+                    function_name.to_string(),
+                    gas_meter.remaining_gas().into(),
+                ));
+            }
+        }
+
+        let bypass_declared_entry_check = true;
+        self.execute_function_with_values(
+            module,
+            function_name,
+            ty_args,
+            args,
+            data_store,
+            gas_meter,
+            extensions,
+            bypass_declared_entry_check,
+            tracer,
         )
     }
 
     pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> VMResult<A::MoveTypeLayout> {
-        self.loader.type_to_fully_annotated_layout(ty).map_err(|e| e.finish(Location::Undefined))
+        self.loader
+            .type_to_fully_annotated_layout(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn load_function(
@@ -467,11 +666,18 @@ impl VMRuntime {
         data_store: &mut impl DataStore,
     ) -> VMResult<LoadedFunctionInstantiation> {
         let (_, _, _, instantiation) =
-            self.loader.load_function(module_id, function_name, type_arguments, data_store)?;
+            self.loader
+                .load_function(module_id, function_name, type_arguments, data_store)?;
         Ok(instantiation)
     }
 
-    pub fn load_module(&self, module_id: &ModuleId, data_store: &impl DataStore) -> VMResult<Arc<CompiledModule>> {
-        self.loader.load_module(module_id, data_store).map(|(compiled, _)| compiled)
+    pub fn load_module(
+        &self,
+        module_id: &ModuleId,
+        data_store: &impl DataStore,
+    ) -> VMResult<Arc<CompiledModule>> {
+        self.loader
+            .load_module(module_id, data_store)
+            .map(|(compiled, _)| compiled)
     }
 }

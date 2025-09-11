@@ -5,7 +5,7 @@
 use crate::{
     deserializer::load_signature_token_test_entry,
     file_format::{DatatypeHandleIndex, SignatureToken},
-    file_format_common::{BinaryData, SerializedType, SIGNATURE_TOKEN_DEPTH_MAX},
+    file_format_common::{BinaryData, SIGNATURE_TOKEN_DEPTH_MAX, SerializedType},
     serializer::{serialize_signature_token, serialize_signature_token_unchecked},
 };
 use std::io::Cursor;
@@ -37,7 +37,8 @@ fn serialize_nested_types_too_deep() {
         serialize_signature_token(&mut binary, &ty).expect_err("serialization should fail");
 
         let mut binary = BinaryData::new();
-        serialize_signature_token_unchecked(&mut binary, &ty).expect("serialization (unchecked) should succeed");
+        serialize_signature_token_unchecked(&mut binary, &ty)
+            .expect("serialization (unchecked) should succeed");
 
         let cursor = Cursor::new(binary.as_inner());
         load_signature_token_test_entry(cursor).expect_err("deserialization should fail");

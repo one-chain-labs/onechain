@@ -38,17 +38,27 @@ pub struct Committee {
 impl Committee {
     pub fn new(epoch: Epoch, authorities: Vec<Authority>) -> Self {
         assert!(!authorities.is_empty(), "Committee cannot be empty!");
-        assert!(authorities.len() < u32::MAX as usize, "Too many authorities ({})!", authorities.len());
+        assert!(
+            authorities.len() < u32::MAX as usize,
+            "Too many authorities ({})!",
+            authorities.len()
+        );
 
         let total_stake = authorities.iter().map(|a| a.stake).sum();
         assert_ne!(total_stake, 0, "Total stake cannot be zero!");
         let quorum_threshold = 2 * total_stake / 3 + 1;
         let validity_threshold = (total_stake + 2) / 3;
-        Self { epoch, total_stake, quorum_threshold, validity_threshold, authorities }
+        Self {
+            epoch,
+            total_stake,
+            quorum_threshold,
+            validity_threshold,
+            authorities,
+        }
     }
 
-    /// -----------------------------------------------------------------------
-    /// Accessors to Committee fields.
+    // -----------------------------------------------------------------------
+    // Accessors to Committee fields.
 
     pub fn epoch(&self) -> Epoch {
         self.epoch
@@ -75,11 +85,14 @@ impl Committee {
     }
 
     pub fn authorities(&self) -> impl Iterator<Item = (AuthorityIndex, &Authority)> {
-        self.authorities.iter().enumerate().map(|(i, a)| (AuthorityIndex(i as u32), a))
+        self.authorities
+            .iter()
+            .enumerate()
+            .map(|(i, a)| (AuthorityIndex(i as u32), a))
     }
 
-    /// -----------------------------------------------------------------------
-    /// Helpers for Committee properties.
+    // -----------------------------------------------------------------------
+    // Helpers for Committee properties.
 
     /// Returns true if the provided stake has reached quorum (2f+1).
     pub fn reached_quorum(&self, stake: Stake) -> bool {
@@ -91,7 +104,7 @@ impl Committee {
         stake >= self.validity_threshold()
     }
 
-    /// Coverts an index to an AuthorityIndex, if valid.
+    /// Converts an index to an AuthorityIndex, if valid.
     /// Returns None if index is out of bound.
     pub fn to_authority_index(&self, index: usize) -> Option<AuthorityIndex> {
         if index < self.authorities.len() {
@@ -138,15 +151,18 @@ pub struct Authority {
 /// NOTE: for safety, invalid AuthorityIndex should be impossible to create. So AuthorityIndex
 /// should not be created or incremented outside of this file. AuthorityIndex received from peers
 /// should be validated before use.
-#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Debug, Default, Hash, Serialize, Deserialize)]
+#[derive(
+    Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Debug, Default, Hash, Serialize, Deserialize,
+)]
 pub struct AuthorityIndex(u32);
 
 impl AuthorityIndex {
-    pub const MAX: Self = Self(u32::MAX);
-    // Only for scanning rows in the database. Invalid elsewhere.
-    pub const MIN: Self = Self::ZERO;
     // Minimum committee size is 1, so 0 index is always valid.
     pub const ZERO: Self = Self(0);
+
+    // Only for scanning rows in the database. Invalid elsewhere.
+    pub const MIN: Self = Self::ZERO;
+    pub const MAX: Self = Self(u32::MAX);
 
     pub fn value(&self) -> usize {
         self.0 as usize
@@ -159,15 +175,9 @@ impl AuthorityIndex {
     }
 }
 
-// TODO: re-evaluate formats for production debugging.
 impl Display for AuthorityIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.value() < 26 {
-            let c = (b'A' + self.value() as u8) as char;
-            f.write_str(c.to_string().as_str())
-        } else {
-            write!(f, "[{:02}]", self.value())
-        }
+        write!(f, "[{}]", self.value())
     }
 }
 

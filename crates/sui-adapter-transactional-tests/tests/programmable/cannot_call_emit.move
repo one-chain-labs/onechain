@@ -13,14 +13,14 @@ module test::m1 {
 
 //# programmable
 //> 0: test::m1::a();
-//> one::event::emit<test::m1::A>(Result(0));
+//> sui::event::emit<test::m1::A>(Result(0));
 
 //# programmable
 //> 0: test::m1::a();
-// wrong type annotation doesn't matter
-//> one::event::emit<bool>(Result(0));
+// wrong type annotation did not matter in v1 of PTB execution
+//> sui::event::emit<bool>(Result(0));
 
 //# programmable
 //> 0: test::m1::a();
 // function doesn't exist
-//> one::event::does_not_exist<test::m1::A>(Result(0));
+//> sui::event::does_not_exist<test::m1::A>(Result(0));

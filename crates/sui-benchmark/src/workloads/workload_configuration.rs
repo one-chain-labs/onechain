@@ -1,33 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    bank::BenchmarkBank,
-    drivers::Interval,
-    options::{Opts, RunSpec},
-    system_state_observer::SystemStateObserver,
-    workloads::{
-        batch_payment::BatchPaymentWorkloadBuilder,
-        delegation::DelegationWorkloadBuilder,
-        shared_counter::SharedCounterWorkloadBuilder,
-        transfer_object::TransferObjectWorkloadBuilder,
-        ExpectedFailureType,
-        GroupID,
-        WorkloadBuilderInfo,
-        WorkloadInfo,
-    },
-};
+use crate::bank::BenchmarkBank;
+use crate::drivers::Interval;
+use crate::options::{Opts, RunSpec};
+use crate::system_state_observer::SystemStateObserver;
+use crate::workloads::batch_payment::BatchPaymentWorkloadBuilder;
+use crate::workloads::delegation::DelegationWorkloadBuilder;
+use crate::workloads::party::PartyWorkloadBuilder;
+use crate::workloads::shared_counter::SharedCounterWorkloadBuilder;
+use crate::workloads::slow::SlowWorkloadBuilder;
+use crate::workloads::transfer_object::TransferObjectWorkloadBuilder;
+use crate::workloads::{ExpectedFailureType, GroupID, WorkloadBuilderInfo, WorkloadInfo};
 use anyhow::Result;
-use std::{collections::BTreeMap, str::FromStr, sync::Arc};
+use std::collections::BTreeMap;
+use std::str::FromStr;
+use std::sync::Arc;
 use tracing::info;
 
-use super::{
-    adversarial::{AdversarialPayloadCfg, AdversarialWorkloadBuilder},
-    expected_failure::{ExpectedFailurePayloadCfg, ExpectedFailureWorkloadBuilder},
-    randomness::RandomnessWorkloadBuilder,
-    shared_object_deletion::SharedCounterDeletionWorkloadBuilder,
-};
+use super::adversarial::{AdversarialPayloadCfg, AdversarialWorkloadBuilder};
+use super::expected_failure::{ExpectedFailurePayloadCfg, ExpectedFailureWorkloadBuilder};
+use super::randomized_transaction::RandomizedTransactionWorkloadBuilder;
+use super::randomness::RandomnessWorkloadBuilder;
+use super::shared_object_deletion::SharedCounterDeletionWorkloadBuilder;
 
+#[derive(Debug)]
 pub struct WorkloadWeights {
     pub shared_counter: u32,
     pub transfer_object: u32,
@@ -37,6 +34,9 @@ pub struct WorkloadWeights {
     pub adversarial: u32,
     pub expected_failure: u32,
     pub randomness: u32,
+    pub randomized_transaction: u32,
+    pub slow: u32,
+    pub party: u32,
 }
 
 pub struct WorkloadConfig {
@@ -76,6 +76,9 @@ impl WorkloadConfiguration {
                 adversarial,
                 expected_failure,
                 randomness,
+                randomized_transaction,
+                slow,
+                party,
                 shared_counter_hotness_factor,
                 num_shared_counters,
                 shared_counter_max_tip,
@@ -87,7 +90,10 @@ impl WorkloadConfiguration {
                 in_flight_ratio,
                 duration,
             } => {
-                info!("Number of benchmark groups to run: {}", num_of_benchmark_groups);
+                info!(
+                    "Number of benchmark groups to run: {}",
+                    num_of_benchmark_groups
+                );
 
                 // Creating the workload builders for each benchmark group. The workloads for each
                 // benchmark group will run in the same time for the same duration.
@@ -106,10 +112,15 @@ impl WorkloadConfiguration {
                             adversarial: adversarial[i],
                             expected_failure: expected_failure[i],
                             randomness: randomness[i],
+                            randomized_transaction: randomized_transaction[i],
+                            slow: slow[i],
+                            party: party[i],
                         },
-                        adversarial_cfg: AdversarialPayloadCfg::from_str(&adversarial_cfg[i]).unwrap(),
+                        adversarial_cfg: AdversarialPayloadCfg::from_str(&adversarial_cfg[i])
+                            .unwrap(),
                         expected_failure_cfg: ExpectedFailurePayloadCfg {
-                            failure_type: ExpectedFailureType::try_from(expected_failure_type[i]).unwrap(),
+                            failure_type: ExpectedFailureType::try_from(expected_failure_type[i])
+                                .unwrap(),
                         },
                         batch_payment_size: batch_payment_size[i],
                         shared_counter_hotness_factor: shared_counter_hotness_factor[i],
@@ -119,11 +130,18 @@ impl WorkloadConfiguration {
                         in_flight_ratio: in_flight_ratio[i],
                         duration: duration[i],
                     };
-                    let builders = Self::create_workload_builders(config, system_state_observer.clone()).await;
+                    let builders =
+                        Self::create_workload_builders(config, system_state_observer.clone()).await;
                     workload_builders.extend(builders);
                 }
 
-                Self::build(workload_builders, bank, system_state_observer, opts.gas_request_chunk_size).await
+                Self::build(
+                    workload_builders,
+                    bank,
+                    system_state_observer,
+                    opts.gas_request_chunk_size,
+                )
+                .await
             }
         }
     }
@@ -136,17 +154,31 @@ impl WorkloadConfiguration {
     ) -> Result<BTreeMap<GroupID, Vec<WorkloadInfo>>> {
         // Generate the workloads and init them
         let reference_gas_price = system_state_observer.state.borrow().reference_gas_price;
-        let (workload_params, workload_builders): (Vec<_>, Vec<_>) =
-            workload_builders.into_iter().flatten().map(|x| (x.workload_params, x.workload_builder)).unzip();
-        let mut workloads = bank.generate(workload_builders, reference_gas_price, gas_request_chunk_size).await?;
+        let (workload_params, workload_builders): (Vec<_>, Vec<_>) = workload_builders
+            .into_iter()
+            .flatten()
+            .map(|x| (x.workload_params, x.workload_builder))
+            .unzip();
+        let mut workloads = bank
+            .generate(
+                workload_builders,
+                reference_gas_price,
+                gas_request_chunk_size,
+            )
+            .await?;
         for workload in workloads.iter_mut() {
-            workload.init(bank.proxy.clone(), system_state_observer.clone()).await;
+            workload
+                .init(bank.proxy.clone(), system_state_observer.clone())
+                .await;
         }
 
         let all_workloads = workloads.into_iter().zip(workload_params).fold(
             BTreeMap::<GroupID, Vec<WorkloadInfo>>::new(),
             |mut acc, (workload, workload_params)| {
-                let w = WorkloadInfo { workload, workload_params };
+                let w = WorkloadInfo {
+                    workload,
+                    workload_params,
+                };
 
                 acc.entry(w.workload_params.group).or_default().push(w);
                 acc
@@ -174,6 +206,13 @@ impl WorkloadConfiguration {
         }: WorkloadConfig,
         system_state_observer: Arc<SystemStateObserver>,
     ) -> Vec<Option<WorkloadBuilderInfo>> {
+        tracing::info!(
+            "Workload Configuration weights {:?} target_qps: {:?} num_workers: {:?} duration: {:?}",
+            weights,
+            target_qps,
+            num_workers,
+            duration
+        );
         let total_weight = weights.shared_counter
             + weights.shared_deletion
             + weights.transfer_object
@@ -181,7 +220,10 @@ impl WorkloadConfiguration {
             + weights.batch_payment
             + weights.adversarial
             + weights.randomness
-            + weights.expected_failure;
+            + weights.expected_failure
+            + weights.randomized_transaction
+            + weights.slow
+            + weights.party;
         let reference_gas_price = system_state_observer.state.borrow().reference_gas_price;
         let mut workload_builders = vec![];
         let shared_workload = SharedCounterWorkloadBuilder::from(
@@ -269,7 +311,34 @@ impl WorkloadConfiguration {
             group,
         );
         workload_builders.push(expected_failure_workload);
-
+        let randomized_transaction_workload = RandomizedTransactionWorkloadBuilder::from(
+            weights.randomized_transaction as f32 / total_weight as f32,
+            target_qps,
+            num_workers,
+            in_flight_ratio,
+            reference_gas_price,
+            duration,
+            group,
+        );
+        workload_builders.push(randomized_transaction_workload);
+        let slow_workload = SlowWorkloadBuilder::from(
+            weights.slow as f32 / total_weight as f32,
+            target_qps,
+            num_workers,
+            in_flight_ratio,
+            duration,
+            group,
+        );
+        workload_builders.push(slow_workload);
+        let party_workload = PartyWorkloadBuilder::from(
+            weights.party as f32 / total_weight as f32,
+            target_qps,
+            num_workers,
+            in_flight_ratio,
+            duration,
+            group,
+        );
+        workload_builders.push(party_workload);
         workload_builders
     }
 }

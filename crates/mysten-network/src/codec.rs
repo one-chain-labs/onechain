@@ -12,8 +12,8 @@ use tonic::{
 pub struct BcsEncoder<T>(PhantomData<T>);
 
 impl<T: serde::Serialize> Encoder for BcsEncoder<T> {
-    type Error = Status;
     type Item = T;
+    type Error = Status;
 
     fn encode(&mut self, item: Self::Item, buf: &mut EncodeBuf<'_>) -> Result<(), Self::Error> {
         bcs::serialize_into(&mut buf.writer(), &item).map_err(|e| Status::internal(e.to_string()))
@@ -24,8 +24,8 @@ impl<T: serde::Serialize> Encoder for BcsEncoder<T> {
 pub struct BcsDecoder<U>(PhantomData<U>);
 
 impl<U: serde::de::DeserializeOwned> Decoder for BcsDecoder<U> {
-    type Error = Status;
     type Item = U;
+    type Error = Status;
 
     fn decode(&mut self, buf: &mut DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
         if !buf.has_remaining() {
@@ -34,7 +34,8 @@ impl<U: serde::de::DeserializeOwned> Decoder for BcsDecoder<U> {
 
         let chunk = buf.chunk();
 
-        let item: Self::Item = bcs::from_bytes(chunk).map_err(|e| Status::internal(e.to_string()))?;
+        let item: Self::Item =
+            bcs::from_bytes(chunk).map_err(|e| Status::internal(e.to_string()))?;
         buf.advance(chunk.len());
 
         Ok(Some(item))
@@ -56,10 +57,10 @@ where
     T: serde::Serialize + Send + 'static,
     U: serde::de::DeserializeOwned + Send + 'static,
 {
-    type Decode = U;
-    type Decoder = BcsDecoder<U>;
     type Encode = T;
+    type Decode = U;
     type Encoder = BcsEncoder<T>;
+    type Decoder = BcsDecoder<U>;
 
     fn encoder(&mut self) -> Self::Encoder {
         BcsEncoder(PhantomData)
@@ -74,8 +75,8 @@ where
 pub struct BcsSnappyEncoder<T>(PhantomData<T>);
 
 impl<T: serde::Serialize> Encoder for BcsSnappyEncoder<T> {
-    type Error = Status;
     type Item = T;
+    type Error = Status;
 
     fn encode(&mut self, item: Self::Item, buf: &mut EncodeBuf<'_>) -> Result<(), Self::Error> {
         let mut snappy_encoder = snap::write::FrameEncoder::new(buf.writer());
@@ -87,8 +88,8 @@ impl<T: serde::Serialize> Encoder for BcsSnappyEncoder<T> {
 pub struct BcsSnappyDecoder<U>(PhantomData<U>);
 
 impl<U: serde::de::DeserializeOwned> Decoder for BcsSnappyDecoder<U> {
-    type Error = Status;
     type Item = U;
+    type Error = Status;
 
     fn decode(&mut self, buf: &mut DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
         let compressed_size = buf.remaining();
@@ -98,7 +99,8 @@ impl<U: serde::de::DeserializeOwned> Decoder for BcsSnappyDecoder<U> {
         let mut snappy_decoder = snap::read::FrameDecoder::new(buf.reader());
         let mut bytes = Vec::with_capacity(compressed_size);
         snappy_decoder.read_to_end(&mut bytes)?;
-        let item = bcs::from_bytes(bytes.as_slice()).map_err(|e| Status::internal(e.to_string()))?;
+        let item =
+            bcs::from_bytes(bytes.as_slice()).map_err(|e| Status::internal(e.to_string()))?;
         Ok(Some(item))
     }
 }
@@ -119,10 +121,10 @@ where
     T: serde::Serialize + Send + 'static,
     U: serde::de::DeserializeOwned + Send + 'static,
 {
-    type Decode = U;
-    type Decoder = BcsSnappyDecoder<U>;
     type Encode = T;
+    type Decode = U;
     type Encoder = BcsSnappyEncoder<T>;
+    type Decoder = BcsSnappyDecoder<U>;
 
     fn encoder(&mut self) -> Self::Encoder {
         BcsSnappyEncoder(PhantomData)
@@ -143,8 +145,8 @@ pub mod anemo {
     pub struct BcsSnappyEncoder<T>(PhantomData<T>);
 
     impl<T: serde::Serialize> Encoder for BcsSnappyEncoder<T> {
-        type Error = bcs::Error;
         type Item = T;
+        type Error = bcs::Error;
 
         fn encode(&mut self, item: Self::Item) -> Result<bytes::Bytes, Self::Error> {
             let mut buf = Vec::<u8>::new();
@@ -159,8 +161,8 @@ pub mod anemo {
     pub struct BcsSnappyDecoder<U>(PhantomData<U>);
 
     impl<U: serde::de::DeserializeOwned> Decoder for BcsSnappyDecoder<U> {
-        type Error = bcs::Error;
         type Item = U;
+        type Error = bcs::Error;
 
         fn decode(&mut self, buf: bytes::Bytes) -> Result<Self::Item, Self::Error> {
             let compressed_size = buf.len();
@@ -186,10 +188,10 @@ pub mod anemo {
         T: serde::Serialize + Send + 'static,
         U: serde::de::DeserializeOwned + Send + 'static,
     {
-        type Decode = U;
-        type Decoder = BcsSnappyDecoder<U>;
         type Encode = T;
+        type Decode = U;
         type Encoder = BcsSnappyEncoder<T>;
+        type Decoder = BcsSnappyDecoder<U>;
 
         fn encoder(&mut self) -> Self::Encoder {
             BcsSnappyEncoder(PhantomData)

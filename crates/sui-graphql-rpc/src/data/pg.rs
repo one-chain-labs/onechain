@@ -9,12 +9,10 @@ use diesel::{
     query_builder::{Query, QueryFragment, QueryId},
     QueryResult,
 };
-use diesel_async::{
-    methods::LoadQuery,
-    scoped_futures::{ScopedBoxFuture, ScopedFutureExt},
-    RunQueryDsl,
-};
-use std::{fmt, time::Instant};
+use diesel_async::{methods::LoadQuery, scoped_futures::ScopedBoxFuture};
+use diesel_async::{scoped_futures::ScopedFutureExt, RunQueryDsl};
+use std::fmt;
+use std::time::Instant;
 use sui_indexer::indexer_reader::IndexerReader;
 
 use tracing::error;
@@ -35,19 +33,27 @@ pub(crate) struct ByteaLiteral<'a>(pub &'a [u8]);
 
 impl PgExecutor {
     pub(crate) fn new(inner: IndexerReader, limits: Limits, metrics: Metrics) -> Self {
-        Self { inner, limits, metrics }
+        Self {
+            inner,
+            limits,
+            metrics,
+        }
     }
 }
 
 #[async_trait]
 impl QueryExecutor for PgExecutor {
-    type Backend = Pg;
     type Connection = diesel_async::AsyncPgConnection;
+    type Backend = Pg;
     type DbConnection<'c> = PgConnection<'c>;
 
     async fn execute<'c, T, U, E>(&self, txn: T) -> Result<U, Error>
     where
-        T: for<'r> FnOnce(&'r mut Self::DbConnection<'_>) -> ScopedBoxFuture<'static, 'r, Result<U, E>> + Send + 'c,
+        T: for<'r> FnOnce(
+                &'r mut Self::DbConnection<'_>,
+            ) -> ScopedBoxFuture<'static, 'r, Result<U, E>>
+            + Send
+            + 'c,
         E: From<diesel::result::Error> + std::error::Error,
         T: Send + 'static,
         U: Send + 'static,
@@ -55,7 +61,12 @@ impl QueryExecutor for PgExecutor {
     {
         let max_cost = self.limits.max_db_query_cost;
         let instant = Instant::now();
-        let mut connection = self.inner.pool().get().await.map_err(|e| Error::Internal(e.to_string()))?;
+        let mut connection = self
+            .inner
+            .pool()
+            .get()
+            .await
+            .map_err(|e| Error::Internal(e.to_string()))?;
 
         let result = connection
             .build_transaction()
@@ -69,7 +80,8 @@ impl QueryExecutor for PgExecutor {
             })
             .await;
 
-        self.metrics.observe_db_data(instant.elapsed(), result.is_ok());
+        self.metrics
+            .observe_db_data(instant.elapsed(), result.is_ok());
         if let Err(e) = &result {
             error!("DB query error: {e:?}");
         }
@@ -78,7 +90,11 @@ impl QueryExecutor for PgExecutor {
 
     async fn execute_repeatable<'c, T, U, E>(&self, txn: T) -> Result<U, Error>
     where
-        T: for<'r> FnOnce(&'r mut Self::DbConnection<'_>) -> ScopedBoxFuture<'static, 'r, Result<U, E>> + Send + 'c,
+        T: for<'r> FnOnce(
+                &'r mut Self::DbConnection<'_>,
+            ) -> ScopedBoxFuture<'static, 'r, Result<U, E>>
+            + Send
+            + 'c,
         E: From<diesel::result::Error> + std::error::Error,
         T: Send + 'static,
         U: Send + 'static,
@@ -87,7 +103,12 @@ impl QueryExecutor for PgExecutor {
         let max_cost = self.limits.max_db_query_cost;
         let instant = Instant::now();
 
-        let mut connection = self.inner.pool().get().await.map_err(|e| Error::Internal(e.to_string()))?;
+        let mut connection = self
+            .inner
+            .pool()
+            .get()
+            .await
+            .map_err(|e| Error::Internal(e.to_string()))?;
 
         let result = connection
             .build_transaction()
@@ -102,7 +123,8 @@ impl QueryExecutor for PgExecutor {
             })
             .await;
 
-        self.metrics.observe_db_data(instant.elapsed(), result.is_ok());
+        self.metrics
+            .observe_db_data(instant.elapsed(), result.is_ok());
         if let Err(e) = &result {
             error!("DB query error: {e:?}");
         }
@@ -111,9 +133,9 @@ impl QueryExecutor for PgExecutor {
 }
 
 #[async_trait]
-impl<'c> super::DbConnection for PgConnection<'c> {
-    type Backend = Pg;
+impl super::DbConnection for PgConnection<'_> {
     type Connection = diesel_async::AsyncPgConnection;
+    type Backend = Pg;
 
     async fn result<T, Q, U>(&mut self, query: T) -> QueryResult<U>
     where
@@ -200,10 +222,15 @@ mod query_cost {
     where
         Q: Query + QueryId + QueryFragment<Pg> + RunQueryDsl<AsyncPgConnection> + Send,
     {
-        let result: String =
-            Explained { query }.get_result(conn).await.tap_err(|e| warn!("Failed to run EXPLAIN: {e}")).ok()?;
+        let result: String = Explained { query }
+            .get_result(conn)
+            .await
+            .tap_err(|e| warn!("Failed to run EXPLAIN: {e}"))
+            .ok()?;
 
-        let parsed = serde_json::from_str(&result).tap_err(|e| warn!("Failed to parse EXPLAIN result: {e}")).ok()?;
+        let parsed = serde_json::from_str(&result)
+            .tap_err(|e| warn!("Failed to parse EXPLAIN result: {e}"))
+            .ok()?;
 
         extract_cost(&parsed).tap_none(|| warn!("Failed to extract cost from EXPLAIN"))
     }
@@ -219,26 +246,35 @@ mod tests {
     use diesel::QueryDsl;
     use sui_framework::BuiltInFramework;
     use sui_indexer::{
-        database::Connection,
-        db::reset_database,
-        models::objects::StoredObject,
-        schema::objects,
+        database::Connection, db::reset_database, models::objects::StoredObject, schema::objects,
         types::IndexedObject,
     };
-    use sui_pg_temp_db::TempDb;
+    use sui_pg_db::temp::TempDb;
 
     #[tokio::test]
     async fn test_query_cost() {
         let database = TempDb::new().unwrap();
-        reset_database(Connection::dedicated(database.database().url()).await.unwrap()).await.unwrap();
-        let mut connection = Connection::dedicated(database.database().url()).await.unwrap();
+        reset_database(
+            Connection::dedicated(database.database().url())
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        let mut connection = Connection::dedicated(database.database().url())
+            .await
+            .unwrap();
 
         let objects: Vec<StoredObject> = BuiltInFramework::iter_system_packages()
             .map(|pkg| IndexedObject::from_object(1, pkg.genesis_object(), None).into())
             .collect();
 
         let expect = objects.len();
-        let actual = diesel::insert_into(objects::dsl::objects).values(objects).execute(&mut connection).await.unwrap();
+        let actual = diesel::insert_into(objects::dsl::objects)
+            .values(objects)
+            .execute(&mut connection)
+            .await
+            .unwrap();
 
         assert_eq!(expect, actual, "Failed to write objects");
 
@@ -247,9 +283,16 @@ mod tests {
         let query_all = dsl::objects.select(dsl::objects.star());
 
         // Test estimating query costs
-        let cost_one = query_cost::explain(&mut connection, query_one).await.unwrap();
-        let cost_all = query_cost::explain(&mut connection, query_all).await.unwrap();
+        let cost_one = query_cost::explain(&mut connection, query_one)
+            .await
+            .unwrap();
+        let cost_all = query_cost::explain(&mut connection, query_all)
+            .await
+            .unwrap();
 
-        assert!(cost_one < cost_all, "cost_one = {cost_one} >= {cost_all} = cost_all");
+        assert!(
+            cost_one < cost_all,
+            "cost_one = {cost_one} >= {cost_all} = cost_all"
+        );
     }
 }

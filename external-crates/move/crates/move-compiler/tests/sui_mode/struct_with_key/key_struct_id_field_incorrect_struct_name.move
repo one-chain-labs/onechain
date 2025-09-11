@@ -1,12 +1,12 @@
 // invalid, objects need UID not ID
 module a::m {
-    use one::object;
+    use sui::object;
     struct S has key {
         id: object::ID
     }
 }
 
-module one::object {
+module oct::object {
     struct ID has store {
         id: address,
     }

@@ -7,24 +7,19 @@ mod rosetta_client;
 mod test_coin_utils;
 
 use serde_json::json;
-use std::{num::NonZeroUsize, path::Path};
-use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions};
-use sui_rosetta::{
-    operations::Operations,
-    types::{
-        AccountBalanceRequest,
-        AccountBalanceResponse,
-        AccountIdentifier,
-        Currencies,
-        Currency,
-        CurrencyMetadata,
-        NetworkIdentifier,
-        OperationType,
-        SuiEnv,
-    },
-    CoinMetadataCache,
-    SUI,
+use std::num::NonZeroUsize;
+use std::path::Path;
+use sui_json_rpc_types::{
+    SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions,
 };
+use sui_rosetta::operations::Operations;
+use sui_rosetta::types::{
+    AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, Currency, CurrencyMetadata,
+    NetworkIdentifier, SuiEnv,
+};
+use sui_rosetta::types::{Currencies, OperationType};
+use sui_rosetta::CoinMetadataCache;
+use sui_rosetta::SUI;
 use test_cluster::TestClusterBuilder;
 use test_coin_utils::{init_package, mint};
 
@@ -43,41 +38,72 @@ async fn test_custom_coin_balance() {
     let (rosetta_client, _handle) = start_rosetta_test_server(client.clone()).await;
 
     let sender = test_cluster.get_address_0();
-    let init_ret = init_package(&client, keystore, sender, Path::new("tests/custom_coins/test_coin")).await.unwrap();
+    let init_ret = init_package(
+        &client,
+        keystore,
+        sender,
+        Path::new("tests/custom_coins/test_coin"),
+    )
+    .await
+    .unwrap();
 
     let address1 = test_cluster.get_address_1();
     let address2 = test_cluster.get_address_2();
     let balances_to = vec![(COIN1_BALANCE, address1), (COIN2_BALANCE, address2)];
     let coin_type = init_ret.coin_tag.to_canonical_string(true);
 
-    let _mint_res = mint(&client, keystore, init_ret, balances_to).await.unwrap();
+    let _mint_res = mint(&client, keystore, init_ret, balances_to)
+        .await
+        .unwrap();
 
     // setup AccountBalanceRequest
-    let network_identifier = NetworkIdentifier { blockchain: "sui".to_string(), network: SuiEnv::LocalNet };
+    let network_identifier = NetworkIdentifier {
+        blockchain: "sui".to_string(),
+        network: SuiEnv::LocalNet,
+    };
 
     let sui_currency = SUI.clone();
     let test_coin_currency = Currency {
         symbol: "TEST_COIN".to_string(),
         decimals: 6,
-        metadata: CurrencyMetadata { coin_type: coin_type.clone() },
+        metadata: CurrencyMetadata {
+            coin_type: coin_type.clone(),
+        },
     };
 
     // Verify initial balance and stake
     let request = AccountBalanceRequest {
         network_identifier: network_identifier.clone(),
-        account_identifier: AccountIdentifier { address: address1, sub_account: None },
+        account_identifier: AccountIdentifier {
+            address: address1,
+            sub_account: None,
+        },
         block_identifier: Default::default(),
         currencies: Currencies(vec![sui_currency, test_coin_currency]),
     };
 
-    println!("request: {}", serde_json::to_string_pretty(&request).unwrap());
-    let response: AccountBalanceResponse = rosetta_client.call(RosettaEndpoint::Balance, &request).await;
-    println!("response: {}", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "request: {}",
+        serde_json::to_string_pretty(&request).unwrap()
+    );
+    let response: AccountBalanceResponse = rosetta_client
+        .call(RosettaEndpoint::Balance, &request)
+        .await;
+    println!(
+        "response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
     assert_eq!(response.balances.len(), 2);
     assert_eq!(response.balances[0].value, SUI_BALANCE as i128);
-    assert_eq!(response.balances[0].currency.clone().metadata.coin_type, "0x2::oct::OCT");
+    assert_eq!(
+        response.balances[0].currency.clone().metadata.coin_type,
+        "0x2::oct::OCT"
+    );
     assert_eq!(response.balances[1].value, COIN1_BALANCE as i128);
-    assert_eq!(response.balances[1].currency.clone().metadata.coin_type, coin_type);
+    assert_eq!(
+        response.balances[1].currency.clone().metadata.coin_type,
+        coin_type
+    );
 }
 
 #[tokio::test]
@@ -101,8 +127,13 @@ async fn test_default_balance() {
         }
     ))
     .unwrap();
-    let response: AccountBalanceResponse = rosetta_client.call(RosettaEndpoint::Balance, &request).await;
-    println!("response: {}", serde_json::to_string_pretty(&response).unwrap());
+    let response: AccountBalanceResponse = rosetta_client
+        .call(RosettaEndpoint::Balance, &request)
+        .await;
+    println!(
+        "response: {}",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
     assert_eq!(response.balances.len(), 1);
     assert_eq!(response.balances[0].value, SUI_BALANCE as i128);
 
@@ -137,10 +168,19 @@ async fn test_custom_coin_transfer() {
     let keystore = &test_cluster.wallet.config.keystore;
 
     // TEST_COIN setup and mint
-    let init_ret = init_package(&client, keystore, sender, Path::new("tests/custom_coins/test_coin")).await.unwrap();
+    let init_ret = init_package(
+        &client,
+        keystore,
+        sender,
+        Path::new("tests/custom_coins/test_coin"),
+    )
+    .await
+    .unwrap();
     let balances_to = vec![(COIN1_BALANCE, sender)];
     let coin_type = init_ret.coin_tag.to_canonical_string(true);
-    let _mint_res = mint(&client, keystore, init_ret, balances_to).await.unwrap();
+    let _mint_res = mint(&client, keystore, init_ret, balances_to)
+        .await
+        .unwrap();
 
     let (rosetta_client, _handle) = start_rosetta_test_server(client.clone()).await;
 
@@ -184,15 +224,24 @@ async fn test_custom_coin_transfer() {
         .read_api()
         .get_transaction_with_options(
             response.transaction_identifier.hash,
-            SuiTransactionBlockResponseOptions::new().with_input().with_effects().with_balance_changes().with_events(),
+            SuiTransactionBlockResponseOptions::new()
+                .with_input()
+                .with_effects()
+                .with_balance_changes()
+                .with_events(),
         )
         .await
         .unwrap();
 
-    assert_eq!(&SuiExecutionStatus::Success, tx.effects.as_ref().unwrap().status());
+    assert_eq!(
+        &SuiExecutionStatus::Success,
+        tx.effects.as_ref().unwrap().status()
+    );
     println!("Sui TX: {tx:?}");
     let coin_cache = CoinMetadataCache::new(client, NonZeroUsize::new(2).unwrap());
-    let ops2 = Operations::try_from_response(tx, &coin_cache).await.unwrap();
+    let ops2 = Operations::try_from_response(tx, &coin_cache)
+        .await
+        .unwrap();
     assert!(
         ops2.contains(&ops),
         "Operation mismatch. expecting:{}, got:{}",
@@ -210,24 +259,41 @@ async fn test_custom_coin_without_symbol() {
     let keystore = &test_cluster.wallet.config.keystore;
 
     // TEST_COIN setup and mint
-    let init_ret =
-        init_package(&client, keystore, sender, Path::new("tests/custom_coins/test_coin_no_symbol")).await.unwrap();
+    let init_ret = init_package(
+        &client,
+        keystore,
+        sender,
+        Path::new("tests/custom_coins/test_coin_no_symbol"),
+    )
+    .await
+    .unwrap();
 
     let balances_to = vec![(COIN1_BALANCE, sender)];
-    let mint_res = mint(&client, keystore, init_ret, balances_to).await.unwrap();
+    let mint_res = mint(&client, keystore, init_ret, balances_to)
+        .await
+        .unwrap();
 
     let tx = client
         .read_api()
         .get_transaction_with_options(
             mint_res.digest,
-            SuiTransactionBlockResponseOptions::new().with_input().with_effects().with_balance_changes().with_events(),
+            SuiTransactionBlockResponseOptions::new()
+                .with_input()
+                .with_effects()
+                .with_balance_changes()
+                .with_events(),
         )
         .await
         .unwrap();
 
-    assert_eq!(&SuiExecutionStatus::Success, tx.effects.as_ref().unwrap().status());
+    assert_eq!(
+        &SuiExecutionStatus::Success,
+        tx.effects.as_ref().unwrap().status()
+    );
     let coin_cache = CoinMetadataCache::new(client, NonZeroUsize::new(2).unwrap());
-    let ops = Operations::try_from_response(tx, &coin_cache).await.unwrap();
+    let ops = Operations::try_from_response(tx, &coin_cache)
+        .await
+        .unwrap();
 
     for op in ops {
         if op.type_ == OperationType::SuiBalanceChange {

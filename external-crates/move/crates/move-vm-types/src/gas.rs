@@ -96,7 +96,8 @@ pub trait GasMeter {
 
     fn charge_ld_const(&mut self, size: NumBytes) -> PartialVMResult<()>;
 
-    fn charge_ld_const_after_deserialization(&mut self, val: impl ValueView) -> PartialVMResult<()>;
+    fn charge_ld_const_after_deserialization(&mut self, val: impl ValueView)
+    -> PartialVMResult<()>;
 
     fn charge_copy_loc(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
@@ -120,7 +121,11 @@ pub trait GasMeter {
 
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
-    fn charge_write_ref(&mut self, new_val: impl ValueView, old_val: impl ValueView) -> PartialVMResult<()>;
+    fn charge_write_ref(
+        &mut self,
+        new_val: impl ValueView,
+        old_val: impl ValueView,
+    ) -> PartialVMResult<()>;
 
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()>;
 
@@ -134,11 +139,24 @@ pub trait GasMeter {
 
     fn charge_vec_len(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
 
-    fn charge_vec_borrow(&mut self, is_mut: bool, ty: impl TypeView, is_success: bool) -> PartialVMResult<()>;
+    fn charge_vec_borrow(
+        &mut self,
+        is_mut: bool,
+        ty: impl TypeView,
+        is_success: bool,
+    ) -> PartialVMResult<()>;
 
-    fn charge_vec_push_back(&mut self, ty: impl TypeView, val: impl ValueView) -> PartialVMResult<()>;
+    fn charge_vec_push_back(
+        &mut self,
+        ty: impl TypeView,
+        val: impl ValueView,
+    ) -> PartialVMResult<()>;
 
-    fn charge_vec_pop_back(&mut self, ty: impl TypeView, val: Option<impl ValueView>) -> PartialVMResult<()>;
+    fn charge_vec_pop_back(
+        &mut self,
+        ty: impl TypeView,
+        val: Option<impl ValueView>,
+    ) -> PartialVMResult<()>;
 
     // TODO(Gas): Expose the elements
     fn charge_vec_unpack(
@@ -163,7 +181,10 @@ pub trait GasMeter {
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()>;
 
-    fn charge_drop_frame(&mut self, locals: impl Iterator<Item = impl ValueView>) -> PartialVMResult<()>;
+    fn charge_drop_frame(
+        &mut self,
+        locals: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()>;
 
     /// Returns the gas left
     fn remaining_gas(&self) -> InternalGas;
@@ -211,7 +232,10 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_ld_const_after_deserialization(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_ld_const_after_deserialization(
+        &mut self,
+        _val: impl ValueView,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -251,7 +275,11 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_write_ref(&mut self, _new_val: impl ValueView, _old_val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_write_ref(
+        &mut self,
+        _new_val: impl ValueView,
+        _old_val: impl ValueView,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -275,15 +303,28 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_vec_borrow(&mut self, _is_mut: bool, _ty: impl TypeView, _is_success: bool) -> PartialVMResult<()> {
+    fn charge_vec_borrow(
+        &mut self,
+        _is_mut: bool,
+        _ty: impl TypeView,
+        _is_success: bool,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_push_back(&mut self, _ty: impl TypeView, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_vec_push_back(
+        &mut self,
+        _ty: impl TypeView,
+        _val: impl ValueView,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_pop_back(&mut self, _ty: impl TypeView, _val: Option<impl ValueView>) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(
+        &mut self,
+        _ty: impl TypeView,
+        _val: Option<impl ValueView>,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -316,7 +357,10 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_drop_frame(&mut self, _locals: impl Iterator<Item = impl ValueView>) -> PartialVMResult<()> {
+    fn charge_drop_frame(
+        &mut self,
+        _locals: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 

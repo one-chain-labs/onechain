@@ -16,7 +16,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
-    values::{values_impl::Reference, Value},
+    values::{Value, values_impl::Reference},
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
@@ -60,33 +60,47 @@ fn native_to_bytes(
             // If we run out of gas when charging for failure, we don't want the `OUT_OF_GAS` error
             // to mask the actual error `NFE_BCS_SERIALIZATION_FAILURE`, so we saturate deduction at 0
             context.charge_gas(gas_params.failure);
-            return Ok(NativeResult::err(context.gas_used(), NFE_BCS_SERIALIZATION_FAILURE));
+            return Ok(NativeResult::err(
+                context.gas_used(),
+                NFE_BCS_SERIALIZATION_FAILURE,
+            ));
         }
     };
     // serialize value
     let val = ref_to_val.read_ref()?;
-    let serialized_value = match val.simple_serialize(&layout) {
+    let serialized_value = match val.typed_serialize(&layout) {
         Some(serialized_value) => serialized_value,
         None => {
             // If we run out of gas when charging for failure, we don't want the `OUT_OF_GAS` error
             // to mask the actual error `NFE_BCS_SERIALIZATION_FAILURE`, so we saturate deduction at 0
             context.charge_gas(gas_params.failure);
-            return Ok(NativeResult::err(context.gas_used(), NFE_BCS_SERIALIZATION_FAILURE));
+            return Ok(NativeResult::err(
+                context.gas_used(),
+                NFE_BCS_SERIALIZATION_FAILURE,
+            ));
         }
     };
     native_charge_gas_early_exit!(
         context,
         gas_params.per_byte_serialized
-            * std::cmp::max(NumBytes::new(serialized_value.len() as u64), gas_params.legacy_min_output_size,)
+            * std::cmp::max(
+                NumBytes::new(serialized_value.len() as u64),
+                gas_params.legacy_min_output_size,
+            )
     );
 
-    Ok(NativeResult::ok(context.gas_used(), smallvec![Value::vector_u8(serialized_value)]))
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![Value::vector_u8(serialized_value)],
+    ))
 }
 
 pub fn make_native_to_bytes(gas_params: ToBytesGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_to_bytes(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_to_bytes(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************

@@ -1,34 +1,35 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, fmt::Display, sync::Arc};
+use std::{collections::BTreeMap, fmt::Display, sync::Arc, sync::OnceLock};
 
 use self::known_attributes::AttributePosition;
 use crate::{
-    expansion::ast::{AbilitySet, Attributes, ModuleIdent, TargetKind, Visibility},
+    PreCompiledProgramInfo,
+    expansion::ast::{AbilitySet, Attributes, ModuleIdent, Visibility},
     naming::ast::{
-        self as N,
-        DatatypeTypeParameter,
-        EnumDefinition,
-        FunctionSignature,
-        ResolvedUseFuns,
-        StructDefinition,
-        SyntaxMethods,
-        Type,
+        self as N, BuiltinTypeName_, DatatypeTypeParameter, EnumDefinition, FunctionSignature,
+        ResolvedUseFuns, StructDefinition, StructFields, SyntaxMethods, Type, Type_, TypeName_,
+        VariantFields,
     },
-    parser::ast::{ConstantName, DatatypeName, Field, FunctionName, VariantName},
+    parser::ast::{
+        ConstantName, DatatypeName, DocComment, Field, FunctionName, TargetKind, VariantName,
+    },
     shared::{unique_map::UniqueMap, *},
-    sui_mode::info::SuiInfo,
+    sui_mode::info::{SuiInfo, SuiModInfo},
     typing::ast::{self as T},
-    FullyCompiledProgram,
 };
+use move_core_types::runtime_value;
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 
 #[derive(Debug, Clone)]
 pub struct FunctionInfo {
+    pub doc: DocComment,
+    pub index: usize,
     pub attributes: Attributes,
     pub defined_loc: Loc,
+    pub full_loc: Loc,
     pub visibility: Visibility,
     pub entry: Option<Loc>,
     pub macro_: Option<Loc>,
@@ -37,16 +38,25 @@ pub struct FunctionInfo {
 
 #[derive(Debug, Clone)]
 pub struct ConstantInfo {
+    pub doc: DocComment,
+    pub index: usize,
     pub attributes: Attributes,
     pub defined_loc: Loc,
     pub signature: Type,
+    // Set after compilation
+    pub value: OnceLock<runtime_value::MoveValue>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ModuleInfo {
+    pub doc: DocComment,
+    pub defined_loc: Loc,
     pub target_kind: TargetKind,
     pub attributes: Attributes,
     pub package: Option<Symbol>,
+    /// The named address map used by this module during `expansion`.
+    pub named_address_map: Arc<NamedAddressMap>,
+    pub dependency_order: Option<usize>,
     pub use_funs: ResolvedUseFuns,
     pub syntax_methods: SyntaxMethods,
     pub friends: UniqueMap<ModuleIdent, Loc>,
@@ -54,12 +64,12 @@ pub struct ModuleInfo {
     pub enums: UniqueMap<DatatypeName, EnumDefinition>,
     pub functions: UniqueMap<FunctionName, FunctionInfo>,
     pub constants: UniqueMap<ConstantName, ConstantInfo>,
+    pub sui_info: Option<SuiModInfo>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ProgramInfo<const AFTER_TYPING: bool> {
     pub modules: UniqueMap<ModuleIdent, ModuleInfo>,
-    pub sui_flavor_info: Option<SuiInfo>,
 }
 pub type NamingProgramInfo = ProgramInfo<false>;
 pub type TypingProgramInfo = ProgramInfo<true>;
@@ -79,32 +89,42 @@ pub enum NamedMemberKind {
 }
 
 macro_rules! program_info {
-    ($pre_compiled_lib:ident, $prog:ident, $pass:ident, $module_use_funs:ident) => {{
+    ($pre_compiled_lib:ident, $converter:expr, $prog:ident, $module_use_funs:ident, $dependency_order:expr) => {{
         let all_modules = $prog.modules.key_cloned_iter();
         let mut modules = UniqueMap::maybe_from_iter(all_modules.map(|(mident, mdef)| {
             let structs = mdef.structs.clone();
             let enums = mdef.enums.clone();
             let functions = mdef.functions.ref_map(|fname, fdef| FunctionInfo {
+                doc: fdef.doc.clone(),
+                index: fdef.index,
                 attributes: fdef.attributes.clone(),
                 defined_loc: fname.loc(),
+                full_loc: fdef.loc,
                 visibility: fdef.visibility.clone(),
                 entry: fdef.entry,
                 macro_: fdef.macro_,
                 signature: fdef.signature.clone(),
             });
             let constants = mdef.constants.ref_map(|cname, cdef| ConstantInfo {
+                doc: cdef.doc.clone(),
+                index: cdef.index,
                 attributes: cdef.attributes.clone(),
                 defined_loc: cname.loc(),
                 signature: cdef.signature.clone(),
+                value: OnceLock::new(),
             });
             let use_funs = $module_use_funs
                 .as_mut()
                 .map(|module_use_funs| module_use_funs.remove(&mident).unwrap())
                 .unwrap_or_default();
             let minfo = ModuleInfo {
+                doc: mdef.doc.clone(),
+                defined_loc: mdef.loc,
                 target_kind: mdef.target_kind,
                 attributes: mdef.attributes.clone(),
                 package: mdef.package_name,
+                named_address_map: mdef.named_address_map.clone(),
+                dependency_order: $dependency_order(&mdef),
                 use_funs,
                 syntax_methods: mdef.syntax_methods.clone(),
                 friends: mdef.friends.ref_map(|_, friend| friend.loc),
@@ -112,50 +132,173 @@ macro_rules! program_info {
                 enums,
                 functions,
                 constants,
+                sui_info: None,
             };
             (mident, minfo)
         }))
         .unwrap();
+
         if let Some(pre_compiled_lib) = $pre_compiled_lib {
-            for (mident, minfo) in pre_compiled_lib.$pass.info.modules.key_cloned_iter() {
+            for (mident, minfo) in pre_compiled_lib.iter() {
                 if !modules.contains_key(&mident) {
-                    modules.add(mident, minfo.clone()).unwrap();
+                    modules
+                        .add(mident.clone(), $converter(&minfo.info))
+                        .unwrap();
                 }
             }
         }
-        ProgramInfo { modules, sui_flavor_info: None }
+        ProgramInfo { modules }
     }};
 }
 
 impl TypingProgramInfo {
     pub fn new(
         env: &CompilationEnv,
-        pre_compiled_lib: Option<Arc<FullyCompiledProgram>>,
+        pre_compiled_lib: Option<Arc<PreCompiledProgramInfo>>,
         modules: &UniqueMap<ModuleIdent, T::ModuleDefinition>,
         mut module_use_funs: BTreeMap<ModuleIdent, ResolvedUseFuns>,
     ) -> Self {
+        /// Identity function for cloning typing module info to be used in program_info macro
+        /// to create typing program info from pre-compiled module info.
+        fn typing_module_info_clone(minfo: &ModuleInfo) -> ModuleInfo {
+            minfo.clone()
+        }
+        /// Used to populate `dependency_order` field in `ModuleInfo`
+        fn typing_dependency_order(mdef: &T::ModuleDefinition) -> Option<usize> {
+            Some(mdef.dependency_order)
+        }
         struct Prog<'a> {
             modules: &'a UniqueMap<ModuleIdent, T::ModuleDefinition>,
         }
         let mut module_use_funs = Some(&mut module_use_funs);
         let prog = Prog { modules };
-        let pcl = pre_compiled_lib.clone();
-        let mut info = program_info!(pcl, prog, typing, module_use_funs);
+        let pcmi = pre_compiled_lib.clone();
+        let mut info = program_info!(
+            pcmi,
+            typing_module_info_clone,
+            prog,
+            module_use_funs,
+            typing_dependency_order
+        );
         // TODO we should really have an idea of root package flavor here
         // but this feels roughly equivalent
-        if env.package_configs().any(|(_, config)| config.flavor == Flavor::Sui) {
-            let sui_flavor_info = SuiInfo::new(pre_compiled_lib, modules, &info);
-            info.sui_flavor_info = Some(sui_flavor_info);
-        };
+        if env
+            .package_configs()
+            .any(|(_, config)| config.flavor == Flavor::Sui)
+        {
+            let mut sui_flavor_info = SuiInfo::new(modules, &info);
+            for (mident, module_info) in info.modules.key_cloned_iter_mut() {
+                let uid_holders = sui_flavor_info
+                    .uid_holders
+                    .remove(&mident)
+                    .unwrap_or_default();
+                let transferred = sui_flavor_info
+                    .transferred
+                    .remove(&mident)
+                    .unwrap_or_default();
+                module_info.sui_info = Some(SuiModInfo {
+                    uid_holders,
+                    transferred,
+                });
+            }
+        }
         info
     }
 }
 
+/// Re-create naming module info from typing module info to be used in program_info macro
+/// to create naming program info from pre-compiled module info.
+fn typing_module_info_to_naming(minfo: &ModuleInfo) -> ModuleInfo {
+    // Typing ProgramInfo contains abilities that would not yet be inferred at naming
+    // (for user-defined data types and vector element types). We need to strip these
+    // down so that ProgramInfo does not trip subsequent typing analysis.
+    fn strip_type_abilities(ty: &mut Type) {
+        match &mut ty.value {
+            Type_::Apply(abilities, type_name, type_args) => {
+                let should_strip = matches!(
+                    &type_name.value,
+                    TypeName_::Builtin(sp!(_, BuiltinTypeName_::Vector))
+                        | TypeName_::ModuleType(_, _)
+                        | TypeName_::Multiple(_)
+                );
+                if should_strip {
+                    *abilities = None;
+                }
+                // Recursively strip abilities from type arguments
+                for ty_arg in type_args {
+                    strip_type_abilities(ty_arg);
+                }
+            }
+            Type_::Ref(_, ty) => strip_type_abilities(ty),
+            Type_::Fun(args, result) => {
+                for arg in args {
+                    strip_type_abilities(arg);
+                }
+                strip_type_abilities(result);
+            }
+            Type_::Unit
+            | Type_::Param(_)
+            | Type_::Var(_)
+            | Type_::Anything
+            | Type_::Void
+            | Type_::UnresolvedError => (),
+        }
+    }
+
+    let mut minfo = minfo.clone();
+
+    // update structs
+    for (_, _, sdef) in minfo.structs.iter_mut() {
+        if let StructFields::Defined(_, fields) = &mut sdef.fields {
+            for (_, _, (_, (_, ty))) in fields.iter_mut() {
+                strip_type_abilities(ty);
+            }
+        }
+    }
+
+    // update enums
+    for (_, _, edef) in minfo.enums.iter_mut() {
+        for (_, _, vdef) in edef.variants.iter_mut() {
+            if let VariantFields::Defined(_, fields) = &mut vdef.fields {
+                for (_, _, (_, (_, ty))) in fields.iter_mut() {
+                    strip_type_abilities(ty);
+                }
+            }
+        }
+    }
+
+    // update constants
+    for (_, _, cdef) in minfo.constants.iter_mut() {
+        strip_type_abilities(&mut cdef.signature);
+    }
+
+    // update functions
+    for (_, _, fdef) in minfo.functions.iter_mut() {
+        for (_, _, ty) in fdef.signature.parameters.iter_mut() {
+            strip_type_abilities(ty);
+        }
+        strip_type_abilities(&mut fdef.signature.return_type);
+    }
+
+    minfo
+}
+
 impl NamingProgramInfo {
-    pub fn new(pre_compiled_lib: Option<Arc<FullyCompiledProgram>>, prog: &N::Program_) -> Self {
+    pub fn new(pre_compiled_lib: Option<Arc<PreCompiledProgramInfo>>, prog: &N::Program_) -> Self {
+        /// Used to populate `dependency_order` field in `ModuleInfo`
+        fn dependency_order(_mdef: &N::ModuleDefinition) -> Option<usize> {
+            // No dependency order available in the naming pass
+            None
+        }
         // use_funs will be populated later
         let mut module_use_funs: Option<&mut BTreeMap<ModuleIdent, ResolvedUseFuns>> = None;
-        program_info!(pre_compiled_lib, prog, naming, module_use_funs)
+        program_info!(
+            pre_compiled_lib,
+            typing_module_info_to_naming,
+            prog,
+            module_use_funs,
+            dependency_order
+        )
     }
 
     pub fn set_use_funs(&mut self, module_use_funs: BTreeMap<ModuleIdent, ResolvedUseFuns>) {
@@ -167,10 +310,17 @@ impl NamingProgramInfo {
     }
 
     pub fn take_use_funs(self) -> BTreeMap<ModuleIdent, ResolvedUseFuns> {
-        self.modules.into_iter().map(|(mident, minfo)| (mident, minfo.use_funs)).collect()
+        self.modules
+            .into_iter()
+            .map(|(mident, minfo)| (mident, minfo.use_funs))
+            .collect()
     }
 
-    pub fn set_module_syntax_methods(&mut self, mident: ModuleIdent, syntax_methods: SyntaxMethods) {
+    pub fn set_module_syntax_methods(
+        &mut self,
+        mident: ModuleIdent,
+        syntax_methods: SyntaxMethods,
+    ) {
         let syntax_methods_ref = &mut self.modules.get_mut(&mident).unwrap().syntax_methods;
         *syntax_methods_ref = syntax_methods;
     }
@@ -178,7 +328,8 @@ impl NamingProgramInfo {
 
 impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
     pub fn module(&self, m: &ModuleIdent) -> &ModuleInfo {
-        self.module_opt(m).expect("ICE should have failed in naming")
+        self.module_opt(m)
+            .expect("ICE should have failed in naming")
     }
 
     pub fn module_opt(&self, m: &ModuleIdent) -> Option<&ModuleInfo> {
@@ -201,7 +352,8 @@ impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
     }
 
     pub fn function_info(&self, m: &ModuleIdent, n: &FunctionName) -> &FunctionInfo {
-        self.function_info_opt(m, n).expect("ICE should have failed in naming")
+        self.function_info_opt(m, n)
+            .expect("ICE should have failed in naming")
     }
 
     pub fn function_info_opt(&self, m: &ModuleIdent, n: &FunctionName) -> Option<&FunctionInfo> {
@@ -209,7 +361,8 @@ impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
     }
 
     pub fn constant_info(&self, m: &ModuleIdent, n: &ConstantName) -> &ConstantInfo {
-        self.constant_info_opt(m, n).expect("ICE should have failed in naming")
+        self.constant_info_opt(m, n)
+            .expect("ICE should have failed in naming")
     }
 
     pub fn constant_info_opt(&self, m: &ModuleIdent, n: &ConstantName) -> Option<&ConstantInfo> {
@@ -239,10 +392,15 @@ impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
     }
 
     pub fn struct_definition(&self, m: &ModuleIdent, n: &DatatypeName) -> &StructDefinition {
-        self.struct_definition_opt(m, n).expect("ICE should have failed in naming")
+        self.struct_definition_opt(m, n)
+            .expect("ICE should have failed in naming")
     }
 
-    pub fn struct_definition_opt(&self, m: &ModuleIdent, n: &DatatypeName) -> Option<&StructDefinition> {
+    pub fn struct_definition_opt(
+        &self,
+        m: &ModuleIdent,
+        n: &DatatypeName,
+    ) -> Option<&StructDefinition> {
         self.module_opt(m)?.structs.get(n)
     }
 
@@ -256,18 +414,32 @@ impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
 
     pub fn struct_declared_loc_(&self, m: &ModuleIdent, n: &Symbol) -> Loc {
         let minfo = self.module(m);
-        *minfo.structs.get_loc_(n).expect("ICE should have failed in naming")
+        *minfo
+            .structs
+            .get_loc_(n)
+            .expect("ICE should have failed in naming")
     }
 
-    pub fn struct_type_parameters(&self, m: &ModuleIdent, n: &DatatypeName) -> &Vec<DatatypeTypeParameter> {
+    pub fn struct_type_parameters(
+        &self,
+        m: &ModuleIdent,
+        n: &DatatypeName,
+    ) -> &Vec<DatatypeTypeParameter> {
         &self.struct_definition(m, n).type_parameters
     }
 
     pub fn is_struct(&self, module: &ModuleIdent, datatype_name: &DatatypeName) -> bool {
-        matches!(self.datatype_kind(module, datatype_name), DatatypeKind::Struct)
+        matches!(
+            self.datatype_kind(module, datatype_name),
+            DatatypeKind::Struct
+        )
     }
 
-    pub fn struct_fields(&self, module: &ModuleIdent, struct_name: &DatatypeName) -> Option<UniqueMap<Field, usize>> {
+    pub fn struct_fields(
+        &self,
+        module: &ModuleIdent,
+        struct_name: &DatatypeName,
+    ) -> Option<UniqueMap<Field, usize>> {
         let fields = match &self.struct_definition(module, struct_name).fields {
             N::StructFields::Defined(_, fields) => Some(fields.ref_map(|_, (ndx, _)| *ndx)),
             N::StructFields::Native(_) => None,
@@ -284,10 +456,15 @@ impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
     }
 
     pub fn enum_definition(&self, m: &ModuleIdent, n: &DatatypeName) -> &EnumDefinition {
-        self.enum_definition_opt(m, n).expect("ICE should have failed in naming")
+        self.enum_definition_opt(m, n)
+            .expect("ICE should have failed in naming")
     }
 
-    pub fn enum_definition_opt(&self, m: &ModuleIdent, n: &DatatypeName) -> Option<&EnumDefinition> {
+    pub fn enum_definition_opt(
+        &self,
+        m: &ModuleIdent,
+        n: &DatatypeName,
+    ) -> Option<&EnumDefinition> {
         self.module_opt(m)?.enums.get(n)
     }
 
@@ -301,15 +478,26 @@ impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
 
     pub fn enum_declared_loc_(&self, m: &ModuleIdent, n: &Symbol) -> Loc {
         let minfo = self.module(m);
-        *minfo.enums.get_loc_(n).expect("ICE should have failed in naming")
+        *minfo
+            .enums
+            .get_loc_(n)
+            .expect("ICE should have failed in naming")
     }
 
-    pub fn enum_type_parameters(&self, m: &ModuleIdent, n: &DatatypeName) -> &Vec<DatatypeTypeParameter> {
+    pub fn enum_type_parameters(
+        &self,
+        m: &ModuleIdent,
+        n: &DatatypeName,
+    ) -> &Vec<DatatypeTypeParameter> {
         &self.enum_definition(m, n).type_parameters
     }
 
     /// Returns the enum variant names in sorted order.
-    pub fn enum_variants(&self, module: &ModuleIdent, enum_name: &DatatypeName) -> Vec<VariantName> {
+    pub fn enum_variants(
+        &self,
+        module: &ModuleIdent,
+        enum_name: &DatatypeName,
+    ) -> Vec<VariantName> {
         let mut names = self
             .enum_definition(module, enum_name)
             .variants
@@ -327,7 +515,11 @@ impl<const AFTER_TYPING: bool> ProgramInfo<AFTER_TYPING> {
         enum_name: &DatatypeName,
         variant_name: &VariantName,
     ) -> Option<UniqueMap<Field, usize>> {
-        let Some(variant) = self.enum_definition(module, enum_name).variants.get(variant_name) else {
+        let Some(variant) = self
+            .enum_definition(module, enum_name)
+            .variants
+            .get(variant_name)
+        else {
             return None;
         };
         match &variant.fields {

@@ -5,13 +5,8 @@ use better_any::{Tid, TidAble};
 use linked_hash_map::LinkedHashMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    account_address::AccountAddress,
-    annotated_value as A,
-    annotated_visitor as AV,
-    effects::Op,
-    language_storage::StructTag,
-    runtime_value as R,
-    vm_status::StatusCode,
+    account_address::AccountAddress, annotated_value as A, annotated_visitor as AV, effects::Op,
+    language_storage::StructTag, runtime_value as R, vm_status::StatusCode,
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -30,8 +25,7 @@ use sui_types::{
     metrics::LimitsMetrics,
     object::{MoveObject, Owner},
     storage::{ChildObjectResolver, DeleteKind, WriteKind},
-    SUI_CLOCK_OBJECT_ID,
-    SUI_SYSTEM_STATE_OBJECT_ID,
+    SUI_CLOCK_OBJECT_ID, SUI_SYSTEM_STATE_OBJECT_ID,
 };
 
 pub(crate) mod object_store;
@@ -110,14 +104,20 @@ impl LocalProtocolConfig {
             max_num_new_move_object_ids: constants.max_num_new_move_object_ids(),
             max_num_transferred_move_object_ids: constants.max_num_transferred_move_object_ids(),
             max_event_emit_size: constants.max_event_emit_size(),
-            max_num_deleted_move_object_ids_system_tx: constants.max_num_deleted_move_object_ids_system_tx(),
-            max_num_new_move_object_ids_system_tx: constants.max_num_new_move_object_ids_system_tx(),
-            max_num_transferred_move_object_ids_system_tx: constants.max_num_transferred_move_object_ids_system_tx(),
+            max_num_deleted_move_object_ids_system_tx: constants
+                .max_num_deleted_move_object_ids_system_tx(),
+            max_num_new_move_object_ids_system_tx: constants
+                .max_num_new_move_object_ids_system_tx(),
+            max_num_transferred_move_object_ids_system_tx: constants
+                .max_num_transferred_move_object_ids_system_tx(),
 
-            object_runtime_max_num_cached_objects: constants.object_runtime_max_num_cached_objects(),
-            object_runtime_max_num_cached_objects_system_tx: constants.object_runtime_max_num_cached_objects_system_tx(),
+            object_runtime_max_num_cached_objects: constants
+                .object_runtime_max_num_cached_objects(),
+            object_runtime_max_num_cached_objects_system_tx: constants
+                .object_runtime_max_num_cached_objects_system_tx(),
             object_runtime_max_num_store_entries: constants.object_runtime_max_num_store_entries(),
-            object_runtime_max_num_store_entries_system_tx: constants.object_runtime_max_num_store_entries_system_tx(),
+            object_runtime_max_num_store_entries_system_tx: constants
+                .object_runtime_max_num_store_entries_system_tx(),
         }
     }
 }
@@ -168,7 +168,11 @@ impl<'a> ObjectRuntime<'a> {
         let mut input_object_owners = BTreeMap::new();
         let mut root_version = BTreeMap::new();
         for (id, input_object) in input_objects {
-            let InputObject { contained_uids, version, owner } = input_object;
+            let InputObject {
+                contained_uids,
+                version,
+                owner,
+            } = input_object;
             input_object_owners.insert(id, owner);
             debug_assert!(contained_uids.contains(&id));
             for contained_uid in contained_uids {
@@ -210,7 +214,9 @@ impl<'a> ObjectRuntime<'a> {
         ) {
             return Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
                 .with_message(format!("Creating more than {} IDs is not allowed", lim))
-                .with_sub_status(VMMemoryLimitExceededSubStatusCode::NEW_ID_COUNT_LIMIT_EXCEEDED as u64));
+                .with_sub_status(
+                    VMMemoryLimitExceededSubStatusCode::NEW_ID_COUNT_LIMIT_EXCEEDED as u64,
+                ));
         };
 
         // remove from deleted_ids for the case in dynamic fields where the Field object was deleted
@@ -236,7 +242,9 @@ impl<'a> ObjectRuntime<'a> {
         ) {
             return Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
                 .with_message(format!("Deleting more than {} IDs is not allowed", lim))
-                .with_sub_status(VMMemoryLimitExceededSubStatusCode::DELETED_ID_COUNT_LIMIT_EXCEEDED as u64));
+                .with_sub_status(
+                    VMMemoryLimitExceededSubStatusCode::DELETED_ID_COUNT_LIMIT_EXCEEDED as u64,
+                ));
         };
 
         let was_new = self.state.new_ids.remove(&id).is_some();
@@ -250,8 +258,15 @@ impl<'a> ObjectRuntime<'a> {
         &self.state.new_ids
     }
 
-    pub fn transfer(&mut self, owner: Owner, ty: Type, obj: Value) -> PartialVMResult<TransferResult> {
-        let id: ObjectID = get_object_id(obj.copy_value()?)?.value_as::<AccountAddress>()?.into();
+    pub fn transfer(
+        &mut self,
+        owner: Owner,
+        ty: Type,
+        obj: Value,
+    ) -> PartialVMResult<TransferResult> {
+        let id: ObjectID = get_object_id(obj.copy_value()?)?
+            .value_as::<AccountAddress>()?
+            .into();
         // - An object is new if it is contained in the new ids or if it is one of the objects
         //   created during genesis (the system state object or clock).
         // - Otherwise, check the input objects for the previous owner
@@ -283,7 +298,9 @@ impl<'a> ObjectRuntime<'a> {
         ) {
             return Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
                 .with_message(format!("Transferring more than {} IDs is not allowed", lim))
-                .with_sub_status(VMMemoryLimitExceededSubStatusCode::TRANSFER_ID_COUNT_LIMIT_EXCEEDED as u64));
+                .with_sub_status(
+                    VMMemoryLimitExceededSubStatusCode::TRANSFER_ID_COUNT_LIMIT_EXCEEDED as u64,
+                ));
         };
 
         self.state.transfers.insert(id, (owner, ty, obj));
@@ -302,7 +319,11 @@ impl<'a> ObjectRuntime<'a> {
         std::mem::take(&mut self.state.events)
     }
 
-    pub(crate) fn child_object_exists(&mut self, parent: ObjectID, child: ObjectID) -> PartialVMResult<bool> {
+    pub(crate) fn child_object_exists(
+        &mut self,
+        parent: ObjectID,
+        child: ObjectID,
+    ) -> PartialVMResult<bool> {
         self.object_store.object_exists(parent, child)
     }
 
@@ -312,7 +333,8 @@ impl<'a> ObjectRuntime<'a> {
         child: ObjectID,
         child_type: &MoveObjectType,
     ) -> PartialVMResult<bool> {
-        self.object_store.object_exists_and_has_type(parent, child, child_type)
+        self.object_store
+            .object_exists_and_has_type(parent, child, child_type)
     }
 
     pub(crate) fn get_or_fetch_child_object(
@@ -346,7 +368,8 @@ impl<'a> ObjectRuntime<'a> {
         child_move_type: MoveObjectType,
         child_value: Value,
     ) -> PartialVMResult<()> {
-        self.object_store.add_object(parent, child, child_ty, child_move_type, child_value)
+        self.object_store
+            .add_object(parent, child, child_ty, child_move_type, child_value)
     }
 
     // returns None if a child object is still borrowed
@@ -369,7 +392,9 @@ impl<'a> ObjectRuntime<'a> {
         )
     }
 
-    pub(crate) fn all_active_child_objects(&self) -> impl Iterator<Item = (&ObjectID, &Type, Value)> {
+    pub(crate) fn all_active_child_objects(
+        &self,
+    ) -> impl Iterator<Item = (&ObjectID, &Type, Value)> {
         self.object_store.all_active_objects()
     }
 
@@ -379,13 +404,16 @@ impl<'a> ObjectRuntime<'a> {
             .iter()
             .filter_map(|(id, obj_opt)| {
                 obj_opt.as_ref().map(|obj| {
-                    (*id, DynamicallyLoadedObjectMetadata {
-                        version: obj.version(),
-                        digest: obj.digest(),
-                        storage_rebate: obj.storage_rebate,
-                        owner: obj.owner.clone(),
-                        previous_transaction: obj.previous_transaction,
-                    })
+                    (
+                        *id,
+                        DynamicallyLoadedObjectMetadata {
+                            version: obj.version(),
+                            digest: obj.digest(),
+                            storage_rebate: obj.storage_rebate,
+                            owner: obj.owner.clone(),
+                            previous_transaction: obj.previous_transaction,
+                        },
+                    )
                 })
             })
             .collect()
@@ -394,7 +422,10 @@ impl<'a> ObjectRuntime<'a> {
 
 pub fn max_event_error(max_events: u64) -> PartialVMError {
     PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
-        .with_message(format!("Emitting more than {} events is not allowed", max_events))
+        .with_message(format!(
+            "Emitting more than {} events is not allowed",
+            max_events
+        ))
         .with_sub_status(VMMemoryLimitExceededSubStatusCode::EVENT_COUNT_LIMIT_EXCEEDED as u64)
 }
 
@@ -425,7 +456,12 @@ impl ObjectRuntimeState {
             }
         }
         for (child, child_object_effect) in child_object_effects {
-            let ChildObjectEffect { owner: parent, loaded_version, ty, effect } = child_object_effect;
+            let ChildObjectEffect {
+                owner: parent,
+                loaded_version,
+                ty,
+                effect,
+            } = child_object_effect;
 
             match effect {
                 // was modified, so mark it as mutated and transferred
@@ -433,12 +469,14 @@ impl ObjectRuntimeState {
                     debug_assert!(!self.transfers.contains_key(&child));
                     debug_assert!(!self.new_ids.contains_key(&child));
                     debug_assert!(loaded_version.is_some());
-                    self.transfers.insert(child, (Owner::ObjectOwner(parent.into()), ty, v));
+                    self.transfers
+                        .insert(child, (Owner::ObjectOwner(parent.into()), ty, v));
                 }
 
                 Op::New(v) => {
                     debug_assert!(!self.transfers.contains_key(&child));
-                    self.transfers.insert(child, (Owner::ObjectOwner(parent.into()), ty, v));
+                    self.transfers
+                        .insert(child, (Owner::ObjectOwner(parent.into()), ty, v));
                 }
                 // was transferred so not actually deleted
                 Op::Delete if self.transfers.contains_key(&child) => {
@@ -459,35 +497,49 @@ impl ObjectRuntimeState {
                 }
             }
         }
-        let ObjectRuntimeState { input_objects, new_ids, deleted_ids, transfers, events: user_events } = self;
+        let ObjectRuntimeState {
+            input_objects,
+            new_ids,
+            deleted_ids,
+            transfers,
+            events: user_events,
+        } = self;
         let input_owner_map = input_objects
             .iter()
             .filter_map(|(id, owner)| match owner {
                 Owner::AddressOwner(_) | Owner::Shared { .. } | Owner::Immutable => None,
                 Owner::ObjectOwner(parent) => Some((*id, (*parent).into())),
-                Owner::ConsensusV2 { .. } => {
-                    unimplemented!("ConsensusV2 does not exist for this execution version")
+                Owner::ConsensusAddressOwner { .. } => {
+                    unimplemented!(
+                        "ConsensusAddressOwner does not exist for this execution version"
+                    )
                 }
             })
             .collect();
         // update the input owners with the new owners from transfers
         // reports an error on cycles
         // TODO can we have cycles in the new system?
-        update_owner_map(input_owner_map, transfers.iter().map(|(id, (owner, _, _))| (*id, owner.clone())))?;
+        update_owner_map(
+            input_owner_map,
+            transfers
+                .iter()
+                .map(|(id, (owner, _, _))| (*id, owner.clone())),
+        )?;
         // determine write kinds
         let writes: LinkedHashMap<_, _> = transfers
             .into_iter()
             .map(|(id, (owner, type_, value))| {
-                let write_kind = if input_objects.contains_key(&id) || loaded_child_objects.contains_key(&id) {
-                    debug_assert!(!new_ids.contains_key(&id));
-                    WriteKind::Mutate
-                } else if id == SUI_SYSTEM_STATE_OBJECT_ID || new_ids.contains_key(&id) {
-                    // SUI_SYSTEM_STATE_OBJECT_ID is only transferred during genesis
-                    // TODO find a way to insert this in the new_ids during genesis transactions
-                    WriteKind::Create
-                } else {
-                    WriteKind::Unwrap
-                };
+                let write_kind =
+                    if input_objects.contains_key(&id) || loaded_child_objects.contains_key(&id) {
+                        debug_assert!(!new_ids.contains_key(&id));
+                        WriteKind::Mutate
+                    } else if id == SUI_SYSTEM_STATE_OBJECT_ID || new_ids.contains_key(&id) {
+                        // SUI_SYSTEM_STATE_OBJECT_ID is only transferred during genesis
+                        // TODO find a way to insert this in the new_ids during genesis transactions
+                        WriteKind::Create
+                    } else {
+                        WriteKind::Unwrap
+                    };
                 (id, (write_kind, owner, type_, value))
             })
             .collect();
@@ -496,18 +548,23 @@ impl ObjectRuntimeState {
             .into_iter()
             .map(|(id, ())| {
                 debug_assert!(!new_ids.contains_key(&id));
-                let delete_kind = if input_objects.contains_key(&id) || loaded_child_objects.contains_key(&id) {
-                    DeleteKind::Normal
-                } else {
-                    DeleteKind::UnwrapThenDelete
-                };
+                let delete_kind =
+                    if input_objects.contains_key(&id) || loaded_child_objects.contains_key(&id) {
+                        DeleteKind::Normal
+                    } else {
+                        DeleteKind::UnwrapThenDelete
+                    };
                 (id, delete_kind)
             })
             .collect();
         // remaining by value objects must be wrapped
         let remaining_by_value_objects = by_value_inputs
             .into_iter()
-            .filter(|id| !writes.contains_key(id) && !deletions.contains_key(id) && !external_transfers.contains(id))
+            .filter(|id| {
+                !writes.contains_key(id)
+                    && !deletions.contains_key(id)
+                    && !external_transfers.contains(id)
+            })
             .collect::<Vec<_>>();
         for id in remaining_by_value_objects {
             deletions.insert(id, DeleteKind::Wrap);
@@ -519,7 +576,12 @@ impl ObjectRuntimeState {
 
         debug_assert!(writes.keys().all(|id| !deletions.contains_key(id)));
         debug_assert!(deletions.keys().all(|id| !writes.contains_key(id)));
-        Ok(RuntimeResults { writes, deletions, user_events, loaded_child_objects })
+        Ok(RuntimeResults {
+            writes,
+            deletions,
+            user_events,
+            loaded_child_objects,
+        })
     }
 }
 
@@ -536,9 +598,9 @@ fn update_owner_map(
                 let mut cur = new_owner;
                 loop {
                     if cur == id {
-                        return Err(ExecutionError::from_kind(ExecutionErrorKind::CircularObjectOwnership {
-                            object: cur,
-                        }));
+                        return Err(ExecutionError::from_kind(
+                            ExecutionErrorKind::CircularObjectOwnership { object: cur },
+                        ));
                     }
                     if let Some(parent) = object_owner_map.get(&cur) {
                         cur = *parent;
@@ -548,8 +610,8 @@ fn update_owner_map(
                 }
                 object_owner_map.insert(id, new_owner);
             }
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         }
     }
@@ -569,10 +631,13 @@ pub fn get_all_uids(
     struct UIDTraversal<'i>(&'i mut BTreeSet<ObjectID>);
     struct UIDCollector<'i>(&'i mut BTreeSet<ObjectID>);
 
-    impl<'i, 'b, 'l> AV::Traversal<'b, 'l> for UIDTraversal<'i> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for UIDTraversal<'_> {
         type Error = AV::Error;
 
-        fn traverse_struct(&mut self, driver: &mut AV::StructDriver<'_, 'b, 'l>) -> Result<(), Self::Error> {
+        fn traverse_struct(
+            &mut self,
+            driver: &mut AV::StructDriver<'_, 'b, 'l>,
+        ) -> Result<(), Self::Error> {
             if driver.struct_layout().type_ == UID::type_() {
                 while driver.next_field(&mut UIDCollector(self.0))?.is_some() {}
             } else {
@@ -582,9 +647,8 @@ pub fn get_all_uids(
         }
     }
 
-    impl<'i, 'b, 'l> AV::Traversal<'b, 'l> for UIDCollector<'i> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for UIDCollector<'_> {
         type Error = AV::Error;
-
         fn traverse_address(
             &mut self,
             _driver: &AV::ValueDriver<'_, 'b, 'l>,
@@ -595,7 +659,11 @@ pub fn get_all_uids(
         }
     }
 
-    A::MoveValue::visit_deserialize(bcs_bytes, fully_annotated_layout, &mut UIDTraversal(&mut ids))
-        .map_err(|e| format!("Failed to deserialize. {e:?}"))?;
+    A::MoveValue::visit_deserialize(
+        bcs_bytes,
+        fully_annotated_layout,
+        &mut UIDTraversal(&mut ids),
+    )
+    .map_err(|e| format!("Failed to deserialize. {e:?}"))?;
     Ok(ids)
 }

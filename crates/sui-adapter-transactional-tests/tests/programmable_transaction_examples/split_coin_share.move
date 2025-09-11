@@ -5,25 +5,25 @@
 
 //# publish
 module p::m {
-    use one::oct::OCT;
-    use one::coin;
+    use sui::oct::OCT;
+    use sui::coin;
 
     public fun sharer<T: key + store>(x: T) {
         transfer::public_share_object(x);
     }
 
     public fun mint_shared(ctx: &mut TxContext) {
-        transfer::public_share_object(coin::zero<OCT>(ctx))
+        transfer::public_share_object(coin::zero<SUI>(ctx))
     }
 }
 
 //# programmable --sender A --inputs 10
 //> 0: SplitCoins(Gas, [Input(0)]);
-//> 1: one::transfer::public_share_object<one::coin::Coin<one::oct::OCT>>(Result(0));
+//> 1: sui::transfer::public_share_object<sui::coin::Coin<sui::oct::OCT>>(Result(0));
 
 //# programmable --sender A --inputs 10
 //> 0: SplitCoins(Gas, [Input(0)]);
-//> 1: p::m::sharer<one::coin::Coin<one::oct::OCT>>(Result(0));
+//> 1: p::m::sharer<sui::coin::Coin<sui::oct::OCT>>(Result(0));
 
 //# run p::m::mint_shared
 

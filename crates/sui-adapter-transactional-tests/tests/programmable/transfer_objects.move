@@ -38,7 +38,7 @@ module test::m1 {
 
 // cast using a Move function
 //# programmable --sender A --inputs 0u256
-//> 0: one::address::from_u256(Input(0));
+//> 0: sui::address::from_u256(Input(0));
 //> 1: test::m1::new();
 //> TransferObjects([Result(1)], Result(0));
 
@@ -46,8 +46,8 @@ module test::m1 {
 
 // compilicated Move logic
 //# programmable --sender A --inputs @B true
-//> 0: one::address::to_u256(Input(0));
-//> 1: one::address::from_u256(Result(0));
+//> 0: sui::address::to_u256(Input(0));
+//> 1: sui::address::from_u256(Result(0));
 //> 2: test::m1::new();
 //> 3: test::m1::addr(Result(1), Input(1));
 //> TransferObjects([Result(2)], Result(3));
@@ -56,11 +56,11 @@ module test::m1 {
 
 // many object types
 //# programmable --sender A --inputs @B true
-//> 0: one::address::to_u256(Input(0));
-//> 1: one::address::from_u256(Result(0));
+//> 0: sui::address::to_u256(Input(0));
+//> 1: sui::address::from_u256(Result(0));
 //> 2: test::m1::new();
 //> 3: test::m1::addr(Result(1), Input(1));
-//> 4: test::m1::cup<one::object::ID>();
+//> 4: test::m1::cup<sui::object::ID>();
 //> 5: test::m1::cup<test::m1::Pub>();
 //> TransferObjects([Result(4), Result(2), Result(5)], Result(3));
 

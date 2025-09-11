@@ -4,15 +4,15 @@
 //! Implements lint to warn against freezing capability-like types in Sui, identifying function calls that may incorrectly freeze such types.
 //! The lint checks for specific freezing functions defined in constants and inspects their type arguments for capability-like type names.
 
-use super::{LinterDiagnosticCategory, LinterDiagnosticCode, LINT_WARNING_PREFIX};
+use super::{LINT_WARNING_PREFIX, LinterDiagnosticCategory, LinterDiagnosticCode};
 use crate::{
     diag,
-    diagnostics::codes::{custom, DiagnosticInfo, Severity},
+    diagnostics::codes::{DiagnosticInfo, Severity, custom},
     naming::ast::TypeName_,
     shared::Identifier,
     sui_mode::{
-        linters::{FREEZE_FUN, PUBLIC_FREEZE_FUN, TRANSFER_MOD_NAME},
         SUI_ADDR_VALUE,
+        linters::{FREEZE_FUN, PUBLIC_FREEZE_FUN, TRANSFER_MOD_NAME},
     },
     typing::{ast as T, core, visitor::simple_visitor},
 };
@@ -29,14 +29,20 @@ const FREEZE_CAPABILITY_DIAG: DiagnosticInfo = custom(
     "freezing potential capability",
 );
 
-const FREEZE_FUNCTIONS: &[(AccountAddress, &str, &str)] =
-    &[(SUI_ADDR_VALUE, TRANSFER_MOD_NAME, PUBLIC_FREEZE_FUN), (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, FREEZE_FUN)];
+const FREEZE_FUNCTIONS: &[(AccountAddress, &str, &str)] = &[
+    (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, PUBLIC_FREEZE_FUN),
+    (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, FREEZE_FUN),
+];
 
 static REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r".*Cap(?:[A-Z0-9_]+|ability|$).*").unwrap());
 
 simple_visitor!(
     WarnFreezeCapability,
-    fn visit_module_custom(&mut self, _ident: crate::expansion::ast::ModuleIdent, mdef: &T::ModuleDefinition) -> bool {
+    fn visit_module_custom(
+        &mut self,
+        _ident: crate::expansion::ast::ModuleIdent,
+        mdef: &T::ModuleDefinition,
+    ) -> bool {
         // skips if true
         mdef.attributes.is_test_or_test_only()
     },
@@ -60,9 +66,9 @@ simple_visitor!(
 );
 
 fn is_freeze_function(fun: &T::ModuleCall) -> bool {
-    FREEZE_FUNCTIONS
-        .iter()
-        .any(|(addr, module, fname)| fun.module.value.is(addr, *module) && &fun.name.value().as_str() == fname)
+    FREEZE_FUNCTIONS.iter().any(|(addr, module, fname)| {
+        fun.module.value.is(addr, *module) && &fun.name.value().as_str() == fname
+    })
 }
 
 fn check_type_arguments(context: &mut Context, fun: &T::ModuleCall, loc: Loc) {

@@ -20,13 +20,19 @@ pub trait PackageHooks {
     /// A resolver for on-chain dependencies in the manifest. This is called to download the
     /// dependency from the dependency into the `info.local_path` location, similar as with git
     /// dependencies.
-    fn resolve_on_chain_dependency(&self, dep_name: Symbol, info: &OnChainInfo) -> anyhow::Result<()>;
+    fn resolve_on_chain_dependency(
+        &self,
+        dep_name: Symbol,
+        info: &OnChainInfo,
+    ) -> anyhow::Result<()>;
 
-    fn custom_resolve_pkg_id(&self, manifest: &SourceManifest) -> anyhow::Result<PackageIdentifier>;
+    fn custom_resolve_pkg_id(&self, manifest: &SourceManifest)
+    -> anyhow::Result<PackageIdentifier>;
 
     fn resolve_version(&self, manifest: &SourceManifest) -> anyhow::Result<Option<Symbol>>;
 }
-static HOOKS: Lazy<Mutex<Option<Box<dyn PackageHooks + Send + Sync>>>> = Lazy::new(|| Mutex::new(None));
+static HOOKS: Lazy<Mutex<Option<Box<dyn PackageHooks + Send + Sync>>>> =
+    Lazy::new(|| Mutex::new(None));
 
 /// Registers package hooks for the process in which the package system is used.
 pub fn register_package_hooks(hooks: Box<dyn PackageHooks + Send + Sync>) {
@@ -34,7 +40,10 @@ pub fn register_package_hooks(hooks: Box<dyn PackageHooks + Send + Sync>) {
 }
 
 /// Calls any registered hook to resolve a node dependency. Bails if none is registered.
-pub(crate) fn resolve_on_chain_dependency(dep_name: Symbol, info: &OnChainInfo) -> anyhow::Result<()> {
+pub(crate) fn resolve_on_chain_dependency(
+    dep_name: Symbol,
+    info: &OnChainInfo,
+) -> anyhow::Result<()> {
     if let Some(hooks) = &*HOOKS.lock().unwrap() {
         hooks.resolve_on_chain_dependency(dep_name, info)
     } else {
@@ -51,7 +60,9 @@ pub(crate) fn custom_package_info_fields() -> Vec<String> {
     }
 }
 
-pub(crate) fn custom_resolve_pkg_id(manifest: &SourceManifest) -> anyhow::Result<PackageIdentifier> {
+pub(crate) fn custom_resolve_pkg_id(
+    manifest: &SourceManifest,
+) -> anyhow::Result<PackageIdentifier> {
     if let Some(hooks) = &*HOOKS.lock().unwrap() {
         hooks.custom_resolve_pkg_id(manifest)
     } else {

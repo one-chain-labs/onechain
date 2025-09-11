@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[allow(unused_const)]
-module one::zklogin_verified_issuer;
+module oct::zklogin_verified_issuer;
 
 use std::string::String;
 

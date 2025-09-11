@@ -55,7 +55,8 @@ impl GenesisTransaction {
 
         for c in cs {
             let GenesisObject::RawObject { data, owner } = self.native.objects[c.ix].clone();
-            let native = NativeObject::new_from_genesis(data, owner, TransactionDigest::genesis_marker());
+            let native =
+                NativeObject::new_from_genesis(data, owner, TransactionDigest::genesis_marker());
 
             let object = Object::from_native(SuiAddress::from(native.id()), native, c.c, None);
             connection.edges.push(Edge::new(c.encode_cursor(), object));

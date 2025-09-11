@@ -38,7 +38,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub node_counter_start: usize,
 }
 
-/// # General
+// # General
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
     pub fn new(parent: &'module_translator mut ModuleBuilder<'env, 'translator>) -> Self {
@@ -85,7 +85,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     fn update_node_instantiation(&self, node_id: NodeId, instantiation: Vec<Type>) {
-        self.parent.parent.env.update_node_instantiation(node_id, instantiation);
+        self.parent
+            .parent
+            .env
+            .update_node_instantiation(node_id, instantiation);
     }
 
     /// Finalizes types in this build, producing errors if some could not be inferred
@@ -99,7 +102,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.update_node_type(node_id, ty);
             }
             if let Some(inst) = self.get_node_instantiation_opt(node_id) {
-                let inst = inst.iter().map(|ty| self.finalize_type(node_id, ty)).collect_vec();
+                let inst = inst
+                    .iter()
+                    .map(|ty| self.finalize_type(node_id, ty))
+                    .collect_vec();
                 self.update_node_instantiation(node_id, inst);
             }
         }
@@ -111,7 +117,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if ty.is_incomplete() {
             // This type could not be fully inferred.
             let loc = self.parent.parent.env.get_node_loc(node_id);
-            self.error(&loc, &format!("unable to infer type: `{}`", ty.display(&self.type_display_context())));
+            self.error(
+                &loc,
+                &format!(
+                    "unable to infer type: `{}`",
+                    ty.display(&self.type_display_context())
+                ),
+            );
         }
         ty
     }
@@ -147,7 +159,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.type_params.push((name, ty));
         } else {
             let param_name = name.display(self.symbol_pool());
-            let context = TypeDisplayContext::WithEnv { env: self.parent.parent.env, type_param_names: None };
+            let context = TypeDisplayContext::WithEnv {
+                env: self.parent.parent.env,
+                type_param_names: None,
+            };
             self.parent.parent.error(
                 loc,
                 &format!(
@@ -168,7 +183,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     fn internal_define_local(&mut self, loc: &Loc, name: Symbol) {
         let entry = LocalVarEntry { loc: loc.clone() };
-        if let Some(old) = self.local_table.front_mut().expect("symbol table empty").insert(name, entry) {
+        if let Some(old) = self
+            .local_table
+            .front_mut()
+            .expect("symbol table empty")
+            .insert(name, entry)
+        {
             let display = name.display(self.symbol_pool());
             self.error(loc, &format!("duplicate declaration of `{}`", display));
             self.error(&old.loc, &format!("previous declaration of `{}`", display));
@@ -195,7 +215,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Analyzes the sequence of function parameters as they are provided via the source AST and
     /// enters them into the environment. Returns a vector for representing them in the target AST.
-    pub fn analyze_and_add_params(&mut self, params: &[(EA::Mutability, PA::Var, EA::Type)]) -> Vec<(Symbol, Type)> {
+    pub fn analyze_and_add_params(
+        &mut self,
+        params: &[(EA::Mutability, PA::Var, EA::Type)],
+    ) -> Vec<(Symbol, Type)> {
         params
             .iter()
             .map(|(_, v, ty)| {
@@ -208,9 +231,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 }
 
-/// # Type Translation
+// # Type Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     /// Translates a source AST type into a target AST type.
     pub fn translate_type(&mut self, ty: &EA::Type) -> Type {
         use EA::Type_::*;
@@ -237,7 +260,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         "u128" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U128));
                         }
-                        "u256" => return check_zero_args(self, Type::new_prim(PrimitiveType::U256)),
+                        "u256" => {
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
+                        }
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::Range));
@@ -250,7 +275,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         }
                         "vector" => {
                             if args.len() != 1 {
-                                self.error(&self.to_loc(&ty.loc), "expected one type argument for `vector`");
+                                self.error(
+                                    &self.to_loc(&ty.loc),
+                                    "expected one type argument for `vector`",
+                                );
                                 return Type::Error;
                             } else {
                                 return Type::Vector(Box::new(self.translate_type(&args[0])));
@@ -283,7 +311,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             }
             Ref(is_mut, ty) => Type::Reference(*is_mut, Box::new(self.translate_type(ty))),
-            Fun(args, result) => Type::Fun(self.translate_types(args), Box::new(self.translate_type(result))),
+            Fun(args, result) => Type::Fun(
+                self.translate_types(args),
+                Box::new(self.translate_type(result)),
+            ),
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => Type::Tuple(self.translate_types(vst)),
             UnresolvedError => Type::Error,
@@ -296,9 +327,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 }
 
-/// # Expression Translation
+// # Expression Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
+    #[allow(dead_code)]
     pub fn translate_value(&mut self, v: &EA::Value) -> Option<(Value, Type)> {
         let loc = self.to_loc(&v.loc);
         match &v.value {
@@ -307,22 +339,30 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let value = Value::Address(BigUint::from_bytes_be(&addr_bytes.into_bytes()));
                 Some((value, Type::new_prim(PrimitiveType::Address)))
             }
-            EA::Value_::U8(x) => Some((Value::Number(BigInt::from_u8(*x).unwrap()), Type::new_prim(PrimitiveType::U8))),
-            EA::Value_::U16(x) => {
-                Some((Value::Number(BigInt::from_u16(*x).unwrap()), Type::new_prim(PrimitiveType::U16)))
-            }
-            EA::Value_::U32(x) => {
-                Some((Value::Number(BigInt::from_u32(*x).unwrap()), Type::new_prim(PrimitiveType::U32)))
-            }
-            EA::Value_::U64(x) => {
-                Some((Value::Number(BigInt::from_u64(*x).unwrap()), Type::new_prim(PrimitiveType::U64)))
-            }
-            EA::Value_::U128(x) => {
-                Some((Value::Number(BigInt::from_u128(*x).unwrap()), Type::new_prim(PrimitiveType::U128)))
-            }
-            EA::Value_::InferredNum(x) | EA::Value_::U256(x) => {
-                Some((Value::Number(BigInt::from(x)), Type::new_prim(PrimitiveType::U256)))
-            }
+            EA::Value_::U8(x) => Some((
+                Value::Number(BigInt::from_u8(*x).unwrap()),
+                Type::new_prim(PrimitiveType::U8),
+            )),
+            EA::Value_::U16(x) => Some((
+                Value::Number(BigInt::from_u16(*x).unwrap()),
+                Type::new_prim(PrimitiveType::U16),
+            )),
+            EA::Value_::U32(x) => Some((
+                Value::Number(BigInt::from_u32(*x).unwrap()),
+                Type::new_prim(PrimitiveType::U32),
+            )),
+            EA::Value_::U64(x) => Some((
+                Value::Number(BigInt::from_u64(*x).unwrap()),
+                Type::new_prim(PrimitiveType::U64),
+            )),
+            EA::Value_::U128(x) => Some((
+                Value::Number(BigInt::from_u128(*x).unwrap()),
+                Type::new_prim(PrimitiveType::U128),
+            )),
+            EA::Value_::InferredNum(x) | EA::Value_::U256(x) => Some((
+                Value::Number(BigInt::from(x)),
+                Type::new_prim(PrimitiveType::U256),
+            )),
             EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {
                 let ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
@@ -362,7 +402,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .filter_map(|v| match v {
                             MoveValue::Address(a) => Some(crate::addr_to_big_uint(a)),
                             _ => {
-                                self.error(loc, &format!("Expected address type, but found: {:?}", v));
+                                self.error(
+                                    loc,
+                                    &format!("Expected address type, but found: {:?}", v),
+                                );
                                 None
                             }
                         })
@@ -370,7 +413,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Value::AddressArray(b)
                 }
                 _ => {
-                    let b = vs.iter().map(|v| self.translate_from_move_value(loc, inner, v)).collect::<Vec<Value>>();
+                    let b = vs
+                        .iter()
+                        .map(|v| self.translate_from_move_value(loc, inner, v))
+                        .collect::<Vec<Value>>();
                     Value::Vector(b)
                 }
             },
@@ -406,7 +452,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             | (Type::ResourceDomain(_, _, _), MoveValue::Variant(_))
             | (Type::Error, MoveValue::Variant(_))
             | (Type::Var(_), MoveValue::Variant(_)) => {
-                self.error(loc, &format!("Not yet supported constant value: {:?}", value));
+                self.error(
+                    loc,
+                    &format!("Not yet supported constant value: {:?}", value),
+                );
                 Value::Bool(false)
             }
         }

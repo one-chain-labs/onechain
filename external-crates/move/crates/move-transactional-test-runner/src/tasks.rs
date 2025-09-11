@@ -4,17 +4,15 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use clap::*;
 use move_command_line_common::files::{MOVE_EXTENSION, MOVE_IR_EXTENSION};
 use move_compiler::shared::NumericalAddress;
-use move_core_types::{
-    identifier::Identifier,
-    parsing::{
-        address::ParsedAddress,
-        types::ParsedType,
-        values::{ParsableValue, ParsedValue},
-    },
+use move_core_types::identifier::Identifier;
+use move_core_types::parsing::{
+    address::ParsedAddress,
+    types::ParsedType,
+    values::{ParsableValue, ParsedValue},
 };
 use std::{convert::TryInto, fmt::Debug, path::Path, str::FromStr};
 use tempfile::NamedTempFile;
@@ -48,11 +46,15 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
     let re_command_text = Regex::new(r"^\s*//#\s*(.*)\s*$").unwrap();
 
     let file = File::open(filename).unwrap();
-    let lines: Vec<String> = io::BufReader::new(file).lines().map(|ln| ln.expect("Could not parse line")).collect();
+    let lines: Vec<String> = io::BufReader::new(file)
+        .lines()
+        .map(|ln| ln.expect("Could not parse line"))
+        .collect();
 
     let lines_iter = lines.into_iter().enumerate().map(|(idx, l)| (idx + 1, l));
-    let skipped_whitespace =
-        lines_iter.skip_while(|(_line_number, line)| re_whitespace.is_match(line) || re_comment.is_match(line));
+    let skipped_whitespace = lines_iter.skip_while(|(_line_number, line)| {
+        re_whitespace.is_match(line) || re_comment.is_match(line)
+    });
     let mut bucketed_lines = vec![];
     let mut cur_commands = vec![];
     let mut cur_text = vec![];
@@ -117,12 +119,22 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
                     Ok(_) => panic!(),
                     Err(e) => e,
                 };
-                bail!("Invalid command. Got error {}\nLines {} - {}.\n{}", e, start_line, command_lines_stop, help)
+                bail!(
+                    "Invalid command. Got error {}\nLines {} - {}.\n{}",
+                    e,
+                    start_line,
+                    command_lines_stop,
+                    help
+                )
             }
         };
         let name = name_opt.unwrap();
 
-        let stop_line = if text.is_empty() { command_lines_stop } else { text[text.len() - 1].0 };
+        let stop_line = if text.is_empty() {
+            command_lines_stop
+        } else {
+            text[text.len() - 1].0
+        };
 
         // Keep fucking this up somehow
         // let last_non_whitespace = text
@@ -141,21 +153,49 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             None
         } else {
             let data = NamedTempFile::new()?;
-            data.reopen()?.write_all(file_text_vec.join("\n").as_bytes())?;
+            data.reopen()?
+                .write_all(file_text_vec.join("\n").as_bytes())?;
             Some(data)
         };
 
         let task_text = "//#".to_owned() + command_text.replace('\n', "\n//#").as_str();
 
-        tasks.push(TaskInput { command, name, number, start_line, command_lines_stop, stop_line, data, task_text })
+        tasks.push(TaskInput {
+            command,
+            name,
+            number,
+            start_line,
+            command_lines_stop,
+            stop_line,
+            data,
+            task_text,
+        })
     }
     Ok(tasks)
 }
 
 impl<T> TaskInput<T> {
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> TaskInput<U> {
-        let Self { command, name, number, start_line, command_lines_stop, stop_line, data, task_text } = self;
-        TaskInput { command: f(command), name, number, start_line, command_lines_stop, stop_line, data, task_text }
+        let Self {
+            command,
+            name,
+            number,
+            start_line,
+            command_lines_stop,
+            stop_line,
+            data,
+            task_text,
+        } = self;
+        TaskInput {
+            command: f(command),
+            name,
+            number,
+            start_line,
+            command_lines_stop,
+            stop_line,
+            data,
+            task_text,
+        }
     }
 }
 
@@ -235,26 +275,31 @@ pub enum TaskCommand<
 }
 
 impl<
-        ExtraInitArgs: Parser,
-        ExtraPublishArgs: Parser,
-        ExtraValueArgs: ParsableValue,
-        ExtraRunArgs: Parser,
-        SubCommands: Parser,
-    > FromArgMatches for TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraValueArgs, ExtraRunArgs, SubCommands>
+    ExtraInitArgs: Parser,
+    ExtraPublishArgs: Parser,
+    ExtraValueArgs: ParsableValue,
+    ExtraRunArgs: Parser,
+    SubCommands: Parser,
+> FromArgMatches
+    for TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraValueArgs, ExtraRunArgs, SubCommands>
 {
     fn from_arg_matches(matches: &ArgMatches) -> Result<Self, Error> {
         Ok(match matches.subcommand() {
-            Some(("init", matches)) => {
-                TaskCommand::Init(FromArgMatches::from_arg_matches(matches)?, FromArgMatches::from_arg_matches(matches)?)
+            Some(("init", matches)) => TaskCommand::Init(
+                FromArgMatches::from_arg_matches(matches)?,
+                FromArgMatches::from_arg_matches(matches)?,
+            ),
+            Some(("print-bytecode", matches)) => {
+                TaskCommand::PrintBytecode(FromArgMatches::from_arg_matches(matches)?)
             }
-            Some(("print-bytecode", matches)) => TaskCommand::PrintBytecode(FromArgMatches::from_arg_matches(matches)?),
             Some(("publish", matches)) => TaskCommand::Publish(
                 FromArgMatches::from_arg_matches(matches)?,
                 FromArgMatches::from_arg_matches(matches)?,
             ),
-            Some(("run", matches)) => {
-                TaskCommand::Run(FromArgMatches::from_arg_matches(matches)?, FromArgMatches::from_arg_matches(matches)?)
-            }
+            Some(("run", matches)) => TaskCommand::Run(
+                FromArgMatches::from_arg_matches(matches)?,
+                FromArgMatches::from_arg_matches(matches)?,
+            ),
             _ => TaskCommand::Subcommand(SubCommands::from_arg_matches(matches)?),
         })
     }
@@ -266,12 +311,13 @@ impl<
 }
 
 impl<
-        ExtraInitArgs: Parser,
-        ExtraPublishArgs: Parser,
-        ExtraValueArgs: ParsableValue,
-        ExtraRunArgs: Parser,
-        SubCommands: Parser,
-    > CommandFactory for TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraValueArgs, ExtraRunArgs, SubCommands>
+    ExtraInitArgs: Parser,
+    ExtraPublishArgs: Parser,
+    ExtraValueArgs: ParsableValue,
+    ExtraRunArgs: Parser,
+    SubCommands: Parser,
+> CommandFactory
+    for TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraValueArgs, ExtraRunArgs, SubCommands>
 {
     fn command() -> Command {
         SubCommands::command()
@@ -279,7 +325,9 @@ impl<
             .subcommand(InitCommand::augment_args(ExtraInitArgs::command()).name("init"))
             .subcommand(PrintBytecodeCommand::command().name("print-bytecode"))
             .subcommand(PublishCommand::augment_args(ExtraPublishArgs::command()).name("publish"))
-            .subcommand(RunCommand::<ExtraValueArgs>::augment_args(ExtraRunArgs::command()).name("run"))
+            .subcommand(
+                RunCommand::<ExtraValueArgs>::augment_args(ExtraRunArgs::command()).name("run"),
+            )
     }
 
     fn command_for_update() -> Command {
@@ -293,12 +341,13 @@ impl<
 // (`cargo expand` is useful in printing out the derived code.)
 //
 impl<
-        ExtraInitArgs: Parser,
-        ExtraPublishArgs: Parser,
-        ExtraValueArgs: ParsableValue,
-        ExtraRunArgs: Parser,
-        SubCommands: Parser,
-    > Parser for TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraValueArgs, ExtraRunArgs, SubCommands>
+    ExtraInitArgs: Parser,
+    ExtraPublishArgs: Parser,
+    ExtraValueArgs: ParsableValue,
+    ExtraRunArgs: Parser,
+    SubCommands: Parser,
+> Parser
+    for TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraValueArgs, ExtraRunArgs, SubCommands>
 {
 }
 
@@ -306,13 +355,14 @@ impl<
 pub struct EmptyCommand;
 
 fn parse_qualified_module_access(s: &str) -> Result<(ParsedAddress, Identifier, Identifier)> {
-    let [addr_str, module_str, struct_str]: [&str; 3] = s.split("::").collect::<Vec<_>>().try_into().map_err(|e| {
-        anyhow!(
-            "Invalid module access. \
+    let [addr_str, module_str, struct_str]: [&str; 3] =
+        s.split("::").collect::<Vec<_>>().try_into().map_err(|e| {
+            anyhow!(
+                "Invalid module access. \
                  Expected 3 distinct parts, address, module, and struct. Got error {:?}",
-            e
-        )
-    })?;
+                e
+            )
+        })?;
     let addr = ParsedAddress::parse(addr_str)?;
     let module = Identifier::new(module_str)?;
     let struct_ = Identifier::new(struct_str)?;
@@ -326,7 +376,11 @@ impl FromStr for SyntaxChoice {
         match s {
             MOVE_EXTENSION => Ok(SyntaxChoice::Source),
             MOVE_IR_EXTENSION => Ok(SyntaxChoice::IR),
-            _ => Err(anyhow!("Invalid syntax choice. Expected '{}' or '{}'", MOVE_EXTENSION, MOVE_IR_EXTENSION)),
+            _ => Err(anyhow!(
+                "Invalid syntax choice. Expected '{}' or '{}'",
+                MOVE_EXTENSION,
+                MOVE_IR_EXTENSION
+            )),
         }
     }
 }

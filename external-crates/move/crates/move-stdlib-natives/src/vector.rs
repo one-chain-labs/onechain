@@ -43,13 +43,18 @@ pub fn native_empty(
 
     native_charge_gas_early_exit!(context, gas_params.base);
 
-    NativeResult::map_partial_vm_result_one(context.gas_used(), Vector::empty(&ty_args[0]))
+    NativeResult::map_partial_vm_result_one(
+        context.gas_used(),
+        (&ty_args[0]).try_into().and_then(Vector::empty),
+    )
 }
 
 pub fn make_native_empty(gas_params: EmptyGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_empty(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_empty(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -79,9 +84,11 @@ pub fn native_length(
 }
 
 pub fn make_native_length(gas_params: LengthGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_length(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_length(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -111,20 +118,27 @@ pub fn native_push_back(
     let r = pop_arg!(args, VectorRef);
 
     if gas_params.legacy_per_abstract_memory_unit != 0.into() {
-        let cost = gas_params.legacy_per_abstract_memory_unit * std::cmp::max(e.legacy_abstract_memory_size(), 1.into());
+        let cost = gas_params.legacy_per_abstract_memory_unit
+            * std::cmp::max(e.legacy_abstract_memory_size(), 1.into());
         native_charge_gas_early_exit!(context, cost);
     }
 
     NativeResult::map_partial_vm_result_empty(
         context.gas_used(),
-        r.push_back(e, &ty_args[0], context.runtime_limits_config().vector_len_max),
+        r.push_back(
+            e,
+            &ty_args[0],
+            context.runtime_limits_config().vector_len_max,
+        ),
     )
 }
 
 pub fn make_native_push_back(gas_params: PushBackGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_push_back(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_push_back(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -152,14 +166,17 @@ pub fn native_borrow(
     let r = pop_arg!(args, VectorRef);
     NativeResult::map_partial_vm_result_one(
         context.gas_used(),
-        r.borrow_elem(idx, &ty_args[0]).map_err(native_error_to_abort),
+        r.borrow_elem(idx, &ty_args[0])
+            .map_err(native_error_to_abort),
     )
 }
 
 pub fn make_native_borrow(gas_params: BorrowGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_borrow(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_borrow(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -184,13 +201,18 @@ pub fn native_pop_back(
 
     native_charge_gas_early_exit!(context, gas_params.base);
     let r = pop_arg!(args, VectorRef);
-    NativeResult::map_partial_vm_result_one(context.gas_used(), r.pop(&ty_args[0]).map_err(native_error_to_abort))
+    NativeResult::map_partial_vm_result_one(
+        context.gas_used(),
+        r.pop(&ty_args[0]).map_err(native_error_to_abort),
+    )
 }
 
 pub fn make_native_pop_back(gas_params: PopBackGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_pop_back(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_pop_back(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -223,9 +245,11 @@ pub fn native_destroy_empty(
 }
 
 pub fn make_native_destroy_empty(gas_params: DestroyEmptyGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_destroy_empty(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_destroy_empty(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -251,18 +275,22 @@ pub fn native_swap(
     let r = pop_arg!(args, VectorRef);
     NativeResult::map_partial_vm_result_empty(
         context.gas_used(),
-        r.swap(idx1, idx2, &ty_args[0]).map_err(native_error_to_abort),
+        r.swap(idx1, idx2, &ty_args[0])
+            .map_err(native_error_to_abort),
     )
 }
 
 pub fn make_native_swap(gas_params: SwapGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_swap(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_swap(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 fn native_error_to_abort(err: PartialVMError) -> PartialVMError {
-    let (major_status, sub_status_opt, message_opt, exec_state_opt, indices, offsets) = err.all_data();
+    let (major_status, sub_status_opt, message_opt, exec_state_opt, indices, offsets) =
+        err.all_data();
     let new_err = match major_status {
         StatusCode::VECTOR_OPERATION_ERROR => PartialVMError::new(StatusCode::ABORTED),
         _ => PartialVMError::new(major_status),
@@ -304,7 +332,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ("borrow", make_native_borrow(gas_params.borrow.clone())),
         ("borrow_mut", make_native_borrow(gas_params.borrow)),
         ("pop_back", make_native_pop_back(gas_params.pop_back)),
-        ("destroy_empty", make_native_destroy_empty(gas_params.destroy_empty)),
+        (
+            "destroy_empty",
+            make_native_destroy_empty(gas_params.destroy_empty),
+        ),
         ("swap", make_native_swap(gas_params.swap)),
     ];
 

@@ -1,17 +1,18 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, fmt::Debug};
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 use crate::{
+    PreCompiledProgramInfo,
     cfgir::{
-        absint::{AbstractDomain, AbstractInterpreter, JoinResult, TransferFunctions},
+        CFGContext,
+        absint::{AbstractDomain, JoinResult, TransferFunctions, analyze_function},
         ast as G,
         cfg::ImmForwardCFG,
-        CFGContext,
     },
     command_line::compiler::Visitor,
-    diagnostics::{warning_filters::WarningFilters, Diagnostic, Diagnostics},
+    diagnostics::{Diagnostic, Diagnostics, warning_filters::WarningFilters},
     expansion::ast::ModuleIdent,
     hlir::ast::{self as H, Command, Exp, LValue, LValue_, Label, ModuleCall, Type, Type_, Var},
     parser::ast::{ConstantName, DatatypeName, Field, FunctionName},
@@ -25,7 +26,12 @@ pub type AbsIntVisitorObj = Box<dyn AbstractInterpreterVisitor>;
 pub type CFGIRVisitorObj = Box<dyn CFGIRVisitor>;
 
 pub trait CFGIRVisitor: Send + Sync {
-    fn visit(&self, env: &CompilationEnv, program: &G::Program);
+    fn visit(
+        &self,
+        env: &CompilationEnv,
+        pre_compiled_program: Option<Arc<PreCompiledProgramInfo>>,
+        program: &G::Program,
+    );
 
     fn visitor(self) -> Visitor
     where
@@ -53,10 +59,18 @@ pub trait AbstractInterpreterVisitor: Send + Sync {
 pub trait CFGIRVisitorConstructor: Send {
     type Context<'a>: Sized + CFGIRVisitorContext;
 
-    fn context<'a>(env: &'a CompilationEnv, program: &G::Program) -> Self::Context<'a>;
+    fn context<'a>(
+        env: &'a CompilationEnv,
+        pre_compiled_program: Option<Arc<PreCompiledProgramInfo>>,
+        program: &G::Program,
+    ) -> Self::Context<'a>;
 
-    fn visit(env: &CompilationEnv, program: &G::Program) {
-        let mut context = Self::context(env, program);
+    fn visit(
+        env: &CompilationEnv,
+        pre_compiled_program: Option<Arc<PreCompiledProgramInfo>>,
+        program: &G::Program,
+    ) {
+        let mut context = Self::context(env, pre_compiled_program, program);
         context.visit(program);
     }
 }
@@ -107,7 +121,12 @@ pub trait CFGIRVisitorContext {
     ) -> bool {
         false
     }
-    fn visit_struct(&mut self, module: ModuleIdent, struct_name: DatatypeName, sdef: &H::StructDefinition) {
+    fn visit_struct(
+        &mut self,
+        module: ModuleIdent,
+        struct_name: DatatypeName,
+        sdef: &H::StructDefinition,
+    ) {
         self.push_warning_filter_scope(sdef.warning_filter);
         if self.visit_struct_custom(module, struct_name, sdef) {
             self.pop_warning_filter_scope();
@@ -116,10 +135,20 @@ pub trait CFGIRVisitorContext {
         self.pop_warning_filter_scope();
     }
 
-    fn visit_enum_custom(&mut self, _module: ModuleIdent, _enum_name: DatatypeName, _edef: &H::EnumDefinition) -> bool {
+    fn visit_enum_custom(
+        &mut self,
+        _module: ModuleIdent,
+        _enum_name: DatatypeName,
+        _edef: &H::EnumDefinition,
+    ) -> bool {
         false
     }
-    fn visit_enum(&mut self, module: ModuleIdent, enum_name: DatatypeName, edef: &H::EnumDefinition) {
+    fn visit_enum(
+        &mut self,
+        module: ModuleIdent,
+        enum_name: DatatypeName,
+        edef: &H::EnumDefinition,
+    ) {
         self.push_warning_filter_scope(edef.warning_filter);
         if self.visit_enum_custom(module, enum_name, edef) {
             self.pop_warning_filter_scope();
@@ -136,7 +165,12 @@ pub trait CFGIRVisitorContext {
     ) -> bool {
         false
     }
-    fn visit_constant(&mut self, module: ModuleIdent, constant_name: ConstantName, cdef: &G::Constant) {
+    fn visit_constant(
+        &mut self,
+        module: ModuleIdent,
+        constant_name: ConstantName,
+        cdef: &G::Constant,
+    ) {
         self.push_warning_filter_scope(cdef.warning_filter);
         if self.visit_constant_custom(module, constant_name, cdef) {
             self.pop_warning_filter_scope();
@@ -153,13 +187,24 @@ pub trait CFGIRVisitorContext {
     ) -> bool {
         false
     }
-    fn visit_function(&mut self, module: ModuleIdent, function_name: FunctionName, fdef: &G::Function) {
+    fn visit_function(
+        &mut self,
+        module: ModuleIdent,
+        function_name: FunctionName,
+        fdef: &G::Function,
+    ) {
         self.push_warning_filter_scope(fdef.warning_filter);
         if self.visit_function_custom(module, function_name, fdef) {
             self.pop_warning_filter_scope();
             return;
         }
-        if let G::FunctionBody_::Defined { locals: _, start: _, block_info: _, blocks } = &fdef.body.value {
+        if let G::FunctionBody_::Defined {
+            locals: _,
+            start: _,
+            block_info: _,
+            blocks,
+        } = &fdef.body.value
+        {
             for (lbl, block) in blocks {
                 self.visit_block(*lbl, block);
             }
@@ -223,9 +268,11 @@ pub trait CFGIRVisitorContext {
 
             E::Value(v) => self.visit_value(v),
 
-            E::Freeze(e) | E::Dereference(e) | E::UnaryExp(_, e) | E::Borrow(_, e, _, _) | E::Cast(e, _) => {
-                self.visit_exp(e)
-            }
+            E::Freeze(e)
+            | E::Dereference(e)
+            | E::UnaryExp(_, e)
+            | E::Borrow(_, e, _, _)
+            | E::Cast(e, _) => self.visit_exp(e),
 
             E::BinopExp(el, _, er) => {
                 self.visit_exp(el);
@@ -261,7 +308,14 @@ pub trait CFGIRVisitorContext {
             return;
         }
         match &v.value {
-            V::Address(_) | V::U8(_) | V::U16(_) | V::U32(_) | V::U64(_) | V::U128(_) | V::U256(_) | V::Bool(_) => (),
+            V::Address(_)
+            | V::U8(_)
+            | V::U16(_)
+            | V::U32(_)
+            | V::U64(_)
+            | V::U128(_)
+            | V::U256(_)
+            | V::Bool(_) => (),
             V::Vector(_, vs) => {
                 for v in vs {
                     self.visit_value(v)
@@ -278,8 +332,13 @@ impl<V: CFGIRVisitor + 'static> From<V> for CFGIRVisitorObj {
 }
 
 impl<V: CFGIRVisitorConstructor + Send + Sync> CFGIRVisitor for V {
-    fn visit(&self, env: &CompilationEnv, program: &G::Program) {
-        Self::visit(env, program)
+    fn visit(
+        &self,
+        env: &CompilationEnv,
+        pre_compiled_program: Option<Arc<PreCompiledProgramInfo>>,
+        program: &G::Program,
+    ) {
+        Self::visit(env, pre_compiled_program, program)
     }
 }
 
@@ -296,7 +355,11 @@ macro_rules! simple_visitor {
         impl crate::cfgir::visitor::CFGIRVisitorConstructor for $visitor {
             type Context<'a> = Context<'a>;
 
-            fn context<'a>(env: &'a crate::shared::CompilationEnv, _program: &crate::cfgir::ast::Program) -> Self::Context<'a> {
+            fn context<'a>(
+                env: &'a crate::shared::CompilationEnv,
+                _pre_compiled_program: Option<std::sync::Arc<crate::command_line::compiler::PreCompiledProgramInfo>>,
+                _program: &crate::cfgir::ast::Program,
+            ) -> Self::Context<'a> {
                 let reporter = env.diagnostic_reporter_at_top_level();
                 Context {
                     env,
@@ -351,10 +414,14 @@ pub enum UnavailableReason {
 pub enum LocalState<V: Clone + Debug + Default> {
     Unavailable(Loc, UnavailableReason),
     Available(Loc, V),
-    MaybeUnavailable { available: Loc, unavailable: Loc, unavailable_reason: UnavailableReason },
+    MaybeUnavailable {
+        available: Loc,
+        unavailable: Loc,
+        unavailable_reason: UnavailableReason,
+    },
 }
 
-/// A trait for a the context when visiting a `Command` in a block. At a minimum it must hold the diagnostics
+/// A trait for the context when visiting a `Command` in a block. At a minimum it must hold the diagnostics
 /// and the abstract state
 pub trait SimpleExecutionContext {
     /// Add a diagnostic
@@ -430,7 +497,11 @@ impl<V: SimpleDomain> AbstractDomain for V {
                     result = JoinResult::Changed;
                     let available = *available;
                     let unavailable = *unavailable;
-                    let state = L::MaybeUnavailable { available, unavailable, unavailable_reason: *reason };
+                    let state = L::MaybeUnavailable {
+                        available,
+                        unavailable,
+                        unavailable_reason: *reason,
+                    };
                     self.locals_mut().insert(*local, state);
                 }
             }
@@ -475,7 +546,7 @@ pub trait SimpleAbsIntConstructor: Sized {
         let Some(mut ai) = Self::new(context, cfg, &mut init_state) else {
             return Diagnostics::new();
         };
-        let (final_state, ds) = ai.analyze_function(cfg, init_state);
+        let (final_state, ds) = analyze_function(&mut ai, cfg, init_state);
         ai.finish(final_state, ds)
     }
 }
@@ -488,19 +559,37 @@ pub trait SimpleAbsInt: Sized {
     /// A hook for an additional processing after visiting all codes. The `final_states` are the
     /// pre-states for each block (keyed by the label for the block). The `diags` are collected from
     /// all code visited.
-    fn finish(&mut self, final_states: BTreeMap<Label, Self::State>, diags: Diagnostics) -> Diagnostics;
+    fn finish(
+        &mut self,
+        final_states: BTreeMap<Label, Self::State>,
+        diags: Diagnostics,
+    ) -> Diagnostics;
 
     /// A hook for any pre-processing at the start of a command
     fn start_command(&self, pre: &mut Self::State) -> Self::ExecutionContext;
 
     /// A hook for any post-processing after a command has been visited
-    fn finish_command(&self, context: Self::ExecutionContext, state: &mut Self::State) -> Diagnostics;
+    fn finish_command(
+        &self,
+        context: Self::ExecutionContext,
+        state: &mut Self::State,
+    ) -> Diagnostics;
 
     /// custom visit for a command. It will skip `command` if `command_custom` returns true.
-    fn command_custom(&self, _context: &mut Self::ExecutionContext, _state: &mut Self::State, _cmd: &Command) -> bool {
+    fn command_custom(
+        &self,
+        _context: &mut Self::ExecutionContext,
+        _state: &mut Self::State,
+        _cmd: &Command,
+    ) -> bool {
         false
     }
-    fn command(&self, context: &mut Self::ExecutionContext, state: &mut Self::State, cmd: &Command) {
+    fn command(
+        &self,
+        context: &mut Self::ExecutionContext,
+        state: &mut Self::State,
+        cmd: &Command,
+    ) {
         use H::Command_ as C;
         if self.command_custom(context, state, cmd) {
             return;
@@ -535,7 +624,9 @@ pub trait SimpleAbsInt: Sized {
         values: Vec<<Self::State as SimpleDomain>::Value>,
     ) {
         // pad with defautl to account for errors
-        let padded_values = values.into_iter().chain(std::iter::repeat(<Self::State as SimpleDomain>::Value::default()));
+        let padded_values = values.into_iter().chain(std::iter::repeat(
+            <Self::State as SimpleDomain>::Value::default(),
+        ));
         for (l, value) in ls.iter().zip(padded_values) {
             self.lvalue(context, state, l, value)
         }
@@ -619,7 +710,10 @@ pub trait SimpleAbsInt: Sized {
         match &parent_e.exp.value {
             E::Move { var, .. } => {
                 let locals = state.locals_mut();
-                let prev = locals.insert(*var, LocalState::Unavailable(*eloc, UnavailableReason::Moved));
+                let prev = locals.insert(
+                    *var,
+                    LocalState::Unavailable(*eloc, UnavailableReason::Moved),
+                );
                 match prev {
                     Some(LocalState::Available(_, value)) => {
                         vec![value]
@@ -637,7 +731,11 @@ pub trait SimpleAbsInt: Sized {
                 }
             }
             E::BorrowLocal(_, _) => default_values(1),
-            E::Freeze(e) | E::Dereference(e) | E::Borrow(_, e, _, _) | E::Cast(e, _) | E::UnaryExp(_, e) => {
+            E::Freeze(e)
+            | E::Dereference(e)
+            | E::Borrow(_, e, _, _)
+            | E::Cast(e, _)
+            | E::UnaryExp(_, e) => {
                 self.exp(context, state, e);
                 default_values(1)
             }
@@ -648,8 +746,14 @@ pub trait SimpleAbsInt: Sized {
                 default_values(*n)
             }
             E::ModuleCall(mcall) => {
-                let evalues = mcall.arguments.iter().flat_map(|arg| self.exp(context, state, arg)).collect();
-                if let Some(vs) = self.call_custom(context, state, eloc, &parent_e.ty, mcall, evalues) {
+                let evalues = mcall
+                    .arguments
+                    .iter()
+                    .flat_map(|arg| self.exp(context, state, arg))
+                    .collect();
+                if let Some(vs) =
+                    self.call_custom(context, state, eloc, &parent_e.ty, mcall, evalues)
+                {
                     return vs;
                 }
 
@@ -657,7 +761,9 @@ pub trait SimpleAbsInt: Sized {
             }
 
             E::Unit { .. } => vec![],
-            E::Value(_) | E::Constant(_) | E::UnresolvedError | E::ErrorConstant { .. } => default_values(1),
+            E::Value(_) | E::Constant(_) | E::UnresolvedError | E::ErrorConstant { .. } => {
+                default_values(1)
+            }
 
             E::BinopExp(e1, _, e2) => {
                 self.exp(context, state, e1);
@@ -676,7 +782,10 @@ pub trait SimpleAbsInt: Sized {
                 }
                 default_values(1)
             }
-            E::Multiple(es) => es.iter().flat_map(|e| self.exp(context, state, e)).collect(),
+            E::Multiple(es) => es
+                .iter()
+                .flat_map(|e| self.exp(context, state, e))
+                .collect(),
             E::Unreachable => panic!("ICE should not analyze dead code"),
         }
     }
@@ -700,13 +809,18 @@ pub fn default_values<V: Clone + Default>(c: usize) -> Vec<V> {
 impl<V: SimpleAbsInt> TransferFunctions for V {
     type State = V::State;
 
-    fn execute(&mut self, pre: &mut Self::State, _lbl: Label, _idx: usize, cmd: &Command) -> Diagnostics {
+    fn execute(
+        &mut self,
+        pre: &mut Self::State,
+        _lbl: Label,
+        _idx: usize,
+        cmd: &Command,
+    ) -> Diagnostics {
         let mut context = self.start_command(pre);
         self.command(&mut context, pre, cmd);
         self.finish_command(context, pre)
     }
 }
-impl<V: SimpleAbsInt> AbstractInterpreter for V {}
 
 impl<V: AbstractInterpreterVisitor + 'static> From<V> for AbsIntVisitorObj {
     fn from(value: V) -> Self {
@@ -724,7 +838,11 @@ impl<V: SimpleAbsIntConstructor + Send + Sync> AbstractInterpreterVisitor for V 
 // utils
 //**************************************************************************************************
 
-pub fn cfg_satisfies<FCommand, FExp>(cfg: &ImmForwardCFG, mut p_command: FCommand, mut p_exp: FExp) -> bool
+pub fn cfg_satisfies<FCommand, FExp>(
+    cfg: &ImmForwardCFG,
+    mut p_command: FCommand,
+    mut p_exp: FExp,
+) -> bool
 where
     FCommand: FnMut(&Command) -> bool,
     FExp: FnMut(&Exp) -> bool,
@@ -732,7 +850,11 @@ where
     cfg_satisfies_(cfg, &mut p_command, &mut p_exp)
 }
 
-pub fn command_satisfies<FCommand, FExp>(cmd: &Command, mut p_command: FCommand, mut p_exp: FExp) -> bool
+pub fn command_satisfies<FCommand, FExp>(
+    cmd: &Command,
+    mut p_command: FCommand,
+    mut p_exp: FExp,
+) -> bool
 where
     FCommand: FnMut(&Command) -> bool,
     FExp: FnMut(&Exp) -> bool,
@@ -747,11 +869,17 @@ where
     exp_satisfies_(e, &mut p)
 }
 
-pub fn calls_special_function(special: &[(AccountAddress, &str, &str)], cfg: &ImmForwardCFG) -> bool {
+pub fn calls_special_function(
+    special: &[(AccountAddress, &str, &str)],
+    cfg: &ImmForwardCFG,
+) -> bool {
     cfg_satisfies(cfg, |_| true, |e| is_special_function(special, e))
 }
 
-pub fn calls_special_function_command(special: &[(AccountAddress, &str, &str)], cmd: &Command) -> bool {
+pub fn calls_special_function_command(
+    special: &[(AccountAddress, &str, &str)],
+    cmd: &Command,
+) -> bool {
     command_satisfies(cmd, |_| true, |e| is_special_function(special, e))
 }
 
@@ -772,7 +900,11 @@ fn cfg_satisfies_(
     p_command: &mut impl FnMut(&Command) -> bool,
     p_exp: &mut impl FnMut(&Exp) -> bool,
 ) -> bool {
-    cfg.blocks().values().any(|block| block.iter().any(|cmd| command_satisfies_(cmd, p_command, p_exp)))
+    cfg.blocks().values().any(|block| {
+        block
+            .iter()
+            .any(|cmd| command_satisfies_(cmd, p_command, p_exp))
+    })
 }
 
 fn command_satisfies_(
@@ -812,16 +944,20 @@ fn exp_satisfies_(e: &Exp, p: &mut impl FnMut(&Exp) -> bool) -> bool {
         | E::UnresolvedError
         | E::Value(_) => false,
 
-        E::Freeze(e) | E::Dereference(e) | E::UnaryExp(_, e) | E::Borrow(_, e, _, _) | E::Cast(e, _) => {
-            exp_satisfies_(e, p)
-        }
+        E::Freeze(e)
+        | E::Dereference(e)
+        | E::UnaryExp(_, e)
+        | E::Borrow(_, e, _, _)
+        | E::Cast(e, _) => exp_satisfies_(e, p),
 
         E::BinopExp(el, _, er) => exp_satisfies_(el, p) || exp_satisfies_(er, p),
 
         E::ModuleCall(call) => call.arguments.iter().any(|arg| exp_satisfies_(arg, p)),
         E::Vector(_, _, _, es) | E::Multiple(es) => es.iter().any(move |e| exp_satisfies_(e, p)),
 
-        E::Pack(_, _, es) | E::PackVariant(_, _, _, es) => es.iter().any(|(_, _, e)| exp_satisfies_(e, p)),
+        E::Pack(_, _, es) | E::PackVariant(_, _, _, es) => {
+            es.iter().any(|(_, _, e)| exp_satisfies_(e, p))
+        }
     }
 }
 
@@ -843,10 +979,16 @@ pub fn same_value_exp_(e1: &H::UnannotatedExp_, e2: &H::UnannotatedExp_) -> bool
         (E::Unit { .. }, E::Unit { .. }) => true,
         (E::Constant(c1), E::Constant(c2)) => c1 == c2,
         (E::Move { var, .. } | E::Copy { var, .. } | E::BorrowLocal(_, var), other)
-        | (other, E::Move { var, .. } | E::Copy { var, .. } | E::BorrowLocal(_, var)) => same_local_(var, other),
+        | (other, E::Move { var, .. } | E::Copy { var, .. } | E::BorrowLocal(_, var)) => {
+            same_local_(var, other)
+        }
 
         (E::Vector(_, _, _, e1), E::Vector(_, _, _, e2)) => {
-            e1.len() == e2.len() && e1.iter().zip(e2.iter()).all(|(e1, e2)| same_value_exp(e1, e2))
+            e1.len() == e2.len()
+                && e1
+                    .iter()
+                    .zip(e2.iter())
+                    .all(|(e1, e2)| same_value_exp(e1, e2))
         }
 
         (E::UnaryExp(op1, e1), E::UnaryExp(op2, e2)) => op1 == op2 && same_value_exp(e1, e2),
@@ -854,7 +996,9 @@ pub fn same_value_exp_(e1: &H::UnannotatedExp_, e2: &H::UnannotatedExp_) -> bool
             op1 == op2 && same_value_exp(l1, l2) && same_value_exp(r1, r2)
         }
 
-        (E::Pack(n1, _, fields1), E::Pack(n2, _, fields2)) => n1 == n2 && same_value_fields(fields1, fields2),
+        (E::Pack(n1, _, fields1), E::Pack(n2, _, fields2)) => {
+            n1 == n2 && same_value_fields(fields1, fields2)
+        }
         (E::PackVariant(n1, v1, _, fields1), E::PackVariant(n2, v2, _, fields2)) => {
             n1 == n2 && v1 == v2 && same_value_fields(fields1, fields2)
         }
@@ -872,9 +1016,15 @@ pub fn same_value_exp_(e1: &H::UnannotatedExp_, e2: &H::UnannotatedExp_) -> bool
     }
 }
 
-fn same_value_fields(fields1: &[(Field, H::BaseType, Exp)], fields2: &[(Field, H::BaseType, Exp)]) -> bool {
+fn same_value_fields(
+    fields1: &[(Field, H::BaseType, Exp)],
+    fields2: &[(Field, H::BaseType, Exp)],
+) -> bool {
     fields1.len() == fields2.len()
-        && fields1.iter().zip(fields2.iter()).all(|((_, _, e1), (_, _, e2))| same_value_exp(e1, e2))
+        && fields1
+            .iter()
+            .zip(fields2.iter())
+            .all(|((_, _, e1), (_, _, e2))| same_value_exp(e1, e2))
 }
 
 fn same_local_(lhs: &Var, rhs: &H::UnannotatedExp_) -> bool {

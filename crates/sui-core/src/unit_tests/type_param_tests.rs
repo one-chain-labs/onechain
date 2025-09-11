@@ -10,10 +10,10 @@ use crate::authority::{
 
 use move_core_types::language_storage::TypeTag;
 
+use sui_types::effects::TransactionEffectsAPI;
 use sui_types::{
     base_types::ObjectID,
     crypto::{get_key_pair, AccountKeyPair},
-    effects::TransactionEffectsAPI,
 };
 
 #[tokio::test]
@@ -33,24 +33,42 @@ async fn test_same_module_type_param() {
     )
     .await;
 
-    let effects =
-        call_move(&authority, &gas, &sender, &sender_key, &package.0, "m1", "create_and_transfer", vec![], vec![
+    let effects = call_move(
+        &authority,
+        &gas,
+        &sender,
+        &sender_key,
+        &package.0,
+        "m1",
+        "create_and_transfer",
+        vec![],
+        vec![
             TestCallArg::Pure(bcs::to_bytes(&(16_u64)).unwrap()),
             TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
-        ])
-        .await
-        .unwrap();
+        ],
+    )
+    .await
+    .unwrap();
 
     let created_object_id = effects.created()[0].0 .0;
     let type_param = TypeTag::from_str(format!("{}::m1::Object", package.0).as_str()).unwrap();
 
-    let effects =
-        call_move(&authority, &gas, &sender, &sender_key, &package.0, "m1", "transfer_object", vec![type_param], vec![
+    let effects = call_move(
+        &authority,
+        &gas,
+        &sender,
+        &sender_key,
+        &package.0,
+        "m1",
+        "transfer_object",
+        vec![type_param],
+        vec![
             TestCallArg::Object(created_object_id),
             TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
-        ])
-        .await
-        .unwrap();
+        ],
+    )
+    .await
+    .unwrap();
 
     assert!(effects.status().is_ok());
 }
@@ -72,16 +90,26 @@ async fn test_different_module_type_param() {
     )
     .await;
 
-    let effects =
-        call_move(&authority, &gas, &sender, &sender_key, &package.0, "m2", "create_and_transfer", vec![], vec![
+    let effects = call_move(
+        &authority,
+        &gas,
+        &sender,
+        &sender_key,
+        &package.0,
+        "m2",
+        "create_and_transfer",
+        vec![],
+        vec![
             TestCallArg::Pure(bcs::to_bytes(&(16_u64)).unwrap()),
             TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
-        ])
-        .await
-        .unwrap();
+        ],
+    )
+    .await
+    .unwrap();
 
     let created_object_id = effects.created()[0].0 .0;
-    let type_param = TypeTag::from_str(format!("{}::m2::AnotherObject", package.0).as_str()).unwrap();
+    let type_param =
+        TypeTag::from_str(format!("{}::m2::AnotherObject", package.0).as_str()).unwrap();
 
     let effects = call_move(
         &authority,
@@ -93,7 +121,10 @@ async fn test_different_module_type_param() {
         "m1",
         "transfer_object",
         vec![type_param],
-        vec![TestCallArg::Object(created_object_id), TestCallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            TestCallArg::Object(created_object_id),
+            TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
     )
     .await
     .unwrap();
@@ -118,17 +149,32 @@ async fn test_nested_type_param() {
     )
     .await;
 
-    let effects =
-        call_move(&authority, &gas, &sender, &sender_key, &package.0, "m1", "create_and_transfer_gen", vec![], vec![
+    let effects = call_move(
+        &authority,
+        &gas,
+        &sender,
+        &sender_key,
+        &package.0,
+        "m1",
+        "create_and_transfer_gen",
+        vec![],
+        vec![
             TestCallArg::Pure(bcs::to_bytes(&(16_u64)).unwrap()),
             TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
-        ])
-        .await
-        .unwrap();
+        ],
+    )
+    .await
+    .unwrap();
 
     let created_object_id = effects.created()[0].0 .0;
-    let type_param =
-        TypeTag::from_str(format!("{}::m1::GenObject<{}::m2::AnotherObject>", package.0, package.0).as_str()).unwrap();
+    let type_param = TypeTag::from_str(
+        format!(
+            "{}::m1::GenObject<{}::m2::AnotherObject>",
+            package.0, package.0
+        )
+        .as_str(),
+    )
+    .unwrap();
 
     let effects = call_move(
         &authority,
@@ -140,7 +186,10 @@ async fn test_nested_type_param() {
         "transfer_object",
         // outer type comes from the same module but nested one from a different module
         vec![type_param],
-        vec![TestCallArg::Object(created_object_id), TestCallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            TestCallArg::Object(created_object_id),
+            TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
     )
     .await
     .unwrap();
@@ -165,17 +214,32 @@ async fn test_nested_type_param_different_module() {
     )
     .await;
 
-    let effects =
-        call_move(&authority, &gas, &sender, &sender_key, &package.0, "m1", "create_and_transfer_gen", vec![], vec![
+    let effects = call_move(
+        &authority,
+        &gas,
+        &sender,
+        &sender_key,
+        &package.0,
+        "m1",
+        "create_and_transfer_gen",
+        vec![],
+        vec![
             TestCallArg::Pure(bcs::to_bytes(&(16_u64)).unwrap()),
             TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
-        ])
-        .await
-        .unwrap();
+        ],
+    )
+    .await
+    .unwrap();
 
     let created_object_id = effects.created()[0].0 .0;
-    let type_param =
-        TypeTag::from_str(format!("{}::m1::GenObject<{}::m2::AnotherObject>", package.0, package.0).as_str()).unwrap();
+    let type_param = TypeTag::from_str(
+        format!(
+            "{}::m1::GenObject<{}::m2::AnotherObject>",
+            package.0, package.0
+        )
+        .as_str(),
+    )
+    .unwrap();
 
     let effects = call_move(
         &authority,
@@ -187,7 +251,10 @@ async fn test_nested_type_param_different_module() {
         "m3",
         "transfer_object",
         vec![type_param],
-        vec![TestCallArg::Object(created_object_id), TestCallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            TestCallArg::Object(created_object_id),
+            TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
     )
     .await
     .unwrap();
@@ -222,16 +289,26 @@ async fn test_different_package_type_param() {
     )
     .await;
 
-    let effects =
-        call_move(&authority, &gas, &sender, &sender_key, &package.0, "m2", "create_and_transfer", vec![], vec![
+    let effects = call_move(
+        &authority,
+        &gas,
+        &sender,
+        &sender_key,
+        &package.0,
+        "m2",
+        "create_and_transfer",
+        vec![],
+        vec![
             TestCallArg::Pure(bcs::to_bytes(&(16_u64)).unwrap()),
             TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
-        ])
-        .await
-        .unwrap();
+        ],
+    )
+    .await
+    .unwrap();
 
     let created_object_id = effects.created()[0].0 .0;
-    let type_param = TypeTag::from_str(format!("{}::m2::AnotherObject", package.0).as_str()).unwrap();
+    let type_param =
+        TypeTag::from_str(format!("{}::m2::AnotherObject", package.0).as_str()).unwrap();
 
     let effects = call_move(
         &authority,
@@ -243,7 +320,10 @@ async fn test_different_package_type_param() {
         "m1",
         "transfer_object",
         vec![type_param],
-        vec![TestCallArg::Object(created_object_id), TestCallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            TestCallArg::Object(created_object_id),
+            TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
     )
     .await
     .unwrap();
@@ -278,17 +358,32 @@ async fn test_nested_type_param_different_package() {
     )
     .await;
 
-    let effects =
-        call_move(&authority, &gas, &sender, &sender_key, &package.0, "m1", "create_and_transfer_gen", vec![], vec![
+    let effects = call_move(
+        &authority,
+        &gas,
+        &sender,
+        &sender_key,
+        &package.0,
+        "m1",
+        "create_and_transfer_gen",
+        vec![],
+        vec![
             TestCallArg::Pure(bcs::to_bytes(&(16_u64)).unwrap()),
             TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
-        ])
-        .await
-        .unwrap();
+        ],
+    )
+    .await
+    .unwrap();
 
     let created_object_id = effects.created()[0].0 .0;
-    let type_param =
-        TypeTag::from_str(format!("{}::m1::GenObject<{}::m2::AnotherObject>", package.0, package.0).as_str()).unwrap();
+    let type_param = TypeTag::from_str(
+        format!(
+            "{}::m1::GenObject<{}::m2::AnotherObject>",
+            package.0, package.0
+        )
+        .as_str(),
+    )
+    .unwrap();
 
     let effects = call_move(
         &authority,
@@ -300,7 +395,10 @@ async fn test_nested_type_param_different_package() {
         "m1",
         "transfer_object",
         vec![type_param],
-        vec![TestCallArg::Object(created_object_id), TestCallArg::Pure(bcs::to_bytes(&sender).unwrap())],
+        vec![
+            TestCallArg::Object(created_object_id),
+            TestCallArg::Pure(bcs::to_bytes(&sender).unwrap()),
+        ],
     )
     .await
     .unwrap();

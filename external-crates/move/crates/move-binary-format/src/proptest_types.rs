@@ -5,20 +5,12 @@
 //! Utilities for property-based testing.
 
 use crate::file_format::{
-    AddressIdentifierIndex,
-    CompiledModule,
-    EnumDefinition,
-    FunctionDefinition,
-    FunctionHandle,
-    IdentifierIndex,
-    ModuleHandle,
-    ModuleHandleIndex,
-    StructDefinition,
-    TableIndex,
+    AddressIdentifierIndex, CompiledModule, EnumDefinition, FunctionDefinition, FunctionHandle,
+    IdentifierIndex, ModuleHandle, ModuleHandleIndex, StructDefinition, TableIndex,
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use proptest::{
-    collection::{btree_set, vec, SizeRange},
+    collection::{SizeRange, btree_set, vec},
     prelude::*,
     sample::Index as PropIndex,
 };
@@ -30,7 +22,9 @@ mod signature;
 mod types;
 
 use constants::ConstantPoolGen;
-use functions::{FnDefnMaterializeState, FnHandleMaterializeState, FunctionDefinitionGen, FunctionHandleGen};
+use functions::{
+    FnDefnMaterializeState, FnHandleMaterializeState, FunctionDefinitionGen, FunctionHandleGen,
+};
 
 use crate::proptest_types::{
     metadata::MetadataGen,
@@ -160,7 +154,10 @@ impl CompiledModuleStrategyGen {
         //
         // Struct and enum generators
         //
-        let datatype_handles_strat = vec(DatatypeHandleGen::strategy(self.datatype_params.clone()), 1..=self.size);
+        let datatype_handles_strat = vec(
+            DatatypeHandleGen::strategy(self.datatype_params.clone()),
+            1..=self.size,
+        );
 
         let struct_defs_strat = vec(
             StructDefinitionGen::strategy(self.field_count.clone(), self.datatype_params.clone()),
@@ -182,7 +179,10 @@ impl CompiledModuleStrategyGen {
         // These signatures may or may not be used in the bytecode. One way to use these signatures
         // is the Vec* bytecode (e.g. VecEmpty), which will grab a random index from the pool.
         //
-        let random_sigs_strat = vec(SignatureGen::strategy(self.tokens_per_random_sig_count), self.random_sigs_count);
+        let random_sigs_strat = vec(
+            SignatureGen::strategy(self.tokens_per_random_sig_count),
+            self.random_sigs_count,
+        );
 
         //
         // Functions generators
@@ -219,7 +219,12 @@ impl CompiledModuleStrategyGen {
         // Note that prop_test only allows a tuple of length up to 10
         (
             self_idx_strat,
-            (address_pool_strat, identifiers_strat, constant_pool_strat, metadata_strat),
+            (
+                address_pool_strat,
+                identifiers_strat,
+                constant_pool_strat,
+                metadata_strat,
+            ),
             module_handles_strat,
             datatype_handles_strat,
             struct_defs_strat,
@@ -256,7 +261,9 @@ impl CompiledModuleStrategyGen {
                     let mut module_handles = vec![];
                     for (address, name) in module_handles_gen {
                         let mh = ModuleHandle {
-                            address: AddressIdentifierIndex(address.index(address_identifiers_len) as TableIndex),
+                            address: AddressIdentifierIndex(
+                                address.index(address_identifiers_len) as TableIndex
+                            ),
                             name: IdentifierIndex(name.index(identifiers_len) as TableIndex),
                         };
                         if module_handles_set.insert((mh.address, mh.name)) {
@@ -267,14 +274,17 @@ impl CompiledModuleStrategyGen {
 
                     //
                     // self module handle index
-                    let self_module_handle_idx = ModuleHandleIndex(self_idx_gen.index(module_handles_len) as TableIndex);
+                    let self_module_handle_idx =
+                        ModuleHandleIndex(self_idx_gen.index(module_handles_len) as TableIndex);
 
                     //
                     // Friend Declarations
                     let friend_decl_set: BTreeSet<_> = friend_decl_gens
                         .into_iter()
                         .map(|(address_gen, name_gen)| ModuleHandle {
-                            address: AddressIdentifierIndex(address_gen.index(address_identifiers_len) as TableIndex),
+                            address: AddressIdentifierIndex(
+                                address_gen.index(address_identifiers_len) as TableIndex,
+                            ),
                             name: IdentifierIndex(name_gen.index(identifiers_len) as TableIndex),
                         })
                         .collect();
@@ -300,8 +310,11 @@ impl CompiledModuleStrategyGen {
                     //
                     // Struct definitions.
                     // Struct handles for the definitions are generated in this step
-                    let mut state =
-                        StDefnMaterializeState::new(self_module_handle_idx, identifiers_len, datatype_handles);
+                    let mut state = StDefnMaterializeState::new(
+                        self_module_handle_idx,
+                        identifiers_len,
+                        datatype_handles,
+                    );
                     let mut struct_def_to_field_count: HashMap<usize, usize> = HashMap::new();
                     let mut struct_defs: Vec<StructDefinition> = vec![];
                     for struct_def_gen in struct_def_gens {
@@ -320,12 +333,16 @@ impl CompiledModuleStrategyGen {
                         }
                     }
 
-                    let StDefnMaterializeState { datatype_handles, .. } = state;
+                    let StDefnMaterializeState {
+                        datatype_handles, ..
+                    } = state;
 
                     //
                     // Create some random signatures.
-                    let mut signatures: Vec<_> =
-                        random_sigs_gens.into_iter().map(|sig_gen| sig_gen.materialize(&datatype_handles)).collect();
+                    let mut signatures: Vec<_> = random_sigs_gens
+                        .into_iter()
+                        .map(|sig_gen| sig_gen.materialize(&datatype_handles))
+                        .collect();
 
                     //
                     // Function handles.
@@ -339,7 +356,9 @@ impl CompiledModuleStrategyGen {
                             signatures,
                         );
                         for function_handle_gen in function_handle_gens {
-                            if let Some(function_handle) = function_handle_gen.materialize(&mut state) {
+                            if let Some(function_handle) =
+                                function_handle_gen.materialize(&mut state)
+                            {
                                 function_handles.push(function_handle);
                             }
                         }
@@ -382,6 +401,7 @@ impl CompiledModuleStrategyGen {
                     // Build a compiled module
                     CompiledModule {
                         version: crate::file_format_common::VERSION_MAX,
+                        publishable: true,
                         module_handles,
                         self_module_handle_idx,
                         datatype_handles,
@@ -415,10 +435,10 @@ impl CompiledModuleStrategyGen {
 /// A utility function that produces a prop_index but also avoiding the given index. If the random
 /// index at the first choice collides with the avoidance, then try +/- 1 from the chosen value and
 /// pick the one that does not over/under-flow.
-pub(crate) fn prop_index_avoid(gen: PropIndex, avoid: usize, pool_size: usize) -> usize {
+pub(crate) fn prop_index_avoid(r#gen: PropIndex, avoid: usize, pool_size: usize) -> usize {
     assert!(pool_size > 1);
     assert!(pool_size > avoid);
-    let rand = gen.index(pool_size);
+    let rand = r#gen.index(pool_size);
     if rand != avoid {
         return rand;
     }

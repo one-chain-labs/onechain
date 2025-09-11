@@ -72,7 +72,7 @@ pub const DISABLE_INVARIANTS_IN_BODY_PRAGMA: &str = "disable_invariants_in_body"
 /// to this function
 pub const DELEGATE_INVARIANTS_TO_CALLER_PRAGMA: &str = "delegate_invariants_to_caller";
 
-/// # Pragmas for intrinsic table declaration
+// # Pragmas for intrinsic table declaration
 
 /// The intrinsic type for `Map<K, V>`
 pub const INTRINSIC_TYPE_MAP: &str = "map";
@@ -152,28 +152,29 @@ pub const INTRINSIC_FUN_MAP_BORROW: &str = "map_borrow";
 pub const INTRINSIC_FUN_MAP_BORROW_MUT: &str = "map_borrow_mut";
 
 /// All intrinsic functions associated with the map type
-pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>> = Lazy::new(|| {
-    BTreeMap::from([
-        (INTRINSIC_FUN_MAP_NEW, true),
-        (INTRINSIC_FUN_MAP_SPEC_NEW, false),
-        (INTRINSIC_FUN_MAP_SPEC_GET, false),
-        (INTRINSIC_FUN_MAP_SPEC_SET, false),
-        (INTRINSIC_FUN_MAP_SPEC_DEL, false),
-        (INTRINSIC_FUN_MAP_SPEC_LEN, false),
-        (INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, false),
-        (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, false),
-        (INTRINSIC_FUN_MAP_LEN, true),
-        (INTRINSIC_FUN_MAP_IS_EMPTY, true),
-        (INTRINSIC_FUN_MAP_HAS_KEY, true),
-        (INTRINSIC_FUN_MAP_DESTROY_EMPTY, true),
-        (INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, true),
-        (INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS, true),
-        (INTRINSIC_FUN_MAP_DEL_MUST_EXIST, true),
-        (INTRINSIC_FUN_MAP_DEL_RETURN_KEY, true),
-        (INTRINSIC_FUN_MAP_BORROW, true),
-        (INTRINSIC_FUN_MAP_BORROW_MUT, true),
-    ])
-});
+pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>> =
+    Lazy::new(|| {
+        BTreeMap::from([
+            (INTRINSIC_FUN_MAP_NEW, true),
+            (INTRINSIC_FUN_MAP_SPEC_NEW, false),
+            (INTRINSIC_FUN_MAP_SPEC_GET, false),
+            (INTRINSIC_FUN_MAP_SPEC_SET, false),
+            (INTRINSIC_FUN_MAP_SPEC_DEL, false),
+            (INTRINSIC_FUN_MAP_SPEC_LEN, false),
+            (INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, false),
+            (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, false),
+            (INTRINSIC_FUN_MAP_LEN, true),
+            (INTRINSIC_FUN_MAP_IS_EMPTY, true),
+            (INTRINSIC_FUN_MAP_HAS_KEY, true),
+            (INTRINSIC_FUN_MAP_DESTROY_EMPTY, true),
+            (INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, true),
+            (INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS, true),
+            (INTRINSIC_FUN_MAP_DEL_MUST_EXIST, true),
+            (INTRINSIC_FUN_MAP_DEL_RETURN_KEY, true),
+            (INTRINSIC_FUN_MAP_BORROW, true),
+            (INTRINSIC_FUN_MAP_BORROW_MUT, true),
+        ])
+    });
 
 /// Internal property attached to conditions if they are injected via an apply or a module
 /// invariant.

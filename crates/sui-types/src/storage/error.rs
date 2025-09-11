@@ -27,7 +27,12 @@ pub enum Kind {
 
 impl Error {
     fn new<E: Into<BoxError>>(kind: Kind, source: Option<E>) -> Self {
-        Self { inner: Box::new(Inner { kind, source: source.map(Into::into) }) }
+        Self {
+            inner: Box::new(Inner {
+                kind,
+                source: source.map(Into::into),
+            }),
+        }
     }
 
     pub fn serialization<E: Into<BoxError>>(e: E) -> Self {

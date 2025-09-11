@@ -58,7 +58,7 @@ that you provided and match it against the amount owed.
 Later on (either asynchronously or in a batch at the end of the day), you can
 process the payments you've received by iterating over the set of
 `IdentifiedPayment` objects under your account, `unpack`ing them, and then
-using the unpacked SUI coin.
+using the unpacked OCT coin.
 
 Overall, this is a very simple representation for on-chain payments and
 relatively easy to set up. However, it has some issues:

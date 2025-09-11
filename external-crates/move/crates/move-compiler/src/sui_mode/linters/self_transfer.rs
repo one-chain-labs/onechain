@@ -9,24 +9,18 @@ use move_ir_types::location::*;
 
 use crate::{
     cfgir::{
+        CFGContext, MemberName,
         absint::JoinResult,
         cfg::ImmForwardCFG,
         visitor::{
-            calls_special_function,
-            LocalState,
-            SimpleAbsInt,
-            SimpleAbsIntConstructor,
-            SimpleDomain,
-            SimpleExecutionContext,
+            LocalState, SimpleAbsInt, SimpleAbsIntConstructor, SimpleDomain,
+            SimpleExecutionContext, calls_special_function,
         },
-        CFGContext,
-        MemberName,
     },
     diag,
     diagnostics::{
-        codes::{custom, DiagnosticInfo, Severity},
-        Diagnostic,
-        Diagnostics,
+        Diagnostic, Diagnostics,
+        codes::{DiagnosticInfo, Severity, custom},
     },
     hlir::ast::{Label, ModuleCall, Type, Type_, Var},
     parser::ast::Ability_,
@@ -35,18 +29,14 @@ use crate::{
 use std::collections::BTreeMap;
 
 use super::{
-    type_abilities,
-    LinterDiagnosticCategory,
-    LinterDiagnosticCode,
-    INVALID_LOC,
-    LINT_WARNING_PREFIX,
-    PUBLIC_TRANSFER_FUN,
-    TRANSFER_FUN,
-    TRANSFER_MOD_NAME,
+    INVALID_LOC, LINT_WARNING_PREFIX, LinterDiagnosticCategory, LinterDiagnosticCode,
+    PUBLIC_TRANSFER_FUN, TRANSFER_FUN, TRANSFER_MOD_NAME, type_abilities,
 };
 
-const TRANSFER_FUNCTIONS: &[(AccountAddress, &str, &str)] =
-    &[(SUI_ADDR_VALUE, TRANSFER_MOD_NAME, PUBLIC_TRANSFER_FUN), (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, TRANSFER_FUN)];
+const TRANSFER_FUNCTIONS: &[(AccountAddress, &str, &str)] = &[
+    (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, PUBLIC_TRANSFER_FUN),
+    (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, TRANSFER_FUN),
+];
 
 const SELF_TRANSFER_DIAG: DiagnosticInfo = custom(
     LINT_WARNING_PREFIX,
@@ -101,7 +91,11 @@ impl SimpleAbsIntConstructor for SelfTransferVerifier {
 
         if context.entry.is_some()
             || context.attributes.is_test_or_test_only()
-            || context.info.module(&context.module).attributes.is_test_or_test_only()
+            || context
+                .info
+                .module(&context.module)
+                .attributes
+                .is_test_or_test_only()
         {
             // Cannot return objects from entry
             // No need to check test functions
@@ -118,20 +112,24 @@ impl SimpleAbsIntConstructor for SelfTransferVerifier {
             // skip if it does not use transfer functions
             return None;
         }
-        Some(SelfTransferVerifierAI { fn_ret_loc: context.signature.return_type.loc })
+        Some(SelfTransferVerifierAI {
+            fn_ret_loc: context.signature.return_type.loc,
+        })
     }
 }
 
 impl SimpleAbsInt for SelfTransferVerifierAI {
-    type ExecutionContext = ExecutionContext;
     type State = State;
+    type ExecutionContext = ExecutionContext;
 
     fn finish(&mut self, _final_states: BTreeMap<Label, State>, diags: Diagnostics) -> Diagnostics {
         diags
     }
 
     fn start_command(&self, _: &mut State) -> ExecutionContext {
-        ExecutionContext { diags: Diagnostics::new() }
+        ExecutionContext {
+            diags: Diagnostics::new(),
+        }
     }
 
     fn finish_command(&self, context: ExecutionContext, _state: &mut State) -> Diagnostics {
@@ -148,7 +146,10 @@ impl SimpleAbsInt for SelfTransferVerifierAI {
         f: &ModuleCall,
         args: Vec<Value>,
     ) -> Option<Vec<Value>> {
-        if TRANSFER_FUNCTIONS.iter().any(|(addr, module, fun)| f.is(addr, module, fun)) {
+        if TRANSFER_FUNCTIONS
+            .iter()
+            .any(|(addr, module, fun)| f.is(addr, module, fun))
+        {
             if let Value::SenderAddress(sender_addr_loc) = args[1] {
                 if is_wrappable_obj_type(&f.arguments[0].ty) {
                     let msg = "Transfer of an object to transaction sender address";
@@ -156,7 +157,10 @@ impl SimpleAbsInt for SelfTransferVerifierAI {
                                and enables composability via programmable transactions.";
                     let mut d = diag!(SELF_TRANSFER_DIAG, (*loc, msg), (self.fn_ret_loc, uid_msg));
                     if sender_addr_loc != INVALID_LOC {
-                        d.add_secondary_label((sender_addr_loc, "Transaction sender address coming from here"));
+                        d.add_secondary_label((
+                            sender_addr_loc,
+                            "Transaction sender address coming from here",
+                        ));
                     }
                     context.add_diag(d);
                 }

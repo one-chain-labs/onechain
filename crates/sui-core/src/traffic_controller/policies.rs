@@ -7,13 +7,12 @@ use std::{collections::HashMap, net::IpAddr, sync::Arc};
 use count_min_sketch::CountMinSketch32;
 use mysten_metrics::spawn_monitored_task;
 use parking_lot::RwLock;
-use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap, VecDeque},
-    fmt::Debug,
-    hash::Hash,
-    time::{Duration, Instant, SystemTime},
-};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, VecDeque};
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::time::Duration;
+use std::time::{Instant, SystemTime};
 use sui_types::traffic_control::{FreqThresholdConfig, PolicyConfig, PolicyType, Weight};
 use tracing::{info, trace};
 
@@ -86,26 +85,37 @@ impl TrafficSketch {
         }
         let window_size = new_window_size;
 
-        assert!(window_size < Duration::from_secs(600), "window_size too large. Max 600 seconds");
-        assert!(update_interval < window_size, "Update interval may not be larger than window size");
-        assert!(update_interval >= Duration::from_secs(1), "Update interval too short, must be at least 1 second");
         assert!(
-            num_sketches <= 10,
-            "Given parameters require too many sketches to be stored. Reduce window size or increase update interval."
+            window_size < Duration::from_secs(600),
+            "window_size too large. Max 600 seconds"
         );
+        assert!(
+            update_interval < window_size,
+            "Update interval may not be larger than window size"
+        );
+        assert!(
+            update_interval >= Duration::from_secs(1),
+            "Update interval too short, must be at least 1 second"
+        );
+        assert!(num_sketches <= 10, "Given parameters require too many sketches to be stored. Reduce window size or increase update interval.");
         let mem_estimate = (num_sketches as usize)
-            * CountMinSketch32::<IpAddr>::estimate_memory(sketch_capacity, sketch_probability, sketch_tolerance)
-                .expect("Failed to estimate memory for CountMinSketch32");
-        assert!(
-            mem_estimate < 128_000_000,
-            "Memory estimate for traffic sketch exceeds 128MB. Reduce window size or increase update interval."
-        );
+            * CountMinSketch32::<IpAddr>::estimate_memory(
+                sketch_capacity,
+                sketch_probability,
+                sketch_tolerance,
+            )
+            .expect("Failed to estimate memory for CountMinSketch32");
+        assert!(mem_estimate < 128_000_000, "Memory estimate for traffic sketch exceeds 128MB. Reduce window size or increase update interval.");
 
         let mut sketches = VecDeque::with_capacity(num_sketches as usize);
         for _ in 0..num_sketches {
             sketches.push_back(
-                CountMinSketch32::<SketchKey>::new(sketch_capacity, sketch_probability, sketch_tolerance)
-                    .expect("Failed to create CountMinSketch32"),
+                CountMinSketch32::<SketchKey>::new(
+                    sketch_capacity,
+                    sketch_probability,
+                    sketch_tolerance,
+                )
+                .expect("Failed to create CountMinSketch32"),
             );
         }
         Self {
@@ -135,7 +145,11 @@ impl TrafficSketch {
     }
 
     fn get_request_rate(&mut self, key: &SketchKey) -> f64 {
-        let count: u32 = self.sketches.iter().map(|sketch| sketch.estimate(key)).sum();
+        let count: u32 = self
+            .sketches
+            .iter()
+            .map(|sketch| sketch.estimate(key))
+            .sum();
         let rate = count as f64 / self.window_size.as_secs() as f64;
         self.update_highest_rates(key, rate);
         rate
@@ -224,7 +238,13 @@ impl TrafficTally {
         error_info: Option<(Weight, String)>,
         spam_weight: Weight,
     ) -> Self {
-        Self { direct, through_fullnode, error_info, spam_weight, timestamp: SystemTime::now() }
+        Self {
+            direct,
+            through_fullnode,
+            error_info,
+            spam_weight,
+            timestamp: SystemTime::now(),
+        }
     }
 }
 
@@ -275,18 +295,18 @@ impl TrafficControlPolicy {
     pub async fn from_spam_config(policy_config: PolicyConfig) -> Self {
         Self::from_config(policy_config.clone().spam_policy_type, policy_config).await
     }
-
     pub async fn from_error_config(policy_config: PolicyConfig) -> Self {
         Self::from_config(policy_config.clone().error_policy_type, policy_config).await
     }
-
     pub async fn from_config(policy_type: PolicyType, policy_config: PolicyConfig) -> Self {
         match policy_type {
             PolicyType::NoOp => Self::NoOp(NoOpPolicy::new(policy_config)),
-            PolicyType::FreqThreshold(freq_threshold_config) => {
-                Self::FreqThreshold(FreqThresholdPolicy::new(policy_config, freq_threshold_config))
+            PolicyType::FreqThreshold(freq_threshold_config) => Self::FreqThreshold(
+                FreqThresholdPolicy::new(policy_config, freq_threshold_config),
+            ),
+            PolicyType::TestNConnIP(n) => {
+                Self::TestNConnIP(TestNConnIPPolicy::new(policy_config, n).await)
             }
-            PolicyType::TestNConnIP(n) => Self::TestNConnIP(TestNConnIPPolicy::new(policy_config, n).await),
             PolicyType::TestPanicOnInvocation => {
                 Self::TestPanicOnInvocation(TestPanicOnInvocationPolicy::new(policy_config))
             }
@@ -297,10 +317,10 @@ impl TrafficControlPolicy {
 ////////////// *** Policy definitions *** //////////////
 
 pub struct FreqThresholdPolicy {
-    config: PolicyConfig,
+    pub config: PolicyConfig,
+    pub client_threshold: u64,
+    pub proxied_client_threshold: u64,
     sketch: TrafficSketch,
-    client_threshold: u64,
-    proxied_client_threshold: u64,
     /// Unique salt to be added to all keys in the sketch. This
     /// ensures that false positives are not correlated across
     /// all nodes at the same time. For Sui validators for example,
@@ -330,7 +350,13 @@ impl FreqThresholdPolicy {
             sketch_tolerance,
             HIGHEST_RATES_CAPACITY,
         );
-        Self { config, sketch, client_threshold, proxied_client_threshold, salt: rand::random() }
+        Self {
+            config,
+            sketch,
+            client_threshold,
+            proxied_client_threshold,
+            salt: rand::random(),
+        }
     }
 
     pub fn highest_direct_rate(&self) -> Option<(u64, IpAddr)> {
@@ -343,7 +369,11 @@ impl FreqThresholdPolicy {
 
     pub fn handle_tally(&mut self, tally: TrafficTally) -> PolicyResponse {
         let block_client = if let Some(source) = tally.direct {
-            let key = SketchKey { salt: self.salt, ip_addr: source, client_type: ClientType::Direct };
+            let key = SketchKey {
+                salt: self.salt,
+                ip_addr: source,
+                client_type: ClientType::Direct,
+            };
             self.sketch.increment_count(&key);
             let req_rate = self.sketch.get_request_rate(&key);
             trace!(
@@ -361,7 +391,11 @@ impl FreqThresholdPolicy {
             None
         };
         let block_proxied_client = if let Some(source) = tally.through_fullnode {
-            let key = SketchKey { salt: self.salt, ip_addr: source, client_type: ClientType::ThroughFullnode };
+            let key = SketchKey {
+                salt: self.salt,
+                ip_addr: source,
+                client_type: ClientType::ThroughFullnode,
+            };
             self.sketch.increment_count(&key);
             if self.sketch.get_request_rate(&key) >= self.proxied_client_threshold as f64 {
                 Some(source)
@@ -371,7 +405,10 @@ impl FreqThresholdPolicy {
         } else {
             None
         };
-        PolicyResponse { block_client, block_proxied_client }
+        PolicyResponse {
+            block_client,
+            block_proxied_client,
+        }
     }
 
     fn policy_config(&self) -> &PolicyConfig {
@@ -402,17 +439,24 @@ impl NoOpPolicy {
 
 #[derive(Clone)]
 pub struct TestNConnIPPolicy {
-    config: PolicyConfig,
+    pub threshold: u64,
+    pub config: PolicyConfig,
     frequencies: Arc<RwLock<HashMap<IpAddr, u64>>>,
-    threshold: u64,
 }
 
 impl TestNConnIPPolicy {
     pub async fn new(config: PolicyConfig, threshold: u64) -> Self {
         let frequencies = Arc::new(RwLock::new(HashMap::new()));
         let frequencies_clone = frequencies.clone();
-        spawn_monitored_task!(run_clear_frequencies(frequencies_clone, config.connection_blocklist_ttl_sec * 2,));
-        Self { config, frequencies, threshold }
+        spawn_monitored_task!(run_clear_frequencies(
+            frequencies_clone,
+            config.connection_blocklist_ttl_sec * 2,
+        ));
+        Self {
+            config,
+            frequencies,
+            threshold,
+        }
     }
 
     fn handle_tally(&mut self, tally: TrafficTally) -> PolicyResponse {
@@ -427,7 +471,11 @@ impl TestNConnIPPolicy {
         let count = frequencies.entry(client).or_insert(0);
         *count += 1;
         PolicyResponse {
-            block_client: if *count >= self.threshold { Some(client) } else { None },
+            block_client: if *count >= self.threshold {
+                Some(client)
+            } else {
+                None
+            },
             block_proxied_client: None,
         }
     }
@@ -468,20 +516,25 @@ mod tests {
     use super::*;
     use std::net::{IpAddr, Ipv4Addr};
     use sui_macros::sim_test;
-    use sui_types::traffic_control::{DEFAULT_SKETCH_CAPACITY, DEFAULT_SKETCH_PROBABILITY, DEFAULT_SKETCH_TOLERANCE};
+    use sui_types::traffic_control::{
+        DEFAULT_SKETCH_CAPACITY, DEFAULT_SKETCH_PROBABILITY, DEFAULT_SKETCH_TOLERANCE,
+    };
 
     #[sim_test]
     async fn test_freq_threshold_policy() {
         // Create freq policy that will block on average frequency 2 requests per second
         // for proxied connections and 4 requests per second for direct connections
         // as observed over a 5 second window.
-        let mut policy = FreqThresholdPolicy::new(PolicyConfig::default(), FreqThresholdConfig {
-            client_threshold: 5,
-            proxied_client_threshold: 2,
-            window_size_secs: 5,
-            update_interval_secs: 1,
-            ..Default::default()
-        });
+        let mut policy = FreqThresholdPolicy::new(
+            PolicyConfig::default(),
+            FreqThresholdConfig {
+                client_threshold: 5,
+                proxied_client_threshold: 2,
+                window_size_secs: 5,
+                update_interval_secs: 1,
+                ..Default::default()
+            },
+        );
         // alice and bob connection from different IPs through the
         // same fullnode, thus have the same connection IP on
         // validator, but different proxy IPs
@@ -635,6 +688,9 @@ mod tests {
         )
         .unwrap()
             * (window_size.as_secs() / update_interval.as_secs()) as usize;
-        assert!(mem_estimate < 128_000_000, "Memory estimate {mem_estimate} for traffic sketch exceeds 128MB.");
+        assert!(
+            mem_estimate < 128_000_000,
+            "Memory estimate {mem_estimate} for traffic sketch exceeds 128MB."
+        );
     }
 }

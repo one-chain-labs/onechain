@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{CallbackLayer, MakeCallbackHandler, ResponseFuture};
+use super::{CallbackLayer, MakeCallbackHandler, ResponseBody, ResponseFuture};
 use http::{Request, Response};
 use std::task::{Context, Poll};
 use tower::Service;
@@ -20,7 +20,10 @@ pub struct Callback<S, M> {
 impl<S, M> Callback<S, M> {
     /// Create a new [`Callback`].
     pub fn new(inner: S, make_callback_handler: M) -> Self {
-        Self { inner, make_callback_handler }
+        Self {
+            inner,
+            make_callback_handler,
+        }
     }
 
     /// Returns a new [`Layer`] that wraps services with a [`CallbackLayer`] middleware.
@@ -49,14 +52,20 @@ impl<S, M> Callback<S, M> {
     }
 }
 
-impl<S, M, RequestBody, ResponseBody> Service<Request<RequestBody>> for Callback<S, M>
+impl<S, M, RequestBody, ResponseBodyT> Service<Request<RequestBody>> for Callback<S, M>
 where
-    S: Service<Request<RequestBody>, Response = Response<ResponseBody>>,
+    S: Service<
+        Request<RequestBody>,
+        Response = Response<ResponseBodyT>,
+        Error: std::fmt::Display + 'static,
+    >,
     M: MakeCallbackHandler,
+    RequestBody: http_body::Body<Error: std::fmt::Display + 'static>,
+    ResponseBodyT: http_body::Body<Error: std::fmt::Display + 'static>,
 {
+    type Response = Response<ResponseBody<ResponseBodyT, M::Handler>>;
     type Error = S::Error;
     type Future = ResponseFuture<S::Future, M::Handler>;
-    type Response = Response<ResponseBody>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -67,6 +76,9 @@ where
         let handler = self.make_callback_handler.make_handler(&head);
         let request = Request::from_parts(head, body);
 
-        ResponseFuture { inner: self.inner.call(request), handler: Some(handler) }
+        ResponseFuture {
+            inner: self.inner.call(request),
+            handler: Some(handler),
+        }
     }
 }

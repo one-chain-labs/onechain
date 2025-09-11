@@ -4,29 +4,39 @@
 use criterion::*;
 
 use itertools::Itertools as _;
-use rand::{prelude::*, seq::SliceRandom};
+use rand::prelude::*;
+use rand::seq::SliceRandom;
 
 use futures::future::join_all;
 use prometheus::Registry;
 use std::sync::Arc;
 use sui_core::test_utils::{make_cert_with_large_committee, make_dummy_tx};
-use sui_types::{
-    committee::Committee,
-    crypto::{get_key_pair, AccountKeyPair, AuthorityKeyPair},
-    transaction::CertifiedTransaction,
-};
+use sui_types::committee::Committee;
+use sui_types::crypto::{get_key_pair, AccountKeyPair, AuthorityKeyPair};
+use sui_types::transaction::CertifiedTransaction;
 
 use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
 use sui_core::signature_verifier::*;
 use sui_types::signature_verification::VerifiedDigestCache;
-fn gen_certs(committee: &Committee, key_pairs: &[AuthorityKeyPair], count: u64) -> Vec<CertifiedTransaction> {
+fn gen_certs(
+    committee: &Committee,
+    key_pairs: &[AuthorityKeyPair],
+    count: u64,
+) -> Vec<CertifiedTransaction> {
     let (receiver, _): (_, AccountKeyPair) = get_key_pair();
 
-    let senders: Vec<_> = (0..count).map(|_| get_key_pair::<AccountKeyPair>()).collect();
+    let senders: Vec<_> = (0..count)
+        .map(|_| get_key_pair::<AccountKeyPair>())
+        .collect();
 
-    let txns: Vec<_> = senders.iter().map(|(sender, sender_sec)| make_dummy_tx(receiver, *sender, sender_sec)).collect();
+    let txns: Vec<_> = senders
+        .iter()
+        .map(|(sender, sender_sec)| make_dummy_tx(receiver, *sender, sender_sec))
+        .collect();
 
-    txns.iter().map(|t| make_cert_with_large_committee(committee, key_pairs, t)).collect()
+    txns.iter()
+        .map(|t| make_cert_with_large_committee(committee, key_pairs, t))
+        .collect()
 }
 
 fn async_verifier_bench(c: &mut Criterion) {
@@ -52,7 +62,10 @@ fn async_verifier_bench(c: &mut Criterion) {
     for num_threads in [1, num_cpus / 2, num_cpus] {
         for batch_size in [8, 16, 32] {
             group.bench_with_input(
-                BenchmarkId::new(format!("num_threads={num_threads} batch_size={batch_size}"), count),
+                BenchmarkId::new(
+                    format!("num_threads={num_threads} batch_size={batch_size}"),
+                    count,
+                ),
                 &count,
                 |b, _| {
                     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -68,7 +81,10 @@ fn async_verifier_bench(c: &mut Criterion) {
                         ZkLoginEnv::Test,
                         true,
                         true,
+                        true,
                         Some(30),
+                        vec![],
+                        true,
                     ));
 
                     b.iter(|| {
@@ -125,6 +141,7 @@ fn batch_verification_bench(c: &mut Criterion) {
                             &committee,
                             &certs.iter().collect_vec(),
                             Arc::new(VerifiedDigestCache::new_empty()),
+                            None,
                         );
                     })
                 },

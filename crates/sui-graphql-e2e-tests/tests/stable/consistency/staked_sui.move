@@ -6,7 +6,7 @@
 //# run-graphql
 {
   address(address: "@{C}") {
-    stakedOcts {
+    stakedSuis {
       edges {
         cursor
         node {
@@ -44,7 +44,7 @@
 //# run-graphql
 {
   address(address: "@{C}") {
-    stakedOcts {
+    stakedSuis {
       edges {
         cursor
         node {
@@ -55,12 +55,12 @@
   }
 }
 
-//# run-graphql --cursors @{obj_3_1,1} @{obj_7_0,1}
+//# run-graphql --cursors bcs(@{obj_3_1},1) bcs(@{obj_7_0},1)
 # Even though there is a stake created after the initial one, the cursor locks the upper bound to
 # checkpoint 1 - at that point in time, we did not have any additional stakes.
 {
   no_coins_after_obj_3_1_chkpt_1: address(address: "@{C}") {
-    stakedOcts(after: "@{cursor_0}") {
+    stakedSuis(after: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -70,7 +70,7 @@
     }
   }
   no_coins_before_obj_3_1_chkpt_1: address(address: "@{C}") {
-    stakedOcts(before: "@{cursor_0}") {
+    stakedSuis(before: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -80,7 +80,7 @@
     }
   }
   no_coins_after_obj_7_0_chkpt_1: address(address: "@{C}") {
-    stakedOcts(after: "@{cursor_0}") {
+    stakedSuis(after: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -90,7 +90,7 @@
     }
   }
   no_coins_before_obj_7_0_chkpt_1: address(address: "@{C}") {
-    stakedOcts(before: "@{cursor_0}") {
+    stakedSuis(before: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -101,11 +101,11 @@
   }
 }
 
-//# run-graphql --cursors @{obj_3_1,3} @{obj_7_0,3}
+//# run-graphql --cursors bcs(@{obj_3_1},3) bcs(@{obj_7_0},3)
 # The second stake was created at checkpoint 3, and thus will be visible.
 {
   coins_after_obj_3_1_chkpt_3: address(address: "@{C}") {
-    stakedOcts(after: "@{cursor_0}") {
+    stakedSuis(after: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -115,7 +115,7 @@
     }
   }
   coins_before_obj_3_1_chkpt_3: address(address: "@{C}") {
-    stakedOcts(before: "@{cursor_0}") {
+    stakedSuis(before: "@{cursor_0}") {
       edges {
         cursor
         node {
@@ -125,7 +125,7 @@
     }
   }
   coins_after_obj_7_0_chkpt_3: address(address: "@{C}") {
-    stakedOcts(after: "@{cursor_1}") {
+    stakedSuis(after: "@{cursor_1}") {
       edges {
         cursor
         node {
@@ -135,7 +135,7 @@
     }
   }
   coins_before_obj_7_0_chkpt_3: address(address: "@{C}") {
-    stakedOcts(before: "@{cursor_1}") {
+    stakedSuis(before: "@{cursor_1}") {
       edges {
         cursor
         node {

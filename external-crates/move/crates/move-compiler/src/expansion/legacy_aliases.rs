@@ -29,7 +29,11 @@ pub struct OldAliasMap(Option<AliasMap>);
 
 impl AliasMap {
     pub fn new() -> Self {
-        Self { modules: UniqueMap::new(), members: UniqueMap::new(), unused: vec![] }
+        Self {
+            modules: UniqueMap::new(),
+            members: UniqueMap::new(),
+            unused: vec![],
+        }
     }
 
     fn current_depth(&self) -> usize {
@@ -48,7 +52,13 @@ impl AliasMap {
                 // the alias was defined. The name represents JUST the module name, though, so we do
                 // not change location of the address as we don't have this information.
                 // TODO maybe we should also keep the alias reference (or its location)?
-                let sp!(_, ModuleIdent_ { address, module: ModuleName(sp!(_, module)) }) = ident;
+                let sp!(
+                    _,
+                    ModuleIdent_ {
+                        address,
+                        module: ModuleName(sp!(_, module))
+                    }
+                ) = ident;
                 let address = *address;
                 let module = ModuleName(sp(n.loc, *module));
                 Some(sp(n.loc, ModuleIdent_ { address, module }))
@@ -75,14 +85,26 @@ impl AliasMap {
 
     /// Adds all of the new items in the new inner scope as shadowing the outer one.
     /// Gives back the outer scope
-    pub fn add_and_shadow_all(&mut self, loc: Loc, shadowing: AliasMapBuilder) -> Result<OldAliasMap, Box<Diagnostic>> {
+    pub fn add_and_shadow_all(
+        &mut self,
+        loc: Loc,
+        shadowing: AliasMapBuilder,
+    ) -> Result<OldAliasMap, Box<Diagnostic>> {
         if shadowing.is_empty() {
             return Ok(OldAliasMap(None));
         }
 
         let outer_scope = OldAliasMap(Some(self.clone()));
-        let AliasMapBuilder::Legacy { modules: new_modules, members: new_members, .. } = shadowing else {
-            return Err(Box::new(ice!((loc, "ICE alias map builder should be legacy for legacy"))));
+        let AliasMapBuilder::Legacy {
+            modules: new_modules,
+            members: new_members,
+            ..
+        } = shadowing
+        else {
+            return Err(Box::new(ice!((
+                loc,
+                "ICE alias map builder should be legacy for legacy"
+            ))));
         };
 
         let next_depth = self.current_depth();
@@ -99,14 +121,19 @@ impl AliasMap {
                 current_scope.members.add(alias).unwrap();
             }
             self.members.remove(&alias);
-            self.members.add(alias, (Some(next_depth), (mident, name))).unwrap();
+            self.members
+                .add(alias, (Some(next_depth), (mident, name)))
+                .unwrap();
         }
         self.unused.push(current_scope);
         Ok(outer_scope)
     }
 
     /// Similar to add_and_shadow but just removes aliases now shadowed by a type parameter
-    pub fn shadow_for_type_parameters<'a, I: IntoIterator<Item = &'a Name>>(&mut self, tparams: I) -> OldAliasMap
+    pub fn shadow_for_type_parameters<'a, I: IntoIterator<Item = &'a Name>>(
+        &mut self,
+        tparams: I,
+    ) -> OldAliasMap
     where
         I::IntoIter: ExactSizeIterator,
     {

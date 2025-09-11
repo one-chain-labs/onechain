@@ -3,19 +3,23 @@
 #![allow(dead_code)]
 
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, collections::HashSet, fmt::Debug, sync::Mutex, time::Duration};
-use typed_store::{
-    metrics::SamplingInterval,
-    rocks::{be_fix_int_ser, list_tables, DBMap, MetricConf, RocksDBAccessType},
-    sally::{SallyColumn, SallyDBOptions, SallyReadOnlyDBOptions},
-    traits::{Map, TableSummary, TypedStoreDebug},
-    DBMapUtils,
-    SallyDB,
-};
+use serde::Deserialize;
+use serde::Serialize;
+use std::borrow::Borrow;
+use std::collections::HashSet;
+use std::fmt::Debug;
+use std::sync::Mutex;
+use std::time::Duration;
+use typed_store::metrics::SamplingInterval;
+use typed_store::rocks::DBMap;
+use typed_store::rocks::MetricConf;
+use typed_store::traits::Map;
+use typed_store::{be_fix_int_ser, DBMapUtils};
 
 fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").keep()
+    tempfile::tempdir()
+        .expect("Failed to open temporary directory")
+        .keep()
 }
 /// This struct is used to illustrate how the utility works
 #[derive(DBMapUtils)]
@@ -47,8 +51,10 @@ struct RenameTables2 {
     renamed_table: DBMap<String, String>,
 }
 
-impl<T: Eq + Debug + Serialize + for<'de> Deserialize<'de>, V: Eq + Debug + Serialize + for<'de> Deserialize<'de>>
-    Generic<T, V>
+impl<
+        T: Eq + Debug + Serialize + for<'de> Deserialize<'de>,
+        V: Eq + Debug + Serialize + for<'de> Deserialize<'de>,
+    > Generic<T, V>
 {
 }
 
@@ -61,7 +67,8 @@ struct TablesSingle {
 #[tokio::test]
 async fn macro_test() {
     let primary_path = temp_dir();
-    let tbls_primary = Tables::open_tables_read_write(primary_path.clone(), MetricConf::default(), None, None);
+    let tbls_primary =
+        Tables::open_tables_read_write(primary_path.clone(), MetricConf::default(), None, None);
 
     // Write to both tables
     let mut raw_key_bytes1 = 0;
@@ -70,13 +77,16 @@ async fn macro_test() {
     for i in kv_range.clone() {
         let key = i.to_string();
         let value = i.to_string();
-        let k_buf = be_fix_int_ser::<String>(&key).unwrap();
+        let k_buf = be_fix_int_ser::<String>(&key);
         let value_buf = bcs::to_bytes::<String>(&value).unwrap();
         raw_key_bytes1 += k_buf.len();
         raw_value_bytes1 += value_buf.len();
     }
     let keys_vals_1 = kv_range.map(|i| (i.to_string(), i.to_string()));
-    tbls_primary.table1.multi_insert(keys_vals_1.clone()).expect("Failed to multi-insert");
+    tbls_primary
+        .table1
+        .multi_insert(keys_vals_1.clone())
+        .expect("Failed to multi-insert");
 
     let mut raw_key_bytes2 = 0;
     let mut raw_value_bytes2 = 0;
@@ -84,28 +94,30 @@ async fn macro_test() {
     for i in kv_range.clone() {
         let key = i;
         let value = i.to_string();
-        let k_buf = be_fix_int_ser(key.borrow()).unwrap();
+        let k_buf = be_fix_int_ser(key.borrow());
         let value_buf = bcs::to_bytes::<String>(&value).unwrap();
         raw_key_bytes2 += k_buf.len();
         raw_value_bytes2 += value_buf.len();
     }
     let keys_vals_2 = kv_range.map(|i| (i, i.to_string()));
-    tbls_primary.table2.multi_insert(keys_vals_2.clone()).expect("Failed to multi-insert");
+    tbls_primary
+        .table2
+        .multi_insert(keys_vals_2.clone())
+        .expect("Failed to multi-insert");
 
     // Open in secondary mode
-    let tbls_secondary = Tables::get_read_only_handle(primary_path.clone(), None, None, MetricConf::default());
+    let tbls_secondary =
+        Tables::get_read_only_handle(primary_path.clone(), None, None, MetricConf::default());
 
     // Check all the tables can be listed
-    let actual_table_names: HashSet<_> = list_tables(primary_path).unwrap().into_iter().collect();
-    let observed_table_names: HashSet<_> = Tables::describe_tables().iter().map(|q| q.0.clone()).collect();
+    let observed_table_names: HashSet<_> = Tables::describe_tables()
+        .iter()
+        .map(|q| q.0.clone())
+        .collect();
 
-    let exp: HashSet<String> = HashSet::from_iter(vec!["table1", "table2"].into_iter().map(|s| s.to_owned()));
-    assert_eq!(HashSet::from_iter(actual_table_names), exp);
+    let exp: HashSet<String> =
+        HashSet::from_iter(vec!["table1", "table2"].into_iter().map(|s| s.to_owned()));
     assert_eq!(HashSet::from_iter(observed_table_names), exp);
-
-    // Check the counts
-    assert_eq!(9, tbls_secondary.count_keys("table1").unwrap());
-    assert_eq!(7, tbls_secondary.count_keys("table2").unwrap());
 
     // check raw byte sizes of key and values
     let summary1 = tbls_secondary.table_summary("table1").unwrap();
@@ -130,9 +142,10 @@ async fn macro_test() {
 
     // Check that catchup logic works
     let keys_vals_1 = (100..110).map(|i| (i.to_string(), i.to_string()));
-    tbls_primary.table1.multi_insert(keys_vals_1).expect("Failed to multi-insert");
-    // New entries should be present in secondary
-    assert_eq!(19, tbls_secondary.count_keys("table1").unwrap());
+    tbls_primary
+        .table1
+        .multi_insert(keys_vals_1)
+        .expect("Failed to multi-insert");
 
     // Test pagination
     let m = tbls_secondary.dump("table1", 2, 0).unwrap();
@@ -153,7 +166,8 @@ async fn rename_test() {
     let key = "key".to_string();
     let value = "value".to_string();
     {
-        let original_db = RenameTables1::open_tables_read_write(dbdir.clone(), MetricConf::default(), None, None);
+        let original_db =
+            RenameTables1::open_tables_read_write(dbdir.clone(), MetricConf::default(), None, None);
         original_db.table.insert(&key, &value).unwrap();
     }
 
@@ -161,7 +175,8 @@ async fn rename_test() {
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     {
-        let renamed_db = RenameTables2::open_tables_read_write(dbdir.clone(), MetricConf::default(), None, None);
+        let renamed_db =
+            RenameTables2::open_tables_read_write(dbdir.clone(), MetricConf::default(), None, None);
         assert_eq!(renamed_db.renamed_table.get(&key), Ok(Some(value)));
     }
 }
@@ -179,7 +194,8 @@ async fn deprecate_test() {
     let key = "key".to_string();
     let value = "value".to_string();
     {
-        let original_db = Tables::open_tables_read_write(dbdir.clone(), MetricConf::default(), None, None);
+        let original_db =
+            Tables::open_tables_read_write(dbdir.clone(), MetricConf::default(), None, None);
         original_db.table1.insert(&key, &value).unwrap();
         original_db.table2.insert(&0, &value).unwrap();
     }
@@ -194,96 +210,6 @@ async fn deprecate_test() {
         );
         assert_eq!(db.table1.get(&key), Ok(Some(value.clone())));
     }
-}
-
-#[derive(SallyDB)]
-pub struct SallyDBExample {
-    col1: SallyColumn<String, String>,
-    col2: SallyColumn<i32, String>,
-}
-
-#[tokio::test]
-async fn test_sallydb() {
-    let primary_path = temp_dir();
-    let example_db = SallyDBExample::init(SallyDBOptions::RocksDB((
-        primary_path.clone(),
-        MetricConf::default(),
-        RocksDBAccessType::Primary,
-        None,
-        None,
-    )));
-
-    // Write to both columns
-    let keys_vals_1 = (1..10).map(|i| (i.to_string(), i.to_string()));
-    let mut wb = example_db.col1.batch();
-    wb.insert_batch(&example_db.col1, keys_vals_1.clone()).expect("Failed to insert");
-
-    let keys_vals_2 = (3..10).map(|i| (i, i.to_string()));
-    wb.insert_batch(&example_db.col2, keys_vals_2.clone()).expect("Failed to insert");
-
-    wb.write().await.expect("Failed to commit write batch");
-
-    // Open in secondary mode
-    let example_db_secondary = SallyDBExample::get_read_only_handle(SallyReadOnlyDBOptions::RocksDB(Box::new((
-        primary_path.clone(),
-        MetricConf::default(),
-        None,
-        None,
-    ))));
-
-    // Check all the tables can be listed
-    let actual_table_names: HashSet<_> = list_tables(primary_path).unwrap().into_iter().collect();
-    let observed_table_names: HashSet<_> = SallyDBExample::describe_tables().iter().map(|q| q.0.clone()).collect();
-
-    let exp: HashSet<String> = HashSet::from_iter(vec!["col1", "col2"].into_iter().map(|s| s.to_owned()));
-    assert_eq!(HashSet::from_iter(actual_table_names), exp);
-    assert_eq!(HashSet::from_iter(observed_table_names), exp);
-
-    // Check the counts
-    assert_eq!(9, example_db_secondary.count_keys("col1").unwrap());
-    assert_eq!(7, example_db_secondary.count_keys("col2").unwrap());
-
-    // Test all entries
-    let m = example_db_secondary.dump("col1", 100, 0).unwrap();
-    for (k, v) in keys_vals_1 {
-        assert_eq!(format!("\"{v}\""), *m.get(&format!("\"{k}\"")).unwrap());
-    }
-
-    let m = example_db_secondary.dump("col2", 100, 0).unwrap();
-    for (k, v) in keys_vals_2 {
-        assert_eq!(format!("\"{v}\""), *m.get(&k.to_string()).unwrap());
-    }
-
-    // Check that catchup logic works
-    let keys_vals_1 = (100..110).map(|i| (i.to_string(), i.to_string()));
-    let mut wb = example_db.col1.batch();
-    wb.insert_batch(&example_db.col1, keys_vals_1.clone()).expect("Failed to insert");
-    wb.write().await.expect("Failed to commit write batch");
-
-    // New entries should be present in secondary
-    assert_eq!(19, example_db_secondary.count_keys("col1").unwrap());
-
-    // Test pagination
-    let m = example_db_secondary.dump("col1", 2, 0).unwrap();
-    assert_eq!(2, m.len());
-    assert_eq!(format!("\"1\""), *m.get("\"1\"").unwrap());
-    assert_eq!(format!("\"2\""), *m.get("\"2\"").unwrap());
-
-    let m = example_db_secondary.dump("col1", 3, 2).unwrap();
-    assert_eq!(3, m.len());
-    assert_eq!(format!("\"7\""), *m.get("\"7\"").unwrap());
-    assert_eq!(format!("\"8\""), *m.get("\"8\"").unwrap());
-}
-
-#[tokio::test]
-async fn macro_transactional_test() {
-    let key = "key".to_string();
-    let primary_path = temp_dir();
-    let tables = Tables::open_tables_transactional(primary_path, MetricConf::default(), None, None);
-    let mut transaction = tables.table1.transaction().expect("failed to init transaction");
-    transaction.insert_batch(&tables.table1, vec![(key.to_string(), "1".to_string())]).unwrap();
-    transaction.commit().expect("failed to commit first transaction");
-    assert_eq!(tables.table1.get(&key), Ok(Some("1".to_string())));
 }
 
 /// We show that custom functions can be applied
@@ -311,39 +237,6 @@ fn another_custom_fn_name() -> typed_store::rocks::DBOptions {
     TABLE2_OPTIONS_SET_FLAG.lock().unwrap().push(false);
     TABLE2_OPTIONS_SET_FLAG.lock().unwrap().push(false);
     typed_store::rocks::DBOptions::default()
-}
-
-#[tokio::test]
-async fn macro_test_configure() {
-    let primary_path = temp_dir();
-
-    // Get a configurator for this table
-    let mut config = Tables::configurator();
-    // Config table 1
-    config.table1 = typed_store::rocks::DBOptions::default();
-    config.table1.options.create_if_missing(true);
-    config.table1.options.set_write_buffer_size(123456);
-
-    // Config table 2
-    config.table2 = config.table1.clone();
-
-    config.table2.options.create_if_missing(false);
-
-    // Build and open with new config
-    let _ = Tables::open_tables_read_write(primary_path, MetricConf::default(), None, Some(config.build()));
-
-    // Test the static config options
-    let primary_path = temp_dir();
-
-    assert_eq!(TABLE1_OPTIONS_SET_FLAG.lock().unwrap().len(), 0);
-
-    let _ = TablesCustomOptions::open_tables_read_write(primary_path, MetricConf::default(), None, None);
-
-    // Ensures that the function to set options was called
-    assert_eq!(TABLE1_OPTIONS_SET_FLAG.lock().unwrap().len(), 1);
-
-    // `another_custom_fn_name` is called twice, so 6 items in vec
-    assert_eq!(TABLE2_OPTIONS_SET_FLAG.lock().unwrap().len(), 6);
 }
 
 /// We show that custom functions can be applied
@@ -385,4 +278,36 @@ async fn test_sampling_time() {
     tokio::time::advance(Duration::from_secs(1)).await;
     tokio::task::yield_now().await;
     assert!(sampling_interval.sample());
+}
+
+#[cfg(tidehunter)]
+mod tidehunter_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use typed_store::tidehunter_util::ThConfig;
+
+    #[derive(DBMapUtils)]
+    #[tidehunter]
+    struct ThTable {
+        table1: DBMap<String, String>,
+        table2: DBMap<i32, String>,
+    }
+
+    #[tokio::test]
+    async fn test_tidehunter_map() {
+        let primary_path = temp_dir();
+        let configs = vec![
+            ("table1".to_string(), ThConfig::new(11, 1, 1)),
+            ("table2".to_string(), ThConfig::new(11, 1, 1)),
+        ];
+        let db = ThTable::open_tables_read_write(
+            primary_path.clone(),
+            MetricConf::new("test_th"),
+            BTreeMap::from_iter(configs),
+        );
+        let (key, value) = ("key".to_string(), "value".to_string());
+        db.table1.insert(&key, &value).unwrap();
+        let result = db.table1.get(&key).unwrap();
+        assert_eq!(result, Some(value));
+    }
 }

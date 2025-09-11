@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::collections::btree_map::{self, BTreeMap};
 
 /// A storage operation.
@@ -77,8 +77,8 @@ fn squash<K, V>(map: &mut BTreeMap<K, Op<V>>, other: BTreeMap<K, Op<V>>) -> Resu
 where
     K: Ord,
 {
-    use btree_map::Entry::*;
     use Op::*;
+    use btree_map::Entry::*;
 
     for (key, op) in other.into_iter() {
         match map.entry(key) {
@@ -111,8 +111,11 @@ impl AccountChangeSet {
         Self { modules }
     }
 
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self { modules: BTreeMap::new() }
+        Self {
+            modules: BTreeMap::new(),
+        }
     }
 
     pub fn add_module_op(&mut self, name: Identifier, op: Op<Vec<u8>>) -> Result<()> {
@@ -166,12 +169,21 @@ impl Default for ChangeSet {
 
 impl ChangeSet {
     pub fn new() -> Self {
-        Self { accounts: BTreeMap::new() }
+        Self {
+            accounts: BTreeMap::new(),
+        }
     }
 
-    pub fn add_account_changeset(&mut self, addr: AccountAddress, account_changeset: AccountChangeSet) -> Result<()> {
+    pub fn add_account_changeset(
+        &mut self,
+        addr: AccountAddress,
+        account_changeset: AccountChangeSet,
+    ) -> Result<()> {
         match self.accounts.entry(addr) {
-            btree_map::Entry::Occupied(_) => bail!("Failed to add account change set. Account {} already exists.", addr),
+            btree_map::Entry::Occupied(_) => bail!(
+                "Failed to add account change set. Account {} already exists.",
+                addr
+            ),
             btree_map::Entry::Vacant(entry) => {
                 entry.insert(account_changeset);
             }
@@ -216,14 +228,20 @@ impl ChangeSet {
 
     pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Op<Vec<u8>>)> {
         self.accounts.into_iter().flat_map(|(addr, account)| {
-            account.modules.into_iter().map(move |(module_name, blob_opt)| (ModuleId::new(addr, module_name), blob_opt))
+            account
+                .modules
+                .into_iter()
+                .map(move |(module_name, blob_opt)| (ModuleId::new(addr, module_name), blob_opt))
         })
     }
 
     pub fn modules(&self) -> impl Iterator<Item = (AccountAddress, &Identifier, Op<&[u8]>)> {
         self.accounts.iter().flat_map(|(addr, account)| {
             let addr = *addr;
-            account.modules.iter().map(move |(module_name, op)| (addr, module_name, op.as_ref().map(|v| v.as_ref())))
+            account
+                .modules
+                .iter()
+                .map(move |(module_name, op)| (addr, module_name, op.as_ref().map(|v| v.as_ref())))
         })
     }
 }

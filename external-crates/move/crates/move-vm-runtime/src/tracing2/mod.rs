@@ -26,10 +26,12 @@ macro_rules! open_initial_frame {
 }
 
 #[macro_export]
-macro_rules! close_initial_frame {
+macro_rules! close_initial_native_frame {
     ($tracer: expr, $function: expr, $return_values: expr, $gas_meter: expr) => {
         if $crate::tracing2::TRACING_ENABLED {
-            $tracer.as_mut().map(|tracer| tracer.close_initial_frame($return_values, $gas_meter.remaining_gas().into()));
+            $tracer.as_mut().map(|tracer| {
+                tracer.close_initial_native_frame($return_values, $gas_meter.remaining_gas().into())
+            });
             move_vm_profiler::profile_close_frame!($gas_meter, $function.pretty_string());
         }
     };
@@ -79,9 +81,9 @@ macro_rules! open_frame {
 macro_rules! open_instruction {
     ($tracer: expr, $instruction: expr, $frame: expr, $interp: expr, $loader: expr, $gas_meter: expr) => {
         if $crate::tracing2::TRACING_ENABLED {
-            $tracer
-                .as_mut()
-                .map(|tracer| tracer.open_instruction($frame, $interp, $loader, $gas_meter.remaining_gas().into()));
+            $tracer.as_mut().map(|tracer| {
+                tracer.open_instruction($frame, $interp, $loader, $gas_meter.remaining_gas().into())
+            });
             move_vm_profiler::profile_open_instr!($gas_meter, format!("{:?}", $instruction));
         }
     };
@@ -92,7 +94,13 @@ macro_rules! close_instruction {
     ($tracer: expr, $instruction: expr, $frame: expr, $interp: expr, $loader: expr, $gas_meter: expr, $result: expr) => {
         if $crate::tracing2::TRACING_ENABLED {
             $tracer.as_mut().map(|tracer| {
-                tracer.close_instruction($frame, $interp, $loader, $gas_meter.remaining_gas().into(), $result)
+                tracer.close_instruction(
+                    $frame,
+                    $interp,
+                    $loader,
+                    $gas_meter.remaining_gas().into(),
+                    $result,
+                )
             });
             move_vm_profiler::profile_close_instr!($gas_meter, format!("{:?}", $instruction));
         }

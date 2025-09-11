@@ -1,9 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
-use crate::{sandbox::utils::OnDiskStateView, DEFAULT_BUILD_DIR};
+use crate::{DEFAULT_BUILD_DIR, sandbox::utils::OnDiskStateView};
 use anyhow::Result;
-use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
+use move_package::{BuildConfig, compilation::compiled_package::CompiledPackage};
 use std::path::{Path, PathBuf};
 
 /// The PackageContext controls the package that the CLI is executing with respect to, and handles the
@@ -16,8 +16,14 @@ pub struct PackageContext {
 impl PackageContext {
     pub fn new(path: &Option<PathBuf>, build_config: &BuildConfig) -> Result<Self> {
         let path = path.as_deref().unwrap_or_else(|| Path::new("."));
-        let build_dir = build_config.install_dir.as_ref().unwrap_or(&PathBuf::from(DEFAULT_BUILD_DIR)).clone();
-        let package = build_config.clone().compile_package(path, &mut Vec::new())?;
+        let build_dir = build_config
+            .install_dir
+            .as_ref()
+            .unwrap_or(&PathBuf::from(DEFAULT_BUILD_DIR))
+            .clone();
+        let package = build_config
+            .clone()
+            .compile_package(path, &mut Vec::new())?;
         Ok(PackageContext { package, build_dir })
     }
 

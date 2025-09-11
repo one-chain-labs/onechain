@@ -1,37 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use crate::crypto::PublicKey;
+use crate::crypto::Secp256r1SuiSignature;
+use crate::crypto::SuiSignatureInner;
+use crate::signature_verification::VerifiedDigestCache;
 use crate::{
     base_types::{EpochId, SuiAddress},
-    crypto::{
-        DefaultHash,
-        PublicKey,
-        Secp256r1SuiSignature,
-        Signature,
-        SignatureScheme,
-        SuiSignature,
-        SuiSignatureInner,
-    },
+    crypto::{DefaultHash, Signature, SignatureScheme, SuiSignature},
     digests::ZKLoginInputsDigest,
     error::{SuiError, SuiResult},
     signature::{AuthenticatorTrait, VerifyParams},
-    signature_verification::VerifiedDigestCache,
 };
-use fastcrypto::{
-    error::FastCryptoError,
-    hash::{HashFunction, Sha256},
-    rsa::{Base64UrlUnpadded, Encoding},
-    secp256r1::{Secp256r1PublicKey, Secp256r1Signature},
-    traits::{ToFromBytes, VerifyingKey},
-};
+use fastcrypto::hash::{HashFunction, Sha256};
+use fastcrypto::rsa::{Base64UrlUnpadded, Encoding};
+use fastcrypto::secp256r1::{Secp256r1PublicKey, Secp256r1Signature};
+use fastcrypto::traits::VerifyingKey;
+use fastcrypto::{error::FastCryptoError, traits::ToFromBytes};
 use once_cell::sync::OnceCell;
 use passkey_types::webauthn::{ClientDataType, CollectedClientData};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use shared_crypto::intent::IntentMessage;
-use std::{
-    hash::{Hash, Hasher},
-    sync::Arc,
-};
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::sync::Arc;
 
 #[cfg(test)]
 #[path = "unit_tests/passkey_authenticator_test.rs"]
@@ -72,7 +64,7 @@ pub struct PasskeyAuthenticator {
     bytes: OnceCell<Vec<u8>>,
 }
 
-/// An raw passkey authenticator struct used during deserialization. Can be converted to [struct PasskeyAuthenticator].
+/// A raw passkey authenticator struct used during deserialization. Can be converted to [struct PasskeyAuthenticator].
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RawPasskeyAuthenticator {
     pub authenticator_data: Vec<u8>,
@@ -85,27 +77,44 @@ impl TryFrom<RawPasskeyAuthenticator> for PasskeyAuthenticator {
     type Error = SuiError;
 
     fn try_from(raw: RawPasskeyAuthenticator) -> Result<Self, Self::Error> {
-        let client_data_json_parsed: CollectedClientData = serde_json::from_str(&raw.client_data_json)
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid client data json".to_string() })?;
+        let client_data_json_parsed: CollectedClientData =
+            serde_json::from_str(&raw.client_data_json).map_err(|_| {
+                SuiError::InvalidSignature {
+                    error: "Invalid client data json".to_string(),
+                }
+            })?;
 
         if client_data_json_parsed.ty != ClientDataType::Get {
-            return Err(SuiError::InvalidSignature { error: "Invalid client data type".to_string() });
+            return Err(SuiError::InvalidSignature {
+                error: "Invalid client data type".to_string(),
+            });
         };
 
         let challenge = Base64UrlUnpadded::decode_vec(&client_data_json_parsed.challenge)
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid encoded challenge".to_string() })?
+            .map_err(|_| SuiError::InvalidSignature {
+                error: "Invalid encoded challenge".to_string(),
+            })?
             .try_into()
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid encoded challenge".to_string() })?;
+            .map_err(|_| SuiError::InvalidSignature {
+                error: "Invalid size for challenge".to_string(),
+            })?;
 
         if raw.user_signature.scheme() != SignatureScheme::Secp256r1 {
-            return Err(SuiError::InvalidSignature { error: "Invalid signature scheme".to_string() });
+            return Err(SuiError::InvalidSignature {
+                error: "Invalid signature scheme".to_string(),
+            });
         };
 
-        let pk = Secp256r1PublicKey::from_bytes(raw.user_signature.public_key_bytes())
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid r1 pk".to_string() })?;
+        let pk = Secp256r1PublicKey::from_bytes(raw.user_signature.public_key_bytes()).map_err(
+            |_| SuiError::InvalidSignature {
+                error: "Invalid r1 pk".to_string(),
+            },
+        )?;
 
         let signature = Secp256r1Signature::from_bytes(raw.user_signature.signature_bytes())
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid r1 sig".to_string() })?;
+            .map_err(|_| SuiError::InvalidSignature {
+                error: "Invalid r1 sig".to_string(),
+            })?;
 
         Ok(PasskeyAuthenticator {
             authenticator_data: raw.authenticator_data,
@@ -126,7 +135,9 @@ impl<'de> Deserialize<'de> for PasskeyAuthenticator {
         use serde::de::Error;
 
         let serializable = RawPasskeyAuthenticator::deserialize(deserializer)?;
-        serializable.try_into().map_err(|e: SuiError| Error::custom(e.to_string()))
+        serializable
+            .try_into()
+            .map_err(|e: SuiError| Error::custom(e.to_string()))
     }
 }
 
@@ -143,11 +154,14 @@ impl Serialize for PasskeyAuthenticator {
         let raw = RawPasskeyAuthenticator {
             authenticator_data: self.authenticator_data.clone(),
             client_data_json: self.client_data_json.clone(),
-            user_signature: Signature::Secp256r1SuiSignature(Secp256r1SuiSignature::from_bytes(&bytes).unwrap()),
+            user_signature: Signature::Secp256r1SuiSignature(
+                Secp256r1SuiSignature::from_bytes(&bytes).unwrap(), // ok to unwrap since the bytes are constructed as valid above.
+            ),
         };
         raw.serialize(serializer)
     }
 }
+
 impl PasskeyAuthenticator {
     /// A constructor for [struct PasskeyAuthenticator] with custom
     /// defined fields. Used for testing.
@@ -156,13 +170,35 @@ impl PasskeyAuthenticator {
         client_data_json: String,
         user_signature: Signature,
     ) -> Result<Self, SuiError> {
-        let raw = RawPasskeyAuthenticator { authenticator_data, client_data_json, user_signature };
+        let raw = RawPasskeyAuthenticator {
+            authenticator_data,
+            client_data_json,
+            user_signature,
+        };
         raw.try_into()
     }
 
     /// Returns the public key of the passkey authenticator.
     pub fn get_pk(&self) -> SuiResult<PublicKey> {
         Ok(PublicKey::Passkey((&self.pk).into()))
+    }
+
+    pub fn authenticator_data(&self) -> &[u8] {
+        &self.authenticator_data
+    }
+
+    pub fn client_data_json(&self) -> &str {
+        &self.client_data_json
+    }
+
+    pub fn signature(&self) -> Signature {
+        let mut bytes = Vec::with_capacity(Secp256r1SuiSignature::LENGTH);
+        bytes.push(SignatureScheme::Secp256r1.flag());
+        bytes.extend_from_slice(self.signature.as_ref());
+        bytes.extend_from_slice(self.pk.as_ref());
+
+        // Safe to unwrap because signature and pk are serialized from valid struct.
+        Signature::Secp256r1SuiSignature(Secp256r1SuiSignature::from_bytes(&bytes).unwrap())
     }
 }
 
@@ -184,7 +220,11 @@ impl Hash for PasskeyAuthenticator {
 }
 
 impl AuthenticatorTrait for PasskeyAuthenticator {
-    fn verify_user_authenticator_epoch(&self, _epoch: EpochId, _max_epoch_upper_bound_delta: Option<u64>) -> SuiResult {
+    fn verify_user_authenticator_epoch(
+        &self,
+        _epoch: EpochId,
+        _max_epoch_upper_bound_delta: Option<u64>,
+    ) -> SuiResult {
         Ok(())
     }
 
@@ -199,9 +239,18 @@ impl AuthenticatorTrait for PasskeyAuthenticator {
     where
         T: Serialize,
     {
+        // Check if author is derived from the public key.
+        if author != SuiAddress::from(&self.get_pk()?) {
+            return Err(SuiError::InvalidSignature {
+                error: "Invalid author".to_string(),
+            });
+        };
+
         // Check the intent and signing is consisted from what's parsed from client_data_json.challenge
         if self.challenge != to_signing_message(intent_msg) {
-            return Err(SuiError::InvalidSignature { error: "Invalid challenge".to_string() });
+            return Err(SuiError::InvalidSignature {
+                error: "Invalid challenge".to_string(),
+            });
         };
 
         // Construct msg = authenticator_data || sha256(client_data_json).
@@ -209,22 +258,21 @@ impl AuthenticatorTrait for PasskeyAuthenticator {
         let client_data_hash = Sha256::digest(self.client_data_json.as_bytes()).digest;
         message.extend_from_slice(&client_data_hash);
 
-        // Check if author is derived from the public key.
-        if author != SuiAddress::from(&self.get_pk()?) {
-            return Err(SuiError::InvalidSignature { error: "Invalid author".to_string() });
-        };
-
         // Verify the signature against pk and message.
         self.pk
             .verify(&message, &self.signature)
-            .map_err(|_| SuiError::InvalidSignature { error: "Fails to verify".to_string() })
+            .map_err(|_| SuiError::InvalidSignature {
+                error: "Fails to verify".to_string(),
+            })
     }
 }
 
 impl ToFromBytes for PasskeyAuthenticator {
     fn from_bytes(bytes: &[u8]) -> Result<Self, FastCryptoError> {
         // The first byte matches the flag of PasskeyAuthenticator.
-        if bytes.first().ok_or(FastCryptoError::InvalidInput)? != &SignatureScheme::PasskeyAuthenticator.flag() {
+        if bytes.first().ok_or(FastCryptoError::InvalidInput)?
+            != &SignatureScheme::PasskeyAuthenticator.flag()
+        {
             return Err(FastCryptoError::InvalidInput);
         }
         let passkey: PasskeyAuthenticator =
@@ -248,7 +296,9 @@ impl AsRef<[u8]> for PasskeyAuthenticator {
 }
 
 /// Compute the signing digest that the signature committed over as `hash(intent || tx_data)`
-pub fn to_signing_message<T: Serialize>(intent_msg: &IntentMessage<T>) -> [u8; DefaultHash::OUTPUT_SIZE] {
+pub fn to_signing_message<T: Serialize>(
+    intent_msg: &IntentMessage<T>,
+) -> [u8; DefaultHash::OUTPUT_SIZE] {
     let mut hasher = DefaultHash::default();
     bcs::serialize_into(&mut hasher, intent_msg).expect("Message serialization should not fail");
     hasher.finalize().digest

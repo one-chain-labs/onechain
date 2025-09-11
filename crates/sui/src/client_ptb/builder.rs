@@ -7,25 +7,27 @@ use crate::{
         ast::{Argument as PTBArg, ASSIGN, GAS_BUDGET},
         error::{PTBError, PTBResult, Span, Spanned},
     },
-    err,
-    error,
-    sp,
+    err, error, sp,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use miette::Severity;
-use move_binary_format::{binary_config::BinaryConfig, file_format::SignatureToken, CompiledModule};
+use move_binary_format::{
+    binary_config::BinaryConfig, file_format::SignatureToken, CompiledModule,
+};
 use move_core_types::{
-    account_address::AccountAddress,
-    annotated_value::MoveTypeLayout,
-    ident_str,
+    account_address::AccountAddress, annotated_value::MoveTypeLayout, ident_str,
+};
+use move_core_types::{
+    language_storage::StructTag,
     parsing::{
         address::{NumericalAddress, ParsedAddress},
         parser::NumberFormat,
+        types::{ParsedStructType, ParsedType},
     },
 };
-use move_package::BuildConfig;
+use move_package::BuildConfig as MoveBuildConfig;
 use std::{collections::BTreeMap, path::Path};
 use sui_json::{is_receiving_argument, primitive_type};
 use sui_json_rpc_types::{SuiObjectData, SuiObjectDataOptions, SuiRawData};
@@ -38,12 +40,13 @@ use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     resolve_address,
     transaction::{self as Tx, ObjectArg},
-    Identifier,
-    TypeTag,
-    SUI_FRAMEWORK_PACKAGE_ID,
+    Identifier, TypeTag, SUI_FRAMEWORK_PACKAGE_ID,
 };
 
-use super::ast::{ModuleAccess as PTBModuleAccess, ParsedPTBCommand, Program};
+use super::{
+    ast::{ModuleAccess as PTBModuleAccess, ParsedPTBCommand, Program},
+    ptb::AddressData,
+};
 
 // ===========================================================================
 // Object Resolution
@@ -62,7 +65,12 @@ use super::ast::{ModuleAccess as PTBModuleAccess, ParsedPTBCommand, Program};
 #[async_trait]
 trait Resolver<'a>: Send {
     /// Resolve a pure value. This should almost always resolve to a pure value.
-    async fn pure(&mut self, builder: &mut PTBBuilder<'a>, loc: Span, argument: PTBArg) -> PTBResult<Tx::Argument> {
+    async fn pure(
+        &mut self,
+        builder: &mut PTBBuilder<'a>,
+        loc: Span,
+        argument: PTBArg,
+    ) -> PTBResult<Tx::Argument> {
         let value = argument.to_pure_move_value(loc)?;
         builder.ptb.pure(value).map_err(|e| err!(loc, "{e}"))
     }
@@ -90,13 +98,19 @@ struct ToObject {
 
 impl Default for ToObject {
     fn default() -> Self {
-        Self { is_receiving: false, is_mut: true }
+        Self {
+            is_receiving: false,
+            is_mut: true,
+        }
     }
 }
 
 impl ToObject {
     fn new(is_receiving: bool, is_mut: bool) -> Self {
-        Self { is_receiving, is_mut }
+        Self {
+            is_receiving,
+            is_mut,
+        }
     }
 }
 
@@ -110,17 +124,27 @@ impl<'a> Resolver<'a> for ToObject {
     ) -> PTBResult<Tx::Argument> {
         // Get the object from the reader to get metadata about the object.
         let obj = builder.get_object(obj_id, loc).await?;
-        let owner = obj.owner.clone().ok_or_else(|| err!(loc, "Unable to get owner info for object {obj_id}"))?;
+        let owner = obj
+            .owner
+            .clone()
+            .ok_or_else(|| err!(loc, "Unable to get owner info for object {obj_id}"))?;
         let object_ref = obj.object_ref();
         // Depending on the ownership of the object, we resolve it to different types of object
         // arguments for the transaction.
         let obj_arg = match owner {
             Owner::AddressOwner(_) if self.is_receiving => ObjectArg::Receiving(object_ref),
             Owner::Immutable | Owner::AddressOwner(_) => ObjectArg::ImmOrOwnedObject(object_ref),
-            Owner::Shared { initial_shared_version }
-            | Owner::ConsensusV2 { start_version: initial_shared_version, .. } => {
-                ObjectArg::SharedObject { id: object_ref.0, initial_shared_version, mutable: self.is_mut }
+            Owner::Shared {
+                initial_shared_version,
             }
+            | Owner::ConsensusAddressOwner {
+                start_version: initial_shared_version,
+                ..
+            } => ObjectArg::SharedObject {
+                id: object_ref.0,
+                initial_shared_version,
+                mutable: self.is_mut,
+            },
             Owner::ObjectOwner(_) => {
                 error!(loc => help: {
                     "{obj_id} is an object-owned object, you can only use immutable, shared, or owned objects here."
@@ -149,13 +173,20 @@ impl ToPure {
     }
 
     pub fn new_from_layout(layout: MoveTypeLayout) -> Self {
-        Self { type_: TypeTag::from(&layout) }
+        Self {
+            type_: TypeTag::from(&layout),
+        }
     }
 }
 
 #[async_trait]
 impl<'a> Resolver<'a> for ToPure {
-    async fn pure(&mut self, builder: &mut PTBBuilder<'a>, loc: Span, argument: PTBArg) -> PTBResult<Tx::Argument> {
+    async fn pure(
+        &mut self,
+        builder: &mut PTBBuilder<'a>,
+        loc: Span,
+        argument: PTBArg,
+    ) -> PTBResult<Tx::Argument> {
         let value = argument.checked_to_pure_move_value(loc, &self.type_)?;
         builder.ptb.pure(value).map_err(|e| err!(loc, "{e}"))
     }
@@ -186,9 +217,9 @@ impl<'a> Resolver<'a> for ToPure {
 ///   an object ID should be resolved to a pure value or an object argument.
 /// - A way to bind the result of a command to an identifier.
 pub struct PTBBuilder<'a> {
-    /// A map from identifiers to addresses. This is used to support address resolution, and also
-    /// supports external address sources (e.g., keystore).
-    addresses: BTreeMap<String, AccountAddress>,
+    /// A map from identifiers to address or move pkg. This is used to support address resolution
+    /// and also supports external address sources (e.g., keystore, mvr).
+    addresses: BTreeMap<String, AddressData>,
     /// A map from identifiers to the file scopes in which they were declared. This is used
     /// for reporting shadowing warnings.
     identifiers: BTreeMap<String, Vec<Span>>,
@@ -251,7 +282,7 @@ impl ArgWithHistory {
 }
 
 impl<'a> PTBBuilder<'a> {
-    pub fn new(starting_env: BTreeMap<String, AccountAddress>, reader: &'a ReadApi) -> Self {
+    pub fn new(starting_env: BTreeMap<String, AddressData>, reader: &'a ReadApi) -> Self {
         Self {
             addresses: starting_env,
             identifiers: BTreeMap::new(),
@@ -268,7 +299,13 @@ impl<'a> PTBBuilder<'a> {
     /// now. Otherwise, the PTB is finalized and returned.
     /// If the warn_on_shadowing flag was set, then we will print warnings for any shadowed
     /// variables that we encountered during the building of the PTB.
-    pub fn finish(self, warn_on_shadowing: bool) -> (Result<Tx::ProgrammableTransaction, Vec<PTBError>>, Vec<PTBError>) {
+    pub fn finish(
+        self,
+        warn_on_shadowing: bool,
+    ) -> (
+        Result<Tx::ProgrammableTransaction, Vec<PTBError>>,
+        Vec<PTBError>,
+    ) {
         let mut warnings = vec![];
         if warn_on_shadowing {
             for (ident, commands) in self.identifiers.iter() {
@@ -288,15 +325,11 @@ impl<'a> PTBBuilder<'a> {
                         warnings.push(PTBError {
                             message: format!(
                                 "Variable '{}' used again here (shadowed) for the {} time.",
-                                ident,
-                                to_ordinal_contraction(i + 1)
+                                ident, to_ordinal_contraction(i + 1)
                             ),
                             span: *command_loc,
-                            help: Some(
-                                "You can either rename this variable, or do not \
-                                       pass the `warn-shadows` flag to ignore these types of errors."
-                                    .to_string(),
-                            ),
+                            help: Some("You can either rename this variable, or do not \
+                                       pass the `warn-shadows` flag to ignore these types of errors.".to_string()),
                             severity: Severity::Warning,
                         });
                     }
@@ -315,7 +348,10 @@ impl<'a> PTBBuilder<'a> {
     pub async fn build(
         mut self,
         program: Program,
-    ) -> (Result<Tx::ProgrammableTransaction, Vec<PTBError>>, Vec<PTBError>) {
+    ) -> (
+        Result<Tx::ProgrammableTransaction, Vec<PTBError>>,
+        Vec<PTBError>,
+    ) {
         for command in program.commands.into_iter() {
             self.handle_command(command).await;
         }
@@ -345,7 +381,8 @@ impl<'a> PTBBuilder<'a> {
     fn declare_possible_address_binding(&mut self, ident: String, possible_addr: &Spanned<PTBArg>) {
         match possible_addr.value {
             PTBArg::Address(addr) => {
-                self.addresses.insert(ident, addr.into_inner());
+                self.addresses
+                    .insert(ident, AddressData::AccountAddress(addr.into_inner()));
             }
             PTBArg::Identifier(ref i) => {
                 // We do a one-hop resolution here to see if we can resolve the identifier to an
@@ -353,16 +390,25 @@ impl<'a> PTBBuilder<'a> {
                 // This will also handle direct aliasing of addresses throughout the ptb.
                 // Note that we don't do this recursively so no need to worry about loops/cycles.
                 if let Some(addr) = self.addresses.get(i) {
-                    self.addresses.insert(ident, *addr);
+                    if let Some(a) = addr.address() {
+                        self.addresses.insert(ident, AddressData::AccountAddress(a));
+                    }
                 }
             }
             // If we encounter a dotted string e.g., "foo.0" or "sui.io" or something like that
             // this see if we can find an address for it in the environment and bind to it.
             PTBArg::VariableAccess(ref head, ref fields) => {
-                let key =
-                    format!("{}.{}", head.value, fields.iter().map(|f| f.value.clone()).collect::<Vec<_>>().join("."));
+                let key = format!(
+                    "{}.{}",
+                    head.value,
+                    fields
+                        .iter()
+                        .map(|f| f.value.clone())
+                        .collect::<Vec<_>>()
+                        .join(".")
+                );
                 if let Some(addr) = self.addresses.get(&key) {
-                    self.addresses.insert(ident, *addr);
+                    self.addresses.insert(ident, addr.clone());
                 }
             }
             _ => (),
@@ -370,30 +416,12 @@ impl<'a> PTBBuilder<'a> {
     }
 
     /// Resolve an object ID to a Move package.
-    async fn resolve_to_package(&mut self, package_id: ObjectID, loc: Span) -> PTBResult<MovePackage> {
-        let object = self
-            .reader
-            .get_object_with_options(package_id, SuiObjectDataOptions::bcs_lossless())
-            .await
-            .map_err(|e| err!(loc, "{e}"))?
-            .into_object()
-            .map_err(|e| err!(loc, "{e}"))?;
-
-        let Some(SuiRawData::Package(package)) = object.bcs else {
-            error!(loc, "BCS field in object '{}' is missing or not a package.", package_id);
-        };
-
-        MovePackage::new(
-            package.id,
-            package.version,
-            package.module_map,
-            // This package came from on-chain and the tool runs locally, so don't worry about
-            // trying to enforce the package size limit.
-            u64::MAX,
-            package.type_origin_table,
-            package.linkage_table,
-        )
-        .map_err(|e| err!(loc, "{e}"))
+    async fn resolve_to_package(
+        &mut self,
+        package_id: ObjectID,
+        loc: Span,
+    ) -> PTBResult<MovePackage> {
+        resolve_package(self.reader, package_id, loc).await
     }
 
     /// Resolves the argument to the move call based on the type information of the function being
@@ -410,7 +438,9 @@ impl<'a> PTBBuilder<'a> {
         // If it's a primitive value, see if we've already resolved this argument. Otherwise, we
         // need to resolve it.
         if let Some(layout) = layout {
-            return self.resolve(loc.wrap(arg), ToPure::new_from_layout(layout)).await;
+            return self
+                .resolve(loc.wrap(arg), ToPure::new_from_layout(layout))
+                .await;
         }
 
         // Otherwise it's ambiguous what the value should be, and we need to turn to the signature
@@ -455,7 +485,8 @@ impl<'a> PTBBuilder<'a> {
 
         // Note: need to re-resolve an argument possibly since it may be used immutably first, and
         // then mutably.
-        self.resolve(loc.wrap(arg), ToObject::new(is_receiving, is_mutable)).await
+        self.resolve(loc.wrap(arg), ToObject::new(is_receiving, is_mutable))
+            .await
     }
 
     /// Resolve the arguments to a Move call based on the type information about the function
@@ -469,36 +500,48 @@ impl<'a> PTBBuilder<'a> {
         args: Vec<Spanned<PTBArg>>,
         package_name_loc: Span,
     ) -> PTBResult<Vec<Tx::Argument>> {
-        let module = package.deserialize_module(module_name, &BinaryConfig::standard()).map_err(|e| {
-            let help_message = if package.serialized_module_map().is_empty() {
-                Some("No modules found in this package".to_string())
-            } else {
-                display_did_you_mean(find_did_you_means(
-                    module_name.as_str(),
-                    package.serialized_module_map().iter().map(|(x, _)| x.as_str()),
-                ))
-            };
-            let e = err!(*mloc, "{e}");
-            if let Some(help_message) = help_message {
-                e.with_help(help_message)
-            } else {
-                e
-            }
-        })?;
+        let module = package
+            .deserialize_module(module_name, &BinaryConfig::standard())
+            .map_err(|e| {
+                let help_message = if package.serialized_module_map().is_empty() {
+                    Some("No modules found in this package".to_string())
+                } else {
+                    display_did_you_mean(find_did_you_means(
+                        module_name.as_str(),
+                        package
+                            .serialized_module_map()
+                            .iter()
+                            .map(|(x, _)| x.as_str()),
+                    ))
+                };
+                let e = err!(*mloc, "{e}");
+                if let Some(help_message) = help_message {
+                    e.with_help(help_message)
+                } else {
+                    e
+                }
+            })?;
         let fdef = module
             .function_defs
             .iter()
             .find(|fdef| {
-                module.identifier_at(module.function_handle_at(fdef.function).name) == function_name.as_ident_str()
+                module.identifier_at(module.function_handle_at(fdef.function).name)
+                    == function_name.as_ident_str()
             })
             .ok_or_else(|| {
-                let e = err!(*floc, "Could not resolve function '{}' in module '{}'", function_name, module_name);
+                let e = err!(
+                    *floc,
+                    "Could not resolve function '{}' in module '{}'",
+                    function_name,
+                    module_name
+                );
                 if let Some(help_message) = display_did_you_mean(find_did_you_means(
                     function_name.as_str(),
-                    module
-                        .function_defs
-                        .iter()
-                        .map(|fdef| module.identifier_at(module.function_handle_at(fdef.function).name).as_str()),
+                    module.function_defs.iter().map(|fdef| {
+                        module
+                            .identifier_at(module.function_handle_at(fdef.function).name)
+                            .as_str()
+                    }),
                 )) {
                     e.with_help(help_message)
                 } else {
@@ -531,13 +574,19 @@ impl<'a> PTBBuilder<'a> {
 
         let mut call_args = vec![];
         for (param, arg) in parameters.iter().zip(args.into_iter()) {
-            let call_arg = self.resolve_move_call_arg(&module, ty_args, arg, param).await?;
+            let call_arg = self
+                .resolve_move_call_arg(&module, ty_args, arg, param)
+                .await?;
             call_args.push(call_arg);
         }
         Ok(call_args)
     }
 
-    fn resolve_variable_access(&self, head: &Spanned<String>, fields: Vec<Spanned<String>>) -> Spanned<ResolvedAccess> {
+    fn resolve_variable_access(
+        &self,
+        head: &Spanned<String>,
+        fields: Vec<Spanned<String>>,
+    ) -> Spanned<ResolvedAccess> {
         if fields.len() == 1 {
             // Get the span and value of the field zero'th field. Safe since we just checked the
             // length above. Since the length is 1, we know that the field is non-empty.
@@ -550,7 +599,11 @@ impl<'a> PTBBuilder<'a> {
         tl_loc.wrap(ResolvedAccess::DottedString(format!(
             "{}.{}",
             head.value,
-            fields.into_iter().map(|f| f.value).collect::<Vec<_>>().join(".")
+            fields
+                .into_iter()
+                .map(|f| f.value)
+                .collect::<Vec<_>>()
+                .join(".")
         )))
     }
 
@@ -579,7 +632,10 @@ impl<'a> PTBBuilder<'a> {
             // If we encounter an identifier that we have not already resolved, then we resolve the
             // value and return it.
             PTBArg::Identifier(i)
-                if self.arguments_to_resolve.get(&i).is_some_and(|arg_hist| !arg_hist.is_resolved()) =>
+                if self
+                    .arguments_to_resolve
+                    .get(&i)
+                    .is_some_and(|arg_hist| !arg_hist.is_resolved()) =>
             {
                 let arg_hist = self.arguments_to_resolve.get(&i).unwrap();
                 let arg = arg_hist.get().clone();
@@ -592,7 +648,8 @@ impl<'a> PTBBuilder<'a> {
             // we return the resolved value.
             PTBArg::Identifier(i) if self.resolved_arguments.contains_key(&i) => {
                 if ctx.re_resolve() && self.arguments_to_resolve.contains_key(&i) {
-                    self.resolve(self.arguments_to_resolve[&i].get().clone(), ctx).await
+                    self.resolve(self.arguments_to_resolve[&i].get().clone(), ctx)
+                        .await
                 } else {
                     Ok(self.resolved_arguments[&i])
                 }
@@ -603,9 +660,15 @@ impl<'a> PTBBuilder<'a> {
                 // We now have a location for this address (which may have come from the keystore
                 // so we didnt' have an address for it before), so we tag it with its first usage
                 // location put it in the arguments to resolve and resolve away.
-                let addr = self.addresses[&i];
-                let arg = arg_loc.wrap(PTBArg::Address(NumericalAddress::new(addr.into_bytes(), NumberFormat::Hex)));
-                self.arguments_to_resolve.insert(i.clone(), ArgWithHistory::Unresolved(arg.clone()));
+                let addr = self.addresses[&i]
+                    .address()
+                    .ok_or_else(|| err!(arg_loc, "Expected an address"))?;
+                let arg = arg_loc.wrap(PTBArg::Address(NumericalAddress::new(
+                    addr.into_bytes(),
+                    NumberFormat::Hex,
+                )));
+                self.arguments_to_resolve
+                    .insert(i.clone(), ArgWithHistory::Unresolved(arg.clone()));
                 self.resolve(arg_loc.wrap(PTBArg::Identifier(i)), ctx).await
             }
             PTBArg::Address(addr) => {
@@ -624,14 +687,20 @@ impl<'a> PTBBuilder<'a> {
                     }
                     sp!(_, ResolvedAccess::ResultAccess(access)) => {
                         match self.resolved_arguments.get(&head.value) {
-                            Some(Tx::Argument::Result(u)) => Ok(Tx::Argument::NestedResult(*u, access)),
+                            Some(Tx::Argument::Result(u)) => {
+                                Ok(Tx::Argument::NestedResult(*u, access))
+                            }
                             // Tried to access into a nested result, input, or gascoin
                             Some(
-                                x @ (Tx::Argument::NestedResult(..) | Tx::Argument::Input(..) | Tx::Argument::GasCoin),
+                                x @ (Tx::Argument::NestedResult(..)
+                                | Tx::Argument::Input(..)
+                                | Tx::Argument::GasCoin),
                             ) => {
                                 error!(
                                     arg_loc,
-                                    "Tried to access a nested result, input, or gascoin {}: {}", head.value, x,
+                                    "Tried to access a nested result, input, or gascoin {}: {}",
+                                    head.value,
+                                    x,
                                 );
                             }
                             // Unable to resolve, so now see if we can resolve it to an alias, i.e.,
@@ -651,12 +720,17 @@ impl<'a> PTBBuilder<'a> {
                                         None => {
                                             error!(
                                                 head.span,
-                                                "Tried to access an unresolved identifier: {}", head.value
+                                                "Tried to access an unresolved identifier: {}",
+                                                head.value
                                             );
                                         }
                                     }
                                 }
-                                self.resolve(arg_loc.wrap(PTBArg::Identifier(formatted_access.clone())), ctx).await
+                                self.resolve(
+                                    arg_loc.wrap(PTBArg::Identifier(formatted_access.clone())),
+                                    ctx,
+                                )
+                                .await
                             }
                         }
                     }
@@ -677,7 +751,10 @@ impl<'a> PTBBuilder<'a> {
     async fn get_object(&self, object_id: ObjectID, obj_loc: Span) -> PTBResult<SuiObjectData> {
         let res = self
             .reader
-            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_type().with_owner())
+            .get_object_with_options(
+                object_id,
+                SuiObjectDataOptions::new().with_type().with_owner(),
+            )
             .await
             .map_err(|e| err!(obj_loc, "{e}"))?
             .into_object()
@@ -701,17 +778,26 @@ impl<'a> PTBBuilder<'a> {
 
     /// Add a single PTB command to the PTB that we are building up. This is the workhorse of it
     /// all.
-    async fn handle_command_(&mut self, cmd_span: Span, command: ParsedPTBCommand) -> PTBResult<()> {
+    async fn handle_command_(
+        &mut self,
+        cmd_span: Span,
+        command: ParsedPTBCommand,
+    ) -> PTBResult<()> {
         // let sp!(cmd_span, tok) = &command.name;
         match command {
             ParsedPTBCommand::TransferObjects(obj_args, to_address) => {
-                let to_arg = self.resolve(to_address, ToPure::new(TypeTag::Address)).await?;
+                let to_arg = self
+                    .resolve(to_address, ToPure::new(TypeTag::Address))
+                    .await?;
                 let mut transfer_args = vec![];
                 for o in obj_args.value.into_iter() {
                     let arg = self.resolve(o, ToObject::default()).await?;
                     transfer_args.push(arg);
                 }
-                self.last_command = Some(self.ptb.command(Tx::Command::TransferObjects(transfer_args, to_arg)));
+                self.last_command = Some(
+                    self.ptb
+                        .command(Tx::Command::TransferObjects(transfer_args, to_arg)),
+                );
             }
             ParsedPTBCommand::Assign(sp!(ident_loc, i), None) => {
                 let Some(prev_ptb_arg) = self.last_command.take() else {
@@ -730,10 +816,12 @@ impl<'a> PTBBuilder<'a> {
             ParsedPTBCommand::Assign(sp!(ident_loc, i), Some(arg_w_loc)) => {
                 self.declare_identifier(i.clone(), ident_loc);
                 self.declare_possible_address_binding(i.clone(), &arg_w_loc);
-                self.arguments_to_resolve.insert(i, ArgWithHistory::Unresolved(arg_w_loc));
+                self.arguments_to_resolve
+                    .insert(i, ArgWithHistory::Unresolved(arg_w_loc));
             }
             ParsedPTBCommand::MakeMoveVec(sp!(ty_loc, ty_arg), sp!(_, args)) => {
-                let ty_arg = ty_arg.into_type_tag(&resolve_address).map_err(|e| err!(ty_loc, "{e}"))?;
+                let ty_arg = into_type_tag(&self.addresses, ty_arg, &resolve_address)
+                    .map_err(|e| err!(ty_loc, "{e}"))?;
                 let mut vec_args: Vec<Tx::Argument> = vec![];
                 if is_primitive_type_tag(&ty_arg) {
                     for arg in args.into_iter() {
@@ -746,7 +834,9 @@ impl<'a> PTBBuilder<'a> {
                         vec_args.push(arg);
                     }
                 }
-                let res = self.ptb.command(Tx::Command::make_move_vec(Some(ty_arg), vec_args));
+                let res = self
+                    .ptb
+                    .command(Tx::Command::make_move_vec(Some(ty_arg), vec_args));
                 self.last_command = Some(res);
             }
             ParsedPTBCommand::SplitCoins(pre_coin, sp!(_, amounts)) => {
@@ -770,21 +860,19 @@ impl<'a> PTBBuilder<'a> {
                 self.last_command = Some(res);
             }
             ParsedPTBCommand::MoveCall(
-                sp!(mod_access_loc, PTBModuleAccess { address, module_name, function_name }),
+                sp!(
+                    mod_access_loc,
+                    PTBModuleAccess {
+                        address,
+                        module_name,
+                        function_name,
+                    }
+                ),
                 in_ty_args,
                 args,
             ) => {
-                let mut ty_args = vec![];
-
-                if let Some(sp!(ty_loc, in_ty_args)) = in_ty_args {
-                    for t in in_ty_args.into_iter() {
-                        ty_args.push(t.into_type_tag(&resolve_address).map_err(|e| err!(ty_loc, "{e}"))?)
-                    }
-                }
-
-                let resolved_address = address.value.clone().into_account_address(&|s| {
-                    self.addresses.get(s).cloned().or_else(|| resolve_address(s))
-                }).map_err(|e| {
+                let resolved_address = try_resolve_parsed_address(&self.addresses, &address)
+                    .map_err(|e| {
                     let e = err!(address.span, "{e}");
                     if let ParsedAddress::Named(name) = address.value {
                         e.with_help(
@@ -795,10 +883,27 @@ impl<'a> PTBBuilder<'a> {
                     }
                 })?;
 
+                let mut ty_args = vec![];
+                if let Some(sp!(ty_loc, in_ty_args)) = in_ty_args {
+                    for t in in_ty_args.into_iter() {
+                        ty_args.push(
+                            into_type_tag(&self.addresses, t, &resolve_address)
+                                .map_err(|e| err!(ty_loc, "{e}"))?,
+                        )
+                    }
+                }
+
                 let package_id = ObjectID::from_address(resolved_address);
                 let package = self.resolve_to_package(package_id, address.span).await?;
                 let args = self
-                    .resolve_move_call_args(package, &module_name, &function_name, &ty_args, args, mod_access_loc)
+                    .resolve_move_call_args(
+                        package,
+                        &module_name,
+                        &function_name,
+                        &ty_args,
+                        args,
+                        mod_access_loc,
+                    )
                     .await?;
                 let res = self.ptb.command(Tx::Command::move_call(
                     package_id,
@@ -811,7 +916,7 @@ impl<'a> PTBBuilder<'a> {
             }
             ParsedPTBCommand::Publish(sp!(pkg_loc, package_path)) => {
                 let chain_id = self.reader.get_chain_identifier().await.ok();
-                let build_config = BuildConfig::default();
+                let build_config = MoveBuildConfig::default();
                 let package_path = Path::new(&package_path);
                 let build_config = resolve_lock_file_path(build_config.clone(), Some(package_path))
                     .map_err(|e| err!(pkg_loc, "{e}"))?;
@@ -826,14 +931,6 @@ impl<'a> PTBBuilder<'a> {
                 } else {
                     None
                 };
-                let compile_result = compile_package(
-                    self.reader,
-                    build_config.clone(),
-                    package_path,
-                    false, /* with_unpublished_dependencies */
-                    false, /* skip_dependency_verification */
-                )
-                .await;
                 // Restore original ID, then check result.
                 if let (Some(chain_id), Some(previous_id)) = (chain_id, previous_id) {
                     let _ = sui_package_management::set_package_id(
@@ -844,9 +941,22 @@ impl<'a> PTBBuilder<'a> {
                     )
                     .map_err(|e| err!(pkg_loc, "{e}"))?;
                 }
-                let (dependencies, compiled_modules, _, _) = compile_result.map_err(|e| err!(pkg_loc, "{e}"))?;
+                let compiled_package = compile_package(
+                    self.reader,
+                    build_config.clone(),
+                    package_path,
+                    false, /* with_unpublished_dependencies */
+                    false, /* skip_dependency_verification */
+                )
+                .await
+                .map_err(|e| err!(pkg_loc, "{e}"))?;
 
-                let res = self.ptb.publish_upgradeable(compiled_modules, dependencies.published.into_values().collect());
+                let compiled_modules = compiled_package.get_package_bytes(false);
+
+                let res = self.ptb.publish_upgradeable(
+                    compiled_modules,
+                    compiled_package.get_published_dependencies_ids(),
+                );
                 self.last_command = Some(res);
             }
             // Update this command to not do as many things. It should result in a single command.
@@ -866,11 +976,15 @@ impl<'a> PTBBuilder<'a> {
                     }
                 };
 
-                let upgrade_cap_arg =
-                    self.resolve(cap_loc.wrap(PTBArg::Address(upgrade_cap_id)), ToObject::default()).await?;
+                let upgrade_cap_arg = self
+                    .resolve(
+                        cap_loc.wrap(PTBArg::Address(upgrade_cap_id)),
+                        ToObject::default(),
+                    )
+                    .await?;
 
                 let chain_id = self.reader.get_chain_identifier().await.ok();
-                let build_config = BuildConfig::default();
+                let build_config = MoveBuildConfig::default();
                 let package_path = Path::new(&package_path);
                 let build_config = resolve_lock_file_path(build_config.clone(), Some(package_path))
                     .map_err(|e| err!(path_loc, "{e}"))?;
@@ -885,16 +999,6 @@ impl<'a> PTBBuilder<'a> {
                 } else {
                     None
                 };
-                let upgrade_result = upgrade_package(
-                    self.reader,
-                    build_config.clone(),
-                    package_path,
-                    ObjectID::from_address(upgrade_cap_id.into_inner()),
-                    false, /* with_unpublished_dependencies */
-                    false, /* skip_dependency_verification */
-                    None,
-                )
-                .await;
                 // Restore original ID, then check result.
                 if let (Some(chain_id), Some(previous_id)) = (chain_id, previous_id) {
                     let _ = sui_package_management::set_package_id(
@@ -905,11 +1009,37 @@ impl<'a> PTBBuilder<'a> {
                     )
                     .map_err(|e| err!(path_loc, "{e}"))?;
                 }
-                let (package_id, compiled_modules, dependencies, package_digest, upgrade_policy, _) =
-                    upgrade_result.map_err(|e| err!(path_loc, "{e}"))?;
 
-                let upgrade_arg = self.ptb.pure(upgrade_policy).map_err(|e| err!(cmd_span, "{e}"))?;
-                let digest_arg = self.ptb.pure(package_digest).map_err(|e| err!(cmd_span, "{e}"))?;
+                let (upgrade_policy, compiled_package) = upgrade_package(
+                    self.reader,
+                    build_config.clone(),
+                    package_path,
+                    ObjectID::from_address(upgrade_cap_id.into_inner()),
+                    false, /* with_unpublished_dependencies */
+                    false, /* skip_dependency_verification */
+                    None,
+                )
+                .await
+                .map_err(|e| err!(path_loc, "{e}"))?;
+
+                let package_digest = compiled_package.get_package_digest(false);
+                let package_id = compiled_package
+                    .published_at
+                    .as_ref()
+                    .map_err(|e| err!(path_loc, "{e}"))?;
+                let compiled_modules = compiled_package.get_package_bytes(false);
+                // let (package_id, compiled_modules, dependencies, package_digest, upgrade_policy, _) =
+                //     upgrade_result.map_err(|e| err!(path_loc, "{e}"))?;
+
+                let upgrade_arg = self
+                    .ptb
+                    .pure(upgrade_policy)
+                    .map_err(|e| err!(cmd_span, "{e}"))?;
+                let digest_arg = self
+                    .ptb
+                    // .to_vec() is necessary to get the length prefix
+                    .pure(package_digest.to_vec())
+                    .map_err(|e| err!(cmd_span, "{e}"))?;
                 let upgrade_ticket = self.ptb.command(Tx::Command::move_call(
                     SUI_FRAMEWORK_PACKAGE_ID,
                     ident_str!("package").to_owned(),
@@ -918,9 +1048,13 @@ impl<'a> PTBBuilder<'a> {
                     vec![upgrade_cap_arg, upgrade_arg, digest_arg],
                 ));
                 let upgrade_receipt = self.ptb.upgrade(
-                    package_id,
+                    *package_id,
                     upgrade_ticket,
-                    dependencies.published.into_values().collect(),
+                    compiled_package
+                        .dependency_ids
+                        .published
+                        .into_values()
+                        .collect(),
                     compiled_modules,
                 );
                 let res = self.ptb.command(Tx::Command::move_call(
@@ -956,7 +1090,10 @@ pub fn to_ordinal_contraction(num: usize) -> String {
     format!("{}{}", num, suffix)
 }
 
-pub(crate) fn find_did_you_means<'a>(needle: &str, haystack: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
+pub(crate) fn find_did_you_means<'a>(
+    needle: &str,
+    haystack: impl IntoIterator<Item = &'a str>,
+) -> Vec<&'a str> {
     let mut results = Vec::new();
     let mut best_distance = usize::MAX;
 
@@ -979,14 +1116,20 @@ pub(crate) fn find_did_you_means<'a>(needle: &str, haystack: impl IntoIterator<I
     results
 }
 
-pub(crate) fn display_did_you_mean<S: AsRef<str> + std::fmt::Display>(possibles: Vec<S>) -> Option<String> {
+pub(crate) fn display_did_you_mean<S: AsRef<str> + std::fmt::Display>(
+    possibles: Vec<S>,
+) -> Option<String> {
     if possibles.is_empty() {
         return None;
     }
 
     let mut strs = vec![];
 
-    let preposition = if possibles.len() == 1 { "Did you mean " } else { "Did you mean one of " };
+    let preposition = if possibles.len() == 1 {
+        "Did you mean "
+    } else {
+        "Did you mean one of "
+    };
 
     let len = possibles.len();
     for (i, possible) in possibles.into_iter().enumerate() {
@@ -1030,4 +1173,134 @@ fn edit_distance(a: &str, b: &str) -> usize {
     }
 
     cache[a.len()][b.len()]
+}
+
+/// Check if it's a MVR name. MVR names must contain a / in them so as we already
+/// parsed the name, we can just check if it contains a / in it. A keystore alias cannot
+/// contain a slash, and similarly a numerical address or named address cannot have a / in it.
+pub fn is_mvr_name(name: &str) -> bool {
+    name.contains('/') && (name.contains("@") || name.contains(".sui"))
+}
+
+pub fn into_struct_tag(
+    addresses: &BTreeMap<String, AddressData>,
+    parsed_struct_type: ParsedStructType,
+    mapping: &(impl Fn(&str) -> Option<AccountAddress> + std::marker::Sync),
+) -> anyhow::Result<StructTag> {
+    let fq_name = parsed_struct_type.fq_name;
+    let type_args = parsed_struct_type.type_args;
+
+    let address = match fq_name.module.address {
+        ParsedAddress::Named(name) if is_mvr_name(&name) => {
+            let addr = addresses.get(&name);
+            let Some(AddressData::MovePackage((pkg, type_origin_map))) = addr else {
+                return Err(anyhow::anyhow!(
+                    "Expected that {name} is an actual Move package"
+                ));
+            };
+            let Some(address) =
+                type_origin_map.get(&(fq_name.module.name.clone(), fq_name.name.clone()))
+            else {
+                return Err(anyhow::anyhow!(
+                    "Cannot find the type {} in module {} in package {}({})",
+                    fq_name.name,
+                    fq_name.module.name,
+                    name,
+                    pkg.id()
+                ));
+            };
+            AccountAddress::from_bytes(address.into_bytes()).map_err(|_| {
+                anyhow::anyhow!("Cannot convert ObjectID {address} into AccountAddress")
+            })
+        }
+        _ => fq_name.module.address.into_account_address(mapping),
+    }?;
+
+    Ok(StructTag {
+        address,
+        module: Identifier::new(fq_name.module.name)?,
+        name: Identifier::new(fq_name.name)?,
+        type_params: type_args
+            .into_iter()
+            .map(|t| into_type_tag(addresses, t, mapping))
+            .collect::<anyhow::Result<_>>()?,
+    })
+}
+
+/// Given a parsed type, resolve it to a TypeTag. This custom function makes usage of the custom
+/// into struct tag function that makes use of the already resolved MVR data, if needed.
+pub fn into_type_tag(
+    addresses: &BTreeMap<String, AddressData>,
+    parsed_type: ParsedType,
+    mapping: &(impl Fn(&str) -> Option<AccountAddress> + std::marker::Sync),
+) -> anyhow::Result<TypeTag> {
+    Ok(match parsed_type {
+        ParsedType::U8 => TypeTag::U8,
+        ParsedType::U16 => TypeTag::U16,
+        ParsedType::U32 => TypeTag::U32,
+        ParsedType::U64 => TypeTag::U64,
+        ParsedType::U128 => TypeTag::U128,
+        ParsedType::U256 => TypeTag::U256,
+        ParsedType::Bool => TypeTag::Bool,
+        ParsedType::Address => TypeTag::Address,
+        ParsedType::Signer => TypeTag::Signer,
+        ParsedType::Vector(inner) => {
+            TypeTag::Vector(Box::new(into_type_tag(addresses, *inner, mapping)?))
+        }
+        ParsedType::Struct(s) => TypeTag::Struct(Box::new(into_struct_tag(addresses, s, mapping)?)),
+    })
+}
+
+/// Try to resolve a parsed address by using the already known mvr data and the keystore (addresses
+/// ) or the known package names (e.g., sui, deepbook, etc) by calling `resolve_address`.
+fn try_resolve_parsed_address(
+    addresses: &BTreeMap<String, AddressData>,
+    address: &Spanned<ParsedAddress>,
+) -> Result<AccountAddress> {
+    match &address.value {
+        ParsedAddress::Named(name) => {
+            let address = if let Some(addr) = addresses.get(name) {
+                addr.address()
+            } else {
+                resolve_address(name)
+            };
+
+            address.ok_or_else(|| anyhow!("Unbound named address: '{name}'"))
+        }
+
+        ParsedAddress::Numerical(x) => Ok(x.into_inner()),
+    }
+}
+
+/// Try to resolve an ObjectID to a MovePackage
+pub async fn resolve_package(
+    reader: &ReadApi,
+    package_id: ObjectID,
+    loc: Span,
+) -> Result<MovePackage, PTBError> {
+    let object = reader
+        .get_object_with_options(package_id, SuiObjectDataOptions::bcs_lossless())
+        .await
+        .map_err(|e| err!(loc, "{e}"))?
+        .into_object()
+        .map_err(|e| err!(loc, "{e}"))?;
+
+    let Some(SuiRawData::Package(package)) = object.bcs else {
+        error!(
+            loc,
+            "BCS field in object '{}' is missing or not a package.", package_id
+        );
+    };
+
+    MovePackage::new(
+        package.id,
+        package.version,
+        package.module_map,
+        // This package came from on-chain and the tool runs locally, so don't worry about
+        // trying to enforce the package size limit.
+        u64::MAX,
+        package.type_origin_table,
+        package.linkage_table,
+    )
+    .map_err(|e| err!(loc, "{e}"))
 }

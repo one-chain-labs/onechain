@@ -1,15 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{executor::MAX_CHECKPOINTS_IN_PROGRESS, reducer::reduce, Reducer, Worker};
+use crate::executor::MAX_CHECKPOINTS_IN_PROGRESS;
+use crate::reducer::reduce;
+use crate::{Reducer, Worker};
 use mysten_metrics::spawn_monitored_task;
-use std::{
-    collections::{BTreeSet, VecDeque},
-    sync::Arc,
-    time::Instant,
-};
-use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
-use tokio::sync::{mpsc, oneshot};
+use std::collections::{BTreeSet, VecDeque};
+use std::sync::Arc;
+use std::time::Instant;
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 use tracing::info;
 
 pub struct WorkerPool<W: Worker> {
@@ -21,16 +23,25 @@ pub struct WorkerPool<W: Worker> {
 
 impl<W: Worker + 'static> WorkerPool<W> {
     pub fn new(worker: W, task_name: String, concurrency: usize) -> Self {
-        Self { task_name, concurrency, worker: Arc::new(worker), reducer: None }
+        Self {
+            task_name,
+            concurrency,
+            worker: Arc::new(worker),
+            reducer: None,
+        }
     }
-
     pub fn new_with_reducer(
         worker: W,
         task_name: String,
         concurrency: usize,
         reducer: Box<dyn Reducer<W::Result>>,
     ) -> Self {
-        Self { task_name, concurrency, worker: Arc::new(worker), reducer: Some(reducer) }
+        Self {
+            task_name,
+            concurrency,
+            worker: Arc::new(worker),
+            reducer: Some(reducer),
+        }
     }
 
     pub async fn run(
@@ -43,8 +54,8 @@ impl<W: Worker + 'static> WorkerPool<W> {
             "Starting indexing pipeline {} with concurrency {}. Current watermark is {}.",
             self.task_name, self.concurrency, watermark
         );
-        let (progress_sender, mut progress_receiver) = mpsc::channel(MAX_CHECKPOINTS_IN_PROGRESS);
-        let (reducer_sender, reducer_receiver) = mpsc::channel(MAX_CHECKPOINTS_IN_PROGRESS);
+        let (progress_sender, mut progress_receiver) = mpsc::channel(*MAX_CHECKPOINTS_IN_PROGRESS);
+        let (reducer_sender, reducer_receiver) = mpsc::channel(*MAX_CHECKPOINTS_IN_PROGRESS);
         let mut workers = vec![];
         let mut idle: BTreeSet<_> = (0..self.concurrency).collect();
         let mut checkpoints = VecDeque::new();
@@ -53,7 +64,8 @@ impl<W: Worker + 'static> WorkerPool<W> {
 
         // spawn child workers
         for worker_id in 0..self.concurrency {
-            let (worker_sender, mut worker_recv) = mpsc::channel::<Arc<CheckpointData>>(MAX_CHECKPOINTS_IN_PROGRESS);
+            let (worker_sender, mut worker_recv) =
+                mpsc::channel::<Arc<CheckpointData>>(*MAX_CHECKPOINTS_IN_PROGRESS);
             let (term_sender, mut term_receiver) = oneshot::channel::<()>();
             let cloned_progress_sender = progress_sender.clone();
             let task_name = self.task_name.clone();
@@ -72,7 +84,7 @@ impl<W: Worker + 'static> WorkerPool<W> {
                             let result = backoff::future::retry(backoff, || async {
                                 worker
                                     .clone()
-                                    .process_checkpoint(&checkpoint)
+                                    .process_checkpoint_arc(&checkpoint)
                                     .await
                                     .map_err(|err| {
                                         info!("transient worker execution error {:?} for checkpoint {}", err, sequence_number);

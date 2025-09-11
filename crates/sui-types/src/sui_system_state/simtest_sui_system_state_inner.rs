@@ -1,21 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    balance::Balance,
-    base_types::SuiAddress,
-    collection_types::{Bag, Table},
-    committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
-    crypto::{AuthorityPublicKey, AuthorityPublicKeyBytes, NetworkPublicKey},
-    error::SuiError,
-    storage::ObjectStore,
-    sui_system_state::{
-        epoch_start_sui_system_state::{EpochStartSystemState, EpochStartValidatorInfoV1},
-        sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-        AdvanceEpochParams,
-        SuiSystemStateTrait,
-    },
+use crate::balance::Balance;
+use crate::base_types::SuiAddress;
+use crate::collection_types::{Bag, Table};
+use crate::committee::{CommitteeWithNetworkMetadata, NetworkMetadata};
+use crate::crypto::{AuthorityPublicKey, AuthorityPublicKeyBytes, NetworkPublicKey};
+use crate::error::SuiError;
+use crate::gas::GasCostSummary;
+use crate::storage::ObjectStore;
+use crate::sui_system_state::epoch_start_sui_system_state::{
+    EpochStartSystemState, EpochStartValidatorInfoV1,
 };
+use crate::sui_system_state::sui_system_state_summary::{
+    SuiSystemStateSummary, SuiValidatorSummary,
+};
+use crate::sui_system_state::{AdvanceEpochParams, SuiSystemStateTrait};
 use fastcrypto::traits::ToFromBytes;
 use mysten_network::Multiaddr;
 use once_cell::sync::OnceCell;
@@ -60,7 +60,8 @@ pub struct SimTestValidatorV1 {
 
 impl SimTestValidatorV1 {
     pub fn verified_metadata(&self) -> &VerifiedSimTestValidatorMetadataV1 {
-        self.verified_metadata.get_or_init(|| self.metadata.verify())
+        self.verified_metadata
+            .get_or_init(|| self.metadata.verify())
     }
 
     pub fn into_sui_validator_summary(self) -> SuiValidatorSummary {
@@ -95,9 +96,12 @@ pub struct VerifiedSimTestValidatorMetadataV1 {
 
 impl SimTestValidatorMetadataV1 {
     pub fn verify(&self) -> VerifiedSimTestValidatorMetadataV1 {
-        let protocol_pubkey = AuthorityPublicKey::from_bytes(self.protocol_pubkey_bytes.as_ref()).unwrap();
-        let network_pubkey = NetworkPublicKey::from_bytes(self.network_pubkey_bytes.as_ref()).unwrap();
-        let worker_pubkey = NetworkPublicKey::from_bytes(self.worker_pubkey_bytes.as_ref()).unwrap();
+        let protocol_pubkey =
+            AuthorityPublicKey::from_bytes(self.protocol_pubkey_bytes.as_ref()).unwrap();
+        let network_pubkey =
+            NetworkPublicKey::from_bytes(self.network_pubkey_bytes.as_ref()).unwrap();
+        let worker_pubkey =
+            NetworkPublicKey::from_bytes(self.worker_pubkey_bytes.as_ref()).unwrap();
         let net_address = Multiaddr::try_from(self.net_address.clone()).unwrap();
         let p2p_address = Multiaddr::try_from(self.p2p_address.clone()).unwrap();
         let primary_address = Multiaddr::try_from(self.primary_address.clone()).unwrap();
@@ -150,6 +154,10 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerV1 {
         self.safe_mode
     }
 
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary::default()
+    }
+
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
         self.epoch = params.epoch;
         self.safe_mode = true;
@@ -167,11 +175,14 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerV1 {
                 let name = verified_metadata.sui_pubkey_bytes();
                 (
                     name,
-                    (validator.voting_power, NetworkMetadata {
-                        network_address: verified_metadata.net_address.clone(),
-                        narwhal_primary_address: verified_metadata.primary_address.clone(),
-                        network_public_key: Some(verified_metadata.network_pubkey.clone()),
-                    }),
+                    (
+                        validator.voting_power,
+                        NetworkMetadata {
+                            network_address: verified_metadata.net_address.clone(),
+                            narwhal_primary_address: verified_metadata.primary_address.clone(),
+                            network_public_key: Some(verified_metadata.network_pubkey.clone()),
+                        },
+                    ),
                 )
             })
             .collect();
@@ -264,6 +275,10 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerShallowV2 {
         self.safe_mode
     }
 
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary::default()
+    }
+
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
         self.epoch = params.epoch;
         self.safe_mode = true;
@@ -281,11 +296,14 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerShallowV2 {
                 let name = verified_metadata.sui_pubkey_bytes();
                 (
                     name,
-                    (validator.voting_power, NetworkMetadata {
-                        network_address: verified_metadata.net_address.clone(),
-                        narwhal_primary_address: verified_metadata.primary_address.clone(),
-                        network_public_key: Some(verified_metadata.network_pubkey.clone()),
-                    }),
+                    (
+                        validator.voting_power,
+                        NetworkMetadata {
+                            network_address: verified_metadata.net_address.clone(),
+                            narwhal_primary_address: verified_metadata.primary_address.clone(),
+                            network_public_key: Some(verified_metadata.network_pubkey.clone()),
+                        },
+                    ),
                 )
             })
             .collect();
@@ -354,7 +372,8 @@ pub struct SimTestValidatorDeepV2 {
 
 impl SimTestValidatorDeepV2 {
     pub fn verified_metadata(&self) -> &VerifiedSimTestValidatorMetadataV1 {
-        self.verified_metadata.get_or_init(|| self.metadata.verify())
+        self.verified_metadata
+            .get_or_init(|| self.metadata.verify())
     }
 
     pub fn into_sui_validator_summary(self) -> SuiValidatorSummary {
@@ -406,6 +425,10 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerDeepV2 {
         self.safe_mode
     }
 
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary::default()
+    }
+
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
         self.epoch = params.epoch;
         self.safe_mode = true;
@@ -423,11 +446,14 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerDeepV2 {
                 let name = verified_metadata.sui_pubkey_bytes();
                 (
                     name,
-                    (validator.voting_power, NetworkMetadata {
-                        network_address: verified_metadata.net_address.clone(),
-                        narwhal_primary_address: verified_metadata.primary_address.clone(),
-                        network_public_key: Some(verified_metadata.network_pubkey.clone()),
-                    }),
+                    (
+                        validator.voting_power,
+                        NetworkMetadata {
+                            network_address: verified_metadata.net_address.clone(),
+                            narwhal_primary_address: verified_metadata.primary_address.clone(),
+                            network_public_key: Some(verified_metadata.network_pubkey.clone()),
+                        },
+                    ),
                 )
             })
             .collect();

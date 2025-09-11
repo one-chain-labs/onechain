@@ -31,7 +31,11 @@ pub fn borrow_uid(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    let borrow_uid_cost_params = context.extensions_mut().get::<NativesCostTable>().borrow_uid_cost_params.clone();
+    let borrow_uid_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .borrow_uid_cost_params
+        .clone();
 
     // Charge base fee
     native_charge_gas_early_exit!(context, borrow_uid_cost_params.object_borrow_uid_cost_base);
@@ -59,10 +63,17 @@ pub fn delete_impl(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let delete_impl_cost_params = context.extensions_mut().get::<NativesCostTable>().delete_impl_cost_params.clone();
+    let delete_impl_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .delete_impl_cost_params
+        .clone();
 
     // Charge base fee
-    native_charge_gas_early_exit!(context, delete_impl_cost_params.object_delete_impl_cost_base);
+    native_charge_gas_early_exit!(
+        context,
+        delete_impl_cost_params.object_delete_impl_cost_base
+    );
 
     // unwrap safe because the interface of native function guarantees it.
     let uid_bytes = pop_arg!(args, AccountAddress);
@@ -89,10 +100,17 @@ pub fn record_new_uid(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let record_new_id_cost_params = context.extensions_mut().get::<NativesCostTable>().record_new_id_cost_params.clone();
+    let record_new_id_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .record_new_id_cost_params
+        .clone();
 
     // Charge base fee
-    native_charge_gas_early_exit!(context, record_new_id_cost_params.object_record_new_uid_cost_base);
+    native_charge_gas_early_exit!(
+        context,
+        record_new_id_cost_params.object_record_new_uid_cost_base
+    );
 
     // unwrap safe because the interface of native function guarantees it.
     let uid_bytes = pop_arg!(args, AccountAddress);

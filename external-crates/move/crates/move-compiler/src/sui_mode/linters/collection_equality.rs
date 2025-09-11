@@ -10,32 +10,18 @@ use move_symbol_pool::Symbol;
 
 use crate::{
     diag,
-    diagnostics::codes::{custom, DiagnosticInfo, Severity},
+    diagnostics::codes::{DiagnosticInfo, Severity, custom},
     parser::ast as P,
     sui_mode::{SUI_ADDR_NAME, SUI_ADDR_VALUE},
     typing::{ast as T, visitor::simple_visitor},
 };
 
 use super::{
-    LinterDiagnosticCategory,
-    LinterDiagnosticCode,
-    BAG_MOD_NAME,
-    BAG_STRUCT_NAME,
-    LINKED_TABLE_MOD_NAME,
-    LINKED_TABLE_STRUCT_NAME,
-    LINT_WARNING_PREFIX,
-    OBJECT_BAG_MOD_NAME,
-    OBJECT_BAG_STRUCT_NAME,
-    OBJECT_TABLE_MOD_NAME,
-    OBJECT_TABLE_STRUCT_NAME,
-    TABLE_MOD_NAME,
-    TABLE_STRUCT_NAME,
-    TABLE_VEC_MOD_NAME,
-    TABLE_VEC_STRUCT_NAME,
-    VEC_MAP_MOD_NAME,
-    VEC_MAP_STRUCT_NAME,
-    VEC_SET_MOD_NAME,
-    VEC_SET_STRUCT_NAME,
+    BAG_MOD_NAME, BAG_STRUCT_NAME, LINKED_TABLE_MOD_NAME, LINKED_TABLE_STRUCT_NAME,
+    LINT_WARNING_PREFIX, LinterDiagnosticCategory, LinterDiagnosticCode, OBJECT_BAG_MOD_NAME,
+    OBJECT_BAG_STRUCT_NAME, OBJECT_TABLE_MOD_NAME, OBJECT_TABLE_STRUCT_NAME, TABLE_MOD_NAME,
+    TABLE_STRUCT_NAME, TABLE_VEC_MOD_NAME, TABLE_VEC_STRUCT_NAME, VEC_MAP_MOD_NAME,
+    VEC_MAP_STRUCT_NAME, VEC_SET_MOD_NAME, VEC_SET_STRUCT_NAME,
 };
 
 const COLLECTIONS_EQUALITY_DIAG: DiagnosticInfo = custom(
@@ -48,13 +34,48 @@ const COLLECTIONS_EQUALITY_DIAG: DiagnosticInfo = custom(
 
 const COLLECTION_TYPES: &[(Symbol, AccountAddress, &str, &str)] = &[
     (SUI_ADDR_NAME, SUI_ADDR_VALUE, BAG_MOD_NAME, BAG_STRUCT_NAME),
-    (SUI_ADDR_NAME, SUI_ADDR_VALUE, OBJECT_BAG_MOD_NAME, OBJECT_BAG_STRUCT_NAME),
-    (SUI_ADDR_NAME, SUI_ADDR_VALUE, TABLE_MOD_NAME, TABLE_STRUCT_NAME),
-    (SUI_ADDR_NAME, SUI_ADDR_VALUE, OBJECT_TABLE_MOD_NAME, OBJECT_TABLE_STRUCT_NAME),
-    (SUI_ADDR_NAME, SUI_ADDR_VALUE, LINKED_TABLE_MOD_NAME, LINKED_TABLE_STRUCT_NAME),
-    (SUI_ADDR_NAME, SUI_ADDR_VALUE, TABLE_VEC_MOD_NAME, TABLE_VEC_STRUCT_NAME),
-    (SUI_ADDR_NAME, SUI_ADDR_VALUE, VEC_MAP_MOD_NAME, VEC_MAP_STRUCT_NAME),
-    (SUI_ADDR_NAME, SUI_ADDR_VALUE, VEC_SET_MOD_NAME, VEC_SET_STRUCT_NAME),
+    (
+        SUI_ADDR_NAME,
+        SUI_ADDR_VALUE,
+        OBJECT_BAG_MOD_NAME,
+        OBJECT_BAG_STRUCT_NAME,
+    ),
+    (
+        SUI_ADDR_NAME,
+        SUI_ADDR_VALUE,
+        TABLE_MOD_NAME,
+        TABLE_STRUCT_NAME,
+    ),
+    (
+        SUI_ADDR_NAME,
+        SUI_ADDR_VALUE,
+        OBJECT_TABLE_MOD_NAME,
+        OBJECT_TABLE_STRUCT_NAME,
+    ),
+    (
+        SUI_ADDR_NAME,
+        SUI_ADDR_VALUE,
+        LINKED_TABLE_MOD_NAME,
+        LINKED_TABLE_STRUCT_NAME,
+    ),
+    (
+        SUI_ADDR_NAME,
+        SUI_ADDR_VALUE,
+        TABLE_VEC_MOD_NAME,
+        TABLE_VEC_STRUCT_NAME,
+    ),
+    (
+        SUI_ADDR_NAME,
+        SUI_ADDR_VALUE,
+        VEC_MAP_MOD_NAME,
+        VEC_MAP_STRUCT_NAME,
+    ),
+    (
+        SUI_ADDR_NAME,
+        SUI_ADDR_VALUE,
+        VEC_SET_MOD_NAME,
+        VEC_SET_STRUCT_NAME,
+    ),
 ];
 
 simple_visitor!(
@@ -70,8 +91,9 @@ simple_visitor!(
                 // no type name
                 return false;
             };
-            if let Some((caddr_name, _, cmodule, cname)) =
-                COLLECTION_TYPES.iter().find(|(_, caddr_value, cmodule, cname)| tn_.is(caddr_value, *cmodule, *cname))
+            if let Some((caddr_name, _, cmodule, cname)) = COLLECTION_TYPES
+                .iter()
+                .find(|(_, caddr_value, cmodule, cname)| tn_.is(caddr_value, *cmodule, *cname))
             {
                 let msg = format!(
                     "Comparing collections of type '{caddr_name}::{cmodule}::{cname}' \

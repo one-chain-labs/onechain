@@ -10,76 +10,56 @@ mod checked {
     use move_binary_format::CompiledModule;
     use move_vm_runtime::move_vm::MoveVM;
     use std::{collections::HashSet, sync::Arc};
-    use sui_types::{
-        balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
-        base_types::SequenceNumber,
-        gas_coin::GAS,
-        messages_checkpoint::CheckpointTimestamp,
-        metrics::LimitsMetrics,
-        object::OBJECT_START_VERSION,
-        programmable_transaction_builder::ProgrammableTransactionBuilder,
-        randomness_state::{
-            RANDOMNESS_MODULE_NAME,
-            RANDOMNESS_STATE_CREATE_FUNCTION_NAME,
-            RANDOMNESS_STATE_UPDATE_FUNCTION_NAME,
-        },
-        SUI_RANDOMNESS_STATE_OBJECT_ID,
+    use sui_types::balance::{
+        BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME,
+        BALANCE_MODULE_NAME,
     };
+    use sui_types::execution_params::ExecutionOrEarlyError;
+    use sui_types::gas_coin::GAS;
+    use sui_types::messages_checkpoint::CheckpointTimestamp;
+    use sui_types::metrics::LimitsMetrics;
+    use sui_types::object::OBJECT_START_VERSION;
+    use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+    use sui_types::randomness_state::{
+        RANDOMNESS_MODULE_NAME, RANDOMNESS_STATE_CREATE_FUNCTION_NAME,
+        RANDOMNESS_STATE_UPDATE_FUNCTION_NAME,
+    };
+    use sui_types::SUI_RANDOMNESS_STATE_OBJECT_ID;
     use tracing::{info, instrument, trace, warn};
 
-    use crate::{
-        gas_charger::GasCharger,
-        programmable_transactions,
-        temporary_store::TemporaryStore,
-        type_layout_resolver::TypeLayoutResolver,
-    };
+    use crate::programmable_transactions;
+    use crate::type_layout_resolver::TypeLayoutResolver;
+    use crate::{gas_charger::GasCharger, temporary_store::TemporaryStore};
     use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
+    use sui_types::authenticator_state::{
+        AUTHENTICATOR_STATE_CREATE_FUNCTION_NAME, AUTHENTICATOR_STATE_EXPIRE_JWKS_FUNCTION_NAME,
+        AUTHENTICATOR_STATE_MODULE_NAME, AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME,
+    };
+    use sui_types::clock::{CLOCK_MODULE_NAME, CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME};
+    use sui_types::committee::EpochId;
+    use sui_types::deny_list_v1::{DENY_LIST_CREATE_FUNC, DENY_LIST_MODULE};
+    use sui_types::effects::TransactionEffects;
+    use sui_types::error::{ExecutionError, ExecutionErrorKind};
+    use sui_types::execution_config_utils::to_binary_config;
+    use sui_types::execution_status::ExecutionStatus;
+    use sui_types::gas::GasCostSummary;
+    use sui_types::gas::SuiGasStatus;
+    use sui_types::inner_temporary_store::InnerTemporaryStore;
+    use sui_types::storage::BackingStore;
     #[cfg(msim)]
-    use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result;
+    use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result_legacy;
+    use sui_types::sui_system_state::{AdvanceEpochParams, ADVANCE_EPOCH_SAFE_MODE_FUNCTION_NAME};
+    use sui_types::transaction::{
+        Argument, AuthenticatorStateExpire, AuthenticatorStateUpdate, CallArg, ChangeEpoch,
+        Command, EndOfEpochTransactionKind, GenesisTransaction, ObjectArg, ProgrammableTransaction,
+        TransactionKind,
+    };
+    use sui_types::transaction::{CheckedInputObjects, RandomnessStateUpdate};
     use sui_types::{
-        authenticator_state::{
-            AUTHENTICATOR_STATE_CREATE_FUNCTION_NAME,
-            AUTHENTICATOR_STATE_EXPIRE_JWKS_FUNCTION_NAME,
-            AUTHENTICATOR_STATE_MODULE_NAME,
-            AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME,
-        },
-        base_types::{ObjectID, ObjectRef, SuiAddress, TransactionDigest, TxContext},
-        clock::{CLOCK_MODULE_NAME, CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME},
-        committee::EpochId,
-        deny_list_v1::{DENY_LIST_CREATE_FUNC, DENY_LIST_MODULE},
-        effects::TransactionEffects,
-        error::{ExecutionError, ExecutionErrorKind},
-        execution::is_certificate_denied,
-        execution_config_utils::to_binary_config,
-        execution_status::{CongestedObjects, ExecutionStatus},
-        gas::{GasCostSummary, SuiGasStatus},
-        inner_temporary_store::InnerTemporaryStore,
+        base_types::{ObjectRef, SuiAddress, TransactionDigest, TxContext},
         object::{Object, ObjectInner},
-        storage::BackingStore,
-        sui_system_state::{
-            AdvanceEpochParams,
-            ADVANCE_EPOCH_FUNCTION_NAME,
-            ADVANCE_EPOCH_SAFE_MODE_FUNCTION_NAME,
-            SUI_SYSTEM_MODULE_NAME,
-        },
-        transaction::{
-            Argument,
-            AuthenticatorStateExpire,
-            AuthenticatorStateUpdate,
-            CallArg,
-            ChangeEpoch,
-            CheckedInputObjects,
-            Command,
-            EndOfEpochTransactionKind,
-            GenesisTransaction,
-            ObjectArg,
-            ProgrammableTransaction,
-            RandomnessStateUpdate,
-            TransactionKind,
-        },
-        SUI_AUTHENTICATOR_STATE_OBJECT_ID,
-        SUI_FRAMEWORK_ADDRESS,
-        SUI_FRAMEWORK_PACKAGE_ID,
+        sui_system_state::{ADVANCE_EPOCH_FUNCTION_NAME, SUI_SYSTEM_MODULE_NAME},
+        SUI_AUTHENTICATOR_STATE_OBJECT_ID, SUI_FRAMEWORK_ADDRESS, SUI_FRAMEWORK_PACKAGE_ID,
         SUI_SYSTEM_PACKAGE_ID,
     };
 
@@ -98,8 +78,13 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
-    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Mode::ExecutionResults, ExecutionError>) {
+        execution_params: ExecutionOrEarlyError,
+    ) -> (
+        InnerTemporaryStore,
+        SuiGasStatus,
+        TransactionEffects,
+        Result<Mode::ExecutionResults, ExecutionError>,
+    ) {
         let input_objects = input_objects.into_inner();
         let mutable_inputs = if enable_expensive_checks {
             input_objects.mutable_inputs().keys().copied().collect()
@@ -109,20 +94,33 @@ mod checked {
         let shared_object_refs = input_objects.filter_shared_objects();
         let receiving_objects = transaction_kind.receiving_objects();
         let mut transaction_dependencies = input_objects.transaction_dependencies();
-        let contains_deleted_input = input_objects.contains_deleted_objects();
-        let cancelled_objects = input_objects.get_cancelled_objects();
 
-        let mut temporary_store =
-            TemporaryStore::new(store, input_objects, receiving_objects, transaction_digest, protocol_config);
+        let mut temporary_store = TemporaryStore::new(
+            store,
+            input_objects,
+            receiving_objects,
+            transaction_digest,
+            protocol_config,
+        );
 
-        let mut gas_charger = GasCharger::new(transaction_digest, gas_coins, gas_status, protocol_config);
+        let mut gas_charger =
+            GasCharger::new(transaction_digest, gas_coins, gas_status, protocol_config);
 
-        let mut tx_ctx =
-            TxContext::new_from_components(&transaction_signer, &transaction_digest, epoch_id, epoch_timestamp_ms);
+        let mut tx_ctx = TxContext::new_from_components(
+            &transaction_signer,
+            &transaction_digest,
+            epoch_id,
+            epoch_timestamp_ms,
+            // Those values are unused in execution versions before 3 (or latest)
+            1,
+            1,
+            1_000_000,
+            None,
+            protocol_config,
+        );
 
         let is_epoch_change = transaction_kind.is_end_of_epoch_tx();
 
-        let deny_cert = is_certificate_denied(&transaction_digest, certificate_deny_set);
         let (gas_cost_summary, execution_result) = execute_transaction::<Mode>(
             &mut temporary_store,
             transaction_kind,
@@ -132,9 +130,7 @@ mod checked {
             protocol_config,
             metrics,
             enable_expensive_checks,
-            deny_cert,
-            contains_deleted_input,
-            cancelled_objects,
+            execution_params,
         );
 
         let status = if let Err(error) = &execution_result {
@@ -197,7 +193,12 @@ mod checked {
 
         if enable_expensive_checks && !Mode::allow_arbitrary_function_calls() {
             temporary_store
-                .check_ownership_invariants(&transaction_signer, &mut gas_charger, &mutable_inputs, is_epoch_change)
+                .check_ownership_invariants(
+                    &transaction_signer,
+                    &mut gas_charger,
+                    &mutable_inputs,
+                    is_epoch_change,
+                )
                 .unwrap()
         } // else, in dev inspect mode and anything goes--don't check
 
@@ -211,7 +212,12 @@ mod checked {
             *epoch_id,
         );
 
-        (inner, gas_charger.into_gas_status(), effects, execution_result)
+        (
+            inner,
+            gas_charger.into_gas_status(),
+            effects,
+            execution_result,
+        )
     }
 
     pub fn execute_genesis_state_update(
@@ -224,8 +230,13 @@ mod checked {
         pt: ProgrammableTransaction,
     ) -> Result<InnerTemporaryStore, ExecutionError> {
         let input_objects = input_objects.into_inner();
-        let mut temporary_store =
-            TemporaryStore::new(store, input_objects, vec![], tx_context.digest(), protocol_config);
+        let mut temporary_store = TemporaryStore::new(
+            store,
+            input_objects,
+            vec![],
+            tx_context.digest(),
+            protocol_config,
+        );
         let mut gas_charger = GasCharger::new_unmetered(tx_context.digest());
         programmable_transactions::execution::execute::<execution_mode::Genesis>(
             protocol_config,
@@ -250,14 +261,18 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        deny_cert: bool,
-        contains_deleted_input: bool,
-        cancelled_objects: Option<(Vec<ObjectID>, SequenceNumber)>,
-    ) -> (GasCostSummary, Result<Mode::ExecutionResults, ExecutionError>) {
+        execution_params: ExecutionOrEarlyError,
+    ) -> (
+        GasCostSummary,
+        Result<Mode::ExecutionResults, ExecutionError>,
+    ) {
         gas_charger.smash_gas(temporary_store);
 
         // At this point no charges have been applied yet
-        debug_assert!(gas_charger.no_charges(), "No gas charges must be applied yet");
+        debug_assert!(
+            gas_charger.no_charges(),
+            "No gas charges must be applied yet"
+        );
 
         let is_genesis_tx = matches!(transaction_kind, TransactionKind::Genesis(_));
         let advance_epoch_gas_summary = transaction_kind.get_advance_epoch_tx_gas_summary();
@@ -266,25 +281,11 @@ mod checked {
         // we must still ensure an effect is committed and all objects versions incremented
         let result = gas_charger.charge_input_objects(temporary_store);
         let mut result = result.and_then(|()| {
-            let mut execution_result = if deny_cert {
-                Err(ExecutionError::new(ExecutionErrorKind::CertificateDenied, None))
-            } else if contains_deleted_input {
-                Err(ExecutionError::new(ExecutionErrorKind::InputObjectDeleted, None))
-            } else if let Some((cancelled_objects, reason)) = cancelled_objects {
-                match reason {
-                    SequenceNumber::CONGESTED => Err(ExecutionError::new(
-                        ExecutionErrorKind::ExecutionCancelledDueToSharedObjectCongestion {
-                            congested_objects: CongestedObjects(cancelled_objects),
-                        },
-                        None,
-                    )),
-                    SequenceNumber::RANDOMNESS_UNAVAILABLE => {
-                        Err(ExecutionError::new(ExecutionErrorKind::ExecutionCancelledDueToRandomnessUnavailable, None))
-                    }
-                    _ => panic!("invalid cancellation reason SequenceNumber: {reason}"),
+            let mut execution_result = match execution_params {
+                ExecutionOrEarlyError::Err(early_execution_error) => {
+                    Err(ExecutionError::new(early_execution_error, None))
                 }
-            } else {
-                execution_loop::<Mode>(
+                ExecutionOrEarlyError::Ok(()) => execution_loop::<Mode>(
                     temporary_store,
                     transaction_kind,
                     tx_ctx,
@@ -292,17 +293,26 @@ mod checked {
                     gas_charger,
                     protocol_config,
                     metrics.clone(),
-                )
+                ),
             };
 
-            let meter_check = check_meter_limit(temporary_store, gas_charger, protocol_config, metrics.clone());
+            let meter_check = check_meter_limit(
+                temporary_store,
+                gas_charger,
+                protocol_config,
+                metrics.clone(),
+            );
             if let Err(e) = meter_check {
                 execution_result = Err(e);
             }
 
             if execution_result.is_ok() {
-                let gas_check =
-                    check_written_objects_limit::<Mode>(temporary_store, gas_charger, protocol_config, metrics);
+                let gas_check = check_written_objects_limit::<Mode>(
+                    temporary_store,
+                    gas_charger,
+                    protocol_config,
+                    metrics,
+                );
                 if let Err(e) = gas_check {
                     execution_result = Err(e);
                 }
@@ -355,32 +365,13 @@ mod checked {
         if !is_genesis_tx && !Mode::skip_conservation_checks() {
             // ensure that this transaction did not create or destroy SUI, try to recover if the check fails
             let conservation_result = {
-                temporary_store.check_sui_conserved(simple_conservation_checks, cost_summary).and_then(|()| {
-                    if enable_expensive_checks {
-                        // ensure that this transaction did not create or destroy SUI, try to recover if the check fails
-                        let mut layout_resolver = TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
-                        temporary_store.check_sui_conserved_expensive(
-                            cost_summary,
-                            advance_epoch_gas_summary,
-                            &mut layout_resolver,
-                        )
-                    } else {
-                        Ok(())
-                    }
-                })
-            };
-            if let Err(conservation_err) = conservation_result {
-                // conservation violated. try to avoid panic by dumping all writes, charging for gas, re-checking
-                // conservation, and surfacing an aborted transaction with an invariant violation if all of that works
-                result = Err(conservation_err);
-                gas_charger.reset(temporary_store);
-                gas_charger.charge_gas(temporary_store, &mut result);
-                // check conservation once more more
-                if let Err(recovery_err) = {
-                    temporary_store.check_sui_conserved(simple_conservation_checks, cost_summary).and_then(|()| {
+                temporary_store
+                    .check_sui_conserved(simple_conservation_checks, cost_summary)
+                    .and_then(|()| {
                         if enable_expensive_checks {
                             // ensure that this transaction did not create or destroy SUI, try to recover if the check fails
-                            let mut layout_resolver = TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
+                            let mut layout_resolver =
+                                TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
                             temporary_store.check_sui_conserved_expensive(
                                 cost_summary,
                                 advance_epoch_gas_summary,
@@ -390,6 +381,31 @@ mod checked {
                             Ok(())
                         }
                     })
+            };
+            if let Err(conservation_err) = conservation_result {
+                // conservation violated. try to avoid panic by dumping all writes, charging for gas, re-checking
+                // conservation, and surfacing an aborted transaction with an invariant violation if all of that works
+                result = Err(conservation_err);
+                gas_charger.reset(temporary_store);
+                gas_charger.charge_gas(temporary_store, &mut result);
+                // check conservation once more more
+                if let Err(recovery_err) = {
+                    temporary_store
+                        .check_sui_conserved(simple_conservation_checks, cost_summary)
+                        .and_then(|()| {
+                            if enable_expensive_checks {
+                                // ensure that this transaction did not create or destroy SUI, try to recover if the check fails
+                                let mut layout_resolver =
+                                    TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
+                                temporary_store.check_sui_conserved_expensive(
+                                    cost_summary,
+                                    advance_epoch_gas_summary,
+                                    &mut layout_resolver,
+                                )
+                            } else {
+                                Ok(())
+                            }
+                        })
                 } {
                     // if we still fail, it's a problem with gas
                     // charging that happens even in the "aborted" case--no other option but panic.
@@ -521,8 +537,12 @@ mod checked {
                 for genesis_object in objects {
                     match genesis_object {
                         sui_types::transaction::GenesisObject::RawObject { data, owner } => {
-                            let object =
-                                ObjectInner { data, owner, previous_transaction: tx_ctx.digest(), storage_rebate: 0 };
+                            let object = ObjectInner {
+                                data,
+                                owner,
+                                previous_transaction: tx_ctx.digest(),
+                                storage_rebate: 0,
+                            };
                             temporary_store.create_object(object.into());
                         }
                     }
@@ -568,15 +588,30 @@ mod checked {
                 .expect("ConsensusCommitPrologueV3 cannot fail");
                 Ok(Mode::empty_results())
             }
-            TransactionKind::ProgrammableTransaction(pt) => programmable_transactions::execution::execute::<Mode>(
-                protocol_config,
-                metrics,
-                move_vm,
-                temporary_store,
-                tx_ctx,
-                gas_charger,
-                pt,
-            ),
+            TransactionKind::ConsensusCommitPrologueV4(prologue) => {
+                setup_consensus_commit(
+                    prologue.commit_timestamp_ms,
+                    temporary_store,
+                    tx_ctx,
+                    move_vm,
+                    gas_charger,
+                    protocol_config,
+                    metrics,
+                )
+                .expect("ConsensusCommitPrologue cannot fail");
+                Ok(Mode::empty_results())
+            }
+            TransactionKind::ProgrammableTransaction(pt) => {
+                programmable_transactions::execution::execute::<Mode>(
+                    protocol_config,
+                    metrics,
+                    move_vm,
+                    temporary_store,
+                    tx_ctx,
+                    gas_charger,
+                    pt,
+                )
+            }
             TransactionKind::EndOfEpochTransaction(txns) => {
                 let mut builder = ProgrammableTransactionBuilder::new();
                 let len = txns.len();
@@ -616,10 +651,18 @@ mod checked {
                             builder = setup_coin_deny_list_state_create(builder);
                         }
                         EndOfEpochTransactionKind::BridgeStateCreate(_) => {
-                            panic!("EndOfEpochTransactionKind::BridgeStateCreate should not exist in v2");
+                            panic!(
+                                "EndOfEpochTransactionKind::BridgeStateCreate should not exist in v2"
+                            );
                         }
                         EndOfEpochTransactionKind::BridgeCommitteeInit(_) => {
                             panic!("EndOfEpochTransactionKind::BridgeCommitteeInit should not exist in v2");
+                        }
+                        EndOfEpochTransactionKind::StoreExecutionTimeObservations(_) => {
+                            panic!("EndOfEpochTransactionKind::StoreExecutionTimeEstimates should not exist in v2");
+                        }
+                        EndOfEpochTransactionKind::AccumulatorRootCreate => {
+                            panic!("EndOfEpochTransactionKind::AccumulatorRootCreate should not exist in v2");
                         }
                     }
                 }
@@ -649,6 +692,9 @@ mod checked {
                 )?;
                 Ok(Mode::empty_results())
             }
+            TransactionKind::ProgrammableSystemTransaction(_) => {
+                panic!("ProgrammableSystemTransaction should not exist in execution layer v2");
+            }
         }?;
         temporary_store.check_execution_results_consistency()?;
         Ok(result)
@@ -659,7 +705,11 @@ mod checked {
         params: &AdvanceEpochParams,
     ) -> (Argument, Argument) {
         // Create storage rewards.
-        let storage_charge_arg = builder.input(CallArg::Pure(bcs::to_bytes(&params.storage_charge).unwrap())).unwrap();
+        let storage_charge_arg = builder
+            .input(CallArg::Pure(
+                bcs::to_bytes(&params.storage_charge).unwrap(),
+            ))
+            .unwrap();
         let storage_rewards = builder.programmable_move_call(
             SUI_FRAMEWORK_PACKAGE_ID,
             BALANCE_MODULE_NAME.to_owned(),
@@ -669,8 +719,11 @@ mod checked {
         );
 
         // Create computation rewards.
-        let computation_charge_arg =
-            builder.input(CallArg::Pure(bcs::to_bytes(&params.computation_charge).unwrap())).unwrap();
+        let computation_charge_arg = builder
+            .input(CallArg::Pure(
+                bcs::to_bytes(&params.computation_charge).unwrap(),
+            ))
+            .unwrap();
         let computation_rewards = builder.programmable_move_call(
             SUI_FRAMEWORK_PACKAGE_ID,
             BALANCE_MODULE_NAME.to_owned(),
@@ -704,7 +757,10 @@ mod checked {
         .map(|a| builder.input(a))
         .collect::<Result<_, _>>();
 
-        assert_invariant!(call_arg_arguments.is_ok(), "Unable to generate args for advance_epoch transaction!");
+        assert_invariant!(
+            call_arg_arguments.is_ok(),
+            "Unable to generate args for advance_epoch transaction!"
+        );
 
         arguments.append(&mut call_arg_arguments.unwrap());
 
@@ -749,12 +805,20 @@ mod checked {
         ];
 
         if protocol_config.get_advance_epoch_start_time_in_safe_mode() {
-            args.push(CallArg::Pure(bcs::to_bytes(&params.epoch_start_timestamp_ms).unwrap()));
+            args.push(CallArg::Pure(
+                bcs::to_bytes(&params.epoch_start_timestamp_ms).unwrap(),
+            ));
         }
 
-        let call_arg_arguments = args.into_iter().map(|a| builder.input(a)).collect::<Result<_, _>>();
+        let call_arg_arguments = args
+            .into_iter()
+            .map(|a| builder.input(a))
+            .collect::<Result<_, _>>();
 
-        assert_invariant!(call_arg_arguments.is_ok(), "Unable to generate args for advance_epoch transaction!");
+        assert_invariant!(
+            call_arg_arguments.is_ok(),
+            "Unable to generate args for advance_epoch transaction!"
+        );
 
         arguments.append(&mut call_arg_arguments.unwrap());
 
@@ -804,7 +868,7 @@ mod checked {
         );
 
         #[cfg(msim)]
-        let result = maybe_modify_result(result, change_epoch.epoch);
+        let result = maybe_modify_result_legacy(result, change_epoch.epoch);
 
         if result.is_err() {
             tracing::error!(
@@ -820,7 +884,8 @@ mod checked {
             if protocol_config.get_advance_epoch_start_time_in_safe_mode() {
                 temporary_store.advance_epoch_safe_mode(&params, protocol_config);
             } else {
-                let advance_epoch_safe_mode_pt = construct_advance_epoch_safe_mode_pt(&params, protocol_config)?;
+                let advance_epoch_safe_mode_pt =
+                    construct_advance_epoch_safe_mode_pt(&params, protocol_config)?;
                 programmable_transactions::execution::execute::<execution_mode::System>(
                     protocol_config,
                     metrics.clone(),
@@ -836,8 +901,10 @@ mod checked {
 
         let binary_config = to_binary_config(protocol_config);
         for (version, modules, dependencies) in change_epoch.system_packages.into_iter() {
-            let deserialized_modules: Vec<_> =
-                modules.iter().map(|m| CompiledModule::deserialize_with_config(m, &binary_config).unwrap()).collect();
+            let deserialized_modules: Vec<_> = modules
+                .iter()
+                .map(|m| CompiledModule::deserialize_with_config(m, &binary_config).unwrap())
+                .collect();
 
             if version == OBJECT_START_VERSION {
                 let package_id = deserialized_modules.first().unwrap().address();
@@ -860,14 +927,25 @@ mod checked {
                 )
                 .expect("System Package Publish must succeed");
             } else {
-                let mut new_package =
-                    Object::new_system_package(&deserialized_modules, version, dependencies, tx_ctx.digest());
+                let mut new_package = Object::new_system_package(
+                    &deserialized_modules,
+                    version,
+                    dependencies,
+                    tx_ctx.digest(),
+                );
 
-                info!("upgraded system package {:?}", new_package.compute_object_reference());
+                info!(
+                    "upgraded system package {:?}",
+                    new_package.compute_object_reference()
+                );
 
                 // Decrement the version before writing the package so that the store can record the
                 // version growing by one in the effects.
-                new_package.data.try_as_package_mut().unwrap().decrement_version();
+                new_package
+                    .data
+                    .try_as_package_mut()
+                    .unwrap()
+                    .decrement_version();
 
                 // upgrade of a previously existing framework module
                 temporary_store.upgrade_system_package(new_package);
@@ -897,9 +975,15 @@ mod checked {
                 CLOCK_MODULE_NAME.to_owned(),
                 CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME.to_owned(),
                 vec![],
-                vec![CallArg::CLOCK_MUT, CallArg::Pure(bcs::to_bytes(&consensus_commit_timestamp_ms).unwrap())],
+                vec![
+                    CallArg::CLOCK_MUT,
+                    CallArg::Pure(bcs::to_bytes(&consensus_commit_timestamp_ms).unwrap()),
+                ],
             );
-            assert_invariant!(res.is_ok(), "Unable to generate consensus_commit_prologue transaction!");
+            assert_invariant!(
+                res.is_ok(),
+                "Unable to generate consensus_commit_prologue transaction!"
+            );
             builder.finish()
         };
         programmable_transactions::execution::execute::<execution_mode::System>(
@@ -913,7 +997,9 @@ mod checked {
         )
     }
 
-    fn setup_authenticator_state_create(mut builder: ProgrammableTransactionBuilder) -> ProgrammableTransactionBuilder {
+    fn setup_authenticator_state_create(
+        mut builder: ProgrammableTransactionBuilder,
+    ) -> ProgrammableTransactionBuilder {
         builder
             .move_call(
                 SUI_FRAMEWORK_ADDRESS.into(),
@@ -926,7 +1012,9 @@ mod checked {
         builder
     }
 
-    fn setup_randomness_state_create(mut builder: ProgrammableTransactionBuilder) -> ProgrammableTransactionBuilder {
+    fn setup_randomness_state_create(
+        mut builder: ProgrammableTransactionBuilder,
+    ) -> ProgrammableTransactionBuilder {
         builder
             .move_call(
                 SUI_FRAMEWORK_ADDRESS.into(),
@@ -964,7 +1052,10 @@ mod checked {
                     CallArg::Pure(bcs::to_bytes(&update.new_active_jwks).unwrap()),
                 ],
             );
-            assert_invariant!(res.is_ok(), "Unable to generate authenticator_state_update transaction!");
+            assert_invariant!(
+                res.is_ok(),
+                "Unable to generate authenticator_state_update transaction!"
+            );
             builder.finish()
         };
         programmable_transactions::execution::execute::<execution_mode::System>(
@@ -1027,7 +1118,10 @@ mod checked {
                     CallArg::Pure(bcs::to_bytes(&update.random_bytes).unwrap()),
                 ],
             );
-            assert_invariant!(res.is_ok(), "Unable to generate randomness_state_update transaction!");
+            assert_invariant!(
+                res.is_ok(),
+                "Unable to generate randomness_state_update transaction!"
+            );
             builder.finish()
         };
         programmable_transactions::execution::execute::<execution_mode::System>(
@@ -1041,7 +1135,9 @@ mod checked {
         )
     }
 
-    fn setup_coin_deny_list_state_create(mut builder: ProgrammableTransactionBuilder) -> ProgrammableTransactionBuilder {
+    fn setup_coin_deny_list_state_create(
+        mut builder: ProgrammableTransactionBuilder,
+    ) -> ProgrammableTransactionBuilder {
         builder
             .move_call(
                 SUI_FRAMEWORK_ADDRESS.into(),

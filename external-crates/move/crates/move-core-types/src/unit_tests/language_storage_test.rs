@@ -6,7 +6,7 @@ use crate::{
     account_address::AccountAddress,
     gas_algebra::AbstractMemorySize,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag, TypeTag, TYPETAG_ENUM_ABSTRACT_SIZE},
+    language_storage::{ModuleId, StructTag, TYPETAG_ENUM_ABSTRACT_SIZE, TypeTag},
 };
 use bcs::test_helpers::assert_canonical_encode_decode;
 use proptest::prelude::*;
@@ -27,9 +27,18 @@ fn test_type_tag_abstract_size() {
     // size = TYPETAG_ENUM_ABSTRACT_SIZE + TYPETAG_ENUM_ABSTRACT_SIZE
     let type_tag3 = TypeTag::Vector(Box::new(TypeTag::U128));
 
-    assert_eq!(type_tag1.abstract_size_for_gas_metering(), *TYPETAG_ENUM_ABSTRACT_SIZE + *TYPETAG_ENUM_ABSTRACT_SIZE);
-    assert_eq!(type_tag2.abstract_size_for_gas_metering(), *TYPETAG_ENUM_ABSTRACT_SIZE + *TYPETAG_ENUM_ABSTRACT_SIZE);
-    assert_eq!(type_tag3.abstract_size_for_gas_metering(), *TYPETAG_ENUM_ABSTRACT_SIZE + *TYPETAG_ENUM_ABSTRACT_SIZE);
+    assert_eq!(
+        type_tag1.abstract_size_for_gas_metering(),
+        *TYPETAG_ENUM_ABSTRACT_SIZE + *TYPETAG_ENUM_ABSTRACT_SIZE
+    );
+    assert_eq!(
+        type_tag2.abstract_size_for_gas_metering(),
+        *TYPETAG_ENUM_ABSTRACT_SIZE + *TYPETAG_ENUM_ABSTRACT_SIZE
+    );
+    assert_eq!(
+        type_tag3.abstract_size_for_gas_metering(),
+        *TYPETAG_ENUM_ABSTRACT_SIZE + *TYPETAG_ENUM_ABSTRACT_SIZE
+    );
 
     let struct_tag1 = StructTag {
         // size = AccountAddress::LENGTH
@@ -68,7 +77,9 @@ fn test_type_tag_abstract_size() {
 
     assert_eq!(
         struct_tag1.abstract_size_for_gas_metering(),
-        AbstractMemorySize::new(u64::from(*TYPETAG_ENUM_ABSTRACT_SIZE) * 15 + 10 + 10 + (AccountAddress::LENGTH as u64))
+        AbstractMemorySize::new(
+            u64::from(*TYPETAG_ENUM_ABSTRACT_SIZE) * 15 + 10 + 10 + (AccountAddress::LENGTH as u64)
+        )
     );
 
     let type_tag4 = TypeTag::Struct(Box::new(struct_tag1.clone()));

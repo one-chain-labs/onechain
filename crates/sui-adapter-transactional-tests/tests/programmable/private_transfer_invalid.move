@@ -18,42 +18,42 @@ module test::m1 {
 
 //# programmable --sender A --inputs @A
 //> 0: test::m1::pub();
-//> one::transfer::transfer<test::m1::Pub>(Result(0), Input(0));
+//> sui::transfer::transfer<test::m1::Pub>(Result(0), Input(0));
 
 //# programmable
 //> 0: test::m1::pub();
-//> one::transfer::share_object<test::m1::Pub>(Result(0));
+//> sui::transfer::share_object<test::m1::Pub>(Result(0));
 
 //# programmable
 //> 0: test::m1::pub();
-//> one::transfer::freeze_object<test::m1::Pub>(Result(0));
+//> sui::transfer::freeze_object<test::m1::Pub>(Result(0));
 
 
 // Does not have store, cannot be used with internal variants
 
 //# programmable --sender A --inputs @A
 //> 0: test::m1::priv();
-//> one::transfer::transfer<test::m1::Priv>(Result(0), Input(0));
+//> sui::transfer::transfer<test::m1::Priv>(Result(0), Input(0));
 
 //# programmable
 //> 0: test::m1::priv();
-//> one::transfer::share_object<test::m1::Priv>(Result(0));
+//> sui::transfer::share_object<test::m1::Priv>(Result(0));
 
 //# programmable
 //> 0: test::m1::priv();
-//> one::transfer::freeze_object<test::m1::Priv>(Result(0));
+//> sui::transfer::freeze_object<test::m1::Priv>(Result(0));
 
 
 // Does not have store, cannot be used with public variants
 
 //# programmable --sender A --inputs @A
 //> 0: test::m1::priv();
-//> one::transfer::public_transfer<test::m1::Priv>(Result(0), Input(0));
+//> sui::transfer::public_transfer<test::m1::Priv>(Result(0), Input(0));
 
 //# programmable
 //> 0: test::m1::priv();
-//> one::transfer::public_share_object<test::m1::Priv>(Result(0));
+//> sui::transfer::public_share_object<test::m1::Priv>(Result(0));
 
 //# programmable
 //> 0: test::m1::priv();
-//> one::transfer::public_freeze_object<test::m1::Priv>(Result(0));
+//> sui::transfer::public_freeze_object<test::m1::Priv>(Result(0));

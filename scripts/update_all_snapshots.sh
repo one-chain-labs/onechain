@@ -11,9 +11,9 @@ SCRIPT_PATH=$(realpath "$0")
 SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
 ROOT="$SCRIPT_DIR/.."
 
+UPDATE=1 cargo test -p sui-framework --test build-system-packages
 cd "$ROOT/crates/sui-protocol-config" && cargo insta test --review
 cd "$ROOT/crates/sui-swarm-config" && cargo insta test --review
 cd "$ROOT/crates/sui-open-rpc" && cargo run --example generate-json-rpc-spec -- record
-cd "$ROOT/crates/sui-core" && cargo -q run --example generate-format -- print > tests/staged/sui.yaml
-UPDATE=1 cargo test -p sui-framework --test build-system-packages
-UPDATE=1 cargo test -p sui-rest-api
+cd "$ROOT/crates/sui-core" && cargo run --example generate-format -- print > tests/staged/sui.yaml
+cd "$ROOT/crates/sui-graphql-rpc" && cargo insta test --review

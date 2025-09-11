@@ -6,21 +6,19 @@
 //! 1. At one time, a transaction is only processed once.
 //! 2. When Fullnode crashes and restarts, the pending transaction will be loaded and retried.
 
+use crate::mutex_table::MutexTable;
 use std::path::PathBuf;
-use sui_types::{
-    base_types::TransactionDigest,
-    crypto::EmptySignInfo,
-    error::{SuiError, SuiResult},
-    message_envelope::TrustedEnvelope,
-    transaction::{SenderSignedData, VerifiedTransaction},
-};
-use typed_store::{
-    rocks::{DBMap, MetricConf},
-    traits::{Map, TableSummary, TypedStoreDebug},
-    DBMapUtils,
-};
+use sui_types::base_types::TransactionDigest;
+use sui_types::crypto::EmptySignInfo;
+use sui_types::error::{SuiError, SuiResult};
+use sui_types::message_envelope::TrustedEnvelope;
+use sui_types::transaction::{SenderSignedData, VerifiedTransaction};
+use typed_store::rocks::MetricConf;
+use typed_store::DBMapUtils;
+use typed_store::{rocks::DBMap, traits::Map};
 
 pub type IsFirstRecord = bool;
+const NUM_SHARDS: usize = 4096;
 
 #[derive(DBMapUtils)]
 struct WritePathPendingTransactionTable {
@@ -29,17 +27,21 @@ struct WritePathPendingTransactionTable {
 
 pub struct WritePathPendingTransactionLog {
     pending_transactions: WritePathPendingTransactionTable,
+    mutex_table: MutexTable<TransactionDigest>,
 }
 
 impl WritePathPendingTransactionLog {
     pub fn new(path: PathBuf) -> Self {
-        let pending_transactions = WritePathPendingTransactionTable::open_tables_transactional(
+        let pending_transactions = WritePathPendingTransactionTable::open_tables_read_write(
             path,
             MetricConf::new("pending_tx_log"),
             None,
             None,
         );
-        Self { pending_transactions }
+        Self {
+            pending_transactions,
+            mutex_table: MutexTable::new(NUM_SHARDS),
+        }
     }
 
     // Returns whether the table currently has this transaction in record.
@@ -47,15 +49,20 @@ impl WritePathPendingTransactionLog {
     // Because the record will be cleaned up when the transaction finishes,
     // even when it returns true, the callsite of this function should check
     // the transaction status before doing anything, to avoid duplicates.
-    pub async fn write_pending_transaction_maybe(&self, tx: &VerifiedTransaction) -> SuiResult<IsFirstRecord> {
+    pub async fn write_pending_transaction_maybe(
+        &self,
+        tx: &VerifiedTransaction,
+    ) -> SuiResult<IsFirstRecord> {
         let tx_digest = tx.digest();
-        let mut transaction = self.pending_transactions.logs.transaction()?;
-        if transaction.get(&self.pending_transactions.logs, tx_digest)?.is_some() {
-            return Ok(false);
+        let _guard = self.mutex_table.acquire_lock(*tx_digest);
+        if self.pending_transactions.logs.contains_key(tx_digest)? {
+            Ok(false)
+        } else {
+            self.pending_transactions
+                .logs
+                .insert(tx_digest, tx.serializable_ref())?;
+            Ok(true)
         }
-        transaction.insert_batch(&self.pending_transactions.logs, [(tx_digest, tx.serializable_ref())])?;
-        let result = transaction.commit();
-        Ok(result.is_ok())
     }
 
     // This function does not need to be behind a lock because:
@@ -74,8 +81,13 @@ impl WritePathPendingTransactionLog {
         write_batch.write().map_err(SuiError::from)
     }
 
-    pub fn load_all_pending_transactions(&self) -> Vec<VerifiedTransaction> {
-        self.pending_transactions.logs.unbounded_iter().map(|(_tx_digest, tx)| VerifiedTransaction::from(tx)).collect()
+    pub fn load_all_pending_transactions(&self) -> SuiResult<Vec<VerifiedTransaction>> {
+        Ok(self
+            .pending_transactions
+            .logs
+            .safe_iter()
+            .map(|item| item.map(|(_tx_digest, tx)| VerifiedTransaction::from(tx)))
+            .collect::<Result<Vec<_>, _>>()?)
     }
 }
 
@@ -92,35 +104,61 @@ mod tests {
         let pending_txes = WritePathPendingTransactionLog::new(temp_dir.path().to_path_buf());
         let tx = VerifiedTransaction::new_unchecked(create_fake_transaction());
         let tx_digest = *tx.digest();
-        assert!(pending_txes.write_pending_transaction_maybe(&tx).await.unwrap());
+        assert!(pending_txes
+            .write_pending_transaction_maybe(&tx)
+            .await
+            .unwrap());
         // The second write will return false
-        assert!(!pending_txes.write_pending_transaction_maybe(&tx).await.unwrap());
+        assert!(!pending_txes
+            .write_pending_transaction_maybe(&tx)
+            .await
+            .unwrap());
 
-        let loaded_txes = pending_txes.load_all_pending_transactions();
+        let loaded_txes = pending_txes.load_all_pending_transactions()?;
         assert_eq!(vec![tx], loaded_txes);
 
         pending_txes.finish_transaction(&tx_digest).unwrap();
-        let loaded_txes = pending_txes.load_all_pending_transactions();
+        let loaded_txes = pending_txes.load_all_pending_transactions()?;
         assert!(loaded_txes.is_empty());
 
         // It's ok to finish an already finished transaction
         pending_txes.finish_transaction(&tx_digest).unwrap();
 
         // Test writing and finishing more transactions
-        let txes: Vec<_> = (0..10).map(|_| VerifiedTransaction::new_unchecked(create_fake_transaction())).collect();
+        let txes: Vec<_> = (0..10)
+            .map(|_| VerifiedTransaction::new_unchecked(create_fake_transaction()))
+            .collect();
         for tx in txes.iter().take(10) {
-            assert!(pending_txes.write_pending_transaction_maybe(tx).await.unwrap());
+            assert!(pending_txes
+                .write_pending_transaction_maybe(tx)
+                .await
+                .unwrap());
         }
-        let loaded_tx_digests: HashSet<_> =
-            pending_txes.load_all_pending_transactions().iter().map(|t| *t.digest()).collect();
-        assert_eq!(txes.iter().map(|t| *t.digest()).collect::<HashSet<_>>(), loaded_tx_digests);
+        let loaded_tx_digests: HashSet<_> = pending_txes
+            .load_all_pending_transactions()?
+            .iter()
+            .map(|t| *t.digest())
+            .collect();
+        assert_eq!(
+            txes.iter().map(|t| *t.digest()).collect::<HashSet<_>>(),
+            loaded_tx_digests
+        );
 
         for tx in txes.iter().take(5) {
             pending_txes.finish_transaction(tx.digest()).unwrap();
         }
-        let loaded_tx_digests: HashSet<_> =
-            pending_txes.load_all_pending_transactions().iter().map(|t| *t.digest()).collect();
-        assert_eq!(txes.iter().skip(5).map(|t| *t.digest()).collect::<HashSet<_>>(), loaded_tx_digests);
+        let loaded_tx_digests: HashSet<_> = pending_txes
+            .load_all_pending_transactions()?
+            .iter()
+            .map(|t| *t.digest())
+            .collect();
+        assert_eq!(
+            txes.iter()
+                .skip(5)
+                .map(|t| *t.digest())
+                .collect::<HashSet<_>>(),
+            loaded_tx_digests
+        );
 
         Ok(())
     }

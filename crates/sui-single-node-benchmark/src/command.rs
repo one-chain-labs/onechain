@@ -14,11 +14,22 @@ use strum_macros::EnumIter;
     version
 )]
 pub struct Command {
-    #[arg(long, default_value_t = 500000, help = "Number of transactions to submit")]
+    #[arg(
+        long,
+        default_value_t = 500000,
+        help = "Number of transactions to submit"
+    )]
     pub tx_count: u64,
-    #[arg(long, default_value_t = 100, help = "Number of transactions in a consensus commit/checkpoint")]
+    #[arg(
+        long,
+        default_value_t = 100,
+        help = "Number of transactions in a consensus commit/checkpoint"
+    )]
     pub checkpoint_size: usize,
-    #[arg(long, help = "Whether to print out a sample transaction and effects that is going to be benchmarked on")]
+    #[arg(
+        long,
+        help = "Whether to print out a sample transaction and effects that is going to be benchmarked on"
+    )]
     pub print_sample_tx: bool,
     #[arg(
         long,
@@ -26,7 +37,12 @@ pub struct Command {
         help = "If true, skip signing on the validators, instead, creating certificates directly using validator secrets"
     )]
     pub skip_signing: bool,
-    #[arg(long, default_value = "baseline", ignore_case = true, help = "Which component to benchmark")]
+    #[arg(
+        long,
+        default_value = "baseline",
+        ignore_case = true,
+        help = "Which component to benchmark"
+    )]
     pub component: Component,
     #[clap(subcommand)]
     pub workload: WorkloadKind,

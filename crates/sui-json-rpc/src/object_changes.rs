@@ -4,12 +4,11 @@
 use std::collections::BTreeMap;
 
 use sui_json_rpc_types::ObjectChange;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    effects::{ObjectRemoveKind, TransactionEffects, TransactionEffectsAPI},
-    object::Owner,
-    storage::WriteKind,
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress};
+use sui_types::effects::ObjectRemoveKind;
+use sui_types::effects::{TransactionEffects, TransactionEffectsAPI};
+use sui_types::object::Owner;
+use sui_types::storage::WriteKind;
 use tracing::instrument;
 
 use crate::ObjectProvider;
@@ -40,12 +39,20 @@ pub async fn get_object_changes<P: ObjectProvider<Error = E>, E>(
                     object_id,
                     version,
                     // modify_at_version should always be available for mutated object
-                    previous_version: modify_at_version.get(&object_id).cloned().unwrap_or_default(),
+                    previous_version: modify_at_version
+                        .get(&object_id)
+                        .cloned()
+                        .unwrap_or_default(),
                     digest,
                 }),
-                WriteKind::Create => {
-                    object_changes.push(ObjectChange::Created { sender, owner, object_type, object_id, version, digest })
-                }
+                WriteKind::Create => object_changes.push(ObjectChange::Created {
+                    sender,
+                    owner,
+                    object_type,
+                    object_id,
+                    version,
+                    digest,
+                }),
                 _ => {}
             }
         } else if let Some(p) = o.data.try_as_package() {
@@ -61,17 +68,25 @@ pub async fn get_object_changes<P: ObjectProvider<Error = E>, E>(
     }
 
     for ((id, version, _), kind) in all_removed_objects {
-        let o = object_provider.find_object_lt_or_eq_version(&id, &version).await?;
+        let o = object_provider
+            .find_object_lt_or_eq_version(&id, &version)
+            .await?;
         if let Some(o) = o {
             if let Some(type_) = o.type_() {
                 let object_type = type_.clone().into();
                 match kind {
-                    ObjectRemoveKind::Delete => {
-                        object_changes.push(ObjectChange::Deleted { sender, object_type, object_id: id, version })
-                    }
-                    ObjectRemoveKind::Wrap => {
-                        object_changes.push(ObjectChange::Wrapped { sender, object_type, object_id: id, version })
-                    }
+                    ObjectRemoveKind::Delete => object_changes.push(ObjectChange::Deleted {
+                        sender,
+                        object_type,
+                        object_id: id,
+                        version,
+                    }),
+                    ObjectRemoveKind::Wrap => object_changes.push(ObjectChange::Wrapped {
+                        sender,
+                        object_type,
+                        object_id: id,
+                        version,
+                    }),
                 }
             }
         };

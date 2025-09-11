@@ -4,19 +4,23 @@
 
 #![forbid(unsafe_code)]
 
-use crate::coverage_map::{ExecCoverageMap, ExecCoverageMapWithModules, ModuleCoverageMap, TraceMap};
-use move_abstract_interpreter::control_flow_graph::{BlockId, ControlFlowGraph, VMControlFlowGraph};
+use crate::coverage_map::{
+    ExecCoverageMap, ExecCoverageMapWithModules, ModuleCoverageMap, TraceMap,
+};
+use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::{
-    file_format::{Bytecode, CodeOffset},
     CompiledModule,
+    file_format::{Bytecode, CodeOffset},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
-use petgraph::{algo::tarjan_scc, Graph};
+use petgraph::{Graph, algo::tarjan_scc};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{self, Write},
 };
+
+type BlockId = CodeOffset;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModuleSummary {
@@ -42,12 +46,25 @@ pub struct FunctionInfo {
 impl ModuleSummary {
     /// Summarizes the modules coverage in CSV format
     pub fn summarize_csv<W: Write>(&self, summary_writer: &mut W) -> io::Result<()> {
-        let module = format!("{}::{}", self.module_name.address(), self.module_name.name());
+        let module = format!(
+            "{}::{}",
+            self.module_name.address(),
+            self.module_name.name()
+        );
 
-        let mut format_line =
-            |fn_name, covered, uncovered| writeln!(summary_writer, "{},{},{},{}", module, fn_name, covered, uncovered);
+        let mut format_line = |fn_name, covered, uncovered| {
+            writeln!(
+                summary_writer,
+                "{},{},{},{}",
+                module, fn_name, covered, uncovered
+            )
+        };
 
-        for (fn_name, fn_summary) in self.function_summaries.iter().filter(|(_, summary)| !summary.fn_is_native) {
+        for (fn_name, fn_summary) in self
+            .function_summaries
+            .iter()
+            .filter(|(_, summary)| !summary.fn_is_native)
+        {
             format_line(fn_name, fn_summary.covered, fn_summary.total)?;
         }
 
@@ -64,23 +81,48 @@ impl ModuleSummary {
         let mut all_total = 0;
         let mut all_covered = 0;
 
-        writeln!(summary_writer, "Module {}::{}", self.module_name.address(), self.module_name.name())?;
+        writeln!(
+            summary_writer,
+            "Module {}::{}",
+            self.module_name.address(),
+            self.module_name.name()
+        )?;
 
         for (fn_name, fn_summary) in self.function_summaries.iter() {
             all_total += fn_summary.total;
             all_covered += fn_summary.covered;
 
             if summarize_function_coverage {
-                let native = if fn_summary.fn_is_native { "native " } else { "" };
+                let native = if fn_summary.fn_is_native {
+                    "native "
+                } else {
+                    ""
+                };
                 writeln!(summary_writer, "\t{}fun {}", native, fn_name)?;
                 writeln!(summary_writer, "\t\ttotal: {}", fn_summary.total)?;
                 writeln!(summary_writer, "\t\tcovered: {}", fn_summary.covered)?;
-                writeln!(summary_writer, "\t\t% coverage: {:.2}", fn_summary.percent_coverage())?;
+                writeln!(
+                    summary_writer,
+                    "\t\t% coverage: {:.2}",
+                    fn_summary.percent_coverage()
+                )?;
             }
         }
 
-        let covered_percentage = (all_covered as f64) / (all_total as f64) * 100f64;
-        writeln!(summary_writer, ">>> % Module coverage: {:.2}", covered_percentage)?;
+        if all_covered == 0 && all_total == 0 {
+            writeln!(
+                summary_writer,
+                ">>> No source code to compute coverage of in module",
+            )?;
+        } else {
+            let covered_percentage = (all_covered as f64) / (all_total as f64) * 100f64;
+            writeln!(
+                summary_writer,
+                ">>> % Module coverage: {:.2}",
+                covered_percentage
+            )?;
+        }
+
         Ok((all_total, all_covered))
     }
 }
@@ -91,7 +133,10 @@ impl FunctionSummary {
     }
 }
 
-pub fn summarize_inst_cov_by_module(module: &CompiledModule, module_map: Option<&ModuleCoverageMap>) -> ModuleSummary {
+pub fn summarize_inst_cov_by_module(
+    module: &CompiledModule,
+    module_map: Option<&ModuleCoverageMap>,
+) -> ModuleSummary {
     let module_name = module.self_id();
     let function_summaries: BTreeMap<_, _> = module
         .function_defs()
@@ -101,11 +146,20 @@ pub fn summarize_inst_cov_by_module(module: &CompiledModule, module_map: Option<
             let fn_name = module.identifier_at(fn_handle.name).to_owned();
 
             let fn_summmary = match &function_def.code {
-                None => FunctionSummary { fn_is_native: true, total: 0, covered: 0 },
+                None => FunctionSummary {
+                    fn_is_native: true,
+                    total: 0,
+                    covered: 0,
+                },
                 Some(code_unit) => {
                     let total_number_of_instructions = code_unit.code.len() as u64;
                     let covered_instructions = module_map
-                        .and_then(|fn_map| fn_map.function_maps.get(&fn_name).map(|function_map| function_map.len()))
+                        .and_then(|fn_map| {
+                            fn_map
+                                .function_maps
+                                .get(&fn_name)
+                                .map(|function_map| function_map.len())
+                        })
                         .unwrap_or(0) as u64;
                     FunctionSummary {
                         fn_is_native: false,
@@ -119,12 +173,20 @@ pub fn summarize_inst_cov_by_module(module: &CompiledModule, module_map: Option<
         })
         .collect();
 
-    ModuleSummary { module_name, function_summaries }
+    ModuleSummary {
+        module_name,
+        function_summaries,
+    }
 }
 
-pub fn summarize_inst_cov(module: &CompiledModule, coverage_map: &ExecCoverageMap) -> ModuleSummary {
+pub fn summarize_inst_cov(
+    module: &CompiledModule,
+    coverage_map: &ExecCoverageMap,
+) -> ModuleSummary {
     let module_name = module.self_id();
-    let module_map = coverage_map.module_maps.get(&(*module_name.address(), module_name.name().to_owned()));
+    let module_map = coverage_map
+        .module_maps
+        .get(&(*module_name.address(), module_name.name().to_owned()));
     summarize_inst_cov_by_module(module, module_map)
 }
 
@@ -140,12 +202,13 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                 None => None,
                 Some(code_unit) => {
                     // build control-flow graph
-                    let fn_cfg = VMControlFlowGraph::new(code_unit.code.as_slice(), &code_unit.jump_tables);
+                    let fn_cfg =
+                        VMControlFlowGraph::new(code_unit.code.as_slice(), &code_unit.jump_tables);
 
                     // get function entry and return points
                     let fn_entry = fn_cfg.block_start(fn_cfg.entry_block_id());
                     let mut fn_returns: BTreeSet<CodeOffset> = BTreeSet::new();
-                    for block_id in fn_cfg.blocks().into_iter() {
+                    for block_id in fn_cfg.blocks() {
                         for i in fn_cfg.block_start(block_id)..=fn_cfg.block_end(block_id) {
                             if let Bytecode::Ret = &code_unit.code[i as usize] {
                                 fn_returns.insert(i);
@@ -156,14 +219,16 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                     // convert into strongly connected components (SCC) graph
                     let mut fn_dgraph: Graph<BlockId, ()> = Graph::new();
 
-                    let block_to_node: BTreeMap<_, _> =
-                        fn_cfg.blocks().into_iter().map(|block_id| (block_id, fn_dgraph.add_node(block_id))).collect();
+                    let block_to_node: BTreeMap<_, _> = fn_cfg
+                        .blocks()
+                        .map(|block_id| (block_id, fn_dgraph.add_node(block_id)))
+                        .collect();
 
-                    for block_id in fn_cfg.blocks().into_iter() {
-                        for succ_block_id in fn_cfg.successors(block_id).iter() {
+                    for block_id in fn_cfg.blocks() {
+                        for succ_block_id in fn_cfg.successors(block_id) {
                             fn_dgraph.add_edge(
                                 *block_to_node.get(&block_id).unwrap(),
-                                *block_to_node.get(succ_block_id).unwrap(),
+                                *block_to_node.get(&succ_block_id).unwrap(),
                                 (),
                             );
                         }
@@ -172,7 +237,8 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                     let scc_iter = tarjan_scc(&fn_dgraph).into_iter();
 
                     // collect branching points
-                    let mut fn_branches: BTreeMap<CodeOffset, BTreeSet<CodeOffset>> = BTreeMap::new();
+                    let mut fn_branches: BTreeMap<CodeOffset, BTreeSet<CodeOffset>> =
+                        BTreeMap::new();
 
                     let mut path_nums: BTreeMap<usize, BTreeMap<usize, usize>> = BTreeMap::new();
                     let mut inst_locs: BTreeMap<CodeOffset, usize> = BTreeMap::new();
@@ -191,9 +257,12 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                         for node_idx in scc.iter() {
                             let block_id = *fn_dgraph.node_weight(*node_idx).unwrap();
                             let term_inst_id = fn_cfg.block_end(block_id);
-                            for dest in
-                                Bytecode::get_successors(term_inst_id, code_unit.code.as_slice(), &code_unit.jump_tables)
-                                    .into_iter()
+                            for dest in Bytecode::get_successors(
+                                term_inst_id,
+                                code_unit.code.as_slice(),
+                                &code_unit.jump_tables,
+                            )
+                            .into_iter()
                             {
                                 if *inst_locs.get(&dest).unwrap() != scc_idx {
                                     assert!(exits.insert((term_inst_id, dest)));
@@ -213,18 +282,25 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                                 let dst_scc_idx = inst_locs.get(dst).unwrap();
                                 for (path_end_scc, path_end_reach_set) in path_nums.iter() {
                                     let reach_from_dst =
-                                        if let Some(v) = path_end_reach_set.get(dst_scc_idx) { *v } else { 0 };
-                                    let reach_from_scc = reachability.entry(*path_end_scc).or_insert(0);
+                                        if let Some(v) = path_end_reach_set.get(dst_scc_idx) {
+                                            *v
+                                        } else {
+                                            0
+                                        };
+                                    let reach_from_scc =
+                                        reachability.entry(*path_end_scc).or_insert(0);
                                     *reach_from_scc += reach_from_dst;
                                 }
                             }
 
                             for (path_end_scc, path_end_reachability) in reachability.into_iter() {
-                                assert!(path_nums
-                                    .get_mut(&path_end_scc)
-                                    .unwrap()
-                                    .insert(scc_idx, path_end_reachability)
-                                    .is_none());
+                                assert!(
+                                    path_nums
+                                        .get_mut(&path_end_scc)
+                                        .unwrap()
+                                        .insert(scc_idx, path_end_reachability)
+                                        .is_none()
+                                );
                             }
 
                             // move to branch info if there are more than one branches
@@ -237,30 +313,50 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                     }
 
                     // calculate path num
-                    let entry_scc = inst_locs.get(&fn_cfg.block_start(fn_cfg.entry_block_id())).unwrap();
+                    let entry_scc = inst_locs
+                        .get(&fn_cfg.block_start(fn_cfg.entry_block_id()))
+                        .unwrap();
                     let mut fn_num_paths: u64 = 0;
                     for (_, path_end_reachability) in path_nums {
-                        fn_num_paths += if let Some(v) = path_end_reachability.get(entry_scc) { *v as u64 } else { 0 };
+                        fn_num_paths += if let Some(v) = path_end_reachability.get(entry_scc) {
+                            *v as u64
+                        } else {
+                            0
+                        };
                     }
 
                     // use function name as key
-                    let fn_name = module.identifier_at(module.function_handle_at(function_def.function).name).to_owned();
-                    Some((fn_name.clone(), FunctionInfo { fn_name, fn_entry, fn_returns, fn_branches, fn_num_paths }))
+                    let fn_name = module
+                        .identifier_at(module.function_handle_at(function_def.function).name)
+                        .to_owned();
+                    Some((
+                        fn_name.clone(),
+                        FunctionInfo {
+                            fn_name,
+                            fn_entry,
+                            fn_returns,
+                            fn_branches,
+                            fn_num_paths,
+                        },
+                    ))
                 }
             }
         })
         .collect();
 
     // examine the trace and check the path covered
-    let mut func_path_cov_stats: BTreeMap<Identifier, BTreeMap<BTreeSet<(CodeOffset, CodeOffset)>, u64>> =
-        BTreeMap::new();
+    let mut func_path_cov_stats: BTreeMap<
+        Identifier,
+        BTreeMap<BTreeSet<(CodeOffset, CodeOffset)>, u64>,
+    > = BTreeMap::new();
 
     for (_, trace) in trace_map.exec_maps.iter() {
         let mut call_stack: Vec<&FunctionInfo> = Vec::new();
         let mut path_stack: Vec<BTreeSet<(CodeOffset, CodeOffset)>> = Vec::new();
         let mut path_store: Vec<(Identifier, BTreeSet<(CodeOffset, CodeOffset)>)> = Vec::new();
         for (index, record) in trace.iter().enumerate().filter(|(_, e)| {
-            e.module_addr == *module_name.address() && e.module_name.as_ident_str() == module_name.name()
+            e.module_addr == *module_name.address()
+                && e.module_name.as_ident_str() == module_name.name()
         }) {
             let (info, is_call) = if let Some(last) = call_stack.last() {
                 if last.fn_name.as_ident_str() != record.func_name.as_ident_str() {
@@ -316,7 +412,11 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
         } else {
             // record path only when execution finishes properly
             for (func_name, path) in path_store.into_iter() {
-                let path_count = func_path_cov_stats.entry(func_name).or_default().entry(path).or_insert(0);
+                let path_count = func_path_cov_stats
+                    .entry(func_name)
+                    .or_default()
+                    .entry(path)
+                    .or_insert(0);
                 *path_count += 1;
             }
         }
@@ -331,7 +431,11 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
             let fn_name = module.identifier_at(fn_handle.name).to_owned();
 
             let fn_summmary = match &function_def.code {
-                None => FunctionSummary { fn_is_native: true, total: 0, covered: 0 },
+                None => FunctionSummary {
+                    fn_is_native: true,
+                    total: 0,
+                    covered: 0,
+                },
                 Some(_) => FunctionSummary {
                     fn_is_native: false,
                     total: func_info.get(&fn_name).unwrap().fn_num_paths,
@@ -346,7 +450,10 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
         })
         .collect();
 
-    ModuleSummary { module_name, function_summaries }
+    ModuleSummary {
+        module_name,
+        function_summaries,
+    }
 }
 
 impl ExecCoverageMapWithModules {
@@ -355,8 +462,10 @@ impl ExecCoverageMapWithModules {
         self.module_maps
             .into_iter()
             .map(|((module_path, _, _), module_cov)| {
-                let module_summary =
-                    summarize_inst_cov_by_module(compiled_modules.get(&module_path).unwrap(), Some(&module_cov));
+                let module_summary = summarize_inst_cov_by_module(
+                    compiled_modules.get(&module_path).unwrap(),
+                    Some(&module_cov),
+                );
                 (module_path, module_summary)
             })
             .collect()

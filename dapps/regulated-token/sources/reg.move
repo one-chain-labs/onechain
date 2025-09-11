@@ -3,10 +3,10 @@
 
 module regulated_token::reg {
     use std::option;
-    use one::tx_context::{sender, TxContext};
-    use one::transfer;
-    use one::coin::{Self, TreasuryCap};
-    use one::token::{Self, Token, TokenPolicy};
+    use sui::tx_context::{sender, TxContext};
+    use sui::transfer;
+    use sui::coin::{Self, TreasuryCap};
+    use sui::token::{Self, Token, TokenPolicy};
 
     use regulated_token::denylist_rule::{Self as denylist, Denylist};
 

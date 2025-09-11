@@ -10,7 +10,7 @@ use crate::{
     diagnostics::Diagnostics,
     hlir::{
         ast::*,
-        translate::{display_var, DisplayVar},
+        translate::{DisplayVar, display_var},
     },
     parser::ast::BinOp_,
     shared::unique_map::UniqueMap,
@@ -35,7 +35,10 @@ impl BorrowSafety {
         for (idx, (v, _)) in local_types.key_cloned_iter().enumerate() {
             local_numbers.add(v, idx).unwrap();
         }
-        Self { local_numbers, mutably_used: Rc::new(RefCell::new(BTreeMap::new())) }
+        Self {
+            local_numbers,
+            mutably_used: Rc::new(RefCell::new(BTreeMap::new())),
+        }
     }
 }
 
@@ -48,7 +51,11 @@ struct Context<'a, 'b> {
 impl<'a, 'b> Context<'a, 'b> {
     fn new(safety: &'a BorrowSafety, borrow_state: &'b mut BorrowState) -> Self {
         let local_numbers = &safety.local_numbers;
-        Self { local_numbers, borrow_state, diags: Diagnostics::new() }
+        Self {
+            local_numbers,
+            borrow_state,
+            diags: Diagnostics::new(),
+        }
     }
 
     fn get_diags(self) -> Diagnostics {
@@ -63,19 +70,30 @@ impl<'a, 'b> Context<'a, 'b> {
 impl TransferFunctions for BorrowSafety {
     type State = BorrowState;
 
-    fn execute(&mut self, pre: &mut Self::State, lbl: Label, idx: usize, cmd: &Command) -> Diagnostics {
+    fn execute(
+        &mut self,
+        pre: &mut Self::State,
+        lbl: Label,
+        idx: usize,
+        cmd: &Command,
+    ) -> Diagnostics {
         pre.start_command(lbl, idx);
         let mut context = Context::new(self, pre);
         command(&mut context, cmd);
-        context.borrow_state.canonicalize_locals(context.local_numbers);
+        context
+            .borrow_state
+            .canonicalize_locals(context.local_numbers);
         context.get_diags()
     }
 }
 
-impl AbstractInterpreter for BorrowSafety {}
-
-pub fn verify(context: &super::CFGContext, cfg: &super::cfg::MutForwardCFG) -> BTreeMap<Label, BorrowState> {
-    let super::CFGContext { signature, locals, .. } = context;
+pub fn verify(
+    context: &super::CFGContext,
+    cfg: &super::cfg::MutForwardCFG,
+) -> BTreeMap<Label, BorrowState> {
+    let super::CFGContext {
+        signature, locals, ..
+    } = context;
     let mut safety = BorrowSafety::new(locals);
 
     // check for existing errors
@@ -83,7 +101,7 @@ pub fn verify(context: &super::CFGContext, cfg: &super::cfg::MutForwardCFG) -> B
     let mut initial_state = BorrowState::initial(locals, safety.mutably_used.clone(), has_errors);
     initial_state.bind_arguments(&signature.parameters);
     initial_state.canonicalize_locals(&safety.local_numbers);
-    let (final_state, ds) = safety.analyze_function(cfg, initial_state);
+    let (final_state, ds) = analyze_function(&mut safety, cfg, initial_state);
     context.add_diags(ds);
     unused_mut_borrows(context, safety.mutably_used);
     final_state
@@ -94,7 +112,12 @@ fn unused_mut_borrows(context: &super::CFGContext, mutably_used: RefExpInfoMap) 
     consider switching to an immutable reference '&' instead";
 
     for info in RefCell::borrow(&mutably_used).values() {
-        let RefExpInfo { loc, is_mut, used_mutably, param_name } = info;
+        let RefExpInfo {
+            loc,
+            is_mut,
+            used_mutably,
+            param_name,
+        } = info;
         if *is_mut && !*used_mutably {
             let diag = if let Some(v) = param_name {
                 if matches!(context.visibility, Visibility::Public(_)) {
@@ -102,7 +125,9 @@ fn unused_mut_borrows(context: &super::CFGContext, mutably_used: RefExpInfoMap) 
                     continue;
                 }
                 let param_loc = v.loc();
-                let DisplayVar::Orig(v) = display_var(v.value()) else { panic!("ICE param {v:?} is a tmp") };
+                let DisplayVar::Orig(v) = display_var(v.value()) else {
+                    panic!("ICE param {v:?} is a tmp")
+                };
                 let param_msg = format!(
                     "For parameters, this can be silenced by prefixing \
                     the name with an underscore, e.g. '_{v}'"
@@ -166,41 +191,63 @@ fn command(context: &mut Context, sp!(loc, cmd_): &Command) {
 }
 
 fn lvalues(context: &mut Context, ls: &[LValue], values: Values) {
-    ls.iter().zip(values).for_each(|(l, value)| lvalue(context, l, value))
+    ls.iter()
+        .zip(values)
+        .for_each(|(l, value)| lvalue(context, l, value))
 }
 
 fn lvalue(context: &mut Context, sp!(loc, l_): &LValue, value: Value) {
     use LValue_ as L;
     match l_ {
-        L::Ignore | L::Var { unused_assignment: true, .. } => {
+        L::Ignore
+        | L::Var {
+            unused_assignment: true,
+            ..
+        } => {
             context.borrow_state.release_value(value);
         }
-        L::Var { var: v, unused_assignment: false, .. } => {
+        L::Var {
+            var: v,
+            unused_assignment: false,
+            ..
+        } => {
             let diags = context.borrow_state.assign_local(*loc, v, value);
             context.add_diags(diags)
         }
         L::Unpack(_, _, fields) => {
             assert!(!value.is_ref());
-            fields.iter().for_each(|(_, l)| lvalue(context, l, Value::NonRef))
+            fields
+                .iter()
+                .for_each(|(_, l)| lvalue(context, l, Value::NonRef))
         }
         L::UnpackVariant(_, _, unpack_type, _, _, fields) => match unpack_type {
             UnpackType::ByValue => {
                 assert!(!value.is_ref());
-                fields.iter().for_each(|(_, l)| lvalue(context, l, Value::NonRef))
+                fields
+                    .iter()
+                    .for_each(|(_, l)| lvalue(context, l, Value::NonRef))
             }
             UnpackType::ByImmRef => {
                 assert!(value.is_ref());
-                let (diags, fvs) = context.borrow_state.borrow_variant_fields(*loc, false, value, fields);
+                let (diags, fvs) = context
+                    .borrow_state
+                    .borrow_variant_fields(*loc, false, value, fields);
                 context.add_diags(diags);
                 assert!(fvs.len() == fields.len());
-                fvs.into_iter().zip(fields.iter()).for_each(|(fv, (_, l))| lvalue(context, l, fv));
+                fvs.into_iter()
+                    .zip(fields.iter())
+                    .for_each(|(fv, (_, l))| lvalue(context, l, fv));
             }
             UnpackType::ByMutRef => {
                 assert!(value.is_ref());
-                let (diags, fvs) = context.borrow_state.borrow_variant_fields(*loc, true, value, fields);
+                let (diags, fvs) = context
+                    .borrow_state
+                    .borrow_variant_fields(*loc, true, value, fields);
                 context.add_diags(diags);
                 assert!(fvs.len() == fields.len());
-                fvs.into_iter().zip(fields.iter()).for_each(|(fv, (_, l))| lvalue(context, l, fv));
+                fvs.into_iter()
+                    .zip(fields.iter())
+                    .for_each(|(fv, (_, l))| lvalue(context, l, fv));
             }
         },
     }
@@ -243,7 +290,10 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
         }
         E::Borrow(mut_, e, f, shared_borrow) => {
             let evalue = assert_single_value(exp(context, e));
-            let (diags, value) = context.borrow_state.borrow_field(*eloc, *mut_, evalue, f, *shared_borrow);
+            let (diags, value) =
+                context
+                    .borrow_state
+                    .borrow_field(*eloc, *mut_, evalue, f, *shared_borrow);
             context.add_diags(diags);
             vec![value]
         }
@@ -256,7 +306,11 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
         }
 
         E::ModuleCall(mcall) => {
-            let evalues: Values = mcall.arguments.iter().flat_map(|arg| exp(context, arg)).collect();
+            let evalues: Values = mcall
+                .arguments
+                .iter()
+                .flat_map(|arg| exp(context, arg))
+                .collect();
             let ret_ty = &parent_e.ty;
             let (diags, values) = context.borrow_state.call(*eloc, evalues, ret_ty);
             context.add_diags(diags);

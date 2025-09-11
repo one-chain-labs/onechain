@@ -7,8 +7,8 @@ use move_binary_format::errors::{Location, PartialVMError, VMError};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag},
-    resolver::{LinkageResolver, ModuleResolver, ResourceResolver},
+    language_storage::ModuleId,
+    resolver::{LinkageResolver, ModuleResolver},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::move_vm::MoveVM;
@@ -49,6 +49,7 @@ fn test_malformed_module() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            None,
         )
         .unwrap();
     }
@@ -75,6 +76,7 @@ fn test_malformed_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                None,
             )
             .unwrap_err();
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
@@ -114,6 +116,7 @@ fn test_unverifiable_module() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            None,
         )
         .unwrap();
     }
@@ -139,6 +142,7 @@ fn test_unverifiable_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                None,
             )
             .unwrap_err();
 
@@ -189,6 +193,7 @@ fn test_missing_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            None,
         )
         .unwrap();
     }
@@ -209,6 +214,7 @@ fn test_missing_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                None,
             )
             .unwrap_err();
 
@@ -259,6 +265,7 @@ fn test_malformed_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            None,
         )
         .unwrap();
     }
@@ -285,6 +292,7 @@ fn test_malformed_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                None,
             )
             .unwrap_err();
 
@@ -336,6 +344,7 @@ fn test_unverifiable_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
+            None,
         )
         .unwrap();
     }
@@ -362,6 +371,7 @@ fn test_unverifiable_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                None,
             )
             .unwrap_err();
 
@@ -390,14 +400,6 @@ impl ModuleResolver for BogusStorage {
     }
 }
 
-impl ResourceResolver for BogusStorage {
-    type Error = VMError;
-
-    fn get_resource(&self, _address: &AccountAddress, _tag: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
-        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
-    }
-}
-
 const LIST_OF_ERROR_CODES: &[StatusCode] = &[
     StatusCode::UNKNOWN_VALIDATION_STATUS,
     StatusCode::INVALID_SIGNATURE,
@@ -414,7 +416,9 @@ fn test_storage_returns_bogus_error_when_loading_module() {
     let fun_name = Identifier::new("bar").unwrap();
 
     for error_code in LIST_OF_ERROR_CODES {
-        let storage = BogusStorage { bad_status_code: *error_code };
+        let storage = BogusStorage {
+            bad_status_code: *error_code,
+        };
         let vm = MoveVM::new(vec![]).unwrap();
         let mut sess = vm.new_session(&storage);
 
@@ -425,6 +429,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                None,
             )
             .unwrap_err();
 

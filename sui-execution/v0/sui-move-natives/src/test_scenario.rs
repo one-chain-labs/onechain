@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_nth_struct_field,
-    legacy_test_cost,
+    get_nth_struct_field, legacy_test_cost,
     object_runtime::{ObjectRuntime, RuntimeResults},
 };
 use linked_hash_map::LinkedHashMap;
@@ -67,15 +66,31 @@ pub fn end_transaction(
     let object_runtime_state = object_runtime_ref.take_state();
     // Determine writes and deletes
     // We pass an empty map as we do not expose dynamic field objects in the system
-    let results = object_runtime_state.finish(BTreeSet::new(), BTreeSet::new(), BTreeMap::new(), BTreeMap::new(), false);
-    let RuntimeResults { writes, deletions, user_events, loaded_child_objects: _ } = match results {
+    let results = object_runtime_state.finish(
+        BTreeSet::new(),
+        BTreeSet::new(),
+        BTreeMap::new(),
+        BTreeMap::new(),
+        false,
+    );
+    let RuntimeResults {
+        writes,
+        deletions,
+        user_events,
+        loaded_child_objects: _,
+    } = match results {
         Ok(res) => res,
         Err(_) => {
-            return Ok(NativeResult::err(legacy_test_cost(), E_COULD_NOT_GENERATE_EFFECTS));
+            return Ok(NativeResult::err(
+                legacy_test_cost(),
+                E_COULD_NOT_GENERATE_EFFECTS,
+            ));
         }
     };
-    let all_active_child_objects =
-        object_runtime_ref.all_active_child_objects().map(|(id, _, _)| *id).collect::<BTreeSet<_>>();
+    let all_active_child_objects = object_runtime_ref
+        .all_active_child_objects()
+        .map(|(id, _, _)| *id)
+        .collect::<BTreeSet<_>>();
     let inventories = &mut object_runtime_ref.test_inventories;
     let mut new_object_values = LinkedHashMap::new();
     let mut transferred = vec![];
@@ -84,7 +99,11 @@ pub fn end_transaction(
     // - deleted objects need to be removed to mark deletions
     // - written objects are removed and later replaced to mark new values and new owners
     // - child objects will not be reflected in transfers, but need to be no longer retrievable
-    for id in deletions.keys().chain(writes.keys()).chain(&all_active_child_objects) {
+    for id in deletions
+        .keys()
+        .chain(writes.keys())
+        .chain(&all_active_child_objects)
+    {
         for addr_inventory in inventories.address_inventories.values_mut() {
             for s in addr_inventory.values_mut() {
                 s.remove(id);
@@ -115,24 +134,39 @@ pub fn end_transaction(
         }
         match owner {
             Owner::AddressOwner(a) => {
-                inventories.address_inventories.entry(a).or_default().entry(ty).or_default().insert(id, ());
+                inventories
+                    .address_inventories
+                    .entry(a)
+                    .or_default()
+                    .entry(ty)
+                    .or_default()
+                    .insert(id, ());
             }
             Owner::ObjectOwner(_) => (),
             Owner::Shared { .. } => {
-                inventories.shared_inventory.entry(ty).or_default().insert(id, ());
+                inventories
+                    .shared_inventory
+                    .entry(ty)
+                    .or_default()
+                    .insert(id, ());
             }
             Owner::Immutable => {
-                inventories.immutable_inventory.entry(ty).or_default().insert(id, ());
+                inventories
+                    .immutable_inventory
+                    .entry(ty)
+                    .or_default()
+                    .insert(id, ());
             }
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         }
     }
     // deletions already handled above, but we drop the delete kind for the effects
     let mut deleted = vec![];
     for (id, _) in deletions {
-        incorrect_shared_or_imm_handling = incorrect_shared_or_imm_handling || taken_shared_or_imm.contains_key(&id);
+        incorrect_shared_or_imm_handling =
+            incorrect_shared_or_imm_handling || taken_shared_or_imm.contains_key(&id);
         deleted.push(id);
     }
     // find all wrapped objects
@@ -141,15 +175,26 @@ pub fn end_transaction(
     find_all_wrapped_objects(
         context,
         &mut all_wrapped,
-        new_object_values.iter().map(|(id, (ty, value))| (id, ty, value)),
+        new_object_values
+            .iter()
+            .map(|(id, (ty, value))| (id, ty, value)),
     );
-    find_all_wrapped_objects(context, &mut all_wrapped, object_runtime_ref.all_active_child_objects());
+    find_all_wrapped_objects(
+        context,
+        &mut all_wrapped,
+        object_runtime_ref.all_active_child_objects(),
+    );
     // mark as "incorrect" if a shared/imm object was wrapped or is a child object
     incorrect_shared_or_imm_handling = incorrect_shared_or_imm_handling
-        || taken_shared_or_imm.keys().any(|id| all_wrapped.contains(id) || all_active_child_objects.contains(id));
+        || taken_shared_or_imm
+            .keys()
+            .any(|id| all_wrapped.contains(id) || all_active_child_objects.contains(id));
     // if incorrect handling, return with an 'abort'
     if incorrect_shared_or_imm_handling {
-        return Ok(NativeResult::err(legacy_test_cost(), E_INVALID_SHARED_OR_IMMUTABLE_USAGE));
+        return Ok(NativeResult::err(
+            legacy_test_cost(),
+            E_INVALID_SHARED_OR_IMMUTABLE_USAGE,
+        ));
     }
 
     // mark all wrapped as deleted
@@ -169,14 +214,23 @@ pub fn end_transaction(
     // check for bad updates to immutable values
     for (id, (ty, value)) in new_object_values {
         debug_assert!(!all_active_child_objects.contains(&id));
-        if let Some(prev_value) =
-            object_runtime_ref.test_inventories.taken_immutable_values.get(&ty).and_then(|values| values.get(&id))
+        if let Some(prev_value) = object_runtime_ref
+            .test_inventories
+            .taken_immutable_values
+            .get(&ty)
+            .and_then(|values| values.get(&id))
         {
             if !value.equals(prev_value)? {
-                return Ok(NativeResult::err(legacy_test_cost(), E_INVALID_SHARED_OR_IMMUTABLE_USAGE));
+                return Ok(NativeResult::err(
+                    legacy_test_cost(),
+                    E_INVALID_SHARED_OR_IMMUTABLE_USAGE,
+                ));
             }
         }
-        object_runtime_ref.test_inventories.objects.insert(id, value);
+        object_runtime_ref
+            .test_inventories
+            .objects
+            .insert(id, value);
     }
     // remove deleted
     for id in &deleted {
@@ -187,7 +241,13 @@ pub fn end_transaction(
         object_runtime_ref.test_inventories.objects.remove(&id);
     }
 
-    let effects = transaction_effects(created, written, deleted, transferred, user_events.len() as u64);
+    let effects = transaction_effects(
+        created,
+        written,
+        deleted,
+        transferred,
+        user_events.len() as u64,
+    );
     Ok(NativeResult::ok(legacy_test_cost(), smallvec![effects]))
 }
 
@@ -261,7 +321,10 @@ pub fn most_recent_id_for_address(
         None => pack_option(None),
         Some(inv) => most_recent_at_ty(&inventories.taken, inv, specified_ty),
     };
-    Ok(NativeResult::ok(legacy_test_cost(), smallvec![most_recent_id]))
+    Ok(NativeResult::ok(
+        legacy_test_cost(),
+        smallvec![most_recent_id],
+    ))
 }
 
 // native fun was_taken_from_address(account: address, id: ID): bool;
@@ -276,8 +339,15 @@ pub fn was_taken_from_address(
     assert!(args.is_empty());
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let inventories = &mut object_runtime.test_inventories;
-    let was_taken = inventories.taken.get(&id).map(|owner| owner == &Owner::AddressOwner(account)).unwrap_or(false);
-    Ok(NativeResult::ok(legacy_test_cost(), smallvec![Value::bool(was_taken)]))
+    let was_taken = inventories
+        .taken
+        .get(&id)
+        .map(|owner| owner == &Owner::AddressOwner(account))
+        .unwrap_or(false);
+    Ok(NativeResult::ok(
+        legacy_test_cost(),
+        smallvec![Value::bool(was_taken)],
+    ))
 }
 
 // native fun take_immutable_by_id<T: key>(id: ID): T;
@@ -293,7 +363,13 @@ pub fn take_immutable_by_id(
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let inventories = &mut object_runtime.test_inventories;
     let res = take_from_inventory(
-        |x| inventories.immutable_inventory.get(&specified_ty).map(|s| s.contains_key(x)).unwrap_or(false),
+        |x| {
+            inventories
+                .immutable_inventory
+                .get(&specified_ty)
+                .map(|s| s.contains_key(x))
+                .unwrap_or(false)
+        },
         &inventories.objects,
         &mut inventories.taken,
         &mut object_runtime.state.input_objects,
@@ -302,7 +378,11 @@ pub fn take_immutable_by_id(
     );
     Ok(match res {
         Ok(value) => {
-            inventories.taken_immutable_values.entry(specified_ty).or_default().insert(id, value.copy_value().unwrap());
+            inventories
+                .taken_immutable_values
+                .entry(specified_ty)
+                .or_default()
+                .insert(id, value.copy_value().unwrap());
             NativeResult::ok(legacy_test_cost(), smallvec![value])
         }
         Err(native_err) => native_err,
@@ -319,8 +399,15 @@ pub fn most_recent_immutable_id(
     assert!(args.is_empty());
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let inventories = &mut object_runtime.test_inventories;
-    let most_recent_id = most_recent_at_ty(&inventories.taken, &inventories.immutable_inventory, specified_ty);
-    Ok(NativeResult::ok(legacy_test_cost(), smallvec![most_recent_id]))
+    let most_recent_id = most_recent_at_ty(
+        &inventories.taken,
+        &inventories.immutable_inventory,
+        specified_ty,
+    );
+    Ok(NativeResult::ok(
+        legacy_test_cost(),
+        smallvec![most_recent_id],
+    ))
 }
 
 // native fun was_taken_immutable(id: ID): bool;
@@ -334,8 +421,15 @@ pub fn was_taken_immutable(
     assert!(args.is_empty());
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let inventories = &mut object_runtime.test_inventories;
-    let was_taken = inventories.taken.get(&id).map(|owner| owner == &Owner::Immutable).unwrap_or(false);
-    Ok(NativeResult::ok(legacy_test_cost(), smallvec![Value::bool(was_taken)]))
+    let was_taken = inventories
+        .taken
+        .get(&id)
+        .map(|owner| owner == &Owner::Immutable)
+        .unwrap_or(false);
+    Ok(NativeResult::ok(
+        legacy_test_cost(),
+        smallvec![Value::bool(was_taken)],
+    ))
 }
 
 // native fun take_shared_by_id<T: key>(id: ID): T;
@@ -351,7 +445,13 @@ pub fn take_shared_by_id(
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let inventories = &mut object_runtime.test_inventories;
     let res = take_from_inventory(
-        |x| inventories.shared_inventory.get(&specified_ty).map(|s| s.contains_key(x)).unwrap_or(false),
+        |x| {
+            inventories
+                .shared_inventory
+                .get(&specified_ty)
+                .map(|s| s.contains_key(x))
+                .unwrap_or(false)
+        },
         &inventories.objects,
         &mut inventories.taken,
         &mut object_runtime.state.input_objects,
@@ -374,8 +474,15 @@ pub fn most_recent_id_shared(
     assert!(args.is_empty());
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let inventories = &mut object_runtime.test_inventories;
-    let most_recent_id = most_recent_at_ty(&inventories.taken, &inventories.shared_inventory, specified_ty);
-    Ok(NativeResult::ok(legacy_test_cost(), smallvec![most_recent_id]))
+    let most_recent_id = most_recent_at_ty(
+        &inventories.taken,
+        &inventories.shared_inventory,
+        specified_ty,
+    );
+    Ok(NativeResult::ok(
+        legacy_test_cost(),
+        smallvec![most_recent_id],
+    ))
 }
 
 // native fun was_taken_shared(id: ID): bool;
@@ -389,8 +496,15 @@ pub fn was_taken_shared(
     assert!(args.is_empty());
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let inventories = &mut object_runtime.test_inventories;
-    let was_taken = inventories.taken.get(&id).map(|owner| matches!(owner, Owner::Shared { .. })).unwrap_or(false);
-    Ok(NativeResult::ok(legacy_test_cost(), smallvec![Value::bool(was_taken)]))
+    let was_taken = inventories
+        .taken
+        .get(&id)
+        .map(|owner| matches!(owner, Owner::Shared { .. }))
+        .unwrap_or(false);
+    Ok(NativeResult::ok(
+        legacy_test_cost(),
+        smallvec![Value::bool(was_taken)],
+    ))
 }
 
 // impls
@@ -406,7 +520,10 @@ fn take_from_inventory(
     let obj_opt = objects.get(&id);
     let is_taken = taken.contains_key(&id);
     if is_taken || !is_in_inventory(&id) || obj_opt.is_none() {
-        return Err(NativeResult::err(legacy_test_cost(), E_OBJECT_NOT_FOUND_CODE));
+        return Err(NativeResult::err(
+            legacy_test_cost(),
+            E_OBJECT_NOT_FOUND_CODE,
+        ));
     }
     taken.insert(id, owner.clone());
     input_objects.insert(id, owner);
@@ -414,7 +531,11 @@ fn take_from_inventory(
     Ok(obj.copy_value().unwrap())
 }
 
-fn most_recent_at_ty(taken: &BTreeMap<ObjectID, Owner>, inv: &BTreeMap<Type, Set<ObjectID>>, ty: Type) -> Value {
+fn most_recent_at_ty(
+    taken: &BTreeMap<ObjectID, Owner>,
+    inv: &BTreeMap<Type, Set<ObjectID>>,
+    ty: Type,
+) -> Value {
     pack_option(most_recent_at_ty_opt(taken, inv, ty))
 }
 
@@ -436,10 +557,16 @@ fn get_specified_ty(mut ty_args: Vec<Type>) -> Type {
 // helpers
 fn pop_id(args: &mut VecDeque<Value>) -> PartialVMResult<ObjectID> {
     let v = match args.pop_back() {
-        None => return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)),
+        None => {
+            return Err(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            ))
+        }
         Some(v) => v,
     };
-    Ok(get_nth_struct_field(v, 0)?.value_as::<AccountAddress>()?.into())
+    Ok(get_nth_struct_field(v, 0)?
+        .value_as::<AccountAddress>()?
+        .into())
 }
 
 fn pack_id(a: impl Into<AccountAddress>) -> Value {
@@ -452,7 +579,9 @@ fn pack_ids(items: impl IntoIterator<Item = impl Into<AccountAddress>>) -> Value
 
 fn pack_vec_map(items: impl IntoIterator<Item = (Value, Value)>) -> Value {
     Value::struct_(values::Struct::pack(vec![Value::vector_for_testing_only(
-        items.into_iter().map(|(k, v)| Value::struct_(values::Struct::pack(vec![k, v]))),
+        items
+            .into_iter()
+            .map(|(k, v)| Value::struct_(values::Struct::pack(vec![k, v]))),
     )]))
 }
 
@@ -469,12 +598,14 @@ fn transaction_effects(
     let mut frozen = vec![];
     for (id, owner) in transferred {
         match owner {
-            Owner::AddressOwner(a) => transferred_to_account.push((pack_id(id), Value::address(a.into()))),
+            Owner::AddressOwner(a) => {
+                transferred_to_account.push((pack_id(id), Value::address(a.into())))
+            }
             Owner::ObjectOwner(o) => transferred_to_object.push((pack_id(id), pack_id(o))),
             Owner::Shared { .. } => shared.push(id),
             Owner::Immutable => frozen.push(id),
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         }
     }
@@ -504,7 +635,9 @@ fn pack_option(opt: Option<Value>) -> Value {
         Some(v) => vec![v],
         None => vec![],
     };
-    Value::struct_(values::Struct::pack(vec![Value::vector_for_testing_only(item)]))
+    Value::struct_(values::Struct::pack(vec![Value::vector_for_testing_only(
+        item,
+    )]))
 }
 
 fn find_all_wrapped_objects<'a, 'i>(
@@ -525,17 +658,24 @@ fn find_all_wrapped_objects<'a, 'i>(
         uid: &'u MoveStructLayout,
     }
 
-    impl<'i, 'u, 'b, 'l> AV::Traversal<'b, 'l> for Traversal<'i, 'u> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for Traversal<'_, '_> {
         type Error = AV::Error;
 
-        fn traverse_struct(&mut self, driver: &mut AV::StructDriver<'_, 'b, 'l>) -> Result<(), Self::Error> {
+        fn traverse_struct(
+            &mut self,
+            driver: &mut AV::StructDriver<'_, 'b, 'l>,
+        ) -> Result<(), Self::Error> {
             match self.state {
                 // We're at the top-level of the traversal, looking for an object to recurse into.
                 // We can unconditionally switch to looking for UID fields at the level below,
                 // because we know that all the top-level values are objects.
                 LookingFor::Wrapped => {
                     while driver
-                        .next_field(&mut Traversal { state: LookingFor::Uid, ids: self.ids, uid: self.uid })?
+                        .next_field(&mut Traversal {
+                            state: LookingFor::Uid,
+                            ids: self.ids,
+                            uid: self.uid,
+                        })?
                         .is_some()
                     {}
                 }
@@ -590,11 +730,15 @@ fn find_all_wrapped_objects<'a, 'i>(
         };
 
         let blob = value.borrow().simple_serialize(&layout).unwrap();
-        MoveValue::visit_deserialize(&blob, &annotated_layout, &mut Traversal {
-            state: LookingFor::Wrapped,
-            ids,
-            uid: &uid,
-        })
+        MoveValue::visit_deserialize(
+            &blob,
+            &annotated_layout,
+            &mut Traversal {
+                state: LookingFor::Wrapped,
+                ids,
+                uid: &uid,
+            },
+        )
         .unwrap();
     }
 }

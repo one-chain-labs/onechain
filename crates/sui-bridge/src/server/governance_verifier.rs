@@ -3,11 +3,9 @@
 
 use std::collections::HashMap;
 
-use crate::{
-    error::{BridgeError, BridgeResult},
-    server::handler::ActionVerifier,
-    types::{BridgeAction, BridgeActionDigest},
-};
+use crate::error::{BridgeError, BridgeResult};
+use crate::server::handler::ActionVerifier;
+use crate::types::{BridgeAction, BridgeActionDigest};
 
 #[derive(Debug)]
 pub struct GovernanceVerifier {
@@ -24,7 +22,9 @@ impl GovernanceVerifier {
             }
             approved_goverance_actions.insert(action.digest(), action);
         }
-        Ok(Self { approved_goverance_actions })
+        Ok(Self {
+            approved_goverance_actions,
+        })
     }
 }
 
@@ -40,7 +40,10 @@ impl ActionVerifier<BridgeAction> for GovernanceVerifier {
             return Err(BridgeError::ActionIsNotGovernanceAction(key));
         }
         if let Some(approved_action) = self.approved_goverance_actions.get(&key.digest()) {
-            assert_eq!(&key, approved_action, "Mismatched action found in approved_actions");
+            assert_eq!(
+                &key, approved_action,
+                "Mismatched action found in approved_actions"
+            );
             return Ok(key);
         }
         return Err(BridgeError::GovernanceActionIsNotApproved);
@@ -71,8 +74,14 @@ mod tests {
         });
 
         let verifier = GovernanceVerifier::new(vec![action_1.clone(), action_2.clone()]).unwrap();
-        assert_eq!(verifier.verify(action_1.clone()).await.unwrap(), action_1.clone());
-        assert_eq!(verifier.verify(action_2.clone()).await.unwrap(), action_2.clone());
+        assert_eq!(
+            verifier.verify(action_1.clone()).await.unwrap(),
+            action_1.clone()
+        );
+        assert_eq!(
+            verifier.verify(action_2.clone()).await.unwrap(),
+            action_2.clone()
+        );
 
         let action_3 = BridgeAction::LimitUpdateAction(LimitUpdateAction {
             chain_id: BridgeChainId::EthCustom,
@@ -80,7 +89,10 @@ mod tests {
             nonce: 2,
             new_usd_limit: 10000,
         });
-        assert_eq!(verifier.verify(action_3).await.unwrap_err(), BridgeError::GovernanceActionIsNotApproved);
+        assert_eq!(
+            verifier.verify(action_3).await.unwrap_err(),
+            BridgeError::GovernanceActionIsNotApproved
+        );
 
         // Token transfer action is not allowed
         let action_4 = get_test_sui_to_eth_bridge_action(None, None, None, None, None, None, None);
@@ -90,6 +102,9 @@ mod tests {
         ));
 
         // Token transfer action will be rejected
-        assert!(matches!(verifier.verify(action_4).await.unwrap_err(), BridgeError::ActionIsNotGovernanceAction(..)));
+        assert!(matches!(
+            verifier.verify(action_4).await.unwrap_err(),
+            BridgeError::ActionIsNotGovernanceAction(..)
+        ));
     }
 }

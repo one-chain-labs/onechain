@@ -14,7 +14,8 @@ pub fn is_pascal_case(s: &str) -> bool {
 }
 
 pub fn is_upper_snake_case(s: &str) -> bool {
-    s.chars().all(|c| c.is_uppercase() || c.is_numeric() || c == '_')
+    s.chars()
+        .all(|c| c.is_uppercase() || c.is_numeric() || c == '_')
 }
 
 //**************************************************************************************************
@@ -49,10 +50,11 @@ pub fn make_ascii_titlecase(in_s: &str) -> String {
 /// format_oxford_list!(ITER, "or", "{}", [1, 2, 3].iter());
 /// ==> "1, 2, or 3"
 ///```
+#[macro_export]
 macro_rules! format_oxford_list {
     ($sep:expr, $format_str:expr, $e:expr) => {{
         let entries = $e;
-        format_oxford_list!(ITER, $sep, $format_str, entries.iter())
+        $crate::format_oxford_list!(ITER, $sep, $format_str, entries.iter())
     }};
     (ITER, $sep:expr, $format_str:expr, $e:expr) => {{
         let mut entries = $e;
@@ -67,7 +69,9 @@ macro_rules! format_oxford_list {
                 format!($format_str, entries.next().unwrap())
             ),
             _ => {
-                let entries = entries.map(|entry| format!($format_str, entry)).collect::<Vec<_>>();
+                let entries = entries
+                    .map(|entry| format!($format_str, entry))
+                    .collect::<Vec<_>>();
                 if let Some((last, init)) = entries.split_last() {
                     let mut result = init.join(", ");
                     result.push_str(&format!(", {} {}", $sep, last));

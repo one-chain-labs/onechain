@@ -3,18 +3,8 @@
 
 use crate::unit_tests::production_config;
 use move_binary_format::file_format::{
-    empty_module,
-    Bytecode,
-    CodeUnit,
-    FunctionDefinition,
-    FunctionHandle,
-    FunctionHandleIndex,
-    IdentifierIndex,
-    ModuleHandleIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken,
-    Visibility,
+    empty_module, Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
+    IdentifierIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, Visibility,
 };
 use move_bytecode_verifier_meter::dummy::DummyMeter;
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
@@ -39,7 +29,11 @@ fn test_vec_pack() {
         visibility: Visibility::Private,
         is_entry: false,
         acquires_global_resources: vec![],
-        code: Some(CodeUnit { locals: SignatureIndex(0), code: vec![], jump_tables: vec![] }),
+        code: Some(CodeUnit {
+            locals: SignatureIndex(0),
+            code: vec![],
+            jump_tables: vec![],
+        }),
     });
 
     m.function_handles.push(FunctionHandle {
@@ -49,16 +43,23 @@ fn test_vec_pack() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
     });
-    m.identifiers.push(Identifier::new("foo".to_string()).unwrap());
+    m.identifiers
+        .push(Identifier::new("foo".to_string()).unwrap());
 
     const COUNT: usize = 3000;
 
-    m.function_defs[0].code.as_mut().unwrap().code = std::iter::once(&[Bytecode::VecPack(sig, 0)][..])
-        .chain(std::iter::repeat(&[Bytecode::VecUnpack(sig, 1024), Bytecode::VecPack(sig, 1024)][..]).take(COUNT))
-        .chain(std::iter::once(&[Bytecode::Pop, Bytecode::Ret][..]))
-        .flatten()
-        .cloned()
-        .collect();
+    m.function_defs[0].code.as_mut().unwrap().code =
+        std::iter::once(&[Bytecode::VecPack(sig, 0)][..])
+            .chain(
+                std::iter::repeat(
+                    &[Bytecode::VecUnpack(sig, 1024), Bytecode::VecPack(sig, 1024)][..],
+                )
+                .take(COUNT),
+            )
+            .chain(std::iter::once(&[Bytecode::Pop, Bytecode::Ret][..]))
+            .flatten()
+            .cloned()
+            .collect();
 
     let res = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_vec_pack",

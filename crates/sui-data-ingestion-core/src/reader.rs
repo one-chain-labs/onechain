@@ -1,23 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{create_remote_store_client, executor::MAX_CHECKPOINTS_IN_PROGRESS};
+use crate::create_remote_store_client;
+use crate::executor::MAX_CHECKPOINTS_IN_PROGRESS;
 use anyhow::Result;
 use backoff::backoff::Backoff;
 use futures::StreamExt;
 use mysten_metrics::spawn_monitored_task;
 #[cfg(not(target_os = "macos"))]
 use notify::{RecommendedWatcher, RecursiveMode};
-use object_store::{path::Path, ObjectStore};
-use std::{collections::BTreeMap, ffi::OsString, fs, path::PathBuf, sync::Arc, time::Duration};
+use object_store::path::Path;
+use object_store::ObjectStore;
+use std::ffi::OsString;
+use std::fs;
+use std::path::PathBuf;
+use std::time::Duration;
+use std::{collections::BTreeMap, sync::Arc};
 use sui_rpc_api::Client;
 use sui_storage::blob::Blob;
-use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
 use tap::pipe::Pipe;
-use tokio::{
-    sync::{mpsc, mpsc::error::TryRecvError, oneshot},
-    time::timeout,
-};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::TryRecvError;
+use tokio::sync::oneshot;
+use tokio::time::timeout;
 use tracing::{debug, error, info};
 
 pub struct CheckpointReader {
@@ -73,7 +80,7 @@ impl CheckpointReader {
     /// Reads files in a local directory, validates them, and forwards `CheckpointData` to the executor.
     async fn read_local_files(&self) -> Result<Vec<Arc<CheckpointData>>> {
         let mut checkpoints = vec![];
-        for offset in 0..MAX_CHECKPOINTS_IN_PROGRESS {
+        for offset in 0..*MAX_CHECKPOINTS_IN_PROGRESS {
             let sequence_number = self.current_checkpoint_number + offset as u64;
             if self.exceeds_capacity(sequence_number) {
                 break;
@@ -90,18 +97,21 @@ impl CheckpointReader {
     }
 
     fn exceeds_capacity(&self, checkpoint_number: CheckpointSequenceNumber) -> bool {
-        ((MAX_CHECKPOINTS_IN_PROGRESS as u64 + self.last_pruned_watermark) <= checkpoint_number)
+        ((*MAX_CHECKPOINTS_IN_PROGRESS as u64 + self.last_pruned_watermark) <= checkpoint_number)
             || self.data_limiter.exceeds()
     }
 
-    async fn fetch_from_object_store(
+    pub async fn fetch_from_object_store(
         store: &dyn ObjectStore,
         checkpoint_number: CheckpointSequenceNumber,
     ) -> Result<(Arc<CheckpointData>, usize)> {
         let path = Path::from(format!("{}.chk", checkpoint_number));
         let response = store.get(&path).await?;
         let bytes = response.bytes().await?;
-        Ok((Blob::from_bytes::<Arc<CheckpointData>>(&bytes)?, bytes.len()))
+        Ok((
+            Blob::from_bytes::<Arc<CheckpointData>>(&bytes)?,
+            bytes.len(),
+        ))
     }
 
     async fn fetch_from_full_node(
@@ -118,12 +128,18 @@ impl CheckpointReader {
         checkpoint_number: CheckpointSequenceNumber,
     ) -> Result<(Arc<CheckpointData>, usize)> {
         match store {
-            RemoteStore::ObjectStore(store) => Self::fetch_from_object_store(store, checkpoint_number).await,
-            RemoteStore::Rest(client) => Self::fetch_from_full_node(client, checkpoint_number).await,
-            RemoteStore::Hybrid(store, client) => match Self::fetch_from_full_node(client, checkpoint_number).await {
-                Ok(result) => Ok(result),
-                Err(_) => Self::fetch_from_object_store(store, checkpoint_number).await,
-            },
+            RemoteStore::ObjectStore(store) => {
+                Self::fetch_from_object_store(store, checkpoint_number).await
+            }
+            RemoteStore::Rest(client) => {
+                Self::fetch_from_full_node(client, checkpoint_number).await
+            }
+            RemoteStore::Hybrid(store, client) => {
+                match Self::fetch_from_full_node(client, checkpoint_number).await {
+                    Ok(result) => Ok(result),
+                    Err(_) => Self::fetch_from_object_store(store, checkpoint_number).await,
+                }
+            }
         }
     }
 
@@ -132,21 +148,35 @@ impl CheckpointReader {
         checkpoint_number: CheckpointSequenceNumber,
     ) -> Result<(Arc<CheckpointData>, usize)> {
         let mut backoff = backoff::ExponentialBackoff::default();
-        backoff.max_elapsed_time = Some(Duration::from_secs(60));
+        let max_elapsed_time = Duration::from_secs(60);
+        backoff.max_elapsed_time = Some(max_elapsed_time);
         backoff.initial_interval = Duration::from_millis(100);
         backoff.current_interval = backoff.initial_interval;
         backoff.multiplier = 1.0;
         loop {
-            match Self::remote_fetch_checkpoint_internal(store, checkpoint_number).await {
-                Ok(data) => return Ok(data),
-                Err(err) => match backoff.next_backoff() {
+            match tokio::time::timeout(
+                max_elapsed_time,
+                Self::remote_fetch_checkpoint_internal(store, checkpoint_number),
+            )
+            .await
+            {
+                Ok(Ok(data)) => return Ok(data),
+                Ok(Err(err)) => match backoff.next_backoff() {
                     Some(duration) => {
                         if !err.to_string().contains("404") {
-                            debug!("remote reader retry in {} ms. Error is {:?}", duration.as_millis(), err);
+                            debug!(
+                                "remote reader retry in {} ms. Error is {:?}",
+                                duration.as_millis(),
+                                err
+                            );
                         }
                         tokio::time::sleep(duration).await
                     }
                     None => return Err(err),
+                },
+                Err(err) => match backoff.next_backoff() {
+                    Some(duration) => tokio::time::sleep(duration).await,
+                    None => return Err(err.into()),
                 },
             }
         }
@@ -156,7 +186,10 @@ impl CheckpointReader {
         let batch_size = self.options.batch_size;
         let start_checkpoint = self.current_checkpoint_number;
         let (sender, receiver) = mpsc::channel(batch_size);
-        let url = self.remote_store_url.clone().expect("remote store url must be set");
+        let url = self
+            .remote_store_url
+            .clone()
+            .expect("remote store url must be set");
         let store = if let Some((fn_url, remote_url)) = url.split_once('|') {
             let object_store = create_remote_store_client(
                 remote_url.to_string(),
@@ -168,9 +201,12 @@ impl CheckpointReader {
         } else if url.ends_with("/rest") {
             RemoteStore::Rest(sui_rpc_api::Client::new(url).unwrap())
         } else {
-            let object_store =
-                create_remote_store_client(url, self.remote_store_options.clone(), self.options.timeout_secs)
-                    .expect("failed to create remote store client");
+            let object_store = create_remote_store_client(
+                url,
+                self.remote_store_options.clone(),
+                self.options.timeout_secs,
+            )
+            .expect("failed to create remote store client");
             RemoteStore::ObjectStore(object_store)
         };
 
@@ -230,7 +266,8 @@ impl CheckpointReader {
         let mut read_source: &str = "local";
         if self.remote_store_url.is_some()
             && (checkpoints.is_empty()
-                || checkpoints[0].checkpoint_summary.sequence_number > self.current_checkpoint_number)
+                || checkpoints[0].checkpoint_summary.sequence_number
+                    > self.current_checkpoint_number)
         {
             checkpoints = self.remote_fetch();
             read_source = "remote";
@@ -247,10 +284,15 @@ impl CheckpointReader {
             checkpoints.len(),
         );
         for checkpoint in checkpoints {
-            if read_source == "local" && checkpoint.checkpoint_summary.sequence_number > self.current_checkpoint_number {
+            if read_source == "local"
+                && checkpoint.checkpoint_summary.sequence_number > self.current_checkpoint_number
+            {
                 break;
             }
-            assert_eq!(checkpoint.checkpoint_summary.sequence_number, self.current_checkpoint_number);
+            assert_eq!(
+                checkpoint.checkpoint_summary.sequence_number,
+                self.current_checkpoint_number
+            );
             self.checkpoint_sender.send(checkpoint).await?;
             self.current_checkpoint_number += 1;
         }
@@ -278,7 +320,10 @@ impl CheckpointReader {
     }
 
     fn checkpoint_number_from_file_path(file_name: &OsString) -> Option<CheckpointSequenceNumber> {
-        file_name.to_str().and_then(|s| s.rfind('.').map(|pos| &s[..pos])).and_then(|s| s.parse().ok())
+        file_name
+            .to_str()
+            .and_then(|s| s.rfind('.').map(|pos| &s[..pos]))
+            .and_then(|s| s.parse().ok())
     }
 
     pub fn initialize(
@@ -287,9 +332,14 @@ impl CheckpointReader {
         remote_store_url: Option<String>,
         remote_store_options: Vec<(String, String)>,
         options: ReaderOptions,
-    ) -> (Self, mpsc::Receiver<Arc<CheckpointData>>, mpsc::Sender<CheckpointSequenceNumber>, oneshot::Sender<()>) {
-        let (checkpoint_sender, checkpoint_recv) = mpsc::channel(MAX_CHECKPOINTS_IN_PROGRESS);
-        let (processed_sender, processed_receiver) = mpsc::channel(MAX_CHECKPOINTS_IN_PROGRESS);
+    ) -> (
+        Self,
+        mpsc::Receiver<Arc<CheckpointData>>,
+        mpsc::Sender<CheckpointSequenceNumber>,
+        oneshot::Sender<()>,
+    ) {
+        let (checkpoint_sender, checkpoint_recv) = mpsc::channel(*MAX_CHECKPOINTS_IN_PROGRESS);
+        let (processed_sender, processed_receiver) = mpsc::channel(*MAX_CHECKPOINTS_IN_PROGRESS);
         let (exit_sender, exit_receiver) = oneshot::channel();
         let reader = Self {
             path,
@@ -308,16 +358,23 @@ impl CheckpointReader {
     }
 
     #[cfg(not(target_os = "macos"))]
-    fn init_watcher(inotify_sender: mpsc::Sender<()>, path: &std::path::Path) -> RecommendedWatcher {
+    fn init_watcher(
+        inotify_sender: mpsc::Sender<()>,
+        path: &std::path::Path,
+    ) -> RecommendedWatcher {
         use notify::Watcher;
         let mut watcher = notify::recommended_watcher(move |res| {
             if let Err(err) = res {
                 eprintln!("watch error: {:?}", err);
             }
-            inotify_sender.blocking_send(()).expect("Failed to send inotify update");
+            inotify_sender
+                .blocking_send(())
+                .expect("Failed to send inotify update");
         })
         .expect("Failed to init inotify");
-        watcher.watch(path, RecursiveMode::NonRecursive).expect("Inotify watcher failed");
+        watcher
+            .watch(path, RecursiveMode::NonRecursive)
+            .expect("Inotify watcher failed");
         watcher
     }
 
@@ -328,7 +385,8 @@ impl CheckpointReader {
         #[cfg(not(target_os = "macos"))]
         let _watcher = Self::init_watcher(_inotify_sender, &self.path);
 
-        self.gc_processed_files(self.last_pruned_watermark).expect("Failed to clean the directory");
+        self.gc_processed_files(self.last_pruned_watermark)
+            .expect("Failed to clean the directory");
 
         loop {
             tokio::select! {
@@ -353,7 +411,11 @@ pub struct DataLimiter {
 
 impl DataLimiter {
     fn new(limit: usize) -> Self {
-        Self { limit, queue: BTreeMap::new(), in_progress: 0 }
+        Self {
+            limit,
+            queue: BTreeMap::new(),
+            in_progress: 0,
+        }
     }
 
     fn exceeds(&self) -> bool {
@@ -365,7 +427,8 @@ impl DataLimiter {
             return;
         }
         self.in_progress += size;
-        self.queue.insert(checkpoint.checkpoint_summary.sequence_number, size);
+        self.queue
+            .insert(checkpoint.checkpoint_summary.sequence_number, size);
     }
 
     fn gc(&mut self, watermark: CheckpointSequenceNumber) {

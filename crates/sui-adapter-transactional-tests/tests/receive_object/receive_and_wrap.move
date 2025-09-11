@@ -5,7 +5,7 @@
 
 //# publish
 module tto::M1 {
-    use one::transfer::Receiving;
+    use sui::transfer::Receiving;
 
     public struct Wrapper has key, store {
         id: UID,

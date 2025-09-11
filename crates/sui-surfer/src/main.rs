@@ -29,7 +29,10 @@ async fn main() {
         return;
     }
 
-    let _guard = telemetry_subscribers::TelemetryConfig::new().with_log_level("off,sui_surfer=info").with_env().init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new()
+        .with_log_level("off,sui_surfer=info")
+        .with_env()
+        .init();
 
     let results = sui_surfer::run(
         Duration::from_secs(args.run_duration.unwrap_or(DEFAULT_RUN_DURATION)),

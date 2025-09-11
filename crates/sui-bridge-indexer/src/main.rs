@@ -5,46 +5,41 @@ use anyhow::Result;
 use clap::*;
 use ethers::types::Address as EthAddress;
 use prometheus::Registry;
-use std::{
-    collections::HashSet,
-    env,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::PathBuf,
-    str::FromStr,
-    sync::Arc,
-};
-use sui_bridge::{
-    eth_client::EthClient,
-    metered_eth_provider::{new_metered_eth_provider, MeteredEthHttpProvier},
-    sui_bridge_watchdog::Observable,
-    sui_client::SuiBridgeClient,
-    utils::get_eth_contract_addresses,
-};
+use std::collections::HashSet;
+use std::env;
+use std::net::IpAddr;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+use sui_bridge::eth_client::EthClient;
+use sui_bridge::metered_eth_provider::{new_metered_eth_provider, MeteredEthHttpProvier};
+use sui_bridge::sui_bridge_watchdog::Observable;
+use sui_bridge::sui_client::SuiBridgeClient;
+use sui_bridge::utils::get_eth_contract_addresses;
 use sui_config::Config;
 use tokio::task::JoinHandle;
 use tracing::info;
 
-use mysten_metrics::{metered_channel::channel, spawn_logged_monitored_task, start_prometheus_server};
+use mysten_metrics::metered_channel::channel;
+use mysten_metrics::spawn_logged_monitored_task;
+use mysten_metrics::start_prometheus_server;
 
-use sui_bridge::{
-    metrics::BridgeMetrics,
-    sui_bridge_watchdog::{
-        eth_bridge_status::EthBridgeStatus,
-        eth_vault_balance::{EthereumVaultBalance, VaultAsset},
-        metrics::WatchdogMetrics,
-        sui_bridge_status::SuiBridgeStatus,
-        BridgeWatchDog,
-    },
+use sui_bridge::metrics::BridgeMetrics;
+use sui_bridge::sui_bridge_watchdog::{
+    eth_bridge_status::EthBridgeStatus,
+    eth_vault_balance::{EthereumVaultBalance, VaultAsset},
+    metrics::WatchdogMetrics,
+    sui_bridge_status::SuiBridgeStatus,
+    BridgeWatchDog,
 };
+use sui_bridge_indexer::config::IndexerConfig;
+use sui_bridge_indexer::metrics::BridgeIndexerMetrics;
+use sui_bridge_indexer::postgres_manager::{get_connection_pool, read_sui_progress_store};
+use sui_bridge_indexer::sui_transaction_handler::handle_sui_transactions_loop;
+use sui_bridge_indexer::sui_transaction_queries::start_sui_tx_polling_task;
 use sui_bridge_indexer::{
-    config::IndexerConfig,
-    create_eth_subscription_indexer,
-    create_eth_sync_indexer,
-    create_sui_indexer,
-    metrics::BridgeIndexerMetrics,
-    postgres_manager::{get_connection_pool, read_sui_progress_store},
-    sui_transaction_handler::handle_sui_transactions_loop,
-    sui_transaction_queries::start_sui_tx_polling_task,
+    create_eth_subscription_indexer, create_eth_sync_indexer, create_sui_indexer,
 };
 use sui_data_ingestion_core::DataIngestionMetrics;
 use sui_sdk::SuiClientBuilder;
@@ -58,7 +53,9 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new()
+        .with_env()
+        .init();
 
     let args = Args::parse();
 
@@ -66,12 +63,15 @@ async fn main() -> Result<()> {
     let config_path = if let Some(path) = args.config_path {
         path
     } else {
-        env::current_dir().expect("Couldn't get current directory").join("config.yaml")
+        env::current_dir()
+            .expect("Couldn't get current directory")
+            .join("config.yaml")
     };
     let config = IndexerConfig::load(&config_path)?;
 
     // Init metrics server
-    let metrics_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), config.metric_port);
+    let metrics_address =
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), config.metric_port);
     let registry_service = start_prometheus_server(metrics_address);
     let registry = registry_service.default_registry();
     mysten_metrics::init_metrics(&registry);
@@ -95,21 +95,44 @@ async fn main() -> Result<()> {
     let eth_bridge_proxy_address = EthAddress::from_str(&config.eth_sui_bridge_contract_address)?;
     let mut tasks = vec![];
     // Start the eth subscription indexer
-    let eth_subscription_indexer =
-        create_eth_subscription_indexer(pool.clone(), indexer_meterics.clone(), &config, eth_client.clone()).await?;
-    tasks.push(spawn_logged_monitored_task!(eth_subscription_indexer.start()));
+    let eth_subscription_indexer = create_eth_subscription_indexer(
+        pool.clone(),
+        indexer_meterics.clone(),
+        &config,
+        eth_client.clone(),
+    )
+    .await?;
+    tasks.push(spawn_logged_monitored_task!(
+        eth_subscription_indexer.start()
+    ));
 
     // Start the eth sync data source
-    let eth_sync_indexer =
-        create_eth_sync_indexer(pool.clone(), indexer_meterics.clone(), bridge_metrics.clone(), &config, eth_client)
-            .await?;
+    let eth_sync_indexer = create_eth_sync_indexer(
+        pool.clone(),
+        indexer_meterics.clone(),
+        bridge_metrics.clone(),
+        &config,
+        eth_client,
+    )
+    .await?;
     tasks.push(spawn_logged_monitored_task!(eth_sync_indexer.start()));
 
-    let indexer = create_sui_indexer(pool, indexer_meterics, ingestion_metrics, &config).await?;
-    tasks.push(spawn_logged_monitored_task!(indexer.start()));
+    if !config.eth_only {
+        let indexer =
+            create_sui_indexer(pool, indexer_meterics, ingestion_metrics, &config).await?;
+        tasks.push(spawn_logged_monitored_task!(indexer.start()));
+    }
 
-    let sui_bridge_client = Arc::new(SuiBridgeClient::new(&config.sui_rpc_url, bridge_metrics.clone()).await?);
-    start_watchdog(config, eth_bridge_proxy_address, sui_bridge_client, &registry, bridge_metrics.clone()).await?;
+    let sui_bridge_client =
+        Arc::new(SuiBridgeClient::new(&config.sui_rpc_url, bridge_metrics.clone()).await?);
+    start_watchdog(
+        config,
+        eth_bridge_proxy_address,
+        sui_bridge_client,
+        &registry,
+        bridge_metrics.clone(),
+    )
+    .await?;
 
     // Wait for tasks in `tasks` to finish. Return when anyone of them returns an error.
     futures::future::try_join_all(tasks).await?;
@@ -124,9 +147,18 @@ async fn start_watchdog(
     bridge_metrics: Arc<BridgeMetrics>,
 ) -> Result<()> {
     let watchdog_metrics = WatchdogMetrics::new(registry);
-    let eth_provider = Arc::new(new_metered_eth_provider(&config.eth_rpc_url, bridge_metrics.clone()).unwrap());
-    let (_committee_address, _limiter_address, vault_address, _config_address, weth_address, usdt_address) =
-        get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider).await?;
+    let eth_provider =
+        Arc::new(new_metered_eth_provider(&config.eth_rpc_url, bridge_metrics.clone()).unwrap());
+    let (
+        _committee_address,
+        _limiter_address,
+        vault_address,
+        _config_address,
+        weth_address,
+        usdt_address,
+        wbtc_address,
+        lbtc_address,
+    ) = get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider).await?;
 
     let eth_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
@@ -137,6 +169,7 @@ async fn start_watchdog(
     )
     .await
     .unwrap_or_else(|e| panic!("Failed to create eth vault balance: {}", e));
+
     let usdt_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
         vault_address,
@@ -147,17 +180,55 @@ async fn start_watchdog(
     .await
     .unwrap_or_else(|e| panic!("Failed to create usdt vault balance: {}", e));
 
-    let eth_bridge_status =
-        EthBridgeStatus::new(eth_provider, eth_bridge_proxy_address, watchdog_metrics.eth_bridge_paused.clone());
+    let wbtc_vault_balance = EthereumVaultBalance::new(
+        eth_provider.clone(),
+        vault_address,
+        wbtc_address,
+        VaultAsset::WBTC,
+        watchdog_metrics.wbtc_vault_balance.clone(),
+    )
+    .await
+    .unwrap_or_else(|e| panic!("Failed to create wbtc vault balance: {}", e));
 
-    let sui_bridge_status = SuiBridgeStatus::new(sui_client, watchdog_metrics.sui_bridge_paused.clone());
-    let observables: Vec<Box<dyn Observable + Send + Sync>> = vec![
+    let lbtc_vault_balance = if !lbtc_address.is_zero() {
+        Some(
+            EthereumVaultBalance::new(
+                eth_provider.clone(),
+                vault_address,
+                lbtc_address,
+                VaultAsset::LBTC,
+                watchdog_metrics.lbtc_vault_balance.clone(),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("Failed to create lbtc vault balance: {}", e)),
+        )
+    } else {
+        None
+    };
+
+    let eth_bridge_status = EthBridgeStatus::new(
+        eth_provider,
+        eth_bridge_proxy_address,
+        watchdog_metrics.eth_bridge_paused.clone(),
+    );
+
+    let sui_bridge_status =
+        SuiBridgeStatus::new(sui_client, watchdog_metrics.sui_bridge_paused.clone());
+    let mut observables: Vec<Box<dyn Observable + Send + Sync>> = vec![
         Box::new(eth_vault_balance),
         Box::new(usdt_vault_balance),
+        Box::new(wbtc_vault_balance),
         Box::new(eth_bridge_status),
         Box::new(sui_bridge_status),
     ];
+
+    // Add lbtc_vault_balance if it's available
+    if let Some(balance) = lbtc_vault_balance {
+        observables.push(Box::new(balance));
+    }
+
     BridgeWatchDog::new(observables).run().await;
+
     Ok(())
 }
 
@@ -176,7 +247,9 @@ async fn start_processing_sui_checkpoints_by_querying_txns(
             .with_label_values(&["sui_transaction_processing_queue"]),
     );
     let mut handles = vec![];
-    let cursor = read_sui_progress_store(&pg_pool).await.expect("Failed to read cursor from sui progress store");
+    let cursor = read_sui_progress_store(&pg_pool)
+        .await
+        .expect("Failed to read cursor from sui progress store");
     let sui_client = SuiClientBuilder::default().build(sui_rpc_url).await?;
     handles.push(spawn_logged_monitored_task!(
         start_sui_tx_polling_task(sui_client, cursor, tx),

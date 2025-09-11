@@ -22,7 +22,10 @@ pub(crate) struct CommitVoteMonitor {
 impl CommitVoteMonitor {
     pub(crate) fn new(context: Arc<Context>) -> Self {
         let highest_voted_commits = Mutex::new(vec![0; context.committee.size()]);
-        Self { context, highest_voted_commits }
+        Self {
+            context,
+            highest_voted_commits,
+        }
     }
 
     /// Keeps track of the highest commit voted by each authority.
@@ -79,7 +82,9 @@ mod test {
         let blocks = (0..4)
             .map(|i| {
                 VerifiedBlock::new_for_test(
-                    TestBlock::new(10, i).set_commit_votes(vec![CommitRef::new(5 + i, CommitDigest::MIN)]).build(),
+                    TestBlock::new(10, i)
+                        .set_commit_votes(vec![CommitRef::new(5 + i, CommitDigest::MIN)])
+                        .build(),
                 )
             })
             .collect::<Vec<_>>();

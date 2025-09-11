@@ -27,8 +27,14 @@ pub struct BytecodeViewer<'a> {
 impl<'a> BytecodeViewer<'a> {
     pub fn new(source_map: SourceMap, module: &'a CompiledModule) -> Self {
         let source_mapping = SourceMapping::new(source_map, module);
-        let options = DisassemblerOptions { print_code: true, print_basic_blocks: true, ..Default::default() };
-        let disassembled_string = Disassembler::new(source_mapping, options).disassemble().unwrap();
+        let options = DisassemblerOptions {
+            print_code: true,
+            print_basic_blocks: true,
+            ..Default::default()
+        };
+        let disassembled_string = Disassembler::new(source_mapping, options)
+            .disassemble()
+            .unwrap();
 
         let mut base_viewer = Self {
             lines: disassembled_string.lines().map(|x| x.to_string()).collect(),
@@ -41,7 +47,9 @@ impl<'a> BytecodeViewer<'a> {
 
     fn build_mapping(&mut self) {
         let regex = Regex::new(r"^(\d+):.*").unwrap();
-        let fun_regex = Regex::new(r"^(?:public(?:\(\w+\))?|native|entry)?\s*(\w+)\s*(?:<.*>)?\s*\(.*\).*\{").unwrap();
+        let fun_regex =
+            Regex::new(r"^(?:public(?:\(\w+\))?|native|entry)?\s*(\w+)\s*(?:<.*>)?\s*\(.*\).*\{")
+                .unwrap();
 
         let mut current_fun = None;
         let mut current_fdef_idx = None;
@@ -53,7 +61,12 @@ impl<'a> BytecodeViewer<'a> {
             .iter()
             .enumerate()
             .map(|(index, fdef)| {
-                (self.module.identifier_at(self.module.function_handle_at(fdef.function).name).to_string(), index as u16)
+                (
+                    self.module
+                        .identifier_at(self.module.function_handle_at(fdef.function).name)
+                        .to_string(),
+                    index as u16,
+                )
             })
             .collect();
 
@@ -69,11 +82,14 @@ impl<'a> BytecodeViewer<'a> {
             if let Some(cap) = regex.captures(line) {
                 current_fun.map(|fname| {
                     let d = cap.get(1).unwrap().as_str().parse::<u16>().unwrap();
-                    line_map.insert(i, BytecodeInfo {
-                        function_name: fname.to_string(),
-                        function_index: current_fdef_idx.unwrap(),
-                        code_offset: d,
-                    })
+                    line_map.insert(
+                        i,
+                        BytecodeInfo {
+                            function_name: fname.to_string(),
+                            function_index: current_fdef_idx.unwrap(),
+                            code_offset: d,
+                        },
+                    )
                 });
             }
         }

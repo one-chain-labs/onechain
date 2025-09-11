@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module move_test_code::shared_objects_version {
-    use one::object::{Self, UID};
-    use one::transfer;
-    use one::tx_context::{Self, TxContext};
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
 
     public struct Counter has key {
         id: UID,

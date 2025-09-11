@@ -4,26 +4,14 @@
 use std::collections::HashMap;
 
 use move_binary_format::{
+    CompiledModule,
     file_format::{
-        Bytecode,
-        CodeUnit,
-        DatatypeHandleIndex,
-        EnumDefinition,
-        EnumDefinitionIndex,
-        FunctionDefinition,
-        FunctionDefinitionIndex,
-        FunctionHandleIndex,
-        IdentifierIndex,
-        ModuleHandleIndex,
-        Signature,
-        SignatureToken,
-        StructDefinition,
-        StructDefinitionIndex,
-        StructFieldInformation,
-        TableIndex,
+        Bytecode, CodeUnit, DatatypeHandleIndex, EnumDefinition, EnumDefinitionIndex,
+        FunctionDefinition, FunctionDefinitionIndex, FunctionHandleIndex, IdentifierIndex,
+        ModuleHandleIndex, Signature, SignatureToken, StructDefinition, StructDefinitionIndex,
+        StructFieldInformation, TableIndex,
     },
     internals::ModuleIndex,
-    CompiledModule,
 };
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
@@ -49,7 +37,10 @@ use move_symbol_pool::Symbol;
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 enum ModuleKey {
     SelfModule,
-    Named { address: Symbol, name: IdentifierIndex },
+    Named {
+        address: Symbol,
+        name: IdentifierIndex,
+    },
     Unnamed,
 }
 
@@ -58,7 +49,10 @@ enum ModuleKey {
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 enum ReferenceKey {
     Internal(TableIndex),
-    External { module: ModuleHandleIndex, name: IdentifierIndex },
+    External {
+        module: ModuleHandleIndex,
+        name: IdentifierIndex,
+    },
 }
 
 /// Forward the index at `$ix`, of type `$Ix` to its new location according to the `$perm`utation
@@ -70,7 +64,10 @@ macro_rules! remap {
 }
 
 /// Apply canonicalization to a compiled module.
-pub fn in_module(module: &mut CompiledModule, address_names: &HashMap<(AccountAddress, &str), Symbol>) {
+pub fn in_module(
+    module: &mut CompiledModule,
+    address_names: &HashMap<(AccountAddress, &str), Symbol>,
+) {
     // 1 (a). Choose ordering for identifiers.
     let identifiers = permutation(&module.identifiers, |_ix, ident| ident);
 
@@ -130,7 +127,10 @@ pub fn in_module(module: &mut CompiledModule, address_names: &HashMap<(AccountAd
         };
 
         // Layout remaining modules in lexicographical order of named address and module name.
-        ModuleKey::Named { address: *address_name, name: handle.name }
+        ModuleKey::Named {
+            address: *address_name,
+            name: handle.name,
+        }
     });
 
     // 2 (b). Update references to module handles.
@@ -155,8 +155,10 @@ pub fn in_module(module: &mut CompiledModule, address_names: &HashMap<(AccountAd
             // Order structs and enums from this module first, and in definition order
 
             let ndx_ref = &DatatypeHandleIndex(ix);
-            let Some(ref_key) =
-                struct_defs.get(ndx_ref).map(|posn| posn.0).or_else(|| enums_defs.get(ndx_ref).map(|posn| posn.0))
+            let Some(ref_key) = struct_defs
+                .get(ndx_ref)
+                .map(|posn| posn.0)
+                .or_else(|| enums_defs.get(ndx_ref).map(|posn| posn.0))
             else {
                 panic!("ICE struct handle from module without definition: {handle:?}");
             };
@@ -164,7 +166,10 @@ pub fn in_module(module: &mut CompiledModule, address_names: &HashMap<(AccountAd
         } else {
             // Order the remaining handles afterwards, in lexicographical order of module, then
             // struct name.
-            ReferenceKey::External { module: handle.module, name: handle.name }
+            ReferenceKey::External {
+                module: handle.module,
+                name: handle.name,
+            }
         }
     });
 
@@ -208,7 +213,10 @@ pub fn in_module(module: &mut CompiledModule, address_names: &HashMap<(AccountAd
         } else {
             // Order the remaining handles afterwards, in lexicographical order of module, then
             // function name.
-            ReferenceKey::External { module: handle.module, name: handle.name }
+            ReferenceKey::External {
+                module: handle.module,
+                name: handle.name,
+            }
         }
     });
 
@@ -239,26 +247,44 @@ pub fn in_module(module: &mut CompiledModule, address_names: &HashMap<(AccountAd
         };
 
         // Layout remaining modules in lexicographical order of named address and module name.
-        ModuleKey::Named { address: *address_name, name: handle.name }
+        ModuleKey::Named {
+            address: *address_name,
+            name: handle.name,
+        }
     });
 }
 
 /// Reverses mapping from `StructDefinition(Index)` to `StructHandle`, so that handles for structs
 /// defined in a module can be arranged in definition order.
-fn struct_definition_order(defs: &[StructDefinition]) -> HashMap<DatatypeHandleIndex, StructDefinitionIndex> {
-    defs.iter().enumerate().map(|(ix, def)| (def.struct_handle, StructDefinitionIndex(ix as TableIndex))).collect()
+fn struct_definition_order(
+    defs: &[StructDefinition],
+) -> HashMap<DatatypeHandleIndex, StructDefinitionIndex> {
+    defs.iter()
+        .enumerate()
+        .map(|(ix, def)| (def.struct_handle, StructDefinitionIndex(ix as TableIndex)))
+        .collect()
 }
 
 /// Reverses mapping from `EnumDefinition(Index)` to `DatatypeHandle`, so that handles for structs
 /// defined in a module can be arranged in definition order.
-fn enum_definition_order(defs: &[EnumDefinition]) -> HashMap<DatatypeHandleIndex, EnumDefinitionIndex> {
-    defs.iter().enumerate().map(|(ix, def)| (def.enum_handle, EnumDefinitionIndex(ix as TableIndex))).collect()
+fn enum_definition_order(
+    defs: &[EnumDefinition],
+) -> HashMap<DatatypeHandleIndex, EnumDefinitionIndex> {
+    defs.iter()
+        .enumerate()
+        .map(|(ix, def)| (def.enum_handle, EnumDefinitionIndex(ix as TableIndex)))
+        .collect()
 }
 
 /// Reverses mapping from `FunctionDefinition(Index)` to `FunctionHandle`, so that handles for
 /// structs defined in a module can be arranged in definition order.
-fn function_definition_order(defs: &[FunctionDefinition]) -> HashMap<FunctionHandleIndex, FunctionDefinitionIndex> {
-    defs.iter().enumerate().map(|(ix, def)| (def.function, FunctionDefinitionIndex(ix as TableIndex))).collect()
+fn function_definition_order(
+    defs: &[FunctionDefinition],
+) -> HashMap<FunctionHandleIndex, FunctionDefinitionIndex> {
+    defs.iter()
+        .enumerate()
+        .map(|(ix, def)| (def.function, FunctionDefinitionIndex(ix as TableIndex)))
+        .collect()
 }
 
 /// Update references to `DatatypeHandle`s within signatures according to the permutation defined by
@@ -277,7 +303,9 @@ fn remap_signature_token(token: &mut SignatureToken, datatypes: &[TableIndex]) {
         | T::Signer
         | T::TypeParameter(_) => (),
 
-        T::Vector(token) | T::Reference(token) | T::MutableReference(token) => remap_signature_token(token, datatypes),
+        T::Vector(token) | T::Reference(token) | T::MutableReference(token) => {
+            remap_signature_token(token, datatypes)
+        }
 
         T::Datatype(handle) => remap!(DatatypeHandleIndex, *handle, datatypes),
 
@@ -307,7 +335,10 @@ fn remap_code(code: &mut CodeUnit, functions: &[TableIndex]) {
 ///   pool'[permutation[i]] = pool[i]
 ///
 /// is sorted according to `key`.
-fn permutation<'p, T, K: Ord>(pool: &'p [T], key: impl Fn(TableIndex, &'p T) -> K + 'p) -> Vec<TableIndex> {
+fn permutation<'p, T, K: Ord>(
+    pool: &'p [T],
+    key: impl Fn(TableIndex, &'p T) -> K + 'p,
+) -> Vec<TableIndex> {
     let mut inverse: Vec<_> = (0..pool.len() as TableIndex).collect();
     inverse.sort_by_key(move |ix| key(*ix, &pool[*ix as usize]));
 

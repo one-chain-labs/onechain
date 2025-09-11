@@ -29,21 +29,27 @@ fn build(path: &Path) -> SuiResult<CompiledPackage> {
 #[cfg_attr(msim, ignore)]
 fn test_metered_move_bytecode_verifier() {
     move_package::package_hooks::register_package_hooks(Box::new(SuiPackageHooks));
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sui-framework/packages/one-framework");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sui-framework/packages/sui-framework");
     let compiled_package = build(&path).unwrap();
     let compiled_modules: Vec<_> = compiled_package.get_modules().cloned().collect();
 
     let protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
     let signing_config = VerifierSigningConfig::default();
-    let mut verifier_config = protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
+    let mut verifier_config =
+        protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
     let mut meter_config = signing_config.meter_config_for_signing();
     let registry = &Registry::new();
     let bytecode_verifier_metrics = Arc::new(BytecodeVerifierMetrics::new(registry));
     let mut meter = SuiVerifierMeter::new(meter_config.clone());
     let timer_start = Instant::now();
     // Default case should pass
-    let r =
-        run_metered_move_bytecode_verifier(&compiled_modules, &verifier_config, &mut meter, &bytecode_verifier_metrics);
+    let r = run_metered_move_bytecode_verifier(
+        &compiled_modules,
+        &verifier_config,
+        &mut meter,
+        &bytecode_verifier_metrics,
+    );
     let elapsed = timer_start.elapsed().as_micros() as f64 / (1000.0 * 1000.0);
     assert!(r.is_ok());
 
@@ -52,18 +58,37 @@ fn test_metered_move_bytecode_verifier() {
     // The number of module success samples must equal the number of modules
     assert_eq!(
         compiled_modules.len() as u64,
-        bytecode_verifier_metrics.verifier_runtime_per_module_success_latency.get_sample_count(),
+        bytecode_verifier_metrics
+            .verifier_runtime_per_module_success_latency
+            .get_sample_count(),
     );
 
     // Others must be zero
-    assert_eq!(0, bytecode_verifier_metrics.verifier_runtime_per_module_timeout_latency.get_sample_count(),);
+    assert_eq!(
+        0,
+        bytecode_verifier_metrics
+            .verifier_runtime_per_module_timeout_latency
+            .get_sample_count(),
+    );
 
-    assert_eq!(0, bytecode_verifier_metrics.verifier_runtime_per_ptb_success_latency.get_sample_count(),);
+    assert_eq!(
+        0,
+        bytecode_verifier_metrics
+            .verifier_runtime_per_ptb_success_latency
+            .get_sample_count(),
+    );
 
-    assert_eq!(0, bytecode_verifier_metrics.verifier_runtime_per_ptb_timeout_latency.get_sample_count(),);
+    assert_eq!(
+        0,
+        bytecode_verifier_metrics
+            .verifier_runtime_per_ptb_timeout_latency
+            .get_sample_count(),
+    );
 
     // Each success timer must be non zero and less than our elapsed time
-    let module_success_latency = bytecode_verifier_metrics.verifier_runtime_per_module_success_latency.get_sample_sum();
+    let module_success_latency = bytecode_verifier_metrics
+        .verifier_runtime_per_module_success_latency
+        .get_sample_sum();
     assert!(0.0 <= module_success_latency && module_success_latency < elapsed);
 
     // No failures expected in counter
@@ -71,7 +96,10 @@ fn test_metered_move_bytecode_verifier() {
         0,
         bytecode_verifier_metrics
             .verifier_timeout_metrics
-            .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::TIMEOUT_TAG,])
+            .with_label_values(&[
+                BytecodeVerifierMetrics::OVERALL_TAG,
+                BytecodeVerifierMetrics::TIMEOUT_TAG,
+            ])
             .get(),
     );
 
@@ -80,7 +108,10 @@ fn test_metered_move_bytecode_verifier() {
         compiled_modules.len() as u64,
         bytecode_verifier_metrics
             .verifier_timeout_metrics
-            .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::SUCCESS_TAG,])
+            .with_label_values(&[
+                BytecodeVerifierMetrics::OVERALL_TAG,
+                BytecodeVerifierMetrics::SUCCESS_TAG,
+            ])
             .get(),
     );
 
@@ -92,27 +123,48 @@ fn test_metered_move_bytecode_verifier() {
 
     let mut meter = SuiVerifierMeter::new(meter_config);
     let timer_start = Instant::now();
-    let r =
-        run_metered_move_bytecode_verifier(&compiled_modules, &verifier_config, &mut meter, &bytecode_verifier_metrics);
+    let r = run_metered_move_bytecode_verifier(
+        &compiled_modules,
+        &verifier_config,
+        &mut meter,
+        &bytecode_verifier_metrics,
+    );
     let elapsed = timer_start.elapsed().as_micros() as f64 / (1000.0 * 1000.0);
 
-    assert!(matches!(r.unwrap_err(), SuiError::ModuleVerificationFailure { .. }));
+    assert!(matches!(
+        r.unwrap_err(),
+        SuiError::ModuleVerificationFailure { .. }
+    ));
 
     // Some new modules might have passed
-    let module_success_samples =
-        bytecode_verifier_metrics.verifier_runtime_per_module_success_latency.get_sample_count();
-    let module_timeout_samples =
-        bytecode_verifier_metrics.verifier_runtime_per_module_timeout_latency.get_sample_count();
+    let module_success_samples = bytecode_verifier_metrics
+        .verifier_runtime_per_module_success_latency
+        .get_sample_count();
+    let module_timeout_samples = bytecode_verifier_metrics
+        .verifier_runtime_per_module_timeout_latency
+        .get_sample_count();
     assert!(module_success_samples >= compiled_modules.len() as u64);
     assert!(module_success_samples < 2 * compiled_modules.len() as u64);
     assert!(module_timeout_samples > 0);
 
     // Others must be zero
-    assert_eq!(0, bytecode_verifier_metrics.verifier_runtime_per_ptb_success_latency.get_sample_count(),);
-    assert_eq!(0, bytecode_verifier_metrics.verifier_runtime_per_ptb_timeout_latency.get_sample_count(),);
+    assert_eq!(
+        0,
+        bytecode_verifier_metrics
+            .verifier_runtime_per_ptb_success_latency
+            .get_sample_count(),
+    );
+    assert_eq!(
+        0,
+        bytecode_verifier_metrics
+            .verifier_runtime_per_ptb_timeout_latency
+            .get_sample_count(),
+    );
 
     // Each success timer must be non zero and less than our elapsed time
-    let module_timeout_latency = bytecode_verifier_metrics.verifier_runtime_per_module_timeout_latency.get_sample_sum();
+    let module_timeout_latency = bytecode_verifier_metrics
+        .verifier_runtime_per_module_timeout_latency
+        .get_sample_sum();
     assert!(0.0 <= module_timeout_latency && module_timeout_latency < elapsed);
 
     // One failure
@@ -120,7 +172,10 @@ fn test_metered_move_bytecode_verifier() {
         1,
         bytecode_verifier_metrics
             .verifier_timeout_metrics
-            .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::TIMEOUT_TAG,])
+            .with_label_values(&[
+                BytecodeVerifierMetrics::OVERALL_TAG,
+                BytecodeVerifierMetrics::TIMEOUT_TAG,
+            ])
             .get(),
     );
 
@@ -128,7 +183,10 @@ fn test_metered_move_bytecode_verifier() {
     assert!(
         bytecode_verifier_metrics
             .verifier_timeout_metrics
-            .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::SUCCESS_TAG,])
+            .with_label_values(&[
+                BytecodeVerifierMetrics::OVERALL_TAG,
+                BytecodeVerifierMetrics::SUCCESS_TAG,
+            ])
             .get()
             > compiled_modules.len() as u64
     );
@@ -147,7 +205,8 @@ fn test_metered_move_bytecode_verifier() {
 
     let signing_config = VerifierSigningConfig::default();
     let protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
-    let verifier_config = protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
+    let verifier_config =
+        protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
     let meter_config = signing_config.meter_config_for_signing();
 
     // Check if the same meter is indeed used multiple invocations of the verifier
@@ -155,8 +214,13 @@ fn test_metered_move_bytecode_verifier() {
     for modules in &packages {
         let prev_meter = meter.get_usage(Scope::Package);
 
-        run_metered_move_bytecode_verifier(modules, &verifier_config, &mut meter, &bytecode_verifier_metrics)
-            .expect("Verification should not timeout");
+        run_metered_move_bytecode_verifier(
+            modules,
+            &verifier_config,
+            &mut meter,
+            &bytecode_verifier_metrics,
+        )
+        .expect("Verification should not timeout");
 
         let curr_meter = meter.get_usage(Scope::Package);
         assert!(curr_meter > prev_meter);
@@ -170,7 +234,8 @@ fn test_meter_system_packages() {
 
     let signing_config = VerifierSigningConfig::default();
     let protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
-    let verifier_config = protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
+    let verifier_config =
+        protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
     let meter_config = signing_config.meter_config_for_signing();
     let registry = &Registry::new();
     let bytecode_verifier_metrics = Arc::new(BytecodeVerifierMetrics::new(registry));
@@ -183,7 +248,10 @@ fn test_meter_system_packages() {
             &bytecode_verifier_metrics,
         )
         .unwrap_or_else(|_| {
-            panic!("Verification of all system packages should succeed, but failed on {}", system_package.id(),)
+            panic!(
+                "Verification of all system packages should succeed, but failed on {}",
+                system_package.id,
+            )
         });
     }
 
@@ -193,16 +261,24 @@ fn test_meter_system_packages() {
         0,
         bytecode_verifier_metrics
             .verifier_timeout_metrics
-            .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::TIMEOUT_TAG,])
+            .with_label_values(&[
+                BytecodeVerifierMetrics::OVERALL_TAG,
+                BytecodeVerifierMetrics::TIMEOUT_TAG,
+            ])
             .get(),
     );
 
     // Counter must equal number of modules
     assert_eq!(
-        BuiltInFramework::iter_system_packages().map(|p| p.modules().len() as u64).sum::<u64>(),
+        BuiltInFramework::iter_system_packages()
+            .map(|p| p.modules().len() as u64)
+            .sum::<u64>(),
         bytecode_verifier_metrics
             .verifier_timeout_metrics
-            .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::SUCCESS_TAG,])
+            .with_label_values(&[
+                BytecodeVerifierMetrics::OVERALL_TAG,
+                BytecodeVerifierMetrics::SUCCESS_TAG,
+            ])
             .get()
     );
 }
@@ -214,7 +290,8 @@ fn test_build_and_verify_programmability_examples() {
 
     let signing_config = VerifierSigningConfig::default();
     let protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
-    let verifier_config = protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
+    let verifier_config =
+        protocol_config.verifier_config(Some(signing_config.limits_for_signing()));
     let meter_config = signing_config.meter_config_for_signing();
     let registry = &Registry::new();
     let bytecode_verifier_metrics = Arc::new(BytecodeVerifierMetrics::new(registry));
@@ -236,7 +313,17 @@ fn test_build_and_verify_programmability_examples() {
         let modules = build(&path).unwrap().into_modules();
 
         let mut meter = SuiVerifierMeter::new(meter_config.clone());
-        run_metered_move_bytecode_verifier(&modules, &verifier_config, &mut meter, &bytecode_verifier_metrics)
-            .unwrap_or_else(|_| panic!("Verification of example: '{:?}' failed", example.file_name(),));
+        run_metered_move_bytecode_verifier(
+            &modules,
+            &verifier_config,
+            &mut meter,
+            &bytecode_verifier_metrics,
+        )
+        .unwrap_or_else(|_| {
+            panic!(
+                "Verification of example: '{:?}' failed",
+                example.file_name(),
+            )
+        });
     }
 }

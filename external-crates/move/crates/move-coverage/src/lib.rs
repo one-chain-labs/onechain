@@ -7,6 +7,8 @@ use move_binary_format::CompiledModule;
 use std::io::Write;
 
 pub mod coverage_map;
+pub mod differential_coverage;
+pub mod lcov;
 pub mod source_coverage;
 pub mod summary;
 
@@ -28,14 +30,20 @@ pub fn format_human_summary<'a, M, F, W: Write>(
 
     for module in modules {
         let coverage_summary = summary_func(module, coverage_map);
-        let (total, covered) = coverage_summary.summarize_human(summary_writer, summarize_functions).unwrap();
+        let (total, covered) = coverage_summary
+            .summarize_human(summary_writer, summarize_functions)
+            .unwrap();
         total_covered += covered;
         total_instructions += total;
     }
 
     writeln!(summary_writer, "+-------------------------+").unwrap();
-    writeln!(summary_writer, "| % Move Coverage: {:.2}  |", (total_covered as f64 / total_instructions as f64) * 100f64)
-        .unwrap();
+    writeln!(
+        summary_writer,
+        "| % Move Coverage: {:.2}  |",
+        (total_covered as f64 / total_instructions as f64) * 100f64
+    )
+    .unwrap();
     writeln!(summary_writer, "+-------------------------+").unwrap();
 }
 

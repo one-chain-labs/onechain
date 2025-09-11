@@ -7,13 +7,8 @@ use crate::absint::{AbstractDomain, FunctionContext, JoinResult};
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        CodeOffset,
-        FieldHandleIndex,
-        FunctionDefinitionIndex,
-        LocalIndex,
-        Signature,
-        SignatureToken,
-        StructDefinitionIndex,
+        CodeOffset, FieldHandleIndex, FunctionDefinitionIndex, LocalIndex, Signature,
+        SignatureToken, StructDefinitionIndex,
     },
     safe_unwrap,
 };
@@ -114,7 +109,9 @@ impl AbstractState {
         for (param_idx, param_ty) in function_context.parameters().0.iter().enumerate() {
             if param_ty.is_reference() {
                 let id = RefID::new(param_idx);
-                state.borrow_graph.new_ref(id, param_ty.is_mutable_reference());
+                state
+                    .borrow_graph
+                    .new_ref(id, param_ty.is_mutable_reference());
                 state.locals[param_idx] = AbstractValue::Reference(id)
             }
         }
@@ -138,7 +135,10 @@ impl AbstractState {
     }
 
     fn error(&self, status: StatusCode, offset: CodeOffset) -> PartialVMError {
-        PartialVMError::new(status).at_code_offset(self.current_function.unwrap_or(FunctionDefinitionIndex(0)), offset)
+        PartialVMError::new(status).at_code_offset(
+            self.current_function.unwrap_or(FunctionDefinitionIndex(0)),
+            offset,
+        )
     }
 
     //**********************************************************************************************
@@ -170,15 +170,18 @@ impl AbstractState {
     }
 
     fn add_field_borrow(&mut self, parent: RefID, field: FieldHandleIndex, child: RefID) {
-        self.borrow_graph.add_strong_field_borrow((), parent, Label::Field(field), child)
+        self.borrow_graph
+            .add_strong_field_borrow((), parent, Label::Field(field), child)
     }
 
     fn add_local_borrow(&mut self, local: LocalIndex, id: RefID) {
-        self.borrow_graph.add_strong_field_borrow((), self.frame_root(), Label::Local(local), id)
+        self.borrow_graph
+            .add_strong_field_borrow((), self.frame_root(), Label::Local(local), id)
     }
 
     fn add_resource_borrow(&mut self, resource: StructDefinitionIndex, id: RefID) {
-        self.borrow_graph.add_weak_field_borrow((), self.frame_root(), Label::Global(resource), id)
+        self.borrow_graph
+            .add_weak_field_borrow((), self.frame_root(), Label::Global(resource), id)
     }
 
     /// removes `id` from borrow graph
@@ -204,7 +207,10 @@ impl AbstractState {
         !full_borrows.is_empty() || {
             match label_opt {
                 None => field_borrows.values().any(|borrows| !borrows.is_empty()),
-                Some(label) => field_borrows.get(&label).map(|borrows| !borrows.is_empty()).unwrap_or(false),
+                Some(label) => field_borrows
+                    .get(&label)
+                    .map(|borrows| !borrows.is_empty())
+                    .unwrap_or(false),
             }
         }
     }
@@ -217,8 +223,13 @@ impl AbstractState {
         let (full_borrows, field_borrows) = self.borrow_graph.borrowed_by(id);
         !self.all_immutable(&full_borrows) || {
             match label_opt {
-                None => field_borrows.values().any(|borrows| !self.all_immutable(borrows)),
-                Some(label) => field_borrows.get(&label).map(|borrows| !self.all_immutable(borrows)).unwrap_or(false),
+                None => field_borrows
+                    .values()
+                    .any(|borrows| !self.all_immutable(borrows)),
+                Some(label) => field_borrows
+                    .get(&label)
+                    .map(|borrows| !self.all_immutable(borrows))
+                    .unwrap_or(false),
             }
         }
     }
@@ -286,7 +297,11 @@ impl AbstractState {
         }
     }
 
-    pub fn copy_loc(&mut self, offset: CodeOffset, local: LocalIndex) -> PartialVMResult<AbstractValue> {
+    pub fn copy_loc(
+        &mut self,
+        offset: CodeOffset,
+        local: LocalIndex,
+    ) -> PartialVMResult<AbstractValue> {
         match safe_unwrap!(self.locals.get(local as usize)) {
             AbstractValue::Reference(id) => {
                 let id = *id;
@@ -301,9 +316,15 @@ impl AbstractState {
         }
     }
 
-    pub fn move_loc(&mut self, offset: CodeOffset, local: LocalIndex) -> PartialVMResult<AbstractValue> {
-        let old_value =
-            std::mem::replace(safe_unwrap!(self.locals.get_mut(local as usize)), AbstractValue::NonReference);
+    pub fn move_loc(
+        &mut self,
+        offset: CodeOffset,
+        local: LocalIndex,
+    ) -> PartialVMResult<AbstractValue> {
+        let old_value = std::mem::replace(
+            safe_unwrap!(self.locals.get_mut(local as usize)),
+            AbstractValue::NonReference,
+        );
         match old_value {
             AbstractValue::Reference(id) => Ok(AbstractValue::Reference(id)),
             AbstractValue::NonReference if self.is_local_borrowed(local) => {
@@ -313,8 +334,14 @@ impl AbstractState {
         }
     }
 
-    pub fn st_loc(&mut self, offset: CodeOffset, local: LocalIndex, new_value: AbstractValue) -> PartialVMResult<()> {
-        let old_value = std::mem::replace(safe_unwrap!(self.locals.get_mut(local as usize)), new_value);
+    pub fn st_loc(
+        &mut self,
+        offset: CodeOffset,
+        local: LocalIndex,
+        new_value: AbstractValue,
+    ) -> PartialVMResult<()> {
+        let old_value =
+            std::mem::replace(safe_unwrap!(self.locals.get_mut(local as usize)), new_value);
         match old_value {
             AbstractValue::Reference(id) => {
                 self.release(id);
@@ -381,7 +408,12 @@ impl AbstractState {
         Ok(())
     }
 
-    pub fn borrow_loc(&mut self, offset: CodeOffset, mut_: bool, local: LocalIndex) -> PartialVMResult<AbstractValue> {
+    pub fn borrow_loc(
+        &mut self,
+        offset: CodeOffset,
+        mut_: bool,
+        local: LocalIndex,
+    ) -> PartialVMResult<AbstractValue> {
         // nothing to check in case borrow is mutable since the frame cannot have an full borrow/
         // epsilon outgoing edge
         if !mut_ && self.is_local_mutably_borrowed(local) {
@@ -423,7 +455,8 @@ impl AbstractState {
         mut_: bool,
         resource: StructDefinitionIndex,
     ) -> PartialVMResult<AbstractValue> {
-        if (mut_ && self.is_global_borrowed(resource)) || self.is_global_mutably_borrowed(resource) {
+        if (mut_ && self.is_global_borrowed(resource)) || self.is_global_mutably_borrowed(resource)
+        {
             return Err(self.error(StatusCode::GLOBAL_REFERENCE_ERROR, offset));
         }
 
@@ -432,7 +465,11 @@ impl AbstractState {
         Ok(AbstractValue::Reference(new_id))
     }
 
-    pub fn move_from(&mut self, offset: CodeOffset, resource: StructDefinitionIndex) -> PartialVMResult<AbstractValue> {
+    pub fn move_from(
+        &mut self,
+        offset: CodeOffset,
+        resource: StructDefinitionIndex,
+    ) -> PartialVMResult<AbstractValue> {
         if self.is_global_borrowed(resource) {
             Err(self.error(StatusCode::GLOBAL_REFERENCE_ERROR, offset))
         } else {
@@ -440,7 +477,12 @@ impl AbstractState {
         }
     }
 
-    pub fn vector_op(&mut self, offset: CodeOffset, vector: AbstractValue, mut_: bool) -> PartialVMResult<()> {
+    pub fn vector_op(
+        &mut self,
+        offset: CodeOffset,
+        vector: AbstractValue,
+        mut_: bool,
+    ) -> PartialVMResult<()> {
         let id = safe_unwrap!(vector.ref_id());
         if mut_ && !self.is_writable(id) {
             return Err(self.error(StatusCode::VEC_UPDATE_EXISTS_MUTABLE_BORROW_ERROR, offset));
@@ -457,7 +499,10 @@ impl AbstractState {
     ) -> PartialVMResult<AbstractValue> {
         let vec_id = safe_unwrap!(vector.ref_id());
         if mut_ && !self.is_writable(vec_id) {
-            return Err(self.error(StatusCode::VEC_BORROW_ELEMENT_EXISTS_MUTABLE_BORROW_ERROR, offset));
+            return Err(self.error(
+                StatusCode::VEC_BORROW_ELEMENT_EXISTS_MUTABLE_BORROW_ERROR,
+                offset,
+            ));
         }
 
         let elem_id = self.new_ref(mut_);
@@ -476,7 +521,11 @@ impl AbstractState {
         return_: &Signature,
         meter: &mut (impl Meter + ?Sized),
     ) -> PartialVMResult<Vec<AbstractValue>> {
-        meter.add_items(Scope::Function, CALL_PER_ACQUIRES_COST, acquired_resources.len())?;
+        meter.add_items(
+            Scope::Function,
+            CALL_PER_ACQUIRES_COST,
+            acquired_resources.len(),
+        )?;
         // Check acquires
         for acquired_resource in acquired_resources {
             if self.is_global_borrowed(*acquired_resource) {
@@ -490,7 +539,9 @@ impl AbstractState {
         for id in arguments.iter().filter_map(|v| v.ref_id()) {
             if self.borrow_graph.is_mutable(id) {
                 if !self.is_writable(id) {
-                    return Err(self.error(StatusCode::CALL_BORROWED_MUTABLE_REFERENCE_ERROR, offset));
+                    return Err(
+                        self.error(StatusCode::CALL_BORROWED_MUTABLE_REFERENCE_ERROR, offset)
+                    );
                 }
                 mutable_references_to_borrow_from.insert(id);
             }
@@ -527,7 +578,9 @@ impl AbstractState {
         meter.add_items_with_growth(
             Scope::Function,
             REF_PARAM_EDGE_COST,
-            all_references_to_borrow_from.len().saturating_mul(returned_refs),
+            all_references_to_borrow_from
+                .len()
+                .saturating_mul(returned_refs),
             REF_PARAM_EDGE_COST_GROWTH,
         )?;
 
@@ -550,7 +603,10 @@ impl AbstractState {
 
         // Check that no local or global is borrowed
         if !self.is_frame_safe_to_destroy() {
-            return Err(self.error(StatusCode::UNSAFE_RET_LOCAL_OR_RESOURCE_STILL_BORROWED, offset));
+            return Err(self.error(
+                StatusCode::UNSAFE_RET_LOCAL_OR_RESOURCE_STILL_BORROWED,
+                offset,
+            ));
         }
 
         // Check mutable references can be transferred
@@ -602,11 +658,12 @@ impl AbstractState {
 
     fn is_canonical(&self) -> bool {
         self.locals.len() + 1 == self.next_id
-            && self
-                .locals
-                .iter()
-                .enumerate()
-                .all(|(local, value)| value.ref_id().map(|id| RefID::new(local) == id).unwrap_or(true))
+            && self.locals.iter().enumerate().all(|(local, value)| {
+                value
+                    .ref_id()
+                    .map(|id| RefID::new(local) == id)
+                    .unwrap_or(true)
+            })
     }
 
     pub fn join_(&self, other: &Self) -> Self {
@@ -643,21 +700,37 @@ impl AbstractState {
         let current_function = self.current_function;
         let next_id = self.next_id;
 
-        Self { current_function, locals, borrow_graph, next_id }
+        Self {
+            current_function,
+            locals,
+            borrow_graph,
+            next_id,
+        }
     }
 }
 
 impl AbstractDomain for AbstractState {
     /// attempts to join state to self and returns the result
-    fn join(&mut self, state: &AbstractState, meter: &mut (impl Meter + ?Sized)) -> PartialVMResult<JoinResult> {
+    fn join(
+        &mut self,
+        state: &AbstractState,
+        meter: &mut (impl Meter + ?Sized),
+    ) -> PartialVMResult<JoinResult> {
         let joined = Self::join_(self, state);
         assert!(joined.is_canonical());
         assert!(self.locals.len() == joined.locals.len());
         meter.add(Scope::Function, JOIN_BASE_COST)?;
         meter.add_items(Scope::Function, JOIN_PER_LOCAL_COST, self.locals.len())?;
-        meter.add_items(Scope::Function, JOIN_PER_GRAPH_ITEM_COST, self.borrow_graph.graph_size())?;
-        let locals_unchanged =
-            self.locals.iter().zip(&joined.locals).all(|(self_value, joined_value)| self_value == joined_value);
+        meter.add_items(
+            Scope::Function,
+            JOIN_PER_GRAPH_ITEM_COST,
+            self.borrow_graph.graph_size(),
+        )?;
+        let locals_unchanged = self
+            .locals
+            .iter()
+            .zip(&joined.locals)
+            .all(|(self_value, joined_value)| self_value == joined_value);
         // locals unchanged and borrow graph covered, return unchanged
         // else mark as changed and update the state
         if locals_unchanged && self.borrow_graph.leq(&joined.borrow_graph) {

@@ -1,27 +1,41 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    config::{ConnectionConfig, ServerConfig, ServiceConfig, Version},
-    server::graphiql_server::start_graphiql_server,
-};
-use rand::{rngs::StdRng, SeedableRng};
+use crate::config::ConnectionConfig;
+use crate::config::ServerConfig;
+use crate::config::ServiceConfig;
+use crate::config::Version;
+use crate::server::graphiql_server::start_graphiql_server;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use simulacrum::AdvanceEpochConfig;
 use simulacrum::Simulacrum;
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 use sui_graphql_rpc_client::simple_client::SimpleClient;
-pub use sui_indexer::config::{RetentionConfig, SnapshotLagConfig};
-use sui_indexer::{errors::IndexerError, store::PgIndexerStore, test_utils::start_indexer_writer_for_testing};
-use sui_pg_temp_db::{get_available_port, TempDb};
+pub use sui_indexer::config::RetentionConfig;
+pub use sui_indexer::config::SnapshotLagConfig;
+use sui_indexer::errors::IndexerError;
+use sui_indexer::store::PgIndexerStore;
+use sui_indexer::test_utils::start_indexer_writer_for_testing;
+use sui_pg_db::temp::{get_available_port, TempDb};
 use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
 use sui_types::storage::RpcStateReader;
-use tempfile::{tempdir, TempDir};
-use test_cluster::{TestCluster, TestClusterBuilder};
-use tokio::{join, task::JoinHandle};
+use tempfile::tempdir;
+use tempfile::TempDir;
+use test_cluster::TestCluster;
+use test_cluster::TestClusterBuilder;
+use tokio::join;
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 const VALIDATOR_COUNT: usize = 4;
-const EPOCH_DURATION_MS: u64 = 10000;
+/// Set default epoch duration to 300s. This high value is to turn the TestCluster into a lockstep
+/// network of sorts. Tests should call `trigger_reconfiguration` to advance the network's epoch.
+const EPOCH_DURATION_MS: u64 = 300_000;
 
 const ACCOUNT_NUM: usize = 20;
 const GAS_OBJECT_COUNT: usize = 3;
@@ -63,9 +77,15 @@ pub async fn start_cluster(service_config: ServiceConfig) -> Cluster {
     let network_cluster = start_network_cluster().await;
     let graphql_connection_config = network_cluster.graphql_connection_config.clone();
 
-    let fn_rpc_url: String = network_cluster.validator_fullnode_handle.rpc_url().to_string();
+    let fn_rpc_url: String = network_cluster
+        .validator_fullnode_handle
+        .rpc_url()
+        .to_string();
 
-    let server_url = format!("http://{}:{}/", graphql_connection_config.host, graphql_connection_config.port);
+    let server_url = format!(
+        "http://{}:{}/",
+        graphql_connection_config.host, graphql_connection_config.port
+    );
 
     let graphql_server_handle = start_graphql_server_with_fn_rpc(
         graphql_connection_config,
@@ -79,7 +99,11 @@ pub async fn start_cluster(service_config: ServiceConfig) -> Cluster {
     let client = SimpleClient::new(server_url);
     wait_for_graphql_server(&client).await;
 
-    Cluster { network: network_cluster, graphql_server_join_handle: graphql_server_handle, graphql_client: client }
+    Cluster {
+        network: network_cluster,
+        graphql_server_join_handle: graphql_server_handle,
+        graphql_client: client,
+    }
 }
 
 /// Starts a validator, fullnode, indexer (using data ingestion). Re-using GraphQL's ConnectionConfig for convenience.
@@ -149,11 +173,19 @@ pub async fn serve_executor(
     // cancellation token on cleanup
     let cancellation_token = CancellationToken::new();
 
-    let executor_server_url: SocketAddr = format!("127.0.0.1:{}", get_available_port()).parse().unwrap();
+    let executor_server_url: SocketAddr = format!("127.0.0.1:{}", get_available_port())
+        .parse()
+        .unwrap();
+
+    info!("Starting executor server on {}", executor_server_url);
 
     let executor_server_handle = tokio::spawn(async move {
-        sui_rpc_api::RpcService::new_without_version(executor).start_service(executor_server_url).await;
+        sui_rpc_api::RpcService::new(executor)
+            .start_service(executor_server_url)
+            .await;
     });
+
+    info!("spawned executor server");
 
     let snapshot_config = snapshot_config.unwrap_or_default();
 
@@ -176,7 +208,10 @@ pub async fn serve_executor(
     )
     .await;
 
-    let server_url = format!("http://{}:{}/", graphql_connection_config.host, graphql_connection_config.port);
+    let server_url = format!(
+        "http://{}:{}/",
+        graphql_connection_config.host, graphql_connection_config.port
+    );
 
     // Starts graphql client
     let client = SimpleClient::new(server_url);
@@ -205,14 +240,29 @@ pub async fn prep_executor_cluster() -> ExecutorCluster {
     sim.create_checkpoint();
     sim.create_checkpoint();
     sim.create_checkpoint();
-    sim.advance_epoch(true);
+    sim.advance_epoch(AdvanceEpochConfig {
+        create_random_state: true,
+        ..Default::default()
+    });
     sim.create_checkpoint();
-    sim.advance_clock(std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap());
+    sim.advance_clock(
+        std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap(),
+    );
     sim.create_checkpoint();
 
-    let mut cluster = serve_executor(Arc::new(sim), None, None, data_ingestion_path.path().to_path_buf()).await;
+    let mut cluster = serve_executor(
+        Arc::new(sim),
+        None,
+        None,
+        data_ingestion_path.path().to_path_buf(),
+    )
+    .await;
 
-    cluster.wait_for_checkpoint_catchup(6, Duration::from_secs(10)).await;
+    cluster
+        .wait_for_checkpoint_catchup(6, Duration::from_secs(10))
+        .await;
 
     cluster.tempdir = Some(data_ingestion_path);
     cluster
@@ -223,7 +273,13 @@ pub async fn start_graphql_server(
     cancellation_token: CancellationToken,
     service_config: ServiceConfig,
 ) -> JoinHandle<()> {
-    start_graphql_server_with_fn_rpc(graphql_connection_config, None, Some(cancellation_token), service_config).await
+    start_graphql_server_with_fn_rpc(
+        graphql_connection_config,
+        None,
+        Some(cancellation_token),
+        service_config,
+    )
+    .await
 }
 
 pub async fn start_graphql_server_with_fn_rpc(
@@ -233,15 +289,20 @@ pub async fn start_graphql_server_with_fn_rpc(
     service_config: ServiceConfig,
 ) -> JoinHandle<()> {
     let cancellation_token = cancellation_token.unwrap_or_default();
-    let mut server_config =
-        ServerConfig { connection: graphql_connection_config, service: service_config, ..ServerConfig::default() };
+    let mut server_config = ServerConfig {
+        connection: graphql_connection_config,
+        service: service_config,
+        ..ServerConfig::default()
+    };
     if let Some(fn_rpc_url) = fn_rpc_url {
         server_config.tx_exec_full_node.node_rpc_url = Some(fn_rpc_url);
     };
 
     // Starts graphql server
     tokio::spawn(async move {
-        start_graphiql_server(&server_config, &Version::for_testing(), cancellation_token).await.unwrap();
+        start_graphiql_server(&server_config, &Version::for_testing(), cancellation_token)
+            .await
+            .unwrap();
     })
 }
 
@@ -251,7 +312,10 @@ async fn start_validator_with_fullnode(data_ingestion_dir: PathBuf) -> TestClust
         .with_epoch_duration_ms(EPOCH_DURATION_MS)
         .with_data_ingestion_dir(data_ingestion_dir)
         .with_accounts(vec![
-            AccountConfig { address: None, gas_amounts: vec![DEFAULT_GAS_AMOUNT; GAS_OBJECT_COUNT] };
+            AccountConfig {
+                address: None,
+                gas_amounts: vec![DEFAULT_GAS_AMOUNT; GAS_OBJECT_COUNT],
+            };
             ACCOUNT_NUM
         ])
         .build()
@@ -271,8 +335,16 @@ pub async fn wait_for_graphql_server(client: &SimpleClient) {
 
 /// Ping the GraphQL server until its background task has updated the checkpoint watermark to the
 /// desired checkpoint.
-pub async fn wait_for_graphql_checkpoint_catchup(client: &SimpleClient, checkpoint: u64, base_timeout: Duration) {
-    info!("Waiting for graphql to catchup to checkpoint {}, base time out is {}", checkpoint, base_timeout.as_secs());
+pub async fn wait_for_graphql_checkpoint_catchup(
+    client: &SimpleClient,
+    checkpoint: u64,
+    base_timeout: Duration,
+) {
+    info!(
+        "Waiting for graphql to catchup to checkpoint {}, base time out is {}",
+        checkpoint,
+        base_timeout.as_secs()
+    );
     let query = r#"
     {
         availableRange {
@@ -286,8 +358,11 @@ pub async fn wait_for_graphql_checkpoint_catchup(client: &SimpleClient, checkpoi
 
     tokio::time::timeout(timeout, async {
         loop {
-            let resp =
-                client.execute_to_graphql(query.to_string(), false, vec![], vec![]).await.unwrap().response_body_json();
+            let resp = client
+                .execute_to_graphql(query.to_string(), false, vec![], vec![])
+                .await
+                .unwrap()
+                .response_body_json();
 
             let current_checkpoint = resp["data"]["availableRange"]["last"].get("sequenceNumber");
             info!("Current checkpoint: {:?}", current_checkpoint);
@@ -312,8 +387,16 @@ pub async fn wait_for_graphql_checkpoint_catchup(client: &SimpleClient, checkpoi
 
 /// Ping the GraphQL server until its background task has updated the checkpoint watermark to the
 /// desired checkpoint.
-pub async fn wait_for_graphql_epoch_catchup(client: &SimpleClient, epoch: u64, base_timeout: Duration) {
-    info!("Waiting for graphql to catchup to epoch {}, base time out is {}", epoch, base_timeout.as_secs());
+pub async fn wait_for_graphql_epoch_catchup(
+    client: &SimpleClient,
+    epoch: u64,
+    base_timeout: Duration,
+) {
+    info!(
+        "Waiting for graphql to catchup to epoch {}, base time out is {}",
+        epoch,
+        base_timeout.as_secs()
+    );
     let query = r#"
     {
         epoch {
@@ -325,8 +408,11 @@ pub async fn wait_for_graphql_epoch_catchup(client: &SimpleClient, epoch: u64, b
 
     tokio::time::timeout(timeout, async {
         loop {
-            let resp =
-                client.execute_to_graphql(query.to_string(), false, vec![], vec![]).await.unwrap().response_body_json();
+            let resp = client
+                .execute_to_graphql(query.to_string(), false, vec![], vec![])
+                .await
+                .unwrap()
+                .response_body_json();
 
             let latest_epoch = resp["data"]["epoch"].get("epochId");
             info!("Latest epoch: {:?}", latest_epoch);
@@ -351,8 +437,16 @@ pub async fn wait_for_graphql_epoch_catchup(client: &SimpleClient, epoch: u64, b
 
 /// Ping the GraphQL server for a checkpoint until an empty response is returned, indicating that
 /// the checkpoint has been pruned.
-pub async fn wait_for_graphql_checkpoint_pruned(client: &SimpleClient, checkpoint: u64, base_timeout: Duration) {
-    info!("Waiting for checkpoint to be pruned {}, base time out is {}", checkpoint, base_timeout.as_secs());
+pub async fn wait_for_graphql_checkpoint_pruned(
+    client: &SimpleClient,
+    checkpoint: u64,
+    base_timeout: Duration,
+) {
+    info!(
+        "Waiting for checkpoint to be pruned {}, base time out is {}",
+        checkpoint,
+        base_timeout.as_secs()
+    );
     let query = format!(
         r#"
         {{
@@ -367,8 +461,11 @@ pub async fn wait_for_graphql_checkpoint_pruned(client: &SimpleClient, checkpoin
 
     tokio::time::timeout(timeout, async {
         loop {
-            let resp =
-                client.execute_to_graphql(query.to_string(), false, vec![], vec![]).await.unwrap().response_body_json();
+            let resp = client
+                .execute_to_graphql(query.to_string(), false, vec![], vec![])
+                .await
+                .unwrap()
+                .response_body_json();
 
             let current_checkpoint = &resp["data"]["checkpoint"];
             if current_checkpoint.is_null() {
@@ -419,7 +516,12 @@ impl ExecutorCluster {
     pub async fn wait_for_objects_snapshot_catchup(&self, base_timeout: Duration) {
         let mut latest_snapshot_cp = 0;
 
-        let latest_cp = self.indexer_store.get_latest_checkpoint_sequence_number().await.unwrap().unwrap();
+        let latest_cp = self
+            .indexer_store
+            .get_latest_checkpoint_sequence_number()
+            .await
+            .unwrap()
+            .unwrap();
 
         tokio::time::timeout(base_timeout, async {
             while latest_cp > latest_snapshot_cp + self.snapshot_config.snapshot_min_lag as u64 {
@@ -433,12 +535,8 @@ impl ExecutorCluster {
             }
         })
         .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "Timeout waiting for indexer to update objects snapshot - latest_cp: {}, latest_snapshot_cp: {}",
-                latest_cp, latest_snapshot_cp
-            )
-        });
+        .unwrap_or_else(|_| panic!("Timeout waiting for indexer to update objects snapshot - latest_cp: {}, latest_snapshot_cp: {}",
+        latest_cp, latest_snapshot_cp));
     }
 
     /// Sends a cancellation signal to the graphql and indexer services, waits for them to complete,

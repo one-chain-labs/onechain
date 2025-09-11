@@ -1,27 +1,26 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    config::{DynamicPeerValidationConfig, RemoteWriteConfig, StaticPeerValidationConfig},
-    handlers::publish_metrics,
-    histogram_relay::HistogramRelay,
-    middleware::{expect_content_length, expect_mysten_proxy_header, expect_valid_public_key},
-    peers::{AllowedPeer, SuiNodeProvider},
-    var,
+use crate::config::{DynamicPeerValidationConfig, RemoteWriteConfig, StaticPeerValidationConfig};
+use crate::handlers::publish_metrics;
+use crate::histogram_relay::HistogramRelay;
+use crate::middleware::{
+    expect_content_length, expect_mysten_proxy_header, expect_valid_public_key,
 };
-use anyhow::{Error, Result};
+use crate::peers::{AllowedPeer, SuiNodeProvider};
+use crate::var;
+use anyhow::Error;
+use anyhow::Result;
 use axum::{extract::DefaultBodyLimit, middleware, routing::post, Extension, Router};
-use fastcrypto::{
-    ed25519::{Ed25519KeyPair, Ed25519PublicKey},
-    traits::{KeyPair, ToFromBytes},
-};
-use std::{fs, io::BufReader, net::SocketAddr, sync::Arc, time::Duration};
+use fastcrypto::ed25519::{Ed25519KeyPair, Ed25519PublicKey};
+use fastcrypto::traits::{KeyPair, ToFromBytes};
+use std::fs;
+use std::io::BufReader;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+use sui_tls::SUI_VALIDATOR_SERVER_NAME;
 use sui_tls::{
-    rustls::ServerConfig,
-    AllowAll,
-    ClientCertVerifier,
-    SelfSignedCertificate,
-    TlsAcceptor,
-    SUI_VALIDATOR_SERVER_NAME,
+    rustls::ServerConfig, AllowAll, ClientCertVerifier, SelfSignedCertificate, TlsAcceptor,
 };
 use tokio::signal;
 use tower::ServiceBuilder;
@@ -35,7 +34,9 @@ use tracing::{info, Level};
 /// Configure our graceful shutdown scenarios
 pub async fn shutdown_signal(h: axum_server::Handle) {
     let ctrl_c = async {
-        signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
     };
 
     #[cfg(unix)]
@@ -55,7 +56,10 @@ pub async fn shutdown_signal(h: axum_server::Handle) {
     }
 
     let grace = 30;
-    info!("signal received, starting graceful shutdown, grace period {} seconds, if needed", &grace);
+    info!(
+        "signal received, starting graceful shutdown, grace period {} seconds, if needed",
+        &grace
+    );
     h.graceful_shutdown(Some(Duration::from_secs(grace)))
 }
 
@@ -88,24 +92,34 @@ pub struct Labels {
 }
 
 /// App will configure our routes. This fn is also used to instrument our tests
-pub fn app(labels: Labels, client: ReqwestClient, relay: HistogramRelay, allower: Option<SuiNodeProvider>) -> Router {
+pub fn app(
+    labels: Labels,
+    client: ReqwestClient,
+    relay: HistogramRelay,
+    allower: Option<SuiNodeProvider>,
+    timeout_secs: Option<u64>,
+) -> Router {
     // build our application with a route and our sender mpsc
     let mut router = Router::new()
         .route("/publish/metrics", post(publish_metrics))
-        .route_layer(DefaultBodyLimit::max(var!("MAX_BODY_SIZE", 1024 * 1024 * 5)))
+        .route_layer(DefaultBodyLimit::max(var!(
+            "MAX_BODY_SIZE",
+            1024 * 1024 * 5
+        )))
         .route_layer(middleware::from_fn(expect_mysten_proxy_header))
         .route_layer(middleware::from_fn(expect_content_length));
     if let Some(allower) = allower {
-        router = router.route_layer(middleware::from_fn(expect_valid_public_key)).layer(Extension(Arc::new(allower)));
+        router = router
+            .route_layer(middleware::from_fn(expect_valid_public_key))
+            .layer(Extension(Arc::new(allower)));
     }
     router
         // Enforce on all routes.
         // If the request does not complete within the specified timeout it will be aborted
         // and a 408 Request Timeout response will be sent.
-        .layer(TimeoutLayer::new(Duration::from_secs(var!(
-            "NODE_CLIENT_TIMEOUT",
-            20
-        ))))
+        .layer(TimeoutLayer::new(Duration::from_secs(
+            timeout_secs.unwrap_or(20),
+        )))
         .layer(Extension(relay))
         .layer(Extension(labels))
         .layer(Extension(client))
@@ -127,7 +141,11 @@ pub fn app(labels: Labels, client: ReqwestClient, relay: HistogramRelay, allower
 }
 
 /// Server creates our http/https server
-pub async fn server(listener: std::net::TcpListener, app: Router, acceptor: Option<TlsAcceptor>) -> std::io::Result<()> {
+pub async fn server(
+    listener: std::net::TcpListener,
+    app: Router,
+    acceptor: Option<TlsAcceptor>,
+) -> std::io::Result<()> {
     // setup our graceful shutdown
     let handle = axum_server::Handle::new();
     // Spawn a task to gracefully shutdown server.
@@ -154,21 +172,26 @@ pub struct CertKeyPair(pub SelfSignedCertificate, pub Ed25519PublicKey);
 pub fn generate_self_cert(hostname: String) -> CertKeyPair {
     let mut rng = rand::thread_rng();
     let keypair = Ed25519KeyPair::generate(&mut rng);
-    CertKeyPair(SelfSignedCertificate::new(keypair.copy().private(), &hostname), keypair.public().to_owned())
+    CertKeyPair(
+        SelfSignedCertificate::new(keypair.copy().private(), &hostname),
+        keypair.public().to_owned(),
+    )
 }
 
 /// Load a certificate for use by the listening service
 fn load_certs(filename: &str) -> Vec<rustls::pki_types::CertificateDer<'static>> {
-    let certfile =
-        fs::File::open(filename).unwrap_or_else(|e| panic!("cannot open certificate file: {}; {}", filename, e));
+    let certfile = fs::File::open(filename)
+        .unwrap_or_else(|e| panic!("cannot open certificate file: {}; {}", filename, e));
     let mut reader = BufReader::new(certfile);
-    rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>().unwrap()
+    rustls_pemfile::certs(&mut reader)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
 }
 
 /// Load a private key
 fn load_private_key(filename: &str) -> rustls::pki_types::PrivateKeyDer<'static> {
-    let keyfile =
-        fs::File::open(filename).unwrap_or_else(|e| panic!("cannot open private key file {}; {}", filename, e));
+    let keyfile = fs::File::open(filename)
+        .unwrap_or_else(|e| panic!("cannot open private key file {}; {}", filename, e));
     let mut reader = BufReader::new(keyfile);
 
     loop {
@@ -181,11 +204,16 @@ fn load_private_key(filename: &str) -> rustls::pki_types::PrivateKeyDer<'static>
         }
     }
 
-    panic!("no keys found in {:?} (encrypted keys not supported)", filename);
+    panic!(
+        "no keys found in {:?} (encrypted keys not supported)",
+        filename
+    );
 }
 
 /// load the static keys we'll use to allow external non-validator nodes to push metrics
-fn load_static_peers(static_peers: Option<StaticPeerValidationConfig>) -> Result<Vec<AllowedPeer>, Error> {
+fn load_static_peers(
+    static_peers: Option<StaticPeerValidationConfig>,
+) -> Result<Vec<AllowedPeer>, Error> {
     let Some(static_peers) = static_peers else {
         return Ok(vec![]);
     };
@@ -195,8 +223,14 @@ fn load_static_peers(static_peers: Option<StaticPeerValidationConfig>) -> Result
         .map(|spk| {
             let peer_id = hex::decode(spk.peer_id).unwrap();
             let public_key = Ed25519PublicKey::from_bytes(peer_id.as_ref()).unwrap();
-            let s = AllowedPeer { name: spk.name.clone(), public_key };
-            info!("loaded static peer: {} public key: {}", &s.name, &s.public_key,);
+            let s = AllowedPeer {
+                name: spk.name.clone(),
+                public_key,
+            };
+            info!(
+                "loaded static peer: {} public key: {}",
+                &s.name, &s.public_key,
+            );
             s
         })
         .collect();
@@ -204,11 +238,15 @@ fn load_static_peers(static_peers: Option<StaticPeerValidationConfig>) -> Result
 }
 
 /// Default allow mode for server, we don't verify clients, everything is accepted
-pub fn create_server_cert_default_allow(hostname: String) -> Result<ServerConfig, sui_tls::rustls::Error> {
+pub fn create_server_cert_default_allow(
+    hostname: String,
+) -> Result<ServerConfig, sui_tls::rustls::Error> {
     let CertKeyPair(server_certificate, _) = generate_self_cert(hostname);
 
-    ClientCertVerifier::new(AllowAll, SUI_VALIDATOR_SERVER_NAME.to_string())
-        .rustls_server_config(vec![server_certificate.rustls_certificate()], server_certificate.rustls_private_key())
+    ClientCertVerifier::new(AllowAll, SUI_VALIDATOR_SERVER_NAME.to_string()).rustls_server_config(
+        vec![server_certificate.rustls_certificate()],
+        server_certificate.rustls_private_key(),
+    )
 }
 
 /// Verify clients against sui blockchain, clients that are not found in sui_getValidators
@@ -217,15 +255,22 @@ pub fn create_server_cert_enforce_peer(
     dynamic_peers: DynamicPeerValidationConfig,
     static_peers: Option<StaticPeerValidationConfig>,
 ) -> Result<(ServerConfig, Option<SuiNodeProvider>), sui_tls::rustls::Error> {
-    let (Some(certificate_path), Some(private_key_path)) = (dynamic_peers.certificate_file, dynamic_peers.private_key)
+    let (Some(certificate_path), Some(private_key_path)) =
+        (dynamic_peers.certificate_file, dynamic_peers.private_key)
     else {
-        return Err(sui_tls::rustls::Error::General("missing certs to initialize server".into()));
+        return Err(sui_tls::rustls::Error::General(
+            "missing certs to initialize server".into(),
+        ));
     };
-    let static_peers = load_static_peers(static_peers)
-        .map_err(|e| sui_tls::rustls::Error::General(format!("unable to load static pub keys: {}", e)))?;
+    let static_peers = load_static_peers(static_peers).map_err(|e| {
+        sui_tls::rustls::Error::General(format!("unable to load static pub keys: {}", e))
+    })?;
     let allower = SuiNodeProvider::new(dynamic_peers.url, dynamic_peers.interval, static_peers);
     allower.poll_peer_list();
     let c = ClientCertVerifier::new(allower.clone(), SUI_VALIDATOR_SERVER_NAME.to_string())
-        .rustls_server_config(load_certs(&certificate_path), load_private_key(&private_key_path))?;
+        .rustls_server_config(
+            load_certs(&certificate_path),
+            load_private_key(&private_key_path),
+        )?;
     Ok((c, Some(allower)))
 }

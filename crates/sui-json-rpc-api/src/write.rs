@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use fastcrypto::encoding::Base64;
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use jsonrpsee::core::RpcResult;
+use jsonrpsee::proc_macros::rpc;
 
 use sui_json_rpc_types::{
-    DevInspectArgs,
-    DevInspectResults,
-    DryRunTransactionBlockResponse,
-    SuiTransactionBlockResponse,
+    DevInspectArgs, DevInspectResults, DryRunTransactionBlockResponse, SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
 };
 use sui_open_rpc_macros::open_rpc;
-use sui_types::{base_types::SuiAddress, quorum_driver_types::ExecuteTransactionRequestType, sui_serde::BigInt};
+use sui_types::base_types::SuiAddress;
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::sui_serde::BigInt;
 
 #[open_rpc(namespace = "sui", tag = "Write API")]
 #[rpc(server, client, namespace = "sui")]
@@ -60,5 +60,8 @@ pub trait WriteApi {
     /// Return transaction execution effects including the gas cost summary,
     /// while the effects are not committed to the chain.
     #[method(name = "dryRunTransactionBlock")]
-    async fn dry_run_transaction_block(&self, tx_bytes: Base64) -> RpcResult<DryRunTransactionBlockResponse>;
+    async fn dry_run_transaction_block(
+        &self,
+        tx_bytes: Base64,
+    ) -> RpcResult<DryRunTransactionBlockResponse>;
 }

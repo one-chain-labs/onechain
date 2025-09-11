@@ -8,7 +8,7 @@
 //# publish
 
 module test::m {
-    use one::dynamic_object_field as ofield;
+    use sui::dynamic_object_field as ofield;
 
     public struct S has key, store {
         id: UID,
@@ -206,4 +206,3 @@ module test::m {
 // Should fail since at the version of the object we're passing in the field exists still
 //# programmable --sender A --inputs object(2,8)@2 vector[] --dev-inspect
 //> test::m::check(Input(0), Input(1))
-

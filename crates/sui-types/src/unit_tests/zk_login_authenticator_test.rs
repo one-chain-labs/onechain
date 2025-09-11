@@ -1,32 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::crypto::{PublicKey, SignatureScheme, ZkLoginPublicIdentifier};
 
+use crate::signature::VerifyParams;
+use crate::signature_verification::VerifiedDigestCache;
+use crate::utils::{get_zklogin_user_address, make_zklogin_tx, sign_zklogin_personal_msg};
+use crate::utils::{load_test_vectors, SHORT_ADDRESS_SEED};
 use crate::{
-    base_types::SuiAddress,
-    signature::{GenericSignature, VerifyParams},
-    signature_verification::VerifiedDigestCache,
-    utils::{
-        get_zklogin_user_address,
-        load_test_vectors,
-        make_zklogin_tx,
-        sign_zklogin_personal_msg,
-        SHORT_ADDRESS_SEED,
-    },
-    zk_login_util::DEFAULT_JWK_BYTES,
+    base_types::SuiAddress, signature::GenericSignature, zk_login_util::DEFAULT_JWK_BYTES,
 };
-use fastcrypto::{encoding::Base64, traits::ToFromBytes};
+use fastcrypto::encoding::Base64;
+use fastcrypto::traits::ToFromBytes;
 
-use fastcrypto_zkp::{
-    bn254::{
-        zk_login::{parse_jwks, JwkId, OIDCProvider, ZkLoginInputs, JWK},
-        zk_login_api::ZkLoginEnv,
-    },
-    zk_login_utils::Bn254FrElement,
-};
+use fastcrypto_zkp::bn254::zk_login::{parse_jwks, JwkId, OIDCProvider, ZkLoginInputs, JWK};
+use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
+use fastcrypto_zkp::zk_login_utils::Bn254FrElement;
 use im::hashmap::HashMap as ImHashMap;
 use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
 
@@ -48,7 +40,8 @@ fn test_serde_zk_login_signature() {
 fn test_serde_zk_public_identifier() {
     let (_, _, inputs) = &load_test_vectors("./src/unit_tests/zklogin_test_vectors.json")[0];
     let modified_inputs =
-        ZkLoginInputs::from_json(&serde_json::to_string(&inputs).unwrap(), SHORT_ADDRESS_SEED).unwrap();
+        ZkLoginInputs::from_json(&serde_json::to_string(&inputs).unwrap(), SHORT_ADDRESS_SEED)
+            .unwrap();
 
     let mut bytes = Vec::new();
     let binding = OIDCProvider::Twitch.get_config();
@@ -60,34 +53,63 @@ fn test_serde_zk_public_identifier() {
     bytes.extend(address_seed.unpadded());
 
     let pk1 = PublicKey::ZkLogin(ZkLoginPublicIdentifier(bytes));
-    assert_eq!(pk1.scheme().flag(), SignatureScheme::ZkLoginAuthenticator.flag());
+    assert_eq!(
+        pk1.scheme().flag(),
+        SignatureScheme::ZkLoginAuthenticator.flag()
+    );
     let serialized = bcs::to_bytes(&pk1).unwrap();
     let deserialized: PublicKey = bcs::from_bytes(&serialized).unwrap();
     assert_eq!(deserialized, pk1);
-    assert_eq!(SuiAddress::try_from_unpadded(&modified_inputs).unwrap(), SuiAddress::from(&pk1));
+    assert_eq!(
+        SuiAddress::try_from_unpadded(&modified_inputs).unwrap(),
+        SuiAddress::from(&pk1)
+    );
 
     let pk2 = PublicKey::ZkLogin(
-        ZkLoginPublicIdentifier::new(&binding.iss, &Bn254FrElement::from_str(SHORT_ADDRESS_SEED).unwrap()).unwrap(),
+        ZkLoginPublicIdentifier::new(
+            &binding.iss,
+            &Bn254FrElement::from_str(SHORT_ADDRESS_SEED).unwrap(),
+        )
+        .unwrap(),
     );
-    assert_eq!(pk2.scheme().flag(), SignatureScheme::ZkLoginAuthenticator.flag());
+    assert_eq!(
+        pk2.scheme().flag(),
+        SignatureScheme::ZkLoginAuthenticator.flag()
+    );
     let serialized2 = bcs::to_bytes(&pk2).unwrap();
     let deserialized2: PublicKey = bcs::from_bytes(&serialized2).unwrap();
     assert_eq!(deserialized2, pk2);
-    assert_eq!(SuiAddress::try_from_padded(&modified_inputs).unwrap(), SuiAddress::from(&pk2));
+    assert_eq!(
+        SuiAddress::try_from_padded(&modified_inputs).unwrap(),
+        SuiAddress::from(&pk2)
+    );
 
     assert_eq!(serialized.len() + 1, serialized2.len());
 }
 
 #[test]
 fn zklogin_sign_personal_message() {
-    let data = PersonalMessage { message: b"hello world".to_vec() };
+    let data = PersonalMessage {
+        message: b"hello world".to_vec(),
+    };
     let (user_address, authenticator) = sign_zklogin_personal_msg(data.clone());
     let intent_msg = IntentMessage::new(Intent::personal_message(), data);
-    let parsed: ImHashMap<JwkId, JWK> =
-        parse_jwks(DEFAULT_JWK_BYTES, &OIDCProvider::Twitch).unwrap().into_iter().collect();
+    let parsed: ImHashMap<JwkId, JWK> = parse_jwks(DEFAULT_JWK_BYTES, &OIDCProvider::Twitch, true)
+        .unwrap()
+        .into_iter()
+        .collect();
 
     // Construct the required info to verify a zk login authenticator, jwks, supported providers list and env (prod/test).
-    let aux_verify_data = VerifyParams::new(parsed, vec![], ZkLoginEnv::Test, true, true, Some(30));
+    let aux_verify_data = VerifyParams::new(
+        parsed,
+        vec![],
+        ZkLoginEnv::Test,
+        true,
+        true,
+        true,
+        Some(30),
+        true,
+    );
     let res = authenticator.verify_authenticator(
         &intent_msg,
         user_address,

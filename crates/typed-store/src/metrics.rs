@@ -1,24 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use mysten_metrics::RegistryService;
 use once_cell::sync::OnceCell;
 use prometheus::{
-    register_histogram_vec_with_registry,
-    register_int_counter_vec_with_registry,
-    register_int_gauge_vec_with_registry,
-    HistogramVec,
-    IntCounterVec,
-    IntGaugeVec,
-    Registry,
+    register_histogram_vec_with_registry, register_int_counter_vec_with_registry,
+    register_int_gauge_vec_with_registry, HistogramVec, IntCounterVec, IntGaugeVec, Registry,
 };
-use rocksdb::{perf::set_perf_stats, PerfContext, PerfMetric, PerfStatsLevel};
-use std::{
-    cell::RefCell,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use rocksdb::perf::set_perf_stats;
+use rocksdb::{PerfContext, PerfMetric, PerfStatsLevel};
+use std::cell::RefCell;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 use tap::TapFallible;
 use tracing::warn;
 
@@ -26,8 +19,12 @@ thread_local! {
     static PER_THREAD_ROCKS_PERF_CONTEXT: std::cell::RefCell<rocksdb::PerfContext>  = RefCell::new(PerfContext::default());
 }
 
-const LATENCY_SEC_BUCKETS: &[f64] =
-    &[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1., 2.5, 5., 10., 20., 30., 60., 90.];
+const LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.00001, 0.00005, // 10 mcs, 50 mcs
+    0.0001, 0.0002, 0.0003, 0.0004, 0.0005, // 100..500 mcs
+    0.001, 0.002, 0.003, 0.004, 0.005, // 1..5ms
+    0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1., 2.5, 5., 10.,
+];
 
 #[derive(Debug, Clone)]
 // A struct for sampling based on number of operations or duration.
@@ -62,13 +59,15 @@ impl SamplingInterval {
                 }
             });
         }
-        SamplingInterval { once_every_duration, after_num_ops, counter }
+        SamplingInterval {
+            once_every_duration,
+            after_num_ops,
+            counter,
+        }
     }
-
     pub fn new_from_self(&self) -> SamplingInterval {
         SamplingInterval::new(self.once_every_duration, self.after_num_ops)
     }
-
     pub fn sample(&self) -> bool {
         if self.once_every_duration.is_zero() {
             self.counter.fetch_add(1, Ordering::Relaxed) % (self.after_num_ops + 1) == 0
@@ -330,7 +329,9 @@ impl OperationMetrics {
                 "rocksdb_iter_bytes",
                 "Rocksdb iter size in bytes",
                 &["cf_name"],
-                prometheus::exponential_buckets(1.0, 4.0, 15).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 4.0, 15)
+                    .unwrap()
+                    .to_vec(),
                 registry,
             )
             .unwrap(),
@@ -353,7 +354,9 @@ impl OperationMetrics {
                 "rocksdb_get_bytes",
                 "Rocksdb get call returned data size in bytes",
                 &["cf_name"],
-                prometheus::exponential_buckets(1.0, 4.0, 15).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 4.0, 15)
+                    .unwrap()
+                    .to_vec(),
                 registry
             )
             .unwrap(),
@@ -369,7 +372,9 @@ impl OperationMetrics {
                 "rocksdb_multiget_bytes",
                 "Rocksdb multiget call returned data size in bytes",
                 &["cf_name"],
-                prometheus::exponential_buckets(1.0, 4.0, 15).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 4.0, 15)
+                    .unwrap()
+                    .to_vec(),
                 registry,
             )
             .unwrap(),
@@ -385,7 +390,9 @@ impl OperationMetrics {
                 "rocksdb_put_bytes",
                 "Rocksdb put call puts data size in bytes",
                 &["cf_name"],
-                prometheus::exponential_buckets(1.0, 4.0, 15).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 4.0, 15)
+                    .unwrap()
+                    .to_vec(),
                 registry,
             )
             .unwrap(),
@@ -393,7 +400,9 @@ impl OperationMetrics {
                 "rocksdb_batch_put_bytes",
                 "Rocksdb batch put call puts data size in bytes",
                 &["cf_name"],
-                prometheus::exponential_buckets(1.0, 4.0, 15).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 4.0, 15)
+                    .unwrap()
+                    .to_vec(),
                 registry,
             )
             .unwrap(),
@@ -424,7 +433,9 @@ impl OperationMetrics {
                 "rocksdb_batch_commit_bytes",
                 "Rocksdb schema batch commit size in bytes",
                 &["db_name"],
-                prometheus::exponential_buckets(1.0, 4.0, 15).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 4.0, 15)
+                    .unwrap()
+                    .to_vec(),
                 registry,
             )
             .unwrap(),
@@ -753,17 +764,27 @@ impl ReadPerfContextMetrics {
             self.block_cache_hit_count
                 .with_label_values(&[cf_name])
                 .inc_by(perf_context.metric(PerfMetric::BlockCacheHitCount));
-            self.block_read_count.with_label_values(&[cf_name]).inc_by(perf_context.metric(PerfMetric::BlockReadCount));
-            self.block_read_byte.with_label_values(&[cf_name]).inc_by(perf_context.metric(PerfMetric::BlockReadByte));
-            self.block_read_nanos.with_label_values(&[cf_name]).inc_by(perf_context.metric(PerfMetric::BlockReadTime));
-            self.block_read_count.with_label_values(&[cf_name]).inc_by(perf_context.metric(PerfMetric::BlockReadCount));
+            self.block_read_count
+                .with_label_values(&[cf_name])
+                .inc_by(perf_context.metric(PerfMetric::BlockReadCount));
+            self.block_read_byte
+                .with_label_values(&[cf_name])
+                .inc_by(perf_context.metric(PerfMetric::BlockReadByte));
+            self.block_read_nanos
+                .with_label_values(&[cf_name])
+                .inc_by(perf_context.metric(PerfMetric::BlockReadTime));
+            self.block_read_count
+                .with_label_values(&[cf_name])
+                .inc_by(perf_context.metric(PerfMetric::BlockReadCount));
             self.block_checksum_nanos
                 .with_label_values(&[cf_name])
                 .inc_by(perf_context.metric(PerfMetric::BlockChecksumTime));
             self.block_decompress_nanos
                 .with_label_values(&[cf_name])
                 .inc_by(perf_context.metric(PerfMetric::BlockDecompressTime));
-            self.get_read_bytes.with_label_values(&[cf_name]).inc_by(perf_context.metric(PerfMetric::GetReadBytes));
+            self.get_read_bytes
+                .with_label_values(&[cf_name])
+                .inc_by(perf_context.metric(PerfMetric::GetReadBytes));
             self.multiget_read_bytes
                 .with_label_values(&[cf_name])
                 .inc_by(perf_context.metric(PerfMetric::MultigetReadBytes));
@@ -800,8 +821,12 @@ impl ReadPerfContextMetrics {
             self.new_table_block_iter_nanos
                 .with_label_values(&[cf_name])
                 .inc_by(perf_context.metric(PerfMetric::NewTableBlockIterNanos));
-            self.block_seek_nanos.with_label_values(&[cf_name]).inc_by(perf_context.metric(PerfMetric::BlockSeekNanos));
-            self.find_table_nanos.with_label_values(&[cf_name]).inc_by(perf_context.metric(PerfMetric::FindTableNanos));
+            self.block_seek_nanos
+                .with_label_values(&[cf_name])
+                .inc_by(perf_context.metric(PerfMetric::BlockSeekNanos));
+            self.find_table_nanos
+                .with_label_values(&[cf_name])
+                .inc_by(perf_context.metric(PerfMetric::FindTableNanos));
             self.bloom_memtable_hit_count
                 .with_label_values(&[cf_name])
                 .inc_by(perf_context.metric(PerfMetric::BloomMemtableHitCount));
@@ -903,16 +928,19 @@ impl WritePerfContextMetrics {
             .unwrap(),
         }
     }
-
     pub fn report_metrics(&self, db_name: &str) {
         PER_THREAD_ROCKS_PERF_CONTEXT.with(|perf_context_cell| {
             set_perf_stats(PerfStatsLevel::Disable);
             let perf_context = perf_context_cell.borrow();
-            self.write_wal_nanos.with_label_values(&[db_name]).inc_by(perf_context.metric(PerfMetric::WriteWalTime));
+            self.write_wal_nanos
+                .with_label_values(&[db_name])
+                .inc_by(perf_context.metric(PerfMetric::WriteWalTime));
             self.write_memtable_nanos
                 .with_label_values(&[db_name])
                 .inc_by(perf_context.metric(PerfMetric::WriteMemtableTime));
-            self.write_delay_nanos.with_label_values(&[db_name]).inc_by(perf_context.metric(PerfMetric::WriteDelayTime));
+            self.write_delay_nanos
+                .with_label_values(&[db_name])
+                .inc_by(perf_context.metric(PerfMetric::WriteDelayTime));
             self.write_pre_and_post_process_nanos
                 .with_label_values(&[db_name])
                 .inc_by(perf_context.metric(PerfMetric::WritePreAndPostProcessTime));
@@ -938,21 +966,23 @@ pub struct DBMetrics {
     pub cf_metrics: ColumnFamilyMetrics,
     pub read_perf_ctx_metrics: ReadPerfContextMetrics,
     pub write_perf_ctx_metrics: WritePerfContextMetrics,
+    pub registry_serivce: RegistryService,
 }
 
 static ONCE: OnceCell<Arc<DBMetrics>> = OnceCell::new();
 
 impl DBMetrics {
-    fn new(registry: &Registry) -> Self {
+    fn new(registry_service: RegistryService) -> Self {
+        let registry = registry_service.default_registry();
         DBMetrics {
-            op_metrics: OperationMetrics::new(registry),
-            cf_metrics: ColumnFamilyMetrics::new(registry),
-            read_perf_ctx_metrics: ReadPerfContextMetrics::new(registry),
-            write_perf_ctx_metrics: WritePerfContextMetrics::new(registry),
+            op_metrics: OperationMetrics::new(&registry),
+            cf_metrics: ColumnFamilyMetrics::new(&registry),
+            read_perf_ctx_metrics: ReadPerfContextMetrics::new(&registry),
+            write_perf_ctx_metrics: WritePerfContextMetrics::new(&registry),
+            registry_serivce: registry_service,
         }
     }
-
-    pub fn init(registry: &Registry) -> &'static Arc<DBMetrics> {
+    pub fn init(registry_service: RegistryService) -> &'static Arc<DBMetrics> {
         // Initialize this before creating any instance of DBMap
         // TODO: Remove static initialization because this basically means we can
         // only ever initialize db metrics once with a registry whereas
@@ -961,21 +991,26 @@ impl DBMetrics {
         // or prometheus complains. We essentially need to pass in DBMetrics
         // everywhere we create DBMap as the right fix
         let _ = ONCE
-            .set(Arc::new(DBMetrics::new(registry)))
+            .set(Arc::new(DBMetrics::new(registry_service)))
             // this happens many times during tests
             .tap_err(|_| warn!("DBMetrics registry overwritten"));
         ONCE.get().unwrap()
     }
-
     pub fn increment_num_active_dbs(&self, db_name: &str) {
-        self.op_metrics.rocksdb_num_active_db_handles.with_label_values(&[db_name]).inc();
+        self.op_metrics
+            .rocksdb_num_active_db_handles
+            .with_label_values(&[db_name])
+            .inc();
     }
-
     pub fn decrement_num_active_dbs(&self, db_name: &str) {
-        self.op_metrics.rocksdb_num_active_db_handles.with_label_values(&[db_name]).dec();
+        self.op_metrics
+            .rocksdb_num_active_db_handles
+            .with_label_values(&[db_name])
+            .dec();
     }
-
     pub fn get() -> &'static Arc<DBMetrics> {
-        ONCE.get().unwrap_or_else(|| DBMetrics::init(prometheus::default_registry()))
+        ONCE.get().unwrap_or_else(|| {
+            DBMetrics::init(RegistryService::new(prometheus::default_registry().clone()))
+        })
     }
 }

@@ -1,20 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use rand::{prelude::StdRng, SeedableRng};
+use rand::prelude::StdRng;
+use rand::SeedableRng;
 use sui_storage::blob::{Blob, BlobEncoding};
-use sui_types::{
-    crypto::KeypairTraits,
-    full_checkpoint_content::CheckpointData,
-    gas::GasCostSummary,
-    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSummary, SignedCheckpointSummary},
-    supported_protocol_versions::ProtocolConfig,
-    utils::make_committee_key,
+
+use crate::types::crypto::KeypairTraits;
+use crate::types::full_checkpoint_content::CheckpointData;
+use crate::types::gas::GasCostSummary;
+use crate::types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSummary, SignedCheckpointSummary,
 };
+use crate::types::supported_protocol_versions::ProtocolConfig;
+use crate::types::utils::make_committee_key;
 
 const RNG_SEED: [u8; 32] = [
-    21, 23, 199, 200, 234, 250, 252, 178, 94, 15, 202, 178, 62, 186, 88, 137, 233, 192, 130, 157, 179, 179, 65, 9, 31,
-    249, 221, 123, 225, 112, 199, 247,
+    21, 23, 199, 200, 234, 250, 252, 178, 94, 15, 202, 178, 62, 186, 88, 137, 233, 192, 130, 157,
+    179, 179, 65, 9, 31, 249, 221, 123, 225, 112, 199, 247,
 ];
 
 pub(crate) fn test_checkpoint_data(cp: u64) -> Vec<u8> {
@@ -43,10 +45,13 @@ pub(crate) fn test_checkpoint_data(cp: u64) -> Vec<u8> {
         .collect();
 
     let checkpoint_data = CheckpointData {
-        checkpoint_summary: CertifiedCheckpointSummary::new(summary, sign_infos, &committee).unwrap(),
+        checkpoint_summary: CertifiedCheckpointSummary::new(summary, sign_infos, &committee)
+            .unwrap(),
         checkpoint_contents: contents,
         transactions: vec![],
     };
 
-    Blob::encode(&checkpoint_data, BlobEncoding::Bcs).unwrap().to_bytes()
+    Blob::encode(&checkpoint_data, BlobEncoding::Bcs)
+        .unwrap()
+        .to_bytes()
 }

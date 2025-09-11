@@ -5,7 +5,7 @@
 
 //# publish
 module P::M {
-  use one::transfer::Receiving;
+  use sui::transfer::Receiving;
 
   public struct Object has key, store {
     id: UID,

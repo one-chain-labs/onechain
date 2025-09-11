@@ -4,11 +4,11 @@
 /// Functions for operating on Move packages from within Move:
 /// - Creating proof-of-publish objects from one-time witnesses
 /// - Administering package upgrades through upgrade policies.
-module one::package;
+module oct::package;
 
 use std::ascii::String;
 use std::type_name;
-use one::types;
+use sui::types;
 
 /// Allows calling `.burn` to destroy a `Publisher`.
 public use fun burn_publisher as Publisher.burn;
@@ -137,12 +137,12 @@ public struct UpgradeReceipt {
 public fun claim<OTW: drop>(otw: OTW, ctx: &mut TxContext): Publisher {
     assert!(types::is_one_time_witness(&otw), ENotOneTimeWitness);
 
-    let tyname = type_name::get_with_original_ids<OTW>();
+    let type_name = type_name::get_with_original_ids<OTW>();
 
     Publisher {
         id: object::new(ctx),
-        package: tyname.get_address(),
-        module_name: tyname.get_module(),
+        package: type_name.get_address(),
+        module_name: type_name.get_module(),
     }
 }
 
@@ -151,7 +151,7 @@ public fun claim<OTW: drop>(otw: OTW, ctx: &mut TxContext): Publisher {
 /// Since this function can only be called in the module initializer,
 /// the sender is the publisher.
 public fun claim_and_keep<OTW: drop>(otw: OTW, ctx: &mut TxContext) {
-    one::transfer::public_transfer(claim(otw, ctx), ctx.sender())
+    sui::transfer::public_transfer(claim(otw, ctx), ctx.sender())
 }
 
 /// Destroy a Publisher object effectively removing all privileges
@@ -168,9 +168,9 @@ public fun from_package<T>(self: &Publisher): bool {
 
 /// Check whether a type belongs to the same module as the publisher object.
 public fun from_module<T>(self: &Publisher): bool {
-    let tyname = type_name::get_with_original_ids<T>();
+    let type_name = type_name::get_with_original_ids<T>();
 
-    (tyname.get_address() == self.package) && (tyname.get_module() == self.module_name)
+    (type_name.get_address() == self.package) && (type_name.get_module() == self.module_name)
 }
 
 /// Read the name of the module.
@@ -249,18 +249,21 @@ public fun additive_policy(): u8 { ADDITIVE }
 
 public fun dep_only_policy(): u8 { DEP_ONLY }
 
+#[allow(lint(public_entry))]
 /// Restrict upgrades through this upgrade `cap` to just add code, or
 /// change dependencies.
 public entry fun only_additive_upgrades(cap: &mut UpgradeCap) {
     cap.restrict(ADDITIVE)
 }
 
+#[allow(lint(public_entry))]
 /// Restrict upgrades through this upgrade `cap` to just change
 /// dependencies.
 public entry fun only_dep_upgrades(cap: &mut UpgradeCap) {
     cap.restrict(DEP_ONLY)
 }
 
+#[allow(lint(public_entry))]
 /// Discard the `UpgradeCap` to make a package immutable.
 public entry fun make_immutable(cap: UpgradeCap) {
     let UpgradeCap { id, package: _, version: _, policy: _ } = cap;
@@ -308,12 +311,12 @@ public fun commit_upgrade(cap: &mut UpgradeCap, receipt: UpgradeReceipt) {
 #[test_only]
 /// Test-only function to claim a Publisher object bypassing OTW check.
 public fun test_claim<OTW: drop>(_: OTW, ctx: &mut TxContext): Publisher {
-    let tyname = type_name::get_with_original_ids<OTW>();
+    let type_name = type_name::get_with_original_ids<OTW>();
 
     Publisher {
         id: object::new(ctx),
-        package: tyname.get_address(),
-        module_name: tyname.get_module(),
+        package: type_name.get_address(),
+        module_name: type_name.get_module(),
     }
 }
 
@@ -340,7 +343,7 @@ public fun test_upgrade(ticket: UpgradeTicket): UpgradeReceipt {
     // hashing the existing package and cap ID.
     let mut data = cap.to_bytes();
     data.append(package.to_bytes());
-    let package = object::id_from_bytes(one::hash::blake2b256(&data));
+    let package = object::id_from_bytes(sui::hash::blake2b256(&data));
 
     UpgradeReceipt {
         cap,

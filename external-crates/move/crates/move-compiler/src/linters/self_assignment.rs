@@ -66,7 +66,9 @@ fn check_mutate(context: &mut Context, loc: Loc, lhs: &T::Exp, rhs: &T::Exp) {
                 None
             }
 
-            E::Move { var: l, .. } | E::Copy { var: l, .. } | E::Use(l) | E::BorrowLocal(_, l) => same_local(l, rhs),
+            E::Move { var: l, .. } | E::Copy { var: l, .. } | E::Use(l) | E::BorrowLocal(_, l) => {
+                same_local(l, rhs)
+            }
             E::Builtin(b1, l) => {
                 if !gives_memory_location(b1) {
                     return None;
@@ -124,10 +126,12 @@ fn inner_exp(mut e: &T::Exp) -> &T::Exp {
     loop {
         match &e.exp.value {
             E::Annotate(inner, _) => e = inner,
-            E::Block((_, seq)) | E::NamedBlock(_, (_, seq)) if seq.len() == 1 => match &seq[0].value {
-                T::SequenceItem_::Seq(inner) => e = inner,
-                T::SequenceItem_::Declare(_) | T::SequenceItem_::Bind(_, _, _) => break e,
-            },
+            E::Block((_, seq)) | E::NamedBlock(_, (_, seq)) if seq.len() == 1 => {
+                match &seq[0].value {
+                    T::SequenceItem_::Seq(inner) => e = inner,
+                    T::SequenceItem_::Declare(_) | T::SequenceItem_::Bind(_, _, _) => break e,
+                }
+            }
             _ => break e,
         }
     }
@@ -159,7 +163,8 @@ fn exp_list_items(e: &T::Exp) -> Vec<&T::Exp> {
 }
 
 fn report_self_assignment(context: &mut Context, case: &str, eloc: Loc, lloc: Loc, rloc: Loc) {
-    let msg = format!("Unnecessary self-{case}. The {case} is redundant and will not change the value");
+    let msg =
+        format!("Unnecessary self-{case}. The {case} is redundant and will not change the value");
     context.add_diag(diag!(
         StyleCodes::SelfAssignment.diag_info(),
         (eloc, msg),

@@ -1,28 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::PathBuf;
+
 use crate::test_adapter::{FakeID, SuiTestAdapter};
 use anyhow::{bail, ensure};
-use clap::{self, Args, Parser};
+use clap;
+use clap::{Args, Parser};
 use move_compiler::editions::Flavor;
-use move_core_types::{
-    parsing::{
-        parser::{parse_u256, parse_u64, Parser as MoveCLParser},
-        values::{ParsableValue, ParsedValue, ValueToken},
-    },
-    runtime_value::{MoveStruct, MoveValue},
-    u256::U256,
+use move_core_types::parsing::{
+    parser::Parser as MoveCLParser,
+    parser::{parse_u256, parse_u64},
+    values::ValueToken,
+    values::{ParsableValue, ParsedValue},
 };
+use move_core_types::runtime_value::{MoveStruct, MoveValue};
+use move_core_types::u256::U256;
 use move_symbol_pool::Symbol;
 use move_transactional_test_runner::tasks::{RunCommand, SyntaxChoice};
 use sui_graphql_rpc::test_infra::cluster::SnapshotLagConfig;
-use sui_types::{
-    base_types::{SequenceNumber, SuiAddress},
-    move_package::UpgradePolicy,
-    object::{Object, Owner},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{Argument, CallArg, ObjectArg},
-};
+use sui_types::base_types::{SequenceNumber, SuiAddress};
+use sui_types::move_package::UpgradePolicy;
+use sui_types::object::{Object, Owner};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{Argument, CallArg, ObjectArg};
 
 pub const SUI_ARGS_LONG: &str = "sui-args";
 
@@ -46,6 +47,8 @@ pub struct SuiPublishArgs {
     pub dependencies: Vec<String>,
     #[clap(long = "gas-price")]
     pub gas_price: Option<u64>,
+    #[clap(long = "dry-run")]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -74,6 +77,13 @@ pub struct SuiInitArgs {
     /// the indexer.
     #[clap(long = "epochs-to-keep")]
     pub epochs_to_keep: Option<u64>,
+    /// Dir for simulacrum to write checkpoint files to. To be passed to the offchain indexer and
+    /// reader.
+    #[clap(long)]
+    pub data_ingestion_path: Option<PathBuf>,
+    /// URL for the Sui REST API. To be passed to the offchain indexer and reader.
+    #[clap(long)]
+    pub rest_api_url: Option<String>,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -113,9 +123,13 @@ pub struct ProgrammableTransactionCommand {
     #[clap(long = "gas-price")]
     pub gas_price: Option<u64>,
     #[clap(long = "gas-payment", value_parser = parse_fake_id)]
-    pub gas_payment: Option<FakeID>,
+    pub gas_payment: Option<Vec<FakeID>>,
     #[clap(long = "dev-inspect")]
     pub dev_inspect: bool,
+    #[clap(long = "dry-run")]
+    pub dry_run: bool,
+    #[clap(long = "expiration")]
+    pub expiration: Option<u64>,
     #[clap(
         long = "inputs",
         value_parser = ParsedValue::<SuiExtraValueArgs>::parse,
@@ -137,6 +151,8 @@ pub struct UpgradePackageCommand {
     pub sender: String,
     #[clap(long = "gas-budget")]
     pub gas_budget: Option<u64>,
+    #[clap(long = "dry-run")]
+    pub dry_run: bool,
     #[clap(long = "syntax")]
     pub syntax: Option<SyntaxChoice>,
     #[clap(long = "policy", default_value="compatible", value_parser = parse_policy)]
@@ -162,8 +178,10 @@ pub struct SetAddressCommand {
 
 #[derive(Debug, clap::Parser)]
 pub struct AdvanceClockCommand {
+    #[clap(long = "duration")]
+    pub duration: Option<String>,
     #[clap(long = "duration-ns")]
-    pub duration_ns: u64,
+    pub duration_ns: Option<u64>,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -181,6 +199,14 @@ pub struct RunGraphqlCommand {
 }
 
 #[derive(Debug, clap::Parser)]
+pub struct RunJsonRpcCommand {
+    #[clap(long = "show-headers")]
+    pub show_headers: bool,
+    #[clap(long, num_args(1..))]
+    pub cursors: Vec<String>,
+}
+
+#[derive(Debug, clap::Parser)]
 pub struct CreateCheckpointCommand {
     pub count: Option<u64>,
 }
@@ -190,6 +216,29 @@ pub struct AdvanceEpochCommand {
     pub count: Option<u64>,
     #[clap(long = "create-random-state")]
     pub create_random_state: bool,
+    #[clap(long = "create-authenticator-state")]
+    pub create_authenticator_state: bool,
+    #[clap(long = "create-authenticator-state-expire")]
+    pub create_authenticator_state_expire: bool,
+    #[clap(long = "create-deny-list-state")]
+    pub create_deny_list_state: bool,
+    #[clap(long = "create-bridge-state")]
+    pub create_bridge_state: bool,
+    #[clap(long = "create-bridge-committee")]
+    pub create_bridge_committee: bool,
+}
+
+impl From<&AdvanceEpochCommand> for simulacrum::AdvanceEpochConfig {
+    fn from(cmd: &AdvanceEpochCommand) -> Self {
+        Self {
+            create_random_state: cmd.create_random_state,
+            create_authenticator_state: cmd.create_authenticator_state,
+            create_authenticator_state_expire: cmd.create_authenticator_state_expire,
+            create_deny_list_state: cmd.create_deny_list_state,
+            create_bridge_state: cmd.create_bridge_state,
+            create_bridge_committee: cmd.create_bridge_committee,
+        }
+    }
 }
 
 #[derive(Debug, clap::Parser)]
@@ -200,6 +249,18 @@ pub struct SetRandomStateCommand {
     pub random_bytes: String,
     #[clap(long = "randomness-initial-version")]
     pub randomness_initial_version: u64,
+}
+
+#[derive(Debug, clap::Parser)]
+pub struct AuthenticatorStateUpdateCommand {
+    #[clap(long = "round")]
+    pub round: u64,
+    /// List of JWK issuers (e.g., "google.com,microsoft.com").
+    /// Key IDs will be automatically generated as "key1", "key2", etc.
+    #[clap(long = "jwk-iss", action = clap::ArgAction::Append)]
+    pub jwk_iss: Vec<String>,
+    #[clap(long = "authenticator-obj-initial-shared-version")]
+    pub authenticator_obj_initial_shared_version: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -215,8 +276,10 @@ pub enum SuiSubcommand<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> {
     AdvanceEpoch(AdvanceEpochCommand),
     AdvanceClock(AdvanceClockCommand),
     SetRandomState(SetRandomStateCommand),
+    AuthenticatorStateUpdate(AuthenticatorStateUpdateCommand),
     ViewCheckpoint,
     RunGraphql(RunGraphqlCommand),
+    RunJsonRpc(RunJsonRpcCommand),
     Bench(RunCommand<ExtraValueArgs>, ExtraRunArgs),
 }
 
@@ -225,23 +288,27 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::FromArgMatches
 {
     fn from_arg_matches(matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
         Ok(match matches.subcommand() {
-            Some(("view-object", matches)) => SuiSubcommand::ViewObject(ViewObjectCommand::from_arg_matches(matches)?),
+            Some(("view-object", matches)) => {
+                SuiSubcommand::ViewObject(ViewObjectCommand::from_arg_matches(matches)?)
+            }
             Some(("transfer-object", matches)) => {
                 SuiSubcommand::TransferObject(TransferObjectCommand::from_arg_matches(matches)?)
             }
-            Some(("consensus-commit-prologue", matches)) => {
-                SuiSubcommand::ConsensusCommitPrologue(ConsensusCommitPrologueCommand::from_arg_matches(matches)?)
-            }
-            Some(("programmable", matches)) => {
-                SuiSubcommand::ProgrammableTransaction(ProgrammableTransactionCommand::from_arg_matches(matches)?)
-            }
+            Some(("consensus-commit-prologue", matches)) => SuiSubcommand::ConsensusCommitPrologue(
+                ConsensusCommitPrologueCommand::from_arg_matches(matches)?,
+            ),
+            Some(("programmable", matches)) => SuiSubcommand::ProgrammableTransaction(
+                ProgrammableTransactionCommand::from_arg_matches(matches)?,
+            ),
             Some(("upgrade", matches)) => {
                 SuiSubcommand::UpgradePackage(UpgradePackageCommand::from_arg_matches(matches)?)
             }
             Some(("stage-package", matches)) => {
                 SuiSubcommand::StagePackage(StagePackageCommand::from_arg_matches(matches)?)
             }
-            Some(("set-address", matches)) => SuiSubcommand::SetAddress(SetAddressCommand::from_arg_matches(matches)?),
+            Some(("set-address", matches)) => {
+                SuiSubcommand::SetAddress(SetAddressCommand::from_arg_matches(matches)?)
+            }
             Some(("create-checkpoint", matches)) => {
                 SuiSubcommand::CreateCheckpoint(CreateCheckpointCommand::from_arg_matches(matches)?)
             }
@@ -254,13 +321,27 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::FromArgMatches
             Some(("set-random-state", matches)) => {
                 SuiSubcommand::SetRandomState(SetRandomStateCommand::from_arg_matches(matches)?)
             }
-            Some(("view-checkpoint", _)) => SuiSubcommand::ViewCheckpoint,
-            Some(("run-graphql", matches)) => SuiSubcommand::RunGraphql(RunGraphqlCommand::from_arg_matches(matches)?),
-            Some(("bench", matches)) => {
-                SuiSubcommand::Bench(RunCommand::from_arg_matches(matches)?, ExtraRunArgs::from_arg_matches(matches)?)
+            Some(("authenticator-state-update", matches)) => {
+                SuiSubcommand::AuthenticatorStateUpdate(
+                    AuthenticatorStateUpdateCommand::from_arg_matches(matches)?,
+                )
             }
+            Some(("view-checkpoint", _)) => SuiSubcommand::ViewCheckpoint,
+            Some(("run-graphql", matches)) => {
+                SuiSubcommand::RunGraphql(RunGraphqlCommand::from_arg_matches(matches)?)
+            }
+            Some(("run-jsonrpc", matches)) => {
+                SuiSubcommand::RunJsonRpc(RunJsonRpcCommand::from_arg_matches(matches)?)
+            }
+            Some(("bench", matches)) => SuiSubcommand::Bench(
+                RunCommand::from_arg_matches(matches)?,
+                ExtraRunArgs::from_arg_matches(matches)?,
+            ),
             _ => {
-                return Err(clap::Error::raw(clap::error::ErrorKind::InvalidSubcommand, "Invalid submcommand"));
+                return Err(clap::Error::raw(
+                    clap::error::ErrorKind::InvalidSubcommand,
+                    "Invalid submcommand",
+                ));
             }
         })
     }
@@ -287,9 +368,15 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::CommandFactory
             .subcommand(AdvanceEpochCommand::command().name("advance-epoch"))
             .subcommand(AdvanceClockCommand::command().name("advance-clock"))
             .subcommand(SetRandomStateCommand::command().name("set-random-state"))
+            .subcommand(
+                AuthenticatorStateUpdateCommand::command().name("authenticator-state-update"),
+            )
             .subcommand(clap::Command::new("view-checkpoint"))
             .subcommand(RunGraphqlCommand::command().name("run-graphql"))
-            .subcommand(RunCommand::<ExtraValueArgs>::augment_args(ExtraRunArgs::command()).name("bench"))
+            .subcommand(RunJsonRpcCommand::command().name("run-jsonrpc"))
+            .subcommand(
+                RunCommand::<ExtraValueArgs>::augment_args(ExtraRunArgs::command()).name("bench"),
+            )
     }
 
     fn command_for_update() -> clap::Command {
@@ -297,7 +384,10 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::CommandFactory
     }
 }
 
-impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::Parser for SuiSubcommand<ExtraValueArgs, ExtraRunArgs> {}
+impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::Parser
+    for SuiSubcommand<ExtraValueArgs, ExtraRunArgs>
+{
+}
 
 #[derive(Clone, Debug)]
 pub enum SuiExtraValueArgs {
@@ -446,8 +536,15 @@ impl SuiValue {
     ) -> anyhow::Result<ObjectArg> {
         let obj = Self::resolve_object(fake_id, version, test_adapter)?;
         let id = obj.id();
-        if let Owner::Shared { initial_shared_version } = obj.owner {
-            Ok(ObjectArg::SharedObject { id, initial_shared_version, mutable: false })
+        if let Owner::Shared {
+            initial_shared_version,
+        } = obj.owner
+        {
+            Ok(ObjectArg::SharedObject {
+                id,
+                initial_shared_version,
+                mutable: false,
+            })
         } else {
             bail!("{fake_id} is not a shared object.")
         }
@@ -461,10 +558,17 @@ impl SuiValue {
         let obj = Self::resolve_object(fake_id, version, test_adapter)?;
         let id = obj.id();
         match obj.owner {
-            Owner::Shared { initial_shared_version }
-            | Owner::ConsensusV2 { start_version: initial_shared_version, .. } => {
-                Ok(ObjectArg::SharedObject { id, initial_shared_version, mutable: true })
+            Owner::Shared {
+                initial_shared_version,
             }
+            | Owner::ConsensusAddressOwner {
+                start_version: initial_shared_version,
+                ..
+            } => Ok(ObjectArg::SharedObject {
+                id,
+                initial_shared_version,
+                mutable: true,
+            }),
             Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => {
                 let obj_ref = obj.compute_object_reference();
                 Ok(ObjectArg::ImmOrOwnedObject(obj_ref))
@@ -474,7 +578,9 @@ impl SuiValue {
 
     pub(crate) fn into_call_arg(self, test_adapter: &SuiTestAdapter) -> anyhow::Result<CallArg> {
         Ok(match self {
-            SuiValue::Object(fake_id, version) => CallArg::Object(Self::object_arg(fake_id, version, test_adapter)?),
+            SuiValue::Object(fake_id, version) => {
+                CallArg::Object(Self::object_arg(fake_id, version, test_adapter)?)
+            }
             SuiValue::MoveValue(v) => CallArg::Pure(v.simple_serialize().unwrap()),
             SuiValue::Receiving(fake_id, version) => {
                 CallArg::Object(Self::receiving_arg(fake_id, version, test_adapter)?)
@@ -533,9 +639,13 @@ impl ParsableValue for SuiExtraValueArgs {
 
     fn concrete_vector(elems: Vec<Self::ConcreteValue>) -> anyhow::Result<Self::ConcreteValue> {
         if !elems.is_empty() && matches!(elems[0], SuiValue::Object(_, _)) {
-            Ok(SuiValue::ObjVec(elems.into_iter().map(SuiValue::assert_object).collect()))
+            Ok(SuiValue::ObjVec(
+                elems.into_iter().map(SuiValue::assert_object).collect(),
+            ))
         } else {
-            Ok(SuiValue::MoveValue(MoveValue::Vector(elems.into_iter().map(SuiValue::assert_move_value).collect())))
+            Ok(SuiValue::MoveValue(MoveValue::Vector(
+                elems.into_iter().map(SuiValue::assert_move_value).collect(),
+            )))
         }
     }
 
@@ -574,9 +684,9 @@ fn parse_fake_id(s: &str) -> anyhow::Result<FakeID> {
 
 fn parse_policy(x: &str) -> anyhow::Result<u8> {
     Ok(match x {
-        "compatible" => UpgradePolicy::COMPATIBLE,
-        "additive" => UpgradePolicy::ADDITIVE,
-        "dep_only" => UpgradePolicy::DEP_ONLY,
-        _ => bail!("Invalid upgrade policy {x}. Policy must be one of 'compatible', 'additive', or 'dep_only'"),
+            "compatible" => UpgradePolicy::COMPATIBLE,
+            "additive" => UpgradePolicy::ADDITIVE,
+            "dep_only" => UpgradePolicy::DEP_ONLY,
+        _ => bail!("Invalid upgrade policy {x}. Policy must be one of 'compatible', 'additive', or 'dep_only'")
     })
 }

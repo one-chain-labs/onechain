@@ -6,14 +6,12 @@ use chrono::{DateTime, Utc};
 use clap::*;
 use once_cell::sync::Lazy;
 use prometheus_http_query::Client;
-use std::{fs::File, io::Read, time::Duration};
+use std::fs::File;
+use std::io::Read;
+use std::time::Duration;
+use sui_metric_checker::query::{instant_query, range_query};
 use sui_metric_checker::{
-    fails_threshold_condition,
-    query::{instant_query, range_query},
-    timestamp_string_to_unix_seconds,
-    Config,
-    NowProvider,
-    QueryType,
+    fails_threshold_condition, timestamp_string_to_unix_seconds, Config, NowProvider, QueryType,
 };
 
 #[derive(Parser)]
@@ -44,7 +42,9 @@ impl NowProvider for UtcNowOnceProvider {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let opts: Opts = Opts::parse();
-    let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new()
+        .with_env()
+        .init();
 
     let auth_header = format!("{}:{}", opts.api_user, opts.api_key);
 
@@ -54,22 +54,36 @@ async fn main() -> Result<(), anyhow::Error> {
     let config: Config = serde_yaml::from_str(&contents)?;
 
     let client = {
-        let c = reqwest::Client::builder().no_proxy().timeout(Duration::from_secs(10)).build().unwrap();
+        let c = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
         Client::from(c, &opts.url).unwrap()
     };
 
-    let backoff = ExponentialBackoff { max_elapsed_time: Some(Duration::from_secs(5)), ..ExponentialBackoff::default() };
+    let backoff = ExponentialBackoff {
+        max_elapsed_time: Some(Duration::from_secs(5)),
+        ..ExponentialBackoff::default()
+    };
 
     let mut failed_queries = Vec::new();
     for query in config.queries {
         let queried_result = match query.query_type {
             QueryType::Instant => {
                 retry(backoff.clone(), || async {
-                    instant_query(&auth_header, client.clone(), &query.query).await.map_err(backoff::Error::transient)
+                    instant_query(&auth_header, client.clone(), &query.query)
+                        .await
+                        .map_err(backoff::Error::transient)
                 })
                 .await
             }
-            QueryType::Range { start, end, step, percentile } => {
+            QueryType::Range {
+                start,
+                end,
+                step,
+                percentile,
+            } => {
                 retry(backoff.clone(), || async {
                     range_query(
                         &auth_header,
@@ -97,7 +111,9 @@ async fn main() -> Result<(), anyhow::Error> {
                     ) {
                         failed_queries.push(format!(
                             "Query \"{}\" returned value of {queried_value} which is {} {}",
-                            query.query, validate_result.failure_condition, validate_result.threshold
+                            query.query,
+                            validate_result.failure_condition,
+                            validate_result.threshold
                         ));
                     }
                 }
@@ -110,7 +126,9 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     if !failed_queries.is_empty() {
-        return Err(anyhow!("Following queries failed to meet threshold conditions: {failed_queries:#?}"));
+        return Err(anyhow!(
+            "Following queries failed to meet threshold conditions: {failed_queries:#?}"
+        ));
     }
 
     Ok(())

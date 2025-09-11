@@ -92,18 +92,27 @@ impl<T: TName> UniqueSet<T> {
     }
 
     pub fn cloned_iter(&self) -> impl Iterator<Item = T> {
-        self.into_iter().map(|(loc, k_)| T::add_loc(loc, k_.clone())).collect::<Vec<_>>().into_iter()
+        self.into_iter()
+            .map(|(loc, k_)| T::add_loc(loc, k_.clone()))
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
-    pub fn from_elements(iter: impl IntoIterator<Item = T>) -> Result<Self, (T::Key, T::Loc, T::Loc)> {
-        Ok(Self(UniqueMap::maybe_from_iter(iter.into_iter().map(|x| (x, ())))?))
+    pub fn from_elements(
+        iter: impl IntoIterator<Item = T>,
+    ) -> Result<Self, (T::Key, T::Loc, T::Loc)> {
+        Ok(Self(UniqueMap::maybe_from_iter(
+            iter.into_iter().map(|x| (x, ())),
+        )?))
     }
 
     pub fn from_elements_(
         loc: T::Loc,
         iter: impl IntoIterator<Item = T::Key>,
     ) -> Result<Self, (T::Key, T::Loc, T::Loc)> {
-        Ok(Self(UniqueMap::maybe_from_iter(iter.into_iter().map(|x_| (T::add_loc(loc, x_), ())))?))
+        Ok(Self(UniqueMap::maybe_from_iter(
+            iter.into_iter().map(|x_| (T::add_loc(loc, x_), ())),
+        )?))
     }
 }
 
@@ -152,7 +161,10 @@ where
 // IntoIter
 //**************************************************************************************************
 
-pub struct IntoIter<T: TName>(std::iter::Map<unique_map::IntoIter<T, ()>, fn((T, ())) -> T>, usize);
+pub struct IntoIter<T: TName>(
+    std::iter::Map<unique_map::IntoIter<T, ()>, fn((T, ())) -> T>,
+    usize,
+);
 
 impl<T: TName> Iterator for IntoIter<T> {
     type Item = T;
@@ -170,8 +182,8 @@ impl<T: TName> Iterator for IntoIter<T> {
 }
 
 impl<T: TName> IntoIterator for UniqueSet<T> {
-    type IntoIter = IntoIter<T>;
     type Item = T;
+    type IntoIter = IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
         let len = self.len();
@@ -190,7 +202,10 @@ impl<T: TName> IntoIterator for UniqueSet<T> {
 //**************************************************************************************************
 
 pub struct Iter<'a, T: TName>(
-    std::iter::Map<unique_map::Iter<'a, T, ()>, fn((T::Loc, &'a T::Key, &'a ())) -> (T::Loc, &'a T::Key)>,
+    std::iter::Map<
+        unique_map::Iter<'a, T, ()>,
+        fn((T::Loc, &'a T::Key, &'a ())) -> (T::Loc, &'a T::Key),
+    >,
     usize,
 );
 
@@ -210,8 +225,8 @@ impl<'a, T: TName> Iterator for Iter<'a, T> {
 }
 
 impl<'a, T: TName> IntoIterator for &'a UniqueSet<T> {
-    type IntoIter = Iter<'a, T>;
     type Item = (T::Loc, &'a T::Key);
+    type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         let len = self.len();

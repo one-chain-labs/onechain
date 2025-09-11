@@ -3,16 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use base::{
-    build::Build,
-    coverage::Coverage,
-    disassemble::Disassemble,
-    docgen::Docgen,
-    info::Info,
-    migrate::Migrate,
-    new::New,
-    test::Test,
+    build::Build, coverage::Coverage, disassemble::Disassemble, docgen::Docgen, info::Info,
+    migrate::Migrate, new::New, summary::Summary, test::Test,
 };
-use move_package::BuildConfig;
+use move_package::{BuildConfig, resolution::resolution_graph::ResolvedGraph};
 
 pub mod base;
 pub mod sandbox;
@@ -80,24 +74,46 @@ pub enum Command {
         #[clap(subcommand)]
         cmd: sandbox::cli::SandboxCommand,
     },
+    Summary(Summary),
 }
 
-pub fn run_cli(natives: Vec<NativeFunctionRecord>, cost_table: &CostTable, move_args: Move, cmd: Command) -> Result<()> {
+pub fn run_cli(
+    natives: Vec<NativeFunctionRecord>,
+    cost_table: &CostTable,
+    move_args: Move,
+    cmd: Command,
+) -> Result<()> {
     // TODO: right now, the gas metering story for move-cli (as a library) is a bit of a mess.
     //         1. It's still using the old CostTable.
     //         2. The CostTable only affects sandbox runs, but not unit tests, which use a unit cost table.
     match cmd {
         Command::Build(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
-        Command::Coverage(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
-        Command::Disassemble(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
+        Command::Coverage(c) => {
+            c.execute(move_args.package_path.as_deref(), move_args.build_config)
+        }
+        Command::Disassemble(c) => {
+            c.execute(move_args.package_path.as_deref(), move_args.build_config)
+        }
         Command::Docgen(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
         Command::Info(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
         Command::Migrate(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
-        Command::Test(c) => {
-            c.execute(move_args.package_path.as_deref(), move_args.build_config, natives, Some(cost_table.clone()))
+        Command::Test(c) => c.execute(
+            move_args.package_path.as_deref(),
+            move_args.build_config,
+            natives,
+            Some(cost_table.clone()),
+        ),
+        Command::Sandbox { storage_dir, cmd } => {
+            cmd.handle_command(natives, cost_table, &move_args, &storage_dir)
         }
-        Command::Sandbox { storage_dir, cmd } => cmd.handle_command(natives, cost_table, &move_args, &storage_dir),
+        Command::Summary(summary) => summary
+            .execute::<(), fn(&mut ResolvedGraph) -> anyhow::Result<()>>(
+                move_args.package_path.as_deref(),
+                move_args.build_config,
+                None,
+                None,
+            ),
     }
 }
 

@@ -12,18 +12,17 @@ mod checked {
         sync::Arc,
     };
 
-    use crate::{
-        execution_mode::ExecutionMode,
-        execution_value::{CommandKind, ExecutionState, ObjectContents, ObjectValue, RawValueType, Value},
-        gas_charger::GasCharger,
+    use crate::execution_value::{
+        CommandKind, ExecutionState, ObjectContents, ObjectValue, RawValueType, Value,
     };
+    use crate::gas_charger::GasCharger;
+    use crate::{execution_mode::ExecutionMode, gas_meter::SuiGasMeter};
     use move_binary_format::{
         compatibility::{Compatibility, InclusionCheck},
         errors::{Location, PartialVMResult, VMResult},
         file_format::{AbilitySet, CodeOffset, FunctionDefinitionIndex, LocalIndex, Visibility},
         file_format_common::VERSION_6,
-        normalized,
-        CompiledModule,
+        normalized, CompiledModule,
     };
     use move_core_types::{
         account_address::AccountAddress,
@@ -39,35 +38,23 @@ mod checked {
     use serde::{de::DeserializeSeed, Deserialize};
     use sui_move_natives::object_runtime::ObjectRuntime;
     use sui_protocol_config::ProtocolConfig;
+    use sui_types::execution_config_utils::to_binary_config;
+    use sui_types::execution_status::{CommandArgumentError, PackageUpgradeError};
+    use sui_types::storage::{get_package_objects, PackageObject};
     use sui_types::{
         base_types::{
-            MoveObjectType,
-            ObjectID,
-            SuiAddress,
-            TxContext,
-            TxContextKind,
-            RESOLVED_ASCII_STR,
-            RESOLVED_STD_OPTION,
-            RESOLVED_UTF8_STR,
-            TX_CONTEXT_MODULE_NAME,
+            MoveLegacyTxContext, MoveObjectType, ObjectID, SuiAddress, TxContext, TxContextKind,
+            RESOLVED_ASCII_STR, RESOLVED_STD_OPTION, RESOLVED_UTF8_STR, TX_CONTEXT_MODULE_NAME,
             TX_CONTEXT_STRUCT_NAME,
         },
         coin::Coin,
         error::{command_argument_error, ExecutionError, ExecutionErrorKind},
-        execution_config_utils::to_binary_config,
-        execution_status::{CommandArgumentError, PackageUpgradeError},
-        id::{RESOLVED_SUI_ID, UID},
+        id::RESOLVED_SUI_ID,
         metrics::LimitsMetrics,
         move_package::{
-            normalize_deserialized_modules,
-            MovePackage,
-            TypeOrigin,
-            UpgradeCap,
-            UpgradePolicy,
-            UpgradeReceipt,
-            UpgradeTicket,
+            normalize_deserialized_modules, MovePackage, TypeOrigin, UpgradeCap, UpgradePolicy,
+            UpgradeReceipt, UpgradeTicket,
         },
-        storage::{get_package_objects, PackageObject},
         transaction::{Argument, Command, ProgrammableMoveCall, ProgrammableTransaction},
         SUI_FRAMEWORK_ADDRESS,
     };
@@ -76,7 +63,8 @@ mod checked {
         INIT_FN_NAME,
     };
 
-    use crate::{adapter::substitute_package_id, programmable_transactions::context::*};
+    use crate::adapter::substitute_package_id;
+    use crate::programmable_transactions::context::*;
 
     pub fn execute<Mode: ExecutionMode>(
         protocol_config: &ProtocolConfig,
@@ -88,8 +76,15 @@ mod checked {
         pt: ProgrammableTransaction,
     ) -> Result<Mode::ExecutionResults, ExecutionError> {
         let ProgrammableTransaction { inputs, commands } = pt;
-        let mut context =
-            ExecutionContext::new(protocol_config, metrics, vm, state_view, tx_context, gas_charger, inputs)?;
+        let mut context = ExecutionContext::new(
+            protocol_config,
+            metrics,
+            vm,
+            state_view,
+            tx_context,
+            gas_charger,
+            inputs,
+        )?;
         // execute commands
         let mut mode_results = Mode::empty_results();
         for (idx, command) in commands.into_iter().enumerate() {
@@ -126,19 +121,33 @@ mod checked {
         let results = match command {
             Command::MakeMoveVec(tag_opt, args) if args.is_empty() => {
                 let Some(tag) = tag_opt else {
-                    invariant_violation!("input checker ensures if args are empty, there is a type specified");
+                    invariant_violation!(
+                        "input checker ensures if args are empty, there is a type specified"
+                    );
                 };
 
                 // SAFETY: Preserving existing behaviour for identifier deserialization within type
                 // tags and inputs.
                 let tag = unsafe { tag.into_type_tag_unchecked() };
 
-                let elem_ty = context.load_type(&tag).map_err(|e| context.convert_vm_error(e))?;
+                let elem_ty = context
+                    .load_type(&tag)
+                    .map_err(|e| context.convert_vm_error(e))?;
                 let ty = Type::Vector(Box::new(elem_ty));
-                let abilities = context.session.get_type_abilities(&ty).map_err(|e| context.convert_vm_error(e))?;
+                let abilities = context
+                    .session
+                    .get_type_abilities(&ty)
+                    .map_err(|e| context.convert_vm_error(e))?;
                 // BCS layout for any empty vector should be the same
                 let bytes = bcs::to_bytes::<Vec<u8>>(&vec![]).unwrap();
-                vec![Value::Raw(RawValueType::Loaded { ty, abilities, used_in_non_entry_move_call: false }, bytes)]
+                vec![Value::Raw(
+                    RawValueType::Loaded {
+                        ty,
+                        abilities,
+                        used_in_non_entry_move_call: false,
+                    },
+                    bytes,
+                )]
             }
             Command::MakeMoveVec(tag_opt, args) => {
                 let mut res = vec![];
@@ -150,14 +159,17 @@ mod checked {
                         // tags and inputs.
                         let tag = unsafe { tag.into_type_tag_unchecked() };
 
-                        let elem_ty = context.load_type(&tag).map_err(|e| context.convert_vm_error(e))?;
+                        let elem_ty = context
+                            .load_type(&tag)
+                            .map_err(|e| context.convert_vm_error(e))?;
                         (false, elem_ty)
                     }
                     // If no tag specified, it _must_ be an object
                     None => {
                         // empty args covered above
                         let (idx, arg) = arg_iter.next().unwrap();
-                        let obj: ObjectValue = context.by_value_arg(CommandKind::MakeMoveVec, idx, arg)?;
+                        let obj: ObjectValue =
+                            context.by_value_arg(CommandKind::MakeMoveVec, idx, arg)?;
                         obj.write_bcs_bytes(&mut res);
                         (obj.used_in_non_entry_move_call, obj.type_)
                     }
@@ -165,12 +177,23 @@ mod checked {
                 for (idx, arg) in arg_iter {
                     let value: Value = context.by_value_arg(CommandKind::MakeMoveVec, idx, arg)?;
                     check_param_type::<Mode>(context, idx, &value, &elem_ty)?;
-                    used_in_non_entry_move_call = used_in_non_entry_move_call || value.was_used_in_non_entry_move_call();
+                    used_in_non_entry_move_call =
+                        used_in_non_entry_move_call || value.was_used_in_non_entry_move_call();
                     value.write_bcs_bytes(&mut res);
                 }
                 let ty = Type::Vector(Box::new(elem_ty));
-                let abilities = context.session.get_type_abilities(&ty).map_err(|e| context.convert_vm_error(e))?;
-                vec![Value::Raw(RawValueType::Loaded { ty, abilities, used_in_non_entry_move_call }, res)]
+                let abilities = context
+                    .session
+                    .get_type_abilities(&ty)
+                    .map_err(|e| context.convert_vm_error(e))?;
+                vec![Value::Raw(
+                    RawValueType::Loaded {
+                        ty,
+                        abilities,
+                        used_in_non_entry_move_call,
+                    },
+                    res,
+                )]
             }
             Command::TransferObjects(objs, addr_arg) => {
                 let objs: Vec<ObjectValue> = objs
@@ -178,7 +201,8 @@ mod checked {
                     .enumerate()
                     .map(|(idx, arg)| context.by_value_arg(CommandKind::TransferObjects, idx, arg))
                     .collect::<Result<_, _>>()?;
-                let addr: SuiAddress = context.by_value_arg(CommandKind::TransferObjects, objs.len(), addr_arg)?;
+                let addr: SuiAddress =
+                    context.by_value_arg(CommandKind::TransferObjects, objs.len(), addr_arg)?;
                 for obj in objs {
                     obj.ensure_public_transfer_eligible()?;
                     context.transfer_object(obj, addr)?;
@@ -188,16 +212,20 @@ mod checked {
             Command::SplitCoins(coin_arg, amount_args) => {
                 let mut obj: ObjectValue = context.borrow_arg_mut(0, coin_arg)?;
                 let ObjectContents::Coin(coin) = &mut obj.contents else {
-                    let e = ExecutionErrorKind::command_argument_error(CommandArgumentError::TypeMismatch, 0);
+                    let e = ExecutionErrorKind::command_argument_error(
+                        CommandArgumentError::TypeMismatch,
+                        0,
+                    );
                     let msg = "Expected a coin but got an non coin object".to_owned();
                     return Err(ExecutionError::new_with_source(e, msg));
                 };
                 let split_coins = amount_args
                     .into_iter()
                     .map(|amount_arg| {
-                        let amount: u64 = context.by_value_arg(CommandKind::SplitCoins, 1, amount_arg)?;
+                        let amount: u64 =
+                            context.by_value_arg(CommandKind::SplitCoins, 1, amount_arg)?;
                         let new_coin_id = context.fresh_id()?;
-                        let new_coin = coin.split(amount, UID::new(new_coin_id))?;
+                        let new_coin = coin.split(amount, new_coin_id)?;
                         let coin_type = obj.type_.clone();
                         // safe because we are propagating the coin type, and relying on the internal
                         // invariant that coin values have a coin type
@@ -211,7 +239,10 @@ mod checked {
             Command::MergeCoins(target_arg, coin_args) => {
                 let mut target: ObjectValue = context.borrow_arg_mut(0, target_arg)?;
                 let ObjectContents::Coin(target_coin) = &mut target.contents else {
-                    let e = ExecutionErrorKind::command_argument_error(CommandArgumentError::TypeMismatch, 0);
+                    let e = ExecutionErrorKind::command_argument_error(
+                        CommandArgumentError::TypeMismatch,
+                        0,
+                    );
                     let msg = "Expected a coin but got an non coin object".to_owned();
                     return Err(ExecutionError::new_with_source(e, msg));
                 };
@@ -238,11 +269,21 @@ mod checked {
                     context.delete_id(*id.object_id())?;
                     target_coin.add(balance)?;
                 }
-                context.restore_arg::<Mode>(&mut argument_updates, target_arg, Value::Object(target))?;
+                context.restore_arg::<Mode>(
+                    &mut argument_updates,
+                    target_arg,
+                    Value::Object(target),
+                )?;
                 vec![]
             }
             Command::MoveCall(move_call) => {
-                let ProgrammableMoveCall { package, module, function, type_arguments, arguments } = *move_call;
+                let ProgrammableMoveCall {
+                    package,
+                    module,
+                    function,
+                    type_arguments,
+                    arguments,
+                } = *move_call;
 
                 // SAFETY: Preserving existing behaviour for identifier deserialization.
                 let module = unsafe { Identifier::new_unchecked(module) };
@@ -255,7 +296,9 @@ mod checked {
                     // tags and inputs.
                     let type_arg = unsafe { type_arg.into_type_tag_unchecked() };
 
-                    let ty = context.load_type(&type_arg).map_err(|e| context.convert_type_argument_error(ix, e))?;
+                    let ty = context
+                        .load_type(&type_arg)
+                        .map_err(|e| context.convert_type_argument_error(ix, e))?;
                     loaded_type_arguments.push(ty);
                 }
 
@@ -278,7 +321,13 @@ mod checked {
                 execute_move_publish::<Mode>(context, &mut argument_updates, modules, dep_ids)?
             }
             Command::Upgrade(modules, dep_ids, current_package_id, upgrade_ticket) => {
-                execute_move_upgrade::<Mode>(context, modules, dep_ids, current_package_id, upgrade_ticket)?
+                execute_move_upgrade::<Mode>(
+                    context,
+                    modules,
+                    dep_ids,
+                    current_package_id,
+                    upgrade_ticket,
+                )?
             }
         };
 
@@ -298,15 +347,38 @@ mod checked {
         is_init: bool,
     ) -> Result<Vec<Value>, ExecutionError> {
         // check that the function is either an entry function or a valid public function
-        let LoadedFunctionInfo { kind, signature, return_value_kinds, index, last_instr } =
-            check_visibility_and_signature::<Mode>(context, module_id, function, &type_arguments, is_init)?;
+        let LoadedFunctionInfo {
+            kind,
+            signature,
+            return_value_kinds,
+            index,
+            last_instr,
+        } = check_visibility_and_signature::<Mode>(
+            context,
+            module_id,
+            function,
+            &type_arguments,
+            is_init,
+        )?;
         // build the arguments, storing meta data about by-mut-ref args
         let (tx_context_kind, by_mut_ref, serialized_arguments) =
             build_move_args::<Mode>(context, module_id, function, kind, &signature, &arguments)?;
         // invoke the VM
-        let SerializedReturnValues { mutable_reference_outputs, return_values } =
-            vm_move_call(context, module_id, function, type_arguments, tx_context_kind, serialized_arguments)?;
-        assert_invariant!(by_mut_ref.len() == mutable_reference_outputs.len(), "lost mutable input");
+        let SerializedReturnValues {
+            mutable_reference_outputs,
+            return_values,
+        } = vm_move_call(
+            context,
+            module_id,
+            function,
+            type_arguments,
+            tx_context_kind,
+            serialized_arguments,
+        )?;
+        assert_invariant!(
+            by_mut_ref.len() == mutable_reference_outputs.len(),
+            "lost mutable input"
+        );
 
         context.take_user_events(module_id, index, last_instr)?;
 
@@ -321,7 +393,9 @@ mod checked {
             argument_updates,
             &arguments,
             used_in_non_entry_move_call,
-            mutable_reference_outputs.into_iter().map(|(i, bytes, _layout)| (i, bytes)),
+            mutable_reference_outputs
+                .into_iter()
+                .map(|(i, bytes, _layout)| (i, bytes)),
             by_mut_ref,
             return_values.into_iter().map(|(bytes, _layout)| bytes),
             return_value_kinds,
@@ -353,7 +427,9 @@ mod checked {
             .zip(return_value_kinds)
             .map(|(bytes, kind)| {
                 // only non entry functions have return values
-                make_value(context, kind, bytes, /* used_in_non_entry_move_call */ true)
+                make_value(
+                    context, kind, bytes, /* used_in_non_entry_move_call */ true,
+                )
             })
             .collect()
     }
@@ -365,7 +441,10 @@ mod checked {
         used_in_non_entry_move_call: bool,
     ) -> Result<Value, ExecutionError> {
         Ok(match value_info {
-            ValueKind::Object { type_, has_public_transfer } => Value::Object(make_object_value(
+            ValueKind::Object {
+                type_,
+                has_public_transfer,
+            } => Value::Object(make_object_value(
                 context.vm,
                 &mut context.session,
                 type_,
@@ -373,9 +452,14 @@ mod checked {
                 used_in_non_entry_move_call,
                 &bytes,
             )?),
-            ValueKind::Raw(ty, abilities) => {
-                Value::Raw(RawValueType::Loaded { ty, abilities, used_in_non_entry_move_call }, bytes)
-            }
+            ValueKind::Raw(ty, abilities) => Value::Raw(
+                RawValueType::Loaded {
+                    ty,
+                    abilities,
+                    used_in_non_entry_move_call,
+                },
+                bytes,
+            ),
         })
     }
 
@@ -387,8 +471,13 @@ mod checked {
         module_bytes: Vec<Vec<u8>>,
         dep_ids: Vec<ObjectID>,
     ) -> Result<Vec<Value>, ExecutionError> {
-        assert_invariant!(!module_bytes.is_empty(), "empty package is checked in transaction input checker");
-        context.gas_charger.charge_publish_package(module_bytes.iter().map(|v| v.len()).sum())?;
+        assert_invariant!(
+            !module_bytes.is_empty(),
+            "empty package is checked in transaction input checker"
+        );
+        context
+            .gas_charger
+            .charge_publish_package(module_bytes.iter().map(|v| v.len()).sum())?;
 
         let mut modules = deserialize_modules::<Mode>(context, &module_bytes)?;
 
@@ -411,7 +500,8 @@ mod checked {
         // affects the order in which error cases are checked.
         let package_obj = if context.protocol_config.package_upgrades_supported() {
             let dependencies = fetch_packages(context, &dep_ids)?;
-            let package_obj = context.new_package(&modules, dependencies.iter().map(|p| p.move_package()))?;
+            let package_obj =
+                context.new_package(&modules, dependencies.iter().map(|p| p.move_package()))?;
 
             let Some(package) = package_obj.data.try_as_package() else {
                 invariant_violation!("Newly created package object is not a package");
@@ -429,7 +519,8 @@ mod checked {
             // required to maintain backwards compatibility.
             publish_and_verify_modules(context, runtime_id, &modules)?;
             let dependencies = fetch_packages(context, &dep_ids)?;
-            let package = context.new_package(&modules, dependencies.iter().map(|p| p.move_package()))?;
+            let package =
+                context.new_package(&modules, dependencies.iter().map(|p| p.move_package()))?;
             init_modules::<Mode>(context, argument_updates, &modules)?;
             package
         };
@@ -466,7 +557,10 @@ mod checked {
             .check_package_upgrades_supported()
             .map_err(|_| ExecutionError::from_kind(ExecutionErrorKind::FeatureNotYetSupported))?;
 
-        assert_invariant!(!module_bytes.is_empty(), "empty package is checked in transaction input checker");
+        assert_invariant!(
+            !module_bytes.is_empty(),
+            "empty package is checked in transaction input checker"
+        );
 
         let upgrade_ticket_type = context
             .load_type(&TypeTag::Struct(Box::new(UpgradeTicket::type_())))
@@ -477,7 +571,8 @@ mod checked {
 
         let upgrade_ticket: UpgradeTicket = {
             let mut ticket_bytes = Vec::new();
-            let ticket_val: Value = context.by_value_arg(CommandKind::Upgrade, 0, upgrade_ticket_arg)?;
+            let ticket_val: Value =
+                context.by_value_arg(CommandKind::Upgrade, 0, upgrade_ticket_arg)?;
             check_param_type::<Mode>(context, 0, &ticket_val, &upgrade_ticket_type)?;
             ticket_val.write_bcs_bytes(&mut ticket_bytes);
             bcs::from_bytes(&ticket_bytes).map_err(|_| {
@@ -490,12 +585,14 @@ mod checked {
 
         // Make sure the passed-in package ID matches the package ID in the `upgrade_ticket`.
         if current_package_id != upgrade_ticket.package.bytes {
-            return Err(ExecutionError::from_kind(ExecutionErrorKind::PackageUpgradeError {
-                upgrade_error: PackageUpgradeError::PackageIDDoesNotMatch {
-                    package_id: current_package_id,
-                    ticket_id: upgrade_ticket.package.bytes,
+            return Err(ExecutionError::from_kind(
+                ExecutionErrorKind::PackageUpgradeError {
+                    upgrade_error: PackageUpgradeError::PackageIDDoesNotMatch {
+                        package_id: current_package_id,
+                        ticket_id: upgrade_ticket.package.bytes,
+                    },
                 },
-            }));
+            ));
         }
 
         // Check digest.
@@ -506,9 +603,13 @@ mod checked {
         )
         .to_vec();
         if computed_digest != upgrade_ticket.digest {
-            return Err(ExecutionError::from_kind(ExecutionErrorKind::PackageUpgradeError {
-                upgrade_error: PackageUpgradeError::DigestDoesNotMatch { digest: computed_digest },
-            }));
+            return Err(ExecutionError::from_kind(
+                ExecutionErrorKind::PackageUpgradeError {
+                    upgrade_error: PackageUpgradeError::DigestDoesNotMatch {
+                        digest: computed_digest,
+                    },
+                },
+            ));
         }
 
         // Check that this package ID points to a package and get the package we're upgrading.
@@ -534,8 +635,16 @@ mod checked {
         };
 
         // Populate loader with all previous types.
-        if !context.protocol_config.disallow_adding_abilities_on_upgrade() {
-            for TypeOrigin { module_name, datatype_name, package: origin } in package.type_origin_table() {
+        if !context
+            .protocol_config
+            .disallow_adding_abilities_on_upgrade()
+        {
+            for TypeOrigin {
+                module_name,
+                datatype_name,
+                package: origin,
+            } in package.type_origin_table()
+            {
                 if package.id() == *origin {
                     continue;
                 }
@@ -562,7 +671,12 @@ mod checked {
         context.reset_linkage();
         res?;
 
-        check_compatibility(context, current_package.move_package(), &modules, upgrade_ticket.policy)?;
+        check_compatibility(
+            context,
+            current_package.move_package(),
+            &modules,
+            upgrade_ticket.policy,
+        )?;
 
         context.write_package(package_obj)?;
         Ok(vec![Value::Raw(
@@ -583,21 +697,32 @@ mod checked {
     ) -> Result<(), ExecutionError> {
         // Make sure this is a known upgrade policy.
         let Ok(policy) = UpgradePolicy::try_from(policy) else {
-            return Err(ExecutionError::from_kind(ExecutionErrorKind::PackageUpgradeError {
-                upgrade_error: PackageUpgradeError::UnknownUpgradePolicy { policy },
-            }));
+            return Err(ExecutionError::from_kind(
+                ExecutionErrorKind::PackageUpgradeError {
+                    upgrade_error: PackageUpgradeError::UnknownUpgradePolicy { policy },
+                },
+            ));
         };
 
         let binary_config = to_binary_config(context.protocol_config);
-        let Ok(current_normalized) = existing_package.normalize(&binary_config) else {
+        let pool = &mut normalized::RcPool::new();
+        let Ok(current_normalized) =
+            existing_package.normalize(pool, &binary_config, /* include code */ true)
+        else {
             invariant_violation!("Tried to normalize modules in existing package but failed")
         };
 
-        let mut new_normalized = normalize_deserialized_modules(upgrading_modules.into_iter());
+        let mut new_normalized = normalize_deserialized_modules(
+            pool,
+            upgrading_modules.into_iter(),
+            /* include code */ true,
+        );
         for (name, cur_module) in current_normalized {
             let Some(new_module) = new_normalized.remove(&name) else {
                 return Err(ExecutionError::new_with_source(
-                    ExecutionErrorKind::PackageUpgradeError { upgrade_error: PackageUpgradeError::IncompatibleUpgrade },
+                    ExecutionErrorKind::PackageUpgradeError {
+                        upgrade_error: PackageUpgradeError::IncompatibleUpgrade,
+                    },
                     format!("Existing module {name} not found in next version of package"),
                 ));
             };
@@ -611,18 +736,19 @@ mod checked {
     fn check_module_compatibility(
         policy: &UpgradePolicy,
         protocol_config: &ProtocolConfig,
-        cur_module: &normalized::Module,
-        new_module: &normalized::Module,
+        cur_module: &move_binary_format::compatibility::Module,
+        new_module: &move_binary_format::compatibility::Module,
     ) -> Result<(), ExecutionError> {
         match policy {
             UpgradePolicy::Additive => InclusionCheck::Subset.check(cur_module, new_module),
             UpgradePolicy::DepOnly => InclusionCheck::Equal.check(cur_module, new_module),
             UpgradePolicy::Compatible => {
-                let disallowed_new_abilities = if protocol_config.disallow_adding_abilities_on_upgrade() {
-                    AbilitySet::ALL
-                } else {
-                    AbilitySet::EMPTY
-                };
+                let disallowed_new_abilities =
+                    if protocol_config.disallow_adding_abilities_on_upgrade() {
+                        AbilitySet::ALL
+                    } else {
+                        AbilitySet::EMPTY
+                    };
 
                 let compatibility = Compatibility {
                     check_datatype_layout: true,
@@ -635,7 +761,9 @@ mod checked {
         }
         .map_err(|e| {
             ExecutionError::new_with_source(
-                ExecutionErrorKind::PackageUpgradeError { upgrade_error: PackageUpgradeError::IncompatibleUpgrade },
+                ExecutionErrorKind::PackageUpgradeError {
+                    upgrade_error: PackageUpgradeError::IncompatibleUpgrade,
+                },
                 e,
             )
         })
@@ -652,9 +780,9 @@ mod checked {
         );
         match fetched_packages.pop() {
             Some(pkg) => Ok(pkg),
-            None => {
-                invariant_violation!("We should always fetch a package for each object or return a dependency error.")
-            }
+            None => invariant_violation!(
+                "We should always fetch a package for each object or return a dependency error."
+            ),
         }
     }
 
@@ -664,13 +792,23 @@ mod checked {
     ) -> Result<Vec<PackageObject>, ExecutionError> {
         let package_ids: BTreeSet<_> = package_ids.into_iter().collect();
         match get_package_objects(&context.state_view, package_ids) {
-            Err(e) => Err(ExecutionError::new_with_source(ExecutionErrorKind::PublishUpgradeMissingDependency, e)),
+            Err(e) => Err(ExecutionError::new_with_source(
+                ExecutionErrorKind::PublishUpgradeMissingDependency,
+                e,
+            )),
             Ok(Err(missing_deps)) => {
                 let msg = format!(
                     "Missing dependencies: {}",
-                    missing_deps.into_iter().map(|dep| format!("{}", dep)).collect::<Vec<_>>().join(", ")
+                    missing_deps
+                        .into_iter()
+                        .map(|dep| format!("{}", dep))
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 );
-                Err(ExecutionError::new_with_source(ExecutionErrorKind::PublishUpgradeMissingDependency, msg))
+                Err(ExecutionError::new_with_source(
+                    ExecutionErrorKind::PublishUpgradeMissingDependency,
+                    msg,
+                ))
             }
             Ok(Ok(pkgs)) => Ok(pkgs),
         }
@@ -691,7 +829,7 @@ mod checked {
         match tx_context_kind {
             TxContextKind::None => (),
             TxContextKind::Mutable | TxContextKind::Immutable => {
-                serialized_arguments.push(context.tx_context.to_vec());
+                serialized_arguments.push(context.tx_context.to_bcs_legacy_context());
             }
         }
         // script visibility checked manually for entry points
@@ -702,7 +840,7 @@ mod checked {
                 function,
                 type_arguments,
                 serialized_arguments,
-                context.gas_charger.move_gas_status_mut(),
+                &mut SuiGasMeter(context.gas_charger.move_gas_status_mut()),
             )
             .map_err(|e| context.convert_vm_error(e))?;
 
@@ -717,8 +855,10 @@ mod checked {
             let Some((_, ctx_bytes, _)) = result.mutable_reference_outputs.pop() else {
                 invariant_violation!("Missing TxContext in reference outputs");
             };
-            let updated_ctx: TxContext = bcs::from_bytes(&ctx_bytes).map_err(|e| {
-                ExecutionError::invariant_violation(format!("Unable to deserialize TxContext bytes. {e}"))
+            let updated_ctx: MoveLegacyTxContext = bcs::from_bytes(&ctx_bytes).map_err(|e| {
+                ExecutionError::invariant_violation(format!(
+                    "Unable to deserialize TxContext bytes. {e}"
+                ))
             })?;
             context.tx_context.update_state(updated_ctx)?;
         }
@@ -734,12 +874,16 @@ mod checked {
         let modules = module_bytes
             .iter()
             .map(|b| {
-                CompiledModule::deserialize_with_config(b, &binary_config).map_err(|e| e.finish(Location::Undefined))
+                CompiledModule::deserialize_with_config(b, &binary_config)
+                    .map_err(|e| e.finish(Location::Undefined))
             })
             .collect::<VMResult<Vec<CompiledModule>>>()
             .map_err(|e| context.convert_vm_error(e))?;
 
-        assert_invariant!(!modules.is_empty(), "input checker ensures package is not empty");
+        assert_invariant!(
+            !modules.is_empty(),
+            "input checker ensures package is not empty"
+        );
 
         Ok(modules)
     }
@@ -765,7 +909,7 @@ mod checked {
                 AccountAddress::from(package_id),
                 // TODO: publish_module_bundle() currently doesn't charge gas.
                 // Do we want to charge there?
-                context.gas_charger.move_gas_status_mut(),
+                &mut SuiGasMeter(context.gas_charger.move_gas_status_mut()),
             )
             .map_err(|e| context.convert_vm_error(e))?;
 
@@ -773,7 +917,11 @@ mod checked {
         for module in modules {
             // Run Sui bytecode verifier, which runs some additional checks that assume the Move
             // bytecode verifier has passed.
-            sui_verifier::verifier::sui_verify_module_unmetered(context.protocol_config, module, &BTreeMap::new())?;
+            sui_verifier::verifier::sui_verify_module_unmetered(
+                context.protocol_config,
+                module,
+                &BTreeMap::new(),
+            )?;
         }
 
         Ok(())
@@ -806,7 +954,10 @@ mod checked {
                 /* is_init */ true,
             )?;
 
-            assert_invariant!(return_values.is_empty(), "init should not have return values")
+            assert_invariant!(
+                return_values.is_empty(),
+                "init should not have return values"
+            )
         }
 
         Ok(())
@@ -827,7 +978,10 @@ mod checked {
 
     /// Used to remember type information about a type when resolving the signature
     enum ValueKind {
-        Object { type_: MoveObjectType, has_public_transfer: bool },
+        Object {
+            type_: MoveObjectType,
+            has_public_transfer: bool,
+        },
         Raw(Type, AbilitySet),
     }
 
@@ -859,8 +1013,13 @@ mod checked {
             // the session is weird and does not load the module on publishing. This is a temporary
             // work around, since loading the function through the session will cause the module
             // to be loaded through the sessions data store.
-            let result = context.session.load_function(module_id, function, type_arguments);
-            assert_invariant!(result.is_ok(), "The modules init should be able to be loaded");
+            let result = context
+                .session
+                .load_function(module_id, function, type_arguments);
+            assert_invariant!(
+                result.is_ok(),
+                "The modules init should be able to be loaded"
+            );
         }
         let module = context
             .vm
@@ -870,11 +1029,16 @@ mod checked {
             .function_defs
             .iter()
             .enumerate()
-            .find(|(_index, fdef)| module.identifier_at(module.function_handle_at(fdef.function).name) == function)
+            .find(|(_index, fdef)| {
+                module.identifier_at(module.function_handle_at(fdef.function).name) == function
+            })
         else {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::FunctionNotFound,
-                format!("Could not resolve function '{}' in module {}", function, &module_id,),
+                format!(
+                    "Could not resolve function '{}' in module {}",
+                    function, &module_id,
+                ),
             ));
         };
 
@@ -886,16 +1050,25 @@ mod checked {
             ));
         }
 
-        let last_instr: CodeOffset = fdef.code.as_ref().map(|code| code.code.len() - 1).unwrap_or(0) as CodeOffset;
+        let last_instr: CodeOffset = fdef
+            .code
+            .as_ref()
+            .map(|code| code.code.len() - 1)
+            .unwrap_or(0) as CodeOffset;
         let function_kind = match (fdef.visibility, fdef.is_entry) {
             (Visibility::Private | Visibility::Friend, true) => FunctionKind::PrivateEntry,
             (Visibility::Public, true) => FunctionKind::PublicEntry,
             (Visibility::Public, false) => FunctionKind::NonEntry,
             (Visibility::Private, false) if from_init => {
-                assert_invariant!(function == INIT_FN_NAME, "module init specified non-init function");
+                assert_invariant!(
+                    function == INIT_FN_NAME,
+                    "module init specified non-init function"
+                );
                 FunctionKind::Init
             }
-            (Visibility::Private | Visibility::Friend, false) if Mode::allow_arbitrary_function_calls() => {
+            (Visibility::Private | Visibility::Friend, false)
+                if Mode::allow_arbitrary_function_calls() =>
+            {
                 FunctionKind::NonEntry
             }
             (Visibility::Private | Visibility::Friend, false) => {
@@ -909,10 +1082,14 @@ mod checked {
             .session
             .load_function(module_id, function, type_arguments)
             .map_err(|e| context.convert_vm_error(e))?;
-        let signature = subst_signature(signature, type_arguments).map_err(|e| context.convert_vm_error(e))?;
+        let signature =
+            subst_signature(signature, type_arguments).map_err(|e| context.convert_vm_error(e))?;
         let return_value_kinds = match function_kind {
             FunctionKind::Init => {
-                assert_invariant!(signature.return_.is_empty(), "init functions must have no return values");
+                assert_invariant!(
+                    signature.return_.is_empty(),
+                    "init functions must have no return values"
+                );
                 vec![]
             }
             FunctionKind::PrivateEntry | FunctionKind::PublicEntry | FunctionKind::NonEntry => {
@@ -934,7 +1111,10 @@ mod checked {
         signature: LoadedFunctionInstantiation,
         type_arguments: &[Type],
     ) -> VMResult<LoadedFunctionInstantiation> {
-        let LoadedFunctionInstantiation { parameters, return_ } = signature;
+        let LoadedFunctionInstantiation {
+            parameters,
+            return_,
+        } = signature;
         let parameters = parameters
             .into_iter()
             .map(|ty| ty.subst(type_arguments))
@@ -945,7 +1125,10 @@ mod checked {
             .map(|ty| ty.subst(type_arguments))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
-        Ok(LoadedFunctionInstantiation { parameters, return_ })
+        Ok(LoadedFunctionInstantiation {
+            parameters,
+            return_,
+        })
     }
 
     /// Checks that the non-entry function does not return references. And marks the return values
@@ -963,24 +1146,32 @@ mod checked {
             .map(|(idx, return_type)| {
                 let return_type = match return_type {
                     // for dev-inspect, just dereference the value
-                    Type::Reference(inner) | Type::MutableReference(inner) if Mode::allow_arbitrary_values() => inner,
+                    Type::Reference(inner) | Type::MutableReference(inner)
+                        if Mode::allow_arbitrary_values() =>
+                    {
+                        inner
+                    }
                     Type::Reference(_) | Type::MutableReference(_) => {
-                        return Err(ExecutionError::from_kind(ExecutionErrorKind::InvalidPublicFunctionReturnType {
-                            idx: idx as u16,
-                        }))
+                        return Err(ExecutionError::from_kind(
+                            ExecutionErrorKind::InvalidPublicFunctionReturnType { idx: idx as u16 },
+                        ))
                     }
                     t => t,
                 };
-                let abilities =
-                    context.session.get_type_abilities(return_type).map_err(|e| context.convert_vm_error(e))?;
+                let abilities = context
+                    .session
+                    .get_type_abilities(return_type)
+                    .map_err(|e| context.convert_vm_error(e))?;
                 Ok(match return_type {
                     Type::MutableReference(_) | Type::Reference(_) => unreachable!(),
                     Type::TyParam(_) => {
                         invariant_violation!("TyParam should have been substituted")
                     }
                     Type::Datatype(_) | Type::DatatypeInstantiation(_) if abilities.has_key() => {
-                        let type_tag =
-                            context.session.get_type_tag(return_type).map_err(|e| context.convert_vm_error(e))?;
+                        let type_tag = context
+                            .session
+                            .get_type_tag(return_type)
+                            .map_err(|e| context.convert_vm_error(e))?;
                         let TypeTag::Struct(struct_tag) = type_tag else {
                             invariant_violation!("Struct type make a non struct type tag")
                         };
@@ -1016,24 +1207,34 @@ mod checked {
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, EVENT_MODULE) {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::NonEntryFunctionInvoked,
-                format!("Cannot directly call functions in one::{}", EVENT_MODULE),
+                format!("Cannot directly call functions in sui::{}", EVENT_MODULE),
             ));
         }
 
-        if module_ident == (&SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) && PRIVATE_TRANSFER_FUNCTIONS.contains(&function) {
+        if module_ident == (&SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE)
+            && PRIVATE_TRANSFER_FUNCTIONS.contains(&function)
+        {
             let msg = format!(
-                "Cannot directly call one::{m}::{f}. \
-            Use the public variant instead, one::{m}::public_{f}",
+                "Cannot directly call sui::{m}::{f}. \
+            Use the public variant instead, sui::{m}::public_{f}",
                 m = TRANSFER_MODULE,
                 f = function
             );
-            return Err(ExecutionError::new_with_source(ExecutionErrorKind::NonEntryFunctionInvoked, msg));
+            return Err(ExecutionError::new_with_source(
+                ExecutionErrorKind::NonEntryFunctionInvoked,
+                msg,
+            ));
         }
 
         Ok(())
     }
 
-    type ArgInfo = (TxContextKind, /* mut ref */ Vec<(LocalIndex, ValueKind)>, Vec<Vec<u8>>);
+    type ArgInfo = (
+        TxContextKind,
+        /* mut ref */
+        Vec<(LocalIndex, ValueKind)>,
+        Vec<Vec<u8>>,
+    );
 
     /// Serializes the arguments into BCS values for Move. Performs the necessary type checking for
     /// each value
@@ -1073,8 +1274,11 @@ mod checked {
         // check the types and remember which are by mutable ref
         let mut by_mut_ref = vec![];
         let mut serialized_args = Vec::with_capacity(num_args);
-        let command_kind =
-            CommandKind::MoveCall { package: (*module_id.address()).into(), module: module_id.name(), function };
+        let command_kind = CommandKind::MoveCall {
+            package: (*module_id.address()).into(),
+            module: module_id.name(),
+            function,
+        };
         // an init function can have one or two arguments, with the last one always being of type
         // &mut TxContext and the additional (first) one representing a one time witness type (see
         // one_time_witness verifier pass for additional explanation)
@@ -1088,16 +1292,29 @@ mod checked {
             let (value, non_ref_param_ty): (Value, &Type) = match param_ty {
                 Type::MutableReference(inner) => {
                     let value = context.borrow_arg_mut(idx, arg)?;
-                    let object_info = if let Value::Object(ObjectValue { type_, has_public_transfer, .. }) = &value {
-                        let type_tag = context.session.get_type_tag(type_).map_err(|e| context.convert_vm_error(e))?;
+                    let object_info = if let Value::Object(ObjectValue {
+                        type_,
+                        has_public_transfer,
+                        ..
+                    }) = &value
+                    {
+                        let type_tag = context
+                            .session
+                            .get_type_tag(type_)
+                            .map_err(|e| context.convert_vm_error(e))?;
                         let TypeTag::Struct(struct_tag) = type_tag else {
                             invariant_violation!("Struct type make a non struct type tag")
                         };
                         let type_ = (*struct_tag).into();
-                        ValueKind::Object { type_, has_public_transfer: *has_public_transfer }
+                        ValueKind::Object {
+                            type_,
+                            has_public_transfer: *has_public_transfer,
+                        }
                     } else {
-                        let abilities =
-                            context.session.get_type_abilities(inner).map_err(|e| context.convert_vm_error(e))?;
+                        let abilities = context
+                            .session
+                            .get_type_abilities(inner)
+                            .map_err(|e| context.convert_vm_error(e))?;
                         ValueKind::Raw((**inner).clone(), abilities)
                     };
                     by_mut_ref.push((idx as LocalIndex, object_info));
@@ -1109,10 +1326,15 @@ mod checked {
                     (value, t)
                 }
             };
-            if matches!(function_kind, FunctionKind::PrivateEntry | FunctionKind::Init)
-                && value.was_used_in_non_entry_move_call()
+            if matches!(
+                function_kind,
+                FunctionKind::PrivateEntry | FunctionKind::Init
+            ) && value.was_used_in_non_entry_move_call()
             {
-                return Err(command_argument_error(CommandArgumentError::InvalidArgumentToPrivateEntryFunction, idx));
+                return Err(command_argument_error(
+                    CommandArgumentError::InvalidArgumentToPrivateEntryFunction,
+                    idx,
+                ));
             }
             check_param_type::<Mode>(context, idx, &value, non_ref_param_ty)?;
             let bytes = {
@@ -1170,7 +1392,10 @@ mod checked {
             }
         };
         if ty != param_ty {
-            Err(command_argument_error(CommandArgumentError::TypeMismatch, idx))
+            Err(command_argument_error(
+                CommandArgumentError::TypeMismatch,
+                idx,
+            ))
         } else {
             Ok(())
         }
@@ -1179,13 +1404,20 @@ mod checked {
     fn get_datatype_ident(s: &CachedDatatype) -> (&AccountAddress, &IdentStr, &IdentStr) {
         let module_id = &s.defining_id;
         let struct_name = &s.name;
-        (module_id.address(), module_id.name(), struct_name.as_ident_str())
+        (
+            module_id.address(),
+            module_id.name(),
+            struct_name.as_ident_str(),
+        )
     }
 
     // Returns Some(kind) if the type is a reference to the TxnContext. kind being Mutable with
     // a MutableReference, and Immutable otherwise.
     // Returns None for all other types
-    pub fn is_tx_context(context: &mut ExecutionContext<'_, '_, '_>, t: &Type) -> Result<TxContextKind, ExecutionError> {
+    pub fn is_tx_context(
+        context: &mut ExecutionContext<'_, '_, '_>,
+        t: &Type,
+    ) -> Result<TxContextKind, ExecutionError> {
         let (is_mut, inner) = match t {
             Type::MutableReference(inner) => (true, inner),
             Type::Reference(inner) => (false, inner),
@@ -1194,7 +1426,9 @@ mod checked {
         let Type::Datatype(idx) = &**inner else {
             return Ok(TxContextKind::None);
         };
-        let Some(s) = context.session.get_struct_type(*idx) else { invariant_violation!("Loaded struct not found") };
+        let Some(s) = context.session.get_struct_type(*idx) else {
+            invariant_violation!("Loaded struct not found")
+        };
         let (module_addr, module_name, struct_name) = get_datatype_ident(&s);
         let is_tx_context_type = module_addr == &SUI_FRAMEWORK_ADDRESS
             && module_name == TX_CONTEXT_MODULE_NAME
@@ -1300,9 +1534,9 @@ mod checked {
         pub fn bcs_only(&self) -> bool {
             match self {
                 // have additional restrictions past BCS
-                PrimitiveArgumentLayout::Option(_) | PrimitiveArgumentLayout::Ascii | PrimitiveArgumentLayout::UTF8 => {
-                    false
-                }
+                PrimitiveArgumentLayout::Option(_)
+                | PrimitiveArgumentLayout::Ascii
+                | PrimitiveArgumentLayout::UTF8 => false,
                 // Move primitives are BCS compatible and do not need additional validation
                 PrimitiveArgumentLayout::Bool
                 | PrimitiveArgumentLayout::U8
@@ -1321,10 +1555,17 @@ mod checked {
     /// Checks the bytes against the `SpecialArgumentLayout` using `bcs`. It does not actually generate
     /// the deserialized value, only walks the bytes. While not necessary if the layout does not contain
     /// special arguments (e.g. Option or String) we check the BCS bytes for predictability
-    pub fn bcs_argument_validate(bytes: &[u8], idx: u16, layout: PrimitiveArgumentLayout) -> Result<(), ExecutionError> {
+    pub fn bcs_argument_validate(
+        bytes: &[u8],
+        idx: u16,
+        layout: PrimitiveArgumentLayout,
+    ) -> Result<(), ExecutionError> {
         bcs::from_bytes_seed(&layout, bytes).map_err(|_| {
             ExecutionError::new_with_source(
-                ExecutionErrorKind::command_argument_error(CommandArgumentError::InvalidBCSBytes, idx),
+                ExecutionErrorKind::command_argument_error(
+                    CommandArgumentError::InvalidBCSBytes,
+                    idx,
+                ),
                 format!("Function expects {layout} but provided argument's value does not match",),
             )
         })
@@ -1332,8 +1573,10 @@ mod checked {
 
     impl<'d> serde::de::DeserializeSeed<'d> for &PrimitiveArgumentLayout {
         type Value = ();
-
-        fn deserialize<D: serde::de::Deserializer<'d>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+        fn deserialize<D: serde::de::Deserializer<'d>>(
+            self,
+            deserializer: D,
+        ) -> Result<Self::Value, D::Error> {
             use serde::de::Error;
             match self {
                 PrimitiveArgumentLayout::Ascii => {
@@ -1348,8 +1591,12 @@ mod checked {
                     deserializer.deserialize_string(serde::de::IgnoredAny)?;
                     Ok(())
                 }
-                PrimitiveArgumentLayout::Option(layout) => deserializer.deserialize_option(OptionElementVisitor(layout)),
-                PrimitiveArgumentLayout::Vector(layout) => deserializer.deserialize_seq(VectorElementVisitor(layout)),
+                PrimitiveArgumentLayout::Option(layout) => {
+                    deserializer.deserialize_option(OptionElementVisitor(layout))
+                }
+                PrimitiveArgumentLayout::Vector(layout) => {
+                    deserializer.deserialize_seq(VectorElementVisitor(layout))
+                }
                 // primitive move value cases, which are hit to make sure the correct number of bytes
                 // are removed for elements of an option/vector
                 PrimitiveArgumentLayout::Bool => {
@@ -1390,7 +1637,7 @@ mod checked {
 
     struct VectorElementVisitor<'a>(&'a PrimitiveArgumentLayout);
 
-    impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
+    impl<'d> serde::de::Visitor<'d> for VectorElementVisitor<'_> {
         type Value = ();
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1408,7 +1655,7 @@ mod checked {
 
     struct OptionElementVisitor<'a>(&'a PrimitiveArgumentLayout);
 
-    impl<'d, 'a> serde::de::Visitor<'d> for OptionElementVisitor<'a> {
+    impl<'d> serde::de::Visitor<'d> for OptionElementVisitor<'_> {
         type Value = ();
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

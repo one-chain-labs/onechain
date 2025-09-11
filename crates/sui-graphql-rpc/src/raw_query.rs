@@ -41,7 +41,14 @@ pub(crate) struct RawQuery {
 impl RawQuery {
     /// Constructs a new `RawQuery` with the given `SELECT` clause and binds.
     pub(crate) fn new(select: impl Into<String>, binds: Vec<String>) -> Self {
-        Self { select: select.into(), where_: None, order_by: Vec::new(), group_by: Vec::new(), limit: None, binds }
+        Self {
+            select: select.into(),
+            where_: None,
+            order_by: Vec::new(),
+            group_by: Vec::new(),
+            limit: None,
+            binds,
+        }
     }
 
     /// Adds a `WHERE` condition to the query, combining it with existing conditions using `AND`.

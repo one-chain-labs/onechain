@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    *,
-};
-use move_binary_format::{errors::PartialVMResult, CompiledModule};
+use async_graphql::connection::{Connection, CursorType, Edge};
+use async_graphql::*;
+use move_binary_format::errors::PartialVMResult;
+use move_binary_format::CompiledModule;
+use sui_types::base_types::SequenceNumber;
+use sui_types::digests::ChainIdentifier as SuiChainIdentifier;
 use sui_types::{
-    base_types::SequenceNumber,
-    digests::{ChainIdentifier as SuiChainIdentifier, TransactionDigest},
+    digests::TransactionDigest,
     object::Object as NativeObject,
     transaction::{
         AuthenticatorStateExpire as NativeAuthenticatorStateExpireTransaction,
@@ -17,18 +17,15 @@ use sui_types::{
     },
 };
 
+use crate::consistency::ConsistentIndexCursor;
+use crate::types::cursor::{JsonCursor, Page};
+use crate::types::sui_address::SuiAddress;
+use crate::types::uint53::UInt53;
 use crate::{
-    consistency::ConsistentIndexCursor,
     error::Error,
     types::{
-        big_int::BigInt,
-        cursor::{JsonCursor, Page},
-        date_time::DateTime,
-        epoch::Epoch,
-        move_package::MovePackage,
+        big_int::BigInt, date_time::DateTime, epoch::Epoch, move_package::MovePackage,
         object::Object,
-        sui_address::SuiAddress,
-        uint53::UInt53,
     },
 };
 
@@ -48,6 +45,8 @@ pub(crate) enum EndOfEpochTransactionKind {
     CoinDenyListStateCreate(CoinDenyListStateCreateTransaction),
     BridgeStateCreate(BridgeStateCreateTransaction),
     BridgeCommitteeInit(BridgeCommitteeInitTransaction),
+    StoreExecutionTimeObservations(StoreExecutionTimeObservationsTransaction),
+    AccumulatorRootCreate(AccumulatorRootCreateTransaction),
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -100,6 +99,20 @@ pub(crate) struct BridgeCommitteeInitTransaction {
     pub checkpoint_viewed_at: u64,
 }
 
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub(crate) struct StoreExecutionTimeObservationsTransaction {
+    /// A workaround to define an empty variant of a GraphQL union.
+    #[graphql(name = "_")]
+    dummy: Option<bool>,
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub(crate) struct AccumulatorRootCreateTransaction {
+    /// A workaround to define an empty variant of a GraphQL union.
+    #[graphql(name = "_")]
+    dummy: Option<bool>,
+}
+
 pub(crate) type CTxn = JsonCursor<ConsistentIndexCursor>;
 pub(crate) type CPackage = JsonCursor<ConsistentIndexCursor>;
 
@@ -147,7 +160,9 @@ impl EndOfEpochTransaction {
 impl ChangeEpochTransaction {
     /// The next (to become) epoch.
     async fn epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at).await.extend()
+        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at)
+            .await
+            .extend()
     }
 
     /// The protocol version in effect in the new epoch.
@@ -195,8 +210,10 @@ impl ChangeEpochTransaction {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
         let mut connection = Connection::new(false, false);
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(self.native.system_packages.len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, _, cs)) = page.paginate_consistent_indices(
+            self.native.system_packages.len(),
+            self.checkpoint_viewed_at,
+        )?
         else {
             return Ok(connection);
         };
@@ -213,8 +230,12 @@ impl ChangeEpochTransaction {
                 .map_err(|e| Error::Internal(format!("Failed to deserialize system modules: {e}")))
                 .extend()?;
 
-            let native =
-                NativeObject::new_system_package(&compiled_modules, *version, deps.clone(), TransactionDigest::ZERO);
+            let native = NativeObject::new_system_package(
+                &compiled_modules,
+                *version,
+                deps.clone(),
+                TransactionDigest::ZERO,
+            );
 
             let runtime_id = native.id();
             let object = Object::from_native(SuiAddress::from(runtime_id), native, c.c, None);
@@ -233,12 +254,17 @@ impl ChangeEpochTransaction {
 impl AuthenticatorStateExpireTransaction {
     /// Expire JWKs that have a lower epoch than this.
     async fn min_epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native.min_epoch), self.checkpoint_viewed_at).await.extend()
+        Epoch::query(ctx, Some(self.native.min_epoch), self.checkpoint_viewed_at)
+            .await
+            .extend()
     }
 
     /// The initial version that the AuthenticatorStateUpdate was shared at.
     async fn authenticator_obj_initial_shared_version(&self) -> UInt53 {
-        self.native.authenticator_obj_initial_shared_version.value().into()
+        self.native
+            .authenticator_obj_initial_shared_version
+            .value()
+            .into()
     }
 }
 
@@ -262,22 +288,43 @@ impl EndOfEpochTransactionKind {
         use NativeEndOfEpochTransactionKind as N;
 
         match kind {
-            N::ChangeEpoch(ce) => K::ChangeEpoch(ChangeEpochTransaction { native: ce, checkpoint_viewed_at }),
+            N::ChangeEpoch(ce) => K::ChangeEpoch(ChangeEpochTransaction {
+                native: ce,
+                checkpoint_viewed_at,
+            }),
             N::AuthenticatorStateCreate => {
                 K::AuthenticatorStateCreate(AuthenticatorStateCreateTransaction { dummy: None })
             }
             N::AuthenticatorStateExpire(ase) => {
-                K::AuthenticatorStateExpire(AuthenticatorStateExpireTransaction { native: ase, checkpoint_viewed_at })
+                K::AuthenticatorStateExpire(AuthenticatorStateExpireTransaction {
+                    native: ase,
+                    checkpoint_viewed_at,
+                })
             }
-            N::RandomnessStateCreate => K::RandomnessStateCreate(RandomnessStateCreateTransaction { dummy: None }),
-            N::DenyListStateCreate => K::CoinDenyListStateCreate(CoinDenyListStateCreateTransaction { dummy: None }),
-            N::BridgeStateCreate(chain_id) => {
-                K::BridgeStateCreate(BridgeStateCreateTransaction { native: chain_id, checkpoint_viewed_at })
+            N::RandomnessStateCreate => {
+                K::RandomnessStateCreate(RandomnessStateCreateTransaction { dummy: None })
             }
-            N::BridgeCommitteeInit(bridge_shared_version) => K::BridgeCommitteeInit(BridgeCommitteeInitTransaction {
-                native: bridge_shared_version,
+            N::DenyListStateCreate => {
+                K::CoinDenyListStateCreate(CoinDenyListStateCreateTransaction { dummy: None })
+            }
+            N::BridgeStateCreate(chain_id) => K::BridgeStateCreate(BridgeStateCreateTransaction {
+                native: chain_id,
                 checkpoint_viewed_at,
             }),
+            N::BridgeCommitteeInit(bridge_shared_version) => {
+                K::BridgeCommitteeInit(BridgeCommitteeInitTransaction {
+                    native: bridge_shared_version,
+                    checkpoint_viewed_at,
+                })
+            }
+            N::StoreExecutionTimeObservations(_) => {
+                K::StoreExecutionTimeObservations(StoreExecutionTimeObservationsTransaction {
+                    dummy: None,
+                })
+            }
+            N::AccumulatorRootCreate => {
+                K::AccumulatorRootCreate(AccumulatorRootCreateTransaction { dummy: None })
+            }
         }
     }
 }

@@ -1,12 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    benchmark_context::BenchmarkContext,
-    command::WorkloadKind,
-    tx_generator::{MoveTxGenerator, PackagePublishTxGenerator, TxGenerator},
-};
-use std::{path::PathBuf, sync::Arc};
+use crate::benchmark_context::BenchmarkContext;
+use crate::command::WorkloadKind;
+use crate::tx_generator::{MoveTxGenerator, PackagePublishTxGenerator, TxGenerator};
+use std::path::PathBuf;
+use std::sync::Arc;
 use sui_test_transaction_builder::PublishData;
 
 #[derive(Clone)]
@@ -17,7 +16,10 @@ pub struct Workload {
 
 impl Workload {
     pub fn new(tx_count: u64, workload_kind: WorkloadKind) -> Self {
-        Self { tx_count, workload_kind }
+        Self {
+            tx_count,
+            workload_kind,
+        }
     }
 
     pub(crate) fn num_accounts(&self) -> u64 {
@@ -28,7 +30,10 @@ impl Workload {
         self.workload_kind.gas_object_num_per_account()
     }
 
-    pub(crate) async fn create_tx_generator(&self, ctx: &mut BenchmarkContext) -> Arc<dyn TxGenerator> {
+    pub(crate) async fn create_tx_generator(
+        &self,
+        ctx: &mut BenchmarkContext,
+    ) -> Arc<dyn TxGenerator> {
         match &self.workload_kind {
             WorkloadKind::PTB {
                 num_transfers,
@@ -43,8 +48,12 @@ impl Workload {
                 let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
                 path.extend(["move_package"]);
                 let move_package = ctx.publish_package(PublishData::Source(path, false)).await;
-                let root_objects = ctx.preparing_dynamic_fields(move_package.0, *num_dynamic_fields).await;
-                let shared_objects = ctx.prepare_shared_objects(move_package.0, *num_shared_objects).await;
+                let root_objects = ctx
+                    .preparing_dynamic_fields(move_package.0, *num_dynamic_fields)
+                    .await;
+                let shared_objects = ctx
+                    .prepare_shared_objects(move_package.0, *num_shared_objects)
+                    .await;
                 Arc::new(MoveTxGenerator::new(
                     move_package.0,
                     *num_transfers,
@@ -57,9 +66,9 @@ impl Workload {
                     *use_batch_mint,
                 ))
             }
-            WorkloadKind::Publish { manifest_file: manifest_path } => {
-                Arc::new(PackagePublishTxGenerator::new(ctx, manifest_path.clone()).await)
-            }
+            WorkloadKind::Publish {
+                manifest_file: manifest_path,
+            } => Arc::new(PackagePublishTxGenerator::new(ctx, manifest_path.clone()).await),
         }
     }
 }

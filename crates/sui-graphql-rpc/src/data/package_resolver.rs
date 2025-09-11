@@ -1,24 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{BTreeSet, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
 
 use async_graphql::dataloader::Loader;
 use async_trait::async_trait;
 use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use move_core_types::account_address::AccountAddress;
-use sui_indexer::{models::packages::StoredPackage, schema::packages};
+use sui_indexer::models::packages::StoredPackage;
+use sui_indexer::schema::packages;
+use sui_package_resolver::Resolver;
 use sui_package_resolver::{
-    error::Error as PackageResolverError,
-    Package,
-    PackageStore,
-    PackageStoreWithLruCache,
-    Resolver,
-    Result,
+    error::Error as PackageResolverError, Package, PackageStore, PackageStoreWithLruCache, Result,
 };
 
 use super::{DataLoader, Db, DbConnection, QueryExecutor};
@@ -56,8 +51,8 @@ impl PackageStore for DbPackageStore {
 
 #[async_trait::async_trait]
 impl Loader<PackageKey> for Db {
-    type Error = PackageResolverError;
     type Value = Arc<Package>;
+    type Error = PackageResolverError;
 
     async fn load(&self, keys: &[PackageKey]) -> Result<HashMap<PackageKey, Arc<Package>>> {
         use packages::dsl;
@@ -74,7 +69,10 @@ impl Loader<PackageKey> for Db {
                 .scope_boxed()
             })
             .await
-            .map_err(|e| PackageResolverError::Store { store: STORE, error: e.to_string() })?;
+            .map_err(|e| PackageResolverError::Store {
+                store: STORE,
+                error: e.to_string(),
+            })?;
 
         let mut id_to_package = HashMap::new();
         for stored_package in stored_packages {

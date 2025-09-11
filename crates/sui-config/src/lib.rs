@@ -1,29 +1,33 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Context, Result};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use anyhow::Context;
+use anyhow::Result;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use std::fs;
+use std::path::{Path, PathBuf};
 use tracing::trace;
 
 pub mod certificate_deny_config;
+pub mod dynamic_transaction_signing_checks;
 pub mod genesis;
 pub mod local_ip_utils;
 pub mod node;
 pub mod node_config_metrics;
 pub mod object_storage_config;
 pub mod p2p;
+pub mod rpc_config;
 pub mod transaction_deny_config;
+pub mod validator_client_monitor_config;
 pub mod verifier_signing_config;
 
 pub use node::{ConsensusConfig, ExecutionCacheConfig, NodeConfig};
+pub use rpc_config::{RpcConfig, RpcIndexInitConfig, RpcTlsConfig};
 use sui_types::multiaddr::Multiaddr;
 
 const SUI_DIR: &str = ".one";
-pub const SUI_CONFIG_DIR: &str = "one_config";
+pub const SUI_CONFIG_DIR: &str = "sui_config";
 pub const SUI_NETWORK_CONFIG: &str = "network.yaml";
 pub const SUI_FULLNODE_CONFIG: &str = "fullnode.yaml";
 pub const SUI_CLIENT_CONFIG: &str = "client.yaml";
@@ -91,13 +95,17 @@ where
     Self: DeserializeOwned + Serialize,
 {
     fn persisted(self, path: &Path) -> PersistedConfig<Self> {
-        PersistedConfig { inner: self, path: path.to_path_buf() }
+        PersistedConfig {
+            inner: self,
+            path: path.to_path_buf(),
+        }
     }
 
     fn load<P: AsRef<Path>>(path: P) -> Result<Self, anyhow::Error> {
         let path = path.as_ref();
         trace!("Reading config from {}", path.display());
-        let reader = fs::File::open(path).with_context(|| format!("Unable to load config from {}", path.display()))?;
+        let reader = fs::File::open(path)
+            .with_context(|| format!("Unable to load config from {}", path.display()))?;
         Ok(serde_yaml::from_reader(reader)?)
     }
 
@@ -105,7 +113,8 @@ where
         let path = path.as_ref();
         trace!("Writing config to {}", path.display());
         let config = serde_yaml::to_string(&self)?;
-        fs::write(path, config).with_context(|| format!("Unable to save config to {}", path.display()))?;
+        fs::write(path, config)
+            .with_context(|| format!("Unable to save config to {}", path.display()))?;
         Ok(())
     }
 }

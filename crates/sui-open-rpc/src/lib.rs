@@ -3,13 +3,12 @@
 
 extern crate core;
 
-use std::collections::{btree_map::Entry::Occupied, BTreeMap, HashMap};
+use std::collections::btree_map::Entry::Occupied;
+use std::collections::{BTreeMap, HashMap};
 
-use schemars::{
-    gen::{SchemaGenerator, SchemaSettings},
-    schema::SchemaObject,
-    JsonSchema,
-};
+use schemars::gen::{SchemaGenerator, SchemaSettings};
+use schemars::schema::SchemaObject;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use versions::Versioning;
@@ -50,12 +49,18 @@ impl Project {
                     url: Some(url.to_string()),
                     email: Some(email.to_string()),
                 }),
-                license: Some(License { name: license.to_string(), url: Some(license_url.to_string()) }),
+                license: Some(License {
+                    name: license.to_string(),
+                    url: Some(license_url.to_string()),
+                }),
                 version: version.to_owned(),
                 ..Default::default()
             },
             methods: vec![],
-            components: Components { content_descriptors: Default::default(), schemas: Default::default() },
+            components: Components {
+                content_descriptors: Default::default(),
+                schemas: Default::default(),
+            },
             method_routing: Default::default(),
         }
     }
@@ -66,7 +71,9 @@ impl Project {
         self.methods.sort_by(|m, n| m.name.cmp(&n.name));
 
         self.components.schemas.extend(module.components.schemas);
-        self.components.content_descriptors.extend(module.components.content_descriptors);
+        self.components
+            .content_descriptors
+            .extend(module.components.content_descriptors);
         self.method_routing.extend(module.method_routing);
     }
 
@@ -74,11 +81,19 @@ impl Project {
         for method in &mut self.methods {
             if let Occupied(entry) = example_provider.entry(method.name.clone()) {
                 let examples = entry.remove();
-                let param_names = method.params.iter().map(|p| p.name.clone()).collect::<Vec<_>>();
+                let param_names = method
+                    .params
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect::<Vec<_>>();
 
                 // Make sure example's parameters are correct.
                 for example in examples.iter() {
-                    let example_param_names = example.params.iter().map(|param| param.name.clone()).collect::<Vec<_>>();
+                    let example_param_names = example
+                        .params
+                        .iter()
+                        .map(|param| param.name.clone())
+                        .collect::<Vec<_>>();
                     assert_eq!(
                         param_names, example_param_names,
                         "Provided example parameters doesn't match the function parameters."
@@ -144,7 +159,11 @@ pub struct MethodRouting {
 
 impl MethodRouting {
     pub fn le(version: &str, route_to: &str) -> Self {
-        Self { min: None, max: Some(Versioning::new(version).unwrap()), route_to: route_to.to_string() }
+        Self {
+            min: None,
+            max: Some(Versioning::new(version).unwrap()),
+            route_to: route_to.to_string(),
+        }
     }
 
     pub fn eq(version: &str, route_to: &str) -> Self {
@@ -202,9 +221,19 @@ impl ExamplePairing {
             summary: None,
             params: params
                 .into_iter()
-                .map(|(name, value)| Example { name: name.to_string(), summary: None, description: None, value })
+                .map(|(name, value)| Example {
+                    name: name.to_string(),
+                    summary: None,
+                    description: None,
+                    value,
+                })
                 .collect(),
-            result: Example { name: "Result".to_string(), summary: None, description: None, value: result },
+            result: Example {
+                name: "Result".to_string(),
+                summary: None,
+                description: None,
+                value: result,
+            },
         }
     }
 }
@@ -230,7 +259,11 @@ struct Tag {
 
 impl Tag {
     pub fn new(name: &str) -> Self {
-        Self { name: name.to_string(), summary: None, description: None }
+        Self {
+            name: name.to_string(),
+            summary: None,
+            description: None,
+        }
     }
 }
 
@@ -306,7 +339,14 @@ impl RpcModuleDocBuilder {
         }
     }
 
-    pub fn add_method_routing(&mut self, namespace: &str, name: &str, route_to: &str, comparator: &str, version: &str) {
+    pub fn add_method_routing(
+        &mut self,
+        namespace: &str,
+        name: &str,
+        route_to: &str,
+        comparator: &str,
+        version: &str,
+    ) {
         let name = format!("{namespace}_{name}");
         let route_to = format!("{namespace}_{route_to}");
         let routing = match comparator {
@@ -359,17 +399,24 @@ impl RpcModuleDocBuilder {
         tags: Vec<Tag>,
         deprecated: bool,
     ) {
-        let description = if doc.trim().is_empty() { None } else { Some(doc.trim().to_string()) };
+        let description = if doc.trim().is_empty() {
+            None
+        } else {
+            Some(doc.trim().to_string())
+        };
         let name = format!("{}_{}", namespace, name);
-        self.methods.insert(name.clone(), Method {
-            name,
-            description,
-            params,
-            result,
-            tags,
-            examples: Vec::new(),
-            deprecated,
-        });
+        self.methods.insert(
+            name.clone(),
+            Method {
+                name,
+                description,
+                params,
+                result,
+                tags,
+                examples: Vec::new(),
+                deprecated,
+            },
+        );
     }
 
     pub fn create_content_descriptor<T: JsonSchema>(
@@ -380,7 +427,14 @@ impl RpcModuleDocBuilder {
         required: bool,
     ) -> ContentDescriptor {
         let schema = self.schema_generator.subschema_for::<T>().into_object();
-        ContentDescriptor { name: name.replace(' ', ""), summary, description, required, schema, deprecated: false }
+        ContentDescriptor {
+            name: name.replace(' ', ""),
+            summary,
+            description,
+            required,
+            schema,
+            deprecated: false,
+        }
     }
 }
 

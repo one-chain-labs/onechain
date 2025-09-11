@@ -4,11 +4,12 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use consensus_config::AuthorityIndex;
+use consensus_types::block::Round;
 use parking_lot::RwLock;
 
 use crate::{
     base_committer::BaseCommitter,
-    block::{Round, Slot, GENESIS_ROUND},
+    block::{Slot, GENESIS_ROUND},
     commit::{DecidedLeader, Decision},
     context::Context,
     dag_state::DagState,
@@ -44,7 +45,11 @@ impl UniversalCommitter {
         // Try to decide as many leaders as possible, starting with the highest round.
         let mut leaders = VecDeque::new();
 
-        let last_round = match self.context.protocol_config.mysticeti_num_leaders_per_round() {
+        let last_round = match self
+            .context
+            .protocol_config
+            .mysticeti_num_leaders_per_round()
+        {
             Some(1) => {
                 // Ensure that we don't commit any leaders from the same round as last_decided
                 // until we have full support for multi-leader per round.
@@ -63,6 +68,7 @@ impl UniversalCommitter {
             for committer in self.committers.iter().rev() {
                 // Skip committers that don't have a leader for this round.
                 let Some(slot) = committer.elect_leader(round) else {
+                    tracing::debug!("No leader for round {round}, skipping");
                     continue;
                 };
 
@@ -72,18 +78,18 @@ impl UniversalCommitter {
                     break 'outer;
                 }
 
-                tracing::debug!("Trying to decide {slot} with {committer}",);
+                tracing::trace!("Trying to decide {slot} with {committer}",);
 
                 // Try to directly decide the leader.
                 let mut status = committer.try_direct_decide(slot);
-                tracing::debug!("Outcome of direct rule: {status}");
+                tracing::debug!("Outcome of direct rule: {status} with {committer}");
 
                 // If we can't directly decide the leader, try to indirectly decide it.
                 if status.is_decided() {
                     leaders.push_front((status, Decision::Direct));
                 } else {
                     status = committer.try_indirect_decide(slot, leaders.iter().map(|(x, _)| x));
-                    tracing::debug!("Outcome of indirect rule: {status}");
+                    tracing::debug!("Outcome of indirect rule: {status} with {committer}");
                     leaders.push_front((status, Decision::Indirect));
                 }
             }
@@ -95,31 +101,54 @@ impl UniversalCommitter {
             if leader.round() == GENESIS_ROUND {
                 continue;
             }
-            let Some(decided_leader) = leader.into_decided_leader() else {
+            let Some(decided_leader) = leader.into_decided_leader(decision == Decision::Direct)
+            else {
                 break;
             };
-            self.update_metrics(&decided_leader, decision);
+            Self::update_metrics(&self.context, &decided_leader, decision);
             decided_leaders.push(decided_leader);
         }
-        tracing::debug!("Decided {decided_leaders:?}");
+        if !decided_leaders.is_empty() {
+            tracing::debug!("Decided {decided_leaders:?}");
+        }
         decided_leaders
     }
 
     /// Return list of leaders for the round.
     /// Can return empty vec if round does not have a designated leader.
     pub(crate) fn get_leaders(&self, round: Round) -> Vec<AuthorityIndex> {
-        self.committers.iter().filter_map(|committer| committer.elect_leader(round)).map(|l| l.authority).collect()
+        self.committers
+            .iter()
+            .filter_map(|committer| committer.elect_leader(round))
+            .map(|l| l.authority)
+            .collect()
     }
 
     /// Update metrics.
-    fn update_metrics(&self, decided_leader: &DecidedLeader, decision: Decision) {
-        let decision_str = if decision == Decision::Direct { "direct" } else { "indirect" };
+    pub(crate) fn update_metrics(
+        context: &Context,
+        decided_leader: &DecidedLeader,
+        decision: Decision,
+    ) {
+        let decision_str = match decision {
+            Decision::Direct => "direct",
+            Decision::Indirect => "indirect",
+            Decision::Certified => "certified",
+        };
         let status = match decided_leader {
             DecidedLeader::Commit(..) => format!("{decision_str}-commit"),
             DecidedLeader::Skip(..) => format!("{decision_str}-skip"),
         };
-        let leader_host = &self.context.committee.authority(decided_leader.slot().authority).hostname;
-        self.context.metrics.node_metrics.committed_leaders_total.with_label_values(&[leader_host, &status]).inc();
+        let leader_host = &context
+            .committee
+            .authority(decided_leader.slot().authority)
+            .hostname;
+        context
+            .metrics
+            .node_metrics
+            .committed_leaders_total
+            .with_label_values(&[leader_host, &status])
+            .inc();
     }
 }
 
@@ -127,7 +156,10 @@ impl UniversalCommitter {
 /// base committer, that is, a single leader and no pipeline.
 pub(crate) mod universal_committer_builder {
     use super::*;
-    use crate::{base_committer::BaseCommitterOptions, commit::DEFAULT_WAVE_LENGTH, leader_schedule::LeaderSchedule};
+    use crate::{
+        base_committer::BaseCommitterOptions, commit::DEFAULT_WAVE_LENGTH,
+        leader_schedule::LeaderSchedule,
+    };
 
     pub(crate) struct UniversalCommitterBuilder {
         context: Arc<Context>,
@@ -190,7 +222,11 @@ pub(crate) mod universal_committer_builder {
                 }
             }
 
-            UniversalCommitter { context: self.context, dag_state: self.dag_state, committers }
+            UniversalCommitter {
+                context: self.context,
+                dag_state: self.dag_state,
+                committers,
+            }
         }
     }
 }

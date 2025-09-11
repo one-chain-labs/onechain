@@ -10,14 +10,12 @@ use std::{
 use tempfile::TempDir;
 
 use move_compiler::editions::{Edition, Flavor};
-use move_package::{
-    lock_file::{
-        schema::{update_managed_address, ManagedAddressUpdate, ManagedPackage, ToolchainVersion},
-        LockFile,
-    },
-    resolution::dependency_graph::DependencyGraph,
-    BuildConfig,
+use move_package::BuildConfig;
+use move_package::lock_file::LockFile;
+use move_package::lock_file::schema::{
+    ManagedAddressUpdate, ManagedPackage, ToolchainVersion, update_managed_address,
 };
+use move_package::resolution::dependency_graph::DependencyGraph;
 use move_symbol_pool::Symbol;
 
 #[test]
@@ -121,7 +119,9 @@ flavor = "one"
     )
     .expect("Read DependencyGraph");
 
-    let lock = graph.write_to_lock(pkg.path().to_path_buf(), Some(lock_path.clone())).expect("Write DependencyGraph");
+    let lock = graph
+        .write_to_lock(pkg.path().to_path_buf(), Some(lock_path.clone()))
+        .expect("Write DependencyGraph");
     lock.commit(&lock_path).expect("Commit lock file");
 
     let mut lock = File::open(&lock_path).expect("Reading lock file");
@@ -187,8 +187,10 @@ fn update_lock_file_toolchain_version() {
     let _ = build_config.update_lock_file_toolchain_version(pkg.path(), "0.0.1".into());
 
     let mut lock_file = File::open(lock_path).unwrap();
-    let toolchain_version = ToolchainVersion::read(&mut lock_file).expect("Invalid toolchain version");
-    let toml = toml::ser::to_string(&toolchain_version).expect("Unable to serialize toolchain version");
+    let toolchain_version =
+        ToolchainVersion::read(&mut lock_file).expect("Invalid toolchain version");
+    let toml =
+        toml::ser::to_string(&toolchain_version).expect("Unable to serialize toolchain version");
 
     let expected = expect![[r#"
         compiler-version = "0.0.1"
@@ -215,22 +217,33 @@ fn test_update_managed_address() {
     // Update managed address in lock file.
     let pb = PathBuf::from(pkg.path());
     let mut lock = LockFile::from(pb, &lock_path).unwrap();
-    update_managed_address(&mut lock, "default", ManagedAddressUpdate::Published {
-        original_id: "0x123".into(),
-        chain_id: "35834a8a".into(),
-    })
+    update_managed_address(
+        &mut lock,
+        "default",
+        ManagedAddressUpdate::Published {
+            original_id: "0x123".into(),
+            chain_id: "35834a8a".into(),
+        },
+    )
     .unwrap();
 
-    update_managed_address(&mut lock, "default", ManagedAddressUpdate::Upgraded {
-        latest_id: "0x456".into(),
-        version: 2,
-    })
+    update_managed_address(
+        &mut lock,
+        "default",
+        ManagedAddressUpdate::Upgraded {
+            latest_id: "0x456".into(),
+            version: 2,
+        },
+    )
     .unwrap();
     lock.commit(&lock_path).unwrap();
 
     // Read lock file and check contents.
     let mut lock_file = File::open(lock_path).unwrap();
-    let envs: Vec<_> = ManagedPackage::read(&mut lock_file).unwrap().into_iter().collect();
+    let envs: Vec<_> = ManagedPackage::read(&mut lock_file)
+        .unwrap()
+        .into_iter()
+        .collect();
 
     let expected = expect![[r#"
         [
@@ -253,7 +266,9 @@ fn test_update_managed_address() {
 fn create_test_package() -> io::Result<TempDir> {
     let dir = tempfile::tempdir()?;
 
-    let toml_path: PathBuf = [".", "tests", "test_sources", "basic_no_deps", "Move.toml"].into_iter().collect();
+    let toml_path: PathBuf = [".", "tests", "test_sources", "basic_no_deps", "Move.toml"]
+        .into_iter()
+        .collect();
 
     fs::copy(toml_path, dir.path().join("Move.toml"))?;
     Ok(dir)

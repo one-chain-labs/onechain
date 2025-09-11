@@ -3,74 +3,62 @@
 
 use futures::{future::join_all, StreamExt};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use one_node::SuiNodeHandle;
+use mysten_common::fatal;
 use rand::{distributions::*, rngs::OsRng, seq::SliceRandom};
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    num::NonZeroUsize,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-use sui_config::{
-    genesis::Genesis,
-    node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange},
-    Config,
-    ExecutionCacheConfig,
-    NodeConfig,
-    PersistedConfig,
-    SUI_CLIENT_CONFIG,
-    SUI_KEYSTORE_FILENAME,
-    SUI_NETWORK_CONFIG,
-};
-use sui_core::{authority_aggregator::AuthorityAggregator, authority_client::NetworkAuthorityClient};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::num::NonZeroUsize;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use sui_config::genesis::Genesis;
+use sui_config::node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange};
+use sui_config::{Config, ExecutionCacheConfig, SUI_CLIENT_CONFIG, SUI_NETWORK_CONFIG};
+use sui_config::{NodeConfig, PersistedConfig, SUI_KEYSTORE_FILENAME};
+use sui_core::authority_aggregator::AuthorityAggregator;
+use sui_core::authority_client::NetworkAuthorityClient;
 use sui_json_rpc_types::{
-    SuiExecutionStatus,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
+    SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
     TransactionFilter,
 };
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
-use sui_protocol_config::ProtocolVersion;
-use sui_sdk::{
-    apis::QuorumDriverApi,
-    sui_client_config::{SuiClientConfig, SuiEnv},
-    wallet_context::WalletContext,
-    SuiClient,
-    SuiClientBuilder,
-};
+use one_node::SuiNodeHandle;
+use sui_protocol_config::{Chain, ProtocolVersion};
+use sui_sdk::apis::QuorumDriverApi;
+use sui_sdk::sui_client_config::{SuiClientConfig, SuiEnv};
+use sui_sdk::wallet_context::WalletContext;
+use sui_sdk::{SuiClient, SuiClientBuilder};
 use sui_swarm::memory::{Swarm, SwarmBuilder};
-use sui_swarm_config::{
-    genesis_config::{AccountConfig, GenesisConfig, ValidatorGenesisConfig, DEFAULT_GAS_AMOUNT},
-    network_config::NetworkConfig,
-    network_config_builder::{
-        ProtocolVersionsConfig,
-        StateAccumulatorV2EnabledCallback,
-        StateAccumulatorV2EnabledConfig,
-        SupportedProtocolVersionsCallback,
-    },
-    node_config_builder::{FullnodeConfigBuilder, ValidatorConfigBuilder},
+use sui_swarm_config::genesis_config::{
+    AccountConfig, GenesisConfig, ValidatorGenesisConfig, DEFAULT_GAS_AMOUNT,
 };
+use sui_swarm_config::network_config::NetworkConfig;
+use sui_swarm_config::network_config_builder::{
+    GlobalStateHashV2EnabledCallback, GlobalStateHashV2EnabledConfig, ProtocolVersionsConfig,
+    SupportedProtocolVersionsCallback,
+};
+use sui_swarm_config::node_config_builder::{FullnodeConfigBuilder, ValidatorConfigBuilder};
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{AuthorityName, ConciseableName, ObjectID, ObjectRef, SuiAddress},
-    committee::{Committee, CommitteeTrait, EpochId},
-    crypto::{KeypairTraits, SuiKeyPair},
-    effects::{TransactionEffects, TransactionEvents},
-    error::SuiResult,
-    governance::MIN_VALIDATOR_JOINING_STAKE_MIST,
-    message_envelope::Message,
-    object::Object,
-    sui_system_state::{epoch_start_sui_system_state::EpochStartSystemStateTrait, SuiSystemState, SuiSystemStateTrait},
-    supported_protocol_versions::SupportedProtocolVersions,
-    traffic_control::{PolicyConfig, RemoteFirewallConfig},
-    transaction::{CertifiedTransaction, Transaction, TransactionData, TransactionDataAPI, TransactionKind},
+use sui_types::base_types::ConciseableName;
+use sui_types::base_types::{AuthorityName, ObjectID, ObjectRef, SuiAddress};
+use sui_types::committee::CommitteeTrait;
+use sui_types::committee::{Committee, EpochId};
+use sui_types::crypto::KeypairTraits;
+use sui_types::crypto::SuiKeyPair;
+use sui_types::effects::{TransactionEffects, TransactionEvents};
+use sui_types::error::SuiResult;
+use sui_types::message_envelope::Message;
+use sui_types::object::Object;
+use sui_types::sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait;
+use sui_types::sui_system_state::SuiSystemState;
+use sui_types::sui_system_state::SuiSystemStateTrait;
+use sui_types::supported_protocol_versions::SupportedProtocolVersions;
+use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
+use sui_types::transaction::{
+    CertifiedTransaction, Transaction, TransactionData, TransactionDataAPI, TransactionKind,
 };
-use tokio::{
-    task::JoinHandle,
-    time::{sleep, timeout, Instant},
-};
+use tokio::time::{timeout, Instant};
+use tokio::{task::JoinHandle, time::sleep};
 use tracing::{error, info};
 
 mod test_indexer_handle;
@@ -91,7 +79,12 @@ impl FullNodeHandle {
 
         let sui_client = SuiClientBuilder::default().build(&rpc_url).await.unwrap();
 
-        Self { sui_node, sui_client, rpc_client, rpc_url }
+        Self {
+            sui_node,
+            sui_client,
+            rpc_client,
+            rpc_url,
+        }
     }
 }
 
@@ -100,19 +93,29 @@ pub struct TestCluster {
     pub wallet: WalletContext,
     pub fullnode_handle: FullNodeHandle,
     indexer_handle: Option<test_indexer_handle::IndexerHandle>,
+    transaction_driver_percentage: Option<u8>,
 }
 
 impl TestCluster {
     pub fn rpc_client(&self) -> &HttpClient {
-        self.indexer_handle.as_ref().map(|h| &h.rpc_client).unwrap_or(&self.fullnode_handle.rpc_client)
+        self.indexer_handle
+            .as_ref()
+            .map(|h| &h.rpc_client)
+            .unwrap_or(&self.fullnode_handle.rpc_client)
     }
 
     pub fn sui_client(&self) -> &SuiClient {
-        self.indexer_handle.as_ref().map(|h| &h.sui_client).unwrap_or(&self.fullnode_handle.sui_client)
+        self.indexer_handle
+            .as_ref()
+            .map(|h| &h.sui_client)
+            .unwrap_or(&self.fullnode_handle.sui_client)
     }
 
     pub fn rpc_url(&self) -> &str {
-        self.indexer_handle.as_ref().map(|h| h.rpc_url.as_str()).unwrap_or(&self.fullnode_handle.rpc_url)
+        self.indexer_handle
+            .as_ref()
+            .map(|h| h.rpc_url.as_str())
+            .unwrap_or(&self.fullnode_handle.rpc_url)
     }
 
     pub fn quorum_driver_api(&self) -> &QuorumDriverApi {
@@ -151,12 +154,22 @@ impl TestCluster {
     }
 
     pub fn committee(&self) -> Arc<Committee> {
-        self.fullnode_handle.sui_node.with(|node| node.state().epoch_store_for_testing().committee().clone())
+        self.fullnode_handle
+            .sui_node
+            .with(|node| node.state().epoch_store_for_testing().committee().clone())
+    }
+
+    pub fn transaction_driver_percentage(&self) -> Option<u8> {
+        self.transaction_driver_percentage
     }
 
     /// Convenience method to start a new fullnode in the test cluster.
     pub async fn spawn_new_fullnode(&mut self) -> FullNodeHandle {
-        self.start_fullnode_from_config(self.fullnode_config_builder().build(&mut OsRng, self.swarm.config())).await
+        self.start_fullnode_from_config(
+            self.fullnode_config_builder()
+                .build(&mut OsRng, self.swarm.config()),
+        )
+        .await
     }
 
     pub async fn start_fullnode_from_config(&mut self, config: NodeConfig) -> FullNodeHandle {
@@ -166,11 +179,17 @@ impl TestCluster {
     }
 
     pub fn all_node_handles(&self) -> Vec<SuiNodeHandle> {
-        self.swarm.all_nodes().flat_map(|n| n.get_node_handle()).collect()
+        self.swarm
+            .all_nodes()
+            .flat_map(|n| n.get_node_handle())
+            .collect()
     }
 
     pub fn all_validator_handles(&self) -> Vec<SuiNodeHandle> {
-        self.swarm.validator_nodes().map(|n| n.get_node_handle().unwrap()).collect()
+        self.swarm
+            .validator_nodes()
+            .map(|n| n.get_node_handle().unwrap())
+            .collect()
     }
 
     pub fn get_validator_pubkeys(&self) -> Vec<AuthorityName> {
@@ -210,8 +229,12 @@ impl TestCluster {
         node.start().await.unwrap();
     }
 
-    pub async fn spawn_new_validator(&mut self, genesis_config: ValidatorGenesisConfig) -> SuiNodeHandle {
-        let node_config = ValidatorConfigBuilder::new().build(genesis_config, self.swarm.config().genesis.clone());
+    pub async fn spawn_new_validator(
+        &mut self,
+        genesis_config: ValidatorGenesisConfig,
+    ) -> SuiNodeHandle {
+        let node_config = ValidatorConfigBuilder::new()
+            .build(genesis_config, self.swarm.config().genesis.clone());
         self.swarm.spawn_new_node(node_config).await
     }
 
@@ -220,18 +243,31 @@ impl TestCluster {
     }
 
     pub async fn get_reference_gas_price(&self) -> u64 {
-        self.sui_client().governance_api().get_reference_gas_price().await.expect("failed to get reference gas price")
+        self.sui_client()
+            .governance_api()
+            .get_reference_gas_price()
+            .await
+            .expect("failed to get reference gas price")
     }
 
     pub async fn get_object_from_fullnode_store(&self, object_id: &ObjectID) -> Option<Object> {
-        self.fullnode_handle.sui_node.with_async(|node| async { node.state().get_object(object_id).await }).await
+        self.fullnode_handle
+            .sui_node
+            .with_async(|node| async { node.state().get_object(object_id).await })
+            .await
     }
 
     pub async fn get_latest_object_ref(&self, object_id: &ObjectID) -> ObjectRef {
-        self.get_object_from_fullnode_store(object_id).await.unwrap().compute_object_reference()
+        self.get_object_from_fullnode_store(object_id)
+            .await
+            .unwrap()
+            .compute_object_reference()
     }
 
-    pub async fn get_object_or_tombstone_from_fullnode_store(&self, object_id: ObjectID) -> ObjectRef {
+    pub async fn get_object_or_tombstone_from_fullnode_store(
+        &self,
+        object_id: ObjectID,
+    ) -> ObjectRef {
         self.fullnode_handle
             .sui_node
             .state()
@@ -241,14 +277,18 @@ impl TestCluster {
     }
 
     pub async fn wait_for_run_with_range_shutdown_signal(&self) -> Option<RunWithRange> {
-        self.wait_for_run_with_range_shutdown_signal_with_timeout(Duration::from_secs(60)).await
+        self.wait_for_run_with_range_shutdown_signal_with_timeout(Duration::from_secs(60))
+            .await
     }
 
     pub async fn wait_for_run_with_range_shutdown_signal_with_timeout(
         &self,
         timeout_dur: Duration,
     ) -> Option<RunWithRange> {
-        let mut shutdown_channel_rx = self.fullnode_handle.sui_node.with(|node| node.subscribe_to_shutdown_channel());
+        let mut shutdown_channel_rx = self
+            .fullnode_handle
+            .sui_node
+            .with(|node| node.subscribe_to_shutdown_channel());
 
         timeout(timeout_dur, async move {
             tokio::select! {
@@ -258,7 +298,7 @@ impl TestCluster {
                         Ok(Some(run_with_range)) => Some(run_with_range),
                         Ok(None) => None,
                         Err(e) => {
-                            error!("failed recv from sui-node shutdown channel: {}", e);
+                            error!("failed recv from one-node shutdown channel: {}", e);
                             None
                         },
                     }
@@ -266,11 +306,18 @@ impl TestCluster {
             }
         })
         .await
-        .expect("Timed out waiting for cluster to hit target epoch and recv shutdown signal from sui-node")
+        .expect("Timed out waiting for cluster to hit target epoch and recv shutdown signal from one-node")
     }
 
-    pub async fn wait_for_protocol_version(&self, target_protocol_version: ProtocolVersion) -> SuiSystemState {
-        self.wait_for_protocol_version_with_timeout(target_protocol_version, Duration::from_secs(60)).await
+    pub async fn wait_for_protocol_version(
+        &self,
+        target_protocol_version: ProtocolVersion,
+    ) -> SuiSystemState {
+        self.wait_for_protocol_version_with_timeout(
+            target_protocol_version,
+            Duration::from_secs(60),
+        )
+        .await
     }
 
     pub async fn wait_for_protocol_version_with_timeout(
@@ -297,13 +344,21 @@ impl TestCluster {
         let start = Instant::now();
 
         // Close epoch on 2f+1 validators.
-        let cur_committee = self.fullnode_handle.sui_node.with(|node| node.state().clone_committee_for_testing());
+        let cur_committee = self
+            .fullnode_handle
+            .sui_node
+            .with(|node| node.state().clone_committee_for_testing());
         let mut cur_stake = 0;
         for node in self.swarm.active_validators() {
             node.get_node_handle()
                 .unwrap()
                 .with_async(|node| async {
-                    node.close_epoch_for_testing().await.unwrap();
+                    node.close_epoch_for_testing().await.unwrap_or_else(|_| {
+                        fatal!(
+                            "Failed to close epoch for validator {:?}",
+                            node.state().name
+                        );
+                    });
                     cur_stake += cur_committee.weight(&node.state().name);
                 })
                 .await;
@@ -326,7 +381,8 @@ impl TestCluster {
     /// If target_epoch is None, wait until the cluster reaches the next epoch.
     /// Note that this function does not guarantee that every node is at the target epoch.
     pub async fn wait_for_epoch(&self, target_epoch: Option<EpochId>) -> SuiSystemState {
-        self.wait_for_epoch_with_timeout(target_epoch, Duration::from_secs(60)).await
+        self.wait_for_epoch_with_timeout(target_epoch, Duration::from_secs(60))
+            .await
     }
 
     pub async fn wait_for_epoch_on_node(
@@ -362,10 +418,7 @@ impl TestCluster {
         .unwrap_or_else(|_| {
             error!("Timed out waiting for cluster to reach epoch {target_epoch:?}");
             if let Some(state) = state {
-                panic!(
-                    "Timed out waiting for cluster to reach epoch {target_epoch:?}. Current epoch: {}",
-                    state.epoch()
-                );
+                panic!("Timed out waiting for cluster to reach epoch {target_epoch:?}. Current epoch: {}", state.epoch());
             }
             panic!("Timed out waiting for cluster to target epoch {target_epoch:?}")
         })
@@ -376,11 +429,16 @@ impl TestCluster {
         target_epoch: Option<EpochId>,
         timeout_dur: Duration,
     ) -> SuiSystemState {
-        self.wait_for_epoch_on_node(&self.fullnode_handle.sui_node, target_epoch, timeout_dur).await
+        self.wait_for_epoch_on_node(&self.fullnode_handle.sui_node, target_epoch, timeout_dur)
+            .await
     }
 
     pub async fn wait_for_epoch_all_nodes(&self, target_epoch: EpochId) {
-        let handles: Vec<_> = self.swarm.all_nodes().map(|node| node.get_node_handle().unwrap()).collect();
+        let handles: Vec<_> = self
+            .swarm
+            .all_nodes()
+            .map(|node| node.get_node_handle().unwrap())
+            .collect();
         let tasks: Vec<_> = handles
             .iter()
             .map(|handle| {
@@ -418,11 +476,18 @@ impl TestCluster {
     /// supported versions.
     /// Note that we don't restart the fullnode here, and it is assumed that the fulnode supports
     /// the entire version range.
-    pub async fn update_validator_supported_versions(&self, new_supported_versions: SupportedProtocolVersions) {
+    pub async fn update_validator_supported_versions(
+        &self,
+        new_supported_versions: SupportedProtocolVersions,
+    ) {
         for authority in self.get_validator_pubkeys() {
             self.stop_node(&authority);
             tokio::time::sleep(Duration::from_millis(1000)).await;
-            self.swarm.node(&authority).unwrap().config().supported_protocol_versions = Some(new_supported_versions);
+            self.swarm
+                .node(&authority)
+                .unwrap()
+                .config()
+                .supported_protocol_versions = Some(new_supported_versions);
             self.start_node(&authority).await;
             info!("Restarted validator {}", authority);
         }
@@ -432,7 +497,12 @@ impl TestCluster {
     pub async fn wait_for_all_nodes_upgrade_to(&self, protocol_version: u64) {
         for h in self.all_node_handles() {
             h.with_async(|node| async {
-                while node.state().epoch_store_for_testing().epoch_start_state().protocol_version().as_u64()
+                while node
+                    .state()
+                    .epoch_store_for_testing()
+                    .epoch_start_state()
+                    .protocol_version()
+                    .as_u64()
                     != protocol_version
                 {
                     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -453,7 +523,10 @@ impl TestCluster {
 
                 while let Some(tx) = txns.next().await {
                     let digest = *tx.transaction_digest();
-                    let tx = state.get_transaction_cache_reader().get_transaction_block(&digest).unwrap();
+                    let tx = state
+                        .get_transaction_cache_reader()
+                        .get_transaction_block(&digest)
+                        .unwrap();
                     match &tx.data().intent_message().value.kind() {
                         TransactionKind::EndOfEpochTransaction(_) => (),
                         TransactionKind::AuthenticatorStateUpdate(_) => break,
@@ -470,19 +543,36 @@ impl TestCluster {
     pub fn highest_protocol_version(&self) -> ProtocolVersion {
         self.all_node_handles()
             .into_iter()
-            .map(|h| h.with(|node| node.state().epoch_store_for_testing().epoch_start_state().protocol_version()))
+            .map(|h| {
+                h.with(|node| {
+                    node.state()
+                        .epoch_store_for_testing()
+                        .epoch_start_state()
+                        .protocol_version()
+                })
+            })
             .max()
             .expect("at least one node must be up to get highest protocol version")
     }
 
     pub async fn test_transaction_builder(&self) -> TestTransactionBuilder {
         let (sender, gas) = self.wallet.get_one_gas_object().await.unwrap().unwrap();
-        self.test_transaction_builder_with_gas_object(sender, gas).await
+        self.test_transaction_builder_with_gas_object(sender, gas)
+            .await
     }
 
-    pub async fn test_transaction_builder_with_sender(&self, sender: SuiAddress) -> TestTransactionBuilder {
-        let gas = self.wallet.get_one_gas_object_owned_by_address(sender).await.unwrap().unwrap();
-        self.test_transaction_builder_with_gas_object(sender, gas).await
+    pub async fn test_transaction_builder_with_sender(
+        &self,
+        sender: SuiAddress,
+    ) -> TestTransactionBuilder {
+        let gas = self
+            .wallet
+            .get_one_gas_object_owned_by_address(sender)
+            .await
+            .unwrap()
+            .unwrap();
+        self.test_transaction_builder_with_gas_object(sender, gas)
+            .await
     }
 
     pub async fn test_transaction_builder_with_gas_object(
@@ -498,7 +588,10 @@ impl TestCluster {
         self.wallet.sign_transaction(tx_data)
     }
 
-    pub async fn sign_and_execute_transaction(&self, tx_data: &TransactionData) -> SuiTransactionBlockResponse {
+    pub async fn sign_and_execute_transaction(
+        &self,
+        tx_data: &TransactionData,
+    ) -> SuiTransactionBlockResponse {
         let tx = self.wallet.sign_transaction(tx_data);
         self.execute_transaction(tx).await
     }
@@ -523,13 +616,17 @@ impl TestCluster {
         &self,
         tx: Transaction,
     ) -> anyhow::Result<(TransactionEffects, TransactionEvents)> {
-        let results = self.submit_transaction_to_validators(tx.clone(), &self.get_validator_pubkeys()).await?;
+        let results = self
+            .submit_transaction_to_validators(tx.clone(), &self.get_validator_pubkeys())
+            .await?;
         self.wallet.execute_transaction_may_fail(tx).await.unwrap();
         Ok(results)
     }
 
     pub fn authority_aggregator(&self) -> Arc<AuthorityAggregator<NetworkAuthorityClient>> {
-        self.fullnode_handle.sui_node.with(|node| node.clone_authority_aggregator().unwrap())
+        self.fullnode_handle
+            .sui_node
+            .with(|node| node.clone_authority_aggregator().unwrap())
     }
 
     pub async fn create_certificate(
@@ -538,7 +635,10 @@ impl TestCluster {
         client_addr: Option<SocketAddr>,
     ) -> anyhow::Result<CertifiedTransaction> {
         let agg = self.authority_aggregator();
-        Ok(agg.process_transaction(tx, client_addr).await?.into_cert_for_testing())
+        Ok(agg
+            .process_transaction(tx, client_addr)
+            .await?
+            .into_cert_for_testing())
     }
 
     /// Execute a transaction on specified list of validators, and bypassing authority aggregator.
@@ -552,12 +652,21 @@ impl TestCluster {
         pubkeys: &[AuthorityName],
     ) -> anyhow::Result<(TransactionEffects, TransactionEvents)> {
         let agg = self.authority_aggregator();
-        let certificate = agg.process_transaction(tx, None).await?.into_cert_for_testing();
+        let certificate = agg
+            .process_transaction(tx, None)
+            .await?
+            .into_cert_for_testing();
         let replies = loop {
             let futures: Vec<_> = agg
                 .authority_clients
                 .iter()
-                .filter_map(|(name, client)| if pubkeys.contains(name) { Some(client) } else { None })
+                .filter_map(|(name, client)| {
+                    if pubkeys.contains(name) {
+                        Some(client)
+                    } else {
+                        None
+                    }
+                })
                 .map(|client| {
                     let cert = certificate.clone();
                     async move { client.handle_certificate_v2(cert, None).await }
@@ -589,7 +698,10 @@ impl TestCluster {
         }
         assert_eq!(all_effects.len(), 1);
         assert_eq!(all_events.len(), 1);
-        Ok((all_effects.into_values().next().unwrap(), all_events.into_values().next().unwrap()))
+        Ok((
+            all_effects.into_values().next().unwrap(),
+            all_events.into_values().next().unwrap(),
+        ))
     }
 
     /// This call sends some funds from the seeded address to the funding
@@ -604,16 +716,35 @@ impl TestCluster {
         let context = &self.wallet;
         let (sender, gas) = context.get_one_gas_object().await.unwrap().unwrap();
         let tx = context.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(amount, funding_address).build(),
+            &TestTransactionBuilder::new(sender, gas, rgp)
+                .transfer_oct(amount, funding_address)
+                .build(),
         );
         context.execute_transaction_must_succeed(tx).await;
 
-        context.get_one_gas_object_owned_by_address(funding_address).await.unwrap().unwrap()
+        context
+            .get_one_gas_object_owned_by_address(funding_address)
+            .await
+            .unwrap()
+            .unwrap()
     }
 
-    pub async fn transfer_sui_must_exceed(&self, sender: SuiAddress, receiver: SuiAddress, amount: u64) -> ObjectID {
-        let tx = self.test_transaction_builder_with_sender(sender).await.transfer_oct(Some(amount), receiver).build();
-        let effects = self.sign_and_execute_transaction(&tx).await.effects.unwrap();
+    pub async fn transfer_oct_must_exceed(
+        &self,
+        sender: SuiAddress,
+        receiver: SuiAddress,
+        amount: u64,
+    ) -> ObjectID {
+        let tx = self
+            .test_transaction_builder_with_sender(sender)
+            .await
+            .transfer_oct(Some(amount), receiver)
+            .build();
+        let effects = self
+            .sign_and_execute_transaction(&tx)
+            .await
+            .effects
+            .unwrap();
         assert_eq!(&SuiExecutionStatus::Success, effects.status());
         effects.created().first().unwrap().object_id()
     }
@@ -697,6 +828,7 @@ pub struct TestClusterBuilder {
     network_config: Option<NetworkConfig>,
     additional_objects: Vec<Object>,
     num_validators: Option<usize>,
+    validators: Option<Vec<ValidatorGenesisConfig>>,
     fullnode_rpc_port: Option<u16>,
     enable_fullnode_events: bool,
     disable_fullnode_pruning: bool,
@@ -718,9 +850,16 @@ pub struct TestClusterBuilder {
 
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
-    validator_state_accumulator_v2_enabled_config: StateAccumulatorV2EnabledConfig,
+    validator_global_state_hash_v2_enabled_config: GlobalStateHashV2EnabledConfig,
 
     indexer_backed_rpc: bool,
+
+    chain_override: Option<Chain>,
+
+    transaction_driver_percentage: Option<u8>,
+
+    #[cfg(msim)]
+    inject_synthetic_execution_time: bool,
 }
 
 impl TestClusterBuilder {
@@ -728,9 +867,11 @@ impl TestClusterBuilder {
         TestClusterBuilder {
             genesis_config: None,
             network_config: None,
+            chain_override: None,
             additional_objects: vec![],
             fullnode_rpc_port: None,
             num_validators: None,
+            validators: None,
             enable_fullnode_events: false,
             disable_fullnode_pruning: false,
             validator_supported_protocol_versions_config: ProtocolVersionsConfig::Default,
@@ -749,8 +890,13 @@ impl TestClusterBuilder {
             fullnode_fw_config: None,
             max_submit_position: None,
             submit_delay_step_override_millis: None,
-            validator_state_accumulator_v2_enabled_config: StateAccumulatorV2EnabledConfig::Global(true),
+            validator_global_state_hash_v2_enabled_config: GlobalStateHashV2EnabledConfig::Global(
+                true,
+            ),
             indexer_backed_rpc: false,
+            transaction_driver_percentage: None,
+            #[cfg(msim)]
+            inject_synthetic_execution_time: false,
         }
     }
 
@@ -793,8 +939,16 @@ impl TestClusterBuilder {
         self
     }
 
+    /// Set the number of default validators to spawn. Can be overridden by `with_validators`, if
+    /// you need to provide more specific genesis configs for each validator.
     pub fn with_num_validators(mut self, num: usize) -> Self {
         self.num_validators = Some(num);
+        self
+    }
+
+    /// Provide validator genesis configs, overrides the `num_validators` setting.
+    pub fn with_validators(mut self, validators: Vec<ValidatorGenesisConfig>) -> Self {
+        self.validators = Some(validators);
         self
     }
 
@@ -831,12 +985,16 @@ impl TestClusterBuilder {
     }
 
     pub fn with_epoch_duration_ms(mut self, epoch_duration_ms: u64) -> Self {
-        self.get_or_init_genesis_config().parameters.epoch_duration_ms = epoch_duration_ms;
+        self.get_or_init_genesis_config()
+            .parameters
+            .epoch_duration_ms = epoch_duration_ms;
         self
     }
 
     pub fn with_stake_subsidy_start_epoch(mut self, stake_subsidy_start_epoch: u64) -> Self {
-        self.get_or_init_genesis_config().parameters.stake_subsidy_start_epoch = stake_subsidy_start_epoch;
+        self.get_or_init_genesis_config()
+            .parameters
+            .stake_subsidy_start_epoch = stake_subsidy_start_epoch;
         self
     }
 
@@ -850,31 +1008,49 @@ impl TestClusterBuilder {
         self
     }
 
-    pub fn with_fullnode_supported_protocol_versions_config(mut self, c: SupportedProtocolVersions) -> Self {
+    pub fn with_fullnode_supported_protocol_versions_config(
+        mut self,
+        c: SupportedProtocolVersions,
+    ) -> Self {
         self.fullnode_supported_protocol_versions_config = Some(ProtocolVersionsConfig::Global(c));
         self
     }
 
     pub fn with_protocol_version(mut self, v: ProtocolVersion) -> Self {
-        self.get_or_init_genesis_config().parameters.protocol_version = v;
+        self.get_or_init_genesis_config()
+            .parameters
+            .protocol_version = v;
         self
     }
 
-    pub fn with_supported_protocol_version_callback(mut self, func: SupportedProtocolVersionsCallback) -> Self {
-        self.validator_supported_protocol_versions_config = ProtocolVersionsConfig::PerValidator(func);
+    pub fn with_supported_protocol_version_callback(
+        mut self,
+        func: SupportedProtocolVersionsCallback,
+    ) -> Self {
+        self.validator_supported_protocol_versions_config =
+            ProtocolVersionsConfig::PerValidator(func);
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled_callback(mut self, func: StateAccumulatorV2EnabledCallback) -> Self {
-        self.validator_state_accumulator_v2_enabled_config = StateAccumulatorV2EnabledConfig::PerValidator(func);
+    pub fn with_global_state_hash_v2_enabled_callback(
+        mut self,
+        func: GlobalStateHashV2EnabledCallback,
+    ) -> Self {
+        self.validator_global_state_hash_v2_enabled_config =
+            GlobalStateHashV2EnabledConfig::PerValidator(func);
         self
     }
 
-    pub fn with_validator_candidates(mut self, addresses: impl IntoIterator<Item = SuiAddress>) -> Self {
-        self.get_or_init_genesis_config().accounts.extend(addresses.into_iter().map(|address| AccountConfig {
-            address: Some(address),
-            gas_amounts: vec![DEFAULT_GAS_AMOUNT, MIN_VALIDATOR_JOINING_STAKE_MIST],
-        }));
+    pub fn with_validator_candidates(
+        mut self,
+        addresses: impl IntoIterator<Item = SuiAddress>,
+    ) -> Self {
+        self.get_or_init_genesis_config()
+            .accounts
+            .extend(addresses.into_iter().map(|address| AccountConfig {
+                address: Some(address),
+                gas_amounts: vec![DEFAULT_GAS_AMOUNT, DEFAULT_GAS_AMOUNT],
+            }));
         self
     }
 
@@ -925,7 +1101,10 @@ impl TestClusterBuilder {
         self
     }
 
-    pub fn with_submit_delay_step_override_millis(mut self, submit_delay_step_override_millis: u64) -> Self {
+    pub fn with_submit_delay_step_override_millis(
+        mut self,
+        submit_delay_step_override_millis: u64,
+    ) -> Self {
         self.submit_delay_step_override_millis = Some(submit_delay_step_override_millis);
         self
     }
@@ -935,13 +1114,31 @@ impl TestClusterBuilder {
         self
     }
 
+    pub fn with_chain_override(mut self, chain: Chain) -> Self {
+        self.chain_override = Some(chain);
+        self
+    }
+
+    #[cfg(msim)]
+    pub fn with_synthetic_execution_time_injection(mut self) -> Self {
+        self.inject_synthetic_execution_time = true;
+        self
+    }
+
+    /// Percentage of transactions going through TransactionDriver, instead of QuorumDriver.
+    /// Can be overridden by setting the TRANSACTION_DRIVER environment variable.
+    pub fn transaction_driver_percentage(mut self, percent: u8) -> Self {
+        self.transaction_driver_percentage = Some(percent);
+        self
+    }
+
     pub async fn build(mut self) -> TestCluster {
         // All test clusters receive a continuous stream of random JWKs.
         // If we later use zklogin authenticated transactions in tests we will need to supply
         // valid JWKs as well.
         #[cfg(msim)]
         if !self.default_jwks {
-            sui_node::set_jwk_injector(Arc::new(|_authority, provider| {
+            one_node::set_jwk_injector(Arc::new(|_authority, provider| {
                 use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
                 use rand::Rng;
 
@@ -949,7 +1146,10 @@ impl TestClusterBuilder {
                 let id_num = rand::thread_rng().gen_range(1..=4);
                 let key_num = rand::thread_rng().gen_range(1..=4);
 
-                let id = JwkId { iss: provider.get_config().iss, kid: format!("kid{}", id_num) };
+                let id = JwkId {
+                    iss: provider.get_config().iss,
+                    kid: format!("kid{}", id_num),
+                };
 
                 let jwk = JWK {
                     kty: "kty".to_string(),
@@ -967,8 +1167,14 @@ impl TestClusterBuilder {
 
         if self.indexer_backed_rpc {
             if self.data_ingestion_dir.is_none() {
-                temp_data_ingestion_dir = Some(tempfile::tempdir().unwrap());
-                self.data_ingestion_dir = Some(temp_data_ingestion_dir.as_ref().unwrap().path().to_path_buf());
+                temp_data_ingestion_dir = Some(mysten_common::tempdir().unwrap());
+                self.data_ingestion_dir = Some(
+                    temp_data_ingestion_dir
+                        .as_ref()
+                        .unwrap()
+                        .path()
+                        .to_path_buf(),
+                );
                 assert!(self.data_ingestion_dir.is_some());
             }
             assert!(self.data_ingestion_dir.is_some());
@@ -980,7 +1186,8 @@ impl TestClusterBuilder {
 
         let fullnode = swarm.fullnodes().next().unwrap();
         let json_rpc_address = fullnode.config().json_rpc_address;
-        let fullnode_handle = FullNodeHandle::new(fullnode.get_node_handle().unwrap(), json_rpc_address).await;
+        let fullnode_handle =
+            FullNodeHandle::new(fullnode.get_node_handle().unwrap(), json_rpc_address).await;
 
         let (rpc_url, indexer_handle) = if self.indexer_backed_rpc {
             let handle = test_indexer_handle::IndexerHandle::new(
@@ -994,26 +1201,46 @@ impl TestClusterBuilder {
             (fullnode_handle.rpc_url.clone(), None)
         };
 
-        let mut wallet_conf: SuiClientConfig = PersistedConfig::read(&working_dir.join(SUI_CLIENT_CONFIG)).unwrap();
-        wallet_conf.envs.push(SuiEnv { alias: "localnet".to_string(), rpc: rpc_url, ws: None, basic_auth: None });
+        let mut wallet_conf: SuiClientConfig =
+            PersistedConfig::read(&working_dir.join(SUI_CLIENT_CONFIG)).unwrap();
+        wallet_conf.envs.push(SuiEnv {
+            alias: "localnet".to_string(),
+            rpc: rpc_url,
+            ws: None,
+            basic_auth: None,
+        });
         wallet_conf.active_env = Some("localnet".to_string());
 
-        wallet_conf.persisted(&working_dir.join(SUI_CLIENT_CONFIG)).save().unwrap();
+        wallet_conf
+            .persisted(&working_dir.join(SUI_CLIENT_CONFIG))
+            .save()
+            .unwrap();
 
         let wallet_conf = swarm.dir().join(SUI_CLIENT_CONFIG);
-        let wallet = WalletContext::new(&wallet_conf, None, None).unwrap();
+        let wallet = WalletContext::new(&wallet_conf).unwrap();
 
-        TestCluster { swarm, wallet, fullnode_handle, indexer_handle }
+        let transaction_driver_percentage = self.transaction_driver_percentage;
+
+        TestCluster {
+            swarm,
+            wallet,
+            fullnode_handle,
+            indexer_handle,
+            transaction_driver_percentage,
+        }
     }
 
     /// Start a Swarm and set up WalletConfig
     async fn start_swarm(&mut self) -> Result<Swarm, anyhow::Error> {
         let mut builder: SwarmBuilder = Swarm::builder()
-            .committee_size(NonZeroUsize::new(self.num_validators.unwrap_or(NUM_VALIDATOR)).unwrap())
             .with_objects(self.additional_objects.clone())
             .with_db_checkpoint_config(self.db_checkpoint_config_validators.clone())
-            .with_supported_protocol_versions_config(self.validator_supported_protocol_versions_config.clone())
-            .with_state_accumulator_v2_enabled_config(self.validator_state_accumulator_v2_enabled_config.clone())
+            .with_supported_protocol_versions_config(
+                self.validator_supported_protocol_versions_config.clone(),
+            )
+            .with_global_state_hash_v2_enabled_config(
+                self.validator_global_state_hash_v2_enabled_config.clone(),
+            )
             .with_fullnode_count(1)
             .with_fullnode_supported_protocol_versions_config(
                 self.fullnode_supported_protocol_versions_config
@@ -1024,6 +1251,18 @@ impl TestClusterBuilder {
             .with_fullnode_run_with_range(self.fullnode_run_with_range)
             .with_fullnode_policy_config(self.fullnode_policy_config.clone())
             .with_fullnode_fw_config(self.fullnode_fw_config.clone());
+
+        if let Some(validators) = self.validators.take() {
+            builder = builder.with_validators(validators);
+        } else {
+            builder = builder.committee_size(
+                NonZeroUsize::new(self.num_validators.unwrap_or(NUM_VALIDATOR)).unwrap(),
+            )
+        };
+
+        if let Some(chain) = self.chain_override {
+            builder = builder.with_chain_override(chain);
+        }
 
         if let Some(genesis_config) = self.genesis_config.take() {
             builder = builder.with_genesis_config(genesis_config);
@@ -1065,11 +1304,21 @@ impl TestClusterBuilder {
         }
 
         if let Some(submit_delay_step_override_millis) = self.submit_delay_step_override_millis {
-            builder = builder.with_submit_delay_step_override_millis(submit_delay_step_override_millis);
+            builder =
+                builder.with_submit_delay_step_override_millis(submit_delay_step_override_millis);
         }
 
         if self.disable_fullnode_pruning {
             builder = builder.with_disable_fullnode_pruning();
+        }
+
+        #[cfg(msim)]
+        if self.inject_synthetic_execution_time {
+            use sui_config::node::ExecutionTimeObserverConfig;
+
+            let mut config = ExecutionTimeObserverConfig::default();
+            config.inject_synthetic_execution_time = Some(true);
+            builder = builder.with_execution_time_observer_config(config);
         }
 
         let mut swarm = builder.build();
@@ -1084,7 +1333,7 @@ impl TestClusterBuilder {
         swarm.config().save(network_path)?;
         let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path)?);
         for key in &swarm.config().account_keys {
-            keystore.add_key(None, SuiKeyPair::Ed25519(key.copy()))?;
+            keystore.import(None, SuiKeyPair::Ed25519(key.copy()))?;
         }
 
         let active_address = keystore.addresses().first().cloned();

@@ -6,16 +6,12 @@ use anemo::{rpc::Status, types::response::StatusCode, Request, Response, Result}
 use dashmap::DashMap;
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use std::{
-    sync::{Arc, RwLock},
-    task::{Context, Poll},
-};
+use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
 use sui_types::{
     digests::{CheckpointContentsDigest, CheckpointDigest},
     messages_checkpoint::{
-        CertifiedCheckpointSummary as Checkpoint,
-        CheckpointSequenceNumber,
-        FullCheckpointContents,
+        CertifiedCheckpointSummary as Checkpoint, CheckpointSequenceNumber, FullCheckpointContents,
         VerifiedCheckpoint,
     },
     storage::WriteStore,
@@ -46,11 +42,22 @@ impl<S> StateSync for Server<S>
 where
     S: WriteStore + Send + Sync + 'static,
 {
-    async fn push_checkpoint_summary(&self, request: Request<Checkpoint>) -> Result<Response<()>, Status> {
-        let peer_id = request.peer_id().copied().ok_or_else(|| Status::internal("unable to query sender's PeerId"))?;
+    async fn push_checkpoint_summary(
+        &self,
+        request: Request<Checkpoint>,
+    ) -> Result<Response<()>, Status> {
+        let peer_id = request
+            .peer_id()
+            .copied()
+            .ok_or_else(|| Status::internal("unable to query sender's PeerId"))?;
 
         let checkpoint = request.into_inner();
-        if !self.peer_heights.write().unwrap().update_peer_info(peer_id, checkpoint.clone(), None) {
+        if !self
+            .peer_heights
+            .write()
+            .unwrap()
+            .update_peer_info(peer_id, checkpoint.clone(), None)
+        {
             return Ok(Response::new(()));
         }
 
@@ -76,13 +83,17 @@ where
         request: Request<GetCheckpointSummaryRequest>,
     ) -> Result<Response<Option<Checkpoint>>, Status> {
         let checkpoint = match request.inner() {
-            GetCheckpointSummaryRequest::Latest => {
-                self.store.get_highest_synced_checkpoint().map(Some).map_err(|e| Status::internal(e.to_string()))?
+            GetCheckpointSummaryRequest::Latest => self
+                .store
+                .get_highest_synced_checkpoint()
+                .map(Some)
+                .map_err(|e| Status::internal(e.to_string()))?,
+            GetCheckpointSummaryRequest::ByDigest(digest) => {
+                self.store.get_checkpoint_by_digest(digest)
             }
-            GetCheckpointSummaryRequest::ByDigest(digest) => self.store.get_checkpoint_by_digest(digest),
-            GetCheckpointSummaryRequest::BySequenceNumber(sequence_number) => {
-                self.store.get_checkpoint_by_sequence_number(*sequence_number)
-            }
+            GetCheckpointSummaryRequest::BySequenceNumber(sequence_number) => self
+                .store
+                .get_checkpoint_by_sequence_number(*sequence_number),
         }
         .map(VerifiedCheckpoint::into_inner);
 
@@ -98,17 +109,24 @@ where
             .get_highest_synced_checkpoint()
             .map_err(|e| Status::internal(e.to_string()))
             .map(VerifiedCheckpoint::into_inner)?;
-        let lowest_available_checkpoint =
-            self.store.get_lowest_available_checkpoint().map_err(|e| Status::internal(e.to_string()))?;
+        let lowest_available_checkpoint = self
+            .store
+            .get_lowest_available_checkpoint()
+            .map_err(|e| Status::internal(e.to_string()))?;
 
-        Ok(Response::new(GetCheckpointAvailabilityResponse { highest_synced_checkpoint, lowest_available_checkpoint }))
+        Ok(Response::new(GetCheckpointAvailabilityResponse {
+            highest_synced_checkpoint,
+            lowest_available_checkpoint,
+        }))
     }
 
     async fn get_checkpoint_contents(
         &self,
         request: Request<CheckpointContentsDigest>,
     ) -> Result<Response<Option<FullCheckpointContents>>, Status> {
-        let contents = self.store.get_full_checkpoint_contents(request.inner());
+        let contents = self
+            .store
+            .get_full_checkpoint_contents(None, request.inner());
         Ok(Response::new(contents))
     }
 }
@@ -123,14 +141,18 @@ pub(super) struct CheckpointContentsDownloadLimitLayer {
 
 impl CheckpointContentsDownloadLimitLayer {
     pub(super) fn new(max_inflight_per_checkpoint: usize) -> Self {
-        Self { inflight_per_checkpoint: Arc::new(DashMap::new()), max_inflight_per_checkpoint }
+        Self {
+            inflight_per_checkpoint: Arc::new(DashMap::new()),
+            max_inflight_per_checkpoint,
+        }
     }
 
     pub(super) fn maybe_prune_map(&self) {
         const PRUNE_THRESHOLD: usize = 5000;
         if self.inflight_per_checkpoint.len() >= PRUNE_THRESHOLD {
-            self.inflight_per_checkpoint
-                .retain(|_, semaphore| semaphore.available_permits() < self.max_inflight_per_checkpoint);
+            self.inflight_per_checkpoint.retain(|_, semaphore| {
+                semaphore.available_permits() < self.max_inflight_per_checkpoint
+            });
         }
     }
 }
@@ -169,9 +191,9 @@ where
     <S as tower::Service<Request<CheckpointContentsDigest>>>::Future: Send,
     Request<CheckpointContentsDigest>: 'static + Send + Sync,
 {
+    type Response = Response<Option<FullCheckpointContents>>;
     type Error = S::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-    type Response = Response<Option<FullCheckpointContents>>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -191,14 +213,20 @@ where
                 semaphore_entry.value().clone()
             };
             let permit = semaphore.try_acquire_owned().map_err(|e| match e {
-                tokio::sync::TryAcquireError::Closed => anemo::rpc::Status::new(StatusCode::InternalServerError),
-                tokio::sync::TryAcquireError::NoPermits => anemo::rpc::Status::new(StatusCode::TooManyRequests),
+                tokio::sync::TryAcquireError::Closed => {
+                    anemo::rpc::Status::new(StatusCode::InternalServerError)
+                }
+                tokio::sync::TryAcquireError::NoPermits => {
+                    anemo::rpc::Status::new(StatusCode::TooManyRequests)
+                }
             })?;
 
             struct SemaphoreExtension(#[allow(unused)] OwnedSemaphorePermit);
             inner.call(req).await.map(move |mut response| {
                 // Insert permit as extension so it's not dropped until the response is sent.
-                response.extensions_mut().insert(Arc::new(SemaphoreExtension(permit)));
+                response
+                    .extensions_mut()
+                    .insert(Arc::new(SemaphoreExtension(permit)));
                 response
             })
         };

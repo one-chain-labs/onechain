@@ -5,7 +5,8 @@ use proptest::prelude::*;
 use sui_types::utils::to_sender_signed_transaction;
 
 use proptest::strategy::ValueTree;
-use transaction_fuzzer::account_universe::{AccountCurrent, AccountData};
+use transaction_fuzzer::account_universe::AccountCurrent;
+use transaction_fuzzer::account_universe::AccountData;
 
 use transaction_fuzzer::{
     executor::{assert_is_acceptable_result, Executor},

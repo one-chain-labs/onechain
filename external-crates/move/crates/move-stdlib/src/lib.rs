@@ -2,10 +2,11 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use log::LevelFilter;
-use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
+use move_command_line_common::files::{MOVE_EXTENSION, extension_equals, find_filenames};
 use move_core_types::parsing::address::NumericalAddress;
-use std::{collections::BTreeMap, path::PathBuf};
+use move_docgen::DocgenOptions;
+use move_package::BuildConfig;
+use std::{collections::BTreeMap, fs, path::Path, path::PathBuf};
 
 #[cfg(test)]
 mod tests;
@@ -13,12 +14,16 @@ pub mod utils;
 
 const MODULES_DIR: &str = "sources";
 const DOCS_DIR: &str = "docs";
+const SUMMARIES_DIR: &str = "summaries";
 
 const REFERENCES_TEMPLATE: &str = "doc_templates/references.md";
 const OVERVIEW_TEMPLATE: &str = "doc_templates/overview.md";
 
 pub fn unit_testing_files() -> Vec<String> {
-    vec![path_in_crate("sources/UnitTest.move")].into_iter().map(|p| p.into_os_string().into_string().unwrap()).collect()
+    vec![path_in_crate("sources/UnitTest.move")]
+        .into_iter()
+        .map(|p| p.into_os_string().into_string().unwrap())
+        .collect()
 }
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -30,64 +35,65 @@ where
     path
 }
 
-pub fn move_stdlib_modules_full_path() -> String {
+pub fn modules_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), MODULES_DIR)
 }
 
-pub fn move_stdlib_docs_full_path() -> String {
+pub fn docs_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), DOCS_DIR)
 }
 
-pub fn move_stdlib_files() -> Vec<String> {
+pub fn summaries_full_path() -> String {
+    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), SUMMARIES_DIR)
+}
+
+pub fn source_files() -> Vec<String> {
     let path = path_in_crate(MODULES_DIR);
     find_filenames(&[path], |p| extension_equals(p, MOVE_EXTENSION)).unwrap()
 }
 
-pub fn move_stdlib_named_addresses() -> BTreeMap<String, NumericalAddress> {
+pub fn named_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [("std", "0x1")];
-    mapping.iter().map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap())).collect()
+    mapping
+        .iter()
+        .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
+        .collect()
 }
 
-pub fn build_doc(
-    output_path: &str,
-    doc_path: &str,
-    templates: Vec<String>,
-    references_file: Option<String>,
-    sources: &[String],
-    dep_paths: Vec<String>,
-    with_diagram: bool,
-    named_addresses: BTreeMap<String, NumericalAddress>,
-) {
-    let options = move_prover::cli::Options {
-        move_sources: sources.to_vec(),
-        move_deps: dep_paths,
-        move_named_address_values: move_prover::cli::named_addresses_for_options(&named_addresses),
-        verbosity_level: LevelFilter::Warn,
-        run_docgen: true,
-        docgen: move_docgen::DocgenOptions {
-            root_doc_templates: templates,
-            references_file,
-            doc_path: vec![doc_path.to_string()],
-            output_directory: output_path.to_string(),
-            include_dep_diagrams: with_diagram,
-            include_call_diagrams: with_diagram,
-            ..Default::default()
-        },
-        ..Default::default()
+pub fn build_doc(output_directory: String) -> anyhow::Result<()> {
+    let config = build_config();
+    let model =
+        config.move_model_for_package(Path::new(&modules_full_path()), &mut std::io::stdout())?;
+    let options = DocgenOptions {
+        output_directory,
+        doc_path: vec![String::new()],
+        root_doc_templates: vec![
+            path_in_crate(OVERVIEW_TEMPLATE)
+                .to_string_lossy()
+                .to_string(),
+        ],
+        references_file: Some(
+            path_in_crate(REFERENCES_TEMPLATE)
+                .to_string_lossy()
+                .to_string(),
+        ),
+        ..DocgenOptions::default()
     };
-    options.setup_logging_for_test();
-    move_prover::run_move_prover_errors_to_stderr(options).unwrap();
+    let docgen = move_docgen::Docgen::new(&model, &options);
+    for (file, content) in docgen.generate(&model)? {
+        let path = PathBuf::from(&file);
+        fs::create_dir_all(path.parent().unwrap())?;
+        fs::write(path.as_path(), content)?;
+    }
+    Ok(())
 }
 
-pub fn build_stdlib_doc(output_path: &str) {
-    build_doc(
-        output_path,
-        "",
-        vec![path_in_crate(OVERVIEW_TEMPLATE).to_string_lossy().to_string()],
-        Some(path_in_crate(REFERENCES_TEMPLATE).to_string_lossy().to_string()),
-        move_stdlib_files().as_slice(),
-        vec![],
-        false,
-        move_stdlib_named_addresses(),
-    )
+pub(crate) fn build_config() -> BuildConfig {
+    BuildConfig {
+        additional_named_addresses: named_addresses()
+            .into_iter()
+            .map(|(k, v)| (k, v.into_inner()))
+            .collect(),
+        ..BuildConfig::default()
+    }
 }

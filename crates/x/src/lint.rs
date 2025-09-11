@@ -9,13 +9,8 @@ use nexlint_lints::{
     content::*,
     package::*,
     project::{
-        BannedDepConfig,
-        BannedDepType,
-        BannedDeps,
-        BannedDepsConfig,
-        DirectDepDups,
-        DirectDepDupsConfig,
-        DirectDuplicateGitDependencies,
+        BannedDepConfig, BannedDepType, BannedDeps, BannedDepsConfig, DirectDepDups,
+        DirectDepDupsConfig, DirectDuplicateGitDependencies,
     },
 };
 static EXTERNAL_CRATE_DIR: &str = "external-crates/";
@@ -32,30 +27,48 @@ pub struct Args {
 pub fn run(args: Args) -> crate::Result<()> {
     let banned_deps_config = BannedDepsConfig(
         vec![
-            ("lazy_static".to_owned(), BannedDepConfig {
-                message: "use once_cell::sync::Lazy instead".to_owned(),
-                type_: BannedDepType::Direct,
-            }),
-            ("tracing-test".to_owned(), BannedDepConfig {
-                message: "you should not be testing against log lines".to_owned(),
-                type_: BannedDepType::Always,
-            }),
-            ("openssl-sys".to_owned(), BannedDepConfig {
-                message: "use rustls for TLS".to_owned(),
-                type_: BannedDepType::Always,
-            }),
-            ("actix-web".to_owned(), BannedDepConfig {
-                message: "use axum for a webframework instead".to_owned(),
-                type_: BannedDepType::Always,
-            }),
-            ("warp".to_owned(), BannedDepConfig {
-                message: "use axum for a webframework instead".to_owned(),
-                type_: BannedDepType::Always,
-            }),
-            ("pq-sys".to_owned(), BannedDepConfig {
-                message: "diesel_async asynchronous database connections instead".to_owned(),
-                type_: BannedDepType::Always,
-            }),
+            (
+                "lazy_static".to_owned(),
+                BannedDepConfig {
+                    message: "use once_cell::sync::Lazy instead".to_owned(),
+                    type_: BannedDepType::Direct,
+                },
+            ),
+            (
+                "tracing-test".to_owned(),
+                BannedDepConfig {
+                    message: "you should not be testing against log lines".to_owned(),
+                    type_: BannedDepType::Always,
+                },
+            ),
+            (
+                "openssl-sys".to_owned(),
+                BannedDepConfig {
+                    message: "use rustls for TLS".to_owned(),
+                    type_: BannedDepType::Always,
+                },
+            ),
+            (
+                "actix-web".to_owned(),
+                BannedDepConfig {
+                    message: "use axum for a webframework instead".to_owned(),
+                    type_: BannedDepType::Always,
+                },
+            ),
+            (
+                "warp".to_owned(),
+                BannedDepConfig {
+                    message: "use axum for a webframework instead".to_owned(),
+                    type_: BannedDepType::Always,
+                },
+            ),
+            (
+                "pq-sys".to_owned(),
+                BannedDepConfig {
+                    message: "diesel_async asynchronous database connections instead".to_owned(),
+                    type_: BannedDepType::Always,
+                },
+            ),
         ]
         .into_iter()
         .collect(),
@@ -70,6 +83,15 @@ pub fn run(args: Args) -> crate::Result<()> {
             // as the opentelemetry crates.
             "prost".to_owned(),
             "tonic".to_owned(),
+            // jsonrpsee uses an older version of http-body
+            "http-body".to_owned(),
+            // jsonrpsee uses an older version of tower
+            "tower".to_owned(),
+            // async-graphql uses an older version of axum, axum-extra
+            "axum".to_owned(),
+            "axum-extra".to_owned(),
+            // consistent-store uses a newer version of bincode with breaking interface changes
+            "bincode".to_owned(),
         ],
     };
 
@@ -119,7 +141,9 @@ pub fn run(args: Args) -> crate::Result<()> {
 }
 
 /// Define custom handler so we can skip certain lints on certain files. This is a temporary till we upstream this logic
-pub fn handle_lint_results_exclude_external_crate_checks(results: LintResults) -> crate::Result<()> {
+pub fn handle_lint_results_exclude_external_crate_checks(
+    results: LintResults,
+) -> crate::Result<()> {
     // ignore_funcs is a slice of funcs to execute against lint sources and their path
     // if a func returns true, it means it will be ignored and not throw a lint error
     let ignore_funcs = [
@@ -145,7 +169,13 @@ pub fn handle_lint_results_exclude_external_crate_checks(results: LintResults) -
                 continue;
             }
         }
-        println!("[{}] [{}] [{}]: {}\n", message.level(), source.name(), source.kind(), message.message());
+        println!(
+            "[{}] [{}] [{}]: {}\n",
+            message.level(),
+            source.name(),
+            source.kind(),
+            message.message()
+        );
         errs = true;
     }
 

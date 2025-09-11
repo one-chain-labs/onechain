@@ -70,7 +70,12 @@ fn non_loop_back_branch_summary() {
     let summary = {
         use Bytecode::*;
         LoopSummary::new(&VMControlFlowGraph::new(
-            &[/* B0, L0 */ Nop, /*        */ Branch(3), /* B2, L2 */ Ret, /* B3, L1 */ Branch(2)],
+            &[
+                /* B0, L0 */ Nop,
+                /*        */ Branch(3),
+                /* B2, L2 */ Ret,
+                /* B3, L1 */ Branch(2),
+            ],
             &[],
         ))
     };
@@ -109,7 +114,12 @@ fn branching_summary() {
     let summary = {
         use Bytecode::*;
         LoopSummary::new(&VMControlFlowGraph::new(
-            &[/* B0, L0 */ LdTrue, /*        */ BrTrue(3), /* B2, L2 */ Nop, /* B3, L1 */ Ret],
+            &[
+                /* B0, L0 */ LdTrue,
+                /*        */ BrTrue(3),
+                /* B2, L2 */ Nop,
+                /* B3, L1 */ Ret,
+            ],
             &[],
         ))
     };

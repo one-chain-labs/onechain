@@ -6,14 +6,13 @@ use std::collections::{BTreeMap, HashMap};
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
 use tap::tap::TapFallible;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, instrument};
+use tracing::instrument;
+use tracing::{error, info};
 
-use crate::{
-    metrics::IndexerMetrics,
-    models::raw_checkpoints::StoredRawCheckpoint,
-    store::IndexerStore,
-    types::IndexerResult,
-};
+use crate::metrics::IndexerMetrics;
+use crate::models::raw_checkpoints::StoredRawCheckpoint;
+use crate::store::IndexerStore;
+use crate::types::IndexerResult;
 
 use super::{CheckpointDataToCommit, CommitterTables, CommitterWatermark, EpochToCommit};
 
@@ -26,7 +25,6 @@ pub async fn start_tx_checkpoint_commit_task<S>(
     cancel: CancellationToken,
     mut next_checkpoint_sequence_number: CheckpointSequenceNumber,
     end_checkpoint_opt: Option<CheckpointSequenceNumber>,
-    mvr_mode: bool,
 ) -> IndexerResult<()>
 where
     S: IndexerStore + Clone + Sync + Send + 'static,
@@ -63,12 +61,16 @@ where
             // The batch will consist of contiguous checkpoints and at most one epoch boundary at
             // the end.
             if batch.len() == checkpoint_commit_batch_size || epoch.is_some() {
-                commit_checkpoints(&state, batch, epoch, &metrics, mvr_mode).await;
+                commit_checkpoints(&state, batch, epoch, &metrics).await;
                 batch = vec![];
             }
             if let Some(epoch_number) = epoch_number_option {
                 state.upload_display(epoch_number).await.tap_err(|e| {
-                    error!("Failed to upload display table before epoch {} with error: {}", epoch_number, e.to_string());
+                    error!(
+                        "Failed to upload display table before epoch {} with error: {}",
+                        epoch_number,
+                        e.to_string()
+                    );
                 })?;
             }
             // stop adding to the commit batch if we've reached the end checkpoint
@@ -79,7 +81,7 @@ where
             }
         }
         if !batch.is_empty() {
-            commit_checkpoints(&state, batch, None, &metrics, mvr_mode).await;
+            commit_checkpoints(&state, batch, None, &metrics).await;
             batch = vec![];
         }
 
@@ -107,7 +109,6 @@ async fn commit_checkpoints<S>(
     indexed_checkpoint_batch: Vec<CheckpointDataToCommit>,
     epoch: Option<EpochToCommit>,
     metrics: &IndexerMetrics,
-    mvr_mode: bool,
 ) where
     S: IndexerStore + Clone + Sync + Send + 'static,
 {
@@ -136,16 +137,14 @@ async fn commit_checkpoints<S>(
             packages,
             epoch: _,
         } = indexed_checkpoint;
-        // In MVR mode, persist only object_history, packages, checkpoints, and epochs
-        if !mvr_mode {
-            tx_batch.push(transactions);
-            events_batch.push(events);
-            tx_indices_batch.push(tx_indices);
-            event_indices_batch.push(event_indices);
-            display_updates_batch.extend(display_updates.into_iter());
-            object_changes_batch.push(object_changes);
-            object_versions_batch.push(object_versions);
-        }
+
+        tx_batch.push(transactions);
+        events_batch.push(events);
+        tx_indices_batch.push(tx_indices);
+        event_indices_batch.push(event_indices);
+        display_updates_batch.extend(display_updates.into_iter());
+        object_changes_batch.push(object_changes);
+        object_versions_batch.push(object_versions);
         object_history_changes_batch.push(object_history_changes);
         checkpoint_batch.push(checkpoint);
         packages_batch.push(packages);
@@ -159,30 +158,39 @@ async fn commit_checkpoints<S>(
     let tx_batch = tx_batch.into_iter().flatten().collect::<Vec<_>>();
     let tx_indices_batch = tx_indices_batch.into_iter().flatten().collect::<Vec<_>>();
     let events_batch = events_batch.into_iter().flatten().collect::<Vec<_>>();
-    let event_indices_batch = event_indices_batch.into_iter().flatten().collect::<Vec<_>>();
-    let object_versions_batch = object_versions_batch.into_iter().flatten().collect::<Vec<_>>();
+    let event_indices_batch = event_indices_batch
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    let object_versions_batch = object_versions_batch
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
     let packages_batch = packages_batch.into_iter().flatten().collect::<Vec<_>>();
     let checkpoint_num = checkpoint_batch.len();
     let tx_count = tx_batch.len();
-    let raw_checkpoints_batch = checkpoint_batch.iter().map(|c| c.into()).collect::<Vec<StoredRawCheckpoint>>();
+    let raw_checkpoints_batch = checkpoint_batch
+        .iter()
+        .map(|c| c.into())
+        .collect::<Vec<StoredRawCheckpoint>>();
 
     {
-        let _step_1_guard = metrics.checkpoint_db_commit_latency_step_1.start_timer();
-        let mut persist_tasks = Vec::new();
-        // In MVR mode, persist only packages and object history
-        persist_tasks.push(state.persist_packages(packages_batch));
-        persist_tasks.push(state.persist_object_history(object_history_changes_batch.clone()));
-        if !mvr_mode {
-            persist_tasks.push(state.persist_transactions(tx_batch));
-            persist_tasks.push(state.persist_tx_indices(tx_indices_batch));
-            persist_tasks.push(state.persist_events(events_batch));
-            persist_tasks.push(state.persist_event_indices(event_indices_batch));
-            persist_tasks.push(state.persist_displays(display_updates_batch));
-            persist_tasks.push(state.persist_objects(object_changes_batch.clone()));
-            persist_tasks.push(state.persist_full_objects_history(object_history_changes_batch.clone()));
-            persist_tasks.push(state.persist_objects_version(object_versions_batch.clone()));
-            persist_tasks.push(state.persist_raw_checkpoints(raw_checkpoints_batch));
-        }
+        let _step_1_guard: prometheus::HistogramTimer =
+            metrics.checkpoint_db_commit_latency_step_1.start_timer();
+
+        let mut persist_tasks = vec![
+            state.persist_packages(packages_batch),
+            state.persist_object_history(object_history_changes_batch.clone()),
+            state.persist_transactions(tx_batch),
+            state.persist_tx_indices(tx_indices_batch),
+            state.persist_events(events_batch),
+            state.persist_event_indices(event_indices_batch),
+            state.persist_displays(display_updates_batch),
+            state.persist_objects(object_changes_batch.clone()),
+            state.persist_full_objects_history(object_history_changes_batch.clone()),
+            state.persist_objects_version(object_versions_batch.clone()),
+            state.persist_raw_checkpoints(raw_checkpoints_batch),
+        ];
 
         if let Some(epoch_data) = epoch.clone() {
             persist_tasks.push(state.persist_epoch(epoch_data));
@@ -219,7 +227,10 @@ async fn commit_checkpoints<S>(
         .persist_checkpoints(checkpoint_batch)
         .await
         .tap_err(|e| {
-            error!("Failed to persist checkpoint data with error: {}", e.to_string());
+            error!(
+                "Failed to persist checkpoint data with error: {}",
+                e.to_string()
+            );
         })
         .expect("Persisting data into DB should not fail.");
 
@@ -230,14 +241,19 @@ async fn commit_checkpoints<S>(
             .await
             .expect("Failed to get chain identifier")
             .expect("Chain identifier should have been indexed at this point");
-        let _ = state.persist_protocol_configs_and_feature_flags(chain_id).await;
+        let _ = state
+            .persist_protocol_configs_and_feature_flags(chain_id)
+            .await;
     }
 
     state
         .update_watermarks_upper_bound::<CommitterTables>(committer_watermark)
         .await
         .tap_err(|e| {
-            error!("Failed to update watermark upper bound with error: {}", e.to_string());
+            error!(
+                "Failed to update watermark upper bound with error: {}",
+                e.to_string()
+            );
         })
         .expect("Updating watermark upper bound in DB should not fail.");
 
@@ -250,13 +266,20 @@ async fn commit_checkpoints<S>(
         committer_watermark.checkpoint_hi_inclusive,
         tx_count,
     );
-    metrics.latest_tx_checkpoint_sequence_number.set(committer_watermark.checkpoint_hi_inclusive as i64);
-    metrics.total_tx_checkpoint_committed.inc_by(checkpoint_num as u64);
-    metrics.total_transaction_committed.inc_by(tx_count as u64);
     metrics
-        .transaction_per_checkpoint
-        .observe(tx_count as f64 / (committer_watermark.checkpoint_hi_inclusive - first_checkpoint_seq + 1) as f64);
+        .latest_tx_checkpoint_sequence_number
+        .set(committer_watermark.checkpoint_hi_inclusive as i64);
+    metrics
+        .total_tx_checkpoint_committed
+        .inc_by(checkpoint_num as u64);
+    metrics.total_transaction_committed.inc_by(tx_count as u64);
+    metrics.transaction_per_checkpoint.observe(
+        tx_count as f64
+            / (committer_watermark.checkpoint_hi_inclusive - first_checkpoint_seq + 1) as f64,
+    );
     // 1000.0 is not necessarily the batch size, it's to roughly map average tx commit latency to [0.1, 1] seconds,
     // which is well covered by DB_COMMIT_LATENCY_SEC_BUCKETS.
-    metrics.thousand_transaction_avg_db_commit_latency.observe(elapsed * 1000.0 / tx_count as f64);
+    metrics
+        .thousand_transaction_avg_db_commit_latency
+        .observe(elapsed * 1000.0 / tx_count as f64);
 }

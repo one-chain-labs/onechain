@@ -2,6 +2,13 @@
 source: crates/sui-graphql-rpc/tests/snapshot_tests.rs
 expression: sdl
 ---
+type AccumulatorRootCreateTransaction {
+	"""
+	A workaround to define an empty variant of a GraphQL union.
+	"""
+	_: Boolean
+}
+
 type ActiveJwk {
 	"""
 	The string (Issuing Authority) that identifies the OIDC provider.
@@ -89,7 +96,7 @@ type Address implements IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this address.
 	"""
@@ -177,11 +184,6 @@ enum AddressTransactionBlockRelationship {
 	"""
 	AFFECTED
 }
-
-"""
-An Authenticator represents the access control rules for a ConsensusV2 object.
-"""
-union Authenticator = Address
 
 """
 System transaction for creating the on-chain state used by zkLogin.
@@ -527,7 +529,7 @@ type Coin implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -705,7 +707,7 @@ type CoinMetadata implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -838,6 +840,14 @@ type CoinMetadata implements IMoveObject & IObject & IOwner {
 }
 
 """
+Same as AddressOwner, but the object is versioned by consensus.
+"""
+type ConsensusAddressOwner {
+	startVersion: UInt53!
+	owner: Owner
+}
+
+"""
 System transaction that runs at the beginning of a checkpoint, and is responsible for setting
 the current value of the clock, based on the timestamp from consensus.
 """
@@ -859,16 +869,6 @@ type ConsensusCommitPrologueTransaction {
 	transaction).
 	"""
 	consensusCommitDigest: String
-}
-
-"""
-A ConsensusV2 object is an object that is automatically versioned by the consensus protocol
-and allows different authentication modes based on the chosen authenticator.
-(Initially, only single-owner authentication is supported.)
-"""
-type ConsensusV2 {
-	startVersion: UInt53!
-	authenticator: Authenticator
 }
 
 """
@@ -1050,7 +1050,7 @@ type EndOfEpochTransaction {
 	transactions(first: Int, before: String, last: Int, after: String): EndOfEpochTransactionKindConnection!
 }
 
-union EndOfEpochTransactionKind = ChangeEpochTransaction | AuthenticatorStateCreateTransaction | AuthenticatorStateExpireTransaction | RandomnessStateCreateTransaction | CoinDenyListStateCreateTransaction | BridgeStateCreateTransaction | BridgeCommitteeInitTransaction
+union EndOfEpochTransactionKind = ChangeEpochTransaction | AuthenticatorStateCreateTransaction | AuthenticatorStateExpireTransaction | RandomnessStateCreateTransaction | CoinDenyListStateCreateTransaction | BridgeStateCreateTransaction | BridgeCommitteeInitTransaction | StoreExecutionTimeObservationsTransaction | AccumulatorRootCreateTransaction
 
 type EndOfEpochTransactionKindConnection {
 	"""
@@ -1608,7 +1608,7 @@ interface IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -2075,7 +2075,7 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2274,7 +2274,7 @@ type MovePackage implements IObject & IOwner {
 	Note that objects owned by a package are inaccessible, because packages are immutable and
 	cannot be owned by an address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2685,7 +2685,7 @@ type Object implements IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2883,7 +2883,7 @@ objects are ones whose
 
 - Type matches the `type` filter,
 - AND, whose owner matches the `owner` filter,
-- AND, whose ID is in `objectIds` OR whose ID and version is in `objectKeys`.
+- AND, whose ID is in `objectIds`.
 """
 input ObjectFilter {
 	"""
@@ -2902,10 +2902,6 @@ input ObjectFilter {
 	Filter for live objects by their IDs.
 	"""
 	objectIds: [SuiAddress!]
-	"""
-	Filter for live or potentially historical objects by their ID and version.
-	"""
-	objectKeys: [ObjectKey!]
 }
 
 input ObjectKey {
@@ -2926,9 +2922,9 @@ enum ObjectKind {
 }
 
 """
-The object's owner type: Immutable, Shared, Parent, or Address.
+The object's owner type: Immutable, Shared, Parent, Address, or ConsensusAddress.
 """
-union ObjectOwner = Immutable | Shared | Parent | AddressOwner | ConsensusV2
+union ObjectOwner = Immutable | Shared | Parent | AddressOwner | ConsensusAddressOwner
 
 input ObjectRef {
 	"""
@@ -3037,7 +3033,7 @@ type Owner implements IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -3105,6 +3101,21 @@ object could be wrapped and therefore not directly accessible.
 """
 type Parent {
 	parent: Owner
+}
+
+"""
+ProgrammableSystemTransactionBlock is identical to ProgrammableTransactionBlock, but graphql
+does not allow multiple variants with the same type.
+"""
+type ProgrammableSystemTransactionBlock {
+	"""
+	Input objects or primitive values.
+	"""
+	inputs(first: Int, after: String, last: Int, before: String): TransactionInputConnection!
+	"""
+	The transaction commands, executed sequentially.
+	"""
+	transactions(first: Int, after: String, last: Int, before: String): ProgrammableTransactionConnection!
 }
 
 """
@@ -3328,6 +3339,10 @@ type Query {
 	Fetch a transaction block by its transaction digest.
 	"""
 	transactionBlock(digest: String!): TransactionBlock
+	"""
+	Fetch a list of objects by their IDs and versions.
+	"""
+	multiGetObjects(keys: [ObjectKey!]!): [Object]!
 	"""
 	The coin objects that exist in the network.
 	
@@ -3603,6 +3618,10 @@ type ServiceConfig {
 	"""
 	maxTransactionIds: Int!
 	"""
+	Maximum number of keys that can be passed to a `multiGetObjects` query.
+	"""
+	maxMultiGetObjectsKeys: Int!
+	"""
 	Maximum number of candidates to scan when gathering a page of results.
 	"""
 	maxScanLimit: Int!
@@ -3783,7 +3802,7 @@ type StakedOct implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -3974,6 +3993,13 @@ type StorageFund {
 	nonRefundableBalance: BigInt
 }
 
+type StoreExecutionTimeObservationsTransaction {
+	"""
+	A workaround to define an empty variant of a GraphQL union.
+	"""
+	_: Boolean
+}
+
 
 """
 String containing 32B hex-encoded address, with a leading "0x". Leading zeroes can be omitted on input but will always appear in outputs (SuiAddress in output is guaranteed to be 66 characters long).
@@ -4004,7 +4030,7 @@ type SuinsRegistration implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -4292,6 +4318,10 @@ type TransactionBlockEffects {
 	"""
 	errors: String
 	"""
+	The error code of the Move abort, populated if this transaction failed with a Move abort.
+	"""
+	abortCode: BigInt
+	"""
 	Transactions whose outputs this transaction depends upon.
 	"""
 	dependencies(first: Int, after: String, last: Int, before: String): DependencyConnection!
@@ -4397,7 +4427,7 @@ input TransactionBlockFilter {
 """
 The kind of transaction block, either a programmable transaction or a system transaction.
 """
-union TransactionBlockKind = ConsensusCommitPrologueTransaction | GenesisTransaction | ChangeEpochTransaction | ProgrammableTransactionBlock | AuthenticatorStateUpdateTransaction | RandomnessStateUpdateTransaction | EndOfEpochTransaction
+union TransactionBlockKind = ConsensusCommitPrologueTransaction | GenesisTransaction | ChangeEpochTransaction | ProgrammableTransactionBlock | AuthenticatorStateUpdateTransaction | RandomnessStateUpdateTransaction | EndOfEpochTransaction | ProgrammableSystemTransactionBlock
 
 """
 An input filter selecting for either system or programmable transactions.
@@ -4447,7 +4477,7 @@ type TransactionInputEdge {
 
 """
 The optional extra data a user can provide to a transaction dry run.
-`sender` defaults to `0x0`. If gasObjects` is not present, or is an empty list,
+`sender` defaults to `0x0`. If `gasObjects` is not present, or is an empty list,
 it is substituted with a mock Coin object, `gasPrice` defaults to the reference
 gas price, `gasBudget` defaults to the max gas budget and `gasSponsor` defaults
 to the sender.
@@ -4817,4 +4847,3 @@ schema {
 	query: Query
 	mutation: Mutation
 }
-

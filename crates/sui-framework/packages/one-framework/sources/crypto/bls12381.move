@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Group operations of BLS12-381.
-module one::bls12381;
+module oct::bls12381;
 
-use one::group_ops::{Self, Element};
+use sui::group_ops::{Self, Element};
 
 /// @param signature: A 48-bytes signature that is a point on the G1 subgroup.
 /// @param public_key: A 96-bytes public key that is a point on the G2 subgroup.
@@ -45,8 +45,8 @@ public struct UncompressedG1 {}
 // https://docs.rs/bls12_381/latest/bls12_381/notes/serialization/index.html for details.
 // GT is encoded using big-endian byte order and points are uncompressed and not intended
 // to be deserialized.
-// UncompressedG1 elements are G1 elements in uncompressed form. They are larger but faster to 
-// use since they do not have to be uncompressed before use. They can not be constructed 
+// UncompressedG1 elements are G1 elements in uncompressed form. They are larger but faster to
+// use since they do not have to be uncompressed before use. They can not be constructed
 // on their own but have to be created from G1 elements.
 
 // Const elements.

@@ -314,6 +314,8 @@ pub enum StatusCode {
     ZERO_SIZED_ENUM = 1134,
     MAX_VARIANTS_REACHED = 1135,
 
+    INVALID_IDENTIFIER = 1136,
+
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
     // Invariant Violation Errors: 2000-2999
@@ -400,11 +402,15 @@ impl StatusCode {
     /// Return the status type for this status code
     pub fn status_type(self) -> StatusType {
         let major_status_number: u64 = self.into();
-        if major_status_number >= VALIDATION_STATUS_MIN_CODE && major_status_number <= VALIDATION_STATUS_MAX_CODE {
+        if major_status_number >= VALIDATION_STATUS_MIN_CODE
+            && major_status_number <= VALIDATION_STATUS_MAX_CODE
+        {
             return StatusType::Validation;
         }
 
-        if major_status_number >= VERIFICATION_STATUS_MIN_CODE && major_status_number <= VERIFICATION_STATUS_MAX_CODE {
+        if major_status_number >= VERIFICATION_STATUS_MIN_CODE
+            && major_status_number <= VERIFICATION_STATUS_MAX_CODE
+        {
             return StatusType::Verification;
         }
 
@@ -420,7 +426,9 @@ impl StatusCode {
             return StatusType::Deserialization;
         }
 
-        if major_status_number >= EXECUTION_STATUS_MIN_CODE && major_status_number <= EXECUTION_STATUS_MAX_CODE {
+        if major_status_number >= EXECUTION_STATUS_MIN_CODE
+            && major_status_number <= EXECUTION_STATUS_MAX_CODE
+        {
             return StatusType::Execution;
         }
 
@@ -444,7 +452,7 @@ impl<'de> de::Deserialize<'de> for StatusCode {
         D: de::Deserializer<'de>,
     {
         struct StatusCodeVisitor;
-        impl<'de> de::Visitor<'de> for StatusCodeVisitor {
+        impl de::Visitor<'_> for StatusCodeVisitor {
             type Value = StatusCode;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -515,12 +523,18 @@ fn test_status_codes() {
     // Now make sure that all of the error codes (including any that may be out-of-range) succeed.
     // Make sure there aren't any duplicate mappings
     for major_status_code in STATUS_CODE_VALUES.iter() {
-        assert!(!seen_codes.contains(major_status_code), "Duplicate major_status_code found");
+        assert!(
+            !seen_codes.contains(major_status_code),
+            "Duplicate major_status_code found"
+        );
         seen_codes.insert(*major_status_code);
         let status = StatusCode::try_from(*major_status_code);
         assert!(status.is_ok());
         let unwrapped_status = status.unwrap();
-        assert!(!seen_statuses.contains(&unwrapped_status), "Found duplicate u64 -> Status mapping");
+        assert!(
+            !seen_statuses.contains(&unwrapped_status),
+            "Found duplicate u64 -> Status mapping"
+        );
         seen_statuses.insert(unwrapped_status);
         let to_major_status_code = u64::from(unwrapped_status);
         assert_eq!(*major_status_code, to_major_status_code);

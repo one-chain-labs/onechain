@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Sui object identifiers
-module one::object;
+/// Oct object identifiers
+module oct::object;
 
 use std::bcs;
-use one::address;
+use sui::address;
 
 /// Allows calling `.to_address` on an `ID` to get an `address`.
 public use fun id_to_address as ID.to_address;
@@ -39,6 +39,9 @@ const SUI_RANDOM_ID: address = @0x8;
 
 /// The hardcoded ID for the singleton DenyList.
 const SUI_DENY_LIST_OBJECT_ID: address = @0x403;
+
+/// The hardcoded ID for the singleton AccumulatorRoot Object.
+const SUI_ACCUMULATOR_ROOT_OBJECT_ID: address = @0xacc;
 
 /// The hardcoded ID for the Bridge Object.
 const SUI_BRIDGE_ID: address = @0x9;
@@ -136,6 +139,16 @@ public(package) fun sui_deny_list_object_id(): UID {
     }
 }
 
+public(package) fun sui_accumulator_root_object_id(): UID {
+    UID {
+        id: ID { bytes: SUI_ACCUMULATOR_ROOT_OBJECT_ID },
+    }
+}
+
+public(package) fun sui_accumulator_root_address(): address {
+    SUI_ACCUMULATOR_ROOT_OBJECT_ID
+}
+
 #[allow(unused_function)]
 /// Create the `UID` for the singleton `Bridge` object.
 /// This should only be called once from `bridge`.
@@ -175,7 +188,7 @@ public fun new(ctx: &mut TxContext): UID {
     }
 }
 
-/// Delete the object and it's `UID`. This is the only way to eliminate a `UID`.
+/// Delete the object and its `UID`. This is the only way to eliminate a `UID`.
 /// This exists to inform Sui of object deletions. When an object
 /// gets unpacked, the programmer will have to do something with its
 /// `UID`. The implementation of this function emits a deleted

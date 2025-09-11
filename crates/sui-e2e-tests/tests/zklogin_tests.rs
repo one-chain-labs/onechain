@@ -2,24 +2,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use shared_crypto::intent::{Intent, IntentMessage};
+use shared_crypto::intent::Intent;
+use shared_crypto::intent::IntentMessage;
 use std::net::SocketAddr;
 use sui_core::authority_client::AuthorityAPI;
 use sui_macros::sim_test;
 use sui_protocol_config::ProtocolConfig;
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::SuiAddress,
-    committee::EpochId,
-    crypto::Signature,
-    error::{SuiError, SuiResult, UserInputError},
-    signature::GenericSignature,
-    transaction::Transaction,
-    utils::{get_legacy_zklogin_user_address, get_zklogin_user_address, load_test_vectors, make_zklogin_tx},
-    zk_login_authenticator::ZkLoginAuthenticator,
-    SUI_AUTHENTICATOR_STATE_OBJECT_ID,
+use sui_types::base_types::SuiAddress;
+use sui_types::committee::EpochId;
+use sui_types::crypto::Signature;
+use sui_types::error::{SuiError, SuiResult, UserInputError};
+use sui_types::signature::GenericSignature;
+use sui_types::transaction::Transaction;
+use sui_types::utils::load_test_vectors;
+use sui_types::utils::{
+    get_legacy_zklogin_user_address, get_zklogin_user_address, make_zklogin_tx,
 };
-use test_cluster::{TestCluster, TestClusterBuilder};
+use sui_types::zk_login_authenticator::ZkLoginAuthenticator;
+use sui_types::SUI_AUTHENTICATOR_STATE_OBJECT_ID;
+use test_cluster::TestCluster;
+use test_cluster::TestClusterBuilder;
 
 async fn do_zklogin_test(address: SuiAddress, legacy: bool) -> SuiResult {
     let test_cluster = TestClusterBuilder::new().build().await;
@@ -39,19 +42,27 @@ async fn do_zklogin_test(address: SuiAddress, legacy: bool) -> SuiResult {
 
 async fn build_zklogin_tx(test_cluster: &TestCluster, max_epoch: EpochId) -> Transaction {
     // load test vectors
-    let (kp, pk_zklogin, inputs) = &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1];
+    let (kp, pk_zklogin, inputs) =
+        &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1];
     let zklogin_addr = (pk_zklogin).into();
 
     let rgp = test_cluster.get_reference_gas_price().await;
-    let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
-    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
+    let gas = test_cluster
+        .fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr)
+        .await;
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp)
+        .transfer_oct(None, SuiAddress::ZERO)
+        .build();
 
     let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
     let eph_sig = Signature::new_secure(&msg, kp);
 
     // combine ephemeral sig with zklogin inputs.
-    let generic_sig =
-        GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(inputs.clone(), max_epoch, eph_sig.clone()));
+    let generic_sig = GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(
+        inputs.clone(),
+        max_epoch,
+        eph_sig.clone(),
+    ));
     Transaction::from_generic_sig_data(tx_data.clone(), vec![generic_sig])
 }
 #[sim_test]
@@ -63,9 +74,16 @@ async fn test_zklogin_feature_deny() {
         config
     });
 
-    let err = do_zklogin_test(get_zklogin_user_address(), false).await.unwrap_err();
+    let err = do_zklogin_test(get_zklogin_user_address(), false)
+        .await
+        .unwrap_err();
 
-    assert!(matches!(err, SuiError::UserInputError { error: UserInputError::Unsupported(..) }));
+    assert!(matches!(
+        err,
+        SuiError::UserInputError {
+            error: UserInputError::Unsupported(..)
+        }
+    ));
 }
 
 #[sim_test]
@@ -78,7 +96,9 @@ async fn test_zklogin_feature_legacy_address_deny() {
         config
     });
 
-    let err = do_zklogin_test(get_legacy_zklogin_user_address(), true).await.unwrap_err();
+    let err = do_zklogin_test(get_legacy_zklogin_user_address(), true)
+        .await
+        .unwrap_err();
     assert!(matches!(err, SuiError::SignerSignatureAbsent { .. }));
 }
 
@@ -88,7 +108,9 @@ async fn test_legacy_zklogin_address_accept() {
         config.set_verify_legacy_zklogin_address_for_testing(true);
         config
     });
-    let err = do_zklogin_test(get_legacy_zklogin_user_address(), true).await.unwrap_err();
+    let err = do_zklogin_test(get_legacy_zklogin_user_address(), true)
+        .await
+        .unwrap_err();
 
     // it does not hit the signer absent error.
     assert!(matches!(err, SuiError::InvalidSignature { .. }));
@@ -96,7 +118,15 @@ async fn test_legacy_zklogin_address_accept() {
 
 #[sim_test]
 async fn zklogin_end_to_end_test() {
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
+    if sui_simulator::has_mainnet_protocol_config_override() {
+        return;
+    }
+
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(15000)
+        .with_default_jwks()
+        .build()
+        .await;
 
     test_cluster.wait_for_authenticator_state_update().await;
     let signed_txn = build_zklogin_tx(&test_cluster, 2).await;
@@ -106,7 +136,10 @@ async fn zklogin_end_to_end_test() {
 
     // a txn with max_epoch mismatch with proof, fails to execute.
     let signed_txn_with_wrong_max_epoch = build_zklogin_tx(&test_cluster, 1).await;
-    assert!(context.execute_transaction_may_fail(signed_txn_with_wrong_max_epoch).await.is_err());
+    assert!(context
+        .execute_transaction_may_fail(signed_txn_with_wrong_max_epoch)
+        .await
+        .is_err());
 }
 
 #[sim_test]
@@ -117,18 +150,29 @@ async fn test_max_epoch_too_large_fail_tx() {
         config
     });
 
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(15000)
+        .with_default_jwks()
+        .build()
+        .await;
     test_cluster.wait_for_authenticator_state_update().await;
     let context = &test_cluster.wallet;
     // current epoch is 1, upper bound is 1 + 1, so max_epoch as 3 in zklogin signature should fail.
     let signed_txn = build_zklogin_tx(&test_cluster, 2).await;
     let res = context.execute_transaction_may_fail(signed_txn).await;
-    assert!(res.unwrap_err().to_string().contains("ZKLogin max epoch too large"));
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("ZKLogin max epoch too large"));
 }
 
 #[sim_test]
 async fn test_expired_zklogin_sig() {
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(15000)
+        .with_default_jwks()
+        .build()
+        .await;
 
     // trigger reconfiguration that advanced epoch to 1.
     test_cluster.trigger_reconfiguration().await;
@@ -138,25 +182,38 @@ async fn test_expired_zklogin_sig() {
     test_cluster.trigger_reconfiguration().await;
 
     // load one test vector, the zklogin inputs corresponds to max_epoch = 1
-    let (kp, pk_zklogin, inputs) = &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1];
+    let (kp, pk_zklogin, inputs) =
+        &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1];
     let zklogin_addr = (pk_zklogin).into();
 
     let rgp = test_cluster.get_reference_gas_price().await;
-    let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
+    let gas = test_cluster
+        .fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr)
+        .await;
     let context = &test_cluster.wallet;
 
-    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp)
+        .transfer_oct(None, SuiAddress::ZERO)
+        .build();
 
     let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
     let eph_sig = Signature::new_secure(&msg, kp);
 
     // combine ephemeral sig with zklogin inputs.
-    let generic_sig =
-        GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(inputs.clone(), 2, eph_sig.clone()));
+    let generic_sig = GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(
+        inputs.clone(),
+        2,
+        eph_sig.clone(),
+    ));
     let signed_txn_expired = Transaction::from_generic_sig_data(tx_data.clone(), vec![generic_sig]);
 
-    let res = context.execute_transaction_may_fail(signed_txn_expired).await;
-    assert!(res.unwrap_err().to_string().contains("ZKLogin expired at epoch 2"));
+    let res = context
+        .execute_transaction_may_fail(signed_txn_expired)
+        .await;
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("ZKLogin expired at epoch 2"));
 }
 
 #[sim_test]
@@ -177,8 +234,11 @@ async fn test_auth_state_creation() {
 
 #[sim_test]
 async fn test_create_authenticator_state_object() {
-    let test_cluster =
-        TestClusterBuilder::new().with_protocol_version(23.into()).with_epoch_duration_ms(15000).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_protocol_version(23.into())
+        .with_epoch_duration_ms(15000)
+        .build()
+        .await;
 
     let handles = test_cluster.all_node_handles();
 
@@ -215,15 +275,12 @@ async fn test_create_authenticator_state_object() {
 #[sim_test]
 async fn test_conflicting_jwks() {
     use futures::StreamExt;
-    use std::{
-        collections::HashSet,
-        sync::{Arc, Mutex},
-    };
-    use sui_json_rpc_types::{SuiTransactionBlockEffectsAPI, TransactionFilter};
-    use sui_types::{
-        base_types::ObjectID,
-        transaction::{TransactionDataAPI, TransactionKind},
-    };
+    use std::collections::HashSet;
+    use std::sync::{Arc, Mutex};
+    use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
+    use sui_json_rpc_types::TransactionFilter;
+    use sui_types::base_types::ObjectID;
+    use sui_types::transaction::{TransactionDataAPI, TransactionKind};
     use tokio::time::Duration;
 
     let test_cluster = TestClusterBuilder::new()
@@ -236,16 +293,18 @@ async fn test_conflicting_jwks() {
     let jwks_clone = jwks.clone();
 
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        let mut txns = node
-            .state()
-            .subscription_handler
-            .subscribe_transactions(TransactionFilter::ChangedObject(ObjectID::from_hex_literal("0x7").unwrap()));
+        let mut txns = node.state().subscription_handler.subscribe_transactions(
+            TransactionFilter::ChangedObject(ObjectID::from_hex_literal("0x7").unwrap()),
+        );
         let state = node.state();
 
         tokio::spawn(async move {
             while let Some(tx) = txns.next().await {
                 let digest = *tx.transaction_digest();
-                let tx = state.get_transaction_cache_reader().get_transaction_block(&digest).unwrap();
+                let tx = state
+                    .get_transaction_cache_reader()
+                    .get_transaction_block(&digest)
+                    .unwrap();
                 match &tx.data().intent_message().value.kind() {
                     TransactionKind::EndOfEpochTransaction(_) => (),
                     TransactionKind::AuthenticatorStateUpdate(update) => {

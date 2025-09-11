@@ -5,7 +5,8 @@
 /// operation. Can be used to limit any action (eg transfer, toCoin, fromCoin).
 module examples::limiter_rule {
     use std::string::String;
-    use one::{token::{Self, TokenPolicy, TokenPolicyCap, ActionRequest}, vec_map::{Self, VecMap}};
+    use sui::token::{Self, TokenPolicy, TokenPolicyCap, ActionRequest};
+    use sui::vec_map::{Self, VecMap};
 
     /// Trying to perform an action that exceeds the limit.
     const ELimitExceeded: u64 = 0;
@@ -14,7 +15,7 @@ module examples::limiter_rule {
     public struct Limiter has drop {}
 
     /// The Config object for the `lo
-    public struct Config has store, drop {
+    public struct Config has drop, store {
         /// Mapping of Action -> Limit
         limits: VecMap<String, u64>,
     }
@@ -68,14 +69,17 @@ module examples::limiter_rule {
 #[test_only]
 module examples::limiter_rule_tests {
     use examples::limiter_rule::{Self as limiter, Limiter};
-    use std::{option::none, string::utf8};
-    use one::{token, token_test_utils::{Self as test, TEST}, vec_map};
+    use std::option::none;
+    use std::string::utf8;
+    use sui::token;
+    use sui::token_test_utils::{Self as test, TEST};
+    use sui::vec_map;
 
     #[test]
     // Scenario: add a limiter rule for 100 tokens per operation, verify that
     // the request with 100 tokens is confirmed
     fun add_limiter_default() {
-        let ctx = &mut one::tx_context::dummy();
+        let ctx = &mut sui::tx_context::dummy();
         let (mut policy, cap) = test::get_policy(ctx);
 
         token::add_rule_for_action<TEST, Limiter>(&mut policy, &cap, utf8(b"action"), ctx);
@@ -93,7 +97,7 @@ module examples::limiter_rule_tests {
     // the request with 100 tokens is confirmed; then remove the rule and verify
     // that the request with 100 tokens is not confirmed and repeat step (1)
     fun add_remove_limiter() {
-        let ctx = &mut one::tx_context::dummy();
+        let ctx = &mut sui::tx_context::dummy();
         let (mut policy, cap) = test::get_policy(ctx);
 
         let mut config = vec_map::empty();
@@ -131,7 +135,7 @@ module examples::limiter_rule_tests {
     // Scenario: add a limiter rule for 100 tokens per operation, verify that
     // the request with 101 tokens aborts with `ELimitExceeded`
     fun add_limiter_limit_exceeded_fail() {
-        let ctx = &mut one::tx_context::dummy();
+        let ctx = &mut sui::tx_context::dummy();
         let (mut policy, cap) = test::get_policy(ctx);
 
         let mut config = vec_map::empty();

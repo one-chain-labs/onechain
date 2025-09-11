@@ -3,28 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{
-    errors::{offset_out_of_bounds, PartialVMError},
+    IndexKind,
+    errors::{PartialVMError, offset_out_of_bounds},
     file_format::{
-        Bytecode,
-        CodeOffset,
-        CompiledModule,
-        ConstantPoolIndex,
-        FieldHandleIndex,
-        FieldInstantiationIndex,
-        FunctionDefinitionIndex,
-        FunctionHandleIndex,
-        FunctionInstantiationIndex,
-        LocalIndex,
-        SignatureIndex,
-        StructDefInstantiationIndex,
-        StructDefinitionIndex,
-        TableIndex,
-        VariantHandleIndex,
-        VariantInstantiationHandleIndex,
+        Bytecode, CodeOffset, CompiledModule, ConstantPoolIndex, FieldHandleIndex,
+        FieldInstantiationIndex, FunctionDefinitionIndex, FunctionHandleIndex,
+        FunctionInstantiationIndex, LocalIndex, SignatureIndex, StructDefInstantiationIndex,
+        StructDefinitionIndex, TableIndex, VariantHandleIndex, VariantInstantiationHandleIndex,
         VariantJumpTableIndex,
     },
     internals::ModuleIndex,
-    IndexKind,
 };
 use move_core_types::vm_status::StatusCode;
 use proptest::{prelude::*, sample::Index as PropIndex};
@@ -40,11 +28,13 @@ pub struct CodeUnitBoundsMutation {
 
 impl CodeUnitBoundsMutation {
     pub fn strategy() -> impl Strategy<Value = Self> {
-        (any::<PropIndex>(), any::<PropIndex>(), 0..16_usize).prop_map(|(function_def, bytecode, offset)| Self {
-            function_def,
-            bytecode,
-            offset,
-        })
+        (any::<PropIndex>(), any::<PropIndex>(), 0..16_usize).prop_map(
+            |(function_def, bytecode, offset)| Self {
+                function_def,
+                bytecode,
+                offset,
+            },
+        )
     }
 }
 
@@ -151,16 +141,26 @@ macro_rules! locals_bytecode {
 
 impl<'a> ApplyCodeUnitBoundsContext<'a> {
     pub fn new(module: &'a mut CompiledModule, mutations: Vec<CodeUnitBoundsMutation>) -> Self {
-        Self { module, mutations: Some(mutations) }
+        Self {
+            module,
+            mutations: Some(mutations),
+        }
     }
 
     pub fn apply(mut self) -> Vec<PartialVMError> {
         let function_def_len = self.module.function_defs.len();
 
         let mut mutation_map = BTreeMap::new();
-        for mutation in self.mutations.take().expect("mutations should always be present") {
+        for mutation in self
+            .mutations
+            .take()
+            .expect("mutations should always be present")
+        {
             let picked_idx = mutation.function_def.index(function_def_len);
-            mutation_map.entry(picked_idx).or_insert_with(Vec::new).push(mutation);
+            mutation_map
+                .entry(picked_idx)
+                .or_insert_with(Vec::new)
+                .push(mutation);
         }
 
         let mut results = vec![];
@@ -171,7 +171,11 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
         results
     }
 
-    fn apply_one(&mut self, fidx: usize, mutations: Vec<CodeUnitBoundsMutation>) -> Vec<PartialVMError> {
+    fn apply_one(
+        &mut self,
+        fidx: usize,
+        mutations: Vec<CodeUnitBoundsMutation>,
+    ) -> Vec<PartialVMError> {
         // For this function def, find all the places where a bounds mutation can be applied.
         let func_def = &mut self.module.function_defs[fidx];
         let current_fdef = FunctionDefinitionIndex(fidx as TableIndex);
@@ -183,8 +187,9 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
         let code = &mut code.code;
         let code_len = code.len();
 
-        let interesting_offsets: Vec<usize> =
-            (0..code.len()).filter(|bytecode_idx| is_interesting(&code[*bytecode_idx])).collect();
+        let interesting_offsets: Vec<usize> = (0..code.len())
+            .filter(|bytecode_idx| is_interesting(&code[*bytecode_idx]))
+            .collect();
         let to_mutate = crate::helpers::pick_slice_idxs(interesting_offsets.len(), &mutations);
 
         // These have to be computed upfront because self.module is being mutated below.
@@ -208,9 +213,14 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                 use Bytecode::*;
 
                 let (new_bytecode, err) = match code[bytecode_idx] {
-                    LdConst(_) => {
-                        new_bytecode!(constant_pool_len, current_fdef, bytecode_idx, offset, ConstantPoolIndex, LdConst)
-                    }
+                    LdConst(_) => new_bytecode!(
+                        constant_pool_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        ConstantPoolIndex,
+                        LdConst
+                    ),
                     ImmBorrowField(_) => new_bytecode!(
                         field_handle_len,
                         current_fdef,
@@ -309,8 +319,20 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     StLoc(_) => {
                         locals_bytecode!(locals_len, current_fdef, bytecode_idx, offset, StLoc)
                     }
-                    MutBorrowLoc(_) => locals_bytecode!(locals_len, current_fdef, bytecode_idx, offset, MutBorrowLoc),
-                    ImmBorrowLoc(_) => locals_bytecode!(locals_len, current_fdef, bytecode_idx, offset, ImmBorrowLoc),
+                    MutBorrowLoc(_) => locals_bytecode!(
+                        locals_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        MutBorrowLoc
+                    ),
+                    ImmBorrowLoc(_) => locals_bytecode!(
+                        locals_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        ImmBorrowLoc
+                    ),
                     VecPack(_, num) => new_bytecode!(
                         signature_pool_len,
                         current_fdef,
@@ -320,9 +342,14 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         VecPack,
                         num
                     ),
-                    VecLen(_) => {
-                        new_bytecode!(signature_pool_len, current_fdef, bytecode_idx, offset, SignatureIndex, VecLen)
-                    }
+                    VecLen(_) => new_bytecode!(
+                        signature_pool_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        SignatureIndex,
+                        VecLen
+                    ),
                     VecImmBorrow(_) => new_bytecode!(
                         signature_pool_len,
                         current_fdef,
@@ -347,9 +374,14 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         SignatureIndex,
                         VecPushBack
                     ),
-                    VecPopBack(_) => {
-                        new_bytecode!(signature_pool_len, current_fdef, bytecode_idx, offset, SignatureIndex, VecPopBack)
-                    }
+                    VecPopBack(_) => new_bytecode!(
+                        signature_pool_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        SignatureIndex,
+                        VecPopBack
+                    ),
                     VecUnpack(_, num) => new_bytecode!(
                         signature_pool_len,
                         current_fdef,
@@ -359,9 +391,14 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         VecUnpack,
                         num
                     ),
-                    VecSwap(_) => {
-                        new_bytecode!(signature_pool_len, current_fdef, bytecode_idx, offset, SignatureIndex, VecSwap)
-                    }
+                    VecSwap(_) => new_bytecode!(
+                        signature_pool_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        SignatureIndex,
+                        VecSwap
+                    ),
                     PackVariant(_) => new_bytecode! {
                         variant_handle_len,
                         current_fdef,
@@ -449,10 +486,11 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     | MoveToGenericDeprecated(_) => {
                         panic!("Bytecode deprecated: {:?}", code[bytecode_idx])
                     }
-                    FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_)
-                    | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | ReadRef
-                    | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not
-                    | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => {
+                    FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_)
+                    | LdU128(_) | LdU256(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128
+                    | CastU256 | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod
+                    | Div | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt
+                    | Gt | Le | Ge | Abort | Nop => {
                         panic!("Bytecode has no internal index: {:?}", code[bytecode_idx])
                     }
                 };
@@ -519,8 +557,9 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
 
         // List out the other options explicitly so there's a compile error if a new
         // bytecode gets added.
-        FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | CastU8 | CastU16
-        | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod
-        | Div | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
+        FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_)
+        | LdU256(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue
+        | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor
+        | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
     }
 }

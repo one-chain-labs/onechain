@@ -1,31 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    balance::{self, Balance},
-    base64::Base64,
-    big_int::BigInt,
-    coin::Coin,
-    display::DisplayEntry,
-    dynamic_field::{DynamicField, DynamicFieldName},
-    move_object::{MoveObject, MoveObjectImpl},
-    move_value::MoveValue,
-    object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
-    owner::OwnerImpl,
-    stake::StakedOct,
-    sui_address::SuiAddress,
-    suins_registration::{DomainFormat, SuinsRegistration},
-    transaction_block::{self, TransactionBlock, TransactionBlockFilter},
-    type_filter::ExactTypeFilter,
-    uint53::UInt53,
-};
-use crate::{connection::ScanConnection, data::Db, error::Error};
-use async_graphql::{connection::Connection, *};
-use sui_types::{
-    coin::{CoinMetadata as NativeCoinMetadata, TreasuryCap},
-    gas_coin::{GAS, TOTAL_SUPPLY_OCT},
-    TypeTag,
-};
+use super::balance::{self, Balance};
+use super::base64::Base64;
+use super::big_int::BigInt;
+use super::coin::Coin;
+use super::display::DisplayEntry;
+use super::dynamic_field::{DynamicField, DynamicFieldName};
+use super::move_object::{MoveObject, MoveObjectImpl};
+use super::move_value::MoveValue;
+use super::object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus};
+use super::owner::OwnerImpl;
+use super::stake::StakedOct;
+use super::sui_address::SuiAddress;
+use super::suins_registration::{DomainFormat, SuinsRegistration};
+use super::transaction_block::{self, TransactionBlock, TransactionBlockFilter};
+use super::type_filter::ExactTypeFilter;
+use super::uint53::UInt53;
+use crate::connection::ScanConnection;
+use crate::data::Db;
+use crate::error::Error;
+use async_graphql::connection::Connection;
+use async_graphql::*;
+use sui_types::coin::{CoinMetadata as NativeCoinMetadata, TreasuryCap};
+use sui_types::gas_coin::{GAS, TOTAL_SUPPLY_OCT};
+use sui_types::TypeTag;
 
 pub(crate) struct CoinMetadata {
     pub super_: MoveObject,
@@ -54,13 +53,21 @@ impl CoinMetadata {
         before: Option<object::Cursor>,
         filter: Option<ObjectFilter>,
     ) -> Result<Connection<String, MoveObject>> {
-        OwnerImpl::from(&self.super_.super_).objects(ctx, first, after, last, before, filter).await
+        OwnerImpl::from(&self.super_.super_)
+            .objects(ctx, first, after, last, before, filter)
+            .await
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
     /// it defaults to `0x2::oct::OCT`.
-    pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
-        OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
+    pub(crate) async fn balance(
+        &self,
+        ctx: &Context<'_>,
+        type_: Option<ExactTypeFilter>,
+    ) -> Result<Option<Balance>> {
+        OwnerImpl::from(&self.super_.super_)
+            .balance(ctx, type_)
+            .await
     }
 
     /// The balances of all coin types owned by this object.
@@ -72,7 +79,9 @@ impl CoinMetadata {
         last: Option<u64>,
         before: Option<balance::Cursor>,
     ) -> Result<Connection<String, Balance>> {
-        OwnerImpl::from(&self.super_.super_).balances(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .balances(ctx, first, after, last, before)
+            .await
     }
 
     /// The coin objects for this object.
@@ -87,7 +96,9 @@ impl CoinMetadata {
         before: Option<object::Cursor>,
         type_: Option<ExactTypeFilter>,
     ) -> Result<Connection<String, Coin>> {
-        OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
+        OwnerImpl::from(&self.super_.super_)
+            .coins(ctx, first, after, last, before, type_)
+            .await
     }
 
     /// The `0x3::staking_pool::StakedOct` objects owned by this object.
@@ -99,7 +110,9 @@ impl CoinMetadata {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .staked_octs(ctx, first, after, last, before)
+            .await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -108,7 +121,9 @@ impl CoinMetadata {
         ctx: &Context<'_>,
         format: Option<DomainFormat>,
     ) -> Result<Option<String>> {
-        OwnerImpl::from(&self.super_.super_).default_suins_name(ctx, format).await
+        OwnerImpl::from(&self.super_.super_)
+            .default_suins_name(ctx, format)
+            .await
     }
 
     /// The SuinsRegistration NFTs owned by this object. These grant the owner the capability to
@@ -121,7 +136,9 @@ impl CoinMetadata {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, SuinsRegistration>> {
-        OwnerImpl::from(&self.super_.super_).suins_registrations(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .suins_registrations(ctx, first, after, last, before)
+            .await
     }
 
     pub(crate) async fn version(&self) -> UInt53 {
@@ -150,8 +167,13 @@ impl CoinMetadata {
     }
 
     /// The transaction block that created this version of the object.
-    pub(crate) async fn previous_transaction_block(&self, ctx: &Context<'_>) -> Result<Option<TransactionBlock>> {
-        ObjectImpl(&self.super_.super_).previous_transaction_block(ctx).await
+    pub(crate) async fn previous_transaction_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<TransactionBlock>> {
+        ObjectImpl(&self.super_.super_)
+            .previous_transaction_block(ctx)
+            .await
     }
 
     /// The amount of SUI we would rebate if this object gets deleted or mutated. This number is
@@ -227,8 +249,14 @@ impl CoinMetadata {
     ///
     /// Dynamic fields on wrapped objects can be accessed by using the same API under the Owner
     /// type.
-    pub(crate) async fn dynamic_field(&self, ctx: &Context<'_>, name: DynamicFieldName) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_).dynamic_field(ctx, name, Some(self.super_.root_version())).await
+    pub(crate) async fn dynamic_field(
+        &self,
+        ctx: &Context<'_>,
+        name: DynamicFieldName,
+    ) -> Result<Option<DynamicField>> {
+        OwnerImpl::from(&self.super_.super_)
+            .dynamic_field(ctx, name, Some(self.super_.root_version()))
+            .await
     }
 
     /// Access a dynamic object field on an object using its name. Names are arbitrary Move values
@@ -243,7 +271,9 @@ impl CoinMetadata {
         ctx: &Context<'_>,
         name: DynamicFieldName,
     ) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_).dynamic_object_field(ctx, name, Some(self.super_.root_version())).await
+        OwnerImpl::from(&self.super_.super_)
+            .dynamic_object_field(ctx, name, Some(self.super_.root_version()))
+            .await
     }
 
     /// The dynamic fields and dynamic object fields on an object.
@@ -259,7 +289,14 @@ impl CoinMetadata {
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, DynamicField>> {
         OwnerImpl::from(&self.super_.super_)
-            .dynamic_fields(ctx, first, after, last, before, Some(self.super_.root_version()))
+            .dynamic_fields(
+                ctx,
+                first,
+                after,
+                last,
+                before,
+                Some(self.super_.root_version()),
+            )
             .await
     }
 
@@ -294,10 +331,13 @@ impl CoinMetadata {
             return Ok(None);
         };
 
-        let supply =
-            CoinMetadata::query_total_supply(ctx.data_unchecked(), coin_type, self.super_.super_.checkpoint_viewed_at)
-                .await
-                .extend()?;
+        let supply = CoinMetadata::query_total_supply(
+            ctx.data_unchecked(),
+            coin_type,
+            self.super_.super_.checkpoint_viewed_at,
+        )
+        .await
+        .extend()?;
 
         Ok(supply.map(BigInt::from))
     }
@@ -317,16 +357,24 @@ impl CoinMetadata {
         };
 
         let metadata_type = NativeCoinMetadata::type_(*coin_struct);
-        let Some(object) = Object::query_singleton(db, metadata_type, checkpoint_viewed_at).await? else {
+        let Some(object) = Object::query_singleton(db, metadata_type, checkpoint_viewed_at).await?
+        else {
             return Ok(None);
         };
 
         let move_object = MoveObject::try_from(&object).map_err(|_| {
-            Error::Internal(format!("Expected {} to be CoinMetadata, but it is not an object.", object.address,))
+            Error::Internal(format!(
+                "Expected {} to be CoinMetadata, but it is not an object.",
+                object.address,
+            ))
         })?;
 
-        let coin_metadata = CoinMetadata::try_from(&move_object)
-            .map_err(|_| Error::Internal(format!("Expected {} to be CoinMetadata, but it is not.", object.address,)))?;
+        let coin_metadata = CoinMetadata::try_from(&move_object).map_err(|_| {
+            Error::Internal(format!(
+                "Expected {} to be CoinMetadata, but it is not.",
+                object.address,
+            ))
+        })?;
 
         Ok(Some(coin_metadata))
     }
@@ -346,7 +394,8 @@ impl CoinMetadata {
             TOTAL_SUPPLY_OCT
         } else {
             let cap_type = TreasuryCap::type_(*coin_struct);
-            let Some(object) = Object::query_singleton(db, cap_type, checkpoint_viewed_at).await? else {
+            let Some(object) = Object::query_singleton(db, cap_type, checkpoint_viewed_at).await?
+            else {
                 return Ok(None);
             };
 
@@ -355,7 +404,10 @@ impl CoinMetadata {
             };
 
             let treasury_cap = TreasuryCap::try_from(native.clone()).map_err(|e| {
-                Error::Internal(format!("Error while deserializing treasury cap {}: {e}", object.address,))
+                Error::Internal(format!(
+                    "Error while deserializing treasury cap {}: {e}",
+                    object.address,
+                ))
             })?;
 
             treasury_cap.total_supply.value
@@ -373,7 +425,8 @@ impl TryFrom<&MoveObject> for CoinMetadata {
 
         Ok(Self {
             super_: move_object.clone(),
-            native: bcs::from_bytes(move_object.native.contents()).map_err(CoinMetadataDowncastError::Bcs)?,
+            native: bcs::from_bytes(move_object.native.contents())
+                .map_err(CoinMetadataDowncastError::Bcs)?,
         })
     }
 }

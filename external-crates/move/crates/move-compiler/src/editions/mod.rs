@@ -61,8 +61,7 @@ pub enum Flavor {
     Sui,
 }
 
-pub const UPGRADE_NOTE: &str =
-    "You can update the edition in the 'Move.toml', or via command line flag if invoking the \
+pub const UPGRADE_NOTE: &str = "You can update the edition in the 'Move.toml', or via command line flag if invoking the \
     compiler directly.";
 
 //**************************************************************************************************
@@ -71,7 +70,12 @@ pub const UPGRADE_NOTE: &str =
 
 /// Returns true if the feature is present in the given edition.
 /// Adds an error to the environment.
-pub fn check_feature_or_error(reporter: &DiagnosticReporter, edition: Edition, feature: FeatureGate, loc: Loc) -> bool {
+pub fn check_feature_or_error(
+    reporter: &DiagnosticReporter,
+    edition: Edition,
+    feature: FeatureGate,
+    loc: Loc,
+) -> bool {
     if !edition.supports(feature) {
         reporter.add_diag(create_feature_error(edition, feature, loc));
         false
@@ -84,24 +88,28 @@ pub fn feature_edition_error_msg(edition: Edition, feature: FeatureGate) -> Opti
     let supports_feature = edition.supports(feature);
     if !supports_feature {
         let valid_editions = valid_editions_for_feature(feature);
-        let message = if valid_editions.is_empty() && Edition::DEVELOPMENT.features().contains(&feature) {
-            format!("{} under development and should not be used right now.", feature.error_prefix())
-        } else {
-            valid_editions.last().map_or(
+        let message =
+            if valid_editions.is_empty() && Edition::DEVELOPMENT.features().contains(&feature) {
                 format!(
-                    "{} not supported by any current edition '{edition}', \
-                         the feature is still in development",
+                    "{} under development and should not be used right now.",
                     feature.error_prefix()
-                ),
-                |supporting_edition| {
+                )
+            } else {
+                valid_editions.last().map_or(
                     format!(
-                        "{} not supported by current edition '{edition}'; \
+                        "{} not supported by any current edition '{edition}', \
+                         the feature is still in development",
+                        feature.error_prefix()
+                    ),
+                    |supporting_edition| {
+                        format!(
+                            "{} not supported by current edition '{edition}'; \
                              the '{supporting_edition}' edition supports this feature",
-                        feature.error_prefix(),
-                    )
-                },
-            )
-        };
+                            feature.error_prefix(),
+                        )
+                    },
+                )
+            };
         Some(message)
     } else {
         None
@@ -119,7 +127,11 @@ pub fn create_feature_error(edition: Edition, feature: FeatureGate, loc: Loc) ->
 }
 
 pub fn valid_editions_for_feature(feature: FeatureGate) -> Vec<Edition> {
-    Edition::VALID.iter().filter(|e| e.supports(feature)).copied().collect()
+    Edition::VALID
+        .iter()
+        .filter(|e| e.supports(feature))
+        .copied()
+        .collect()
 }
 
 //**************************************************************************************************
@@ -161,18 +173,49 @@ const E2024_FEATURES: &[FeatureGate] = &[
 ];
 
 impl Edition {
-    pub const ALL: &'static [Self] =
-        &[Self::LEGACY, Self::E2024_ALPHA, Self::E2024_BETA, Self::E2024_MIGRATION, Self::DEVELOPMENT, Self::E2024];
-    pub const DEVELOPMENT: Self = Self { edition: symbol!("development"), release: None };
-    pub const E2024: Self = Self { edition: symbol!("2024"), release: None };
-    pub const E2024_ALPHA: Self = Self { edition: symbol!("2024"), release: Some(symbol!("alpha")) };
-    pub const E2024_BETA: Self = Self { edition: symbol!("2024"), release: Some(symbol!("beta")) };
-    pub const E2024_MIGRATION: Self = Self { edition: symbol!("2024"), release: Some(symbol!("migration")) };
-    pub const LEGACY: Self = Self { edition: symbol!("legacy"), release: None };
+    pub const LEGACY: Self = Self {
+        edition: symbol!("legacy"),
+        release: None,
+    };
+    pub const E2024_ALPHA: Self = Self {
+        edition: symbol!("2024"),
+        release: Some(symbol!("alpha")),
+    };
+    pub const E2024_BETA: Self = Self {
+        edition: symbol!("2024"),
+        release: Some(symbol!("beta")),
+    };
+    pub const E2024_MIGRATION: Self = Self {
+        edition: symbol!("2024"),
+        release: Some(symbol!("migration")),
+    };
+    pub const DEVELOPMENT: Self = Self {
+        edition: symbol!("development"),
+        release: None,
+    };
+    pub const E2024: Self = Self {
+        edition: symbol!("2024"),
+        release: None,
+    };
+
     const SEP: &'static str = ".";
+
+    pub const ALL: &'static [Self] = &[
+        Self::LEGACY,
+        Self::E2024_ALPHA,
+        Self::E2024_BETA,
+        Self::E2024_MIGRATION,
+        Self::DEVELOPMENT,
+        Self::E2024,
+    ];
     // NB: This is the list of editions that are considered "valid" for the purposes of the Move.
     // This list should be kept in order from oldest edition to newest.
-    pub const VALID: &'static [Self] = &[Self::LEGACY, Self::E2024_ALPHA, Self::E2024_BETA, Self::E2024];
+    pub const VALID: &'static [Self] = &[
+        Self::LEGACY,
+        Self::E2024_ALPHA,
+        Self::E2024_BETA,
+        Self::E2024,
+    ];
 
     pub fn supports(&self, feature: FeatureGate) -> bool {
         SUPPORTED_FEATURES.get(self).unwrap().contains(&feature)
@@ -238,9 +281,9 @@ impl Edition {
 }
 
 impl Flavor {
-    pub const ALL: &'static [Self] = &[Self::Core, Self::Sui];
     pub const CORE: &'static str = "core";
     pub const SUI: &'static str = "one";
+    pub const ALL: &'static [Self] = &[Self::Core, Self::Sui];
 }
 
 impl FeatureGate {
@@ -280,9 +323,15 @@ impl FromStr for Edition {
 
     // Required method
     fn from_str(s: &str) -> anyhow::Result<Self> {
-        let (edition, release) =
-            if let Some((edition, release)) = s.split_once(Edition::SEP) { (edition, Some(release)) } else { (s, None) };
-        let edition = Edition { edition: Symbol::from(edition), release: release.map(Symbol::from) };
+        let (edition, release) = if let Some((edition, release)) = s.split_once(Edition::SEP) {
+            (edition, Some(release))
+        } else {
+            (s, None)
+        };
+        let edition = Edition {
+            edition: Symbol::from(edition),
+            release: release.map(Symbol::from),
+        };
         if !Self::VALID.iter().any(|e| e == &edition) && edition != Edition::DEVELOPMENT {
             return Err(edition.unknown_edition_error());
         }
@@ -299,7 +348,11 @@ impl FromStr for Flavor {
             Self::SUI => Self::Sui,
             _ => anyhow::bail!(
                 "Unknown flavor \"{s}\". Expected one of: {}",
-                Self::ALL.iter().map(|e| format!("\"{}\"", e)).collect::<Vec<_>>().join(", ")
+                Self::ALL
+                    .iter()
+                    .map(|e| format!("\"{}\"", e))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
         })
     }
@@ -310,7 +363,8 @@ impl<'de> Deserialize<'de> for Edition {
     where
         D: serde::Deserializer<'de>,
     {
-        Edition::from_str(&String::deserialize(deserializer)?).map_err(|e| serde::de::Error::custom(format!("{e}")))
+        Edition::from_str(&String::deserialize(deserializer)?)
+            .map_err(|e| serde::de::Error::custom(format!("{e}")))
     }
 }
 
@@ -319,7 +373,8 @@ impl<'de> Deserialize<'de> for Flavor {
     where
         D: serde::Deserializer<'de>,
     {
-        Flavor::from_str(&String::deserialize(deserializer)?).map_err(|e| serde::de::Error::custom(format!("{e}")))
+        Flavor::from_str(&String::deserialize(deserializer)?)
+            .map_err(|e| serde::de::Error::custom(format!("{e}")))
     }
 }
 

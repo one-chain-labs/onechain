@@ -74,20 +74,26 @@ impl<'a> StackUsageVerifier<'a> {
             // Check that the stack height is sufficient to accommodate the number
             // of pops this instruction does
             if stack_size_increment < num_pops {
-                return Err(PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
-                    .at_code_offset(self.current_function(), block_start));
+                return Err(
+                    PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
+                        .at_code_offset(self.current_function(), block_start),
+                );
             }
             if let Some(new_incr) = u64::checked_sub(stack_size_increment, num_pops) {
                 stack_size_increment = new_incr
             } else {
-                return Err(PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
-                    .at_code_offset(self.current_function(), block_start));
+                return Err(
+                    PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
+                        .at_code_offset(self.current_function(), block_start),
+                );
             };
             if let Some(new_incr) = u64::checked_add(stack_size_increment, num_pushes) {
                 stack_size_increment = new_incr
             } else {
-                return Err(PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
-                    .at_code_offset(self.current_function(), block_start));
+                return Err(
+                    PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
+                        .at_code_offset(self.current_function(), block_start),
+                );
             };
 
             if stack_size_increment > config.max_value_stack_size as u64 {
@@ -99,8 +105,10 @@ impl<'a> StackUsageVerifier<'a> {
         if stack_size_increment == 0 {
             Ok(())
         } else {
-            Err(PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
-                .at_code_offset(self.current_function(), block_start))
+            Err(
+                PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
+                    .at_code_offset(self.current_function(), block_start),
+            )
         }
     }
 
@@ -110,7 +118,11 @@ impl<'a> StackUsageVerifier<'a> {
     fn instruction_effect(&self, instruction: &Bytecode) -> PartialVMResult<(u64, u64)> {
         Ok(match instruction {
             // Instructions that pop, but don't push
-            Bytecode::Pop | Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::StLoc(_) | Bytecode::Abort => (1, 0),
+            Bytecode::Pop
+            | Bytecode::BrTrue(_)
+            | Bytecode::BrFalse(_)
+            | Bytecode::StLoc(_)
+            | Bytecode::Abort => (1, 0),
 
             // Instructions that push, but don't pop
             Bytecode::LdU8(_)
@@ -262,8 +274,10 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::UnpackVariantMutRef(_)
             | Bytecode::UnpackVariantGenericMutRef(_)
             | Bytecode::VariantSwitch(_) => {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Unexpected variant opcode in version 0".to_string()));
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Unexpected variant opcode in version 0".to_string()),
+                );
             }
         })
     }

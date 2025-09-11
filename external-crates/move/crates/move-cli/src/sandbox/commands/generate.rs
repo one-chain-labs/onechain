@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sandbox::utils::on_disk_state_view::OnDiskStateView;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use move_bytecode_utils::layout::{SerdeLayoutBuilder, SerdeLayoutConfig};
 use move_core_types::{
     identifier::Identifier,
@@ -26,20 +26,29 @@ pub fn generate_struct_layouts(
             // Generate for one struct
             let type_params = type_params_opt.as_ref().cloned().unwrap_or_default();
             let name = Identifier::new(struct_.as_str())?;
-            let struct_tag =
-                StructTag { address: *module_id.address(), module: module_id.name().to_owned(), name, type_params };
-            let mut layout_builder = SerdeLayoutBuilder::new_with_config(&state, SerdeLayoutConfig {
-                separator,
-                omit_addresses,
-                ignore_phantom_types,
-                shallow,
-            });
+            let struct_tag = StructTag {
+                address: *module_id.address(),
+                module: module_id.name().to_owned(),
+                name,
+                type_params,
+            };
+            let mut layout_builder = SerdeLayoutBuilder::new_with_config(
+                &state,
+                SerdeLayoutConfig {
+                    separator,
+                    omit_addresses,
+                    ignore_phantom_types,
+                    shallow,
+                },
+            );
             layout_builder.build_data_layout(&struct_tag)?;
             let layout = serde_yaml::to_string(layout_builder.registry())?;
             state.save_struct_layouts(&layout)?;
             println!("{}", layout);
         } else {
-            unimplemented!("Generating layout for all structs in a module. Use the --module and --struct options")
+            unimplemented!(
+                "Generating layout for all structs in a module. Use the --module and --struct options"
+            )
         }
         Ok(())
     } else {

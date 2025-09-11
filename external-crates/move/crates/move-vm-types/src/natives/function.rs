@@ -18,7 +18,7 @@
 //! function.
 
 use crate::values::Value;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 pub use move_binary_format::errors::{PartialVMError, PartialVMResult};
 pub use move_core_types::{gas_algebra::InternalGas, vm_status::StatusCode};
@@ -41,24 +41,36 @@ pub struct NativeResult {
 impl NativeResult {
     /// Return values of a successful execution.
     pub fn ok(cost: InternalGas, values: SmallVec<[Value; 1]>) -> Self {
-        NativeResult { cost, result: Ok(values) }
+        NativeResult {
+            cost,
+            result: Ok(values),
+        }
     }
 
     /// Failed execution. The failure is a runtime failure in the function and not an invariant
     /// failure of the VM which would raise a `PartialVMError` error directly.
-    /// The only thing the funciton can specify is its abort code, as if it had invoked the `Abort`
+    /// The only thing the function can specify is its abort code, as if it had invoked the `Abort`
     /// bytecode instruction
     pub fn err(cost: InternalGas, abort_code: u64) -> Self {
-        NativeResult { cost, result: Err(abort_code) }
+        NativeResult {
+            cost,
+            result: Err(abort_code),
+        }
     }
 
     /// Convert a PartialVMResult<()> into a PartialVMResult<NativeResult>
-    pub fn map_partial_vm_result_empty(cost: InternalGas, res: PartialVMResult<()>) -> PartialVMResult<Self> {
+    pub fn map_partial_vm_result_empty(
+        cost: InternalGas,
+        res: PartialVMResult<()>,
+    ) -> PartialVMResult<Self> {
         let result = match res {
             Ok(_) => NativeResult::ok(cost, smallvec![]),
             Err(err) if err.major_status() == StatusCode::ABORTED => {
                 let (_, abort_code, _, _, _, _) = err.all_data();
-                NativeResult::err(cost, abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64))
+                NativeResult::err(
+                    cost,
+                    abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
+                )
             }
             Err(err) => {
                 return Err(err);
@@ -68,12 +80,18 @@ impl NativeResult {
     }
 
     /// Convert a PartialVMResult<Value> into a PartialVMResult<NativeResult>
-    pub fn map_partial_vm_result_one(cost: InternalGas, res: PartialVMResult<Value>) -> PartialVMResult<Self> {
+    pub fn map_partial_vm_result_one(
+        cost: InternalGas,
+        res: PartialVMResult<Value>,
+    ) -> PartialVMResult<Self> {
         let result = match res {
             Ok(val) => NativeResult::ok(cost, smallvec![val]),
             Err(err) if err.major_status() == StatusCode::ABORTED => {
                 let (_, abort_code, _, _, _, _) = err.all_data();
-                NativeResult::err(cost, abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64))
+                NativeResult::err(
+                    cost,
+                    abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
+                )
             }
             Err(err) => {
                 return Err(err);
@@ -93,7 +111,11 @@ macro_rules! pop_arg {
     ($arguments:ident, $t:ty) => {{
         use $crate::natives::function::{NativeResult, PartialVMError, StatusCode};
         match $arguments.pop_back().map(|v| v.value_as::<$t>()) {
-            None => return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)),
+            None => {
+                return Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                ));
+            }
             Some(Err(e)) => return Err(e),
             Some(Ok(v)) => v,
         }

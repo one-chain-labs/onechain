@@ -28,7 +28,9 @@ pub struct ReconfigState {
 
 impl Default for ReconfigState {
     fn default() -> Self {
-        Self { status: ReconfigCertStatus::AcceptAllCerts }
+        Self {
+            status: ReconfigCertStatus::AcceptAllCerts,
+        }
     }
 }
 
@@ -52,7 +54,10 @@ impl ReconfigState {
     }
 
     pub fn should_accept_consensus_certs(&self) -> bool {
-        matches!(self.status, ReconfigCertStatus::AcceptAllCerts | ReconfigCertStatus::RejectUserCerts)
+        matches!(
+            self.status,
+            ReconfigCertStatus::AcceptAllCerts | ReconfigCertStatus::RejectUserCerts
+        )
     }
 
     pub fn is_reject_all_certs(&self) -> bool {

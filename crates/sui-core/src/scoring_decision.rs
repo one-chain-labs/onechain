@@ -4,7 +4,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use arc_swap::ArcSwap;
 use consensus_config::Committee as ConsensusCommittee;
-use sui_types::{base_types::AuthorityName, committee::Committee, messages_consensus::AuthorityIndex};
+use sui_types::{
+    base_types::AuthorityName, committee::Committee, messages_consensus::AuthorityIndex,
+};
 use tracing::debug;
 
 use crate::authority::AuthorityMetrics;
@@ -24,11 +26,7 @@ pub(crate) fn update_low_scoring_authorities(
     metrics: &Arc<AuthorityMetrics>,
     consensus_bad_nodes_stake_threshold: u64,
 ) {
-    assert!(
-        (0..=33).contains(&consensus_bad_nodes_stake_threshold),
-        "The bad_nodes_stake_threshold should be in range [0 - 33], out of bounds parameter detected {}",
-        consensus_bad_nodes_stake_threshold
-    );
+    assert!((0..=33).contains(&consensus_bad_nodes_stake_threshold), "The bad_nodes_stake_threshold should be in range [0 - 33], out of bounds parameter detected {}", consensus_bad_nodes_stake_threshold);
 
     let Some(reputation_scores) = reputation_score_sorted_desc else {
         return;
@@ -45,13 +43,17 @@ pub(crate) fn update_low_scoring_authorities(
     let mut total_stake = 0;
     for (index, score) in scores_per_authority_order_asc {
         let authority_name = sui_committee.authority_by_index(index).unwrap();
-        let authority_index = consensus_committee.to_authority_index(index as usize).unwrap();
+        let authority_index = consensus_committee
+            .to_authority_index(index as usize)
+            .unwrap();
         let consensus_authority = consensus_committee.authority(authority_index);
         let hostname = &consensus_authority.hostname;
         let stake = consensus_authority.stake;
         total_stake += stake;
 
-        let included = if total_stake <= consensus_bad_nodes_stake_threshold * consensus_committee.total_stake() / 100 {
+        let included = if total_stake
+            <= consensus_bad_nodes_stake_threshold * consensus_committee.total_stake() / 100
+        {
             final_low_scoring_map.insert(*authority_name, score);
             true
         } else {
@@ -59,13 +61,21 @@ pub(crate) fn update_low_scoring_authorities(
         };
 
         if !hostname.is_empty() {
-            debug!("authority {} has score {}, is low scoring: {}", hostname, score, included);
+            debug!(
+                "authority {} has score {}, is low scoring: {}",
+                hostname, score, included
+            );
 
-            metrics.consensus_handler_scores.with_label_values(&[hostname]).set(score as i64);
+            metrics
+                .consensus_handler_scores
+                .with_label_values(&[hostname])
+                .set(score as i64);
         }
     }
     // Report the actual flagged final low scoring authorities
-    metrics.consensus_handler_num_low_scoring_authorities.set(final_low_scoring_map.len() as i64);
+    metrics
+        .consensus_handler_num_low_scoring_authorities
+        .set(final_low_scoring_map.len() as i64);
     low_scoring_authorities.swap(Arc::new(final_low_scoring_map));
 }
 
@@ -147,18 +157,31 @@ mod tests {
 
         // THEN
         assert_eq!(low_scoring.load().len(), 1);
-        assert_eq!(*low_scoring.load().get(sui_committee.authority_by_index(4).unwrap()).unwrap(), 0);
+        assert_eq!(
+            *low_scoring
+                .load()
+                .get(sui_committee.authority_by_index(4).unwrap())
+                .unwrap(),
+            0
+        );
     }
 
     /// Generate a pair of Sui and consensus committees for the given size.
     fn generate_committees(committee_size: usize) -> (Committee, ConsensusCommittee) {
         let (consensus_committee, _) = local_committee_and_keys(0, vec![1; committee_size]);
 
-        let public_keys =
-            consensus_committee.authorities().map(|(_i, authority)| authority.authority_key.inner()).collect::<Vec<_>>();
-        let sui_authorities = public_keys.iter().map(|key| (AuthorityPublicKeyBytes::from(*key), 1)).collect::<Vec<_>>();
-        let sui_committee =
-            Committee::new_for_testing_with_normalized_voting_power(0, sui_authorities.iter().cloned().collect());
+        let public_keys = consensus_committee
+            .authorities()
+            .map(|(_i, authority)| authority.authority_key.inner())
+            .collect::<Vec<_>>();
+        let sui_authorities = public_keys
+            .iter()
+            .map(|key| (AuthorityPublicKeyBytes::from(*key), 1))
+            .collect::<Vec<_>>();
+        let sui_committee = Committee::new_for_testing_with_normalized_voting_power(
+            0,
+            sui_authorities.iter().cloned().collect(),
+        );
 
         (sui_committee, consensus_committee)
     }

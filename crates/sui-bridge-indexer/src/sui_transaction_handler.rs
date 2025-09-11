@@ -1,22 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::BridgeIndexerMetrics;
+use crate::postgres_manager::{update_sui_progress_store, write, PgPool};
+use crate::types::RetrievedTransaction;
 use crate::{
-    metrics::BridgeIndexerMetrics,
-    postgres_manager::{update_sui_progress_store, write, PgPool},
-    types::RetrievedTransaction,
-    BridgeDataSource,
-    ProcessedTxnData,
-    TokenTransfer,
-    TokenTransferData,
-    TokenTransferStatus,
+    BridgeDataSource, ProcessedTxnData, TokenTransfer, TokenTransferData, TokenTransferStatus,
 };
 use anyhow::Result;
 use futures::StreamExt;
 use sui_types::digests::TransactionDigest;
 
 use std::time::Duration;
-use sui_bridge::events::{MoveTokenDepositedEvent, MoveTokenTransferApproved, MoveTokenTransferClaimed};
+use sui_bridge::events::{
+    MoveTokenDepositedEvent, MoveTokenTransferApproved, MoveTokenTransferClaimed,
+};
 
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 
@@ -31,8 +29,10 @@ pub async fn handle_sui_transactions_loop(
     rx: Receiver<(Vec<RetrievedTransaction>, Option<TransactionDigest>)>,
     metrics: BridgeIndexerMetrics,
 ) {
-    let checkpoint_commit_batch_size =
-        std::env::var("COMMIT_BATCH_SIZE").unwrap_or(COMMIT_BATCH_SIZE.to_string()).parse::<usize>().unwrap();
+    let checkpoint_commit_batch_size = std::env::var("COMMIT_BATCH_SIZE")
+        .unwrap_or(COMMIT_BATCH_SIZE.to_string())
+        .parse::<usize>()
+        .unwrap();
     let mut stream = ReceiverStream::new(rx).ready_chunks(checkpoint_commit_batch_size);
     while let Some(batch) = stream.next().await {
         // unwrap: batch must not be empty
@@ -77,7 +77,10 @@ fn process_transactions(
     })
 }
 
-pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMetrics) -> Result<Vec<ProcessedTxnData>> {
+pub fn into_token_transfers(
+    tx: RetrievedTransaction,
+    metrics: &BridgeIndexerMetrics,
+) -> Result<Vec<ProcessedTxnData>> {
     let mut transfers = Vec::new();
     let tx_digest = tx.tx_digest;
     let timestamp_ms = tx.timestamp_ms;
@@ -90,7 +93,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
         match ev.type_.name.as_str() {
             "TokenDepositedEvent" => {
                 info!("Observed Sui Deposit {:?}", ev);
-                metrics.total_sui_token_deposited.inc();
+                metrics.total_oct_token_deposited.inc();
                 let move_event: MoveTokenDepositedEvent = bcs::from_bytes(ev.bcs.bytes())?;
                 transfers.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: move_event.source_chain,
@@ -101,7 +104,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Deposited,
                     gas_usage: effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     is_finalized: true,
                     data: Some(TokenTransferData {
                         destination_chain: move_event.target_chain,
@@ -115,7 +118,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
             }
             "TokenTransferApproved" => {
                 info!("Observed Sui Approval {:?}", ev);
-                metrics.total_sui_token_transfer_approved.inc();
+                metrics.total_oct_token_transfer_approved.inc();
                 let event: MoveTokenTransferApproved = bcs::from_bytes(ev.bcs.bytes())?;
                 transfers.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -126,14 +129,14 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Approved,
                     gas_usage: effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     data: None,
                     is_finalized: true,
                 }));
             }
             "TokenTransferClaimed" => {
                 info!("Observed Sui Claim {:?}", ev);
-                metrics.total_sui_token_transfer_claimed.inc();
+                metrics.total_oct_token_transfer_claimed.inc();
                 let event: MoveTokenTransferClaimed = bcs::from_bytes(ev.bcs.bytes())?;
                 transfers.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -144,18 +147,22 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Claimed,
                     gas_usage: effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     data: None,
                     is_finalized: true,
                 }));
             }
             _ => {
-                metrics.total_sui_bridge_txn_other.inc();
+                metrics.total_oct_bridge_txn_other.inc();
             }
         }
     }
     if !transfers.is_empty() {
-        info!(?tx_digest, "SUI: Extracted {} bridge token transfer data entries", transfers.len(),);
+        info!(
+            ?tx_digest,
+            "SUI: Extracted {} bridge token transfer data entries",
+            transfers.len(),
+        );
     }
     Ok(transfers)
 }

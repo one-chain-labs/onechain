@@ -73,10 +73,16 @@ fn tests_parse_value_positive() {
         ("0xFF", V::InferredNum(U256::from(0xFFu64))),
         ("0xF_F", V::InferredNum(U256::from(0xFFu64))),
         ("0xFF__", V::InferredNum(U256::from(0xFFu64))),
-        ("0x12_34__ABCD_FF", V::InferredNum(U256::from(0x1234ABCDFFu64))),
+        (
+            "0x12_34__ABCD_FF",
+            V::InferredNum(U256::from(0x1234ABCDFFu64)),
+        ),
         ("0u64", V::U64(0)),
         ("0x0u64", V::U64(0)),
-        ("18446744073709551615", V::InferredNum(U256::from(18446744073709551615u128))),
+        (
+            "18446744073709551615",
+            V::InferredNum(U256::from(18446744073709551615u128)),
+        ),
         ("18446744073709551615u64", V::U64(18446744073709551615)),
         ("0u128", V::U128(0)),
         ("1_0u8", V::U8(1_0)),
@@ -85,35 +91,50 @@ fn tests_parse_value_positive() {
         ("1_000", V::InferredNum(U256::from(1_000u32))),
         ("1_0_0_0u64", V::U64(1_000)),
         ("1_000_000u128", V::U128(1_000_000)),
-        ("340282366920938463463374607431768211455u128", V::U128(340282366920938463463374607431768211455)),
+        (
+            "340282366920938463463374607431768211455u128",
+            V::U128(340282366920938463463374607431768211455),
+        ),
         ("true", V::Bool(true)),
         ("false", V::Bool(false)),
         (
             "@0x0",
             V::Address(ParsedAddress::Numerical(NumericalAddress::new(
-                AccountAddress::from_hex_literal("0x0").unwrap().into_bytes(),
+                AccountAddress::from_hex_literal("0x0")
+                    .unwrap()
+                    .into_bytes(),
                 crate::parsing::parser::NumberFormat::Hex,
             ))),
         ),
         (
             "@0",
             V::Address(ParsedAddress::Numerical(NumericalAddress::new(
-                AccountAddress::from_hex_literal("0x0").unwrap().into_bytes(),
+                AccountAddress::from_hex_literal("0x0")
+                    .unwrap()
+                    .into_bytes(),
                 crate::parsing::parser::NumberFormat::Hex,
             ))),
         ),
         (
             "@0x54afa3526",
             V::Address(ParsedAddress::Numerical(NumericalAddress::new(
-                AccountAddress::from_hex_literal("0x54afa3526").unwrap().into_bytes(),
+                AccountAddress::from_hex_literal("0x54afa3526")
+                    .unwrap()
+                    .into_bytes(),
                 crate::parsing::parser::NumberFormat::Hex,
             ))),
         ),
-        ("b\"hello\"", V::Vector("hello".as_bytes().iter().copied().map(V::U8).collect())),
+        (
+            "b\"hello\"",
+            V::Vector("hello".as_bytes().iter().copied().map(V::U8).collect()),
+        ),
         ("x\"7fff\"", V::Vector(vec![V::U8(0x7f), V::U8(0xff)])),
         ("x\"\"", V::Vector(vec![])),
         ("x\"00\"", V::Vector(vec![V::U8(0x00)])),
-        ("x\"deadbeef\"", V::Vector(vec![V::U8(0xde), V::U8(0xad), V::U8(0xbe), V::U8(0xef)])),
+        (
+            "x\"deadbeef\"",
+            V::Vector(vec![V::U8(0xde), V::U8(0xad), V::U8(0xbe), V::U8(0xef)]),
+        ),
     ];
 
     for (s, expected) in cases {
@@ -125,53 +146,57 @@ fn tests_parse_value_positive() {
 fn tests_parse_value_negative() {
     /// Test cases for the parser that should always fail.
     const PARSE_VALUE_NEGATIVE_TEST_CASES: &[&str] = &[
-            "-3",
-            "0u42",
-            "0u645",
-            "0u64x",
-            "0u6 4",
-            "0u",
-            "_10",
-            "_10_u8",
-            "_10__u8",
-            "10_u8__",
-            "0xFF_u8_",
-            "0xF_u8__",
-            "0x_F_u8__",
-            "_",
-            "__",
-            "__4",
-            "_u8",
-            "5_bool",
-            "256u8",
-            "4294967296u32",
-            "65536u16",
-            "18446744073709551616u64",
-            "340282366920938463463374607431768211456u128",
-            "340282366920938463463374607431768211456340282366920938463463374607431768211456340282366920938463463374607431768211456340282366920938463463374607431768211456u256",
-            "0xg",
-            "0x00g0",
-            "0x",
-            "0x_",
-            "",
-            "@@",
-            "()",
-            "x\"ffff",
-            "x\"a \"",
-            "x\" \"",
-            "x\"0g\"",
-            "x\"0\"",
-            "garbage",
-            "true3",
-            "3false",
-            "3 false",
-            "",
-            "0XFF",
-            "0X0",
-        ];
+        "-3",
+        "0u42",
+        "0u645",
+        "0u64x",
+        "0u6 4",
+        "0u",
+        "_10",
+        "_10_u8",
+        "_10__u8",
+        "10_u8__",
+        "0xFF_u8_",
+        "0xF_u8__",
+        "0x_F_u8__",
+        "_",
+        "__",
+        "__4",
+        "_u8",
+        "5_bool",
+        "256u8",
+        "4294967296u32",
+        "65536u16",
+        "18446744073709551616u64",
+        "340282366920938463463374607431768211456u128",
+        "340282366920938463463374607431768211456340282366920938463463374607431768211456340282366920938463463374607431768211456340282366920938463463374607431768211456u256",
+        "0xg",
+        "0x00g0",
+        "0x",
+        "0x_",
+        "",
+        "@@",
+        "()",
+        "x\"ffff",
+        "x\"a \"",
+        "x\" \"",
+        "x\"0g\"",
+        "x\"0\"",
+        "garbage",
+        "true3",
+        "3false",
+        "3 false",
+        "",
+        "0XFF",
+        "0X0",
+    ];
 
     for s in PARSE_VALUE_NEGATIVE_TEST_CASES {
-        assert!(ParsedValue::<()>::parse(s).is_err(), "Unexpectedly succeeded in parsing: {}", s)
+        assert!(
+            ParsedValue::<()>::parse(s).is_err(),
+            "Unexpectedly succeeded in parsing: {}",
+            s
+        )
     }
 }
 
@@ -202,7 +227,10 @@ fn test_parse_struct_negative() {
         "_0x_00::a::a",
         "_0_0::a::a",
     ] {
-        assert!(TypeTag::from_str(s).is_err(), "Parsed type {s} but should have failed");
+        assert!(
+            TypeTag::from_str(s).is_err(),
+            "Parsed type {s} but should have failed"
+        );
     }
 }
 
@@ -242,7 +270,11 @@ fn test_type_type() {
     }
 
     for valid_addr in VALID_ADDRS {
-        assert!(TypeTag::from_str(&format!("{valid_addr}::a::a")).is_ok(), "Failed to parse type {}::a::a", valid_addr);
+        assert!(
+            TypeTag::from_str(&format!("{valid_addr}::a::a")).is_ok(),
+            "Failed to parse type {}::a::a",
+            valid_addr
+        );
     }
 
     for invalid_addr in INVALID_ADDRS {
@@ -286,14 +318,26 @@ fn test_parse_valid_struct_type() {
         "0x1::__::__<0x2::_____::______fooo______, 0xff::Bar____::_______foo>",
     ];
     for s in valid {
-        assert!(StructTag::from_str(s).is_ok(), "Failed to parse struct {}", s);
+        assert!(
+            StructTag::from_str(s).is_ok(),
+            "Failed to parse struct {}",
+            s
+        );
     }
 }
 
 #[test]
 fn test_parse_type_list() {
-    let valid_with_trails = &["<u64,>", "<u64, 0x0::a::a,>", "<u64, 0x0::a::a, 0x0::a::a<0x0::a::a>,>"];
-    let valid_no_trails = &["<u64>", "<u64, 0x0::a::a>", "<u64, 0x0::a::a, 0x0::a::a<0x0::a::a>>"];
+    let valid_with_trails = &[
+        "<u64,>",
+        "<u64, 0x0::a::a,>",
+        "<u64, 0x0::a::a, 0x0::a::a<0x0::a::a>,>",
+    ];
+    let valid_no_trails = &[
+        "<u64>",
+        "<u64, 0x0::a::a>",
+        "<u64, 0x0::a::a, 0x0::a::a<0x0::a::a>>",
+    ];
     let invalid = &[
         "<>",
         "<,>",
@@ -345,7 +389,11 @@ fn test_parse_type_list() {
 }
 
 fn struct_type_gen0() -> impl Strategy<Value = String> {
-    (any::<AccountAddress>(), any::<Identifier>(), any::<Identifier>())
+    (
+        any::<AccountAddress>(),
+        any::<Identifier>(),
+        any::<Identifier>(),
+    )
         .prop_map(|(address, module, name)| format!("0x{}::{}::{}", address, module, name))
 }
 
@@ -355,15 +403,21 @@ fn struct_type_gen1() -> impl Strategy<Value = String> {
 }
 
 fn module_id_gen0() -> impl Strategy<Value = String> {
-    (any::<AccountAddress>(), any::<Identifier>()).prop_map(|(address, module)| format!("0x{address}::{module}"))
+    (any::<AccountAddress>(), any::<Identifier>())
+        .prop_map(|(address, module)| format!("0x{address}::{module}"))
 }
 
 fn module_id_gen1() -> impl Strategy<Value = String> {
-    (any::<U256>(), any::<Identifier>()).prop_map(|(address, module)| format!("{address}::{module}"))
+    (any::<U256>(), any::<Identifier>())
+        .prop_map(|(address, module)| format!("{address}::{module}"))
 }
 
 fn fq_id_gen0() -> impl Strategy<Value = String> {
-    (any::<AccountAddress>(), any::<Identifier>(), any::<Identifier>())
+    (
+        any::<AccountAddress>(),
+        any::<Identifier>(),
+        any::<Identifier>(),
+    )
         .prop_map(|(address, module, name)| format!("0x{address}::{module}::{name}"))
 }
 
@@ -375,8 +429,12 @@ fn fq_id_gen1() -> impl Strategy<Value = String> {
 fn parse_type_tags(s: &str, allow_trailing_delim: bool) -> anyhow::Result<Vec<ParsedType>> {
     parse(s, |parser| {
         parser.advance(TypeToken::Lt)?;
-        let parsed =
-            parser.parse_list(|parser| parser.parse_type(), TypeToken::Comma, TypeToken::Gt, allow_trailing_delim)?;
+        let parsed = parser.parse_list(
+            |parser| parser.parse_type(),
+            TypeToken::Comma,
+            TypeToken::Gt,
+            allow_trailing_delim,
+        )?;
         parser.advance(TypeToken::Gt)?;
         if parsed.is_empty() {
             bail!("expected at least one type argument")
@@ -388,7 +446,11 @@ fn parse_type_tags(s: &str, allow_trailing_delim: bool) -> anyhow::Result<Vec<Pa
 #[test]
 fn address_parsing() {
     for valid_addr in VALID_ADDRS {
-        assert!(ParsedAddress::parse(valid_addr).is_ok(), "parsed address {}", valid_addr);
+        assert!(
+            ParsedAddress::parse(valid_addr).is_ok(),
+            "parsed address {}",
+            valid_addr
+        );
     }
 
     for invalid_addr in INVALID_ADDRS {

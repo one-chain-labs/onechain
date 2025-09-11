@@ -1,47 +1,47 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::WatchdogConfig;
+use crate::crypto::BridgeAuthorityPublicKeyBytes;
+use crate::metered_eth_provider::MeteredEthHttpProvier;
+use crate::sui_bridge_watchdog::eth_bridge_status::EthBridgeStatus;
+use crate::sui_bridge_watchdog::eth_vault_balance::{EthereumVaultBalance, VaultAsset};
+use crate::sui_bridge_watchdog::metrics::WatchdogMetrics;
+use crate::sui_bridge_watchdog::sui_bridge_status::SuiBridgeStatus;
+use crate::sui_bridge_watchdog::total_supplies::TotalSupplies;
+use crate::sui_bridge_watchdog::{BridgeWatchDog, Observable};
+use crate::sui_client::SuiBridgeClient;
+use crate::types::BridgeCommittee;
+use crate::utils::{
+    get_committee_voting_power_by_name, get_eth_contract_addresses, get_validator_names_by_pub_keys,
+};
 use crate::{
     action_executor::BridgeActionExecutor,
     client::bridge_authority_aggregator::BridgeAuthorityAggregator,
-    config::{BridgeClientConfig, BridgeNodeConfig, WatchdogConfig},
-    crypto::BridgeAuthorityPublicKeyBytes,
+    config::{BridgeClientConfig, BridgeNodeConfig},
     eth_syncer::EthSyncer,
     events::init_all_struct_tags,
-    metered_eth_provider::MeteredEthHttpProvier,
     metrics::BridgeMetrics,
     monitor::BridgeMonitor,
     orchestrator::BridgeOrchestrator,
     server::{handler::BridgeRequestHandler, run_server, BridgeNodePublicMetadata},
     storage::BridgeOrchestratorTables,
-    sui_bridge_watchdog::{
-        eth_bridge_status::EthBridgeStatus,
-        eth_vault_balance::{EthereumVaultBalance, VaultAsset},
-        metrics::WatchdogMetrics,
-        sui_bridge_status::SuiBridgeStatus,
-        total_supplies::TotalSupplies,
-        BridgeWatchDog,
-        Observable,
-    },
-    sui_client::SuiBridgeClient,
     sui_syncer::SuiSyncer,
-    types::BridgeCommittee,
-    utils::{get_committee_voting_power_by_name, get_eth_contract_addresses, get_validator_names_by_pub_keys},
 };
 use arc_swap::ArcSwap;
-use ethers::{providers::Provider, types::Address as EthAddress};
+use ethers::providers::Provider;
+use ethers::types::Address as EthAddress;
 use mysten_metrics::spawn_logged_monitored_task;
+use std::collections::BTreeMap;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
     time::Duration,
 };
 use sui_types::{
     bridge::{
-        BRIDGE_COMMITTEE_MODULE_NAME,
-        BRIDGE_LIMITER_MODULE_NAME,
-        BRIDGE_MODULE_NAME,
+        BRIDGE_COMMITTEE_MODULE_NAME, BRIDGE_LIMITER_MODULE_NAME, BRIDGE_MODULE_NAME,
         BRIDGE_TREASURY_MODULE_NAME,
     },
     event::EventID,
@@ -79,7 +79,13 @@ pub async fn run_bridge_node(
         ))
         .unwrap();
 
-    let committee = Arc::new(server_config.sui_client.get_bridge_committee().await.expect("Failed to get committee"));
+    let committee = Arc::new(
+        server_config
+            .sui_client
+            .get_bridge_committee()
+            .await
+            .expect("Failed to get committee"),
+    );
     let mut handles = vec![];
 
     // Start watchdog
@@ -96,23 +102,40 @@ pub async fn run_bridge_node(
 
     // Update voting right metrics
     // Before reconfiguration happens we only set it once when the node starts
-    let sui_system = server_config.sui_client.sui_client().governance_api().get_latest_sui_system_state().await?;
+    let sui_system = server_config
+        .sui_client
+        .sui_client()
+        .governance_api()
+        .get_latest_sui_system_state()
+        .await?;
 
     // Start Client
     if let Some(client_config) = client_config {
-        let committee_keys_to_names = Arc::new(get_validator_names_by_pub_keys(&committee, &sui_system).await);
-        let client_components =
-            start_client_components(client_config, committee.clone(), committee_keys_to_names, metrics.clone()).await?;
+        let committee_keys_to_names =
+            Arc::new(get_validator_names_by_pub_keys(&committee, &sui_system).await);
+        let client_components = start_client_components(
+            client_config,
+            committee.clone(),
+            committee_keys_to_names,
+            metrics.clone(),
+        )
+        .await?;
         handles.extend(client_components);
     }
 
     let committee_name_mapping = get_committee_voting_power_by_name(&committee, &sui_system).await;
     for (name, voting_power) in committee_name_mapping.into_iter() {
-        metrics.current_bridge_voting_rights.with_label_values(&[name.as_str()]).set(voting_power as i64);
+        metrics
+            .current_bridge_voting_rights
+            .with_label_values(&[name.as_str()])
+            .set(voting_power as i64);
     }
 
     // Start Server
-    let socket_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), server_config.server_listen_port);
+    let socket_address = SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+        server_config.server_listen_port,
+    );
     Ok(run_server(
         &socket_address,
         BridgeRequestHandler::new(
@@ -135,10 +158,18 @@ async fn start_watchdog(
     sui_client: Arc<SuiBridgeClient>,
 ) {
     let watchdog_metrics = WatchdogMetrics::new(registry);
-    let (_committee_address, _limiter_address, vault_address, _config_address, weth_address, usdt_address) =
-        get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider)
-            .await
-            .unwrap_or_else(|e| panic!("get_eth_contract_addresses should not fail: {}", e));
+    let (
+        _committee_address,
+        _limiter_address,
+        vault_address,
+        _config_address,
+        weth_address,
+        usdt_address,
+        wbtc_address,
+        lbtc_address,
+    ) = get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider)
+        .await
+        .unwrap_or_else(|e| panic!("get_eth_contract_addresses should not fail: {}", e));
 
     let eth_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
@@ -149,6 +180,7 @@ async fn start_watchdog(
     )
     .await
     .unwrap_or_else(|e| panic!("Failed to create eth vault balance: {}", e));
+
     let usdt_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
         vault_address,
@@ -159,17 +191,56 @@ async fn start_watchdog(
     .await
     .unwrap_or_else(|e| panic!("Failed to create usdt vault balance: {}", e));
 
-    let eth_bridge_status =
-        EthBridgeStatus::new(eth_provider, eth_bridge_proxy_address, watchdog_metrics.eth_bridge_paused.clone());
+    let wbtc_vault_balance = EthereumVaultBalance::new(
+        eth_provider.clone(),
+        vault_address,
+        wbtc_address,
+        VaultAsset::WBTC,
+        watchdog_metrics.wbtc_vault_balance.clone(),
+    )
+    .await
+    .unwrap_or_else(|e| panic!("Failed to create wbtc vault balance: {}", e));
 
-    let sui_bridge_status = SuiBridgeStatus::new(sui_client.clone(), watchdog_metrics.sui_bridge_paused.clone());
+    let lbtc_vault_balance = if !lbtc_address.is_zero() {
+        Some(
+            EthereumVaultBalance::new(
+                eth_provider.clone(),
+                vault_address,
+                lbtc_address,
+                VaultAsset::LBTC,
+                watchdog_metrics.lbtc_vault_balance.clone(),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("Failed to create lbtc vault balance: {}", e)),
+        )
+    } else {
+        None
+    };
+
+    let eth_bridge_status = EthBridgeStatus::new(
+        eth_provider,
+        eth_bridge_proxy_address,
+        watchdog_metrics.eth_bridge_paused.clone(),
+    );
+
+    let sui_bridge_status = SuiBridgeStatus::new(
+        sui_client.clone(),
+        watchdog_metrics.sui_bridge_paused.clone(),
+    );
 
     let mut observables: Vec<Box<dyn Observable + Send + Sync>> = vec![
         Box::new(eth_vault_balance),
         Box::new(usdt_vault_balance),
+        Box::new(wbtc_vault_balance),
         Box::new(eth_bridge_status),
         Box::new(sui_bridge_status),
     ];
+
+    // Add lbtc_vault_balance if it's available
+    if let Some(balance) = lbtc_vault_balance {
+        observables.push(Box::new(balance));
+    }
+
     if let Some(watchdog_config) = watchdog_config {
         if !watchdog_config.total_supplies.is_empty() {
             let total_supplies = TotalSupplies::new(
@@ -193,8 +264,10 @@ async fn start_client_components(
 ) -> anyhow::Result<Vec<JoinHandle<()>>> {
     let store: std::sync::Arc<BridgeOrchestratorTables> =
         BridgeOrchestratorTables::new(&client_config.db_path.join("client"));
-    let sui_modules_to_watch =
-        get_sui_modules_to_watch(&store, client_config.sui_bridge_module_last_processed_event_id_override);
+    let sui_modules_to_watch = get_sui_modules_to_watch(
+        &store,
+        client_config.sui_bridge_module_last_processed_event_id_override,
+    );
     let eth_contracts_to_watch = get_eth_contracts_to_watch(
         &store,
         &client_config.eth_contracts,
@@ -205,16 +278,21 @@ async fn start_client_components(
     let sui_client = client_config.sui_client.clone();
 
     let mut all_handles = vec![];
-    let (task_handles, eth_events_rx, _) = EthSyncer::new(client_config.eth_client.clone(), eth_contracts_to_watch)
-        .run(metrics.clone())
-        .await
-        .expect("Failed to start eth syncer");
+    let (task_handles, eth_events_rx, _) =
+        EthSyncer::new(client_config.eth_client.clone(), eth_contracts_to_watch)
+            .run(metrics.clone())
+            .await
+            .expect("Failed to start eth syncer");
     all_handles.extend(task_handles);
 
-    let (task_handles, sui_events_rx) = SuiSyncer::new(client_config.sui_client, sui_modules_to_watch, metrics.clone())
-        .run(Duration::from_secs(2))
-        .await
-        .expect("Failed to start sui syncer");
+    let (task_handles, sui_events_rx) = SuiSyncer::new(
+        client_config.sui_client,
+        sui_modules_to_watch,
+        metrics.clone(),
+    )
+    .run(Duration::from_secs(2))
+    .await
+    .expect("Failed to start sui syncer");
     all_handles.extend(task_handles);
 
     let bridge_auth_agg = Arc::new(ArcSwap::from(Arc::new(BridgeAuthorityAggregator::new(
@@ -230,11 +308,17 @@ async fn start_client_components(
 
     let (sui_monitor_tx, sui_monitor_rx) = mysten_metrics::metered_channel::channel(
         10000,
-        &mysten_metrics::get_metrics().unwrap().channel_inflight.with_label_values(&["sui_monitor_queue"]),
+        &mysten_metrics::get_metrics()
+            .unwrap()
+            .channel_inflight
+            .with_label_values(&["sui_monitor_queue"]),
     );
     let (eth_monitor_tx, eth_monitor_rx) = mysten_metrics::metered_channel::channel(
         10000,
-        &mysten_metrics::get_metrics().unwrap().channel_inflight.with_label_values(&["eth_monitor_queue"]),
+        &mysten_metrics::get_metrics()
+            .unwrap()
+            .channel_inflight
+            .with_label_values(&["eth_monitor_queue"]),
     );
 
     let sui_token_type_tags = Arc::new(ArcSwap::from(Arc::new(sui_token_type_tags)));
@@ -288,13 +372,21 @@ fn get_sui_modules_to_watch(
     ];
     if let Some(cursor) = sui_bridge_module_last_processed_event_id_override {
         info!("Overriding cursor for sui bridge modules to {:?}", cursor);
-        return HashMap::from_iter(sui_bridge_modules.iter().map(|module| (module.clone(), Some(cursor))));
+        return HashMap::from_iter(
+            sui_bridge_modules
+                .iter()
+                .map(|module| (module.clone(), Some(cursor))),
+        );
     }
 
-    let sui_bridge_module_stored_cursor =
-        store.get_sui_event_cursors(&sui_bridge_modules).expect("Failed to get eth sui event cursors from storage");
+    let sui_bridge_module_stored_cursor = store
+        .get_sui_event_cursors(&sui_bridge_modules)
+        .expect("Failed to get eth sui event cursors from storage");
     let mut sui_modules_to_watch = HashMap::new();
-    for (module_identifier, cursor) in sui_bridge_modules.iter().zip(sui_bridge_module_stored_cursor) {
+    for (module_identifier, cursor) in sui_bridge_modules
+        .iter()
+        .zip(sui_bridge_module_stored_cursor)
+    {
         if cursor.is_none() {
             info!(
                 "No cursor found for sui bridge module {} in storage or config override, query start from the beginning.",
@@ -312,8 +404,9 @@ fn get_eth_contracts_to_watch(
     eth_contracts_start_block_fallback: u64,
     eth_contracts_start_block_override: Option<u64>,
 ) -> HashMap<EthAddress, u64> {
-    let stored_eth_cursors =
-        store.get_eth_event_cursors(eth_contracts).expect("Failed to get eth event cursors from storage");
+    let stored_eth_cursors = store
+        .get_eth_event_cursors(eth_contracts)
+        .expect("Failed to get eth event cursors from storage");
     let mut eth_contracts_to_watch = HashMap::new();
     for (contract, stored_cursor) in eth_contracts.iter().zip(stored_eth_cursors) {
         // start block precedence:
@@ -345,58 +438,76 @@ mod tests {
     use prometheus::Registry;
 
     use super::*;
-    use crate::{
-        config::{default_ed25519_key_pair, BridgeNodeConfig, EthConfig, SuiConfig},
-        e2e_tests::test_utils::{BridgeTestCluster, BridgeTestClusterBuilder},
-        utils::wait_for_server_to_be_up,
-    };
+    use crate::config::default_ed25519_key_pair;
+    use crate::config::BridgeNodeConfig;
+    use crate::config::EthConfig;
+    use crate::config::SuiConfig;
+    use crate::e2e_tests::test_utils::BridgeTestCluster;
+    use crate::e2e_tests::test_utils::BridgeTestClusterBuilder;
+    use crate::utils::wait_for_server_to_be_up;
     use fastcrypto::secp256k1::Secp256k1KeyPair;
     use sui_config::local_ip_utils::get_available_port;
-    use sui_types::{
-        base_types::SuiAddress,
-        bridge::BridgeChainId,
-        crypto::{get_key_pair, EncodeDecodeBase64, KeypairTraits, SuiKeyPair},
-        digests::TransactionDigest,
-        event::EventID,
-    };
+    use sui_types::base_types::SuiAddress;
+    use sui_types::bridge::BridgeChainId;
+    use sui_types::crypto::get_key_pair;
+    use sui_types::crypto::EncodeDecodeBase64;
+    use sui_types::crypto::KeypairTraits;
+    use sui_types::crypto::SuiKeyPair;
+    use sui_types::digests::TransactionDigest;
+    use sui_types::event::EventID;
     use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_get_eth_contracts_to_watch() {
         telemetry_subscribers::init_for_testing();
         let temp_dir = tempfile::tempdir().unwrap();
-        let eth_contracts = vec![EthAddress::from_low_u64_be(1), EthAddress::from_low_u64_be(2)];
+        let eth_contracts = vec![
+            EthAddress::from_low_u64_be(1),
+            EthAddress::from_low_u64_be(2),
+        ];
         let store = BridgeOrchestratorTables::new(temp_dir.path());
 
         // No override, no watermark found in DB, use fallback
         let contracts = get_eth_contracts_to_watch(&store, &eth_contracts, 10, None);
         assert_eq!(
             contracts,
-            vec![(eth_contracts[0], 10), (eth_contracts[1], 10)].into_iter().collect::<HashMap<_, _>>()
+            vec![(eth_contracts[0], 10), (eth_contracts[1], 10)]
+                .into_iter()
+                .collect::<HashMap<_, _>>()
         );
 
         // no watermark found in DB, use override
         let contracts = get_eth_contracts_to_watch(&store, &eth_contracts, 10, Some(420));
         assert_eq!(
             contracts,
-            vec![(eth_contracts[0], 420), (eth_contracts[1], 420)].into_iter().collect::<HashMap<_, _>>()
+            vec![(eth_contracts[0], 420), (eth_contracts[1], 420)]
+                .into_iter()
+                .collect::<HashMap<_, _>>()
         );
 
-        store.update_eth_event_cursor(eth_contracts[0], 100).unwrap();
-        store.update_eth_event_cursor(eth_contracts[1], 102).unwrap();
+        store
+            .update_eth_event_cursor(eth_contracts[0], 100)
+            .unwrap();
+        store
+            .update_eth_event_cursor(eth_contracts[1], 102)
+            .unwrap();
 
         // No override, found watermarks in DB, use +1
         let contracts = get_eth_contracts_to_watch(&store, &eth_contracts, 10, None);
         assert_eq!(
             contracts,
-            vec![(eth_contracts[0], 101), (eth_contracts[1], 103)].into_iter().collect::<HashMap<_, _>>()
+            vec![(eth_contracts[0], 101), (eth_contracts[1], 103)]
+                .into_iter()
+                .collect::<HashMap<_, _>>()
         );
 
         // use override
         let contracts = get_eth_contracts_to_watch(&store, &eth_contracts, 10, Some(200));
         assert_eq!(
             contracts,
-            vec![(eth_contracts[0], 200), (eth_contracts[1], 200)].into_iter().collect::<HashMap<_, _>>()
+            vec![(eth_contracts[0], 200), (eth_contracts[1], 200)]
+                .into_iter()
+                .collect::<HashMap<_, _>>()
         );
     }
 
@@ -425,7 +536,10 @@ mod tests {
         );
 
         // no stored watermark, use override
-        let override_cursor = EventID { tx_digest: TransactionDigest::random(), event_seq: 42 };
+        let override_cursor = EventID {
+            tx_digest: TransactionDigest::random(),
+            event_seq: 42,
+        };
         let sui_modules_to_watch = get_sui_modules_to_watch(&store, Some(override_cursor));
         assert_eq!(
             sui_modules_to_watch,
@@ -441,8 +555,13 @@ mod tests {
 
         // No override, found stored watermark for `bridge` module, use stored watermark for `bridge`
         // and None for `committee`
-        let stored_cursor = EventID { tx_digest: TransactionDigest::random(), event_seq: 100 };
-        store.update_sui_event_cursor(bridge_module.clone(), stored_cursor).unwrap();
+        let stored_cursor = EventID {
+            tx_digest: TransactionDigest::random(),
+            event_seq: 100,
+        };
+        store
+            .update_sui_event_cursor(bridge_module.clone(), stored_cursor)
+            .unwrap();
         let sui_modules_to_watch = get_sui_modules_to_watch(&store, None);
         assert_eq!(
             sui_modules_to_watch,
@@ -457,8 +576,13 @@ mod tests {
         );
 
         // found stored watermark, use override
-        let stored_cursor = EventID { tx_digest: TransactionDigest::random(), event_seq: 100 };
-        store.update_sui_event_cursor(committee_module.clone(), stored_cursor).unwrap();
+        let stored_cursor = EventID {
+            tx_digest: TransactionDigest::random(),
+            event_seq: 100,
+        };
+        store
+            .update_sui_event_cursor(committee_module.clone(), stored_cursor)
+            .unwrap();
         let sui_modules_to_watch = get_sui_modules_to_watch(&store, Some(override_cursor));
         assert_eq!(
             sui_modules_to_watch,
@@ -512,8 +636,13 @@ mod tests {
             watchdog_config: None,
         };
         // Spawn bridge node in memory
-        let _handle =
-            run_bridge_node(config, BridgeNodePublicMetadata::empty_for_testing(), Registry::new()).await.unwrap();
+        let _handle = run_bridge_node(
+            config,
+            BridgeNodePublicMetadata::empty_for_testing(),
+            Registry::new(),
+        )
+        .await
+        .unwrap();
 
         let server_url = format!("http://127.0.0.1:{}", server_listen_port);
         // Now we expect to see the server to be up and running.
@@ -542,7 +671,7 @@ mod tests {
         bridge_test_cluster
             .test_cluster
             .inner
-            .transfer_sui_must_exceed(sender_address, client_sui_address, 1000000000)
+            .transfer_oct_must_exceed(sender_address, client_sui_address, 1000000000)
             .await;
 
         let config = BridgeNodeConfig {
@@ -574,8 +703,13 @@ mod tests {
             watchdog_config: None,
         };
         // Spawn bridge node in memory
-        let _handle =
-            run_bridge_node(config, BridgeNodePublicMetadata::empty_for_testing(), Registry::new()).await.unwrap();
+        let _handle = run_bridge_node(
+            config,
+            BridgeNodePublicMetadata::empty_for_testing(),
+            Registry::new(),
+        )
+        .await
+        .unwrap();
 
         let server_url = format!("http://127.0.0.1:{}", server_listen_port);
         // Now we expect to see the server to be up and running.
@@ -593,8 +727,10 @@ mod tests {
 
         // prepare node config (server + client)
         let tmp_dir = tempdir().unwrap().keep();
-        let db_path = tmp_dir.join("test_starting_bridge_node_with_client_and_separate_client_key_db");
-        let authority_key_path = "test_starting_bridge_node_with_client_and_separate_client_key_bridge_authority_key";
+        let db_path =
+            tmp_dir.join("test_starting_bridge_node_with_client_and_separate_client_key_db");
+        let authority_key_path =
+            "test_starting_bridge_node_with_client_and_separate_client_key_bridge_authority_key";
         let server_listen_port = get_available_port("127.0.0.1");
 
         // prepare bridge authority key
@@ -604,7 +740,8 @@ mod tests {
         // prepare bridge client key
         let (_, kp): (_, Secp256k1KeyPair) = get_key_pair();
         let kp = SuiKeyPair::from(kp);
-        let client_key_path = "test_starting_bridge_node_with_client_and_separate_client_key_bridge_client_key";
+        let client_key_path =
+            "test_starting_bridge_node_with_client_and_separate_client_key_bridge_client_key";
         std::fs::write(tmp_dir.join(client_key_path), kp.encode_base64()).unwrap();
         let client_sui_address = SuiAddress::from(&kp.public());
         let sender_address = bridge_test_cluster.sui_user_address();
@@ -612,7 +749,7 @@ mod tests {
         let gas_obj = bridge_test_cluster
             .test_cluster
             .inner
-            .transfer_sui_must_exceed(sender_address, client_sui_address, 1000000000)
+            .transfer_oct_must_exceed(sender_address, client_sui_address, 1000000000)
             .await;
 
         let config = BridgeNodeConfig {
@@ -644,8 +781,13 @@ mod tests {
             watchdog_config: None,
         };
         // Spawn bridge node in memory
-        let _handle =
-            run_bridge_node(config, BridgeNodePublicMetadata::empty_for_testing(), Registry::new()).await.unwrap();
+        let _handle = run_bridge_node(
+            config,
+            BridgeNodePublicMetadata::empty_for_testing(),
+            Registry::new(),
+        )
+        .await
+        .unwrap();
 
         let server_url = format!("http://127.0.0.1:{}", server_listen_port);
         // Now we expect to see the server to be up and running.

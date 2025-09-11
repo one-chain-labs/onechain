@@ -104,13 +104,19 @@ impl<T> Sender<T> {
 
     pub fn downgrade(&self) -> WeakSender<T> {
         let sender = self.inner.downgrade();
-        WeakSender { inner: sender, inflight: self.inflight.clone(), sent: self.sent.clone() }
+        WeakSender {
+            inner: sender,
+            inflight: self.inflight.clone(),
+            sent: self.sent.clone(),
+        }
     }
 
     /// Returns a reference to the underlying inflight gauge.
     #[cfg(test)]
     fn inflight(&self) -> &IntGauge {
-        self.inflight.as_ref().expect("Metrics should have initialized")
+        self.inflight
+            .as_ref()
+            .expect("Metrics should have initialized")
     }
 
     /// Returns a reference to the underlying sent gauge.
@@ -123,7 +129,11 @@ impl<T> Sender<T> {
 // Derive Clone manually to avoid the `T: Clone` bound
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), inflight: self.inflight.clone(), sent: self.sent.clone() }
+        Self {
+            inner: self.inner.clone(),
+            inflight: self.inflight.clone(),
+            sent: self.sent.clone(),
+        }
     }
 }
 
@@ -141,7 +151,11 @@ impl<'a, T> Permit<'a, T> {
         inflight_ref: &'a Option<IntGauge>,
         sent_ref: &'a Option<IntGauge>,
     ) -> Permit<'a, T> {
-        Permit { permit: Some(permit), inflight_ref, sent_ref }
+        Permit {
+            permit: Some(permit),
+            inflight_ref,
+            sent_ref,
+        }
     }
 
     pub fn send(mut self, value: T) {
@@ -155,7 +169,7 @@ impl<'a, T> Permit<'a, T> {
     }
 }
 
-impl<'a, T> Drop for Permit<'a, T> {
+impl<T> Drop for Permit<'_, T> {
     fn drop(&mut self) {
         // In the case the permit is dropped without sending, we still want to decrease the occupancy of the channel.
         // Otherwise, receiver should be responsible for decreasing the inflight gauge.
@@ -192,14 +206,22 @@ pub struct WeakSender<T> {
 
 impl<T> WeakSender<T> {
     pub fn upgrade(&self) -> Option<Sender<T>> {
-        self.inner.upgrade().map(|s| Sender { inner: s, inflight: self.inflight.clone(), sent: self.sent.clone() })
+        self.inner.upgrade().map(|s| Sender {
+            inner: s,
+            inflight: self.inflight.clone(),
+            sent: self.sent.clone(),
+        })
     }
 }
 
 // Derive Clone manually to avoid the `T: Clone` bound
 impl<T> Clone for WeakSender<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), inflight: self.inflight.clone(), sent: self.sent.clone() }
+        Self {
+            inner: self.inner.clone(),
+            inflight: self.inflight.clone(),
+            sent: self.sent.clone(),
+        }
     }
 }
 
@@ -276,7 +298,9 @@ impl<T> Receiver<T> {
     /// Returns a reference to the underlying received gauge.
     #[cfg(test)]
     fn received(&self) -> &IntGauge {
-        self.received.as_ref().expect("Metrics should have initialized")
+        self.received
+            .as_ref()
+            .expect("Metrics should have initialized")
     }
 }
 
@@ -336,13 +360,19 @@ impl<T> UnboundedSender<T> {
 
     pub fn downgrade(&self) -> WeakUnboundedSender<T> {
         let sender = self.inner.downgrade();
-        WeakUnboundedSender { inner: sender, inflight: self.inflight.clone(), sent: self.sent.clone() }
+        WeakUnboundedSender {
+            inner: sender,
+            inflight: self.inflight.clone(),
+            sent: self.sent.clone(),
+        }
     }
 
     /// Returns a reference to the underlying inflight gauge.
     #[cfg(test)]
     fn inflight(&self) -> &IntGauge {
-        self.inflight.as_ref().expect("Metrics should have initialized")
+        self.inflight
+            .as_ref()
+            .expect("Metrics should have initialized")
     }
 
     /// Returns a reference to the underlying sent gauge.
@@ -355,7 +385,11 @@ impl<T> UnboundedSender<T> {
 // Derive Clone manually to avoid the `T: Clone` bound
 impl<T> Clone for UnboundedSender<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), inflight: self.inflight.clone(), sent: self.sent.clone() }
+        Self {
+            inner: self.inner.clone(),
+            inflight: self.inflight.clone(),
+            sent: self.sent.clone(),
+        }
     }
 }
 
@@ -380,7 +414,11 @@ impl<T> WeakUnboundedSender<T> {
 // Derive Clone manually to avoid the `T: Clone` bound
 impl<T> Clone for WeakUnboundedSender<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), inflight: self.inflight.clone(), sent: self.sent.clone() }
+        Self {
+            inner: self.inner.clone(),
+            inflight: self.inflight.clone(),
+            sent: self.sent.clone(),
+        }
     }
 }
 
@@ -457,7 +495,9 @@ impl<T> UnboundedReceiver<T> {
     /// Returns a reference to the underlying received gauge.
     #[cfg(test)]
     fn received(&self) -> &IntGauge {
-        self.received.as_ref().expect("Metrics should have initialized")
+        self.received
+            .as_ref()
+            .expect("Metrics should have initialized")
     }
 }
 

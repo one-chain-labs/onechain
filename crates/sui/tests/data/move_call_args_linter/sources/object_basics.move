@@ -3,10 +3,10 @@
 
 /// Test CTURD object basics (create, transfer, update, read, delete)
 module examples::object_basics {
-    use one::event;
-    use one::object::{Self, UID};
-    use one::tx_context::{Self, TxContext};
-    use one::transfer;
+    use sui::event;
+    use sui::object::{Self, UID};
+    use sui::tx_context::{Self, TxContext};
+    use sui::transfer;
 
     public struct Object has key, store {
         id: UID,

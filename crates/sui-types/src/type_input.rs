@@ -22,7 +22,9 @@ pub struct StructInput {
     pub type_params: Vec<TypeInput>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord, EnumVariantOrder)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord, EnumVariantOrder,
+)]
 pub enum TypeInput {
     // alias for compatibility with old json serialized data.
     #[serde(rename = "bool", alias = "Bool")]
@@ -101,7 +103,10 @@ impl TypeInput {
             }
         }
 
-        CanonicalDisplay { data: self, with_prefix }
+        CanonicalDisplay {
+            data: self,
+            with_prefix,
+        }
     }
 
     /// Convert the TypeInput into a TypeTag without checking for validity of identifiers within
@@ -124,48 +129,29 @@ impl TypeInput {
             TypeInput::Signer => TypeTag::Signer,
             TypeInput::Vector(inner) => TypeTag::Vector(Box::new(inner.into_type_tag_unchecked())),
             TypeInput::Struct(inner) => {
-                let StructInput { address, module, name, type_params } = *inner;
+                let StructInput {
+                    address,
+                    module,
+                    name,
+                    type_params,
+                } = *inner;
                 TypeTag::Struct(Box::new(StructTag {
                     address,
                     module: Identifier::new_unchecked(module),
                     name: Identifier::new_unchecked(name),
-                    type_params: type_params.into_iter().map(|ty| ty.into_type_tag_unchecked()).collect(),
+                    type_params: type_params
+                        .into_iter()
+                        .map(|ty| ty.into_type_tag_unchecked())
+                        .collect(),
                 }))
             }
         }
     }
 
-    /// Convert to a `TypeTag` consuming `self`. This can fail if this value includes invalid
-    /// identifiers.
-    pub fn into_type_tag(self) -> Result<TypeTag> {
-        use TypeInput as I;
-        use TypeTag as T;
-        Ok(match self {
-            I::Bool => T::Bool,
-            I::U8 => T::U8,
-            I::U16 => T::U16,
-            I::U32 => T::U32,
-            I::U64 => T::U64,
-            I::U128 => T::U128,
-            I::U256 => T::U256,
-            I::Address => T::Address,
-            I::Signer => T::Signer,
-            I::Vector(t) => T::Vector(Box::new(t.into_type_tag()?)),
-            I::Struct(s) => {
-                let StructInput { address, module, name, type_params } = *s;
-                let type_params = type_params.into_iter().map(|t| t.into_type_tag()).collect::<Result<_>>()?;
-                T::Struct(Box::new(StructTag {
-                    address,
-                    module: Identifier::new(module)?,
-                    name: Identifier::new(name)?,
-                    type_params,
-                }))
-            }
-        })
-    }
-
     /// Conversion to a `TypeTag`, which can fail if this value includes invalid identifiers.
-    pub fn as_type_tag(&self) -> Result<TypeTag> {
+    /// NB: This function should _not_ be used in the adapter or on the "write" side of transaction
+    /// processing.
+    pub fn to_type_tag(&self) -> Result<TypeTag> {
         use TypeInput as I;
         use TypeTag as T;
         Ok(match self {
@@ -178,10 +164,18 @@ impl TypeInput {
             I::U256 => T::U256,
             I::Address => T::Address,
             I::Signer => T::Signer,
-            I::Vector(t) => T::Vector(Box::new(t.as_type_tag()?)),
+            I::Vector(t) => T::Vector(Box::new(t.to_type_tag()?)),
             I::Struct(s) => {
-                let StructInput { address, module, name, type_params } = s.as_ref();
-                let type_params = type_params.iter().map(|t| t.as_type_tag()).collect::<Result<_>>()?;
+                let StructInput {
+                    address,
+                    module,
+                    name,
+                    type_params,
+                } = s.as_ref();
+                let type_params = type_params
+                    .iter()
+                    .map(|t| t.to_type_tag())
+                    .collect::<Result<_>>()?;
                 T::Struct(Box::new(StructTag {
                     address: *address,
                     module: Identifier::new(module.to_owned())?,
@@ -241,7 +235,10 @@ impl StructInput {
             }
         }
 
-        CanonicalDisplay { data: self, with_prefix }
+        CanonicalDisplay {
+            data: self,
+            with_prefix,
+        }
     }
 }
 
@@ -282,7 +279,13 @@ impl From<StructInput> for TypeInput {
 
 impl Display for StructInput {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{}::{}::{}", self.address.short_str_lossless(), self.module, self.name)?;
+        write!(
+            f,
+            "0x{}::{}::{}",
+            self.address.short_str_lossless(),
+            self.module,
+            self.name
+        )?;
 
         let mut prefix = "<";
         for ty in &self.type_params {

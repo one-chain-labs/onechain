@@ -34,11 +34,15 @@ pub struct FunctionTarget<'env> {
     annotation_formatters: RefCell<Vec<Box<AnnotationFormatter>>>,
 }
 
-impl<'env> Clone for FunctionTarget<'env> {
+impl Clone for FunctionTarget<'_> {
     fn clone(&self) -> Self {
         // Annotation formatters are transient and forgotten on clone, so this is a cheap
         // handle.
-        Self { func_env: self.func_env, data: self.data, annotation_formatters: RefCell::new(vec![]) }
+        Self {
+            func_env: self.func_env,
+            data: self.data,
+            annotation_formatters: RefCell::new(vec![]),
+        }
     }
 }
 
@@ -79,8 +83,15 @@ pub struct FunctionData {
 }
 
 impl<'env> FunctionTarget<'env> {
-    pub fn new(func_env: &'env FunctionEnv<'env>, data: &'env FunctionData) -> FunctionTarget<'env> {
-        FunctionTarget { func_env, data, annotation_formatters: RefCell::new(vec![]) }
+    pub fn new(
+        func_env: &'env FunctionEnv<'env>,
+        data: &'env FunctionData,
+    ) -> FunctionTarget<'env> {
+        FunctionTarget {
+            func_env,
+            data,
+            annotation_formatters: RefCell::new(vec![]),
+        }
     }
 
     /// Returns the name of this function.
@@ -293,12 +304,25 @@ impl<'env> FunctionTarget<'env> {
 
         // add vc info
         if let Some(msg) = self.data.vc_infos.get(&attr_id) {
-            let loc = self.data.locations.get(&attr_id).cloned().unwrap_or_else(|| self.global_env().unknown_loc());
-            texts.push(format!("     # VC: {} {}", msg, loc.display(self.global_env())));
+            let loc = self
+                .data
+                .locations
+                .get(&attr_id)
+                .cloned()
+                .unwrap_or_else(|| self.global_env().unknown_loc());
+            texts.push(format!(
+                "     # VC: {} {}",
+                msg,
+                loc.display(self.global_env())
+            ));
         }
 
         // add the instruction itself with offset
-        texts.push(format!("{:>3}: {}", offset, code.display(self, label_offsets)));
+        texts.push(format!(
+            "{:>3}: {}",
+            offset,
+            code.display(self, label_offsets)
+        ));
 
         texts.join("\n")
     }
@@ -315,7 +339,9 @@ impl FunctionData {
         acquires_global_resources: Vec<DatatypeId>,
         loop_invariants: BTreeSet<AttrId>,
     ) -> Self {
-        let name_to_index = (0..func_env.get_local_count()).map(|idx| (func_env.get_local_name(idx), idx)).collect();
+        let name_to_index = (0..func_env.get_local_count())
+            .map(|idx| (func_env.get_local_name(idx), idx))
+            .collect();
         FunctionData {
             variant: FunctionVariant::Baseline,
             type_args: vec![],
@@ -335,14 +361,25 @@ impl FunctionData {
 
     /// Computes the next available index for AttrId.
     pub fn next_free_attr_index(&self) -> usize {
-        self.code.iter().map(|b| b.get_attr_id().as_usize()).max().unwrap_or(0) + 1
+        self.code
+            .iter()
+            .map(|b| b.get_attr_id().as_usize())
+            .max()
+            .unwrap_or(0)
+            + 1
     }
 
     /// Computes the next available index for Label.
     pub fn next_free_label_index(&self) -> usize {
         self.code
             .iter()
-            .filter_map(|b| if let Bytecode::Label(_, l) = b { Some(l.as_usize()) } else { None })
+            .filter_map(|b| {
+                if let Bytecode::Label(_, l) = b {
+                    Some(l.as_usize())
+                } else {
+                    None
+                }
+            })
             .max()
             .unwrap_or(0)
             + 1
@@ -360,11 +397,19 @@ impl FunctionData {
     /// variant.
     pub fn fork(&self, new_variant: FunctionVariant) -> Self {
         assert_ne!(self.variant, new_variant);
-        FunctionData { variant: new_variant, ..self.clone() }
+        FunctionData {
+            variant: new_variant,
+            ..self.clone()
+        }
     }
 
     /// Fork this function data with (potentially partial) instantiations.
-    pub fn fork_with_instantiation(&self, env: &GlobalEnv, inst: &[Type], new_variant: FunctionVariant) -> Self {
+    pub fn fork_with_instantiation(
+        &self,
+        env: &GlobalEnv,
+        inst: &[Type],
+        new_variant: FunctionVariant,
+    ) -> Self {
         let type_args = if self.type_args.is_empty() {
             // This is a basic variant wo/ type instantiation, just use the given inst.
             inst.to_vec()
@@ -376,10 +421,22 @@ impl FunctionData {
         // fix types
         let local_types = Type::instantiate_slice(&self.local_types, inst);
         let return_types = Type::instantiate_slice(&self.return_types, inst);
-        let code = self.code.iter().map(|bc| bc.instantiate(env, inst)).collect();
+        let code = self
+            .code
+            .iter()
+            .map(|bc| bc.instantiate(env, inst))
+            .collect();
 
         // construct the new data
-        Self { variant: new_variant, type_args, code, local_types, return_types, ..self.clone() }
+        Self {
+            variant: new_variant,
+            type_args,
+            code,
+            local_types,
+            return_types,
+
+            ..self.clone()
+        }
     }
 
     /// Get the instantiation of this function as a vector of types.
@@ -397,7 +454,7 @@ impl FunctionData {
 /// the given code offset. It should return None if there is no relevant annotation.
 pub type AnnotationFormatter = dyn Fn(&FunctionTarget<'_>, CodeOffset) -> Option<String>;
 
-impl<'env> FunctionTarget<'env> {
+impl FunctionTarget<'_> {
     /// Register a formatter. Each function target processor which introduces new annotations
     /// should register a formatter in order to get is value printed when a function target
     /// is displayed for debugging or testing.
@@ -410,15 +467,22 @@ impl<'env> FunctionTarget<'env> {
     pub fn register_annotation_formatters_for_test(&self) {}
 }
 
-impl<'env> fmt::Display for FunctionTarget<'env> {
+impl fmt::Display for FunctionTarget<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let modifier = if self.func_env.is_native() { "native " } else { "" };
+        let modifier = if self.func_env.is_native() {
+            "native "
+        } else {
+            ""
+        };
         write!(
             f,
             "{}{}fun {}::{}",
             self.func_env.visibility_str(),
             modifier,
-            self.func_env.module_env.get_name().display(self.symbol_pool()),
+            self.func_env
+                .module_env
+                .get_name()
+                .display(self.symbol_pool()),
             self.get_name().display(self.symbol_pool())
         )?;
         let tparams_count_all = self.get_type_parameter_count();
@@ -436,11 +500,21 @@ impl<'env> fmt::Display for FunctionTarget<'env> {
             }
             write!(f, ">")?;
         }
-        let tctx = TypeDisplayContext::WithEnv { env: self.global_env(), type_param_names: None };
+        let tctx = TypeDisplayContext::WithEnv {
+            env: self.global_env(),
+            type_param_names: None,
+        };
         let write_decl = |f: &mut fmt::Formatter<'_>, i: TempIndex| {
             let ty = self.get_local_type(i).display(&tctx);
             if self.has_local_user_name(i) {
-                write!(f, "$t{}|{}: {}", i, self.get_local_name(i).display(self.global_env().symbol_pool()), ty)
+                write!(
+                    f,
+                    "$t{}|{}: {}",
+                    i,
+                    self.get_local_name(i)
+                        .display(self.global_env().symbol_pool()),
+                    ty
+                )
             } else {
                 write!(f, "$t{}: {}", i, ty)
             }
@@ -479,7 +553,11 @@ impl<'env> fmt::Display for FunctionTarget<'env> {
             }
             let label_offsets = Bytecode::label_offsets(self.get_bytecode());
             for (offset, code) in self.get_bytecode().iter().enumerate() {
-                writeln!(f, "{}", self.pretty_print_bytecode(&label_offsets, offset, code))?;
+                writeln!(
+                    f,
+                    "{}",
+                    self.pretty_print_bytecode(&label_offsets, offset, code)
+                )?;
             }
             writeln!(f, "}}")?;
         }

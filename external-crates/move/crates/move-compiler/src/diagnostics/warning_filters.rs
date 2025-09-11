@@ -3,11 +3,10 @@
 
 use crate::{
     diagnostics::{
+        Diagnostic, DiagnosticCode,
         codes::{Category, DiagnosticInfo, ExternalPrefix, Severity, UnusedItem},
-        Diagnostic,
-        DiagnosticCode,
     },
-    shared::{known_attributes, AstDebug},
+    shared::{AstDebug, CompilationEnv, known_attributes},
 };
 use move_symbol_pool::Symbol;
 use std::{
@@ -43,12 +42,14 @@ macro_rules! known_code_filter {
         use crate::diagnostics::codes::*;
         (
             move_symbol_pool::Symbol::from($name),
-            std::collections::BTreeSet::from([crate::diagnostics::warning_filters::WarningFilter::Code {
-                prefix: None,
-                category: Category::$category as u8,
-                code: $category::$code as u8,
-                name: Some($name),
-            }]),
+            std::collections::BTreeSet::from([
+                crate::diagnostics::warning_filters::WarningFilter::Code {
+                    prefix: None,
+                    category: Category::$category as u8,
+                    code: $category::$code as u8,
+                    name: Some($name),
+                },
+            ]),
         )
     }};
 }
@@ -126,9 +127,18 @@ pub enum WarningFilter {
     /// Filters all warnings
     All(ExternalPrefix),
     /// Filters all warnings of a specific category. Only known filters have names.
-    Category { prefix: ExternalPrefix, category: u8, name: Option<WellKnownFilterName> },
+    Category {
+        prefix: ExternalPrefix,
+        category: u8,
+        name: Option<WellKnownFilterName>,
+    },
     /// Filters a single warning, as defined by codes below. Only known filters have names.
-    Code { prefix: ExternalPrefix, category: u8, code: u8, name: Option<WellKnownFilterName> },
+    Code {
+        prefix: ExternalPrefix,
+        category: u8,
+        code: u8,
+        name: Option<WellKnownFilterName>,
+    },
 }
 
 /// The name for a well-known filter.
@@ -142,7 +152,9 @@ impl WarningFiltersScope {
     /// Create a new scope with the given top-level warning filter, if any.
     /// A `&'static WarningFiltersBuilder` is used to avoid cloning the filter table for each
     /// new top-level scope needed
-    pub(crate) const fn root(top_level_warning_filter_opt: Option<&'static WarningFiltersBuilder>) -> Self {
+    pub(crate) const fn root(
+        top_level_warning_filter_opt: Option<&'static WarningFiltersBuilder>,
+    ) -> Self {
         match top_level_warning_filter_opt {
             None => WarningFiltersScope(WarningFiltersScope_::Empty),
             Some(top_level_warning_filter) => {
@@ -152,7 +164,10 @@ impl WarningFiltersScope {
     }
 
     pub fn push(&mut self, filters: WarningFilters) {
-        let node = Arc::new(WarningFiltersScopeNode { filters, prev: self.0.clone() });
+        let node = Arc::new(WarningFiltersScopeNode {
+            filters,
+            prev: self.0.clone(),
+        });
         *self = WarningFiltersScope(WarningFiltersScope_::Node(node))
     }
 
@@ -197,6 +212,12 @@ impl WarningFiltersScope {
     }
 }
 
+impl Default for WarningFiltersTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WarningFiltersTable {
     pub fn new() -> Self {
         Self(HashSet::new())
@@ -237,11 +258,27 @@ impl WarningFilters {
 
 impl WarningFiltersBuilder {
     pub const fn new_for_source() -> Self {
-        Self { filters: BTreeMap::new(), for_dependency: false }
+        Self {
+            filters: BTreeMap::new(),
+            for_dependency: false,
+        }
     }
 
     pub const fn new_for_dependency() -> Self {
-        Self { filters: BTreeMap::new(), for_dependency: true }
+        Self {
+            filters: BTreeMap::new(),
+            for_dependency: true,
+        }
+    }
+
+    pub fn new_all_filter_alls(env: &CompilationEnv) -> Self {
+        let mut all_filter_alls = WarningFiltersBuilder::new_for_dependency();
+        for prefix in env.known_filter_names() {
+            for f in env.filter_from_str(prefix, FILTER_ALL) {
+                all_filter_alls.add(f);
+            }
+        }
+        all_filter_alls
     }
 
     pub fn is_filtered(&self, diag: &Diagnostic) -> bool {
@@ -250,17 +287,28 @@ impl WarningFiltersBuilder {
 
     fn is_filtered_by_info(&self, info: &DiagnosticInfo) -> bool {
         let prefix = info.external_prefix();
-        self.filters.get(&prefix).is_some_and(|filters| filters.is_filtered_by_info(info))
+        self.filters
+            .get(&prefix)
+            .is_some_and(|filters| filters.is_filtered_by_info(info))
     }
 
     pub fn union(&mut self, other: &Self) {
         for (prefix, filters) in &other.filters {
-            self.filters.entry(*prefix).or_insert_with(UnprefixedWarningFilters::new).union(filters);
+            self.filters
+                .entry(*prefix)
+                .or_insert_with(UnprefixedWarningFilters::new)
+                .union(filters);
         }
         // if there is a dependency code filter on the stack, it means we are filtering dependent
         // code and this information must be preserved when stacking up additional filters (which
         // involves union of the current filter with the new one)
         self.for_dependency = self.for_dependency || other.for_dependency;
+    }
+
+    pub fn add_all(&mut self, filters: impl IntoIterator<Item = WarningFilter>) {
+        for filter in filters {
+            self.add(filter);
+        }
     }
 
     pub fn add(&mut self, filter: WarningFilter) {
@@ -269,15 +317,30 @@ impl WarningFiltersBuilder {
                 self.filters.insert(prefix, UnprefixedWarningFilters::All);
                 return;
             }
-            WarningFilter::Category { prefix, category, name } => (prefix, category, None, name),
-            WarningFilter::Code { prefix, category, code, name } => (prefix, category, Some(code), name),
+            WarningFilter::Category {
+                prefix,
+                category,
+                name,
+            } => (prefix, category, None, name),
+            WarningFilter::Code {
+                prefix,
+                category,
+                code,
+                name,
+            } => (prefix, category, Some(code), name),
         };
-        self.filters.entry(prefix).or_insert(UnprefixedWarningFilters::Empty).add(category, code, name)
+        self.filters
+            .entry(prefix)
+            .or_insert(UnprefixedWarningFilters::Empty)
+            .add(category, code, name)
     }
 
     pub fn unused_warnings_filter_for_test() -> Self {
         Self {
-            filters: BTreeMap::from([(None, UnprefixedWarningFilters::unused_warnings_filter_for_test())]),
+            filters: BTreeMap::from([(
+                None,
+                UnprefixedWarningFilters::unused_warnings_filter_for_test(),
+            )]),
             for_dependency: false,
         }
     }
@@ -297,7 +360,8 @@ impl UnprefixedWarningFilters {
             Self::All => info.severity() <= Severity::Warning,
             Self::Specified { categories, codes } => {
                 info.severity() <= Severity::Warning
-                    && (categories.contains_key(&info.category()) || codes.contains_key(&(info.category(), info.code())))
+                    && (categories.contains_key(&info.category())
+                        || codes.contains_key(&(info.category(), info.code())))
             }
             Self::Empty => false,
         }
@@ -315,22 +379,37 @@ impl UnprefixedWarningFilters {
             // category and code level union
             (
                 Self::Specified { categories, codes },
-                Self::Specified { categories: other_categories, codes: other_codes },
+                Self::Specified {
+                    categories: other_categories,
+                    codes: other_codes,
+                },
             ) => {
                 categories.extend(other_categories);
                 // remove any codes covered by the category level filter
-                codes.extend(other_codes.iter().filter(|((category, _), _)| !categories.contains_key(category)));
+                codes.extend(
+                    other_codes
+                        .iter()
+                        .filter(|((category, _), _)| !categories.contains_key(category)),
+                );
             }
         }
     }
 
     /// Add a specific filter to the filter map.
     /// If filter_code is None, then the filter applies to all codes in the filter_category.
-    fn add(&mut self, filter_category: u8, filter_code: Option<u8>, filter_name: Option<WellKnownFilterName>) {
+    fn add(
+        &mut self,
+        filter_category: u8,
+        filter_code: Option<u8>,
+        filter_name: Option<WellKnownFilterName>,
+    ) {
         match self {
             Self::All => (),
             Self::Empty => {
-                *self = Self::Specified { categories: BTreeMap::new(), codes: BTreeMap::new() };
+                *self = Self::Specified {
+                    categories: BTreeMap::new(),
+                    codes: BTreeMap::new(),
+                };
                 self.add(filter_category, filter_code, filter_name)
             }
             Self::Specified { categories, .. } if categories.contains_key(&filter_category) => (),
@@ -360,7 +439,10 @@ impl UnprefixedWarningFilters {
             ((info.category(), info.code()), Some(filter))
         })
         .collect();
-        Self::Specified { categories: BTreeMap::new(), codes: filtered_codes }
+        Self::Specified {
+            categories: BTreeMap::new(),
+            codes: filtered_codes,
+        }
     }
 }
 
@@ -372,17 +454,38 @@ impl WarningFilter {
         }
     }
 
-    pub fn code(prefix: ExternalPrefix, category: u8, code: u8, name: Option<WellKnownFilterName>) -> Self {
-        Self::Code { prefix, category, code, name }
+    pub fn code(
+        prefix: ExternalPrefix,
+        category: u8,
+        code: u8,
+        name: Option<WellKnownFilterName>,
+    ) -> Self {
+        Self::Code {
+            prefix,
+            category,
+            code,
+            name,
+        }
     }
 
-    pub fn category(prefix: ExternalPrefix, category: u8, name: Option<WellKnownFilterName>) -> Self {
-        Self::Category { prefix, category, name }
+    pub fn category(
+        prefix: ExternalPrefix,
+        category: u8,
+        name: Option<WellKnownFilterName>,
+    ) -> Self {
+        Self::Category {
+            prefix,
+            category,
+            name,
+        }
     }
 
     pub fn compiler_known_filters() -> BTreeMap<FilterName, BTreeSet<WarningFilter>> {
         BTreeMap::from([
-            (FILTER_ALL.into(), BTreeSet::from([WarningFilter::All(None)])),
+            (
+                FILTER_ALL.into(),
+                BTreeSet::from([WarningFilter::All(None)]),
+            ),
             (
                 FILTER_UNUSED.into(),
                 BTreeSet::from([WarningFilter::Category {
@@ -446,14 +549,20 @@ impl AstDebug for WarningFiltersBuilder {
         for (prefix, filters) in &self.filters {
             let prefix_str = prefix.unwrap_or(known_attributes::DiagnosticAttribute::ALLOW);
             match filters {
-                UnprefixedWarningFilters::All => {
-                    w.write(format!("#[{}({})]", prefix_str, WarningFilter::All(*prefix).to_str().unwrap(),))
-                }
+                UnprefixedWarningFilters::All => w.write(format!(
+                    "#[{}({})]",
+                    prefix_str,
+                    WarningFilter::All(*prefix).to_str().unwrap(),
+                )),
                 UnprefixedWarningFilters::Specified { categories, codes } => {
                     w.write(format!("#[{}(", prefix_str));
                     let items = categories
                         .iter()
-                        .map(|(cat, n)| WarningFilter::Category { prefix: *prefix, category: *cat, name: *n })
+                        .map(|(cat, n)| WarningFilter::Category {
+                            prefix: *prefix,
+                            category: *cat,
+                            name: *n,
+                        })
                         .chain(codes.iter().map(|((cat, code), n)| WarningFilter::Code {
                             prefix: *prefix,
                             category: *cat,

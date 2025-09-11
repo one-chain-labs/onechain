@@ -2,21 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::examples::RpcExampleProvider;
-use clap::{Parser, ValueEnum};
+use clap::Parser;
+use clap::ValueEnum;
 use pretty_assertions::assert_str_eq;
-use std::{fs::File, io::Write};
+use std::fs::File;
+use std::io::Write;
 //temporarily remove api ref content for indexer methods
 //use sui_json_rpc::api::ExtendedApiOpenRpc;
-use sui_json_rpc::{
-    coin_api::CoinReadApi,
-    governance_api::GovernanceReadApi,
-    read_api::ReadApi,
-    sui_rpc_doc,
-    transaction_builder_api::TransactionBuilderApi,
-    transaction_execution_api::TransactionExecutionApi,
-    SuiRpcModule,
-};
-use sui_json_rpc_api::{IndexerApiOpenRpc, MoveUtilsOpenRpc};
+use sui_json_rpc::coin_api::CoinReadApi;
+use sui_json_rpc::governance_api::GovernanceReadApi;
+use sui_json_rpc::read_api::ReadApi;
+use sui_json_rpc::sui_rpc_doc;
+use sui_json_rpc::transaction_builder_api::TransactionBuilderApi;
+use sui_json_rpc::transaction_execution_api::TransactionExecutionApi;
+use sui_json_rpc::SuiRpcModule;
+use sui_json_rpc_api::IndexerApiOpenRpc;
+use sui_json_rpc_api::MoveUtilsOpenRpc;
 
 mod examples;
 

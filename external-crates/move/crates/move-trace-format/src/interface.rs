@@ -24,10 +24,12 @@ impl Tracer for NopTracer {
 /// non-external events cannot be accidentally added.
 pub struct Writer<'a>(pub(crate) &'a mut MoveTrace);
 
-impl<'a> Writer<'a> {
+impl Writer<'_> {
     /// Emit an external event into the trace.
     pub fn push<T: Serialize>(&mut self, e: T) {
-        self.0.events.push(TraceEvent::External(Box::new(serde_json::to_value(e).unwrap())));
+        self.0.push_event(TraceEvent::External(Box::new(
+            serde_json::to_value(e).unwrap(),
+        )));
     }
 
     /// Get the current version of the trace.

@@ -33,7 +33,10 @@ pub struct DependencyCache {
 impl DependencyCache {
     pub fn new(skip_fetch_latest_git_deps: bool) -> DependencyCache {
         let fetched_deps = BTreeSet::new();
-        DependencyCache { fetched_deps, skip_fetch_latest_git_deps }
+        DependencyCache {
+            fetched_deps,
+            skip_fetch_latest_git_deps,
+        }
     }
 
     pub fn download_and_update_if_remote<Progress: Write>(
@@ -53,14 +56,23 @@ impl DependencyCache {
                 package_hooks::resolve_on_chain_dependency(dep_name, info)
             }
 
-            DependencyKind::Git(GitInfo { git_url, git_rev, subdir: _ }) => {
+            DependencyKind::Git(GitInfo {
+                git_url,
+                git_rev,
+                subdir: _,
+            }) => {
                 let repository_path = repository_path(kind);
                 // check if a give dependency type has already been fetched
                 if !self.fetched_deps.insert(repository_path.clone()) {
                     return Ok(());
                 }
 
-                if Command::new("git").arg("--version").output().is_err() {
+                if Command::new("git")
+                    .arg("--version")
+                    .stdin(Stdio::null())
+                    .output()
+                    .is_err()
+                {
                     writeln!(progress_output, "Git is not installed or not in the PATH.")?;
                     return Err(anyhow::anyhow!("Git is not installed or not in the PATH."));
                 }
@@ -70,26 +82,55 @@ impl DependencyCache {
                 let os_git_rev = OsStr::new(git_rev.as_str());
 
                 if !git_path.exists() {
-                    writeln!(progress_output, "{} {}", "FETCHING GIT DEPENDENCY".bold().green(), git_url,)?;
+                    writeln!(
+                        progress_output,
+                        "{} {}",
+                        "FETCHING GIT DEPENDENCY".bold().green(),
+                        git_url,
+                    )?;
                     // If the cached folder does not exist, download and clone accordingly
-                    if let Ok(mut output) =
-                        Command::new("git").args([OsStr::new("clone"), os_git_url, git_path.as_os_str()]).spawn()
+                    if let Ok(mut output) = Command::new("git")
+                        .args([
+                            OsStr::new("clone"),
+                            OsStr::new("--filter=tree:0"),
+                            OsStr::new("--no-checkout"),
+                            os_git_url,
+                            git_path.as_os_str(),
+                        ])
+                        .stdin(Stdio::null())
+                        .spawn()
                     {
-                        output
-                            .wait()
-                            .map_err(|_| anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name))?;
+                        output.wait().map_err(|_| {
+                            anyhow::anyhow!(
+                                "Failed to clone Git repository for package '{}'",
+                                dep_name
+                            )
+                        })?;
                         if output.stdout.is_some() {
                             writeln!(progress_output, "{:?}", output)?;
                         }
                     } else {
-                        return Err(anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name));
+                        return Err(anyhow::anyhow!(
+                            "Failed to clone Git repository for package '{}'",
+                            dep_name
+                        ));
                     }
 
                     Command::new("git")
-                        .args([OsStr::new("-C"), git_path.as_os_str(), OsStr::new("checkout"), os_git_rev])
+                        .args([
+                            OsStr::new("-C"),
+                            git_path.as_os_str(),
+                            OsStr::new("checkout"),
+                            os_git_rev,
+                        ])
+                        .stdin(Stdio::null())
                         .output()
                         .map_err(|_| {
-                            anyhow::anyhow!("Failed to checkout Git reference '{}' for package '{}'", git_rev, dep_name)
+                            anyhow::anyhow!(
+                                "Failed to checkout Git reference '{}' for package '{}'",
+                                git_rev,
+                                dep_name
+                            )
                         })?;
                 } else if !self.skip_fetch_latest_git_deps {
                     // Update the git dependency
@@ -103,6 +144,7 @@ impl DependencyCache {
                             OsStr::new("--verify"),
                             os_git_rev,
                         ])
+                        .stdin(Stdio::null())
                         .output()
                     {
                         if let Ok(parsable_version) = String::from_utf8(rev.stdout) {
@@ -121,6 +163,7 @@ impl DependencyCache {
                             OsStr::new("--list"),
                             os_git_rev,
                         ])
+                        .stdin(Stdio::null())
                         .output();
 
                     if let Ok(tag) = tag {
@@ -134,7 +177,12 @@ impl DependencyCache {
                         }
                     }
 
-                    writeln!(progress_output, "{} {}", "UPDATING GIT DEPENDENCY".bold().green(), git_url,)?;
+                    writeln!(
+                        progress_output,
+                        "{} {}",
+                        "UPDATING GIT DEPENDENCY".bold().green(),
+                        git_url,
+                    )?;
 
                     // If the current folder exists, do a fetch and reset to ensure that the branch
                     // is up to date.
@@ -143,7 +191,13 @@ impl DependencyCache {
                     // connection.
 
                     if let Ok(mut output) = Command::new("git")
-                        .args([OsStr::new("-C"), git_path.as_os_str(), OsStr::new("fetch"), OsStr::new("origin")])
+                        .args([
+                            OsStr::new("-C"),
+                            git_path.as_os_str(),
+                            OsStr::new("fetch"),
+                            OsStr::new("origin"),
+                        ])
+                        .stdin(Stdio::null())
                         .spawn()
                     {
                         output.wait().map_err(|_| {
@@ -178,11 +232,11 @@ impl DependencyCache {
                         .status()
                         .map_err(|_| {
                             anyhow::anyhow!(
-                                "Failed to reset to latest Git state '{}' for package '{}', to skip \
+                            "Failed to reset to latest Git state '{}' for package '{}', to skip \
                              set --skip-fetch-latest-git-deps",
-                                git_rev,
-                                dep_name
-                            )
+                            git_rev,
+                            dep_name
+                        )
                         })?;
 
                     if !status.success() {

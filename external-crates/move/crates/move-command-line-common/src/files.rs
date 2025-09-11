@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, *};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::{collections::BTreeMap, path::Path};
-use vfs::{error::VfsErrorKind, VfsPath, VfsResult};
+use vfs::{VfsPath, VfsResult, error::VfsErrorKind};
 
 /// Result of sha256 hash of a file's contents.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -41,11 +41,13 @@ pub const MOVE_IR_EXTENSION: &str = "mvir";
 /// Extension for Move bytecode files
 pub const MOVE_COMPILED_EXTENSION: &str = "mv";
 /// Extension for Move source map files (mappings from source to bytecode)
-pub const SOURCE_MAP_EXTENSION: &str = "mvsm";
+pub const DEBUG_INFO_EXTENSION: &str = "mvd";
 /// Extension for error description map for compiled releases
 pub const MOVE_ERROR_DESC_EXTENSION: &str = "errmap";
 /// Extension for coverage maps
 pub const MOVE_COVERAGE_MAP_EXTENSION: &str = "mvcov";
+/// Extension for disassembled Move bytecode files
+pub const MOVE_BYTECODE_EXTENSION: &str = "mvb";
 
 /// Determine if the path at `path` exists distinguishing between whether the path did not exist,
 /// or if there were other errors in determining if the path existed.
@@ -81,7 +83,11 @@ pub fn find_filenames<Predicate: FnMut(&Path) -> bool>(
         if !path.is_dir() {
             continue;
         }
-        for entry in walkdir::WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()) {
+        for entry in walkdir::WalkDir::new(path)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             let entry_path = entry.path();
             if !entry.file_type().is_file() || !is_file_desired(entry_path) {
                 continue;
@@ -97,12 +103,20 @@ pub fn find_filenames<Predicate: FnMut(&Path) -> bool>(
 ///   recursively in that directory
 /// - If `keep_specified_files` any file explicitly passed in `paths`, will be added to the result
 ///   Otherwise, they will be discarded
-pub fn find_move_filenames(paths: &[impl AsRef<Path>], keep_specified_files: bool) -> anyhow::Result<Vec<String>> {
+pub fn find_move_filenames(
+    paths: &[impl AsRef<Path>],
+    keep_specified_files: bool,
+) -> anyhow::Result<Vec<String>> {
     if keep_specified_files {
         let (file_paths, other_paths): (Vec<&Path>, Vec<&Path>) =
             paths.iter().map(|p| p.as_ref()).partition(|s| s.is_file());
-        let mut files = file_paths.into_iter().map(path_to_string).collect::<anyhow::Result<Vec<String>>>()?;
-        files.extend(find_filenames(&other_paths, |path| extension_equals(path, MOVE_EXTENSION))?);
+        let mut files = file_paths
+            .into_iter()
+            .map(path_to_string)
+            .collect::<anyhow::Result<Vec<String>>>()?;
+        files.extend(find_filenames(&other_paths, |path| {
+            extension_equals(path, MOVE_EXTENSION)
+        })?);
         Ok(files)
     } else {
         find_filenames(paths, |path| extension_equals(path, MOVE_EXTENSION))
@@ -116,7 +130,10 @@ pub fn find_filenames_and_keep_specified<Predicate: FnMut(&Path) -> bool>(
 ) -> anyhow::Result<Vec<String>> {
     let (file_paths, other_paths): (Vec<&Path>, Vec<&Path>) =
         paths.iter().map(|p| p.as_ref()).partition(|s| s.is_file());
-    let mut files = file_paths.into_iter().map(path_to_string).collect::<anyhow::Result<Vec<String>>>()?;
+    let mut files = file_paths
+        .into_iter()
+        .map(path_to_string)
+        .collect::<anyhow::Result<Vec<String>>>()?;
     files.extend(find_filenames(&other_paths, is_file_desired)?);
     Ok(files)
 }
@@ -143,7 +160,10 @@ pub fn verify_and_create_named_address_mapping<T: Copy + std::fmt::Display + Eq>
     for (name, addr_bytes) in named_addresses {
         match mapping.insert(name.clone(), addr_bytes) {
             Some(other_addr) if other_addr != addr_bytes => {
-                invalid_mappings.entry(name).or_insert_with(Vec::new).push(other_addr);
+                invalid_mappings
+                    .entry(name)
+                    .or_insert_with(Vec::new)
+                    .push(other_addr);
             }
             None | Some(_) => (),
         }
@@ -156,13 +176,20 @@ pub fn verify_and_create_named_address_mapping<T: Copy + std::fmt::Display + Eq>
                 format!(
                     "{} is assigned differing values {} and {}",
                     name,
-                    addr_bytes.iter().map(|x| format!("{}", x)).collect::<Vec<_>>().join(","),
+                    addr_bytes
+                        .iter()
+                        .map(|x| format!("{}", x))
+                        .collect::<Vec<_>>()
+                        .join(","),
                     mapping[&name]
                 )
             })
             .collect::<Vec<_>>();
 
-        anyhow::bail!("Redefinition of named addresses found in arguments to compiler: {}", redefinitions.join(", "))
+        anyhow::bail!(
+            "Redefinition of named addresses found in arguments to compiler: {}",
+            redefinitions.join(", ")
+        )
     }
 
     Ok(mapping)
@@ -224,7 +251,10 @@ pub fn find_filenames_vfs<Predicate: FnMut(&VfsPath) -> bool>(
 /// Otherwise, they will be discarded
 /// It implements the same functionality as find_move_filenames above but for the virtual file
 /// system
-pub fn find_move_filenames_vfs(paths: &[VfsPath], keep_specified_files: bool) -> anyhow::Result<Vec<VfsPath>> {
+pub fn find_move_filenames_vfs(
+    paths: &[VfsPath],
+    keep_specified_files: bool,
+) -> anyhow::Result<Vec<VfsPath>> {
     if keep_specified_files {
         let mut file_paths = vec![];
         let mut other_paths = vec![];
@@ -236,10 +266,16 @@ pub fn find_move_filenames_vfs(paths: &[VfsPath], keep_specified_files: bool) ->
             }
         }
         file_paths.extend(find_filenames_vfs(&other_paths, |path| {
-            path.extension().map(|e| e.as_str() == MOVE_EXTENSION).unwrap_or(false)
+            path.extension()
+                .map(|e| e.as_str() == MOVE_EXTENSION)
+                .unwrap_or(false)
         })?);
         Ok(file_paths)
     } else {
-        find_filenames_vfs(paths, |path| path.extension().map(|e| e.as_str() == MOVE_EXTENSION).unwrap_or(false))
+        find_filenames_vfs(paths, |path| {
+            path.extension()
+                .map(|e| e.as_str() == MOVE_EXTENSION)
+                .unwrap_or(false)
+        })
     }
 }

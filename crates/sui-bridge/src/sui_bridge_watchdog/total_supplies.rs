@@ -19,8 +19,16 @@ pub struct TotalSupplies {
 }
 
 impl TotalSupplies {
-    pub fn new(sui_client: Arc<SuiClient>, coins: BTreeMap<String, String>, metric: IntGaugeVec) -> Self {
-        Self { sui_client, coins, metric }
+    pub fn new(
+        sui_client: Arc<SuiClient>,
+        coins: BTreeMap<String, String>,
+        metric: IntGaugeVec,
+    ) -> Self {
+        Self {
+            sui_client,
+            coins,
+            metric,
+        }
     }
 }
 
@@ -32,10 +40,16 @@ impl Observable for TotalSupplies {
 
     async fn observe_and_report(&self) {
         for (coin_name, coin_type) in &self.coins {
-            let resp = self.sui_client.coin_read_api().get_total_supply(coin_type.clone()).await;
+            let resp = self
+                .sui_client
+                .coin_read_api()
+                .get_total_supply(coin_type.clone())
+                .await;
             match resp {
                 Ok(supply) => {
-                    self.metric.with_label_values(&[coin_name]).set(supply.value as i64);
+                    self.metric
+                        .with_label_values(&[coin_name])
+                        .set(supply.value as i64);
                     info!("Total supply for {coin_type}: {}", supply.value);
                 }
                 Err(e) => {

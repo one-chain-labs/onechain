@@ -5,7 +5,7 @@
 
 //# publish
 module Test::M1 {
-    use one::coin::Coin;
+    use sui::coin::Coin;
 
     public struct Object has key, store {
         id: UID,

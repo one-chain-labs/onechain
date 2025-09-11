@@ -4,10 +4,10 @@
 module bridged_usdt::usdt {
     use std::option;
 
-    use one::coin;
-    use one::transfer;
-    use one::tx_context;
-    use one::tx_context::TxContext;
+    use sui::coin;
+    use sui::transfer;
+    use sui::tx_context;
+    use sui::tx_context::TxContext;
 
     struct USDT has drop {}
 

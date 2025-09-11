@@ -3,7 +3,7 @@
 
 /// APIs for accessing time from move calls, via the `Clock`: a unique
 /// shared object that is created at 0x6 during genesis.
-module one::clock;
+module oct::clock;
 
 /// Sender is not @0x0 the system address.
 const ENotSystemAddress: u64 = 0;
@@ -20,7 +20,7 @@ public struct Clock has key {
     id: UID,
     /// The clock's timestamp, which is set automatically by a
     /// system transaction every time consensus commits a
-    /// schedule, or by `one::clock::increment_for_testing` during
+    /// schedule, or by `sui::clock::increment_for_testing` during
     /// testing.
     timestamp_ms: u64,
 }

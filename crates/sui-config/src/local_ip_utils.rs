@@ -17,18 +17,24 @@ pub struct SimAddressManager {
 #[cfg(msim)]
 impl SimAddressManager {
     pub fn new() -> Self {
-        Self { next_ip_offset: AtomicI16::new(1), next_port: AtomicI16::new(9000) }
+        Self {
+            next_ip_offset: AtomicI16::new(1),
+            next_port: AtomicI16::new(9000),
+        }
     }
 
     pub fn get_next_ip(&self) -> String {
-        let offset = self.next_ip_offset.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let offset = self
+            .next_ip_offset
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         // If offset ever goes beyond 255, we could use more bytes in the IP.
         assert!(offset <= 255);
         format!("10.10.0.{}", offset)
     }
 
     pub fn get_next_available_port(&self) -> u16 {
-        self.next_port.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u16
+        self.next_port
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u16
     }
 }
 
@@ -78,7 +84,11 @@ pub fn get_available_port(host: &str) -> u16 {
         }
     }
 
-    panic!("Error: could not find an available port on {}: {:?}", host, get_ephemeral_port(host));
+    panic!(
+        "Error: could not find an available port on {}: {:?}",
+        host,
+        get_ephemeral_port(host)
+    );
 }
 
 #[cfg(not(msim))]
@@ -100,17 +110,25 @@ fn get_ephemeral_port(host: &str) -> std::io::Result<u16> {
 
 /// Returns a new unique TCP address for the given host, by finding a new available port.
 pub fn new_tcp_address_for_testing(host: &str) -> Multiaddr {
-    format!("/ip4/{}/tcp/{}/http", host, get_available_port(host)).parse().unwrap()
+    format!("/ip4/{}/tcp/{}/http", host, get_available_port(host))
+        .parse()
+        .unwrap()
 }
 
 /// Returns a new unique UDP address for the given host, by finding a new available port.
 pub fn new_udp_address_for_testing(host: &str) -> Multiaddr {
-    format!("/ip4/{}/udp/{}", host, get_available_port(host)).parse().unwrap()
+    format!("/ip4/{}/udp/{}", host, get_available_port(host))
+        .parse()
+        .unwrap()
 }
 
 /// Returns a new unique TCP address in String format for localhost, by finding a new available port on localhost.
 pub fn new_local_tcp_socket_for_testing_string() -> String {
-    format!("{}:{}", localhost_for_testing(), get_available_port(&localhost_for_testing()))
+    format!(
+        "{}:{}",
+        localhost_for_testing(),
+        get_available_port(&localhost_for_testing())
+    )
 }
 
 /// Returns a new unique TCP address (SocketAddr) for localhost, by finding a new available port on localhost.

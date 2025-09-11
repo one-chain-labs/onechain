@@ -6,23 +6,27 @@
 
 use crate::key_value_store_metrics::KeyValueStoreMetrics;
 use async_trait::async_trait;
-use std::{sync::Arc, time::Instant};
-use sui_types::{
-    base_types::{ObjectID, SequenceNumber, VersionNumber},
-    digests::{CheckpointDigest, TransactionDigest, TransactionEventsDigest},
-    effects::{TransactionEffects, TransactionEvents},
-    error::{SuiError, SuiResult, UserInputError},
-    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber},
-    object::Object,
-    transaction::Transaction,
+use std::sync::Arc;
+use std::time::Instant;
+use sui_types::base_types::{ObjectID, SequenceNumber, VersionNumber};
+use sui_types::digests::{CheckpointDigest, TransactionDigest};
+use sui_types::effects::{TransactionEffects, TransactionEvents};
+use sui_types::error::{SuiError, SuiResult, UserInputError};
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber,
 };
+use sui_types::object::Object;
+use sui_types::storage::ObjectKey;
+use sui_types::transaction::Transaction;
 use tracing::instrument;
 
-pub type KVStoreTransactionData =
-    (Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>, Vec<Option<TransactionEvents>>);
+pub type KVStoreTransactionData = (Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>);
 
-pub type KVStoreCheckpointData =
-    (Vec<Option<CertifiedCheckpointSummary>>, Vec<Option<CheckpointContents>>, Vec<Option<CertifiedCheckpointSummary>>);
+pub type KVStoreCheckpointData = (
+    Vec<Option<CertifiedCheckpointSummary>>,
+    Vec<Option<CheckpointContents>>,
+    Vec<Option<CertifiedCheckpointSummary>>,
+);
 
 pub struct TransactionKeyValueStore {
     store_name: &'static str,
@@ -36,7 +40,11 @@ impl TransactionKeyValueStore {
         metrics: Arc<KeyValueStoreMetrics>,
         inner: Arc<dyn TransactionKeyValueStoreTrait + Send + Sync>,
     ) -> Self {
-        Self { store_name, metrics, inner }
+        Self {
+            store_name,
+            metrics,
+            inner,
+        }
     }
 
     /// Generic multi_get, allows implementors to get heterogenous values with a single round trip.
@@ -44,16 +52,14 @@ impl TransactionKeyValueStore {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
-    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>, Vec<Option<TransactionEvents>>)> {
+    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>)> {
         let start = Instant::now();
-        let res = self.inner.multi_get(transactions, effects, events).await;
+        let res = self.inner.multi_get(transactions, effects).await;
         let elapsed = start.elapsed();
 
         let num_txns = transactions.len() as u64;
         let num_effects = effects.len() as u64;
-        let num_events = events.len() as u64;
-        let total_keys = num_txns + num_effects + num_events;
+        let total_keys = num_txns + num_effects;
 
         self.metrics
             .key_value_store_num_fetches_latency_ms
@@ -67,7 +73,6 @@ impl TransactionKeyValueStore {
         if let Ok(res) = &res {
             let txns_not_found = res.0.iter().filter(|v| v.is_none()).count() as u64;
             let effects_not_found = res.1.iter().filter(|v| v.is_none()).count() as u64;
-            let events_not_found = res.2.iter().filter(|v| v.is_none()).count() as u64;
 
             if num_txns > 0 {
                 self.metrics
@@ -80,12 +85,6 @@ impl TransactionKeyValueStore {
                     .key_value_store_num_fetches_success
                     .with_label_values(&[self.store_name, "fx"])
                     .inc_by(num_effects);
-            }
-            if num_events > 0 {
-                self.metrics
-                    .key_value_store_num_fetches_success
-                    .with_label_values(&[self.store_name, "events"])
-                    .inc_by(num_events);
             }
 
             if txns_not_found > 0 {
@@ -100,22 +99,15 @@ impl TransactionKeyValueStore {
                     .with_label_values(&[self.store_name, "fx"])
                     .inc_by(effects_not_found);
             }
-            if events_not_found > 0 {
-                self.metrics
-                    .key_value_store_num_fetches_not_found
-                    .with_label_values(&[self.store_name, "events"])
-                    .inc_by(events_not_found);
-            }
         } else {
-            self.metrics.key_value_store_num_fetches_error.with_label_values(&[self.store_name, "tx"]).inc_by(num_txns);
+            self.metrics
+                .key_value_store_num_fetches_error
+                .with_label_values(&[self.store_name, "tx"])
+                .inc_by(num_txns);
             self.metrics
                 .key_value_store_num_fetches_error
                 .with_label_values(&[self.store_name, "fx"])
                 .inc_by(num_effects);
-            self.metrics
-                .key_value_store_num_fetches_error
-                .with_label_values(&[self.store_name, "events"])
-                .inc_by(num_events);
         }
 
         res
@@ -134,11 +126,16 @@ impl TransactionKeyValueStore {
         let start = Instant::now();
         let res = self
             .inner
-            .multi_get_checkpoints(checkpoint_summaries, checkpoint_contents, checkpoint_summaries_by_digest)
+            .multi_get_checkpoints(
+                checkpoint_summaries,
+                checkpoint_contents,
+                checkpoint_summaries_by_digest,
+            )
             .await;
         let elapsed = start.elapsed();
 
-        let num_summaries = checkpoint_summaries.len() as u64 + checkpoint_summaries_by_digest.len() as u64;
+        let num_summaries =
+            checkpoint_summaries.len() as u64 + checkpoint_summaries_by_digest.len() as u64;
         let num_contents = checkpoint_contents.len() as u64;
 
         self.metrics
@@ -202,48 +199,47 @@ impl TransactionKeyValueStore {
         &self,
         keys: &[CheckpointSequenceNumber],
     ) -> SuiResult<Vec<Option<CertifiedCheckpointSummary>>> {
-        self.multi_get_checkpoints(keys, &[], &[]).await.map(|(summaries, _, _)| summaries)
+        self.multi_get_checkpoints(keys, &[], &[])
+            .await
+            .map(|(summaries, _, _)| summaries)
     }
 
     pub async fn multi_get_checkpoints_contents(
         &self,
         keys: &[CheckpointSequenceNumber],
     ) -> SuiResult<Vec<Option<CheckpointContents>>> {
-        self.multi_get_checkpoints(&[], keys, &[]).await.map(|(_, contents, _)| contents)
+        self.multi_get_checkpoints(&[], keys, &[])
+            .await
+            .map(|(_, contents, _)| contents)
     }
 
     pub async fn multi_get_checkpoints_summaries_by_digest(
         &self,
         keys: &[CheckpointDigest],
     ) -> SuiResult<Vec<Option<CertifiedCheckpointSummary>>> {
-        self.multi_get_checkpoints(&[], &[], keys).await.map(|(_, _, summaries)| summaries)
+        self.multi_get_checkpoints(&[], &[], keys)
+            .await
+            .map(|(_, _, summaries)| summaries)
     }
 
-    pub async fn multi_get_tx(&self, keys: &[TransactionDigest]) -> SuiResult<Vec<Option<Transaction>>> {
-        self.multi_get(keys, &[], &[]).await.map(|(txns, _, _)| txns)
+    pub async fn multi_get_tx(
+        &self,
+        keys: &[TransactionDigest],
+    ) -> SuiResult<Vec<Option<Transaction>>> {
+        self.multi_get(keys, &[]).await.map(|(txns, _)| txns)
     }
 
     pub async fn multi_get_fx_by_tx_digest(
         &self,
         keys: &[TransactionDigest],
     ) -> SuiResult<Vec<Option<TransactionEffects>>> {
-        self.multi_get(&[], keys, &[]).await.map(|(_, fx, _)| fx)
-    }
-
-    pub async fn multi_get_events(&self, keys: &[TransactionEventsDigest]) -> SuiResult<Vec<Option<TransactionEvents>>> {
-        self.multi_get(&[], &[], keys).await.map(|(_, _, events)| events)
+        self.multi_get(&[], keys).await.map(|(_, fx)| fx)
     }
 
     /// Convenience method for fetching single digest, and returning an error if it's not found.
     /// Prefer using multi_get_tx whenever possible.
     pub async fn get_tx(&self, digest: TransactionDigest) -> SuiResult<Transaction> {
-        self.multi_get_tx(&[digest]).await?.into_iter().next().flatten().ok_or(SuiError::TransactionNotFound { digest })
-    }
-
-    /// Convenience method for fetching single digest, and returning an error if it's not found.
-    /// Prefer using multi_get_fx_by_tx_digest whenever possible.
-    pub async fn get_fx_by_tx_digest(&self, digest: TransactionDigest) -> SuiResult<TransactionEffects> {
-        self.multi_get_fx_by_tx_digest(&[digest])
+        self.multi_get_tx(&[digest])
             .await?
             .into_iter()
             .next()
@@ -252,14 +248,17 @@ impl TransactionKeyValueStore {
     }
 
     /// Convenience method for fetching single digest, and returning an error if it's not found.
-    /// Prefer using multi_get_events whenever possible.
-    pub async fn get_events(&self, digest: TransactionEventsDigest) -> SuiResult<TransactionEvents> {
-        self.multi_get_events(&[digest])
+    /// Prefer using multi_get_fx_by_tx_digest whenever possible.
+    pub async fn get_fx_by_tx_digest(
+        &self,
+        digest: TransactionDigest,
+    ) -> SuiResult<TransactionEffects> {
+        self.multi_get_fx_by_tx_digest(&[digest])
             .await?
             .into_iter()
             .next()
             .flatten()
-            .ok_or(SuiError::TransactionEventsNotFound { digest })
+            .ok_or(SuiError::TransactionNotFound { digest })
     }
 
     /// Convenience method for fetching single checkpoint, and returning an error if it's not found.
@@ -273,18 +272,25 @@ impl TransactionKeyValueStore {
             .into_iter()
             .next()
             .flatten()
-            .ok_or(SuiError::UserInputError { error: UserInputError::VerifiedCheckpointNotFound(checkpoint) })
+            .ok_or(SuiError::UserInputError {
+                error: UserInputError::VerifiedCheckpointNotFound(checkpoint),
+            })
     }
 
     /// Convenience method for fetching single checkpoint, and returning an error if it's not found.
     /// Prefer using multi_get_checkpoints_contents whenever possible.
-    pub async fn get_checkpoint_contents(&self, checkpoint: CheckpointSequenceNumber) -> SuiResult<CheckpointContents> {
+    pub async fn get_checkpoint_contents(
+        &self,
+        checkpoint: CheckpointSequenceNumber,
+    ) -> SuiResult<CheckpointContents> {
         self.multi_get_checkpoints_contents(&[checkpoint])
             .await?
             .into_iter()
             .next()
             .flatten()
-            .ok_or(SuiError::UserInputError { error: UserInputError::VerifiedCheckpointNotFound(checkpoint) })
+            .ok_or(SuiError::UserInputError {
+                error: UserInputError::VerifiedCheckpointNotFound(checkpoint),
+            })
     }
 
     /// Convenience method for fetching single checkpoint, and returning an error if it's not found.
@@ -293,22 +299,38 @@ impl TransactionKeyValueStore {
         &self,
         digest: CheckpointDigest,
     ) -> SuiResult<CertifiedCheckpointSummary> {
-        self.multi_get_checkpoints_summaries_by_digest(&[digest]).await?.into_iter().next().flatten().ok_or(
-            SuiError::UserInputError {
+        self.multi_get_checkpoints_summaries_by_digest(&[digest])
+            .await?
+            .into_iter()
+            .next()
+            .flatten()
+            .ok_or(SuiError::UserInputError {
                 error: UserInputError::VerifiedCheckpointDigestNotFound(format!("{:?}", digest)),
-            },
-        )
+            })
     }
 
     pub async fn deprecated_get_transaction_checkpoint(
         &self,
         digest: TransactionDigest,
     ) -> SuiResult<Option<CheckpointSequenceNumber>> {
-        self.inner.deprecated_get_transaction_checkpoint(digest).await
+        self.inner
+            .deprecated_get_transaction_checkpoint(digest)
+            .await
     }
 
-    pub async fn get_object(&self, object_id: ObjectID, version: VersionNumber) -> SuiResult<Option<Object>> {
+    pub async fn get_object(
+        &self,
+        object_id: ObjectID,
+        version: VersionNumber,
+    ) -> SuiResult<Option<Object>> {
         self.inner.get_object(object_id, version).await
+    }
+
+    pub async fn multi_get_objects(
+        &self,
+        object_keys: &[ObjectKey],
+    ) -> SuiResult<Vec<Option<Object>>> {
+        self.inner.multi_get_objects(object_keys).await
     }
 
     pub async fn multi_get_transaction_checkpoint(
@@ -335,7 +357,6 @@ pub trait TransactionKeyValueStoreTrait {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
     ) -> SuiResult<KVStoreTransactionData>;
 
     /// Generic multi_get to allow implementors to get heterogenous values with a single round trip.
@@ -351,7 +372,13 @@ pub trait TransactionKeyValueStoreTrait {
         digest: TransactionDigest,
     ) -> SuiResult<Option<CheckpointSequenceNumber>>;
 
-    async fn get_object(&self, object_id: ObjectID, version: SequenceNumber) -> SuiResult<Option<Object>>;
+    async fn get_object(
+        &self,
+        object_id: ObjectID,
+        version: SequenceNumber,
+    ) -> SuiResult<Option<Object>>;
+
+    async fn multi_get_objects(&self, object_keys: &[ObjectKey]) -> SuiResult<Vec<Option<Object>>>;
 
     async fn multi_get_transaction_checkpoint(
         &self,
@@ -392,25 +419,25 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
-    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>, Vec<Option<TransactionEvents>>)> {
-        let mut res = self.primary.multi_get(transactions, effects, events).await?;
+    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>)> {
+        let mut res = self.primary.multi_get(transactions, effects).await?;
 
         let (fallback_transactions, indices_transactions) = find_fallback(&res.0, transactions);
         let (fallback_effects, indices_effects) = find_fallback(&res.1, effects);
-        let (fallback_events, indices_events) = find_fallback(&res.2, events);
 
-        if fallback_transactions.is_empty() && fallback_effects.is_empty() && fallback_events.is_empty() {
+        if fallback_transactions.is_empty() && fallback_effects.is_empty() {
             return Ok(res);
         }
 
-        let secondary_res = self.fallback.multi_get(&fallback_transactions, &fallback_effects, &fallback_events).await?;
+        let secondary_res = self
+            .fallback
+            .multi_get(&fallback_transactions, &fallback_effects)
+            .await?;
 
         merge_res(&mut res.0, secondary_res.0, &indices_transactions);
         merge_res(&mut res.1, secondary_res.1, &indices_effects);
-        merge_res(&mut res.2, secondary_res.2, &indices_events);
 
-        Ok((res.0, res.1, res.2))
+        Ok((res.0, res.1))
     }
 
     #[instrument(level = "trace", skip_all)]
@@ -426,7 +453,11 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
     )> {
         let mut res = self
             .primary
-            .multi_get_checkpoints(checkpoint_summaries, checkpoint_contents, checkpoint_summaries_by_digest)
+            .multi_get_checkpoints(
+                checkpoint_summaries,
+                checkpoint_contents,
+                checkpoint_summaries_by_digest,
+            )
             .await?;
 
         let (fallback_summaries, indices_summaries) = find_fallback(&res.0, checkpoint_summaries);
@@ -434,13 +465,20 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
         let (fallback_summaries_by_digest, indices_summaries_by_digest) =
             find_fallback(&res.2, checkpoint_summaries_by_digest);
 
-        if fallback_summaries.is_empty() && fallback_contents.is_empty() && fallback_summaries_by_digest.is_empty() {
+        if fallback_summaries.is_empty()
+            && fallback_contents.is_empty()
+            && fallback_summaries_by_digest.is_empty()
+        {
             return Ok(res);
         }
 
         let secondary_res = self
             .fallback
-            .multi_get_checkpoints(&fallback_summaries, &fallback_contents, &fallback_summaries_by_digest)
+            .multi_get_checkpoints(
+                &fallback_summaries,
+                &fallback_contents,
+                &fallback_summaries_by_digest,
+            )
             .await?;
 
         merge_res(&mut res.0, secondary_res.0, &indices_summaries);
@@ -455,15 +493,25 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
         &self,
         digest: TransactionDigest,
     ) -> SuiResult<Option<CheckpointSequenceNumber>> {
-        let mut res = self.primary.deprecated_get_transaction_checkpoint(digest).await?;
+        let mut res = self
+            .primary
+            .deprecated_get_transaction_checkpoint(digest)
+            .await?;
         if res.is_none() {
-            res = self.fallback.deprecated_get_transaction_checkpoint(digest).await?;
+            res = self
+                .fallback
+                .deprecated_get_transaction_checkpoint(digest)
+                .await?;
         }
         Ok(res)
     }
 
     #[instrument(level = "trace", skip_all)]
-    async fn get_object(&self, object_id: ObjectID, version: SequenceNumber) -> SuiResult<Option<Object>> {
+    async fn get_object(
+        &self,
+        object_id: ObjectID,
+        version: SequenceNumber,
+    ) -> SuiResult<Option<Object>> {
         let mut res = self.primary.get_object(object_id, version).await?;
         if res.is_none() {
             res = self.fallback.get_object(object_id, version).await?;
@@ -472,11 +520,31 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
     }
 
     #[instrument(level = "trace", skip_all)]
+    async fn multi_get_objects(&self, object_keys: &[ObjectKey]) -> SuiResult<Vec<Option<Object>>> {
+        let mut res = self.primary.multi_get_objects(object_keys).await?;
+
+        let (fallback, indices) = find_fallback(&res, object_keys);
+
+        if fallback.is_empty() {
+            return Ok(res);
+        }
+
+        let secondary_res = self.fallback.multi_get_objects(&fallback).await?;
+
+        merge_res(&mut res, secondary_res, &indices);
+
+        Ok(res)
+    }
+
+    #[instrument(level = "trace", skip_all)]
     async fn multi_get_transaction_checkpoint(
         &self,
         digests: &[TransactionDigest],
     ) -> SuiResult<Vec<Option<CheckpointSequenceNumber>>> {
-        let mut res = self.primary.multi_get_transaction_checkpoint(digests).await?;
+        let mut res = self
+            .primary
+            .multi_get_transaction_checkpoint(digests)
+            .await?;
 
         let (fallback, indices) = find_fallback(&res, digests);
 
@@ -484,7 +552,10 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
             return Ok(res);
         }
 
-        let secondary_res = self.fallback.multi_get_transaction_checkpoint(&fallback).await?;
+        let secondary_res = self
+            .fallback
+            .multi_get_transaction_checkpoint(&fallback)
+            .await?;
 
         merge_res(&mut res, secondary_res, &indices);
 
@@ -501,7 +572,10 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
         if fallback.is_empty() {
             return Ok(res);
         }
-        let secondary_res = self.fallback.multi_get_events_by_tx_digests(&fallback).await?;
+        let secondary_res = self
+            .fallback
+            .multi_get_events_by_tx_digests(&fallback)
+            .await?;
         merge_res(&mut res, secondary_res, &indices);
         Ok(res)
     }

@@ -11,7 +11,9 @@ const BYTECODE_VERSION_ENV_VAR: &str = "MOVE_BYTECODE_VERSION";
 /// Get the bytecode version from the environment variable.
 // TODO: This should be configurable via toml and command line flags. See also #129.
 pub fn get_bytecode_version_from_env() -> Option<u32> {
-    std::env::var(BYTECODE_VERSION_ENV_VAR).ok().and_then(|s| s.parse::<u32>().ok())
+    std::env::var(BYTECODE_VERSION_ENV_VAR)
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
 }
 
 pub fn read_env_var(v: &str) -> String {
@@ -25,6 +27,12 @@ pub fn read_bool_env_var(v: &str) -> bool {
 
 pub static MOVE_HOME: Lazy<String> = Lazy::new(|| {
     std::env::var("MOVE_HOME").unwrap_or_else(|_| {
-        format!("{}/.move", dirs_next::home_dir().expect("user's home directory not found").to_str().unwrap())
+        format!(
+            "{}/.move",
+            dirs_next::home_dir()
+                .expect("user's home directory not found")
+                .to_str()
+                .unwrap()
+        )
     })
 });

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module tto::tto {
-    use one::object::{Self, UID};
-    use one::tx_context::{Self, TxContext};
-    use one::transfer::{Self, Receiving};
+    use sui::object::{Self, UID};
+    use sui::tx_context::{Self, TxContext};
+    use sui::transfer::{Self, Receiving};
 
     public struct A has key, store {
         id: UID,

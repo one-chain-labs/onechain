@@ -17,19 +17,30 @@ pub fn run_tests_with_config_and_filter(
     cost_table: Option<CostTable>,
 ) {
     let get_files = |root_path, pat| {
-        let source_re = regex::Regex::new(pat).unwrap_or_else(|_| panic!("Invalid regular expression: '{}'", pat));
-        find_filenames(&[root_path], |path| source_re.is_match(&path.to_string_lossy())).unwrap()
+        let source_re = regex::Regex::new(pat)
+            .unwrap_or_else(|_| panic!("Invalid regular expression: '{}'", pat));
+        find_filenames(&[root_path], |path| {
+            source_re.is_match(&path.to_string_lossy())
+        })
+        .unwrap()
     };
 
     let sources = get_files(root_path, source_pattern);
-    let deps = dep_root.map(|root| get_files(root, r".*\.move$")).unwrap_or_default();
+    let deps = dep_root
+        .map(|root| get_files(root, r".*\.move$"))
+        .unwrap_or_default();
 
     config.source_files = sources;
     config.dep_files = deps;
     let test_plan = config.build_test_plan().expect("Unable to build test plan");
 
     let (_, all_tests_passed) = config
-        .run_and_report_unit_tests(test_plan, native_function_table, cost_table, std::io::stdout())
+        .run_and_report_unit_tests(
+            test_plan,
+            native_function_table,
+            cost_table,
+            std::io::stdout(),
+        )
         .expect("Failed to execute tests");
 
     // If all tests passed, exit with 0 otherwise with a non-zero exit code.
@@ -45,7 +56,9 @@ macro_rules! register_move_unit_tests {
     ($config:expr, $root:expr, $pattern:expr) => {
         #[test]
         fn move_unit_tests() {
-            $crate::cargo_runner::run_tests_with_config_and_filter($config, $root, $pattern, None, None)
+            $crate::cargo_runner::run_tests_with_config_and_filter(
+                $config, $root, $pattern, None, None,
+            )
         }
     };
     ($config:expr, $root:expr, $source_pattern:expr, $dep_root:expr, $native_function_table:expr) => {

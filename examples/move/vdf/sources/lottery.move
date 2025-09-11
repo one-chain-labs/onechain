@@ -22,7 +22,8 @@
 module vdf::lottery;
 
 use std::hash::sha2_256;
-use one::{clock::Clock, vdf::{hash_to_input, vdf_verify}};
+use sui::clock::Clock;
+use sui::vdf::{hash_to_input, vdf_verify};
 
 // === Receiver Functions ===
 

@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{format_err, Result};
+use anyhow::{Result, format_err};
 use move_binary_format::file_format::{CodeOffset, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -59,9 +59,12 @@ pub struct TraceMap {
 
 impl CoverageMap {
     /// Takes in a file containing a raw VM trace, and returns an updated coverage map.
-    pub fn update_coverage_from_trace_file<P: AsRef<Path> + std::fmt::Debug>(mut self, filename: P) -> Self {
-        let file =
-            File::open(&filename).unwrap_or_else(|_| panic!("Unable to open coverage trace file '{:?}'", filename));
+    pub fn update_coverage_from_trace_file<P: AsRef<Path> + std::fmt::Debug>(
+        mut self,
+        filename: P,
+    ) -> Self {
+        let file = File::open(&filename)
+            .unwrap_or_else(|_| panic!("Unable to open coverage trace file '{:?}'", filename));
         for line in BufReader::new(file).lines() {
             let line = line.unwrap();
             let mut splits = line.split(',');
@@ -74,7 +77,8 @@ impl CoverageMap {
             if !is_script {
                 let func_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
                 let module_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
-                let module_addr = AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
+                let module_addr =
+                    AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
                 self.insert(exec_id, module_addr, module_name, func_name, pc);
             } else {
                 // Don't count scripts (for now)
@@ -87,7 +91,9 @@ impl CoverageMap {
 
     /// Takes in a file containing a raw VM trace, and returns a coverage map.
     pub fn from_trace_file<P: AsRef<Path> + std::fmt::Debug>(filename: P) -> Self {
-        let empty_module_map = CoverageMap { exec_maps: BTreeMap::new() };
+        let empty_module_map = CoverageMap {
+            exec_maps: BTreeMap::new(),
+        };
         empty_module_map.update_coverage_from_trace_file(filename)
     }
 
@@ -111,8 +117,10 @@ impl CoverageMap {
         func_name: Identifier,
         pc: u64,
     ) {
-        let exec_entry =
-            self.exec_maps.entry(exec_id.to_owned()).or_insert_with(|| ExecCoverageMap::new(exec_id.to_owned()));
+        let exec_entry = self
+            .exec_maps
+            .entry(exec_id.to_owned())
+            .or_insert_with(|| ExecCoverageMap::new(exec_id.to_owned()));
         exec_entry.insert(module_addr, module_name, func_name, pc);
     }
 
@@ -122,7 +130,13 @@ impl CoverageMap {
             for ((module_addr, module_name), module_map) in exec_map.module_maps.iter() {
                 for (func_name, func_map) in module_map.function_maps.iter() {
                     for (pc, count) in func_map.iter() {
-                        unified_map.insert_multi(*module_addr, module_name.clone(), func_name.clone(), *pc, *count);
+                        unified_map.insert_multi(
+                            *module_addr,
+                            module_name.clone(),
+                            func_name.clone(),
+                            *pc,
+                            *count,
+                        );
                     }
                 }
             }
@@ -133,7 +147,11 @@ impl CoverageMap {
 
 impl ModuleCoverageMap {
     pub fn new(module_addr: AccountAddress, module_name: Identifier) -> Self {
-        ModuleCoverageMap { module_addr, module_name, function_maps: BTreeMap::new() }
+        ModuleCoverageMap {
+            module_addr,
+            module_name,
+            function_maps: BTreeMap::new(),
+        }
     }
 
     pub fn insert_multi(&mut self, func_name: Identifier, pc: u64, count: u64) {
@@ -159,7 +177,10 @@ impl ModuleCoverageMap {
 
 impl ExecCoverageMap {
     pub fn new(exec_id: String) -> Self {
-        ExecCoverageMap { exec_id, module_maps: BTreeMap::new() }
+        ExecCoverageMap {
+            exec_id,
+            module_maps: BTreeMap::new(),
+        }
     }
 
     pub fn insert_multi(
@@ -177,7 +198,13 @@ impl ExecCoverageMap {
         module_entry.insert_multi(func_name, pc, count);
     }
 
-    pub fn insert(&mut self, module_addr: AccountAddress, module_name: Identifier, func_name: Identifier, pc: u64) {
+    pub fn insert(
+        &mut self,
+        module_addr: AccountAddress,
+        module_name: Identifier,
+        func_name: Identifier,
+        pc: u64,
+    ) {
         self.insert_multi(module_addr, module_name, func_name, pc, 1);
     }
 
@@ -190,9 +217,9 @@ impl ExecCoverageMap {
             .into_iter()
             .filter_map(|((module_addr, module_name), module_cov)| {
                 modules.get(&module_addr).and_then(|func_map| {
-                    func_map
-                        .get(&module_name)
-                        .map(|(module_path, _)| ((module_path.clone(), module_addr, module_name), module_cov))
+                    func_map.get(&module_name).map(|(module_path, _)| {
+                        ((module_path.clone(), module_addr, module_name), module_cov)
+                    })
                 })
             })
             .collect();
@@ -200,17 +227,25 @@ impl ExecCoverageMap {
         let compiled_modules = modules
             .into_iter()
             .flat_map(|(_, module_map)| {
-                module_map.into_iter().map(|(_, (module_path, compiled_module))| (module_path, compiled_module))
+                module_map
+                    .into_iter()
+                    .map(|(_, (module_path, compiled_module))| (module_path, compiled_module))
             })
             .collect();
 
-        ExecCoverageMapWithModules { module_maps: retained, compiled_modules }
+        ExecCoverageMapWithModules {
+            module_maps: retained,
+            compiled_modules,
+        }
     }
 }
 
 impl ExecCoverageMapWithModules {
     pub fn empty() -> Self {
-        Self { module_maps: BTreeMap::new(), compiled_modules: BTreeMap::new() }
+        Self {
+            module_maps: BTreeMap::new(),
+            compiled_modules: BTreeMap::new(),
+        }
     }
 
     pub fn merge(&mut self, another: ExecCoverageMapWithModules) {
@@ -222,7 +257,9 @@ impl ExecCoverageMapWithModules {
         }
 
         for (module_path, compiled_module) in another.compiled_modules {
-            self.compiled_modules.entry(module_path).or_insert(compiled_module);
+            self.compiled_modules
+                .entry(module_path)
+                .or_insert(compiled_module);
         }
     }
 }
@@ -243,7 +280,8 @@ impl TraceMap {
             if !is_script {
                 let func_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
                 let module_name = Identifier::new(context_segs.pop().unwrap()).unwrap();
-                let module_addr = AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
+                let module_addr =
+                    AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
                 self.insert(exec_id, module_addr, module_name, func_name, pc);
             } else {
                 // Don't count scripts (for now)
@@ -256,7 +294,9 @@ impl TraceMap {
 
     // Takes in a file containing a raw VM trace, and returns a parsed trace.
     pub fn from_trace_file<P: AsRef<Path>>(filename: P) -> Self {
-        let trace_map = TraceMap { exec_maps: BTreeMap::new() };
+        let trace_map = TraceMap {
+            exec_maps: BTreeMap::new(),
+        };
         trace_map.update_from_trace_file(filename)
     }
 
@@ -268,7 +308,9 @@ impl TraceMap {
             .and_then(|mut file| file.read_to_end(&mut bytes).ok())
             .ok_or_else(|| format_err!("Error while reading in coverage map binary"))
             .unwrap();
-        bcs::from_bytes(&bytes).map_err(|_| format_err!("Error deserializing into coverage map")).unwrap()
+        bcs::from_bytes(&bytes)
+            .map_err(|_| format_err!("Error deserializing into coverage map"))
+            .unwrap()
     }
 
     // add entries in a cascading manner
@@ -281,7 +323,12 @@ impl TraceMap {
         pc: u64,
     ) {
         let exec_entry = self.exec_maps.entry(exec_id.to_owned()).or_default();
-        exec_entry.push(TraceEntry { module_addr, module_name, func_name, func_pc: pc as CodeOffset });
+        exec_entry.push(TraceEntry {
+            module_addr,
+            module_name,
+            func_name,
+            func_pc: pc as CodeOffset,
+        });
     }
 }
 

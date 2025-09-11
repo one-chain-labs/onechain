@@ -5,8 +5,8 @@
 
 //# publish --upgradeable --sender A
 module Test::f {
-    use one::coin::Coin;
-    use one::oct::OCT;
+    use sui::coin::Coin;
+    use sui::oct::OCT;
 
     public struct Other { }
 

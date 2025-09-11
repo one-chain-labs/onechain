@@ -5,37 +5,45 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use mysten_network::config::Config;
-use std::{collections::BTreeMap, net::SocketAddr, time::Duration};
+use std::collections::BTreeMap;
+use std::net::SocketAddr;
+use std::time::Duration;
 use sui_network::{api::ValidatorClient, tonic};
+use sui_types::base_types::AuthorityName;
+use sui_types::committee::CommitteeWithNetworkMetadata;
+use sui_types::crypto::NetworkPublicKey;
+use sui_types::messages_checkpoint::{
+    CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2,
+};
+use sui_types::multiaddr::Multiaddr;
+use sui_types::sui_system_state::SuiSystemState;
 use sui_types::{
-    base_types::AuthorityName,
-    committee::CommitteeWithNetworkMetadata,
-    crypto::NetworkPublicKey,
     error::{SuiError, SuiResult},
-    messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
-    multiaddr::Multiaddr,
-    sui_system_state::SuiSystemState,
     transaction::*,
 };
+use tap::TapFallible;
 
 use crate::authority_client::tonic::IntoRequest;
-use sui_network::tonic::{metadata::KeyAndValueRef, transport::Channel};
+use sui_network::tonic::metadata::KeyAndValueRef;
+use sui_network::tonic::transport::Channel;
 use sui_types::messages_grpc::{
-    HandleCertificateRequestV3,
-    HandleCertificateResponseV2,
-    HandleCertificateResponseV3,
-    HandleSoftBundleCertificatesRequestV3,
-    HandleSoftBundleCertificatesResponseV3,
-    HandleTransactionResponse,
-    ObjectInfoRequest,
-    ObjectInfoResponse,
-    SystemStateRequest,
-    TransactionInfoRequest,
-    TransactionInfoResponse,
+    HandleCertificateRequestV3, HandleCertificateResponseV2, HandleCertificateResponseV3,
+    HandleSoftBundleCertificatesRequestV3, HandleSoftBundleCertificatesResponseV3,
+    HandleTransactionResponse, ObjectInfoRequest, ObjectInfoResponse, RawSubmitTxRequest,
+    RawSubmitTxResponse, RawWaitForEffectsRequest, RawWaitForEffectsResponse, SystemStateRequest,
+    TransactionInfoRequest, TransactionInfoResponse,
 };
 
 #[async_trait]
 pub trait AuthorityAPI {
+    async fn submit_transaction(
+        &self,
+        request: RawSubmitTxRequest,
+        client_addr: Option<SocketAddr>,
+    ) -> Result<RawSubmitTxResponse, SuiError>;
+
+    // TODO(fastpath): Add a soft bundle path for mfp which will return the list of consensus positions
+
     /// Initiate a new transaction to a Sui or Primary account.
     async fn handle_transaction(
         &self,
@@ -64,8 +72,19 @@ pub trait AuthorityAPI {
         client_addr: Option<SocketAddr>,
     ) -> Result<HandleSoftBundleCertificatesResponseV3, SuiError>;
 
+    /// Wait for effects of a transaction that has been submitted to the network
+    /// through the `submit_transaction` API.
+    async fn wait_for_effects(
+        &self,
+        request: RawWaitForEffectsRequest,
+        client_addr: Option<SocketAddr>,
+    ) -> Result<RawWaitForEffectsResponse, SuiError>;
+
     /// Handle Object information requests for this account.
-    async fn handle_object_info_request(&self, request: ObjectInfoRequest) -> Result<ObjectInfoResponse, SuiError>;
+    async fn handle_object_info_request(
+        &self,
+        request: ObjectInfoRequest,
+    ) -> Result<ObjectInfoResponse, SuiError>;
 
     /// Handle Object information requests for this account.
     async fn handle_transaction_info_request(
@@ -73,13 +92,28 @@ pub trait AuthorityAPI {
         request: TransactionInfoRequest,
     ) -> Result<TransactionInfoResponse, SuiError>;
 
-    async fn handle_checkpoint(&self, request: CheckpointRequest) -> Result<CheckpointResponse, SuiError>;
+    async fn handle_checkpoint(
+        &self,
+        request: CheckpointRequest,
+    ) -> Result<CheckpointResponse, SuiError>;
 
-    async fn handle_checkpoint_v2(&self, request: CheckpointRequestV2) -> Result<CheckpointResponseV2, SuiError>;
+    async fn handle_checkpoint_v2(
+        &self,
+        request: CheckpointRequestV2,
+    ) -> Result<CheckpointResponseV2, SuiError>;
 
     // This API is exclusively used by the benchmark code.
     // Hence it's OK to return a fixed system state type.
-    async fn handle_system_state_object(&self, request: SystemStateRequest) -> Result<SuiSystemState, SuiError>;
+    async fn handle_system_state_object(
+        &self,
+        request: SystemStateRequest,
+    ) -> Result<SuiSystemState, SuiError>;
+
+    /// Get validator health metrics (for latency measurement)
+    async fn validator_health(
+        &self,
+        request: sui_types::messages_grpc::RawValidatorHealthRequest,
+    ) -> Result<sui_types::messages_grpc::RawValidatorHealthResponse, SuiError>;
 }
 
 #[derive(Clone)]
@@ -88,19 +122,27 @@ pub struct NetworkAuthorityClient {
 }
 
 impl NetworkAuthorityClient {
-    pub async fn connect(address: &Multiaddr, tls_target: Option<NetworkPublicKey>) -> anyhow::Result<Self> {
-        let tls_config = tls_target.map(|tls_target| {
-            sui_tls::create_rustls_client_config(tls_target, sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(), None)
-        });
-        let channel =
-            mysten_network::client::connect(address, tls_config).await.map_err(|err| anyhow!(err.to_string()))?;
+    pub async fn connect(
+        address: &Multiaddr,
+        tls_target: NetworkPublicKey,
+    ) -> anyhow::Result<Self> {
+        let tls_config = sui_tls::create_rustls_client_config(
+            tls_target,
+            sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
+            None,
+        );
+        let channel = mysten_network::client::connect(address, tls_config)
+            .await
+            .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Self::new(channel))
     }
 
-    pub fn connect_lazy(address: &Multiaddr, tls_target: Option<NetworkPublicKey>) -> Self {
-        let tls_config = tls_target.map(|tls_target| {
-            sui_tls::create_rustls_client_config(tls_target, sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(), None)
-        });
+    pub fn connect_lazy(address: &Multiaddr, tls_target: NetworkPublicKey) -> Self {
+        let tls_config = sui_tls::create_rustls_client_config(
+            tls_target,
+            sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
+            None,
+        );
         let client: SuiResult<_> = mysten_network::client::connect_lazy(address, tls_config)
             .map(ValidatorClient::new)
             .map_err(|err| err.to_string().into());
@@ -108,11 +150,15 @@ impl NetworkAuthorityClient {
     }
 
     pub fn new(channel: Channel) -> Self {
-        Self { client: Ok(ValidatorClient::new(channel)) }
+        Self {
+            client: Ok(ValidatorClient::new(channel)),
+        }
     }
 
     fn new_lazy(client: SuiResult<Channel>) -> Self {
-        Self { client: client.map(ValidatorClient::new) }
+        Self {
+            client: client.map(ValidatorClient::new),
+        }
     }
 
     fn client(&self) -> SuiResult<ValidatorClient<Channel>> {
@@ -122,6 +168,22 @@ impl NetworkAuthorityClient {
 
 #[async_trait]
 impl AuthorityAPI for NetworkAuthorityClient {
+    /// Submits a transaction to the Sui network for certification and execution.
+    async fn submit_transaction(
+        &self,
+        request: RawSubmitTxRequest,
+        client_addr: Option<SocketAddr>,
+    ) -> Result<RawSubmitTxResponse, SuiError> {
+        let mut request = request.into_request();
+        insert_metadata(&mut request, client_addr);
+
+        self.client()?
+            .submit_transaction(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
+    }
+
     /// Initiate a new transfer to a Sui or Primary account.
     async fn handle_transaction(
         &self,
@@ -131,7 +193,11 @@ impl AuthorityAPI for NetworkAuthorityClient {
         let mut request = transaction.into_request();
         insert_metadata(&mut request, client_addr);
 
-        self.client()?.transaction(request).await.map(tonic::Response::into_inner).map_err(Into::into)
+        self.client()?
+            .transaction(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
     }
 
     /// Execute a certificate.
@@ -143,7 +209,11 @@ impl AuthorityAPI for NetworkAuthorityClient {
         let mut request = certificate.into_request();
         insert_metadata(&mut request, client_addr);
 
-        let response = self.client()?.handle_certificate_v2(request).await.map(tonic::Response::into_inner);
+        let response = self
+            .client()?
+            .handle_certificate_v2(request)
+            .await
+            .map(tonic::Response::into_inner);
 
         response.map_err(Into::into)
     }
@@ -156,7 +226,11 @@ impl AuthorityAPI for NetworkAuthorityClient {
         let mut request = request.into_request();
         insert_metadata(&mut request, client_addr);
 
-        let response = self.client()?.handle_certificate_v3(request).await.map(tonic::Response::into_inner);
+        let response = self
+            .client()?
+            .handle_certificate_v3(request)
+            .await
+            .map(tonic::Response::into_inner);
 
         response.map_err(Into::into)
     }
@@ -169,13 +243,39 @@ impl AuthorityAPI for NetworkAuthorityClient {
         let mut request = request.into_request();
         insert_metadata(&mut request, client_addr);
 
-        let response = self.client()?.handle_soft_bundle_certificates_v3(request).await.map(tonic::Response::into_inner);
+        let response = self
+            .client()?
+            .handle_soft_bundle_certificates_v3(request)
+            .await
+            .map(tonic::Response::into_inner);
 
         response.map_err(Into::into)
     }
 
-    async fn handle_object_info_request(&self, request: ObjectInfoRequest) -> Result<ObjectInfoResponse, SuiError> {
-        self.client()?.object_info(request).await.map(tonic::Response::into_inner).map_err(Into::into)
+    async fn wait_for_effects(
+        &self,
+        request: RawWaitForEffectsRequest,
+        client_addr: Option<SocketAddr>,
+    ) -> Result<RawWaitForEffectsResponse, SuiError> {
+        let mut request = request.into_request();
+        insert_metadata(&mut request, client_addr);
+
+        self.client()?
+            .wait_for_effects(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
+    }
+
+    async fn handle_object_info_request(
+        &self,
+        request: ObjectInfoRequest,
+    ) -> Result<ObjectInfoResponse, SuiError> {
+        self.client()?
+            .object_info(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
     }
 
     /// Handle Object information requests for this account.
@@ -183,21 +283,57 @@ impl AuthorityAPI for NetworkAuthorityClient {
         &self,
         request: TransactionInfoRequest,
     ) -> Result<TransactionInfoResponse, SuiError> {
-        self.client()?.transaction_info(request).await.map(tonic::Response::into_inner).map_err(Into::into)
+        self.client()?
+            .transaction_info(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
     }
 
     /// Handle Object information requests for this account.
-    async fn handle_checkpoint(&self, request: CheckpointRequest) -> Result<CheckpointResponse, SuiError> {
-        self.client()?.checkpoint(request).await.map(tonic::Response::into_inner).map_err(Into::into)
+    async fn handle_checkpoint(
+        &self,
+        request: CheckpointRequest,
+    ) -> Result<CheckpointResponse, SuiError> {
+        self.client()?
+            .checkpoint(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
     }
 
     /// Handle Object information requests for this account.
-    async fn handle_checkpoint_v2(&self, request: CheckpointRequestV2) -> Result<CheckpointResponseV2, SuiError> {
-        self.client()?.checkpoint_v2(request).await.map(tonic::Response::into_inner).map_err(Into::into)
+    async fn handle_checkpoint_v2(
+        &self,
+        request: CheckpointRequestV2,
+    ) -> Result<CheckpointResponseV2, SuiError> {
+        self.client()?
+            .checkpoint_v2(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
     }
 
-    async fn handle_system_state_object(&self, request: SystemStateRequest) -> Result<SuiSystemState, SuiError> {
-        self.client()?.get_system_state_object(request).await.map(tonic::Response::into_inner).map_err(Into::into)
+    async fn handle_system_state_object(
+        &self,
+        request: SystemStateRequest,
+    ) -> Result<SuiSystemState, SuiError> {
+        self.client()?
+            .get_system_state_object(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
+    }
+
+    async fn validator_health(
+        &self,
+        request: sui_types::messages_grpc::RawValidatorHealthRequest,
+    ) -> Result<sui_types::messages_grpc::RawValidatorHealthResponse, SuiError> {
+        self.client()?
+            .validator_health(request)
+            .await
+            .map(tonic::Response::into_inner)
+            .map_err(Into::into)
     }
 }
 
@@ -207,25 +343,35 @@ pub fn make_network_authority_clients_with_network_config(
 ) -> BTreeMap<AuthorityName, NetworkAuthorityClient> {
     let mut authority_clients = BTreeMap::new();
     for (name, (_state, network_metadata)) in committee.validators() {
-        let address = network_metadata.network_address.clone();
-        let address = address.rewrite_udp_to_tcp();
-        // TODO: Enable TLS on this interface with below config, once support is rolled out to validators.
-        // let tls_config = network_metadata.network_public_key.as_ref().map(|key| {
-        //     sui_tls::create_rustls_client_config(
-        //         key.clone(),
-        //         sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
-        //         None,
-        //     )
-        // });
-        // TODO: Change below code to generate a SuiError if no valid TLS config is available.
-        let maybe_channel = network_config.connect_lazy(&address, None).map_err(|e| {
-            tracing::error!(
-                address = %address,
-                name = %name,
-                "unable to create authority client: {e}"
-            );
-            e.to_string().into()
-        });
+        let address = network_metadata
+            .network_address
+            .clone()
+            .rewrite_udp_to_tcp()
+            .rewrite_http_to_https();
+        let tls_config = network_metadata
+            .network_public_key
+            .as_ref()
+            .map(|key| {
+                sui_tls::create_rustls_client_config(
+                    key.clone(),
+                    sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
+                    None,
+                )
+            })
+            .ok_or(SuiError::from("network public key is not available"));
+        let maybe_channel = tls_config
+            .and_then(|tls_config| {
+                network_config
+                    .connect_lazy(&address, tls_config)
+                    .map_err(|e| e.to_string().into())
+            })
+            .tap_err(|e| {
+                tracing::error!(
+                    address = %address,
+                    name = %name,
+                    "unable to create authority client: {e}"
+                )
+            });
         let client = NetworkAuthorityClient::new_lazy(maybe_channel);
         authority_clients.insert(*name, client);
     }
@@ -247,13 +393,15 @@ fn insert_metadata<T>(request: &mut tonic::Request<T>, client_addr: Option<Socke
     if let Some(client_addr) = client_addr {
         let mut metadata = tonic::metadata::MetadataMap::new();
         metadata.insert("x-forwarded-for", client_addr.to_string().parse().unwrap());
-        metadata.iter().for_each(|key_and_value| match key_and_value {
-            KeyAndValueRef::Ascii(key, value) => {
-                request.metadata_mut().insert(key, value.clone());
-            }
-            KeyAndValueRef::Binary(key, value) => {
-                request.metadata_mut().insert_bin(key, value.clone());
-            }
-        });
+        metadata
+            .iter()
+            .for_each(|key_and_value| match key_and_value {
+                KeyAndValueRef::Ascii(key, value) => {
+                    request.metadata_mut().insert(key, value.clone());
+                }
+                KeyAndValueRef::Binary(key, value) => {
+                    request.metadata_mut().insert_bin(key, value.clone());
+                }
+            });
     }
 }

@@ -5,51 +5,35 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::{DashMap, DashSet};
 use futures::future::join_all;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use shared_crypto::intent::{Intent, IntentMessage};
-use std::{
-    fmt,
-    fs::{self, File},
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::fmt;
+use std::fs::{self, File};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use sui_json_rpc_types::{
-    SuiExecutionStatus,
-    SuiObjectDataOptions,
-    SuiTransactionBlockDataAPI,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
-    SuiTransactionBlockResponseOptions,
+    SuiExecutionStatus, SuiObjectDataOptions, SuiTransactionBlockDataAPI,
+    SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
 };
 use sui_types::digests::TransactionDigest;
-use tokio::{sync::RwLock, time::sleep};
+use tokio::sync::RwLock;
+use tokio::time::sleep;
 use tracing::{debug, info};
 
 use crate::load_test::LoadTestConfig;
 use sui_sdk::{SuiClient, SuiClientBuilder};
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    crypto::{get_key_pair, AccountKeyPair, EncodeDecodeBase64, Signature, SuiKeyPair},
-    quorum_driver_types::ExecuteTransactionRequestType,
-    transaction::{Transaction, TransactionData},
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SuiAddress};
+use sui_types::crypto::{get_key_pair, AccountKeyPair, EncodeDecodeBase64, Signature, SuiKeyPair};
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::transaction::{Transaction, TransactionData};
 
+use crate::payload::checkpoint_utils::get_latest_checkpoint_stats;
+use crate::payload::validation::chunk_entities;
 use crate::payload::{
-    checkpoint_utils::get_latest_checkpoint_stats,
-    validation::chunk_entities,
-    Command,
-    CommandData,
-    DryRun,
-    GetAllBalances,
-    GetCheckpoints,
-    GetObject,
-    MultiGetObjects,
-    Payload,
-    ProcessPayload,
-    Processor,
-    QueryTransactionBlocks,
-    SignerInfo,
+    Command, CommandData, DryRun, GetAllBalances, GetCheckpoints, GetObject, MultiGetObjects,
+    Payload, ProcessPayload, Processor, QueryTransactionBlocks, SignerInfo,
 };
 
 use super::MultiGetTransactionBlocks;
@@ -89,7 +73,11 @@ impl RpcCommandProcessor {
         }
     }
 
-    async fn process_command_data(&self, command: &CommandData, signer_info: &Option<SignerInfo>) -> Result<()> {
+    async fn process_command_data(
+        &self,
+        command: &CommandData,
+        signer_info: &Option<SignerInfo>,
+    ) -> Result<()> {
         match command {
             CommandData::DryRun(ref v) => self.process(v, signer_info).await,
             CommandData::GetCheckpoints(ref v) => self.process(v, signer_info).await,
@@ -138,7 +126,11 @@ impl RpcCommandProcessor {
     }
 
     /// get the latest object ref from local cache, and if not exist, fetch from fullnode
-    pub(crate) async fn get_object_ref(&self, client: &SuiClient, object_id: &ObjectID) -> ObjectRef {
+    pub(crate) async fn get_object_ref(
+        &self,
+        client: &SuiClient,
+        object_id: &ObjectID,
+    ) -> ObjectRef {
         let object_ref_cache = self.object_ref_cache.clone();
         let current = object_ref_cache.get_mut(object_id);
         match current {
@@ -149,9 +141,9 @@ impl RpcCommandProcessor {
                     .get_object_with_options(*object_id, SuiObjectDataOptions::new())
                     .await
                     .unwrap_or_else(|_| panic!("Unable to fetch object reference {object_id}"));
-                let object_ref = resp
-                    .object_ref_if_exists()
-                    .unwrap_or_else(|| panic!("Unable to extract object reference {object_id} from response {resp:?}"));
+                let object_ref = resp.object_ref_if_exists().unwrap_or_else(|| {
+                    panic!("Unable to extract object reference {object_id} from response {resp:?}")
+                });
                 object_ref_cache.insert(*object_id, object_ref);
                 object_ref
             }
@@ -181,7 +173,8 @@ impl RpcCommandProcessor {
             if let Some(effects) = effects {
                 let all_changed_objects = effects.all_changed_objects();
                 for (object_ref, _) in all_changed_objects {
-                    self.object_ref_cache.insert(object_ref.object_id(), object_ref.reference.to_object_ref());
+                    self.object_ref_cache
+                        .insert(object_ref.object_id(), object_ref.reference.to_object_ref());
                 }
             }
         }
@@ -192,13 +185,21 @@ impl RpcCommandProcessor {
         let digests: Vec<TransactionDigest> = self.transaction_digests.iter().map(|x| *x).collect();
         if !digests.is_empty() {
             debug!("dumping transaction digests to file {:?}", digests.len());
-            write_data_to_file(&digests, &format!("{}/{}", &self.data_dir, CacheType::TransactionDigest)).unwrap();
+            write_data_to_file(
+                &digests,
+                &format!("{}/{}", &self.data_dir, CacheType::TransactionDigest),
+            )
+            .unwrap();
         }
 
         let addresses: Vec<SuiAddress> = self.addresses.iter().map(|x| *x).collect();
         if !addresses.is_empty() {
             debug!("dumping addresses to file {:?}", addresses.len());
-            write_data_to_file(&addresses, &format!("{}/{}", &self.data_dir, CacheType::SuiAddress)).unwrap();
+            write_data_to_file(
+                &addresses,
+                &format!("{}/{}", &self.data_dir, CacheType::SuiAddress),
+            )
+            .unwrap();
         }
 
         let mut object_ids: Vec<ObjectID> = Vec::new();
@@ -211,7 +212,11 @@ impl RpcCommandProcessor {
 
         if !object_ids.is_empty() {
             debug!("dumping object_ids to file {:?}", object_ids.len());
-            write_data_to_file(&object_ids, &format!("{}/{}", &self.data_dir, CacheType::ObjectID)).unwrap();
+            write_data_to_file(
+                &object_ids,
+                &format!("{}/{}", &self.data_dir, CacheType::ObjectID),
+            )
+            .unwrap();
         }
     }
 }
@@ -226,7 +231,8 @@ impl Processor for RpcCommandProcessor {
             for i in 0..=repeat_n_times {
                 let start_time = Instant::now();
 
-                self.process_command_data(&command.data, &payload.signer_info).await?;
+                self.process_command_data(&command.data, &payload.signer_info)
+                    .await?;
 
                 let elapsed_time = start_time.elapsed();
                 if elapsed_time < repeat_interval {
@@ -235,10 +241,7 @@ impl Processor for RpcCommandProcessor {
                 }
                 let clients = self.get_clients().await?;
                 let checkpoint_stats = get_latest_checkpoint_stats(&clients, None).await;
-                info!(
-                    "Repeat {i}: Checkpoint stats {checkpoint_stats}, elapse {:.4} since last repeat",
-                    elapsed_time.as_secs_f64()
-                );
+                info!("Repeat {i}: Checkpoint stats {checkpoint_stats}, elapse {:.4} since last repeat", elapsed_time.as_secs_f64());
             }
         }
         Ok(())
@@ -246,7 +249,11 @@ impl Processor for RpcCommandProcessor {
 
     async fn prepare(&self, config: &LoadTestConfig) -> Result<Vec<Payload>> {
         let clients = self.get_clients().await?;
-        let Command { repeat_n_times, repeat_interval, .. } = &config.command;
+        let Command {
+            repeat_n_times,
+            repeat_interval,
+            ..
+        } = &config.command;
         let command_payloads = match &config.command.data {
             CommandData::GetCheckpoints(data) => {
                 if !config.divide_tasks {
@@ -293,9 +300,11 @@ impl Processor for RpcCommandProcessor {
             _ => vec![config.command.clone(); config.num_threads],
         };
 
-        let command_payloads = command_payloads
-            .into_iter()
-            .map(|command| command.with_repeat_interval(*repeat_interval).with_repeat_n_times(*repeat_n_times));
+        let command_payloads = command_payloads.into_iter().map(|command| {
+            command
+                .with_repeat_interval(*repeat_interval)
+                .with_repeat_n_times(*repeat_n_times)
+        });
 
         let coins_and_keys = if config.signer_info.is_some() {
             Some(
@@ -317,11 +326,13 @@ impl Processor for RpcCommandProcessor {
             .enumerate()
             .map(|(i, command)| Payload {
                 commands: vec![command], // note commands is also a vector
-                signer_info: coins_and_keys.as_ref().map(|(coins, encoded_keypair)| SignerInfo {
-                    encoded_keypair: encoded_keypair.clone(),
-                    gas_payment: Some(coins[num_chunks * i..(i + 1) * num_chunks].to_vec()),
-                    gas_budget: None,
-                }),
+                signer_info: coins_and_keys
+                    .as_ref()
+                    .map(|(coins, encoded_keypair)| SignerInfo {
+                        encoded_keypair: encoded_keypair.clone(),
+                        gas_payment: Some(coins[num_chunks * i..(i + 1) * num_chunks].to_vec()),
+                        gas_budget: None,
+                    }),
             })
             .collect())
     }
@@ -386,7 +397,8 @@ pub fn load_objects_from_file(filepath: String) -> Vec<ObjectID> {
 
 pub fn load_digests_from_file(filepath: String) -> Vec<TransactionDigest> {
     let path = format!("{}/{}", filepath, CacheType::TransactionDigest);
-    let digests: Vec<TransactionDigest> = read_data_from_file(&path).expect("Failed to read transaction digests");
+    let digests: Vec<TransactionDigest> =
+        read_data_from_file(&path).expect("Failed to read transaction digests");
     digests
 }
 
@@ -394,7 +406,7 @@ fn read_data_from_file<T: DeserializeOwned>(file_path: &str) -> Result<T, anyhow
     let mut path_buf = PathBuf::from(file_path);
 
     // Check if the file has a JSON extension
-    if path_buf.extension().map_or(true, |ext| ext != "json") {
+    if path_buf.extension().is_none_or(|ext| ext != "json") {
         // If not, add .json to the filename
         path_buf.set_extension("json");
     }
@@ -405,12 +417,17 @@ fn read_data_from_file<T: DeserializeOwned>(file_path: &str) -> Result<T, anyhow
     }
 
     let file = File::open(path).map_err(|e| anyhow::anyhow!("Error opening file: {}", e))?;
-    let deserialized_data: T = serde_json::from_reader(file).map_err(|e| anyhow!("Deserialization error: {}", e))?;
+    let deserialized_data: T =
+        serde_json::from_reader(file).map_err(|e| anyhow!("Deserialization error: {}", e))?;
 
     Ok(deserialized_data)
 }
 
-async fn divide_checkpoint_tasks(clients: &[SuiClient], data: &GetCheckpoints, num_chunks: usize) -> Vec<Command> {
+async fn divide_checkpoint_tasks(
+    clients: &[SuiClient],
+    data: &GetCheckpoints,
+    num_chunks: usize,
+) -> Vec<Command> {
     let start = data.start;
     let end = match data.end {
         Some(end) => end,
@@ -423,7 +440,10 @@ async fn divide_checkpoint_tasks(clients: &[SuiClient], data: &GetCheckpoints, n
                     .expect("get_latest_checkpoint_sequence_number should not fail")
             }))
             .await;
-            *end_checkpoints.iter().max().expect("get_latest_checkpoint_sequence_number should not return empty")
+            *end_checkpoints
+                .iter()
+                .max()
+                .expect("get_latest_checkpoint_sequence_number should not return empty")
         }
     };
 
@@ -443,38 +463,78 @@ async fn divide_checkpoint_tasks(clients: &[SuiClient], data: &GetCheckpoints, n
         .collect()
 }
 
-async fn divide_query_transaction_blocks_tasks(data: &QueryTransactionBlocks, num_chunks: usize) -> Vec<Command> {
-    let chunk_size = if data.addresses.len() < num_chunks { 1 } else { data.addresses.len() as u64 / num_chunks as u64 };
+async fn divide_query_transaction_blocks_tasks(
+    data: &QueryTransactionBlocks,
+    num_chunks: usize,
+) -> Vec<Command> {
+    let chunk_size = if data.addresses.len() < num_chunks {
+        1
+    } else {
+        data.addresses.len() as u64 / num_chunks as u64
+    };
     let chunked = chunk_entities(data.addresses.as_slice(), Some(chunk_size as usize));
-    chunked.into_iter().map(|chunk| Command::new_query_transaction_blocks(data.address_type.clone(), chunk)).collect()
+    chunked
+        .into_iter()
+        .map(|chunk| Command::new_query_transaction_blocks(data.address_type.clone(), chunk))
+        .collect()
 }
 
-async fn divide_multi_get_transaction_blocks_tasks(data: &MultiGetTransactionBlocks, num_chunks: usize) -> Vec<Command> {
-    let chunk_size = if data.digests.len() < num_chunks { 1 } else { data.digests.len() as u64 / num_chunks as u64 };
+async fn divide_multi_get_transaction_blocks_tasks(
+    data: &MultiGetTransactionBlocks,
+    num_chunks: usize,
+) -> Vec<Command> {
+    let chunk_size = if data.digests.len() < num_chunks {
+        1
+    } else {
+        data.digests.len() as u64 / num_chunks as u64
+    };
     let chunked = chunk_entities(data.digests.as_slice(), Some(chunk_size as usize));
-    chunked.into_iter().map(Command::new_multi_get_transaction_blocks).collect()
+    chunked
+        .into_iter()
+        .map(Command::new_multi_get_transaction_blocks)
+        .collect()
 }
 
 async fn divide_get_all_balances_tasks(data: &GetAllBalances, num_threads: usize) -> Vec<Command> {
-    let per_thread_size = if data.addresses.len() < num_threads { 1 } else { data.addresses.len() / num_threads };
+    let per_thread_size = if data.addresses.len() < num_threads {
+        1
+    } else {
+        data.addresses.len() / num_threads
+    };
 
     let chunked = chunk_entities(data.addresses.as_slice(), Some(per_thread_size));
-    chunked.into_iter().map(|chunk| Command::new_get_all_balances(chunk, data.chunk_size)).collect()
+    chunked
+        .into_iter()
+        .map(|chunk| Command::new_get_all_balances(chunk, data.chunk_size))
+        .collect()
 }
 
 // TODO: probs can do generic divide tasks
 async fn divide_multi_get_objects_tasks(data: &MultiGetObjects, num_chunks: usize) -> Vec<Command> {
-    let chunk_size =
-        if data.object_ids.len() < num_chunks { 1 } else { data.object_ids.len() as u64 / num_chunks as u64 };
+    let chunk_size = if data.object_ids.len() < num_chunks {
+        1
+    } else {
+        data.object_ids.len() as u64 / num_chunks as u64
+    };
     let chunked = chunk_entities(data.object_ids.as_slice(), Some(chunk_size as usize));
-    chunked.into_iter().map(Command::new_multi_get_objects).collect()
+    chunked
+        .into_iter()
+        .map(Command::new_multi_get_objects)
+        .collect()
 }
 
 async fn divide_get_object_tasks(data: &GetObject, num_threads: usize) -> Vec<Command> {
-    let per_thread_size = if data.object_ids.len() < num_threads { 1 } else { data.object_ids.len() / num_threads };
+    let per_thread_size = if data.object_ids.len() < num_threads {
+        1
+    } else {
+        data.object_ids.len() / num_threads
+    };
 
     let chunked = chunk_entities(data.object_ids.as_slice(), Some(per_thread_size));
-    chunked.into_iter().map(|chunk| Command::new_get_object(chunk, data.chunk_size)).collect()
+    chunked
+        .into_iter()
+        .map(|chunk| Command::new_get_object(chunk, data.chunk_size))
+        .collect()
 }
 
 async fn prepare_new_signer_and_coins(
@@ -486,27 +546,32 @@ async fn prepare_new_signer_and_coins(
     // TODO(chris): consider reference gas price
     let amount_per_coin = num_transactions_per_coin * DEFAULT_GAS_BUDGET;
     let pay_amount = amount_per_coin * num_coins as u64;
-    let num_split_txns = num_transactions_needed(num_coins, MAX_NUM_NEW_OBJECTS_IN_SINGLE_TRANSACTION);
-    let (gas_fee_for_split, gas_fee_for_pay_sui) =
-        (DEFAULT_LARGE_GAS_BUDGET * num_split_txns as u64, DEFAULT_GAS_BUDGET);
+    let num_split_txns =
+        num_transactions_needed(num_coins, MAX_NUM_NEW_OBJECTS_IN_SINGLE_TRANSACTION);
+    let (gas_fee_for_split, gas_fee_for_pay_oct) = (
+        DEFAULT_LARGE_GAS_BUDGET * num_split_txns as u64,
+        DEFAULT_GAS_BUDGET,
+    );
 
-    let primary_keypair =
-        SuiKeyPair::decode_base64(&signer_info.encoded_keypair).expect("Decoding keypair should not fail");
+    let primary_keypair = SuiKeyPair::decode_base64(&signer_info.encoded_keypair)
+        .expect("Decoding keypair should not fail");
     let sender = SuiAddress::from(&primary_keypair.public());
     let (coin, balance) = get_coin_with_max_balance(client, sender).await;
     // The balance needs to cover `pay_amount` plus
-    // 1. gas fee for pay_sui from the primary address to the burner address
+    // 1. gas fee for pay_oct from the primary address to the burner address
     // 2. gas fee for splitting the primary coin into `num_coins`
-    let required_balance = pay_amount + gas_fee_for_split + gas_fee_for_pay_sui;
+    let required_balance = pay_amount + gas_fee_for_split + gas_fee_for_pay_oct;
     if required_balance > balance {
-        panic!(
-            "Current balance {balance} is smaller than require amount of MIST to fund the operation {required_balance}"
-        );
+        panic!("Current balance {balance} is smaller than require amount of MIST to fund the operation {required_balance}");
     }
 
     // There is a limit for the number of new objects in a transactions, therefore we need
     // multiple split transactions if the `num_coins` is large
-    let split_amounts = calculate_split_amounts(num_coins, amount_per_coin, MAX_NUM_NEW_OBJECTS_IN_SINGLE_TRANSACTION);
+    let split_amounts = calculate_split_amounts(
+        num_coins,
+        amount_per_coin,
+        MAX_NUM_NEW_OBJECTS_IN_SINGLE_TRANSACTION,
+    );
 
     debug!("split_amounts {split_amounts:?}");
 
@@ -515,8 +580,11 @@ async fn prepare_new_signer_and_coins(
     // some environment that might not be possible when faucet resource is scarce
     let (burner_address, burner_keypair): (_, AccountKeyPair) = get_key_pair();
     let burner_keypair = SuiKeyPair::Ed25519(burner_keypair);
-    let pay_amounts =
-        split_amounts.iter().map(|(amount, _)| *amount).chain(std::iter::once(gas_fee_for_split)).collect::<Vec<_>>();
+    let pay_amounts = split_amounts
+        .iter()
+        .map(|(amount, _)| *amount)
+        .chain(std::iter::once(gas_fee_for_split))
+        .collect::<Vec<_>>();
 
     debug!("pay_amounts {pay_amounts:?}");
 
@@ -539,7 +607,16 @@ async fn prepare_new_signer_and_coins(
     if split_amounts.len() == 1 && split_amounts[0].1 == 0 {
         results.push(get_coin_with_balance(&coins, split_amounts[0].0));
     } else if split_amounts.len() == 1 {
-        results.extend(split_coins(client, &burner_keypair, primary_coin, gas_coin_id, split_amounts[0].1 as u64).await);
+        results.extend(
+            split_coins(
+                client,
+                &burner_keypair,
+                primary_coin,
+                gas_coin_id,
+                split_amounts[0].1 as u64,
+            )
+            .await,
+        );
     } else {
         let (max_amount, max_split) = &split_amounts[0];
         let (remainder_amount, remainder_split) = split_amounts.last().unwrap();
@@ -556,7 +633,8 @@ async fn prepare_new_signer_and_coins(
             .collect::<Vec<_>>();
 
         for (coin_id, splits) in primary_coins {
-            results.extend(split_coins(client, &burner_keypair, coin_id, gas_coin_id, splits).await);
+            results
+                .extend(split_coins(client, &burner_keypair, coin_id, gas_coin_id, splits).await);
         }
     }
     assert_eq!(results.len(), num_coins);
@@ -571,12 +649,16 @@ fn num_transactions_needed(num_coins: usize, new_coins_per_txn: usize) -> usize 
     if num_coins == 1 {
         return 0;
     }
-    (num_coins + new_coins_per_txn - 1) / new_coins_per_txn
+    num_coins.div_ceil(new_coins_per_txn)
 }
 
 /// Calculate the split amounts for a given number of coins, amount per coin, and maximum number of coins per transaction.
 /// Returns a Vec of (primary_coin_amount, split_into_n_coins)
-fn calculate_split_amounts(num_coins: usize, amount_per_coin: u64, max_coins_per_txn: usize) -> Vec<(u64, usize)> {
+fn calculate_split_amounts(
+    num_coins: usize,
+    amount_per_coin: u64,
+    max_coins_per_txn: usize,
+) -> Vec<(u64, usize)> {
     let total_amount = amount_per_coin * num_coins as u64;
     let num_transactions = num_transactions_needed(num_coins, max_coins_per_txn);
 
@@ -586,8 +668,12 @@ fn calculate_split_amounts(num_coins: usize, amount_per_coin: u64, max_coins_per
 
     let amount_per_transaction = max_coins_per_txn as u64 * amount_per_coin;
     let remaining_amount = total_amount - amount_per_transaction * (num_transactions as u64 - 1);
-    let mut split_amounts: Vec<(u64, usize)> = vec![(amount_per_transaction, max_coins_per_txn); num_transactions - 1];
-    split_amounts.push((remaining_amount, num_coins - max_coins_per_txn * (num_transactions - 1)));
+    let mut split_amounts: Vec<(u64, usize)> =
+        vec![(amount_per_transaction, max_coins_per_txn); num_transactions - 1];
+    split_amounts.push((
+        remaining_amount,
+        num_coins - max_coins_per_txn * (num_transactions - 1),
+    ));
     split_amounts
 }
 
@@ -603,8 +689,16 @@ fn get_coin_with_balance(coins: &[(ObjectID, u64)], target: u64) -> ObjectID {
 
 // TODO: move this to the Rust SDK
 async fn get_sui_coin_ids(client: &SuiClient, address: SuiAddress) -> Vec<(ObjectID, u64)> {
-    match client.coin_read_api().get_coins(address, None, None, None).await {
-        Ok(page) => page.data.into_iter().map(|c| (c.coin_object_id, c.balance)).collect::<Vec<_>>(),
+    match client
+        .coin_read_api()
+        .get_coins(address, None, None, None)
+        .await
+    {
+        Ok(page) => page
+            .data
+            .into_iter()
+            .map(|c| (c.coin_object_id, c.balance))
+            .collect::<Vec<_>>(),
         Err(e) => {
             panic!("get_sui_coin_ids error for address {address} {e}")
         }
@@ -626,7 +720,13 @@ async fn pay_oct(
         .pay(sender, input_coins, recipients, amounts, None, gas_budget)
         .await
         .expect("Failed to construct pay sui transaction");
-    sign_and_execute(client, keypair, tx, ExecuteTransactionRequestType::WaitForLocalExecution).await
+    sign_and_execute(
+        client,
+        keypair,
+        tx,
+        ExecuteTransactionRequestType::WaitForLocalExecution,
+    )
+    .await
 }
 
 async fn split_coins(
@@ -639,18 +739,29 @@ async fn split_coins(
     let sender = SuiAddress::from(&keypair.public());
     let split_coin_tx = client
         .transaction_builder()
-        .split_coin_equal(sender, coin_to_split, num_coins, Some(gas_payment), DEFAULT_LARGE_GAS_BUDGET)
+        .split_coin_equal(
+            sender,
+            coin_to_split,
+            num_coins,
+            Some(gas_payment),
+            DEFAULT_LARGE_GAS_BUDGET,
+        )
         .await
         .expect("Failed to construct split coin transaction");
-    sign_and_execute(client, keypair, split_coin_tx, ExecuteTransactionRequestType::WaitForLocalExecution)
-        .await
-        .effects
-        .unwrap()
-        .created()
-        .iter()
-        .map(|owned_object_ref| owned_object_ref.reference.object_id)
-        .chain(std::iter::once(coin_to_split))
-        .collect::<Vec<_>>()
+    sign_and_execute(
+        client,
+        keypair,
+        split_coin_tx,
+        ExecuteTransactionRequestType::WaitForLocalExecution,
+    )
+    .await
+    .effects
+    .unwrap()
+    .created()
+    .iter()
+    .map(|owned_object_ref| owned_object_ref.reference.object_id)
+    .chain(std::iter::once(coin_to_split))
+    .collect::<Vec<_>>()
 }
 
 pub(crate) async fn sign_and_execute(
@@ -659,7 +770,10 @@ pub(crate) async fn sign_and_execute(
     txn_data: TransactionData,
     request_type: ExecuteTransactionRequestType,
 ) -> SuiTransactionBlockResponse {
-    let signature = Signature::new_secure(&IntentMessage::new(Intent::sui_transaction(), &txn_data), keypair);
+    let signature = Signature::new_secure(
+        &IntentMessage::new(Intent::sui_transaction(), &txn_data),
+        keypair,
+    );
 
     let transaction_response = match client
         .quorum_driver_api()
@@ -686,7 +800,10 @@ pub(crate) async fn sign_and_execute(
             }
         }
         None => {
-            panic!("Transaction {} has no effects. Response {:?}", transaction_response.digest, &transaction_response);
+            panic!(
+                "Transaction {} has no effects. Response {:?}",
+                transaction_response.digest, &transaction_response
+            );
         }
     };
     transaction_response

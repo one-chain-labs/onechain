@@ -33,7 +33,10 @@ impl BalanceTraversal {
 impl<'b, 'l> Traversal<'b, 'l> for BalanceTraversal {
     type Error = annotated_visitor::Error;
 
-    fn traverse_struct(&mut self, driver: &mut StructDriver<'_, 'b, 'l>) -> Result<(), Self::Error> {
+    fn traverse_struct(
+        &mut self,
+        driver: &mut StructDriver<'_, 'b, 'l>,
+    ) -> Result<(), Self::Error> {
         let Some(coin_type) = is_balance(&driver.struct_layout().type_) else {
             // Not a balance, search recursively for balances among fields.
             while driver.next_field(self)?.is_some() {}
@@ -49,8 +52,11 @@ impl<'b, 'l> Traversal<'b, 'l> for BalanceTraversal {
 
 impl<'b, 'l> Traversal<'b, 'l> for Accumulator {
     type Error = annotated_visitor::Error;
-
-    fn traverse_u64(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: u64) -> Result<(), Self::Error> {
+    fn traverse_u64(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: u64,
+    ) -> Result<(), Self::Error> {
         self.total += value;
         Ok(())
     }
@@ -70,9 +76,7 @@ mod tests {
     use super::*;
 
     use move_core_types::{
-        account_address::AccountAddress,
-        annotated_value as A,
-        identifier::Identifier,
+        account_address::AccountAddress, annotated_value as A, identifier::Identifier,
         language_storage::StructTag,
     };
 
@@ -108,23 +112,29 @@ mod tests {
     fn test_traverse_nested() {
         use A::MoveTypeLayout as T;
 
-        let layout = layout_("0xa::foo::Bar", vec![
-            ("b", bal_t("0x42::baz::Qux")),
-            ("c", coin_t("0x42::baz::Qux")),
-            ("d", T::Vector(Box::new(coin_t("0x42::quy::Frob")))),
-        ]);
+        let layout = layout_(
+            "0xa::foo::Bar",
+            vec![
+                ("b", bal_t("0x42::baz::Qux")),
+                ("c", coin_t("0x42::baz::Qux")),
+                ("d", T::Vector(Box::new(coin_t("0x42::quy::Frob")))),
+            ],
+        );
 
-        let value = value_("0xa::foo::Bar", vec![
-            ("b", bal_v("0x42::baz::Qux", 42)),
-            ("c", coin_v("0x42::baz::Qux", "0x101", 43)),
-            (
-                "d",
-                A::MoveValue::Vector(vec![
-                    coin_v("0x42::quy::Frob", "0x102", 44),
-                    coin_v("0x42::quy::Frob", "0x103", 45),
-                ]),
-            ),
-        ]);
+        let value = value_(
+            "0xa::foo::Bar",
+            vec![
+                ("b", bal_v("0x42::baz::Qux", 42)),
+                ("c", coin_v("0x42::baz::Qux", "0x101", 43)),
+                (
+                    "d",
+                    A::MoveValue::Vector(vec![
+                        coin_v("0x42::quy::Frob", "0x102", 44),
+                        coin_v("0x42::quy::Frob", "0x103", 45),
+                    ]),
+                ),
+            ],
+        );
 
         let bytes = serialize(value.clone());
 
@@ -132,7 +142,13 @@ mod tests {
         A::MoveValue::visit_deserialize(&bytes, &layout, &mut visitor).unwrap();
         let balances = visitor.finish();
 
-        assert_eq!(balances, BTreeMap::from([(type_("0x42::baz::Qux"), 42 + 43), (type_("0x42::quy::Frob"), 44 + 45),]));
+        assert_eq!(
+            balances,
+            BTreeMap::from([
+                (type_("0x42::baz::Qux"), 42 + 43),
+                (type_("0x42::quy::Frob"), 44 + 45),
+            ])
+        );
     }
 
     #[test]
@@ -154,24 +170,36 @@ mod tests {
     fn test_traverse_fake_balance() {
         use A::MoveTypeLayout as T;
 
-        let layout = layout_("0xa::foo::Bar", vec![
-            ("b", bal_t("0x42::baz::Qux")),
-            ("c", coin_t("0x42::baz::Qux")),
-            (
-                "d",
-                layout_(
-                    // Fake balance
-                    "0x3::balance::Balance<0x42::baz::Qux>",
-                    vec![("value", T::U64)],
+        let layout = layout_(
+            "0xa::foo::Bar",
+            vec![
+                ("b", bal_t("0x42::baz::Qux")),
+                ("c", coin_t("0x42::baz::Qux")),
+                (
+                    "d",
+                    layout_(
+                        // Fake balance
+                        "0x3::balance::Balance<0x42::baz::Qux>",
+                        vec![("value", T::U64)],
+                    ),
                 ),
-            ),
-        ]);
+            ],
+        );
 
-        let value = value_("0xa::foo::Bar", vec![
-            ("b", bal_v("0x42::baz::Qux", 42)),
-            ("c", coin_v("0x42::baz::Qux", "0x101", 43)),
-            ("d", value_("0x3::balance::Balance<0x42::baz::Qux>", vec![("value", A::MoveValue::U64(44))])),
-        ]);
+        let value = value_(
+            "0xa::foo::Bar",
+            vec![
+                ("b", bal_v("0x42::baz::Qux", 42)),
+                ("c", coin_v("0x42::baz::Qux", "0x101", 43)),
+                (
+                    "d",
+                    value_(
+                        "0x3::balance::Balance<0x42::baz::Qux>",
+                        vec![("value", A::MoveValue::U64(44))],
+                    ),
+                ),
+            ],
+        );
 
         let bytes = serialize(value.clone());
 
@@ -179,44 +207,71 @@ mod tests {
         A::MoveValue::visit_deserialize(&bytes, &layout, &mut visitor).unwrap();
         let balances = visitor.finish();
 
-        assert_eq!(balances, BTreeMap::from([(type_("0x42::baz::Qux"), 42 + 43),]));
+        assert_eq!(
+            balances,
+            BTreeMap::from([(type_("0x42::baz::Qux"), 42 + 43),])
+        );
     }
 
     /// Create a UID Move Value for test purposes.
     fn uid_(addr: &str) -> A::MoveValue {
-        value_("0x2::object::UID", vec![(
-            "id",
-            value_("0x2::object::ID", vec![("bytes", A::MoveValue::Address(AccountAddress::from_str(addr).unwrap()))]),
-        )])
+        value_(
+            "0x2::object::UID",
+            vec![(
+                "id",
+                value_(
+                    "0x2::object::ID",
+                    vec![(
+                        "bytes",
+                        A::MoveValue::Address(AccountAddress::from_str(addr).unwrap()),
+                    )],
+                ),
+            )],
+        )
     }
 
     /// Create a Balance value for testing purposes.
     fn bal_v(tag: &str, value: u64) -> A::MoveValue {
-        value_(&format!("0x2::balance::Balance<{tag}>"), vec![("value", A::MoveValue::U64(value))])
+        value_(
+            &format!("0x2::balance::Balance<{tag}>"),
+            vec![("value", A::MoveValue::U64(value))],
+        )
     }
 
     /// Create a Coin value for testing purposes.
     fn coin_v(tag: &str, id: &str, value: u64) -> A::MoveValue {
-        value_(&format!("0x2::coin::Coin<{tag}>"), vec![("id", uid_(id)), ("balance", bal_v(tag, value))])
+        value_(
+            &format!("0x2::coin::Coin<{tag}>"),
+            vec![("id", uid_(id)), ("balance", bal_v(tag, value))],
+        )
     }
 
     /// Create a Balance layout for testing purposes.
     fn bal_t(tag: &str) -> A::MoveTypeLayout {
-        layout_(&format!("0x2::balance::Balance<{tag}>"), vec![("value", A::MoveTypeLayout::U64)])
+        layout_(
+            &format!("0x2::balance::Balance<{tag}>"),
+            vec![("value", A::MoveTypeLayout::U64)],
+        )
     }
 
     /// Create a Coin layout for testing purposes.
     fn coin_t(tag: &str) -> A::MoveTypeLayout {
-        layout_(&format!("0x2::coin::Coin<{tag}>"), vec![
-            ("id", A::MoveTypeLayout::Struct(Box::new(UID::layout()))),
-            ("balance", bal_t(tag)),
-        ])
+        layout_(
+            &format!("0x2::coin::Coin<{tag}>"),
+            vec![
+                ("id", A::MoveTypeLayout::Struct(Box::new(UID::layout()))),
+                ("balance", bal_t(tag)),
+            ],
+        )
     }
 
     /// Create a struct value for test purposes.
     fn value_(rep: &str, fields: Vec<(&str, A::MoveValue)>) -> A::MoveValue {
         let type_ = StructTag::from_str(rep).unwrap();
-        let fields = fields.into_iter().map(|(name, value)| (Identifier::new(name).unwrap(), value)).collect();
+        let fields = fields
+            .into_iter()
+            .map(|(name, value)| (Identifier::new(name).unwrap(), value))
+            .collect();
 
         A::MoveValue::Struct(A::MoveStruct::new(type_, fields))
     }
@@ -234,7 +289,7 @@ mod tests {
             .map(|(name, layout)| A::MoveFieldLayout::new(Identifier::new(name).unwrap(), layout))
             .collect();
 
-        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields: Box::new(fields) }))
+        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields }))
     }
 
     /// BCS encode Move value.

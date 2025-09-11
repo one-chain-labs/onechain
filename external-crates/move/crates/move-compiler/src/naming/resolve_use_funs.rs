@@ -1,16 +1,14 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    diag,
-    diagnostics::{warning_filters::WarningFilters, Diagnostic, DiagnosticReporter, Diagnostics},
-    expansion::ast::{self as E, ModuleIdent},
-    ice,
-    naming::ast as N,
-    parser::ast::{FunctionName, Visibility},
-    shared::{program_info::NamingProgramInfo, unique_map::UniqueMap, *},
-    typing::core,
-};
+use crate::diagnostics::warning_filters::WarningFilters;
+use crate::diagnostics::{Diagnostic, DiagnosticReporter, Diagnostics};
+use crate::expansion::ast::{self as E, ModuleIdent};
+use crate::naming::ast as N;
+use crate::parser::ast::{DocComment, FunctionName, Visibility};
+use crate::shared::{program_info::NamingProgramInfo, unique_map::UniqueMap, *};
+use crate::typing::core;
+use crate::{diag, ice};
 use move_ir_types::location::*;
 use move_proc_macros::growing_stack;
 
@@ -26,9 +24,18 @@ struct Context<'env, 'info> {
 }
 
 impl<'env, 'info> Context<'env, 'info> {
-    fn new(env: &'env CompilationEnv, info: &'info NamingProgramInfo, current_module: ModuleIdent) -> Self {
+    fn new(
+        env: &'env CompilationEnv,
+        info: &'info NamingProgramInfo,
+        current_module: ModuleIdent,
+    ) -> Self {
         let reporter = env.diagnostic_reporter_at_top_level();
-        Self { env, reporter, info, current_module }
+        Self {
+            env,
+            reporter,
+            info,
+            current_module,
+        }
     }
 
     pub fn add_diag(&self, diag: Diagnostic) {
@@ -61,7 +68,11 @@ pub fn program(env: &CompilationEnv, info: &mut NamingProgramInfo, inner: &mut N
     let module_use_funs = modules
         .key_cloned_iter()
         .map(|(mident, mdef)| {
-            let N::UseFuns { resolved, implicit_candidates, color: _ } = &mdef.use_funs;
+            let N::UseFuns {
+                resolved,
+                implicit_candidates,
+                color: _,
+            } = &mdef.use_funs;
             assert!(implicit_candidates.is_empty());
             (mident, resolved.clone())
         })
@@ -69,7 +80,12 @@ pub fn program(env: &CompilationEnv, info: &mut NamingProgramInfo, inner: &mut N
     info.set_use_funs(module_use_funs);
 }
 
-fn module(env: &CompilationEnv, info: &mut NamingProgramInfo, mident: ModuleIdent, mdef: &mut N::ModuleDefinition) {
+fn module(
+    env: &CompilationEnv,
+    info: &mut NamingProgramInfo,
+    mident: ModuleIdent,
+    mdef: &mut N::ModuleDefinition,
+) {
     let context = &mut Context::new(env, info, mident);
     context.push_warning_filter_scope(mdef.warning_filter);
     use_funs(context, &mut mdef.use_funs);
@@ -101,7 +117,11 @@ fn function(context: &mut Context, function: &mut N::Function) {
 //**************************************************************************************************
 
 fn use_funs(context: &mut Context, uf: &mut N::UseFuns) {
-    let N::UseFuns { resolved, implicit_candidates, color: _ } = uf;
+    let N::UseFuns {
+        resolved,
+        implicit_candidates,
+        color: _,
+    } = uf;
     // remove any incorrect resolved functions
     for (tn, methods) in &mut *resolved {
         *methods = std::mem::take(methods).filter_map(|method, mut nuf| {
@@ -113,7 +133,10 @@ fn use_funs(context: &mut Context, uf: &mut N::UseFuns) {
                 "ICE all resolved use funs should be explicit at this stage. kind {kind:?}"
             );
             let (first_ty_loc, first_ty) = first_arg_type(context, &m, &f);
-            let is_valid = match first_ty.as_ref().and_then(|ty| ty.value.unfold_to_type_name()) {
+            let is_valid = match first_ty
+                .as_ref()
+                .and_then(|ty| ty.value.unfold_to_type_name())
+            {
                 Some(first_tn) => first_tn == tn,
                 None => false,
             };
@@ -121,7 +144,10 @@ fn use_funs(context: &mut Context, uf: &mut N::UseFuns) {
                 if let Some(public_loc) = nuf.is_public {
                     let defining_module = match &tn.value {
                         N::TypeName_::Multiple(_) => {
-                            context.add_diag(ice!((tn.loc, "ICE tuple type should not be reachable from use fun")));
+                            context.add_diag(ice!((
+                                tn.loc,
+                                "ICE tuple type should not be reachable from use fun"
+                            )));
                             return None;
                         }
                         N::TypeName_::Builtin(sp!(_, bt_)) => context.env.primitive_definer(*bt_),
@@ -134,9 +160,16 @@ fn use_funs(context: &mut Context, uf: &mut N::UseFuns) {
                             module's types, otherwise they must be internal to the declared scope.",
                             Visibility::PUBLIC
                         );
-                        let mut diag = diag!(Declarations::InvalidUseFun, (loc, msg), (public_loc, vis_msg));
+                        let mut diag = diag!(
+                            Declarations::InvalidUseFun,
+                            (loc, msg),
+                            (public_loc, vis_msg)
+                        );
                         if let Some(m) = defining_module {
-                            diag.add_secondary_label((m.loc, format!("The type '{tn}' is defined here")))
+                            diag.add_secondary_label((
+                                m.loc,
+                                format!("The type '{tn}' is defined here"),
+                            ))
                         }
                         context.add_diag(diag);
                         nuf.is_public = None;
@@ -156,7 +189,11 @@ fn use_funs(context: &mut Context, uf: &mut N::UseFuns) {
                     }
                     None => format!("But '{m}::{f}' takes no arguments"),
                 };
-                context.add_diag(diag!(Declarations::InvalidUseFun, (loc, msg), (first_ty_loc, first_tn_msg),));
+                context.add_diag(diag!(
+                    Declarations::InvalidUseFun,
+                    (loc, msg),
+                    (first_ty_loc, first_tn_msg),
+                ));
                 None
             }
         });
@@ -168,8 +205,13 @@ fn use_funs(context: &mut Context, uf: &mut N::UseFuns) {
     // - It is not a valid method (i.e. if it would be invalid to declare as a 'use fun')
     // - The name is already bound
     for (method, implicit) in std::mem::take(implicit_candidates) {
-        let E::ImplicitUseFunCandidate { loc, attributes, is_public, function: (target_m, target_f), kind: ekind } =
-            implicit;
+        let E::ImplicitUseFunCandidate {
+            loc,
+            attributes,
+            is_public,
+            function: (target_m, target_f),
+            kind: ekind,
+        } = implicit;
         let Some((target_f, tn)) = is_valid_method(context, &target_m, target_f) else {
             if matches!(ekind, E::ImplicitUseFunKind::UseAlias { used: false }) {
                 let msg = format!("Unused 'use' of alias '{}'. Consider removing it", method);
@@ -178,25 +220,27 @@ fn use_funs(context: &mut Context, uf: &mut N::UseFuns) {
             continue;
         };
         let (kind, used) = match ekind {
-            E::ImplicitUseFunKind::FunctionDeclaration => {
-                (N::UseFunKind::FunctionDeclaration, /* silences unused warning */ true)
-            }
+            E::ImplicitUseFunKind::FunctionDeclaration => (
+                N::UseFunKind::FunctionDeclaration,
+                /* silences unused warning */ true,
+            ),
             E::ImplicitUseFunKind::UseAlias { used } => {
                 assert!(is_public.is_none());
                 (N::UseFunKind::UseAlias, used)
             }
         };
         let nuf = N::UseFun {
+            doc: DocComment::empty(),
             loc,
             attributes,
             is_public,
-            tname: tn.clone(),
+            tname: tn,
             target_function: (target_m, target_f),
             kind,
             used,
         };
         let nuf_loc = nuf.loc;
-        let methods = resolved.entry(tn.clone()).or_insert_with(UniqueMap::new);
+        let methods = resolved.entry(tn).or_insert_with(UniqueMap::new);
         if let Err((_, prev)) = methods.add(method, nuf) {
             let msg = format!("Duplicate 'use fun' for '{}.{}'", tn, method);
             let tn_msg = match ekind {
@@ -226,7 +270,12 @@ fn is_valid_method(
 ) -> Option<(FunctionName, N::TypeName)> {
     let target_f = FunctionName(target_f);
     // possible the function was removed, e.g. a spec function
-    if !context.info.module(target_m).functions.contains_key(&target_f) {
+    if !context
+        .info
+        .module(target_m)
+        .functions
+        .contains_key(&target_f)
+    {
         return None;
     }
     let (_, first_ty) = first_arg_type(context, target_m, &target_f);
@@ -238,15 +287,24 @@ fn is_valid_method(
         N::TypeName_::ModuleType(m, _) => m,
     };
     if defining_module == target_m {
-        Some((target_f, tn.clone()))
+        Some((target_f, *tn))
     } else {
         None
     }
 }
 
-fn first_arg_type(context: &mut Context, m: &ModuleIdent, f: &FunctionName) -> (Loc, Option<N::Type>) {
+fn first_arg_type(
+    context: &mut Context,
+    m: &ModuleIdent,
+    f: &FunctionName,
+) -> (Loc, Option<N::Type>) {
     let finfo = context.info.function_info(m, f);
-    match finfo.signature.parameters.first().map(|(_, _, t)| t.clone()) {
+    match finfo
+        .signature
+        .parameters
+        .first()
+        .map(|(_, _, t)| t.clone())
+    {
         None => (finfo.defined_loc, None),
         Some(t) => (t.loc, Some(t)),
     }
@@ -285,9 +343,14 @@ fn exp(context: &mut Context, sp!(_, e_): &mut N::Exp) {
         | N::Exp_::Assign(_, e)
         | N::Exp_::Loop(_, e)
         | N::Exp_::Annotate(e, _)
-        | N::Exp_::Lambda(N::Lambda { parameters: _, return_type: _, return_label: _, use_fun_color: _, body: e }) => {
-            exp(context, e)
-        }
+        | N::Exp_::Lambda(N::Lambda {
+            parameters: _,
+            return_type: _,
+            return_label: _,
+            use_fun_color: _,
+            body: e,
+            extra_annotations: _,
+        }) => exp(context, e),
         N::Exp_::IfElse(econd, et, ef_opt) => {
             exp(context, econd);
             exp(context, et);
@@ -308,7 +371,11 @@ fn exp(context: &mut Context, sp!(_, e_): &mut N::Exp) {
             exp(context, econd);
             exp(context, ebody)
         }
-        N::Exp_::Block(N::Block { name: _, from_macro_argument: _, seq }) => sequence(context, seq),
+        N::Exp_::Block(N::Block {
+            name: _,
+            from_macro_argument: _,
+            seq,
+        }) => sequence(context, seq),
         N::Exp_::FieldMutate(ed, e) => {
             exp_dotted(context, ed);
             exp(context, e)
@@ -351,7 +418,9 @@ fn exp(context: &mut Context, sp!(_, e_): &mut N::Exp) {
 fn exp_dotted(context: &mut Context, sp!(_, ed_): &mut N::ExpDotted) {
     match ed_ {
         N::ExpDotted_::Exp(e) => exp(context, e),
-        N::ExpDotted_::Dot(ed, _, _) | N::ExpDotted_::DotAutocomplete(_, ed) => exp_dotted(context, ed),
+        N::ExpDotted_::Dot(ed, _, _) | N::ExpDotted_::DotAutocomplete(_, ed) => {
+            exp_dotted(context, ed)
+        }
         N::ExpDotted_::Index(ed, sp!(_, es)) => {
             exp_dotted(context, ed);
             for e in es {

@@ -52,12 +52,20 @@ const DEFAULT_MAX_BOUND: usize = 1024 * 1024;
 /// to restart the process with the new value set (or the value unset if you wish to use the
 /// `DEFAULT_MAX_BOUND` value).
 static MAX_BOUND: Lazy<usize> = Lazy::new(|| {
-    let max_bound_opt = std::env::var(MAX_BOUND_VAR_NAME).ok().and_then(|s| s.parse().ok());
+    let max_bound_opt = std::env::var(MAX_BOUND_VAR_NAME)
+        .ok()
+        .and_then(|s| s.parse().ok());
     if let Some(max_bound) = max_bound_opt {
-        info!("Using custom value for '{}' max bound: {}", MAX_BOUND_VAR_NAME, max_bound);
+        info!(
+            "Using custom value for '{}' max bound: {}",
+            MAX_BOUND_VAR_NAME, max_bound
+        );
         max_bound
     } else {
-        info!("Using default value for '{}' -- max bound: {}", MAX_BOUND_VAR_NAME, DEFAULT_MAX_BOUND);
+        info!(
+            "Using default value for '{}' -- max bound: {}",
+            MAX_BOUND_VAR_NAME, DEFAULT_MAX_BOUND
+        );
         DEFAULT_MAX_BOUND
     }
 });
@@ -70,7 +78,10 @@ impl BoundedVisitor {
     /// Deserialize `bytes` as a `MoveValue` with layout `layout`. Can fail if the bytes do not
     /// represent a value with this layout, or if the deserialized value exceeds the field/type size
     /// budget.
-    pub fn deserialize_value(bytes: &[u8], layout: &A::MoveTypeLayout) -> anyhow::Result<A::MoveValue> {
+    pub fn deserialize_value(
+        bytes: &[u8],
+        layout: &A::MoveTypeLayout,
+    ) -> anyhow::Result<A::MoveValue> {
         let mut visitor = Self::default();
         A::MoveValue::visit_deserialize(bytes, layout, &mut visitor)
     }
@@ -78,9 +89,14 @@ impl BoundedVisitor {
     /// Deserialize `bytes` as a `MoveStruct` with layout `layout`. Can fail if the bytes do not
     /// represent a struct with this layout, or if the deserialized struct exceeds the field/type
     /// size budget.
-    pub fn deserialize_struct(bytes: &[u8], layout: &A::MoveStructLayout) -> anyhow::Result<A::MoveStruct> {
+    pub fn deserialize_struct(
+        bytes: &[u8],
+        layout: &A::MoveStructLayout,
+    ) -> anyhow::Result<A::MoveStruct> {
         let mut visitor = Self::default();
-        let A::MoveValue::Struct(struct_) = A::MoveStruct::visit_deserialize(bytes, layout, &mut visitor)? else {
+        let A::MoveValue::Struct(struct_) =
+            A::MoveStruct::visit_deserialize(bytes, layout, &mut visitor)?
+        else {
             bail!("Expected to deserialize a struct");
         };
         Ok(struct_)
@@ -104,9 +120,15 @@ impl BoundedVisitor {
         let mut frontier = vec![tag];
         while let Some(tag) = frontier.pop() {
             match tag {
-                TT::Bool | TT::U8 | TT::U16 | TT::U32 | TT::U64 | TT::U128 | TT::U256 | TT::Address | TT::Signer => {
-                    self.debit(8)?
-                }
+                TT::Bool
+                | TT::U8
+                | TT::U16
+                | TT::U32
+                | TT::U64
+                | TT::U128
+                | TT::U256
+                | TT::Address
+                | TT::Signer => self.debit(8)?,
 
                 TT::Vector(inner) => {
                     self.debit(8)?;
@@ -125,34 +147,62 @@ impl BoundedVisitor {
 }
 
 impl<'b, 'l> Visitor<'b, 'l> for BoundedVisitor {
-    type Error = Error;
     type Value = A::MoveValue;
+    type Error = Error;
 
-    fn visit_u8(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: u8) -> Result<Self::Value, Self::Error> {
+    fn visit_u8(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: u8,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(A::MoveValue::U8(value))
     }
 
-    fn visit_u16(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: u16) -> Result<Self::Value, Self::Error> {
+    fn visit_u16(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: u16,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(A::MoveValue::U16(value))
     }
 
-    fn visit_u32(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: u32) -> Result<Self::Value, Self::Error> {
+    fn visit_u32(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: u32,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(A::MoveValue::U32(value))
     }
 
-    fn visit_u64(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: u64) -> Result<Self::Value, Self::Error> {
+    fn visit_u64(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: u64,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(A::MoveValue::U64(value))
     }
 
-    fn visit_u128(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: u128) -> Result<Self::Value, Self::Error> {
+    fn visit_u128(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: u128,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(A::MoveValue::U128(value))
     }
 
-    fn visit_u256(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: U256) -> Result<Self::Value, Self::Error> {
+    fn visit_u256(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: U256,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(A::MoveValue::U256(value))
     }
 
-    fn visit_bool(&mut self, _driver: &ValueDriver<'_, 'b, 'l>, value: bool) -> Result<Self::Value, Self::Error> {
+    fn visit_bool(
+        &mut self,
+        _driver: &ValueDriver<'_, 'b, 'l>,
+        value: bool,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(A::MoveValue::Bool(value))
     }
 
@@ -172,7 +222,10 @@ impl<'b, 'l> Visitor<'b, 'l> for BoundedVisitor {
         Ok(A::MoveValue::Signer(value))
     }
 
-    fn visit_vector(&mut self, driver: &mut VecDriver<'_, 'b, 'l>) -> Result<Self::Value, Self::Error> {
+    fn visit_vector(
+        &mut self,
+        driver: &mut VecDriver<'_, 'b, 'l>,
+    ) -> Result<Self::Value, Self::Error> {
         let mut elems = vec![];
         while let Some(elem) = driver.next_element(self)? {
             elems.push(elem);
@@ -181,7 +234,10 @@ impl<'b, 'l> Visitor<'b, 'l> for BoundedVisitor {
         Ok(A::MoveValue::Vector(elems))
     }
 
-    fn visit_struct(&mut self, driver: &mut StructDriver<'_, 'b, 'l>) -> Result<Self::Value, Self::Error> {
+    fn visit_struct(
+        &mut self,
+        driver: &mut StructDriver<'_, 'b, 'l>,
+    ) -> Result<Self::Value, Self::Error> {
         let tag = driver.struct_layout().type_.clone().into();
 
         self.debit_type_size(&tag)?;
@@ -198,7 +254,10 @@ impl<'b, 'l> Visitor<'b, 'l> for BoundedVisitor {
             unreachable!("SAFETY: tag was derived from a StructTag.");
         };
 
-        Ok(A::MoveValue::Struct(A::MoveStruct { type_: *type_, fields }))
+        Ok(A::MoveValue::Struct(A::MoveStruct {
+            type_: *type_,
+            fields,
+        }))
     }
 
     fn visit_variant(
@@ -249,19 +308,26 @@ pub(crate) mod tests {
 
     #[test]
     fn test_success() {
-        use A::{MoveTypeLayout as T, MoveValue as V};
+        use A::MoveTypeLayout as T;
+        use A::MoveValue as V;
 
-        let type_layout = layout_("0x0::foo::Bar", vec![
-            ("a", T::U64),
-            ("b", T::Vector(Box::new(T::U64))),
-            ("c", layout_("0x0::foo::Baz", vec![("d", T::U64)])),
-        ]);
+        let type_layout = layout_(
+            "0x0::foo::Bar",
+            vec![
+                ("a", T::U64),
+                ("b", T::Vector(Box::new(T::U64))),
+                ("c", layout_("0x0::foo::Baz", vec![("d", T::U64)])),
+            ],
+        );
 
-        let value = value_("0x0::foo::Bar", vec![
-            ("a", V::U64(42)),
-            ("b", V::Vector(vec![V::U64(43)])),
-            ("c", value_("0x0::foo::Baz", vec![("d", V::U64(44))])),
-        ]);
+        let value = value_(
+            "0x0::foo::Bar",
+            vec![
+                ("a", V::U64(42)),
+                ("b", V::Vector(vec![V::U64(43)])),
+                ("c", value_("0x0::foo::Baz", vec![("d", V::U64(44))])),
+            ],
+        );
 
         let bytes = serialize(value.clone());
 
@@ -272,19 +338,26 @@ pub(crate) mod tests {
 
     #[test]
     fn test_env_variable_override() {
-        use A::{MoveTypeLayout as T, MoveValue as V};
+        use A::MoveTypeLayout as T;
+        use A::MoveValue as V;
 
-        let type_layout = layout_("0x0::foo::Bar", vec![
-            ("a", T::U64),
-            ("b", T::Vector(Box::new(T::U64))),
-            ("c", layout_("0x0::foo::Baz", vec![("d", T::U64)])),
-        ]);
+        let type_layout = layout_(
+            "0x0::foo::Bar",
+            vec![
+                ("a", T::U64),
+                ("b", T::Vector(Box::new(T::U64))),
+                ("c", layout_("0x0::foo::Baz", vec![("d", T::U64)])),
+            ],
+        );
 
-        let value = value_("0x0::foo::Bar", vec![
-            ("a", V::U64(42)),
-            ("b", V::Vector(vec![V::U64(43)])),
-            ("c", value_("0x0::foo::Baz", vec![("d", V::U64(44))])),
-        ]);
+        let value = value_(
+            "0x0::foo::Bar",
+            vec![
+                ("a", V::U64(42)),
+                ("b", V::Vector(vec![V::U64(43)])),
+                ("c", value_("0x0::foo::Baz", vec![("d", V::U64(44))])),
+            ],
+        );
 
         let bytes = serialize(value.clone());
 
@@ -319,7 +392,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_too_deep() {
-        use A::{MoveTypeLayout as T, MoveValue as V};
+        use A::MoveTypeLayout as T;
+        use A::MoveValue as V;
 
         let mut layout = T::U64;
         let mut value = V::U64(42);
@@ -346,7 +420,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_too_wide() {
-        use A::{MoveTypeLayout as T, MoveValue as V};
+        use A::MoveTypeLayout as T;
+        use A::MoveValue as V;
 
         const WIDTH: usize = 10;
         let mut idents = vec![];
@@ -387,7 +462,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_big_types() {
-        use A::{MoveTypeLayout as T, MoveValue as V};
+        use A::MoveTypeLayout as T;
+        use A::MoveValue as V;
 
         let big_mod_ = "m".repeat(128);
         let big_name = "T".repeat(128);
@@ -420,7 +496,10 @@ pub(crate) mod tests {
     /// Create a struct value for test purposes.
     pub(crate) fn value_(rep: &str, fields: Vec<(&str, A::MoveValue)>) -> A::MoveValue {
         let type_ = StructTag::from_str(rep).unwrap();
-        let fields = fields.into_iter().map(|(name, value)| (ident_(name), value)).collect();
+        let fields = fields
+            .into_iter()
+            .map(|(name, value)| (ident_(name), value))
+            .collect();
 
         A::MoveValue::Struct(A::MoveStruct::new(type_, fields))
     }
@@ -428,27 +507,48 @@ pub(crate) mod tests {
     /// Create a struct layout for test purposes.
     pub(crate) fn layout_(rep: &str, fields: Vec<FieldLayout<'_>>) -> A::MoveTypeLayout {
         let type_ = StructTag::from_str(rep).unwrap();
-        let fields = fields.into_iter().map(|(name, layout)| A::MoveFieldLayout::new(ident_(name), layout)).collect();
+        let fields = fields
+            .into_iter()
+            .map(|(name, layout)| A::MoveFieldLayout::new(ident_(name), layout))
+            .collect();
 
-        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields: Box::new(fields) }))
+        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields }))
     }
 
     /// Create a variant value for test purposes.
-    pub(crate) fn variant_(rep: &str, name: &str, tag: u16, fields: Vec<(&str, A::MoveValue)>) -> A::MoveValue {
+    pub(crate) fn variant_(
+        rep: &str,
+        name: &str,
+        tag: u16,
+        fields: Vec<(&str, A::MoveValue)>,
+    ) -> A::MoveValue {
         let type_ = StructTag::from_str(rep).unwrap();
-        let fields = fields.into_iter().map(|(name, value)| (ident_(name), value)).collect();
+        let fields = fields
+            .into_iter()
+            .map(|(name, value)| (ident_(name), value))
+            .collect();
 
-        A::MoveValue::Variant(A::MoveVariant { type_, variant_name: ident_(name), tag, fields })
+        A::MoveValue::Variant(A::MoveVariant {
+            type_,
+            variant_name: ident_(name),
+            tag,
+            fields,
+        })
     }
 
     /// Create an enum layout for test purposes.
-    pub(crate) fn enum_(rep: &str, variants: Vec<(Variant<'_>, Vec<FieldLayout<'_>>)>) -> A::MoveTypeLayout {
+    pub(crate) fn enum_(
+        rep: &str,
+        variants: Vec<(Variant<'_>, Vec<FieldLayout<'_>>)>,
+    ) -> A::MoveTypeLayout {
         let type_ = StructTag::from_str(rep).unwrap();
         let variants = variants
             .into_iter()
             .map(|((name, tag), fields)| {
-                let fields =
-                    fields.into_iter().map(|(name, layout)| A::MoveFieldLayout::new(ident_(name), layout)).collect();
+                let fields = fields
+                    .into_iter()
+                    .map(|(name, layout)| A::MoveFieldLayout::new(ident_(name), layout))
+                    .collect();
                 ((ident_(name), tag), fields)
             })
             .collect();
@@ -457,7 +557,7 @@ pub(crate) mod tests {
     }
 
     /// BCS encode Move value.
-    fn serialize(value: A::MoveValue) -> Vec<u8> {
+    pub(crate) fn serialize(value: A::MoveValue) -> Vec<u8> {
         value.clone().undecorate().simple_serialize().unwrap()
     }
 }

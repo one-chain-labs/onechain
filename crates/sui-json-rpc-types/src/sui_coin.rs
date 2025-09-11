@@ -8,15 +8,16 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
 use crate::Page;
-use sui_types::{
-    base_types::{EpochId, ObjectDigest, ObjectID, ObjectRef, SequenceNumber, TransactionDigest},
-    coin::CoinMetadata,
-    error::SuiError,
-    object::Object,
-    sui_serde::{BigInt, SequenceNumber as AsSequenceNumber},
+use sui_types::base_types::{
+    EpochId, ObjectDigest, ObjectID, ObjectRef, SequenceNumber, TransactionDigest,
 };
+use sui_types::coin::CoinMetadata;
+use sui_types::error::SuiError;
+use sui_types::object::Object;
+use sui_types::sui_serde::BigInt;
+use sui_types::sui_serde::SequenceNumber as AsSequenceNumber;
 
-pub type CoinPage = Page<Coin, ObjectID>;
+pub type CoinPage = Page<Coin, String>;
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, PartialEq, Eq, Clone)]
@@ -35,7 +36,12 @@ pub struct Balance {
 
 impl Balance {
     pub fn zero(coin_type: String) -> Self {
-        Self { coin_type, coin_object_count: 0, total_balance: 0, locked_balance: HashMap::new() }
+        Self {
+            coin_type,
+            coin_object_count: 0,
+            total_balance: 0,
+            locked_balance: HashMap::new(),
+        }
     }
 }
 
@@ -80,10 +86,23 @@ pub struct SuiCoinMetadata {
 
 impl TryFrom<Object> for SuiCoinMetadata {
     type Error = SuiError;
-
     fn try_from(object: Object) -> Result<Self, Self::Error> {
         let metadata: CoinMetadata = object.try_into()?;
-        let CoinMetadata { decimals, name, symbol, description, icon_url, id } = metadata;
-        Ok(Self { id: Some(*id.object_id()), decimals, name, symbol, description, icon_url })
+        let CoinMetadata {
+            decimals,
+            name,
+            symbol,
+            description,
+            icon_url,
+            id,
+        } = metadata;
+        Ok(Self {
+            id: Some(*id.object_id()),
+            decimals,
+            name,
+            symbol,
+            description,
+            icon_url,
+        })
     }
 }

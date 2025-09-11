@@ -1,30 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    available_range::AvailableRange,
-    big_int::BigInt,
-    cursor::{self, Page, RawPaginated, ScanLimited, Target},
-    move_type::MoveType,
-    sui_address::SuiAddress,
-    uint53::UInt53,
-};
-use crate::{
-    consistency::Checkpointed,
-    data::{Db, DbConnection, QueryExecutor},
-    error::Error,
-    filter,
-    query,
-    raw_query::RawQuery,
-};
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    *,
-};
+use super::available_range::AvailableRange;
+use super::cursor::{self, Page, RawPaginated, ScanLimited, Target};
+use super::uint53::UInt53;
+use super::{big_int::BigInt, move_type::MoveType, sui_address::SuiAddress};
+use crate::consistency::Checkpointed;
+use crate::data::{Db, DbConnection, QueryExecutor};
+use crate::error::Error;
+use crate::raw_query::RawQuery;
+use crate::{filter, query};
+use async_graphql::connection::{Connection, CursorType, Edge};
+use async_graphql::*;
 use diesel::{
     sql_types::{BigInt as SqlBigInt, Nullable, Text},
-    OptionalExtension,
-    QueryableByName,
+    OptionalExtension, QueryableByName,
 };
 use diesel_async::scoped_futures::ScopedFutureExt;
 use serde::{Deserialize, Serialize};
@@ -81,13 +71,16 @@ impl Balance {
         let stored: Option<StoredBalance> = db
             .execute_repeatable(move |conn| {
                 async move {
-                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await? else {
+                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await?
+                    else {
                         return Ok::<_, diesel::result::Error>(None);
                     };
 
-                    conn.result(move || balance_query(address, Some(coin_type.clone()), range).into_boxed())
-                        .await
-                        .optional()
+                    conn.result(move || {
+                        balance_query(address, Some(coin_type.clone()), range).into_boxed()
+                    })
+                    .await
+                    .optional()
                 }
                 .scope_boxed()
             })
@@ -113,7 +106,8 @@ impl Balance {
         let Some((prev, next, results)) = db
             .execute_repeatable(move |conn| {
                 async move {
-                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await? else {
+                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await?
+                    else {
                         return Ok::<_, diesel::result::Error>(None);
                     };
 
@@ -131,7 +125,9 @@ impl Balance {
             })
             .await?
         else {
-            return Err(Error::Client("Requested data is outside the available range".to_string()));
+            return Err(Error::Client(
+                "Requested data is outside the available range".to_string(),
+            ));
         };
 
         let mut conn = Connection::new(prev, next);
@@ -164,7 +160,10 @@ impl RawPaginated<Cursor> for StoredBalance {
 
 impl Target<Cursor> for StoredBalance {
     fn cursor(&self, checkpoint_viewed_at: u64) -> Cursor {
-        Cursor::new(BalanceCursor { coin_type: self.coin_type.clone(), checkpoint_viewed_at })
+        Cursor::new(BalanceCursor {
+            coin_type: self.coin_type.clone(),
+            checkpoint_viewed_at,
+        })
     }
 }
 
@@ -180,7 +179,11 @@ impl TryFrom<StoredBalance> for Balance {
     type Error = Error;
 
     fn try_from(s: StoredBalance) -> Result<Self, Error> {
-        let StoredBalance { balance, count, coin_type } = s;
+        let StoredBalance {
+            balance,
+            count,
+            coin_type,
+        } = s;
         let total_balance = balance
             .map(|b| BigInt::from_str(&b))
             .transpose()
@@ -192,14 +195,22 @@ impl TryFrom<StoredBalance> for Balance {
             .map_err(|e| Error::Internal(format!("Failed to parse coin type: {e}")))?
             .into();
 
-        Ok(Balance { coin_type, coin_object_count, total_balance })
+        Ok(Balance {
+            coin_type,
+            coin_object_count,
+            total_balance,
+        })
     }
 }
 
 /// Query the database for a `page` of coin balances. Each balance represents the total balance for
 /// a particular coin type, owned by `address`. This function is meant to be called within a thunk
 /// and returns a RawQuery that can be converted into a BoxedSqlQuery with `.into_boxed()`.
-fn balance_query(address: SuiAddress, coin_type: Option<TypeTag>, range: AvailableRange) -> RawQuery {
+fn balance_query(
+    address: SuiAddress,
+    coin_type: Option<TypeTag>,
+    range: AvailableRange,
+) -> RawQuery {
     // Construct the filtered inner query - apply the same filtering criteria to both
     // objects_snapshot and objects_history tables.
     let mut snapshot_objs = query!("SELECT * FROM objects_snapshot");
@@ -209,20 +220,34 @@ fn balance_query(address: SuiAddress, coin_type: Option<TypeTag>, range: Availab
     // checkpoint_viewed_at, if provided.
     let mut history_objs = query!("SELECT * FROM objects_history");
     history_objs = filter(history_objs, address, coin_type.clone());
-    history_objs =
-        filter!(history_objs, format!(r#"checkpoint_sequence_number BETWEEN {} AND {}"#, range.first, range.last));
+    history_objs = filter!(
+        history_objs,
+        format!(
+            r#"checkpoint_sequence_number BETWEEN {} AND {}"#,
+            range.first, range.last
+        )
+    );
 
     // Combine the two queries, and select the most recent version of each object.
-    let candidates =
-        query!(r#"SELECT DISTINCT ON (object_id) * FROM (({}) UNION ALL ({})) o"#, snapshot_objs, history_objs)
-            .order_by("object_id")
-            .order_by("object_version DESC");
+    let candidates = query!(
+        r#"SELECT DISTINCT ON (object_id) * FROM (({}) UNION ALL ({})) o"#,
+        snapshot_objs,
+        history_objs
+    )
+    .order_by("object_id")
+    .order_by("object_version DESC");
 
     // Objects that fulfill the filtering criteria may not be the most recent version available.
     // Left join the candidates table on newer to filter out any objects that have a newer
     // version.
     let mut newer = query!("SELECT object_id, object_version FROM objects_history");
-    newer = filter!(newer, format!(r#"checkpoint_sequence_number BETWEEN {} AND {}"#, range.first, range.last));
+    newer = filter!(
+        newer,
+        format!(
+            r#"checkpoint_sequence_number BETWEEN {} AND {}"#,
+            range.first, range.last
+        )
+    );
     let final_ = query!(
         r#"SELECT
             CAST(SUM(coin_balance) AS TEXT) as balance,
@@ -257,7 +282,11 @@ fn filter(mut query: RawQuery, owner: SuiAddress, coin_type: Option<TypeTag>) ->
     );
 
     if let Some(coin_type) = coin_type {
-        query = filter!(query, "coin_type = {}", coin_type.to_canonical_display(/* with_prefix */ true));
+        query = filter!(
+            query,
+            "coin_type = {}",
+            coin_type.to_canonical_display(/* with_prefix */ true)
+        );
     };
 
     query

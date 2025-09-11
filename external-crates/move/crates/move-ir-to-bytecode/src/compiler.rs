@@ -3,43 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::context::{CompiledDependency, Context, MaterializedPools, TABLE_MAX_SIZE};
-use anyhow::{bail, format_err, Result};
+use anyhow::{Result, bail, format_err};
 use move_binary_format::{
     file_format::{
-        Ability,
-        AbilitySet,
-        Bytecode,
-        CodeOffset,
-        CodeUnit,
-        CompiledModule,
-        Constant,
-        ConstantPoolIndex,
-        DatatypeHandleIndex,
-        DatatypeTyParameter,
-        EnumDefinition,
-        EnumDefinitionIndex,
-        FieldDefinition,
-        FunctionDefinition,
-        FunctionSignature,
-        JumpTableInner,
-        ModuleHandle,
-        Signature,
-        SignatureToken,
-        StructDefinition,
-        StructDefinitionIndex,
-        StructFieldInformation,
-        TableIndex,
-        TypeParameterIndex,
-        TypeSignature,
-        VariantDefinition,
-        VariantJumpTable,
-        VariantJumpTableIndex,
-        Visibility,
+        Ability, AbilitySet, Bytecode, CodeOffset, CodeUnit, CompiledModule, Constant,
+        ConstantPoolIndex, DatatypeHandleIndex, DatatypeTyParameter, EnumDefinition,
+        EnumDefinitionIndex, FieldDefinition, FunctionDefinition, FunctionSignature,
+        JumpTableInner, ModuleHandle, Signature, SignatureToken, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, TableIndex, TypeParameterIndex,
+        TypeSignature, VariantDefinition, VariantJumpTable, VariantJumpTableIndex, Visibility,
     },
     file_format_common::VERSION_MAX,
 };
 use move_bytecode_source_map::source_map::SourceMap;
-use move_command_line_common::{env::get_bytecode_version_from_env, error_bitset::ErrorBitsetBuilder};
+use move_command_line_common::{
+    env::get_bytecode_version_from_env, error_bitset::ErrorBitsetBuilder,
+};
 use move_core_types::runtime_value::{MoveTypeLayout, MoveValue};
 use move_ir_types::{
     ast::{self, Bytecode as IRBytecode, Bytecode_ as IRBytecode_, *},
@@ -49,10 +28,8 @@ use move_symbol_pool::Symbol;
 use std::{
     clone::Clone,
     collections::{
+        BTreeSet, HashMap, HashSet,
         hash_map::Entry::{Occupied, Vacant},
-        BTreeSet,
-        HashMap,
-        HashSet,
     },
     fmt::Write,
 };
@@ -60,28 +37,39 @@ use std::{
 macro_rules! record_src_loc {
     (local: $context:expr, $var:expr) => {{
         let source_name = ($var.value.0.as_str().to_owned(), $var.loc);
-        $context.source_map.add_local_mapping($context.current_function_definition_index(), source_name)?;
+        $context
+            .source_map
+            .add_local_mapping($context.current_function_definition_index(), source_name)?;
     }};
     (parameter: $context:expr, $var:expr) => {{
         let source_name = ($var.value.0.as_str().to_owned(), $var.loc);
-        $context.source_map.add_parameter_mapping($context.current_function_definition_index(), source_name)?;
+        $context
+            .source_map
+            .add_parameter_mapping($context.current_function_definition_index(), source_name)?;
     }};
     (return_: $context:expr, $_type:expr) => {{
-        $context.source_map.add_return_mapping($context.current_function_definition_index(), $_type.loc)?;
+        $context
+            .source_map
+            .add_return_mapping($context.current_function_definition_index(), $_type.loc)?;
     }};
     (field: $context:expr, $idx: expr, $field:expr) => {{
-        $context.source_map.add_struct_field_mapping($idx, $field.loc)?;
+        $context
+            .source_map
+            .add_struct_field_mapping($idx, $field.loc)?;
     }};
     (variant: $context:expr, $idx: expr, $variant:expr, $field_locs:expr) => {{
         let source_name = ($variant.value.name.0.as_str().to_owned(), $variant.loc);
-        $context.source_map.add_enum_variant_mapping($idx, source_name, $field_locs)?;
+        $context
+            .source_map
+            .add_enum_variant_mapping($idx, source_name, $field_locs)?;
     }};
     (function_type_formals: $context:expr, $var:expr) => {
         for (ty_var, _) in $var.iter() {
             let source_name = (ty_var.value.0.as_str().to_owned(), ty_var.loc);
-            $context
-                .source_map
-                .add_function_type_parameter_mapping($context.current_function_definition_index(), source_name)?;
+            $context.source_map.add_function_type_parameter_mapping(
+                $context.current_function_definition_index(),
+                source_name,
+            )?;
         }
     };
     (function_decl: $context:expr, $location:expr, $definition_location: expr, $function_index:expr, $is_native:expr) => {{
@@ -96,24 +84,30 @@ macro_rules! record_src_loc {
     (struct_type_formals: $context:expr, $var:expr) => {
         for (_, ty_var, _) in $var.iter() {
             let source_name = (ty_var.value.0.as_str().to_owned(), ty_var.loc);
-            $context
-                .source_map
-                .add_struct_type_parameter_mapping($context.current_struct_definition_index(), source_name)?;
+            $context.source_map.add_struct_type_parameter_mapping(
+                $context.current_struct_definition_index(),
+                source_name,
+            )?;
         }
     };
     (struct_decl: $context:expr, $location:expr) => {
-        $context.source_map.add_top_level_struct_mapping($context.current_struct_definition_index(), $location)?;
+        $context
+            .source_map
+            .add_top_level_struct_mapping($context.current_struct_definition_index(), $location)?;
     };
     (enum_type_formals: $context:expr, $var:expr) => {
         for (_, ty_var, _) in $var.iter() {
             let source_name = (ty_var.value.0.as_str().to_owned(), ty_var.loc);
-            $context
-                .source_map
-                .add_enum_type_parameter_mapping($context.current_enum_definition_index(), source_name)?;
+            $context.source_map.add_enum_type_parameter_mapping(
+                $context.current_enum_definition_index(),
+                source_name,
+            )?;
         }
     };
     (enum_decl: $context:expr, $location:expr) => {
-        $context.source_map.add_top_level_enum_mapping($context.current_enum_definition_index(), $location)?;
+        $context
+            .source_map
+            .add_top_level_enum_mapping($context.current_enum_definition_index(), $location)?;
     };
     (const_decl: $context:expr, $const_index:expr, $name:expr) => {
         $context.source_map.add_const_mapping($const_index, $name)?;
@@ -125,7 +119,11 @@ macro_rules! make_push_instr {
         macro_rules! push_instr {
             ($loc:expr, $instr:expr) => {{
                 let code_offset = $code.len() as CodeOffset;
-                $context.source_map.add_code_mapping($context.current_function_definition_index(), code_offset, $loc)?;
+                $context.source_map.add_code_mapping(
+                    $context.current_function_definition_index(),
+                    code_offset,
+                    $loc,
+                )?;
                 $code.push($instr);
             }};
         }
@@ -176,7 +174,9 @@ impl FunctionFrame {
     // Manage the stack info for the function
     fn push(&mut self) -> Result<()> {
         if self.cur_stack_depth == i64::MAX {
-            bail!("ICE Stack depth accounting overflow. The compiler can only support a maximum stack depth of up to i64::max_value")
+            bail!(
+                "ICE Stack depth accounting overflow. The compiler can only support a maximum stack depth of up to i64::max_value"
+            )
         }
         self.cur_stack_depth += 1;
         self.max_stack_depth = std::cmp::max(self.max_stack_depth, self.cur_stack_depth);
@@ -185,7 +185,9 @@ impl FunctionFrame {
 
     fn pop(&mut self) -> Result<()> {
         if self.cur_stack_depth == i64::MIN {
-            bail!("ICE Stack depth accounting underflow. The compiler can only support a minimum stack depth of up to i64::min_value")
+            bail!(
+                "ICE Stack depth accounting underflow. The compiler can only support a minimum stack depth of up to i64::min_value"
+            )
         }
         self.cur_stack_depth -= 1;
         Ok(())
@@ -222,20 +224,31 @@ impl FunctionFrame {
 }
 
 // Returns an error that lists any labels that have been redeclared, or used without being declared.
-fn label_verification_error(redeclared: &[&BlockLabel_], undeclared: &[&BlockLabel_]) -> Result<()> {
+fn label_verification_error(
+    redeclared: &[&BlockLabel_],
+    undeclared: &[&BlockLabel_],
+) -> Result<()> {
     let mut message = "Invalid block labels".to_string();
     if !redeclared.is_empty() {
         write!(
             &mut message,
             ", labels were declared twice ({})",
-            redeclared.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(", ")
+            redeclared
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
         )?;
     }
     if !undeclared.is_empty() {
         write!(
             &mut message,
             ", labels were used without being declared ({})",
-            undeclared.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(", ")
+            undeclared
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
         )?;
     }
     bail!(message);
@@ -257,7 +270,9 @@ fn verify_move_function_body(code: &[Block]) -> Result<()> {
     for block in code {
         for statement in &block.value.statements {
             match &statement.value {
-                Statement_::Jump(label) | Statement_::JumpIf(_, label) | Statement_::JumpIfFalse(_, label) => {
+                Statement_::Jump(label)
+                | Statement_::JumpIf(_, label)
+                | Statement_::JumpIfFalse(_, label) => {
                     if !labels.contains(&label.value) {
                         undeclared.push(&label.value);
                     }
@@ -290,7 +305,9 @@ fn verify_bytecode_function_body(code: &[(BlockLabel_, BytecodeBlock)]) -> Resul
     for block in code {
         for statement in &block.1 {
             match &statement.value {
-                IRBytecode_::Branch(label) | IRBytecode_::BrTrue(label) | IRBytecode_::BrFalse(label) => {
+                IRBytecode_::Branch(label)
+                | IRBytecode_::BrTrue(label)
+                | IRBytecode_::BrFalse(label) => {
                     if !labels.contains(&label) {
                         undeclared.push(label);
                     }
@@ -327,7 +344,10 @@ fn verify_module(module: &ModuleDefinition) -> Result<()> {
     Ok(())
 }
 
-fn constant_name_as_constant_value_index(context: &mut Context, const_name: &ConstantName) -> Result<ConstantPoolIndex> {
+fn constant_name_as_constant_value_index(
+    context: &mut Context,
+    const_name: &ConstantName,
+) -> Result<ConstantPoolIndex> {
     let name_constant = compile_constant(
         context,
         &MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
@@ -344,7 +364,8 @@ pub fn compile_module<'a>(
     verify_module(&module)?;
 
     let current_module = module.identifier;
-    let mut context = Context::new(module.loc, HashMap::new(), current_module)?;
+    let publishable = module.publishable;
+    let mut context = Context::new(module.loc, publishable, HashMap::new(), current_module)?;
     for dep in dependencies {
         context.add_compiled_dependency(dep)?;
     }
@@ -359,26 +380,36 @@ pub fn compile_module<'a>(
     compile_imports(&mut context, module.imports.clone())?;
 
     // Add explicit handles/dependency declarations to `dependencies`
-    compile_explicit_dependency_declarations(&mut context, module.imports, module.explicit_dependency_declarations)?;
+    compile_explicit_dependency_declarations(
+        &mut context,
+        module.imports,
+        module.explicit_dependency_declarations,
+    )?;
 
     // Explicitly declare all structs and enums as they will be included even if not used
     for s in &module.structs {
         let abilities = abilities(&s.value.abilities);
-        let ident = QualifiedDatatypeIdent { module: self_name, name: s.value.name.clone() };
+        let ident = QualifiedDatatypeIdent {
+            module: self_name,
+            name: s.value.name.clone(),
+        };
         let type_parameters = datatype_type_parameters(&s.value.type_formals);
         context.declare_datatype_handle_index(ident, abilities, type_parameters)?;
     }
 
     for s in &module.enums {
         let abilities = abilities(&s.value.abilities);
-        let ident = QualifiedDatatypeIdent { module: self_name, name: s.value.name.clone() };
+        let ident = QualifiedDatatypeIdent {
+            module: self_name,
+            name: s.value.name.clone(),
+        };
         let type_parameters = datatype_type_parameters(&s.value.type_formals);
         context.declare_datatype_handle_index(ident, abilities, type_parameters)?;
     }
 
     for ir_constant in module.constants {
         // If the constant is an error constant in the source, then add the error constant's name
-        // look up the constant's name, as a constant valeu -- this may be present already,
+        // look up the constant's name, as a constant value -- this may be present already,
         // e.g., in the case of something like `const Foo: vector<u8> = b"Foo"` in which case the
         // new index will not be added and the previous index will be used.
         if ir_constant.is_error_constant {
@@ -387,8 +418,11 @@ pub fn compile_module<'a>(
             constant_name_as_constant_value_index(&mut context, &ir_constant.name)?;
         }
 
-        let constant =
-            compile_constant(&mut context, &type_to_constant_type_layout(ir_constant.signature)?, ir_constant.value)?;
+        let constant = compile_constant(
+            &mut context,
+            &type_to_constant_type_layout(ir_constant.signature)?,
+            ir_constant.value,
+        )?;
         context.declare_constant(ir_constant.name.clone(), constant.clone())?;
         let const_idx = context.constant_index(constant)?;
         record_src_loc!(const_decl: context, const_idx, ir_constant.name);
@@ -426,6 +460,7 @@ pub fn compile_module<'a>(
     ) = context.materialize_pools();
     let mut compiled_module = CompiledModule {
         version: VERSION_MAX,
+        publishable,
         module_handles,
         self_module_handle_idx,
         datatype_handles,
@@ -462,15 +497,22 @@ fn set_module_version(module: &mut CompiledModule, version: Option<u32>) {
     // version changes
     #[allow(clippy::assertions_on_constants)]
     const PRE_MAX_VERSION: u32 = {
-        assert!(VERSION_MAX == 7, "Need to update this code if the version changes");
+        assert!(
+            VERSION_MAX == 7,
+            "Need to update this code if the version changes"
+        );
         VERSION_MAX - 1
     };
     let version = if module.enum_defs.is_empty()
         && module.enum_def_instantiations.is_empty()
         && module.variant_handles.is_empty()
         && module.variant_instantiation_handles.is_empty()
-        && module.function_defs.iter().all(|f| f.code.as_ref().map(|c| c.jump_tables.is_empty()).unwrap_or(true))
-    {
+        && module.function_defs.iter().all(|f| {
+            f.code
+                .as_ref()
+                .map(|c| c.jump_tables.is_empty())
+                .unwrap_or(true)
+        }) {
         PRE_MAX_VERSION
     } else {
         VERSION_MAX
@@ -487,14 +529,28 @@ fn compile_explicit_dependency_declarations(
     dependencies: Vec<ModuleDependency>,
 ) -> Result<()> {
     let mut dependencies_acc = outer_context.take_dependencies();
+    let publishable = outer_context.publishable();
     for dependency in dependencies {
-        let ModuleDependency { name: mname, datatypes, functions } = dependency;
+        let ModuleDependency {
+            name: mname,
+            datatypes,
+            functions,
+        } = dependency;
         let current_module = outer_context.module_ident(&mname)?;
-        let mut context = Context::new(outer_context.decl_location(), dependencies_acc, *current_module)?;
+        let mut context = Context::new(
+            outer_context.decl_location(),
+            outer_context.publishable(),
+            dependencies_acc,
+            *current_module,
+        )?;
         compile_imports(&mut context, imports.clone())?;
         let self_module_handle_idx = context.module_handle_index(&mname)?;
         for data_dep in datatypes {
-            let DatatypeDependency { abilities: abs, name, type_formals: tys } = data_dep;
+            let DatatypeDependency {
+                abilities: abs,
+                name,
+                type_formals: tys,
+            } = data_dep;
             let sname = QualifiedDatatypeIdent::new(mname, name);
             let ability_set = abilities(&abs);
             let kinds = datatype_type_parameters(&tys);
@@ -528,6 +584,7 @@ fn compile_explicit_dependency_declarations(
         ) = context.materialize_pools();
         let compiled_module = CompiledModule {
             version: VERSION_MAX,
+            publishable,
             module_handles,
             self_module_handle_idx,
             datatype_handles,
@@ -550,13 +607,19 @@ fn compile_explicit_dependency_declarations(
             variant_instantiation_handles,
         };
         dependencies_acc = compiled_deps;
-        dependencies_acc.insert(*current_module, CompiledDependency::stored(compiled_module)?);
+        dependencies_acc.insert(
+            *current_module,
+            CompiledDependency::stored(compiled_module)?,
+        );
     }
     outer_context.restore_dependencies(dependencies_acc);
     Ok(())
 }
 
-fn compile_friends(context: &mut Context, friends: Vec<ast::ModuleIdent>) -> Result<Vec<ModuleHandle>> {
+fn compile_friends(
+    context: &mut Context,
+    friends: Vec<ast::ModuleIdent>,
+) -> Result<Vec<ModuleHandle>> {
     let mut friend_decls = vec![];
     for friend in friends {
         friend_decls.push(context.declare_friend(friend)?);
@@ -590,12 +653,18 @@ fn type_parameter_indexes<'a>(
 fn datatype_type_parameters(ast_tys: &[ast::DatatypeTypeParameter]) -> Vec<DatatypeTyParameter> {
     ast_tys
         .iter()
-        .map(|(is_phantom, _, abs)| DatatypeTyParameter { constraints: abilities(abs), is_phantom: *is_phantom })
+        .map(|(is_phantom, _, abs)| DatatypeTyParameter {
+            constraints: abilities(abs),
+            is_phantom: *is_phantom,
+        })
         .collect()
 }
 
 fn abilities(abilities: &BTreeSet<ast::Ability>) -> AbilitySet {
-    abilities.iter().map(ability).fold(AbilitySet::EMPTY, |acc, a| acc | a)
+    abilities
+        .iter()
+        .map(ability)
+        .fold(AbilitySet::EMPTY, |acc, a| acc | a)
 }
 
 fn ability(ab: &ast::Ability) -> Ability {
@@ -612,7 +681,9 @@ fn compile_types(
     type_parameters: &HashMap<TypeVar_, TypeParameterIndex>,
     tys: &[Type],
 ) -> Result<Vec<SignatureToken>> {
-    tys.iter().map(|ty| compile_type(context, type_parameters, ty)).collect::<Result<_>>()
+    tys.iter()
+        .map(|ty| compile_type(context, type_parameters, ty))
+        .collect::<Result<_>>()
 }
 
 fn compile_type(
@@ -630,9 +701,11 @@ fn compile_type(
         Type_::U128 => SignatureToken::U128,
         Type_::U256 => SignatureToken::U256,
         Type_::Bool => SignatureToken::Bool,
-        Type_::Vector(inner_type) => {
-            SignatureToken::Vector(Box::new(compile_type(context, type_parameters, inner_type)?))
-        }
+        Type_::Vector(inner_type) => SignatureToken::Vector(Box::new(compile_type(
+            context,
+            type_parameters,
+            inner_type,
+        )?)),
         Type_::Reference(is_mutable, inner_type) => {
             let inner_token = Box::new(compile_type(context, type_parameters, inner_type)?);
             if *is_mutable {
@@ -661,12 +734,27 @@ fn compile_type(
     })
 }
 
-fn function_signature(context: &mut Context, f: &ast::FunctionSignature) -> Result<FunctionSignature> {
+fn function_signature(
+    context: &mut Context,
+    f: &ast::FunctionSignature,
+) -> Result<FunctionSignature> {
     let m = type_parameter_indexes(f.type_formals.iter().map(|formal| &formal.0))?;
     let return_ = compile_types(context, &m, &f.return_type)?;
-    let parameters = f.formals.iter().map(|(_, ty)| compile_type(context, &m, ty)).collect::<Result<_>>()?;
-    let type_parameters = f.type_formals.iter().map(|(_, abs)| abilities(abs)).collect();
-    Ok(move_binary_format::file_format::FunctionSignature { return_, parameters, type_parameters })
+    let parameters = f
+        .formals
+        .iter()
+        .map(|(_, ty)| compile_type(context, &m, ty))
+        .collect::<Result<_>>()?;
+    let type_parameters = f
+        .type_formals
+        .iter()
+        .map(|(_, abs)| abilities(abs))
+        .collect();
+    Ok(move_binary_format::file_format::FunctionSignature {
+        return_,
+        parameters,
+        type_parameters,
+    })
 }
 
 fn compile_structs(
@@ -676,14 +764,20 @@ fn compile_structs(
 ) -> Result<Vec<StructDefinition>> {
     let mut struct_defs = vec![];
     for s in structs {
-        let sident = QualifiedDatatypeIdent { module: *self_name, name: s.value.name.clone() };
+        let sident = QualifiedDatatypeIdent {
+            module: *self_name,
+            name: s.value.name.clone(),
+        };
         let sh_idx = context.datatype_handle_index(sident.clone())?;
         record_src_loc!(struct_decl: context, s.loc);
         record_src_loc!(struct_type_formals: context, &s.value.type_formals);
         let m = type_parameter_indexes(s.value.type_formals.iter().map(|formal| &formal.1))?;
         let sd_idx = context.declare_struct_definition_index(s.value.name)?;
         let field_information = compile_fields(context, &m, sh_idx, sd_idx, s.value.fields)?;
-        struct_defs.push(StructDefinition { struct_handle: sh_idx, field_information });
+        struct_defs.push(StructDefinition {
+            struct_handle: sh_idx,
+            field_information,
+        });
     }
     Ok(struct_defs)
 }
@@ -704,7 +798,10 @@ fn compile_fields(
                 record_src_loc!(field: context, sd_idx, f);
                 let sig_token = compile_type(context, type_parameters, &ty)?;
                 context.declare_field(sh_idx, sd_idx, f.value, sig_token.clone(), decl_order);
-                decl_fields.push(FieldDefinition { name, signature: TypeSignature(sig_token) });
+                decl_fields.push(FieldDefinition {
+                    name,
+                    signature: TypeSignature(sig_token),
+                });
             }
             StructFieldInformation::Declared(decl_fields)
         }
@@ -718,14 +815,20 @@ fn compile_enums(
 ) -> Result<Vec<EnumDefinition>> {
     let mut enum_defs = vec![];
     for s in enums {
-        let sident = QualifiedDatatypeIdent { module: *self_name, name: s.value.name.clone() };
+        let sident = QualifiedDatatypeIdent {
+            module: *self_name,
+            name: s.value.name.clone(),
+        };
         let eh_idx = context.datatype_handle_index(sident.clone())?;
         record_src_loc!(enum_decl: context, s.loc);
         record_src_loc!(enum_type_formals: context, &s.value.type_formals);
         let m = type_parameter_indexes(s.value.type_formals.iter().map(|formal| &formal.1))?;
         let ed_idx = context.declare_enum_definition_index(s.value.name)?;
         let variant_definitions = compile_variants(context, &m, eh_idx, ed_idx, s.value.variants)?;
-        enum_defs.push(EnumDefinition { enum_handle: eh_idx, variants: variant_definitions });
+        enum_defs.push(EnumDefinition {
+            enum_handle: eh_idx,
+            variants: variant_definitions,
+        });
     }
     Ok(enum_defs)
 }
@@ -748,10 +851,16 @@ fn compile_variants(
             let name = context.identifier_index(f.value.0)?;
             field_locs.push(f.loc);
             let sig_token = compile_type(context, type_parameters, &ty)?;
-            decl_fields.push(FieldDefinition { name, signature: TypeSignature(sig_token) });
+            decl_fields.push(FieldDefinition {
+                name,
+                signature: TypeSignature(sig_token),
+            });
         }
         record_src_loc!(variant: context, ed_idx, variant, field_locs);
-        variant_outputs.push(VariantDefinition { variant_name, fields: decl_fields })
+        variant_outputs.push(VariantDefinition {
+            variant_name,
+            fields: decl_fields,
+        })
     }
 
     Ok(variant_outputs)
@@ -765,14 +874,25 @@ fn compile_functions(
     functions
         .into_iter()
         .enumerate()
-        .map(|(func_index, (name, ast_function))| compile_function(context, self_name, name, ast_function, func_index))
+        .map(|(func_index, (name, ast_function))| {
+            compile_function(context, self_name, name, ast_function, func_index)
+        })
         .collect()
 }
 
-fn compile_function_body_impl(context: &mut Context, ast_function: Function_) -> Result<Option<CodeUnit>> {
+fn compile_function_body_impl(
+    context: &mut Context,
+    ast_function: Function_,
+) -> Result<Option<CodeUnit>> {
     Ok(match ast_function.body {
         FunctionBody::Move { locals, code } => {
-            let m = type_parameter_indexes(ast_function.signature.type_formals.iter().map(|formal| &formal.0))?;
+            let m = type_parameter_indexes(
+                ast_function
+                    .signature
+                    .type_formals
+                    .iter()
+                    .map(|formal| &formal.0),
+            )?;
             Some(compile_function_body(
                 context,
                 m,
@@ -783,7 +903,13 @@ fn compile_function_body_impl(context: &mut Context, ast_function: Function_) ->
             )?)
         }
         FunctionBody::Bytecode { locals, code } => {
-            let m = type_parameter_indexes(ast_function.signature.type_formals.iter().map(|formal| &formal.0))?;
+            let m = type_parameter_indexes(
+                ast_function
+                    .signature
+                    .type_formals
+                    .iter()
+                    .map(|formal| &formal.0),
+            )?;
             Some(compile_function_body_bytecode(
                 context,
                 m,
@@ -836,7 +962,13 @@ fn compile_function(
     };
     let code = compile_function_body_impl(context, ast_function)?;
 
-    Ok(FunctionDefinition { function: fh_idx, visibility, is_entry, acquires_global_resources: vec![], code })
+    Ok(FunctionDefinition {
+        function: fh_idx,
+        visibility,
+        is_entry,
+        acquires_global_resources: vec![],
+        code,
+    })
 }
 
 fn compile_function_body(
@@ -866,7 +998,11 @@ fn compile_function_body(
     }
 
     let (code, jump_tables) = compile_blocks(context, &mut function_frame, blocks)?;
-    Ok(CodeUnit { locals: context.signature_index(locals_signature)?, code, jump_tables })
+    Ok(CodeUnit {
+        locals: context.signature_index(locals_signature)?,
+        code,
+        jump_tables,
+    })
 }
 
 /// Translates each of the blocks that a function body is composed of to bytecode.
@@ -882,7 +1018,14 @@ fn compile_blocks(
     let mut jump_tables = vec![];
     let mut label_to_index: HashMap<BlockLabel_, u16> = HashMap::new();
     for block in blocks {
-        compile_block(context, function_frame, &mut label_to_index, &mut code, &mut jump_tables, block.value)?;
+        compile_block(
+            context,
+            function_frame,
+            &mut label_to_index,
+            &mut code,
+            &mut jump_tables,
+            block.value,
+        )?;
     }
     let fake_to_actual = context.build_index_remapping(label_to_index);
     remap_branch_offsets(&mut code, &mut jump_tables, &fake_to_actual);
@@ -901,7 +1044,14 @@ fn compile_block(
     label_to_index.insert(block.label.value.clone(), code.len() as u16);
     context.label_index(block.label.value)?;
     for statement in block.statements {
-        compile_statement(context, function_frame, label_to_index, code, jump_tables, statement)?;
+        compile_statement(
+            context,
+            function_frame,
+            label_to_index,
+            code,
+            jump_tables,
+            statement,
+        )?;
     }
     Ok(())
 }
@@ -939,7 +1089,10 @@ fn compile_statement(
             // and otherwise falls through to an abort. Because the condition expression is
             // evaluated as `!(exp)`, branch to the failure label if the condition is *false*.
             let cont_label = BlockLabel_(Symbol::from(format!("assert_cont_{}", code.len())));
-            push_instr!(cond_loc, Bytecode::BrFalse(context.label_index(cont_label.clone())?));
+            push_instr!(
+                cond_loc,
+                Bytecode::BrFalse(context.label_index(cont_label.clone())?)
+            );
 
             // In case of a fallthrough, the assert has failed.
             // Compile the bytecode for the error expression, then abort.
@@ -957,7 +1110,10 @@ fn compile_statement(
         Statement_::Exp(e) => {
             compile_expression(context, function_frame, code, *e)?;
         }
-        Statement_::Jump(label) => push_instr!(label.loc, Bytecode::Branch(context.label_index(label.value)?)),
+        Statement_::Jump(label) => push_instr!(
+            label.loc,
+            Bytecode::Branch(context.label_index(label.value)?)
+        ),
         Statement_::JumpIf(cond, label) => {
             let loc = cond.loc;
             compile_expression(context, function_frame, code, *cond)?;
@@ -973,7 +1129,11 @@ fn compile_statement(
             push_instr!(statement.loc, Bytecode::Ret);
         }
         Statement_::Unpack(name, tys, bindings, e) => {
-            let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+            let tokens = Signature(compile_types(
+                context,
+                function_frame.type_parameters(),
+                &tys,
+            )?);
 
             compile_expression(context, function_frame, code, *e)?;
 
@@ -994,12 +1154,19 @@ fn compile_statement(
             }
         }
         Statement_::UnpackVariant(name, variant_name, tys, bindings, e, unpack_type) => {
-            let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+            let tokens = Signature(compile_types(
+                context,
+                function_frame.type_parameters(),
+                &tys,
+            )?);
 
             compile_expression(context, function_frame, code, *e)?;
 
             let def_idx = context.enum_definition_index(&name)?;
-            let qname = QualifiedDatatypeIdent { module: ModuleName::module_self(), name };
+            let qname = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name,
+            };
             let dt_idx = context.datatype_handle_index(qname)?;
             let (eh_idx, tag) = context.variant(dt_idx, variant_name)?;
             if tys.is_empty() {
@@ -1033,7 +1200,10 @@ fn compile_statement(
         Statement_::VariantSwitch(name, lbls, e) => {
             compile_expression(context, function_frame, code, *e)?;
             let def_idx = context.enum_definition_index(&name)?;
-            let qname = QualifiedDatatypeIdent { module: ModuleName::module_self(), name };
+            let qname = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name,
+            };
             let eh_idx = context.datatype_handle_index(qname)?;
             let idx = compile_jump_table(context, jump_tables, def_idx, eh_idx, lbls)?;
             push_instr!(statement.loc, Bytecode::VariantSwitch(idx));
@@ -1058,7 +1228,10 @@ fn compile_jump_table(
         jump_table.push(context.label_index(lbl.value)?);
     }
     let jt_idx = VariantJumpTableIndex(jump_tables.len() as TableIndex);
-    jump_tables.push(VariantJumpTable { head_enum: def_idx, jump_table: JumpTableInner::Full(jump_table) });
+    jump_tables.push(VariantJumpTable {
+        head_enum: def_idx,
+        jump_table: JumpTableInner::Full(jump_table),
+    });
     Ok(jt_idx)
 }
 
@@ -1178,7 +1351,10 @@ fn compile_expression(
             let def_idx = context.struct_definition_index(&name)?;
 
             let self_name = ModuleName::module_self();
-            let ident = QualifiedDatatypeIdent { module: self_name, name: name.clone() };
+            let ident = QualifiedDatatypeIdent {
+                module: self_name,
+                name: name.clone(),
+            };
             let sh_idx = context.datatype_handle_index(ident)?;
 
             let num_fields = fields.len();
@@ -1279,7 +1455,11 @@ fn compile_expression(
             compile_expression(context, function_frame, code, *e)?;
             push_instr!(exp.loc, Bytecode::ReadRef);
         }
-        Exp_::Borrow { is_mutable, exp: inner_exp, field } => {
+        Exp_::Borrow {
+            is_mutable,
+            exp: inner_exp,
+            field,
+        } => {
             // Compile the "inner expression." In the case of a field borrow
             // such as `&mut move(s).S::f`, `move(s)` would be the inner
             // expression.
@@ -1290,8 +1470,10 @@ fn compile_expression(
             // field instruction that references the correct field handle index.
             // We can't know what the index of the field is without determining
             // the type of the underlying struct.
-            let struct_ident =
-                QualifiedDatatypeIdent { module: ModuleName::module_self(), name: field.value.struct_name };
+            let struct_ident = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name: field.value.struct_name,
+            };
             let sh_idx = context.datatype_handle_index(struct_ident)?;
             let (def_idx, _, field_offset) = context.field(sh_idx, field.value.field.value)?;
 
@@ -1310,8 +1492,11 @@ fn compile_expression(
             } else {
                 // To borrow a field from a generic struct, the generic borrow
                 // instruction needs the index of the field instantiation.
-                let tokens =
-                    Signature(compile_types(context, function_frame.type_parameters(), &field.value.type_actuals)?);
+                let tokens = Signature(compile_types(
+                    context,
+                    function_frame.type_parameters(),
+                    &field.value.type_actuals,
+                )?);
                 let type_parameters_id = context.signature_index(tokens)?;
                 let fi_idx = context.field_instantiation_index(fh_idx, type_parameters_id)?;
                 if is_mutable {
@@ -1338,7 +1523,10 @@ fn compile_expression(
             let def_idx = context.enum_definition_index(&name)?;
 
             let self_name = ModuleName::module_self();
-            let ident = QualifiedDatatypeIdent { module: self_name, name: name.clone() };
+            let ident = QualifiedDatatypeIdent {
+                module: self_name,
+                name: name.clone(),
+            };
             let sh_idx = context.datatype_handle_index(ident)?;
             let num_fields = fields.len();
             let (eh_idx, tag) = context.variant(sh_idx, variant_name)?;
@@ -1483,8 +1671,13 @@ fn compile_call(
                 }
             }
         }
-        FunctionCall_::ModuleFunctionCall { module, name, type_actuals } => {
-            let ty_arg_tokens = compile_types(context, function_frame.type_parameters(), &type_actuals)?;
+        FunctionCall_::ModuleFunctionCall {
+            module,
+            name,
+            type_actuals,
+        } => {
+            let ty_arg_tokens =
+                compile_types(context, function_frame.type_parameters(), &type_actuals)?;
             let tokens = Signature(ty_arg_tokens);
             let type_actuals_id = context.signature_index(tokens)?;
             let fh_idx = context.function_handle(module, name)?.1;
@@ -1516,7 +1709,9 @@ fn type_to_constant_type_layout(ty: Type) -> Result<MoveTypeLayout> {
         Type_::U128 => MoveTypeLayout::U128,
         Type_::U256 => MoveTypeLayout::U256,
         Type_::Bool => MoveTypeLayout::Bool,
-        Type_::Vector(inner_type) => MoveTypeLayout::Vector(Box::new(type_to_constant_type_layout(*inner_type)?)),
+        Type_::Vector(inner_type) => {
+            MoveTypeLayout::Vector(Box::new(type_to_constant_type_layout(*inner_type)?))
+        }
         Type_::Reference(_, _) => {
             bail!("References are not supported in constant type layouts")
         }
@@ -1529,8 +1724,13 @@ fn type_to_constant_type_layout(ty: Type) -> Result<MoveTypeLayout> {
     })
 }
 
-fn compile_constant(_context: &mut Context, layout: &MoveTypeLayout, value: MoveValue) -> Result<Constant> {
-    Constant::serialize_constant(layout, &value).ok_or_else(|| format_err!("Could not serialize constant"))
+fn compile_constant(
+    _context: &mut Context,
+    layout: &MoveTypeLayout,
+    value: MoveValue,
+) -> Result<Constant> {
+    Constant::serialize_constant(layout, &value)
+        .ok_or_else(|| format_err!("Could not serialize constant"))
 }
 
 //**************************************************************************************************
@@ -1569,11 +1769,21 @@ fn compile_function_body_bytecode(
     for (label, block) in blocks {
         label_to_index.insert(label.clone(), code.len() as u16);
         context.label_index(label)?;
-        compile_bytecode_block(context, &mut function_frame, &mut code, &mut jump_tables, block)?;
+        compile_bytecode_block(
+            context,
+            &mut function_frame,
+            &mut code,
+            &mut jump_tables,
+            block,
+        )?;
     }
     let fake_to_actual = context.build_index_remapping(label_to_index);
     remap_branch_offsets(&mut code, &mut jump_tables, &fake_to_actual);
-    Ok(CodeUnit { locals: sig_idx, code, jump_tables })
+    Ok(CodeUnit {
+        locals: sig_idx,
+        code,
+        jump_tables,
+    })
 }
 
 fn compile_bytecode_block(
@@ -1632,7 +1842,11 @@ fn compile_bytecode(
         IRBytecode_::MoveLoc(sp!(_, v_)) => Bytecode::MoveLoc(function_frame.get_local(&v_)?),
         IRBytecode_::StLoc(sp!(_, v_)) => Bytecode::StLoc(function_frame.get_local(&v_)?),
         IRBytecode_::Call(m, n, tys) => {
-            let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+            let tokens = Signature(compile_types(
+                context,
+                function_frame.type_parameters(),
+                &tys,
+            )?);
             let type_actuals_id = context.signature_index(tokens)?;
             let fh_idx = context.function_handle(m, n)?.1;
             if tys.is_empty() {
@@ -1643,7 +1857,11 @@ fn compile_bytecode(
             }
         }
         IRBytecode_::Pack(n, tys) => {
-            let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+            let tokens = Signature(compile_types(
+                context,
+                function_frame.type_parameters(),
+                &tys,
+            )?);
             let type_actuals_id = context.signature_index(tokens)?;
             let def_idx = context.struct_definition_index(&n)?;
             if tys.is_empty() {
@@ -1654,7 +1872,11 @@ fn compile_bytecode(
             }
         }
         IRBytecode_::Unpack(n, tys) => {
-            let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+            let tokens = Signature(compile_types(
+                context,
+                function_frame.type_parameters(),
+                &tys,
+            )?);
             let type_actuals_id = context.signature_index(tokens)?;
             let def_idx = context.struct_definition_index(&n)?;
             if tys.is_empty() {
@@ -1667,10 +1889,17 @@ fn compile_bytecode(
         IRBytecode_::ReadRef => Bytecode::ReadRef,
         IRBytecode_::WriteRef => Bytecode::WriteRef,
         IRBytecode_::FreezeRef => Bytecode::FreezeRef,
-        IRBytecode_::MutBorrowLoc(sp!(_, v_)) => Bytecode::MutBorrowLoc(function_frame.get_local(&v_)?),
-        IRBytecode_::ImmBorrowLoc(sp!(_, v_)) => Bytecode::ImmBorrowLoc(function_frame.get_local(&v_)?),
+        IRBytecode_::MutBorrowLoc(sp!(_, v_)) => {
+            Bytecode::MutBorrowLoc(function_frame.get_local(&v_)?)
+        }
+        IRBytecode_::ImmBorrowLoc(sp!(_, v_)) => {
+            Bytecode::ImmBorrowLoc(function_frame.get_local(&v_)?)
+        }
         IRBytecode_::MutBorrowField(name, tys, sp!(_, field_)) => {
-            let qualified_struct_name = QualifiedDatatypeIdent { module: ModuleName::module_self(), name };
+            let qualified_struct_name = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name,
+            };
             let sh_idx = context.datatype_handle_index(qualified_struct_name)?;
             let (def_idx, _, field_offset) = context.field(sh_idx, field_)?;
 
@@ -1678,14 +1907,21 @@ fn compile_bytecode(
             if tys.is_empty() {
                 Bytecode::MutBorrowField(fh_idx)
             } else {
-                let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+                let tokens = Signature(compile_types(
+                    context,
+                    function_frame.type_parameters(),
+                    &tys,
+                )?);
                 let type_actuals_id = context.signature_index(tokens)?;
                 let fi_idx = context.field_instantiation_index(fh_idx, type_actuals_id)?;
                 Bytecode::MutBorrowFieldGeneric(fi_idx)
             }
         }
         IRBytecode_::ImmBorrowField(name, tys, sp!(_, field_)) => {
-            let qualified_struct_name = QualifiedDatatypeIdent { module: ModuleName::module_self(), name };
+            let qualified_struct_name = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name,
+            };
             let sh_idx = context.datatype_handle_index(qualified_struct_name)?;
             let (def_idx, _, field_offset) = context.field(sh_idx, field_)?;
 
@@ -1693,7 +1929,11 @@ fn compile_bytecode(
             if tys.is_empty() {
                 Bytecode::ImmBorrowField(fh_idx)
             } else {
-                let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+                let tokens = Signature(compile_types(
+                    context,
+                    function_frame.type_parameters(),
+                    &tys,
+                )?);
                 let type_actuals_id = context.signature_index(tokens)?;
                 let fi_idx = context.field_instantiation_index(fh_idx, type_actuals_id)?;
                 Bytecode::ImmBorrowFieldGeneric(fi_idx)
@@ -1759,7 +1999,11 @@ fn compile_bytecode(
             let sig = Signature(vec![tokens]);
             Bytecode::VecSwap(context.signature_index(sig)?)
         }
-        IRBytecode_::ErrorConstant { line_number, constant } => {
+        IRBytecode_::ErrorConstant {
+            error_code,
+            line_number,
+            constant,
+        } => {
             let mut bitset_builder = ErrorBitsetBuilder::new(line_number);
 
             if let Some(const_name) = constant {
@@ -1770,17 +2014,29 @@ fn compile_bytecode(
                 // All error constant names will be inserted in bulk when adding constants to the
                 // module, so we can just use the index of the constant name here and don't need to add
                 // anything.
-                let constant_name_value_index = constant_name_as_constant_value_index(context, &const_name)?;
+                let constant_name_value_index =
+                    constant_name_as_constant_value_index(context, &const_name)?;
                 bitset_builder.with_identifier_index(constant_name_value_index.0);
             }
 
-            Bytecode::LdU64(bitset_builder.build().bits)
+            if let Some(error_code) = error_code {
+                bitset_builder.with_error_code(error_code);
+            }
+
+            Bytecode::LdU64(bitset_builder.build().bits())
         }
         IRBytecode_::PackVariant(name, variant_name, tys) => {
-            let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+            let tokens = Signature(compile_types(
+                context,
+                function_frame.type_parameters(),
+                &tys,
+            )?);
             let type_actuals_id = context.signature_index(tokens)?;
             let def_idx = context.enum_definition_index(&name)?;
-            let qualified_enum_name = QualifiedDatatypeIdent { module: ModuleName::module_self(), name };
+            let qualified_enum_name = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name,
+            };
             let dt_idx = context.datatype_handle_index(qualified_enum_name)?;
             let (eh_idx, tag) = context.variant(dt_idx, variant_name)?;
             if tys.is_empty() {
@@ -1793,10 +2049,17 @@ fn compile_bytecode(
             }
         }
         IRBytecode_::UnpackVariant(name, variant_name, tys, unpack_type) => {
-            let tokens = Signature(compile_types(context, function_frame.type_parameters(), &tys)?);
+            let tokens = Signature(compile_types(
+                context,
+                function_frame.type_parameters(),
+                &tys,
+            )?);
             let type_actuals_id = context.signature_index(tokens)?;
             let def_idx = context.enum_definition_index(&name)?;
-            let qualified_enum_name = QualifiedDatatypeIdent { module: ModuleName::module_self(), name };
+            let qualified_enum_name = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name,
+            };
             let dt_idx = context.datatype_handle_index(qualified_enum_name)?;
             let (eh_idx, tag) = context.variant(dt_idx, variant_name)?;
             if tys.is_empty() {
@@ -1818,7 +2081,10 @@ fn compile_bytecode(
         }
         IRBytecode_::VariantSwitch(name, lbls) => {
             let def_idx = context.enum_definition_index(&name)?;
-            let qname = QualifiedDatatypeIdent { module: ModuleName::module_self(), name };
+            let qname = QualifiedDatatypeIdent {
+                module: ModuleName::module_self(),
+                name,
+            };
             let eh_idx = context.datatype_handle_index(qname)?;
             let table_idx = compile_jump_table(context, jump_tables, def_idx, eh_idx, lbls)?;
             Bytecode::VariantSwitch(table_idx)

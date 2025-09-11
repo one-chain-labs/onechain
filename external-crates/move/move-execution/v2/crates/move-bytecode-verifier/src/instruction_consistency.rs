@@ -9,15 +9,8 @@
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode,
-        CodeOffset,
-        CodeUnit,
-        CompiledModule,
-        FieldHandleIndex,
-        FunctionDefinitionIndex,
-        FunctionHandleIndex,
-        StructDefinitionIndex,
-        TableIndex,
+        Bytecode, CodeOffset, CodeUnit, CompiledModule, FieldHandleIndex, FunctionDefinitionIndex,
+        FunctionHandleIndex, StructDefinitionIndex, TableIndex,
     },
 };
 use move_core_types::vm_status::StatusCode;
@@ -39,7 +32,10 @@ impl<'a> InstructionConsistency<'a> {
             match &func_def.code {
                 None => (),
                 Some(code) => {
-                    let checker = Self { resolver, current_function: Some(FunctionDefinitionIndex(idx as TableIndex)) };
+                    let checker = Self {
+                        resolver,
+                        current_function: Some(FunctionDefinitionIndex(idx as TableIndex)),
+                    };
                     checker.check_instructions(code)?
                 }
             }
@@ -132,12 +128,13 @@ impl<'a> InstructionConsistency<'a> {
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
-                FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_) | LdU32(_)
-                | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128
-                | CastU256 | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd
-                | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
-                | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_) | VecImmBorrow(_) | VecMutBorrow(_)
-                | VecPushBack(_) | VecPopBack(_) | VecSwap(_) | Abort | Nop => (),
+                FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_)
+                | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16
+                | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | ReadRef
+                | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl | Shr
+                | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
+                | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_) | VecImmBorrow(_)
+                | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_) | VecSwap(_) | Abort | Nop => (),
                 PackVariant(_)
                 | PackVariantGeneric(_)
                 | UnpackVariant(_)
@@ -147,9 +144,11 @@ impl<'a> InstructionConsistency<'a> {
                 | UnpackVariantMutRef(_)
                 | UnpackVariantGenericMutRef(_)
                 | VariantSwitch(_) => {
-                    return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .at_code_offset(self.current_function(), offset as CodeOffset)
-                        .with_message("Unexpected variant opcode in version 2".to_string()));
+                    return Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .at_code_offset(self.current_function(), offset as CodeOffset)
+                            .with_message("Unexpected variant opcode in version 2".to_string()),
+                    );
                 }
             }
         }
@@ -162,7 +161,12 @@ impl<'a> InstructionConsistency<'a> {
     // a non generic one.
     //
 
-    fn check_field_op(&self, offset: usize, field_handle_index: FieldHandleIndex, generic: bool) -> PartialVMResult<()> {
+    fn check_field_op(
+        &self,
+        offset: usize,
+        field_handle_index: FieldHandleIndex,
+        generic: bool,
+    ) -> PartialVMResult<()> {
         let field_handle = self.resolver.field_handle_at(field_handle_index);
         self.check_type_op(offset, field_handle.owner, generic)
     }
@@ -180,8 +184,10 @@ impl<'a> InstructionConsistency<'a> {
         let struct_def = self.resolver.struct_def_at(struct_def_index);
         let struct_handle = self.resolver.datatype_handle_at(struct_def.struct_handle);
         if struct_handle.type_parameters.is_empty() == generic {
-            return Err(PartialVMError::new(StatusCode::GENERIC_MEMBER_OPCODE_MISMATCH)
-                .at_code_offset(self.current_function(), offset as CodeOffset));
+            return Err(
+                PartialVMError::new(StatusCode::GENERIC_MEMBER_OPCODE_MISMATCH)
+                    .at_code_offset(self.current_function(), offset as CodeOffset),
+            );
         }
         Ok(())
     }
@@ -194,8 +200,10 @@ impl<'a> InstructionConsistency<'a> {
     ) -> PartialVMResult<()> {
         let function_handle = self.resolver.function_handle_at(func_handle_index);
         if function_handle.type_parameters.is_empty() == generic {
-            return Err(PartialVMError::new(StatusCode::GENERIC_MEMBER_OPCODE_MISMATCH)
-                .at_code_offset(self.current_function(), offset as CodeOffset));
+            return Err(
+                PartialVMError::new(StatusCode::GENERIC_MEMBER_OPCODE_MISMATCH)
+                    .at_code_offset(self.current_function(), offset as CodeOffset),
+            );
         }
         Ok(())
     }

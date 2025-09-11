@@ -8,9 +8,7 @@ use clap::Parser;
 use move_binary_format::file_format::CompiledModule;
 use move_coverage::{
     coverage_map::{CoverageMap, TraceMap},
-    format_csv_summary,
-    format_human_summary,
-    summary,
+    format_csv_summary, format_human_summary, summary,
 };
 use std::{
     fs::{self, File},
@@ -57,15 +55,16 @@ fn get_modules(args: &Args) -> Vec<CompiledModule> {
     if let Some(stdlib_path) = &args.stdlib_path {
         let stdlib_modules = fs::read_dir(stdlib_path).unwrap().map(|file| {
             let bytes = fs::read(file.unwrap().path()).unwrap();
-            CompiledModule::deserialize_with_defaults(&bytes).expect("Module blob can't be deserialized")
+            CompiledModule::deserialize_with_defaults(&bytes)
+                .expect("Module blob can't be deserialized")
         });
         modules.extend(stdlib_modules);
     }
 
     if let Some(module_binary_path) = &args.module_binary_path {
         let bytecode_bytes = fs::read(module_binary_path).expect("Unable to read bytecode file");
-        let compiled_module =
-            CompiledModule::deserialize_with_defaults(&bytecode_bytes).expect("Module blob can't be deserialized");
+        let compiled_module = CompiledModule::deserialize_with_defaults(&bytecode_bytes)
+            .expect("Module blob can't be deserialized");
         modules.push(compiled_module);
     }
 
@@ -104,7 +103,12 @@ fn main() {
                 args.summarize_functions,
             )
         } else {
-            format_csv_summary(&modules, &trace_map, summary::summarize_path_cov, &mut summary_writer)
+            format_csv_summary(
+                &modules,
+                &trace_map,
+                summary::summarize_path_cov,
+                &mut summary_writer,
+            )
         }
     } else {
         let coverage_map = if args.is_raw_trace_file {
@@ -122,7 +126,12 @@ fn main() {
                 args.summarize_functions,
             )
         } else {
-            format_csv_summary(&modules, &unified_exec_map, summary::summarize_inst_cov, &mut summary_writer)
+            format_csv_summary(
+                &modules,
+                &unified_exec_map,
+                summary::summarize_inst_cov,
+                &mut summary_writer,
+            )
         }
     }
 }

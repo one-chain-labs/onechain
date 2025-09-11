@@ -1,5 +1,5 @@
 module a::trigger_lint_cases {
-    use one::object::UID;
+    use sui::object::UID;
 
     // 4. Suppress warning
     #[allow(lint(missing_key))]
@@ -8,7 +8,7 @@ module a::trigger_lint_cases {
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

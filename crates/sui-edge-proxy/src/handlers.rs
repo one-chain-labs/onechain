@@ -1,16 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{config::PeerConfig, metrics::AppMetrics};
+use crate::config::{LoggingConfig, PeerConfig};
+use crate::metrics::AppMetrics;
 use axum::{
     body::Body,
     extract::{Request, State},
-    http::{request::Parts, StatusCode},
+    http::request::Parts,
+    http::StatusCode,
     response::Response,
 };
 use bytes::Bytes;
+use rand::Rng;
 use std::time::Instant;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 #[derive(Debug)]
 enum PeerRole {
@@ -33,11 +36,24 @@ pub struct AppState {
     read_peer: PeerConfig,
     execution_peer: PeerConfig,
     metrics: AppMetrics,
+    logging_config: LoggingConfig,
 }
 
 impl AppState {
-    pub fn new(client: reqwest::Client, read_peer: PeerConfig, execution_peer: PeerConfig, metrics: AppMetrics) -> Self {
-        Self { client, read_peer, execution_peer, metrics }
+    pub fn new(
+        client: reqwest::Client,
+        read_peer: PeerConfig,
+        execution_peer: PeerConfig,
+        metrics: AppMetrics,
+        logging_config: LoggingConfig,
+    ) -> Self {
+        Self {
+            client,
+            read_peer,
+            execution_peer,
+            metrics,
+            logging_config,
+        }
     }
 }
 
@@ -57,9 +73,13 @@ pub async fn proxy_handler(
         }
     };
 
-    match parts.headers.get("Client-Request-Method").and_then(|h| h.to_str().ok()) {
+    match parts
+        .headers
+        .get("Client-Request-Method")
+        .and_then(|h| h.to_str().ok())
+    {
         Some("sui_executeTransactionBlock") => {
-            info!("Using execution peer");
+            debug!("Using execution peer");
             proxy_request(state, parts, body_bytes, PeerRole::Execution).await
         }
         _ => {
@@ -70,7 +90,9 @@ pub async fn proxy_handler(
                     return proxy_request(state, parts, body_bytes, PeerRole::Read).await;
                 }
             };
-            if let Some("sui_executeTransactionBlock") = json_body.get("method").and_then(|m| m.as_str()) {
+            if let Some("sui_executeTransactionBlock") =
+                json_body.get("method").and_then(|m| m.as_str())
+            {
                 proxy_request(state, parts, body_bytes, PeerRole::Execution).await
             } else {
                 proxy_request(state, parts, body_bytes, PeerRole::Read).await
@@ -93,6 +115,31 @@ async fn proxy_request(
         body_bytes.len(),
         peer_type
     );
+    if matches!(peer_type, PeerRole::Read) {
+        let user_agent = parts
+            .headers
+            .get("user-agent")
+            .and_then(|h| h.to_str().ok());
+        let is_health_check = matches!(user_agent, Some(ua) if ua.contains("GoogleHC/1.0"));
+        let is_grafana_agent = matches!(user_agent, Some(ua) if ua.contains("GrafanaAgent"));
+        let is_grpc = parts
+            .headers
+            .get("content-type")
+            .and_then(|h| h.to_str().ok())
+            .map(|ct| ct.contains("grpc"))
+            .unwrap_or(false);
+
+        let should_sample = !is_health_check && !is_grafana_agent && !is_grpc;
+        let rate = state.logging_config.read_request_sample_rate;
+        if should_sample && rand::thread_rng().gen::<f64>() < rate {
+            tracing::info!(
+                headers = ?parts.headers,
+                body = ?body_bytes,
+                peer_type = ?peer_type,
+                "Sampled read request"
+            );
+        }
+    }
 
     let metrics = &state.metrics;
     let peer_type_str = peer_type.as_str();
@@ -100,7 +147,10 @@ async fn proxy_request(
     let timer_histogram = metrics.request_latency.with_label_values(&[peer_type_str]);
     let _timer = timer_histogram.start_timer();
 
-    metrics.request_size_bytes.with_label_values(&[peer_type_str]).observe(body_bytes.len() as f64);
+    metrics
+        .request_size_bytes
+        .with_label_values(&[peer_type_str])
+        .observe(body_bytes.len() as f64);
 
     let peer_config = match peer_type {
         PeerRole::Read => &state.read_peer,
@@ -116,7 +166,11 @@ async fn proxy_request(
     // remove host header to avoid interfering with reqwest auto-host header
     let mut headers = parts.headers.clone();
     headers.remove("host");
-    let request_builder = state.client.request(parts.method.clone(), target_url).headers(headers).body(body_bytes);
+    let request_builder = state
+        .client
+        .request(parts.method.clone(), target_url)
+        .headers(headers)
+        .body(body_bytes.clone());
     debug!("Request builder: {:?}", request_builder);
 
     let upstream_start = Instant::now();
@@ -127,7 +181,10 @@ async fn proxy_request(
                 .upstream_response_latency
                 .with_label_values(&[peer_type_str, &status])
                 .observe(upstream_start.elapsed().as_secs_f64());
-            metrics.requests_total.with_label_values(&[peer_type_str, &status]).inc();
+            metrics
+                .requests_total
+                .with_label_values(&[peer_type_str, &status])
+                .inc();
             debug!("Response: {:?}", response);
             response
         }
@@ -137,9 +194,15 @@ async fn proxy_request(
                 .upstream_response_latency
                 .with_label_values(&[peer_type_str, "error"])
                 .observe(upstream_start.elapsed().as_secs_f64());
-            metrics.requests_total.with_label_values(&[peer_type_str, "error"]).inc();
+            metrics
+                .requests_total
+                .with_label_values(&[peer_type_str, "error"])
+                .inc();
             if e.is_timeout() {
-                metrics.timeouts_total.with_label_values(&[peer_type_str]).inc();
+                metrics
+                    .timeouts_total
+                    .with_label_values(&[peer_type_str])
+                    .inc();
             }
             return Err((StatusCode::BAD_GATEWAY, format!("Request failed: {}", e)));
         }
@@ -150,11 +213,20 @@ async fn proxy_request(
         Ok(bytes) => bytes,
         Err(e) => {
             warn!("Failed to read response body: {}", e);
-            metrics.error_counts.with_label_values(&[peer_type_str, "response_body_read"]).inc();
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to read response body".to_string()));
+            metrics
+                .error_counts
+                .with_label_values(&[peer_type_str, "response_body_read"])
+                .inc();
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to read response body".to_string(),
+            ));
         }
     };
-    metrics.response_size_bytes.with_label_values(&[peer_type_str]).observe(response_bytes.len() as f64);
+    metrics
+        .response_size_bytes
+        .with_label_values(&[peer_type_str])
+        .observe(response_bytes.len() as f64);
 
     let mut resp = Response::new(response_bytes.into());
     for (name, value) in response_headers {
@@ -162,5 +234,6 @@ async fn proxy_request(
             resp.headers_mut().insert(name, value);
         }
     }
+
     Ok(resp)
 }

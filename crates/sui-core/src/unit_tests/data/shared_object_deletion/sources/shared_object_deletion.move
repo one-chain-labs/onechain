@@ -4,9 +4,9 @@
 
 module shared_object_deletion::o2 {
     use std::vector;
-    use one::object::{Self, UID};
-    use one::transfer;
-    use one::tx_context::{Self, TxContext};
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
 
     public struct Obj has key, store {
         id: UID,

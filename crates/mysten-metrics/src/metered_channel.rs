@@ -27,14 +27,20 @@ pub struct Sender<T> {
 
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), gauge: self.gauge.clone() }
+        Self {
+            inner: self.inner.clone(),
+            gauge: self.gauge.clone(),
+        }
     }
 }
 
 impl<T> Sender<T> {
     pub fn downgrade(&self) -> WeakSender<T> {
         let sender = self.inner.downgrade();
-        WeakSender { inner: sender, gauge: self.gauge.clone() }
+        WeakSender {
+            inner: sender,
+            gauge: self.gauge.clone(),
+        }
     }
 }
 
@@ -48,13 +54,19 @@ pub struct WeakSender<T> {
 
 impl<T> Clone for WeakSender<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), gauge: self.gauge.clone() }
+        Self {
+            inner: self.inner.clone(),
+            gauge: self.gauge.clone(),
+        }
     }
 }
 
 impl<T> WeakSender<T> {
     pub fn upgrade(&self) -> Option<Sender<T>> {
-        self.inner.upgrade().map(|s| Sender { inner: s, gauge: self.gauge.clone() })
+        self.inner.upgrade().map(|s| Sender {
+            inner: s,
+            gauge: self.gauge.clone(),
+        })
     }
 }
 
@@ -136,7 +148,10 @@ pub struct Permit<'a, T> {
 
 impl<'a, T> Permit<'a, T> {
     pub fn new(permit: mpsc::Permit<'a, T>, gauge_ref: &'a IntGauge) -> Permit<'a, T> {
-        Permit { permit: Some(permit), gauge_ref }
+        Permit {
+            permit: Some(permit),
+            gauge_ref,
+        }
     }
 
     pub fn send(mut self, value: T) {
@@ -147,7 +162,7 @@ impl<'a, T> Permit<'a, T> {
     }
 }
 
-impl<'a, T> Drop for Permit<'a, T> {
+impl<T> Drop for Permit<'_, T> {
     fn drop(&mut self) {
         // in the case the permit is dropped without sending, we still want to decrease the occupancy of the channel
         if self.permit.is_some() {
@@ -160,7 +175,10 @@ impl<T> Sender<T> {
     /// Sends a value, waiting until there is capacity.
     /// Increments the gauge in case of a successful `send`.
     pub async fn send(&self, value: T) -> Result<(), SendError<T>> {
-        self.inner.send(value).inspect_ok(|_| self.gauge.inc()).await
+        self.inner
+            .send(value)
+            .inspect_ok(|_| self.gauge.inc())
+            .await
     }
 
     /// Completes when the receiver has dropped.
@@ -235,11 +253,10 @@ impl<T> Sender<T> {
 }
 
 ////////////////////////////////
-/// Stream API Wrappers!
+// Stream API Wrappers!
 ////////////////////////////////
 
 /// A wrapper around [`crate::metered_channel::Receiver`] that implements [`Stream`].
-///
 #[derive(Debug)]
 pub struct ReceiverStream<T> {
     inner: Receiver<T>,
@@ -265,7 +282,10 @@ impl<T> ReceiverStream<T> {
 impl<T> Stream for ReceiverStream<T> {
     type Item = T;
 
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
         self.inner.poll_recv(cx)
     }
 }
@@ -292,7 +312,7 @@ impl<T> From<Receiver<T>> for ReceiverStream<T> {
 // TODO: add prom metrics reporting for gauge and migrate all existing use cases.
 
 ////////////////////////////////////////////////////////////////
-/// Constructor
+// Constructor
 ////////////////////////////////////////////////////////////////
 
 /// Similar to `mpsc::channel`, `channel` creates a pair of `Sender` and `Receiver`
@@ -301,19 +321,39 @@ impl<T> From<Receiver<T>> for ReceiverStream<T> {
 pub fn channel<T>(size: usize, gauge: &IntGauge) -> (Sender<T>, Receiver<T>) {
     gauge.set(0);
     let (sender, receiver) = mpsc::channel(size);
-    (Sender { inner: sender, gauge: gauge.clone() }, Receiver { inner: receiver, gauge: gauge.clone(), total: None })
+    (
+        Sender {
+            inner: sender,
+            gauge: gauge.clone(),
+        },
+        Receiver {
+            inner: receiver,
+            gauge: gauge.clone(),
+            total: None,
+        },
+    )
 }
 
 /// Deprecated: use `monitored_mpsc::channel` instead.
 #[track_caller]
-pub fn channel_with_total<T>(size: usize, gauge: &IntGauge, total_gauge: &IntCounter) -> (Sender<T>, Receiver<T>) {
+pub fn channel_with_total<T>(
+    size: usize,
+    gauge: &IntGauge,
+    total_gauge: &IntCounter,
+) -> (Sender<T>, Receiver<T>) {
     gauge.set(0);
     let (sender, receiver) = mpsc::channel(size);
-    (Sender { inner: sender, gauge: gauge.clone() }, Receiver {
-        inner: receiver,
-        gauge: gauge.clone(),
-        total: Some(total_gauge.clone()),
-    })
+    (
+        Sender {
+            inner: sender,
+            gauge: gauge.clone(),
+        },
+        Receiver {
+            inner: receiver,
+            gauge: gauge.clone(),
+            total: Some(total_gauge.clone()),
+        },
+    )
 }
 
 #[async_trait]

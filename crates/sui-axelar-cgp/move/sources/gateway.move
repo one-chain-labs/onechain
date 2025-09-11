@@ -32,7 +32,7 @@ module axelar::gateway {
     use std::string::{Self, String};
     use std::vector;
 
-    use one::bcs;
+    use sui::bcs;
 
     use axelar::utils::to_sui_signed;
     use axelar::channel::{Self, Channel, ApprovedCall};
@@ -162,7 +162,7 @@ module axelar::gateway {
         destination_address: vector<u8>,
         payload: vector<u8>
     ) {
-        one::event::emit(ContractCall {
+        sui::event::emit(ContractCall {
             source: channel::source_id(channel),
             destination,
             destination_address,
@@ -173,7 +173,7 @@ module axelar::gateway {
     #[test_only]
     use axelar::utils::operators_hash;
     #[test_only]
-    use one::vec_map;
+    use sui::vec_map;
 
     #[test_only]
     /// Test call approval for the `test_execute` test.
@@ -187,7 +187,7 @@ module axelar::gateway {
     /// Tests execution with a set of validators.
     /// Samples for this test are generated with the `presets/` application.
     fun test_execute() {
-        use one::test_scenario::{Self as ts, ctx};
+        use sui::test_scenario::{Self as ts, ctx};
 
         // public keys of `operators`
         let epoch = 1;
@@ -217,7 +217,7 @@ module axelar::gateway {
 
     #[test]
     fun test_transfer_operatorship() {
-        use one::test_scenario::{Self as ts, ctx};
+        use sui::test_scenario::{Self as ts, ctx};
         // public keys of `operators`
         let epoch = 1;
         let operators = vector[

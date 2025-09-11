@@ -7,27 +7,16 @@ use crate::{
     abstract_state::{AbstractState, AbstractValue, BorrowState, Mutability},
     config::ALLOW_MEMORY_UNSAFE,
     error::VMError,
-    get_struct_handle_from_reference,
-    get_type_actuals_from_reference,
-    substitute,
+    get_struct_handle_from_reference, get_type_actuals_from_reference, substitute,
 };
 use move_binary_format::file_format::{
-    Ability,
-    AbilitySet,
-    FieldHandleIndex,
-    FieldInstantiationIndex,
-    FunctionHandleIndex,
-    FunctionInstantiationIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken,
-    StructDefInstantiationIndex,
-    StructDefinitionIndex,
-    StructFieldInformation,
+    Ability, AbilitySet, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
+    FunctionInstantiationIndex, Signature, SignatureIndex, SignatureToken,
+    StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
 };
 
 use move_binary_format::file_format::TableIndex;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 //---------------------------------------------------------------------------
 // Type Instantiations from Unification with the Abstract Stack
@@ -68,7 +57,10 @@ impl Subst {
             (SignatureToken::TypeParameter(_), _) => false,
             (SignatureToken::Datatype(sig1), SignatureToken::Datatype(sig2)) => sig1 == sig2,
             // Build a substitution from recursing into structs
-            (SignatureToken::DatatypeInstantiation(inst1), SignatureToken::DatatypeInstantiation(inst2)) => {
+            (
+                SignatureToken::DatatypeInstantiation(inst1),
+                SignatureToken::DatatypeInstantiation(inst2),
+            ) => {
                 let (sig1, params1) = *inst1;
                 let (sig2, params2) = *inst2;
                 if sig1 != sig2 {
@@ -100,15 +92,25 @@ impl Subst {
 
 /// Given a signature token, returns the abilities of this token in the module context, and
 /// instantiation for the function.
-pub fn abilities_for_token(state: &AbstractState, token: &SignatureToken, type_paramters: &[AbilitySet]) -> AbilitySet {
+pub fn abilities_for_token(
+    state: &AbstractState,
+    token: &SignatureToken,
+    type_paramters: &[AbilitySet],
+) -> AbilitySet {
     abilities(&state.module.module, token, type_paramters)
 }
 
 /// Given a locals signature index, determine the abilities for each signature token. Restricted for
 /// determining abilities at the top-level only. This is reflected in the use of
 /// `state.instantiation[..]` as the kind context.
-pub fn abilities_for_instantiation(state: &AbstractState, instantiation: &[SignatureToken]) -> Vec<AbilitySet> {
-    instantiation.iter().map(|token| abilities(&state.module.module, token, &state.instantiation[..])).collect()
+pub fn abilities_for_instantiation(
+    state: &AbstractState,
+    instantiation: &[SignatureToken],
+) -> Vec<AbilitySet> {
+    instantiation
+        .iter()
+        .map(|token| abilities(&state.module.module, token, &state.instantiation[..]))
+        .collect()
 }
 
 /// Determine whether the stack contains an integer value at given index.
@@ -123,36 +125,105 @@ pub fn stack_has_integer(state: &AbstractState, index: usize) -> bool {
 pub fn stack_top_is_castable_to(state: &AbstractState, typ: SignatureToken) -> bool {
     stack_has_integer(state, 0)
         && match typ {
-            SignatureToken::U8 => stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U8))),
+            SignatureToken::U8 => stack_has(
+                state,
+                0,
+                Some(AbstractValue::new_primitive(SignatureToken::U8)),
+            ),
             SignatureToken::U64 => {
-                stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U8)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U16)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U32)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U64)))
+                stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U8)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U16)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U32)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U64)),
+                )
             }
             SignatureToken::U16 => {
-                stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U8)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U16)))
+                stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U8)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U16)),
+                )
             }
             SignatureToken::U32 => {
-                stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U8)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U16)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U32)))
+                stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U8)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U16)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U32)),
+                )
             }
             SignatureToken::U128 => {
-                stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U8)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U16)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U32)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U64)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U128)))
+                stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U8)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U16)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U32)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U64)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U128)),
+                )
             }
             SignatureToken::U256 => {
-                stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U8)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U16)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U32)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U64)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U128)))
-                    || stack_has(state, 0, Some(AbstractValue::new_primitive(SignatureToken::U256)))
+                stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U8)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U16)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U32)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U64)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U128)),
+                ) || stack_has(
+                    state,
+                    0,
+                    Some(AbstractValue::new_primitive(SignatureToken::U256)),
+                )
             }
             SignatureToken::Bool
             | SignatureToken::Address
@@ -190,7 +261,9 @@ pub fn stack_has_all_abilities(state: &AbstractState, index: usize, abilities: A
 
 /// Check whether the local at `index` has the given ability
 pub fn local_has_ability(state: &AbstractState, index: u8, ability: Ability) -> bool {
-    state.local_has_ability(index as usize, ability).unwrap_or(false)
+    state
+        .local_has_ability(index as usize, ability)
+        .unwrap_or(false)
 }
 
 //---------------------------------------------------------------------------
@@ -199,9 +272,15 @@ pub fn local_has_ability(state: &AbstractState, index: u8, ability: Ability) -> 
 
 /// Determine whether the stack is at least of size `index`. If the optional `abstract_value`
 /// argument is some `AbstractValue`, check whether the type at `index` is that abstract_value.
-pub fn stack_has(state: &AbstractState, index: usize, abstract_value: Option<AbstractValue>) -> bool {
+pub fn stack_has(
+    state: &AbstractState,
+    index: usize,
+    abstract_value: Option<AbstractValue>,
+) -> bool {
     match abstract_value {
-        Some(abstract_value) => index < state.stack_len() && state.stack_peek(index) == Some(abstract_value),
+        Some(abstract_value) => {
+            index < state.stack_len() && state.stack_peek(index) == Some(abstract_value)
+        }
         None => index < state.stack_len(),
     }
 }
@@ -209,7 +288,8 @@ pub fn stack_has(state: &AbstractState, index: usize, abstract_value: Option<Abs
 /// Determine whether two tokens on the stack have the same type
 pub fn stack_has_polymorphic_eq(state: &AbstractState, index1: usize, index2: usize) -> bool {
     if stack_has(state, index2, None) {
-        state.stack_peek(index1) == state.stack_peek(index2) && stack_has_ability(state, index1, Ability::Drop)
+        state.stack_peek(index1) == state.stack_peek(index2)
+            && stack_has_ability(state, index1, Ability::Drop)
     } else {
         false
     }
@@ -233,7 +313,9 @@ pub fn local_exists(state: &AbstractState, index: u8) -> bool {
 
 /// Check whether the local at `index` is of the given availability
 pub fn local_availability_is(state: &AbstractState, index: u8, availability: BorrowState) -> bool {
-    state.local_availability_is(index as usize, availability).unwrap_or(false)
+    state
+        .local_availability_is(index as usize, availability)
+        .unwrap_or(false)
 }
 
 /// Determine whether an abstract value on the stack that is a reference points to something of the
@@ -286,7 +368,10 @@ pub enum StackBinOpResult {
 }
 
 /// Perform a binary operation using the top two values on the stack as operands.
-pub fn stack_bin_op(state: &AbstractState, res: StackBinOpResult) -> Result<AbstractState, VMError> {
+pub fn stack_bin_op(
+    state: &AbstractState,
+    res: StackBinOpResult,
+) -> Result<AbstractState, VMError> {
     let mut state = state.clone();
     let right = {
         state.stack_pop()?;
@@ -305,7 +390,10 @@ pub fn stack_bin_op(state: &AbstractState, res: StackBinOpResult) -> Result<Abst
 }
 
 /// Push given abstract_value to the top of the stack.
-pub fn stack_push(state: &AbstractState, abstract_value: AbstractValue) -> Result<AbstractState, VMError> {
+pub fn stack_push(
+    state: &AbstractState,
+    abstract_value: AbstractValue,
+) -> Result<AbstractState, VMError> {
     let mut state = state.clone();
     state.stack_push(abstract_value);
     Ok(state)
@@ -319,7 +407,11 @@ pub fn stack_push_register(state: &AbstractState) -> Result<AbstractState, VMErr
 }
 
 /// Set the availability of local at `index`
-pub fn local_set(state: &AbstractState, index: u8, availability: BorrowState) -> Result<AbstractState, VMError> {
+pub fn local_set(
+    state: &AbstractState,
+    index: u8,
+    availability: BorrowState,
+) -> Result<AbstractState, VMError> {
     let mut state = state.clone();
     state.local_set(index as usize, availability)?;
     Ok(state)
@@ -333,7 +425,11 @@ pub fn local_take(state: &AbstractState, index: u8) -> Result<AbstractState, VME
 }
 
 /// Put reference to local at `index` in register
-pub fn local_take_borrow(state: &AbstractState, index: u8, mutability: Mutability) -> Result<AbstractState, VMError> {
+pub fn local_take_borrow(
+    state: &AbstractState,
+    index: u8,
+    mutability: Mutability,
+) -> Result<AbstractState, VMError> {
     let mut state = state.clone();
     state.local_take_borrow(index as usize, mutability)?;
     Ok(state)
@@ -374,14 +470,25 @@ pub fn stack_satisfies_struct_signature(
 ) -> (bool, Subst) {
     let instantiation = instantiation.map(|index| state.module.instantiantiation_at(index));
     let struct_def = state.module.module.struct_def_at(struct_index);
-    let shandle = state.module.module.datatype_handle_at(struct_def.struct_handle);
+    let shandle = state
+        .module
+        .module
+        .datatype_handle_at(struct_def.struct_handle);
     // Get the type formals for the struct, and the kinds that they expect.
     let type_parameters = shandle.type_parameters.clone();
-    let field_tokens = struct_def.fields().into_iter().flatten().map(|field| &field.signature.0);
+    let field_tokens = struct_def
+        .fields()
+        .into_iter()
+        .flatten()
+        .map(|field| &field.signature.0);
     let mut satisfied = true;
     let mut substitution = Subst::new();
     for (i, token) in field_tokens.rev().enumerate() {
-        let ty = if let Some(subst) = &instantiation { substitute(token, subst) } else { token.clone() };
+        let ty = if let Some(subst) = &instantiation {
+            substitute(token, subst)
+        } else {
+            token.clone()
+        };
         let has = if let SignatureToken::TypeParameter(idx) = &ty {
             if stack_has_all_abilities(state, i, type_parameters[*idx as usize].constraints) {
                 let stack_tok = state.stack_peek(i).unwrap();
@@ -395,7 +502,10 @@ pub fn stack_satisfies_struct_signature(
                 abilities: abilities(
                     &state.module.module,
                     token,
-                    &type_parameters.iter().map(|param| param.constraints).collect::<Vec<_>>(),
+                    &type_parameters
+                        .iter()
+                        .map(|param| param.constraints)
+                        .collect::<Vec<_>>(),
                 ),
             };
             stack_has(state, i, Some(abstract_value))
@@ -415,12 +525,21 @@ pub fn get_struct_instantiation_for_state(
 ) -> (StructDefinitionIndex, Vec<SignatureToken>) {
     let struct_inst = state.module.struct_instantiantiation_at(struct_inst_idx);
     if exact {
-        return (struct_inst.def, state.module.instantiantiation_at(struct_inst.type_parameters).clone());
+        return (
+            struct_inst.def,
+            state
+                .module
+                .instantiantiation_at(struct_inst.type_parameters)
+                .clone(),
+        );
     }
     let struct_index = struct_inst.def;
     let mut partial_instantiation = stack_satisfies_struct_signature(state, struct_index, None).1;
     let struct_def = state.module.module.struct_def_at(struct_index);
-    let shandle = state.module.module.datatype_handle_at(struct_def.struct_handle);
+    let shandle = state
+        .module
+        .module
+        .datatype_handle_at(struct_def.struct_handle);
     let typs = &shandle.type_parameters;
     for (index, type_param) in typs.iter().enumerate() {
         if let Entry::Vacant(e) = partial_instantiation.subst.entry(index) {
@@ -469,7 +588,10 @@ pub fn stack_has_struct(state: &AbstractState, struct_index: StructDefinitionInd
     false
 }
 
-pub fn stack_has_struct_inst(state: &AbstractState, struct_index: StructDefInstantiationIndex) -> bool {
+pub fn stack_has_struct_inst(
+    state: &AbstractState,
+    struct_index: StructDefInstantiationIndex,
+) -> bool {
     let struct_inst = state.module.module.struct_instantiation_at(struct_index);
     stack_has_struct(state, struct_inst.def)
 }
@@ -481,28 +603,48 @@ pub fn struct_abilities(
     type_args: &Signature,
 ) -> AbilitySet {
     let struct_def = state.module.module.struct_def_at(struct_index);
-    let struct_handle = state.module.module.datatype_handle_at(struct_def.struct_handle);
-    let declared_phantom_parameters = struct_handle.type_parameters.iter().map(|param| param.is_phantom);
+    let struct_handle = state
+        .module
+        .module
+        .datatype_handle_at(struct_def.struct_handle);
+    let declared_phantom_parameters = struct_handle
+        .type_parameters
+        .iter()
+        .map(|param| param.is_phantom);
     let type_argument_abilities = abilities_for_instantiation(state, &type_args.0);
-    AbilitySet::polymorphic_abilities(struct_handle.abilities, declared_phantom_parameters, type_argument_abilities)
-        .unwrap()
+    AbilitySet::polymorphic_abilities(
+        struct_handle.abilities,
+        declared_phantom_parameters,
+        type_argument_abilities,
+    )
+    .unwrap()
 }
 
-pub fn struct_inst_abilities(state: &AbstractState, struct_index: StructDefInstantiationIndex) -> AbilitySet {
+pub fn struct_inst_abilities(
+    state: &AbstractState,
+    struct_index: StructDefInstantiationIndex,
+) -> AbilitySet {
     let struct_inst = state.module.module.struct_instantiation_at(struct_index);
-    let type_args = state.module.module.signature_at(struct_inst.type_parameters);
+    let type_args = state
+        .module
+        .module
+        .signature_at(struct_inst.type_parameters);
     struct_abilities(state, struct_inst.def, type_args)
 }
 
-pub fn stack_struct_has_field_inst(state: &AbstractState, field_index: FieldInstantiationIndex) -> bool {
+pub fn stack_struct_has_field_inst(
+    state: &AbstractState,
+    field_index: FieldInstantiationIndex,
+) -> bool {
     let field_inst = state.module.module.field_instantiation_at(field_index);
     stack_struct_has_field(state, field_inst.handle)
 }
 
 pub fn stack_struct_has_field(state: &AbstractState, field_index: FieldHandleIndex) -> bool {
     let field_handle = state.module.module.field_handle_at(field_index);
-    if let Some(struct_handle_index) =
-        state.stack_peek(0).and_then(|abstract_value| get_struct_handle_from_reference(&abstract_value.token))
+    if let Some(struct_handle_index) = state
+        .stack_peek(0)
+        .and_then(|abstract_value| get_struct_handle_from_reference(&abstract_value.token))
     {
         let struct_def = state.module.module.struct_def_at(field_handle.owner);
         return struct_handle_index == struct_def.struct_handle;
@@ -549,13 +691,19 @@ pub fn stack_struct_inst_popn(
     state: &AbstractState,
     struct_inst_index: StructDefInstantiationIndex,
 ) -> Result<AbstractState, VMError> {
-    let struct_inst = state.module.module.struct_instantiation_at(struct_inst_index);
+    let struct_inst = state
+        .module
+        .module
+        .struct_instantiation_at(struct_inst_index);
     stack_struct_popn(state, struct_inst.def)
 }
 
 /// Pop the number of stack values required to construct the struct
 /// at `struct_index`
-pub fn stack_struct_popn(state: &AbstractState, struct_index: StructDefinitionIndex) -> Result<AbstractState, VMError> {
+pub fn stack_struct_popn(
+    state: &AbstractState,
+    struct_index: StructDefinitionIndex,
+) -> Result<AbstractState, VMError> {
     let state_copy = state.clone();
     let mut state = state.clone();
     let struct_def = state_copy.module.module.struct_def_at(struct_index);
@@ -588,7 +736,10 @@ pub fn create_struct(
         None => SignatureToken::Datatype(struct_def.struct_handle),
         Some(inst) => {
             let ty_instantiation = state.module.instantiantiation_at(inst);
-            SignatureToken::DatatypeInstantiation(Box::new((struct_def.struct_handle, ty_instantiation.clone())))
+            SignatureToken::DatatypeInstantiation(Box::new((
+                struct_def.struct_handle,
+                ty_instantiation.clone(),
+            )))
         }
     };
     let struct_kind = abilities_for_token(&state, &sig_tok, &state.instantiation);
@@ -597,7 +748,9 @@ pub fn create_struct(
     Ok(state)
 }
 
-pub fn stack_unpack_struct_instantiation(state: &AbstractState) -> (StructDefinitionIndex, Vec<SignatureToken>) {
+pub fn stack_unpack_struct_instantiation(
+    state: &AbstractState,
+) -> (StructDefinitionIndex, Vec<SignatureToken>) {
     if let Some(av) = state.stack_peek(0) {
         match av.token {
             SignatureToken::DatatypeInstantiation(inst) => {
@@ -658,7 +811,11 @@ pub fn stack_unpack_struct(
     };
     let abilities = abilities_for_instantiation(&state_copy, &ty_instantiation);
     let struct_def = state_copy.module.module.struct_def_at(struct_index);
-    let tokens = struct_def.fields().into_iter().flatten().map(|field| &field.signature.0);
+    let tokens = struct_def
+        .fields()
+        .into_iter()
+        .flatten()
+        .map(|field| &field.signature.0);
     for token in tokens {
         let abstract_value = AbstractValue {
             token: substitute(token, &ty_instantiation),
@@ -725,11 +882,17 @@ pub fn register_dereference(state: &AbstractState) -> Result<AbstractState, VMEr
     if let Some(abstract_value) = state.register_move() {
         match abstract_value.token {
             SignatureToken::MutableReference(token) => {
-                state.register_set(AbstractValue { token: *token, abilities: abstract_value.abilities });
+                state.register_set(AbstractValue {
+                    token: *token,
+                    abilities: abstract_value.abilities,
+                });
                 Ok(state)
             }
             SignatureToken::Reference(token) => {
-                state.register_set(AbstractValue { token: *token, abilities: abstract_value.abilities });
+                state.register_set(AbstractValue {
+                    token: *token,
+                    abilities: abstract_value.abilities,
+                });
                 Ok(state)
             }
             SignatureToken::Bool
@@ -744,7 +907,9 @@ pub fn register_dereference(state: &AbstractState) -> Result<AbstractState, VMEr
             | SignatureToken::TypeParameter(_)
             | SignatureToken::U16
             | SignatureToken::U32
-            | SignatureToken::U256 => Err(VMError::new("Register does not contain a reference".to_string())),
+            | SignatureToken::U256 => Err(VMError::new(
+                "Register does not contain a reference".to_string(),
+            )),
         }
     } else {
         println!("{:?}", state);
@@ -753,7 +918,10 @@ pub fn register_dereference(state: &AbstractState) -> Result<AbstractState, VMEr
 }
 
 /// Push a reference to a register value with the given mutability.
-pub fn stack_push_register_borrow(state: &AbstractState, mutability: Mutability) -> Result<AbstractState, VMError> {
+pub fn stack_push_register_borrow(
+    state: &AbstractState,
+    mutability: Mutability,
+) -> Result<AbstractState, VMError> {
     let mut state = state.clone();
     if let Some(abstract_value) = state.register_move() {
         match mutability {
@@ -784,7 +952,10 @@ pub fn stack_push_register_borrow(state: &AbstractState, mutability: Mutability)
 
 /// Determine whether the function at the given index can be constructed from the values on
 /// the stack.
-pub fn stack_satisfies_function_signature(state: &AbstractState, function_index: FunctionHandleIndex) -> (bool, Subst) {
+pub fn stack_satisfies_function_signature(
+    state: &AbstractState,
+    function_index: FunctionHandleIndex,
+) -> (bool, Subst) {
     let state_copy = state.clone();
     let function_handle = state_copy.module.module.function_handle_at(function_index);
     let type_parameters = &function_handle.type_parameters;
@@ -801,7 +972,10 @@ pub fn stack_satisfies_function_signature(state: &AbstractState, function_index:
             }
         } else {
             let abilities = abilities(&state.module.module, parameter, type_parameters);
-            let abstract_value = AbstractValue { token: parameter.clone(), abilities };
+            let abstract_value = AbstractValue {
+                token: parameter.clone(),
+                abilities,
+            };
             stack_has(state, i, Some(abstract_value))
         };
         if !has {
@@ -815,7 +989,10 @@ pub fn stack_satisfies_function_inst_signature(
     state: &AbstractState,
     function_index: FunctionInstantiationIndex,
 ) -> (bool, Subst) {
-    let func_inst = state.module.module.function_instantiation_at(function_index);
+    let func_inst = state
+        .module
+        .module
+        .function_instantiation_at(function_index);
     stack_satisfies_function_signature(state, func_inst.handle)
 }
 
@@ -853,7 +1030,10 @@ pub fn stack_function_inst_call(
     state: &AbstractState,
     function_index: FunctionInstantiationIndex,
 ) -> Result<AbstractState, VMError> {
-    let func_inst = state.module.module.function_instantiation_at(function_index);
+    let func_inst = state
+        .module
+        .module
+        .function_instantiation_at(function_index);
     stack_function_call(state, func_inst.handle, Some(func_inst.type_parameters))
 }
 
@@ -861,7 +1041,10 @@ pub fn get_function_instantiation_for_state(
     state: &AbstractState,
     function_index: FunctionInstantiationIndex,
 ) -> (FunctionHandleIndex, Vec<SignatureToken>) {
-    let func_inst = state.module.module.function_instantiation_at(function_index);
+    let func_inst = state
+        .module
+        .module
+        .function_instantiation_at(function_index);
     let mut partial_instantiation = stack_satisfies_function_signature(state, func_inst.handle).1;
     let function_handle = state.module.module.function_handle_at(func_inst.handle);
     let typs = &function_handle.type_parameters;
@@ -898,7 +1081,10 @@ pub fn stack_function_inst_popn(
     state: &AbstractState,
     function_index: FunctionInstantiationIndex,
 ) -> Result<AbstractState, VMError> {
-    let func_inst = state.module.module.function_instantiation_at(function_index);
+    let func_inst = state
+        .module
+        .module
+        .function_instantiation_at(function_index);
     stack_function_popn(state, func_inst.handle)
 }
 
@@ -1160,7 +1346,14 @@ macro_rules! state_stack_unpack_struct_inst {
 #[macro_export]
 macro_rules! state_struct_has_key {
     ($e: expr) => {
-        Box::new(move |state| struct_abilities(state, $e, &move_binary_format::file_format::Signature(vec![])).has_key())
+        Box::new(move |state| {
+            struct_abilities(
+                state,
+                $e,
+                &move_binary_format::file_format::Signature(vec![]),
+            )
+            .has_key()
+        })
     };
 }
 
@@ -1358,7 +1551,11 @@ macro_rules! unpack_instantiation_for_state {
 macro_rules! with_ty_param {
     (($is_exact: expr, $struct_inst_idx: expr) => $s_inst_idx:ident, $body:expr) => {
         Box::new(move |$s_inst_idx| {
-            let $s_inst_idx = if $is_exact { $struct_inst_idx } else { $s_inst_idx };
+            let $s_inst_idx = if $is_exact {
+                $struct_inst_idx
+            } else {
+                $s_inst_idx
+            };
             $body
         })
     };

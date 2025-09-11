@@ -2,19 +2,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-pub use bridge::{BridgeReadApiClient, BridgeReadApiOpenRpc, BridgeReadApiServer};
-pub use coin::{CoinReadApiClient, CoinReadApiOpenRpc, CoinReadApiServer};
-pub use extended::{ExtendedApiClient, ExtendedApiOpenRpc, ExtendedApiServer};
-pub use governance::{GovernanceReadApiClient, GovernanceReadApiOpenRpc, GovernanceReadApiServer};
-pub use indexer::{IndexerApiClient, IndexerApiOpenRpc, IndexerApiServer};
-pub use move_utils::{MoveUtilsClient, MoveUtilsOpenRpc, MoveUtilsServer};
+pub use bridge::BridgeReadApiClient;
+pub use bridge::BridgeReadApiOpenRpc;
+pub use bridge::BridgeReadApiServer;
+pub use coin::CoinReadApiClient;
+pub use coin::CoinReadApiOpenRpc;
+pub use coin::CoinReadApiServer;
+pub use extended::ExtendedApiClient;
+pub use extended::ExtendedApiOpenRpc;
+pub use extended::ExtendedApiServer;
+pub use governance::GovernanceReadApiClient;
+pub use governance::GovernanceReadApiOpenRpc;
+pub use governance::GovernanceReadApiServer;
+pub use indexer::IndexerApiClient;
+pub use indexer::IndexerApiOpenRpc;
+pub use indexer::IndexerApiServer;
+pub use move_utils::MoveUtilsClient;
+pub use move_utils::MoveUtilsOpenRpc;
+pub use move_utils::MoveUtilsServer;
 use once_cell::sync::Lazy;
-use prometheus::{register_histogram_with_registry, register_int_counter_with_registry, Histogram, IntCounter};
-pub use read::{ReadApiClient, ReadApiOpenRpc, ReadApiServer};
+use prometheus::register_histogram_with_registry;
+use prometheus::Histogram;
+use prometheus::{register_int_counter_with_registry, IntCounter};
+pub use read::ReadApiClient;
+pub use read::ReadApiOpenRpc;
+pub use read::ReadApiServer;
 use tap::TapFallible;
 use tracing::warn;
-pub use transaction_builder::{TransactionBuilderClient, TransactionBuilderOpenRpc, TransactionBuilderServer};
-pub use write::{WriteApiClient, WriteApiOpenRpc, WriteApiServer};
+pub use transaction_builder::TransactionBuilderClient;
+pub use transaction_builder::TransactionBuilderOpenRpc;
+pub use transaction_builder::TransactionBuilderServer;
+pub use write::WriteApiClient;
+pub use write::WriteApiOpenRpc;
+pub use write::WriteApiServer;
 
 mod bridge;
 mod coin;
@@ -29,8 +49,9 @@ mod write;
 const RPC_QUERY_MAX_RESULT_LIMIT: &str = "RPC_QUERY_MAX_RESULT_LIMIT";
 const DEFAULT_RPC_QUERY_MAX_RESULT_LIMIT: usize = 50;
 
-pub static QUERY_MAX_RESULT_LIMIT: Lazy<usize> =
-    Lazy::new(|| read_size_from_env(RPC_QUERY_MAX_RESULT_LIMIT).unwrap_or(DEFAULT_RPC_QUERY_MAX_RESULT_LIMIT));
+pub static QUERY_MAX_RESULT_LIMIT: Lazy<usize> = Lazy::new(|| {
+    read_size_from_env(RPC_QUERY_MAX_RESULT_LIMIT).unwrap_or(DEFAULT_RPC_QUERY_MAX_RESULT_LIMIT)
+});
 
 // TODOD(chris): make this configurable
 pub const QUERY_MAX_RESULT_LIMIT_CHECKPOINTS: usize = 100;
@@ -307,7 +328,12 @@ pub fn read_size_from_env(var_name: &str) -> Option<usize> {
     std::env::var(var_name)
         .ok()?
         .parse::<usize>()
-        .tap_err(|e| warn!("Env var {} does not contain valid usize integer: {}", var_name, e))
+        .tap_err(|e| {
+            warn!(
+                "Env var {} does not contain valid usize integer: {}",
+                var_name, e
+            )
+        })
         .ok()
 }
 

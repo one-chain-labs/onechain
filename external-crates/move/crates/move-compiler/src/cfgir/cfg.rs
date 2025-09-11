@@ -26,7 +26,11 @@ pub trait CFG {
     fn successors(&self, label: Label) -> &BTreeSet<Label>;
 
     fn predecessors(&self, label: Label) -> &BTreeSet<Label>;
-    fn commands<'a>(&'a self, label: Label) -> Box<dyn Iterator<Item = (usize, &'a Command)> + 'a>;
+    fn commands(&self, label: Label) -> impl Iterator<Item = (usize, &Command)>;
+    fn block_start(&self, label: Label) -> usize;
+    fn block_end(&self, label: Label) -> usize;
+    fn num_commands(&self, label: Label) -> usize;
+    fn block_labels(&self) -> impl Iterator<Item = Label>;
     fn num_blocks(&self) -> usize;
     fn start_block(&self) -> Label;
 
@@ -82,8 +86,11 @@ impl<Blocks: Deref<Target = BasicBlocks>> ForwardCFG<Blocks> {
         }
 
         // build inverse map
-        let mut predecessor_map =
-            successor_map.keys().cloned().map(|lbl| (lbl, BTreeSet::new())).collect::<BTreeMap<_, _>>();
+        let mut predecessor_map = successor_map
+            .keys()
+            .cloned()
+            .map(|lbl| (lbl, BTreeSet::new()))
+            .collect::<BTreeMap<_, _>>();
         for (parent, children) in &successor_map {
             for child in children {
                 predecessor_map.get_mut(child).unwrap().insert(*parent);
@@ -183,7 +190,10 @@ impl<'a> MutForwardCFG<'a> {
     /// Recomputes successor/predecessor maps. returns removed dead blocks
     pub fn recompute(&mut self) -> BasicBlocks {
         let dead_code_labels = self.recompute_impl();
-        dead_code_labels.into_iter().map(|lbl| (lbl, self.blocks.remove(&lbl).unwrap())).collect()
+        dead_code_labels
+            .into_iter()
+            .map(|lbl| (lbl, self.blocks.remove(&lbl).unwrap()))
+            .collect()
     }
 
     pub fn block_mut(&mut self, label: Label) -> &mut BasicBlock {
@@ -233,8 +243,24 @@ impl<T: Deref<Target = BasicBlocks>> CFG for ForwardCFG<T> {
         self.predecessor_map.get(&label).unwrap()
     }
 
-    fn commands<'s>(&'s self, label: Label) -> Box<dyn Iterator<Item = (usize, &'s Command)> + 's> {
-        Box::new(self.block(label).iter().enumerate())
+    fn commands(&self, label: Label) -> impl Iterator<Item = (usize, &Command)> {
+        self.block(label).iter().enumerate()
+    }
+
+    fn block_start(&self, _label: Label) -> usize {
+        0
+    }
+
+    fn block_end(&self, label: Label) -> usize {
+        self.block(label).len().saturating_sub(1)
+    }
+
+    fn num_commands(&self, label: Label) -> usize {
+        self.block(label).len()
+    }
+
+    fn block_labels(&self) -> impl Iterator<Item = Label> {
+        self.blocks.keys().copied()
     }
 
     fn num_blocks(&self) -> usize {
@@ -254,7 +280,9 @@ impl<T: Deref<Target = BasicBlocks>> CFG for ForwardCFG<T> {
     }
 
     fn is_back_edge(&self, cur: Label, next: Label) -> bool {
-        self.loop_heads.get(&next).map_or(false, |back_edge_predecessors| back_edge_predecessors.contains(&cur))
+        self.loop_heads
+            .get(&next)
+            .is_some_and(|back_edge_predecessors| back_edge_predecessors.contains(&cur))
     }
 
     fn debug(&self) {
@@ -270,7 +298,10 @@ fn determine_infinite_loop_starts<'a, T: Deref<Target = BasicBlocks>>(
     block_info: impl IntoIterator<Item = (&'a Label, &'a BlockInfo)>,
 ) -> BTreeSet<Label> {
     // Filter dead code
-    let block_info = block_info.into_iter().filter(|(lbl, _info)| cfg.blocks().contains_key(lbl)).collect::<Vec<_>>();
+    let block_info = block_info
+        .into_iter()
+        .filter(|(lbl, _info)| cfg.blocks().contains_key(lbl))
+        .collect::<Vec<_>>();
 
     // Fully populate infinite loop starts to be pruned later
     // And for any block, determine the current loop
@@ -302,13 +333,21 @@ fn determine_infinite_loop_starts<'a, T: Deref<Target = BasicBlocks>>(
     // Each 'loop' based loop starts in the set, and is removed if it's break is used, or if a
     // return or abort is used
     let mut prev_opt: Option<Label> = None;
-    let zipped = block_info
-        .into_iter()
-        .zip(current_loop_info)
-        .filter_map(|(block_info, cur_loop_opt)| cur_loop_opt.map(|cur_loop| (block_info, cur_loop)));
+    let zipped =
+        block_info
+            .into_iter()
+            .zip(current_loop_info)
+            .filter_map(|(block_info, cur_loop_opt)| {
+                cur_loop_opt.map(|cur_loop| (block_info, cur_loop))
+            });
     for ((lbl, _info), (cur_loop_start, cur_loop_end)) in zipped {
         debug_assert!(prev_opt.map(|prev| prev.0 < lbl.0).unwrap_or(true));
-        maybe_unmark_infinite_loop_starts(&mut infinite_loop_starts, cur_loop_start, cur_loop_end, &cfg.blocks()[lbl]);
+        maybe_unmark_infinite_loop_starts(
+            &mut infinite_loop_starts,
+            cur_loop_start,
+            cur_loop_end,
+            &cfg.blocks()[lbl],
+        );
         prev_opt = Some(*lbl);
     }
 
@@ -327,10 +366,14 @@ fn maybe_unmark_infinite_loop_starts(
         C::Jump { target, .. } if cur_loop_end.equals(*target) => {
             infinite_loop_starts.remove(&cur_loop_start);
         }
-        C::JumpIf { if_true, if_false, .. } if cur_loop_end.equals(*if_true) || cur_loop_end.equals(*if_false) => {
+        C::JumpIf {
+            if_true, if_false, ..
+        } if cur_loop_end.equals(*if_true) || cur_loop_end.equals(*if_false) => {
             infinite_loop_starts.remove(&cur_loop_start);
         }
-        C::VariantSwitch { arms, .. } if arms.iter().any(|(_, target)| cur_loop_end.equals(*target)) => {
+        C::VariantSwitch { arms, .. }
+            if arms.iter().any(|(_, target)| cur_loop_end.equals(*target)) =>
+        {
             infinite_loop_starts.remove(&cur_loop_start);
         }
         C::Return { .. } | C::Abort(_, _) => {
@@ -352,7 +395,10 @@ fn post_order_traversal(
     all_labels: impl IntoIterator<Item = Label>,
     successor_map: &BTreeMap<Label, BTreeSet<Label>>,
     include_dead_code: bool,
-) -> (/* order */ Vec<Label>, /* back edges */ Vec<(Label, Label)>) {
+) -> (
+    /* order */ Vec<Label>,
+    /* back edges */ Vec<(Label, Label)>,
+) {
     fn is_back_edge(cur: Label, target: Label) -> bool {
         target.0 <= cur.0
     }
@@ -376,7 +422,10 @@ fn post_order_traversal(
     let mut post_order = Vec::with_capacity(dag.len());
     let mut finished = BTreeSet::new();
     let mut stack = vec![(start, /* is_first_visit */ true)];
-    let mut remaining = all_labels.into_iter().map(Reverse).collect::<BinaryHeap<_>>();
+    let mut remaining = all_labels
+        .into_iter()
+        .map(Reverse)
+        .collect::<BinaryHeap<_>>();
     while let Some((cur, is_first_visit)) = stack.pop() {
         if is_first_visit {
             stack.push((cur, false));
@@ -387,7 +436,11 @@ fn post_order_traversal(
                     .map(|successor| (*successor, /* is_first_visit */ true)),
             );
         } else {
-            debug_assert!(dag[&cur].iter().all(|successor| finished.contains(successor)));
+            debug_assert!(
+                dag[&cur]
+                    .iter()
+                    .all(|successor| finished.contains(successor))
+            );
             if finished.insert(cur) {
                 post_order.push(cur)
             }
@@ -415,7 +468,10 @@ fn post_order_traversal(
     let mut back_edges: Vec<(Label, Label)> = vec![];
     for (node, successors) in successor_map {
         let node = *node;
-        let loop_continues = successors.iter().filter(|successor| is_back_edge(node, **successor)).copied();
+        let loop_continues = successors
+            .iter()
+            .filter(|successor| is_back_edge(node, **successor))
+            .copied();
         for successor in loop_continues {
             back_edges.push((node, successor));
         }
@@ -444,7 +500,10 @@ pub type MutReverseCFG<'forward, 'blocks> = ReverseCFG<'forward, &'blocks mut Ba
 pub type ImmReverseCFG<'forward, 'blocks> = ReverseCFG<'forward, &'blocks BasicBlocks>;
 
 impl<'forward, Blocks: Deref<Target = BasicBlocks>> ReverseCFG<'forward, Blocks> {
-    pub fn new(forward_cfg: &'forward mut ForwardCFG<Blocks>, infinite_loop_starts: &BTreeSet<Label>) -> Self
+    pub fn new(
+        forward_cfg: &'forward mut ForwardCFG<Blocks>,
+        infinite_loop_starts: &BTreeSet<Label>,
+    ) -> Self
     where
         Blocks: Debug,
     {
@@ -454,7 +513,9 @@ impl<'forward, Blocks: Deref<Target = BasicBlocks>> ReverseCFG<'forward, Blocks>
         let end_blocks = {
             let mut end_blocks = BTreeSet::new();
             for (lbl, successors) in forward_successors.iter() {
-                let loop_start_successors = successors.iter().filter(|l| infinite_loop_starts.contains(l));
+                let loop_start_successors = successors
+                    .iter()
+                    .filter(|l| infinite_loop_starts.contains(l));
                 for loop_start_successor in loop_start_successors {
                     if lbl >= loop_start_successor {
                         end_blocks.insert(*lbl);
@@ -474,7 +535,10 @@ impl<'forward, Blocks: Deref<Target = BasicBlocks>> ReverseCFG<'forward, Blocks>
         let terminal = Label(blocks.keys().map(|lbl| lbl.0).max().unwrap_or(0) + 1);
         assert!(!blocks.contains_key(&terminal), "{:#?}", blocks);
         for terminal_predecessor in &end_blocks {
-            forward_successors.entry(*terminal_predecessor).or_default().insert(terminal);
+            forward_successors
+                .entry(*terminal_predecessor)
+                .or_default()
+                .insert(terminal);
         }
         forward_predecessor.insert(terminal, end_blocks);
         // ensure map is not partial
@@ -521,7 +585,9 @@ impl<'forward, Blocks: Deref<Target = BasicBlocks>> ReverseCFG<'forward, Blocks>
     }
 
     pub fn blocks(&self) -> impl Iterator<Item = (&Label, &BasicBlock)> {
-        self.blocks.iter().chain(std::iter::once((&self.terminal, &self.terminal_block)))
+        self.blocks
+            .iter()
+            .chain(std::iter::once((&self.terminal, &self.terminal_block)))
     }
 
     pub fn block(&self, label: Label) -> &BasicBlock {
@@ -533,7 +599,7 @@ impl<'forward, Blocks: Deref<Target = BasicBlocks>> ReverseCFG<'forward, Blocks>
     }
 }
 
-impl<'forward, 'blocks> MutReverseCFG<'forward, 'blocks> {
+impl MutReverseCFG<'_, '_> {
     pub fn block_mut(&mut self, label: Label) -> &mut BasicBlock {
         if label == self.terminal {
             &mut self.terminal_block
@@ -543,23 +609,31 @@ impl<'forward, 'blocks> MutReverseCFG<'forward, 'blocks> {
     }
 
     pub fn blocks_mut(&mut self) -> impl Iterator<Item = (&Label, &mut BasicBlock)> {
-        self.blocks.iter_mut().chain(std::iter::once((&self.terminal, &mut self.terminal_block)))
+        self.blocks
+            .iter_mut()
+            .chain(std::iter::once((&self.terminal, &mut self.terminal_block)))
     }
 }
 
-impl<'forward, Blocks: Deref<Target = BasicBlocks>> Drop for ReverseCFG<'forward, Blocks> {
+impl<Blocks: Deref<Target = BasicBlocks>> Drop for ReverseCFG<'_, Blocks> {
     fn drop(&mut self) {
         assert!(self.terminal_block.is_empty());
         let start_predecessors = self.predecessor_map.remove(&self.terminal);
-        assert!(start_predecessors.is_some(), "ICE missing start node from predecessors");
+        assert!(
+            start_predecessors.is_some(),
+            "ICE missing start node from predecessors"
+        );
         let start_successors = self.successor_map.remove(&self.terminal).unwrap();
         for start_successor in start_successors {
-            self.predecessor_map.get_mut(&start_successor).unwrap().remove(&self.terminal);
+            self.predecessor_map
+                .get_mut(&start_successor)
+                .unwrap()
+                .remove(&self.terminal);
         }
     }
 }
 
-impl<'forward, Blocks: Deref<Target = BasicBlocks>> CFG for ReverseCFG<'forward, Blocks> {
+impl<Blocks: Deref<Target = BasicBlocks>> CFG for ReverseCFG<'_, Blocks> {
     fn successors(&self, label: Label) -> &BTreeSet<Label> {
         self.successor_map.get(&label).unwrap()
     }
@@ -568,8 +642,24 @@ impl<'forward, Blocks: Deref<Target = BasicBlocks>> CFG for ReverseCFG<'forward,
         self.predecessor_map.get(&label).unwrap()
     }
 
-    fn commands<'s>(&'s self, label: Label) -> Box<dyn Iterator<Item = (usize, &'s Command)> + 's> {
-        Box::new(self.block(label).iter().enumerate().rev())
+    fn commands(&self, label: Label) -> impl Iterator<Item = (usize, &Command)> {
+        self.block(label).iter().enumerate().rev()
+    }
+
+    fn block_start(&self, label: Label) -> usize {
+        self.block(label).len().saturating_sub(1)
+    }
+
+    fn block_end(&self, _label: Label) -> usize {
+        0
+    }
+
+    fn num_commands(&self, label: Label) -> usize {
+        self.block(label).len()
+    }
+
+    fn block_labels(&self) -> impl Iterator<Item = Label> {
+        self.blocks().map(|(lbl, _)| *lbl)
     }
 
     fn num_blocks(&self) -> usize {
@@ -590,7 +680,9 @@ impl<'forward, Blocks: Deref<Target = BasicBlocks>> CFG for ReverseCFG<'forward,
     }
 
     fn is_back_edge(&self, cur: Label, next: Label) -> bool {
-        self.loop_heads.get(&next).map_or(false, |back_edge_predecessors| back_edge_predecessors.contains(&cur))
+        self.loop_heads
+            .get(&next)
+            .is_some_and(|back_edge_predecessors| back_edge_predecessors.contains(&cur))
     }
 
     fn debug(&self) {
@@ -626,7 +718,7 @@ impl<T: Deref<Target = BasicBlocks>> AstDebug for ForwardCFG<T> {
     }
 }
 
-impl<'a, T: Deref<Target = BasicBlocks>> AstDebug for ReverseCFG<'a, T> {
+impl<T: Deref<Target = BasicBlocks>> AstDebug for ReverseCFG<'_, T> {
     fn ast_debug(&self, w: &mut AstWriter) {
         let ReverseCFG {
             terminal,
@@ -690,7 +782,10 @@ fn ast_debug_cfg<'a>(
     w.indent(4, |w| {
         for (loop_head, back_edge_predecessors) in loop_heads {
             for pred in back_edge_predecessors {
-                w.writeln(format!("loop head: {}. back edge predecessor: {}", loop_head, pred))
+                w.writeln(format!(
+                    "loop head: {}. back edge predecessor: {}",
+                    loop_head, pred
+                ))
             }
         }
     });

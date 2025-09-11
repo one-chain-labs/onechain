@@ -37,7 +37,7 @@ This document is focused on using Validator Tool.
       b. `active_address` is correct in `client.yaml`.
       b. `sui.keystore` contains your account key pair.
 
-    If at this point you can't find where `client.yaml` or `sui.keystore` is or have other questions, read [OneChain Client CLI tutorial](https://docs.sui.io/devnet/build/cli-client).
+    If at this point you can't find where `client.yaml` or `sui.keystore` is or have other questions, read [Sui Client CLI tutorial](https://docs.sui.io/devnet/build/cli-client).
 
 ``` bash
 $SUI_BINARY client

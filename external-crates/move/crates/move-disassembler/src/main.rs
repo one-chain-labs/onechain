@@ -7,7 +7,9 @@
 use clap::Parser;
 use move_binary_format::file_format::CompiledModule;
 use move_bytecode_source_map::{mapping::SourceMapping, utils::source_map_from_file};
-use move_command_line_common::files::{MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION};
+use move_command_line_common::files::{
+    DEBUG_INFO_EXTENSION, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
+};
 use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
@@ -49,12 +51,17 @@ fn main() {
 
     let move_extension = MOVE_EXTENSION;
     let mv_bytecode_extension = MOVE_COMPILED_EXTENSION;
-    let source_map_extension = SOURCE_MAP_EXTENSION;
+    let debug_info_extension = DEBUG_INFO_EXTENSION;
 
     let source_path = Path::new(&args.bytecode_file_path);
-    let extension = source_path.extension().expect("Missing file extension for bytecode file");
+    let extension = source_path
+        .extension()
+        .expect("Missing file extension for bytecode file");
     if extension != mv_bytecode_extension {
-        println!("Bad source file extension {:?}; expected {}", extension, mv_bytecode_extension);
+        println!(
+            "Bad source file extension {:?}; expected {}",
+            extension, mv_bytecode_extension
+        );
         std::process::exit(1);
     }
 
@@ -62,7 +69,9 @@ fn main() {
 
     let source_path = Path::new(&args.bytecode_file_path).with_extension(move_extension);
     let source = fs::read_to_string(&source_path).ok();
-    let source_map = source_map_from_file(&Path::new(&args.bytecode_file_path).with_extension(source_map_extension));
+    let source_map = source_map_from_file(
+        &Path::new(&args.bytecode_file_path).with_extension(debug_info_extension),
+    );
 
     let mut disassembler_options = DisassemblerOptions::new();
     disassembler_options.print_code = !args.skip_code;
@@ -72,13 +81,15 @@ fn main() {
 
     // TODO: make source mapping work with the Move source language
     let no_loc = Spanned::unsafe_no_loc(()).loc;
-    let module = CompiledModule::deserialize_with_defaults(&bytecode_bytes).expect("Module blob can't be deserialized");
+    let module = CompiledModule::deserialize_with_defaults(&bytecode_bytes)
+        .expect("Module blob can't be deserialized");
 
     let mut source_mapping = {
         if let Ok(s) = source_map {
             SourceMapping::new(s, &module)
         } else {
-            SourceMapping::new_without_source_map(&module, no_loc).expect("Unable to build dummy source mapping")
+            SourceMapping::new_without_source_map(&module, no_loc)
+                .expect("Unable to build dummy source mapping")
         }
     };
 
@@ -89,7 +100,11 @@ fn main() {
     let mut disassembler = Disassembler::new(source_mapping, disassembler_options);
 
     if let Some(file_path) = &args.code_coverage_path {
-        disassembler.add_coverage_map(CoverageMap::from_binary_file(file_path).unwrap().to_unified_exec_map());
+        disassembler.add_coverage_map(
+            CoverageMap::from_binary_file(file_path)
+                .unwrap()
+                .to_unified_exec_map(),
+        );
     }
 
     let dissassemble_string = disassembler.disassemble().expect("Unable to dissassemble");

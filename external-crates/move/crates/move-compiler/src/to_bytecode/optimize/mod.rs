@@ -10,8 +10,12 @@ use crate::parser::ast::FunctionName;
 use move_ir_types::ast::{self as IR};
 use std::collections::{BTreeSet, HashMap};
 
-pub type Optimization =
-    fn(&FunctionName, &BTreeSet<IR::BlockLabel_>, &mut Vec<(IR::Var, IR::Type)>, &mut IR::BytecodeBlocks) -> bool;
+pub type Optimization = fn(
+    &FunctionName,
+    &BTreeSet<IR::BlockLabel_>,
+    &mut Vec<(IR::Var, IR::Type)>,
+    &mut IR::BytecodeBlocks,
+) -> bool;
 
 const OPTIMIZATIONS: &[Optimization] = &[
     remove_fallthrough_jumps::optimize,

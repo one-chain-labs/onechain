@@ -16,14 +16,8 @@
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode,
-        CompiledModule,
-        FunctionDefinition,
-        FunctionDefinitionIndex,
-        FunctionHandleIndex,
-        SignatureIndex,
-        SignatureToken,
-        TypeParameterIndex,
+        Bytecode, CompiledModule, FunctionDefinition, FunctionDefinitionIndex, FunctionHandleIndex,
+        SignatureIndex, SignatureToken, TypeParameterIndex,
     },
 };
 use move_core_types::vm_status::StatusCode;
@@ -104,15 +98,23 @@ impl<'a> InstantiationLoopChecker<'a> {
             Some((nodes, edges)) => {
                 let msg_edges = edges
                     .into_iter()
-                    .filter_map(|edge_idx| match checker.graph.edge_weight(edge_idx).unwrap() {
-                        Edge::TyConApp(_) => Some(checker.format_edge(edge_idx)),
-                        _ => None,
-                    })
+                    .filter_map(
+                        |edge_idx| match checker.graph.edge_weight(edge_idx).unwrap() {
+                            Edge::TyConApp(_) => Some(checker.format_edge(edge_idx)),
+                            _ => None,
+                        },
+                    )
                     .collect::<Vec<_>>()
                     .join(", ");
-                let msg_nodes =
-                    nodes.into_iter().map(|node_idx| checker.format_node(node_idx)).collect::<Vec<_>>().join(", ");
-                let msg = format!("edges with constructors: [{}], nodes: [{}]", msg_edges, msg_nodes);
+                let msg_nodes = nodes
+                    .into_iter()
+                    .map(|node_idx| checker.format_node(node_idx))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let msg = format!(
+                    "edges with constructors: [{}], nodes: [{}]",
+                    msg_edges, msg_nodes
+                );
                 Err(PartialVMError::new(StatusCode::LOOP_IN_INSTANTIATION_GRAPH).with_message(msg))
             }
         }
@@ -180,12 +182,18 @@ impl<'a> InstantiationLoopChecker<'a> {
         for (formal_idx, ty) in type_actuals.iter().enumerate() {
             let formal_idx = formal_idx as TypeParameterIndex;
             match ty {
-                SignatureToken::TypeParameter(actual_idx) => {
-                    self.add_edge(Node(caller_idx, *actual_idx), Node(callee_idx, formal_idx), Edge::Identity)
-                }
+                SignatureToken::TypeParameter(actual_idx) => self.add_edge(
+                    Node(caller_idx, *actual_idx),
+                    Node(callee_idx, formal_idx),
+                    Edge::Identity,
+                ),
                 _ => {
                     for type_param in self.extract_type_parameters(ty) {
-                        self.add_edge(Node(caller_idx, type_param), Node(callee_idx, formal_idx), Edge::TyConApp(ty));
+                        self.add_edge(
+                            Node(caller_idx, type_param),
+                            Node(callee_idx, formal_idx),
+                            Edge::TyConApp(ty),
+                        );
                     }
                 }
             }
@@ -194,7 +202,11 @@ impl<'a> InstantiationLoopChecker<'a> {
 
     /// Helper of `fn build_graph` that inspects a function definition for calls between two generic
     /// functions defined in the current module.
-    fn build_graph_function_def(&mut self, caller_idx: FunctionDefinitionIndex, caller_def: &FunctionDefinition) {
+    fn build_graph_function_def(
+        &mut self,
+        caller_idx: FunctionDefinitionIndex,
+        caller_def: &FunctionDefinition,
+    ) {
         if let Some(code) = &caller_def.code {
             for instr in &code.code {
                 if let Bytecode::CallGeneric(callee_inst_idx) = instr {
@@ -217,7 +229,13 @@ impl<'a> InstantiationLoopChecker<'a> {
     ///     call.
     ///     - Each edge is labeled either `Identity` or `TyConApp`. See `Edge` for details.
     fn build_graph(&mut self) {
-        for (def_idx, func_def) in self.module.function_defs().iter().enumerate().filter(|(_, def)| !def.is_native()) {
+        for (def_idx, func_def) in self
+            .module
+            .function_defs()
+            .iter()
+            .enumerate()
+            .filter(|(_, def)| !def.is_native())
+        {
             self.build_graph_function_def(FunctionDefinitionIndex::new(def_idx as u16), func_def)
         }
     }
@@ -245,10 +263,12 @@ impl<'a> InstantiationLoopChecker<'a> {
                     })
                     .collect();
 
-                if edges.iter().any(|edge_idx| match self.graph.edge_weight(*edge_idx).unwrap() {
-                    Edge::Identity => false,
-                    Edge::TyConApp(_) => true,
-                }) {
+                if edges.iter().any(
+                    |edge_idx| match self.graph.edge_weight(*edge_idx).unwrap() {
+                        Edge::Identity => false,
+                        Edge::TyConApp(_) => true,
+                    },
+                ) {
                     Some((nodes, edges))
                 } else {
                     None

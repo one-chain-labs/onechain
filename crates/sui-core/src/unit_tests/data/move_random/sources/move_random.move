@@ -3,9 +3,9 @@
 
 module examples::move_random {
     use std::vector;
-    use one::object::{Self, UID};
-    use one::transfer;
-    use one::tx_context::TxContext;
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::tx_context::TxContext;
 
     public struct Object has key, store {
         id: UID,
@@ -28,5 +28,10 @@ module examples::move_random {
             Object { id: object::new(ctx), data },
             recipient
         )
+    }
+    
+    // Function that always aborts to test gas price capping
+    public entry fun always_abort() {
+        abort(42)
     }
 }

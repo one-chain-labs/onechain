@@ -1,10 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, sync::Arc};
+use move_trace_format::format::MoveTraceBuilder;
+use std::sync::Arc;
 use sui_protocol_config::ProtocolConfig;
+use sui_types::execution::ExecutionTiming;
+use sui_types::execution_params::ExecutionOrEarlyError;
+use sui_types::storage::BackingStore;
+use sui_types::transaction::GasData;
 use sui_types::{
-    base_types::{ObjectRef, SuiAddress, TxContext},
+    base_types::SuiAddress,
     committee::EpochId,
     digests::TransactionDigest,
     effects::TransactionEffects,
@@ -14,7 +19,6 @@ use sui_types::{
     inner_temporary_store::InnerTemporaryStore,
     layout_resolver::LayoutResolver,
     metrics::LimitsMetrics,
-    storage::BackingStore,
     transaction::{CheckedInputObjects, ProgrammableTransaction, TransactionKind},
 };
 
@@ -27,20 +31,27 @@ pub trait Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         // Epoch
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         // Transaction Inputs
         input_objects: CheckedInputObjects,
         // Gas related
-        gas_coins: Vec<ObjectRef>,
+        gas: GasData,
         gas_status: SuiGasStatus,
         // Transaction
         transaction_kind: TransactionKind,
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
-    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<(), ExecutionError>);
+        trace_builder_opt: &mut Option<MoveTraceBuilder>,
+    ) -> (
+        InnerTemporaryStore,
+        SuiGasStatus,
+        TransactionEffects,
+        Vec<ExecutionTiming>,
+        Result<(), ExecutionError>,
+    );
 
     fn dev_inspect_transaction(
         &self,
@@ -49,21 +60,26 @@ pub trait Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         // Epoch
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         // Transaction Inputs
         input_objects: CheckedInputObjects,
         // Gas related
-        gas_coins: Vec<ObjectRef>,
+        gas: GasData,
         gas_status: SuiGasStatus,
         // Transaction
         transaction_kind: TransactionKind,
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
         skip_all_checks: bool,
-    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Vec<ExecutionResult>, ExecutionError>);
+    ) -> (
+        InnerTemporaryStore,
+        SuiGasStatus,
+        TransactionEffects,
+        Result<Vec<ExecutionResult>, ExecutionError>,
+    );
 
     fn update_genesis_state(
         &self,
@@ -71,8 +87,11 @@ pub trait Executor {
         // Configuration
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
-        // Genesis State
-        tx_context: &mut TxContext,
+        // Epoch
+        epoch_id: EpochId,
+        epoch_timestamp_ms: u64,
+        // Genesis Digest
+        transaction_digest: &TransactionDigest,
         // Transaction
         input_objects: CheckedInputObjects,
         pt: ProgrammableTransaction,

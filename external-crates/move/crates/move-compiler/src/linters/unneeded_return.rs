@@ -19,7 +19,12 @@ use std::collections::VecDeque;
 
 simple_visitor!(
     UnneededReturn,
-    fn visit_function_custom(&mut self, _module: ModuleIdent, _function_name: FunctionName, fdef: &T::Function) -> bool {
+    fn visit_function_custom(
+        &mut self,
+        _module: ModuleIdent,
+        _function_name: FunctionName,
+        fdef: &T::Function,
+    ) -> bool {
         if let T::FunctionBody_::Defined((_, seq)) = &fdef.body.value {
             tail_block(self, seq);
         };
@@ -121,7 +126,9 @@ fn returnable_value(context: &mut Context, exp: &T::Exp) -> bool {
             false
         }
 
-        T::UnannotatedExp_::BinopExp(lhs, _, _, rhs) => returnable_value(context, lhs) && returnable_value(context, rhs),
+        T::UnannotatedExp_::BinopExp(lhs, _, _, rhs) => {
+            returnable_value(context, lhs) && returnable_value(context, rhs)
+        }
         T::UnannotatedExp_::ExpList(values) => values.iter().all(|v| match v {
             T::ExpListItem::Single(exp, _) => returnable_value(context, exp),
             T::ExpListItem::Splat(_, _, _) => false,
@@ -180,6 +187,9 @@ fn returnable_value(context: &mut Context, exp: &T::Exp) -> bool {
 fn report_unneeded_return(context: &mut Context, loc: Loc) {
     context.add_diag(diag!(
         StyleCodes::UnneededReturn.diag_info(),
-        (loc, "Remove unnecessary 'return', the expression is already in a 'return' position")
+        (
+            loc,
+            "Remove unnecessary 'return', the expression is already in a 'return' position"
+        )
     ));
 }

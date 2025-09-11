@@ -8,19 +8,16 @@ pub mod test_reporter;
 pub mod test_runner;
 
 use crate::test_runner::TestRunner;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::*;
 use move_binary_format::CompiledModule;
 use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler::{
-    self,
+    self, Compiler, Flags, PASS_CFGIR,
     compiled_unit::NamedCompiledModule,
     diagnostics,
     shared::{self, NumericalAddress},
     unit_test::{self, TestPlan},
-    Compiler,
-    Flags,
-    PASS_CFGIR,
 };
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::native_functions::NativeFunctionTable;
@@ -53,7 +50,12 @@ pub struct UnitTestingConfig {
     pub list: bool,
 
     /// Number of threads to use for running tests.
-    #[clap(name = "num-threads", default_value = "8", short = 't', long = "threads")]
+    #[clap(
+        name = "num-threads",
+        default_value = "8",
+        short = 't',
+        long = "threads"
+    )]
     pub num_threads: usize,
 
     /// Dependency files
@@ -79,7 +81,11 @@ pub struct UnitTestingConfig {
     #[clap(name = "report-statistics", short = 's', long = "statistics")]
     pub report_statistics: Option<Option<String>>,
 
-    #[clap(name = "report_stacktrace_on_abort", short = 'r', long = "stacktrace_on_abort")]
+    #[clap(
+        name = "report_stacktrace_on_abort",
+        short = 'r',
+        long = "stacktrace_on_abort"
+    )]
     pub report_stacktrace_on_abort: bool,
 
     /// Named address mapping
@@ -117,11 +123,14 @@ pub struct UnitTestingConfig {
     pub deterministic_generation: bool,
 
     // Enable tracing for tests
-    #[clap(long = TRACE_FLAG, value_name = "PATH")]
-    pub trace_execution: Option<Option<String>>,
+    #[clap(long = TRACE_FLAG)]
+    pub trace_execution: bool,
 }
 
-fn format_module_id(module_map: &BTreeMap<ModuleId, NamedCompiledModule>, module_id: &ModuleId) -> String {
+fn format_module_id(
+    module_map: &BTreeMap<ModuleId, NamedCompiledModule>,
+    module_id: &ModuleId,
+) -> String {
     if let Some(address_name) = module_map.get(module_id).and_then(|m| m.address_name()) {
         format!("{}::{}", address_name, module_id.name())
     } else {
@@ -147,11 +156,14 @@ impl UnitTestingConfig {
             rand_num_iters: Some(DEFAULT_RAND_ITERS),
             seed: None,
             deterministic_generation: false,
-            trace_execution: None,
+            trace_execution: false,
         }
     }
 
-    pub fn with_named_addresses(mut self, named_address_values: BTreeMap<String, NumericalAddress>) -> Self {
+    pub fn with_named_addresses(
+        mut self,
+        named_address_values: BTreeMap<String, NumericalAddress>,
+    ) -> Self {
         assert!(self.named_address_values.is_empty());
         self.named_address_values = named_address_values.into_iter().collect();
         self
@@ -163,11 +175,16 @@ impl UnitTestingConfig {
         deps: Vec<String>,
         bytecode_deps_files: Vec<String>,
     ) -> Option<TestPlan> {
-        let addresses = verify_and_create_named_address_mapping(self.named_address_values.clone()).ok()?;
+        let addresses =
+            verify_and_create_named_address_mapping(self.named_address_values.clone()).ok()?;
         let flags = Flags::testing();
         let (files, comments_and_compiler_res) =
-            Compiler::from_files(None, source_files, deps, addresses).set_flags(flags).run::<PASS_CFGIR>().unwrap();
-        let (_, compiler) = diagnostics::unwrap_or_report_pass_diagnostics(&files, comments_and_compiler_res);
+            Compiler::from_files(None, source_files, deps, addresses)
+                .set_flags(flags)
+                .run::<PASS_CFGIR>()
+                .unwrap();
+        let compiler =
+            diagnostics::unwrap_or_report_pass_diagnostics(&files, comments_and_compiler_res);
 
         let (compiler, cfgir) = compiler.into_ast();
         let compilation_env = compiler.compilation_env();
@@ -175,7 +192,8 @@ impl UnitTestingConfig {
         let mapped_files = compilation_env.mapped_files().clone();
 
         let compilation_result = compiler.at_cfgir(cfgir).build();
-        let (units, warnings) = diagnostics::unwrap_or_report_pass_diagnostics(&files, compilation_result);
+        let (units, warnings) =
+            diagnostics::unwrap_or_report_pass_diagnostics(&files, compilation_result);
         diagnostics::report_warnings(&files, warnings);
         let units: Vec<_> = units.into_iter().map(|unit| unit.named_module).collect();
 
@@ -194,10 +212,14 @@ impl UnitTestingConfig {
     pub fn build_test_plan(&self) -> Option<TestPlan> {
         let deps = self.dep_files.clone();
 
-        let TestPlan { module_info, .. } = self.compile_to_test_plan(deps.clone(), vec![], vec![])?;
+        let TestPlan { module_info, .. } =
+            self.compile_to_test_plan(deps.clone(), vec![], vec![])?;
 
-        let mut test_plan =
-            self.compile_to_test_plan(self.source_files.clone(), deps, self.bytecode_deps_files.clone())?;
+        let mut test_plan = self.compile_to_test_plan(
+            self.source_files.clone(),
+            deps,
+            self.bytecode_deps_files.clone(),
+        )?;
         test_plan.module_info.extend(module_info);
         Some(test_plan)
     }
@@ -246,10 +268,10 @@ impl UnitTestingConfig {
         }
 
         writeln!(shared_writer.lock().unwrap(), "Running Move unit tests")?;
-        let trace_location = match &self.trace_execution {
-            Some(None) => Some("traces".to_string()),
-            Some(Some(path)) => Some(path.clone()),
-            None => None,
+        let trace_location = if self.trace_execution {
+            Some("traces".to_string())
+        } else {
+            None
         };
         let mut test_runner = TestRunner::new(
             self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
@@ -266,7 +288,7 @@ impl UnitTestingConfig {
         .unwrap();
 
         if let Some(filter_str) = &self.filter {
-            test_runner.filter(filter_str)
+            test_runner.filter(filter_str)?;
         }
 
         let test_results = test_runner.run(&shared_writer).unwrap();

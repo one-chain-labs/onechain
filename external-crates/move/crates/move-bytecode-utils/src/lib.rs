@@ -6,9 +6,11 @@ pub mod layout;
 pub mod module_cache;
 
 use move_binary_format::file_format::{CompiledModule, DatatypeHandleIndex, SignatureToken};
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use indexmap::IndexMap;
 use petgraph::graphmap::DiGraphMap;
 use std::collections::BTreeMap;
@@ -23,7 +25,12 @@ impl<'a> Modules<'a> {
     pub fn new(modules: impl IntoIterator<Item = &'a CompiledModule>) -> Self {
         let mut map = BTreeMap::new();
         for m in modules {
-            assert!(map.insert(m.self_id(), m).is_none(), "Duplicate module found");
+            if let Some(prev) = map.insert(m.self_id(), m) {
+                panic!(
+                    "Duplicate module found: {}",
+                    prev.self_id().to_canonical_display(/* with_prefix */ true)
+                )
+            }
         }
         Modules(map)
     }
@@ -64,7 +71,10 @@ impl<'a> Modules<'a> {
 
         match petgraph::algo::toposort(&graph, None) {
             Err(_) => panic!("Circular dependency detected"),
-            Ok(ordered_idxs) => Ok(ordered_idxs.into_iter().map(move |idx| *module_map.get_index(idx).unwrap().1).rev()),
+            Ok(ordered_idxs) => Ok(ordered_idxs
+                .into_iter()
+                .map(move |idx| *module_map.get_index(idx).unwrap().1)
+                .rev()),
         }
     }
 
@@ -75,7 +85,10 @@ impl<'a> Modules<'a> {
 
     /// Return the bytecode for the module bound to `module_id`
     pub fn get_module(&self, module_id: &ModuleId) -> Result<&CompiledModule> {
-        self.0.get(module_id).copied().ok_or_else(|| anyhow!("Can't find module {:?}", module_id))
+        self.0
+            .get(module_id)
+            .copied()
+            .ok_or_else(|| anyhow!("Can't find module {:?}", module_id))
     }
 
     /// Return the immediate dependencies for `module_id`
@@ -102,7 +115,10 @@ impl<'a> Modules<'a> {
     }
 
     /// Return the transitive dependencies for `module_id`
-    pub fn get_transitive_dependencies(&self, module_id: &ModuleId) -> Result<Vec<&CompiledModule>> {
+    pub fn get_transitive_dependencies(
+        &self,
+        module_id: &ModuleId,
+    ) -> Result<Vec<&CompiledModule>> {
         let mut all_deps = vec![];
         for dep in self.get_immediate_dependencies(module_id)? {
             self.get_transitive_dependencies_(&mut all_deps, dep)?;
@@ -111,7 +127,10 @@ impl<'a> Modules<'a> {
     }
 }
 
-pub fn resolve_struct(module: &CompiledModule, sidx: DatatypeHandleIndex) -> (&AccountAddress, &IdentStr, &IdentStr) {
+pub fn resolve_struct(
+    module: &CompiledModule,
+    sidx: DatatypeHandleIndex,
+) -> (&AccountAddress, &IdentStr, &IdentStr) {
     let shandle = module.datatype_handle_at(sidx);
     let mhandle = module.module_handle_at(shandle.module);
     let address = module.address_identifier_at(mhandle.address);
@@ -158,8 +177,21 @@ pub fn format_signature_token_struct(
     let ty_args_string = if ty_args.is_empty() {
         ""
     } else {
-        s = format!("<{}>", ty_args.iter().map(|t| format_signature_token(module, t)).collect::<Vec<_>>().join(", "));
+        s = format!(
+            "<{}>",
+            ty_args
+                .iter()
+                .map(|t| format_signature_token(module, t))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
         &s
     };
-    format!("0x{}::{}::{}{}", address.short_str_lossless(), module_name, struct_name, ty_args_string)
+    format!(
+        "0x{}::{}::{}{}",
+        address.short_str_lossless(),
+        module_name,
+        struct_name,
+        ty_args_string
+    )
 }

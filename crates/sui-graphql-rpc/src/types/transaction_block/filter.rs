@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::TransactionBlockKindInput;
-use crate::types::{digest::Digest, intersect, sui_address::SuiAddress, type_filter::FqNameFilter, uint53::UInt53};
+use crate::types::{digest::Digest, sui_address::SuiAddress, type_filter::FqNameFilter};
+use crate::types::{intersect, uint53::UInt53};
 use async_graphql::InputObject;
 use std::collections::BTreeSet;
 use sui_types::base_types::SuiAddress as NativeSuiAddress;
@@ -125,7 +126,9 @@ impl TransactionBlockFilter {
         #[cfg(feature = "staging")]
         let missing_implicit_sender = missing_implicit_sender && self.affected_object.is_none();
 
-        missing_implicit_sender.then_some(self.sent_address).flatten()
+        missing_implicit_sender
+            .then_some(self.sent_address)
+            .flatten()
     }
 
     /// A TransactionBlockFilter is considered not to have any filters if no filters are specified,

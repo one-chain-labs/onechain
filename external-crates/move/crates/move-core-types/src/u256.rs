@@ -2,37 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use ethnum::U256 as EthnumU256;
-use num::{bigint::Sign, BigInt};
+use num::{BigInt, bigint::Sign};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::strategy::BoxedStrategy;
 use rand::{
-    distributions::{
-        uniform::{SampleUniform, UniformSampler},
-        Distribution,
-        Standard,
-    },
     Rng,
+    distributions::{
+        Distribution, Standard,
+        uniform::{SampleUniform, UniformSampler},
+    },
 };
 use std::{
     fmt,
     mem::size_of,
     ops::{
-        Add,
-        AddAssign,
-        BitAnd,
-        BitAndAssign,
-        BitOr,
-        BitXor,
-        Div,
-        DivAssign,
-        Mul,
-        MulAssign,
-        Rem,
-        RemAssign,
-        Shl,
-        Shr,
-        Sub,
-        SubAssign,
+        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, Div, DivAssign, Mul, MulAssign, Rem,
+        RemAssign, Shl, Shr, Sub, SubAssign,
     },
 };
 use uint::FromStrRadixErr;
@@ -75,7 +60,10 @@ pub struct U256CastError {
 
 impl U256CastError {
     pub fn new<T: std::convert::Into<U256>>(val: T, kind: U256CastErrorKind) -> Self {
-        Self { kind, val: val.into() }
+        Self {
+            kind,
+            val: val.into(),
+        }
     }
 }
 
@@ -141,7 +129,9 @@ impl<'de> Deserialize<'de> for U256 {
     where
         D: Deserializer<'de>,
     {
-        Ok(U256::from_le_bytes(&(<[u8; U256_NUM_BYTES]>::deserialize(deserializer)?)))
+        Ok(U256::from_le_bytes(
+            &(<[u8; U256_NUM_BYTES]>::deserialize(deserializer)?),
+        ))
     }
 }
 
@@ -308,7 +298,9 @@ impl U256 {
 
     /// U256 from string with radix 10 or 16
     pub fn from_str_radix(src: &str, radix: u32) -> Result<Self, U256FromStrError> {
-        PrimitiveU256::from_str_radix(src.trim_start_matches('0'), radix).map(Self).map_err(U256FromStrError)
+        PrimitiveU256::from_str_radix(src.trim_start_matches('0'), radix)
+            .map(Self)
+            .map_err(U256FromStrError)
     }
 
     /// U256 from 32 little endian bytes
@@ -403,13 +395,17 @@ impl U256 {
         Some(Self(self.0.shr(rhs)))
     }
 
-    /// Downcast to a an unsigned value of type T
+    /// Downcast to an unsigned value of type T
     /// T must be at most u128
     pub fn down_cast_lossy<T: std::convert::TryFrom<u128>>(self) -> T {
         // Size of this type
         let type_size = size_of::<T>();
         // Maximum value for this type
-        let max_val: u128 = if type_size < 16 { (1u128 << (NUM_BITS_PER_BYTE * type_size)) - 1u128 } else { u128::MAX };
+        let max_val: u128 = if type_size < 16 {
+            (1u128 << (NUM_BITS_PER_BYTE * type_size)) - 1u128
+        } else {
+            u128::MAX
+        };
         // This should never fail
         match T::try_from(self.0.low_u128() & max_val) {
             Ok(w) => w,
@@ -510,7 +506,6 @@ impl From<&U256> for EthnumU256 {
 
 impl TryFrom<U256> for u8 {
     type Error = U256CastError;
-
     fn try_from(n: U256) -> Result<Self, Self::Error> {
         let n = n.0.low_u64();
         if n > u8::MAX as u64 {
@@ -615,15 +610,25 @@ impl UniformSampler for UniformU256 {
     {
         let low = *low.borrow();
         let high = *high.borrow();
-        assert!(low <= high, "Uniform::new_inclusive called with `low > high`");
+        assert!(
+            low <= high,
+            "Uniform::new_inclusive called with `low > high`"
+        );
         let unsigned_max = U256::max_value();
 
         let range = high.wrapping_sub(low).wrapping_add(U256::one());
 
-        let ints_to_reject =
-            if range > U256::zero() { (unsigned_max - range) + U256::one() % range } else { U256::zero() };
+        let ints_to_reject = if range > U256::zero() {
+            (unsigned_max - range) + U256::one() % range
+        } else {
+            U256::zero()
+        };
 
-        UniformU256 { low, range, z: ints_to_reject }
+        UniformU256 {
+            low,
+            range,
+            z: ints_to_reject,
+        }
     }
 
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
@@ -632,7 +637,7 @@ impl UniformSampler for UniformU256 {
             let unsigned_max = U256::max_value();
             let zone = unsigned_max - self.z;
             loop {
-                let v: U256 = rng.gen();
+                let v: U256 = rng.r#gen();
                 let (hi, lo) = v.wmul(range);
                 if lo <= zone {
                     return self.low.wrapping_add(hi);
@@ -640,7 +645,7 @@ impl UniformSampler for UniformU256 {
             }
         } else {
             // Sample from the entire integer range.
-            rng.gen()
+            rng.r#gen()
         }
     }
 
@@ -655,26 +660,33 @@ impl UniformSampler for UniformU256 {
         Self::sample_single_inclusive(low, high - U256::one(), rng)
     }
 
-    fn sample_single_inclusive<R: rand::Rng + ?Sized, B1, B2>(low: B1, high: B2, rng: &mut R) -> Self::X
+    fn sample_single_inclusive<R: rand::Rng + ?Sized, B1, B2>(
+        low: B1,
+        high: B2,
+        rng: &mut R,
+    ) -> Self::X
     where
         B1: rand::distributions::uniform::SampleBorrow<Self::X> + Sized,
         B2: rand::distributions::uniform::SampleBorrow<Self::X> + Sized,
     {
         let low = *low.borrow();
         let high = *high.borrow();
-        assert!(low <= high, "UniformSampler::sample_single_inclusive: low > high");
+        assert!(
+            low <= high,
+            "UniformSampler::sample_single_inclusive: low > high"
+        );
         let range = high.wrapping_sub(low).wrapping_add(U256::one());
         // If the above resulted in wrap-around to 0, the range is U256::MIN..=U256::MAX,
         // and any integer will do.
         if range == U256::zero() {
-            return rng.gen();
+            return rng.r#gen();
         }
         // conservative but fast approximation. `- 1` is necessary to allow the
         // same comparison without bias.
         let zone = (range << range.leading_zeros()).wrapping_sub(U256::one());
 
         loop {
-            let v: U256 = rng.gen();
+            let v: U256 = rng.r#gen();
             let (hi, lo) = v.wmul(range);
             if lo <= zone {
                 return low.wrapping_add(hi);
@@ -685,12 +697,13 @@ impl UniformSampler for UniformU256 {
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl proptest::prelude::Arbitrary for U256 {
-    type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
-
+    type Parameters = ();
     fn arbitrary_with(_params: Self::Parameters) -> Self::Strategy {
         use proptest::strategy::Strategy as _;
-        proptest::arbitrary::any::<[u8; U256_NUM_BYTES]>().prop_map(|q| U256::from_le_bytes(&q)).boxed()
+        proptest::arbitrary::any::<[u8; U256_NUM_BYTES]>()
+            .prop_map(|q| U256::from_le_bytes(&q))
+            .boxed()
     }
 }
 
@@ -708,8 +721,11 @@ fn wrapping_add() {
     // By definition in std::instrinsics, a.wrapping_add(b) = (a + b) % (2^N), where N is bit width
 
     let a = U256::from(1234u32);
-    let b = U256::from_str_radix("115792089237316195423570985008687907853269984665640564039457584007913129638801", 10)
-        .unwrap();
+    let b = U256::from_str_radix(
+        "115792089237316195423570985008687907853269984665640564039457584007913129638801",
+        10,
+    )
+    .unwrap();
 
     assert!(a.wrapping_add(b) == U256::from(99u8));
 }

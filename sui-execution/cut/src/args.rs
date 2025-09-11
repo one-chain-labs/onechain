@@ -3,7 +3,9 @@
 
 use anyhow::{self, bail, Result};
 use clap::{ArgAction, Parser};
-use std::{env, path::PathBuf, str::FromStr};
+use std::env;
+use std::path::PathBuf;
+use std::str::FromStr;
 use thiserror::Error;
 
 /// Tool for cutting duplicate versions of a subset of crates in a git repository.
@@ -72,9 +74,13 @@ impl FromStr for Directory {
     fn from_str(s: &str) -> Result<Self> {
         let mut parts = s.split(':');
 
-        let Some(src_part) = parts.next() else { bail!(DirectoryParseError::NoSrc(s.to_string())) };
+        let Some(src_part) = parts.next() else {
+            bail!(DirectoryParseError::NoSrc(s.to_string()))
+        };
 
-        let Some(dst_part) = parts.next() else { bail!(DirectoryParseError::NoDst(s.to_string())) };
+        let Some(dst_part) = parts.next() else {
+            bail!(DirectoryParseError::NoDst(s.to_string()))
+        };
 
         let suffix = parts.next().map(|sfx| sfx.to_string());
 
@@ -105,7 +111,14 @@ mod tests {
         let src = cwd.join("src");
         let dst = cwd.join("dst");
 
-        assert_eq!(dir, Directory { src, dst, suffix: Some("suffix".to_string()) })
+        assert_eq!(
+            dir,
+            Directory {
+                src,
+                dst,
+                suffix: Some("suffix".to_string()),
+            }
+        )
     }
 
     #[test]
@@ -117,7 +130,14 @@ mod tests {
         let src = cwd.join("src");
         let dst = cwd.join("dst");
 
-        assert_eq!(dir, Directory { src, dst, suffix: None })
+        assert_eq!(
+            dir,
+            Directory {
+                src,
+                dst,
+                suffix: None,
+            }
+        )
     }
 
     #[test]
@@ -131,7 +151,8 @@ mod tests {
     fn test_directory_parsing_src_non_existent() {
         // Source directory relative to CARGO_MANIFEST_DIR
         let err = Directory::from_str("i_dont_exist:dst").unwrap_err();
-        expect!["Can't parse an existing source directory from 'i_dont_exist'"].assert_eq(&format!("{err}"));
+        expect!["Can't parse an existing source directory from 'i_dont_exist'"]
+            .assert_eq(&format!("{err}"));
     }
 
     #[test]

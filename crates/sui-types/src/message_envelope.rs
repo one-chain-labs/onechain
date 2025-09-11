@@ -1,33 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::AuthorityName,
-    committee::{Committee, EpochId},
-    crypto::{
-        AuthorityKeyPair,
-        AuthorityQuorumSignInfo,
-        AuthoritySignInfo,
-        AuthoritySignInfoTrait,
-        AuthoritySignature,
-        AuthorityStrongQuorumSignInfo,
-        EmptySignInfo,
-        Signer,
-    },
-    error::SuiResult,
-    executable_transaction::CertificateProof,
-    messages_checkpoint::CheckpointSequenceNumber,
-    transaction::SenderSignedData,
+use crate::base_types::AuthorityName;
+use crate::committee::{Committee, EpochId};
+use crate::crypto::{
+    AuthorityKeyPair, AuthorityQuorumSignInfo, AuthoritySignInfo, AuthoritySignInfoTrait,
+    AuthoritySignature, AuthorityStrongQuorumSignInfo, EmptySignInfo, Signer,
 };
+use crate::error::SuiResult;
+use crate::executable_transaction::CertificateProof;
+use crate::messages_checkpoint::CheckpointSequenceNumber;
+use crate::transaction::SenderSignedData;
 use fastcrypto::traits::KeyPair;
 use once_cell::sync::OnceCell;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_name::{DeserializeNameAdapter, SerializeNameAdapter};
 use shared_crypto::intent::{Intent, IntentScope};
-use std::{
-    fmt::{Debug, Display, Formatter},
-    ops::{Deref, DerefMut},
-};
+use std::fmt::{Debug, Display, Formatter};
+use std::ops::{Deref, DerefMut};
 
 pub trait Message {
     type DigestType: Clone + Debug;
@@ -59,7 +49,10 @@ where
     where
         D: serde::de::Deserializer<'de>,
     {
-        Envelope::deserialize(DeserializeNameAdapter::new(deserializer, std::any::type_name::<Self>()))
+        Envelope::deserialize(DeserializeNameAdapter::new(
+            deserializer,
+            std::any::type_name::<Self>(),
+        ))
     }
 }
 
@@ -72,13 +65,20 @@ where
     where
         S: serde::ser::Serializer,
     {
-        Envelope::serialize(self, SerializeNameAdapter::new(serializer, std::any::type_name::<Self>()))
+        Envelope::serialize(
+            self,
+            SerializeNameAdapter::new(serializer, std::any::type_name::<Self>()),
+        )
     }
 }
 
 impl<T: Message, S> Envelope<T, S> {
     pub fn new_from_data_and_sig(data: T, sig: S) -> Self {
-        Self { digest: Default::default(), data, auth_signature: sig }
+        Self {
+            digest: Default::default(),
+            data,
+            auth_signature: sig,
+        }
     }
 
     pub fn data(&self) -> &T {
@@ -94,7 +94,11 @@ impl<T: Message, S> Envelope<T, S> {
     }
 
     pub fn into_data_and_sig(self) -> (T, S) {
-        let Self { data, auth_signature, .. } = self;
+        let Self {
+            data,
+            auth_signature,
+            ..
+        } = self;
         (data, auth_signature)
     }
 
@@ -128,7 +132,11 @@ impl<T: Message + PartialEq, S: PartialEq> PartialEq for Envelope<T, S> {
 
 impl<T: Message> Envelope<T, EmptySignInfo> {
     pub fn new(data: T) -> Self {
-        Self { digest: OnceCell::new(), data, auth_signature: EmptySignInfo {} }
+        Self {
+            digest: OnceCell::new(),
+            data,
+            auth_signature: EmptySignInfo {},
+        }
     }
 }
 
@@ -136,9 +144,18 @@ impl<T> Envelope<T, AuthoritySignInfo>
 where
     T: Message + Serialize,
 {
-    pub fn new(epoch: EpochId, data: T, secret: &dyn Signer<AuthoritySignature>, authority: AuthorityName) -> Self {
+    pub fn new(
+        epoch: EpochId,
+        data: T,
+        secret: &dyn Signer<AuthoritySignature>,
+        authority: AuthorityName,
+    ) -> Self {
         let auth_signature = Self::sign(epoch, &data, secret, authority);
-        Self { digest: OnceCell::new(), data, auth_signature }
+        Self {
+            digest: OnceCell::new(),
+            data,
+            auth_signature,
+        }
     }
 
     pub fn sign(
@@ -157,7 +174,11 @@ where
 
 impl Envelope<SenderSignedData, AuthoritySignInfo> {
     pub fn verify_committee_sigs_only(&self, committee: &Committee) -> SuiResult {
-        self.auth_signature.verify_secure(self.data(), Intent::sui_app(IntentScope::SenderSignedTransaction), committee)
+        self.auth_signature.verify_secure(
+            self.data(),
+            Intent::sui_app(IntentScope::SenderSignedTransaction),
+            committee,
+        )
     }
 }
 
@@ -165,17 +186,27 @@ impl<T, const S: bool> Envelope<T, AuthorityQuorumSignInfo<S>>
 where
     T: Message + Serialize,
 {
-    pub fn new(data: T, signatures: Vec<AuthoritySignInfo>, committee: &Committee) -> SuiResult<Self> {
+    pub fn new(
+        data: T,
+        signatures: Vec<AuthoritySignInfo>,
+        committee: &Committee,
+    ) -> SuiResult<Self> {
         let cert = Self {
             digest: OnceCell::new(),
             data,
-            auth_signature: AuthorityQuorumSignInfo::<S>::new_from_auth_sign_infos(signatures, committee)?,
+            auth_signature: AuthorityQuorumSignInfo::<S>::new_from_auth_sign_infos(
+                signatures, committee,
+            )?,
         };
 
         Ok(cert)
     }
 
-    pub fn new_from_keypairs_for_testing(data: T, keypairs: &[AuthorityKeyPair], committee: &Committee) -> Self {
+    pub fn new_from_keypairs_for_testing(
+        data: T,
+        keypairs: &[AuthorityKeyPair],
+        committee: &Committee,
+    ) -> Self {
         let signatures = keypairs
             .iter()
             .map(|keypair| {
@@ -304,7 +335,6 @@ impl<T: Message, S> From<TrustedEnvelope<T, S>> for VerifiedEnvelope<T, S> {
 
 impl<T: Message, S> Deref for VerifiedEnvelope<T, S> {
     type Target = Envelope<T, S>;
-
     fn deref(&self) -> &Self::Target {
         &self.0 .0
     }
@@ -312,7 +342,6 @@ impl<T: Message, S> Deref for VerifiedEnvelope<T, S> {
 
 impl<T: Message, S> Deref for Envelope<T, S> {
     type Target = T;
-
     fn deref(&self) -> &Self::Target {
         &self.data
     }
@@ -358,9 +387,15 @@ where
 /// and converting a VerifiedTransaction along with checkpoint information into a VerifiedEnvelope
 /// with CertificateProof::Checkpoint.
 impl<T: Message> VerifiedEnvelope<T, CertificateProof> {
-    pub fn new_from_certificate(certificate: VerifiedEnvelope<T, AuthorityStrongQuorumSignInfo>) -> Self {
+    pub fn new_from_certificate(
+        certificate: VerifiedEnvelope<T, AuthorityStrongQuorumSignInfo>,
+    ) -> Self {
         let inner = certificate.into_inner();
-        let Envelope { digest, data, auth_signature } = inner;
+        let Envelope {
+            digest,
+            data,
+            auth_signature,
+        } = inner;
         VerifiedEnvelope::new_unchecked(Envelope {
             digest,
             data,
@@ -374,7 +409,11 @@ impl<T: Message> VerifiedEnvelope<T, CertificateProof> {
         checkpoint: CheckpointSequenceNumber,
     ) -> Self {
         let inner = transaction.into_inner();
-        let Envelope { digest, data, auth_signature: _ } = inner;
+        let Envelope {
+            digest,
+            data,
+            auth_signature: _,
+        } = inner;
         VerifiedEnvelope::new_unchecked(Envelope {
             digest,
             data,
@@ -384,13 +423,28 @@ impl<T: Message> VerifiedEnvelope<T, CertificateProof> {
 
     pub fn new_system(transaction: VerifiedEnvelope<T, EmptySignInfo>, epoch: EpochId) -> Self {
         let inner = transaction.into_inner();
-        let Envelope { digest, data, auth_signature: _ } = inner;
-        VerifiedEnvelope::new_unchecked(Envelope { digest, data, auth_signature: CertificateProof::new_system(epoch) })
+        let Envelope {
+            digest,
+            data,
+            auth_signature: _,
+        } = inner;
+        VerifiedEnvelope::new_unchecked(Envelope {
+            digest,
+            data,
+            auth_signature: CertificateProof::new_system(epoch),
+        })
     }
 
-    pub fn new_from_quorum_execution(transaction: VerifiedEnvelope<T, EmptySignInfo>, epoch: EpochId) -> Self {
+    pub fn new_from_quorum_execution(
+        transaction: VerifiedEnvelope<T, EmptySignInfo>,
+        epoch: EpochId,
+    ) -> Self {
         let inner = transaction.into_inner();
-        let Envelope { digest, data, auth_signature: _ } = inner;
+        let Envelope {
+            digest,
+            data,
+            auth_signature: _,
+        } = inner;
         VerifiedEnvelope::new_unchecked(Envelope {
             digest,
             data,
@@ -398,9 +452,16 @@ impl<T: Message> VerifiedEnvelope<T, CertificateProof> {
         })
     }
 
-    pub fn new_from_consensus(transaction: VerifiedEnvelope<T, EmptySignInfo>, epoch: EpochId) -> Self {
+    pub fn new_from_consensus(
+        transaction: VerifiedEnvelope<T, EmptySignInfo>,
+        epoch: EpochId,
+    ) -> Self {
         let inner = transaction.into_inner();
-        let Envelope { digest, data, auth_signature: _ } = inner;
+        let Envelope {
+            digest,
+            data,
+            auth_signature: _,
+        } = inner;
         VerifiedEnvelope::new_unchecked(Envelope {
             digest,
             data,

@@ -7,15 +7,14 @@ use crate::{DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
 use move_command_line_common::{
     env::read_bool_env_var,
     files::{find_filenames, path_to_string},
-    testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
 };
 use move_compiler::command_line::COLOR_MODE_ENV_VAR;
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMapWithModules};
 use move_package::{
+    BuildConfig,
     compilation::{compiled_package::OnDiskCompiledPackage, package_layout::CompiledPackageLayout},
     resolution::resolution_graph::ResolvedGraph,
     source_package::{layout::SourcePackageLayout, manifest_parser::parse_move_manifest_from_file},
-    BuildConfig,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -28,11 +27,11 @@ use std::{
 };
 use tempfile::tempdir;
 
-/// Basic datatest testing framework for the CLI. The `run_one` entrypoint expects
-/// an `args.txt` file with arguments that the `move` binary understands (one set
-/// of arguments per line). The testing framework runs the commands, compares the
-/// result to the expected output, and runs `move clean` to discard resources,
-/// modules, and event data created by running the test.
+// Basic datatest testing framework for the CLI. The `run_one` entrypoint expects
+// an `args.txt` file with arguments that the `move` binary understands (one set
+// of arguments per line). The testing framework runs the commands, compares the
+// result to the expected output, and runs `move clean` to discard resources,
+// modules, and event data created by running the test.
 
 /// If this env var is set, `move clean` will not be run after each test.
 /// this is useful if you want to look at the `storage` or `move_events`
@@ -56,15 +55,23 @@ const DEFAULT_TRACE_FILE: &str = "trace";
 /// The prefix for the stack trace that we want to remove from the stderr output if present.
 const STACK_TRACE_PREFIX: &str = "\nStack backtrace:";
 
-fn collect_coverage(trace_file: &Path, build_dir: &Path) -> anyhow::Result<ExecCoverageMapWithModules> {
+fn collect_coverage(
+    trace_file: &Path,
+    build_dir: &Path,
+) -> anyhow::Result<ExecCoverageMapWithModules> {
     let canonical_build = build_dir.canonicalize().unwrap();
-    let package_name = parse_move_manifest_from_file(&SourcePackageLayout::try_find_root(&canonical_build).unwrap())?
-        .package
-        .name
-        .to_string();
-    let pkg =
-        OnDiskCompiledPackage::from_path(&build_dir.join(package_name).join(CompiledPackageLayout::BuildInfo.path()))?
-            .into_compiled_package()?;
+    let package_name = parse_move_manifest_from_file(
+        &SourcePackageLayout::try_find_root(&canonical_build).unwrap(),
+    )?
+    .package
+    .name
+    .to_string();
+    let pkg = OnDiskCompiledPackage::from_path(
+        &build_dir
+            .join(package_name)
+            .join(CompiledPackageLayout::BuildInfo.path()),
+    )?
+    .into_compiled_package()?;
     let src_modules = pkg
         .all_modules()
         .map(|unit| {
@@ -84,16 +91,23 @@ fn collect_coverage(trace_file: &Path, build_dir: &Path) -> anyhow::Result<ExecC
     }
 
     // collect filtered trace
-    let coverage_map =
-        CoverageMap::from_trace_file(trace_file).to_unified_exec_map().into_coverage_map_with_modules(filter);
+    let coverage_map = CoverageMap::from_trace_file(trace_file)
+        .to_unified_exec_map()
+        .into_coverage_map_with_modules(filter);
 
     Ok(coverage_map)
 }
 
-fn determine_package_nest_depth(resolution_graph: &ResolvedGraph, pkg_dir: &Path) -> anyhow::Result<usize> {
+fn determine_package_nest_depth(
+    resolution_graph: &ResolvedGraph,
+    pkg_dir: &Path,
+) -> anyhow::Result<usize> {
     let mut depth = 0;
     for (_, dep) in resolution_graph.package_table.iter() {
-        depth = std::cmp::max(depth, dep.package_path.strip_prefix(pkg_dir)?.components().count() + 1);
+        depth = std::cmp::max(
+            depth,
+            dep.package_path.strip_prefix(pkg_dir)?.components().count() + 1,
+        );
     }
     Ok(depth)
 }
@@ -116,11 +130,12 @@ fn copy_deps(tmp_dir: &Path, pkg_dir: &Path) -> anyhow::Result<PathBuf> {
     // Sometimes we run a test that isn't a package for metatests so if there isn't a package we
     // don't need to nest at all. Resolution graph diagnostics are only needed for CLI commands so
     // ignore them by passing a vector as the writer.
-    let package_resolution = match (BuildConfig { dev_mode: true, ..Default::default() }).resolution_graph_for_package(
-        pkg_dir,
-        None,
-        &mut Vec::new(),
-    ) {
+    let package_resolution = match (BuildConfig {
+        dev_mode: true,
+        ..Default::default()
+    })
+    .resolution_graph_for_package(pkg_dir, None, &mut Vec::new())
+    {
         Ok(pkg) => pkg,
         Err(_) => return Ok(tmp_dir.to_path_buf()),
     };
@@ -176,7 +191,9 @@ pub fn run_one(
     let wks_dir = temp_dir.as_ref().map_or(exe_dir, |t| &t.1);
 
     let storage_dir = wks_dir.join(DEFAULT_STORAGE_DIR);
-    let build_output = wks_dir.join(DEFAULT_BUILD_DIR).join(CompiledPackageLayout::Root.path());
+    let build_output = wks_dir
+        .join(DEFAULT_BUILD_DIR)
+        .join(CompiledPackageLayout::Root.path());
 
     // template for preparing a cli command
     let cli_command_template = || {
@@ -191,26 +208,29 @@ pub fn run_one(
 
     if storage_dir.exists() || build_output.exists() {
         // need to clean before testing
-        cli_command_template().arg("sandbox").arg("clean").output()?;
+        cli_command_template()
+            .arg("sandbox")
+            .arg("clean")
+            .output()?;
     }
     let mut output = "".to_string();
 
     // always use the absolute path for the trace file as we may change dirs in the process
-    let trace_file = if track_cov { Some(wks_dir.canonicalize()?.join(DEFAULT_TRACE_FILE)) } else { None };
+    let trace_file = if track_cov {
+        Some(wks_dir.canonicalize()?.join(DEFAULT_TRACE_FILE))
+    } else {
+        None
+    };
 
     // Disable colors in error reporting from the Move compiler
-    env::set_var(COLOR_MODE_ENV_VAR, "NONE");
+    unsafe { env::set_var(COLOR_MODE_ENV_VAR, "NONE") };
     for args_line in args_file {
         let args_line = args_line?;
 
         if let Some(external_cmd) = args_line.strip_prefix('>') {
             let external_cmd = external_cmd.trim_start();
-            let mut cmd_iter = external_cmd.split_ascii_whitespace();
-
-            let external_program = cmd_iter.next().expect("empty external command");
-
-            let mut command = Command::new(external_program);
-            command.args(cmd_iter);
+            let mut command = Command::new("sh");
+            command.arg("-c").arg(external_cmd);
             if let Some(work_dir) = temp_dir.as_ref() {
                 command.current_dir(&work_dir.1);
             } else {
@@ -219,8 +239,8 @@ pub fn run_one(
             let cmd_output = command.output()?;
 
             writeln!(&mut output, "External Command `{}`:", external_cmd)?;
-            output += std::str::from_utf8(&cmd_output.stdout)?;
-            output += std::str::from_utf8(&cmd_output.stderr)?;
+            output += std::str::from_utf8(cmd_output.stdout.trim_ascii_start())?;
+            output += std::str::from_utf8(cmd_output.stderr.trim_ascii_start())?;
 
             continue;
         }
@@ -243,9 +263,9 @@ pub fn run_one(
                 //   1. we run with move-cli test <path-to-args-A.txt> --track-cov, and
                 //   2. in this <args-A.txt>, there is another command: test <args-B.txt>
                 // then, when running <args-B.txt>, coverage will not be tracked nor printed
-                env::remove_var(MOVE_VM_TRACING_ENV_VAR_NAME);
+                unsafe { env::remove_var(MOVE_VM_TRACING_ENV_VAR_NAME) };
             }
-            Some(path) => env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, path.as_os_str()),
+            Some(path) => unsafe { env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, path.as_os_str()) },
         }
 
         let cmd_output = cli_command_template().args(args_iter).output()?;
@@ -279,11 +299,22 @@ pub fn run_one(
     let run_move_clean = !read_bool_env_var(NO_MOVE_CLEAN);
     if run_move_clean {
         // run the clean command to ensure that temporary state is cleaned up
-        cli_command_template().arg("sandbox").arg("clean").output()?;
+        cli_command_template()
+            .arg("sandbox")
+            .arg("clean")
+            .output()?;
 
         // check that build and storage was deleted
-        assert!(!storage_dir.exists(), "`move clean` failed to eliminate {} directory", DEFAULT_STORAGE_DIR);
-        assert!(!build_output.exists(), "`move clean` failed to eliminate {} directory", DEFAULT_BUILD_DIR);
+        assert!(
+            !storage_dir.exists(),
+            "`move clean` failed to eliminate {} directory",
+            DEFAULT_STORAGE_DIR
+        );
+        assert!(
+            !build_output.exists(),
+            "`move clean` failed to eliminate {} directory",
+            DEFAULT_BUILD_DIR
+        );
 
         // clean the trace file as well if it exists
         if let Some(trace_path) = &trace_file {
@@ -308,14 +339,22 @@ pub fn run_one(
 
     let expected_output = fs::read_to_string(exp_path).unwrap_or_else(|_| "".to_string());
     if expected_output != output {
-        let msg = format!("Expected output differs from actual output:\n{}", format_diff(expected_output, output));
+        let msg = format!(
+            "Expected output differs from actual output:\n{}",
+            format_diff(expected_output, output)
+        );
         anyhow::bail!(add_update_baseline_fix(msg))
     } else {
         Ok(cov_info)
     }
 }
 
-pub fn run_all(args_path: &Path, cli_binary: &Path, use_temp_dir: bool, track_cov: bool) -> anyhow::Result<()> {
+pub fn run_all(
+    args_path: &Path,
+    cli_binary: &Path,
+    use_temp_dir: bool,
+    track_cov: bool,
+) -> anyhow::Result<()> {
     let mut test_total: u64 = 0;
     let mut test_passed: u64 = 0;
     let mut cov_info = ExecCoverageMapWithModules::empty();
@@ -352,4 +391,49 @@ pub fn run_all(args_path: &Path, cli_binary: &Path, use_temp_dir: bool, track_co
     }
 
     Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// The following code is migrated from `move-command-line-common` crate, which switched to `insta`
+// for expected output testing. That is not really desierable for the Move CLI, so it has kept
+// this hand rolled approach.
+
+/// Extension for expected output files
+const EXP_EXT: &str = "exp";
+
+/// If any of these env vars is set, the test harness should overwrite
+/// the existing .exp files with the output instead of checking
+/// them against the output.
+const UPDATE_BASELINE: &str = "UPDATE_BASELINE";
+const UPBL: &str = "UPBL";
+const UB: &str = "UB";
+
+fn read_env_update_baseline() -> bool {
+    read_bool_env_var(UPDATE_BASELINE) || read_bool_env_var(UPBL) || read_bool_env_var(UB)
+}
+
+fn add_update_baseline_fix(s: impl AsRef<str>) -> String {
+    format!(
+        "{}\n\
+        Run with `env {}=1` (or `env {}=1`) to save the current output as \
+        the new expected output",
+        s.as_ref(),
+        UB,
+        UPDATE_BASELINE
+    )
+}
+
+fn format_diff(expected: impl AsRef<str>, actual: impl AsRef<str>) -> String {
+    use colored::Colorize;
+    use similar::ChangeTag;
+    let diff = similar::TextDiff::from_lines(expected.as_ref(), actual.as_ref());
+
+    diff.iter_all_changes()
+        .map(|change| match change.tag() {
+            ChangeTag::Delete => format!("{}{}", "-".bold(), change.value()).red(),
+            ChangeTag::Insert => format!("{}{}", "+".bold(), change.value()).green(),
+            ChangeTag::Equal => change.value().dimmed(),
+        })
+        .map(|s| s.to_string())
+        .collect()
 }

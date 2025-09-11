@@ -6,7 +6,11 @@
 
 use crate::{
     completions::utils::mod_defs,
-    symbols::{CursorContext, CursorDefinition, DefInfo, Symbols},
+    symbols::{
+        Symbols,
+        cursor::{CursorContext, CursorDefinition},
+        def_info::DefInfo,
+    },
 };
 use lsp_types::{CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, Position};
 use move_command_line_common::files::FileHash;
@@ -18,7 +22,10 @@ use std::path::Path;
 
 /// Checks if the cursor is at the opening brace of a struct definition and returns
 /// auto-completion of this struct into an object if the struct has the `key` ability.
-pub fn object_completion(symbols: &Symbols, cursor: &CursorContext) -> (Option<CompletionItem>, bool) {
+pub fn object_completion(
+    symbols: &Symbols,
+    cursor: &CursorContext,
+) -> (Option<CompletionItem>, bool) {
     let mut completion_finalized = false;
     // look for a struct definition on the line that contains `{`, check its abilities,
     // and do auto-completion if `key` ability is present
@@ -36,7 +43,9 @@ pub fn object_completion(symbols: &Symbols, cursor: &CursorContext) -> (Option<C
         return (None, completion_finalized);
     };
 
-    let Some(DefInfo::Struct(_, _, _, _, abilities, ..)) = symbols.def_info.get(&struct_def.name_loc) else {
+    let Some(DefInfo::Struct(_, _, _, _, abilities, ..)) =
+        symbols.def_info.get(&struct_def.name_loc)
+    else {
         return (None, completion_finalized);
     };
 
@@ -84,7 +93,13 @@ pub fn init_completion(
             let Some(use_file_mod_def) = use_file_mod_definition.first() else {
                 break;
             };
-            if is_definition(symbols, position.line, u.col_start(), use_file_mod_def.fhash(), def_loc) {
+            if is_definition(
+                symbols,
+                position.line,
+                u.col_start(),
+                use_file_mod_def.fhash(),
+                def_loc,
+            ) {
                 // since it's a definition, there is no point in trying to suggest a name
                 // if one is about to create a fresh identifier
                 completion_finalized = true;
@@ -121,7 +136,9 @@ pub fn init_completion(
             // the init function has a struct thats an one-time-witness candidate struct
             let otw_candidate = Symbol::from(mod_ident.module.value().to_uppercase());
             let init_snippet = if mdef.structs().contains_key(&otw_candidate) {
-                format!("{INIT_FN_NAME}(${{1:witness}}: {otw_candidate}, {sui_ctx_arg}) {{\n\t${{2:}}\n}}\n")
+                format!(
+                    "{INIT_FN_NAME}(${{1:witness}}: {otw_candidate}, {sui_ctx_arg}) {{\n\t${{2:}}\n}}\n"
+                )
             } else {
                 format!("{INIT_FN_NAME}({sui_ctx_arg}) {{\n\t${{1:}}\n}}\n")
             };
@@ -129,7 +146,9 @@ pub fn init_completion(
             let init_completion = CompletionItem {
                 label: INIT_FN_NAME.to_string(),
                 kind: Some(CompletionItemKind::SNIPPET),
-                documentation: Some(Documentation::String("Module initializer snippet".to_string())),
+                documentation: Some(Documentation::String(
+                    "Module initializer snippet".to_string(),
+                )),
                 insert_text: Some(init_snippet),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
                 ..Default::default()
@@ -183,8 +202,17 @@ fn preceding_strings(buffer: &str, position: &Position) -> Vec<(String, u32)> {
 }
 
 /// Checks if a use at a given position is also a definition.
-fn is_definition(symbols: &Symbols, use_line: u32, use_col: u32, use_fhash: FileHash, def_loc: Loc) -> bool {
-    if let Some(use_loc) = symbols.files.line_char_offset_to_loc_opt(use_fhash, use_line, use_col) {
+fn is_definition(
+    symbols: &Symbols,
+    use_line: u32,
+    use_col: u32,
+    use_fhash: FileHash,
+    def_loc: Loc,
+) -> bool {
+    if let Some(use_loc) = symbols
+        .files
+        .line_char_offset_to_loc_opt(use_fhash, use_line, use_col)
+    {
         // TODO: is overlapping better?
         def_loc.contains(&use_loc)
     } else {

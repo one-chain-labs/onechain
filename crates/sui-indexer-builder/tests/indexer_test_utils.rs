@@ -1,26 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use prometheus::{IntCounterVec, IntGaugeVec};
-use tokio::{sync::Mutex, task::JoinHandle};
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
 use mysten_metrics::spawn_monitored_task;
 
-use sui_indexer_builder::{
-    indexer_builder::{DataMapper, DataSender, Datasource, IndexerProgressStore, Persistent},
-    metrics::IndexerMetricProvider,
-    Task,
-    Tasks,
-    LIVE_TASK_TARGET_CHECKPOINT,
+use sui_indexer_builder::indexer_builder::{
+    DataMapper, DataSender, Datasource, IndexerProgressStore, Persistent,
 };
+use sui_indexer_builder::metrics::IndexerMetricProvider;
+use sui_indexer_builder::{Task, Tasks, LIVE_TASK_TARGET_CHECKPOINT};
 
 pub struct TestDatasource<T> {
     pub data: Vec<T>,
@@ -46,7 +43,9 @@ where
         Ok(spawn_monitored_task!(async {
             let mut cp = task.start_checkpoint;
             while cp < data_clone.len() as u64 {
-                data_sender.send((cp, vec![data_clone[cp as usize].clone()])).await?;
+                data_sender
+                    .send((cp, vec![data_clone[cp as usize].clone()]))
+                    .await?;
                 cp += 1;
             }
             Ok(())
@@ -96,7 +95,10 @@ pub struct InMemoryPersistent<T> {
 
 impl<T> InMemoryPersistent<T> {
     pub fn new() -> Self {
-        InMemoryPersistent { progress_store: Default::default(), data: Arc::new(Mutex::new(vec![])) }
+        InMemoryPersistent {
+            progress_store: Default::default(),
+            data: Arc::new(Mutex::new(vec![])),
+        }
     }
 
     #[cfg(any(feature = "test-utils", test))]
@@ -113,7 +115,10 @@ impl<T> InMemoryPersistent<T> {
         Ok(tasks)
     }
 
-    async fn get_largest_backfill_task_target_checkpoint(&self, task_prefix: &str) -> Result<Option<u64>, Error> {
+    async fn get_largest_backfill_task_target_checkpoint(
+        &self,
+        task_prefix: &str,
+    ) -> Result<Option<u64>, Error> {
         Ok(self
             .progress_store
             .lock()
@@ -129,12 +134,27 @@ impl<T> InMemoryPersistent<T> {
 #[async_trait]
 impl<T: Send + Sync> IndexerProgressStore for InMemoryPersistent<T> {
     async fn load_progress(&self, task_name: String) -> anyhow::Result<u64> {
-        Ok(self.progress_store.lock().await.get(&task_name).unwrap().start_checkpoint)
+        Ok(self
+            .progress_store
+            .lock()
+            .await
+            .get(&task_name)
+            .unwrap()
+            .start_checkpoint)
     }
 
-    async fn save_progress(&mut self, task: &Task, checkpoint_numbers: &[u64]) -> anyhow::Result<Option<u64>> {
+    async fn save_progress(
+        &mut self,
+        task: &Task,
+        checkpoint_numbers: &[u64],
+    ) -> anyhow::Result<Option<u64>> {
         let checkpoint_number = *checkpoint_numbers.last().unwrap();
-        self.progress_store.lock().await.get_mut(&task.task_name).unwrap().start_checkpoint = checkpoint_number;
+        self.progress_store
+            .lock()
+            .await
+            .get_mut(&task.task_name)
+            .unwrap()
+            .start_checkpoint = checkpoint_number;
         Ok(Some(checkpoint_number))
     }
 
@@ -151,7 +171,10 @@ impl<T: Send + Sync> IndexerProgressStore for InMemoryPersistent<T> {
         Tasks::new(tasks)
     }
 
-    async fn get_largest_indexed_checkpoint(&self, task_prefix: &str) -> Result<Option<u64>, Error> {
+    async fn get_largest_indexed_checkpoint(
+        &self,
+        task_prefix: &str,
+    ) -> Result<Option<u64>, Error> {
         let checkpoint = self
             .progress_store
             .lock()
@@ -165,32 +188,48 @@ impl<T: Send + Sync> IndexerProgressStore for InMemoryPersistent<T> {
         if checkpoint.is_some() {
             Ok(checkpoint)
         } else {
-            self.get_largest_backfill_task_target_checkpoint(task_prefix).await
+            self.get_largest_backfill_task_target_checkpoint(task_prefix)
+                .await
         }
     }
 
-    async fn register_task(&mut self, task_name: String, checkpoint: u64, target_checkpoint: u64) -> Result<(), Error> {
-        let existing = self.progress_store.lock().await.insert(task_name.clone(), Task {
-            task_name: task_name.clone(),
-            start_checkpoint: checkpoint,
-            target_checkpoint,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
-            is_live_task: false,
-        });
+    async fn register_task(
+        &mut self,
+        task_name: String,
+        checkpoint: u64,
+        target_checkpoint: u64,
+    ) -> Result<(), Error> {
+        let existing = self.progress_store.lock().await.insert(
+            task_name.clone(),
+            Task {
+                task_name: task_name.clone(),
+                start_checkpoint: checkpoint,
+                target_checkpoint,
+                timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+                is_live_task: false,
+            },
+        );
         if existing.is_some() {
             return Err(anyhow!("Task {task_name} already exists"));
         }
         Ok(())
     }
 
-    async fn register_live_task(&mut self, task_name: String, checkpoint: u64) -> Result<(), Error> {
-        let existing = self.progress_store.lock().await.insert(task_name.clone(), Task {
-            task_name: task_name.clone(),
-            start_checkpoint: checkpoint,
-            target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
-            is_live_task: true,
-        });
+    async fn register_live_task(
+        &mut self,
+        task_name: String,
+        checkpoint: u64,
+    ) -> Result<(), Error> {
+        let existing = self.progress_store.lock().await.insert(
+            task_name.clone(),
+            Task {
+                task_name: task_name.clone(),
+                start_checkpoint: checkpoint,
+                target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
+                timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+                is_live_task: true,
+            },
+        );
         if existing.is_some() {
             return Err(anyhow!("Task {task_name} already exists"));
         }
@@ -198,7 +237,10 @@ impl<T: Send + Sync> IndexerProgressStore for InMemoryPersistent<T> {
     }
 
     async fn update_task(&mut self, task: Task) -> Result<(), Error> {
-        self.progress_store.lock().await.insert(task.task_name.clone(), task);
+        self.progress_store
+            .lock()
+            .await
+            .insert(task.task_name.clone(), task);
         Ok(())
     }
 }

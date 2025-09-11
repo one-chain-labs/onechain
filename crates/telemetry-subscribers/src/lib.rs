@@ -6,26 +6,26 @@ use crossterm::tty::IsTty;
 use once_cell::sync::Lazy;
 use opentelemetry::{
     trace::{Link, SamplingResult, SpanKind, TraceId, TracerProvider as _},
-    Context,
-    KeyValue,
+    Context, KeyValue,
 };
 use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::trace::Sampler;
 use opentelemetry_sdk::{
-    self,
-    runtime,
-    trace::{BatchSpanProcessor, Sampler, ShouldSample, TracerProvider},
+    self, runtime,
+    trace::{BatchSpanProcessor, ShouldSample, TracerProvider},
     Resource,
 };
 use span_latency_prom::PrometheusSpanLatencyLayer;
+use std::path::PathBuf;
+use std::time::Duration;
 use std::{
     env,
     io::{stderr, Write},
-    path::PathBuf,
     str::FromStr,
     sync::{atomic::Ordering, Arc, Mutex},
-    time::Duration,
 };
-use tracing::{error, info, metadata::LevelFilter, Level};
+use tracing::metadata::LevelFilter;
+use tracing::{error, info, Level};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_subscriber::{filter, fmt, layer::SubscriberExt, reload, EnvFilter, Layer, Registry};
 
@@ -75,9 +75,16 @@ pub struct TelemetryGuards {
 }
 
 impl TelemetryGuards {
-    fn new(config: TelemetryConfig, worker_guard: WorkerGuard, provider: Option<TracerProvider>) -> Self {
+    fn new(
+        config: TelemetryConfig,
+        worker_guard: WorkerGuard,
+        provider: Option<TracerProvider>,
+    ) -> Self {
         set_global_telemetry_config(config);
-        Self { worker_guard, provider }
+        Self {
+            worker_guard,
+            provider,
+        }
     }
 }
 
@@ -98,7 +105,9 @@ impl FilterHandle {
     }
 
     pub fn get(&self) -> Result<String, BoxError> {
-        self.0.with_current(|filter| filter.to_string()).map_err(Into::into)
+        self.0
+            .with_current(|filter| filter.to_string())
+            .map_err(Into::into)
     }
 }
 
@@ -128,7 +137,11 @@ impl TracingHandle {
         Ok(())
     }
 
-    pub fn update_trace_filter<S: AsRef<str>>(&self, directives: S, duration: Duration) -> Result<(), BoxError> {
+    pub fn update_trace_filter<S: AsRef<str>>(
+        &self,
+        directives: S,
+        duration: Duration,
+    ) -> Result<(), BoxError> {
         if let Some(trace) = &self.trace {
             let res = trace.update(directives);
             // after duration is elapsed, reset to the env setting
@@ -210,7 +223,8 @@ fn set_panic_hook(crash_on_panic: bool) {
     }));
 }
 
-static GLOBAL_CONFIG: Lazy<Arc<Mutex<Option<TelemetryConfig>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
+static GLOBAL_CONFIG: Lazy<Arc<Mutex<Option<TelemetryConfig>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(None)));
 
 fn set_global_telemetry_config(config: TelemetryConfig) {
     let mut global_config = GLOBAL_CONFIG.lock().unwrap();
@@ -302,7 +316,8 @@ impl TelemetryConfig {
         }
 
         if let Ok(span_level) = env::var("TOKIO_SPAN_LEVEL") {
-            self.span_level = Some(Level::from_str(&span_level).expect("Cannot parse TOKIO_SPAN_LEVEL"));
+            self.span_level =
+                Some(Level::from_str(&span_level).expect("Cannot parse TOKIO_SPAN_LEVEL"));
         }
 
         if let Ok(filepath) = env::var("RUST_LOG_FILE") {
@@ -330,7 +345,8 @@ impl TelemetryConfig {
                 directives.push_str(&format!(",{}=trace", target));
             }
         }
-        let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(directives));
+        let env_filter =
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(directives));
         let (log_filter, reload_handle) = reload::Layer::new(env_filter);
         let log_filter_handle = FilterHandle(reload_handle);
 
@@ -338,21 +354,22 @@ impl TelemetryConfig {
         // This is a dumb filter for now - allows all spans that are below a given level.
         // TODO: implement a sampling filter
         let span_level = config.span_level.unwrap_or(Level::INFO);
-        let span_filter = filter::filter_fn(move |metadata| metadata.is_span() && *metadata.level() <= span_level);
+        let span_filter = filter::filter_fn(move |metadata| {
+            metadata.is_span() && *metadata.level() <= span_level
+        });
 
         let mut layers = Vec::new();
 
         // tokio-console layer
         // Please see https://docs.rs/console-subscriber/latest/console_subscriber/struct.Builder.html#configuration
         // for environment vars/config options
-        #[cfg(feature = "tokio-console")]
         if config.tokio_console {
             layers.push(console_subscriber::spawn().boxed());
         }
 
         if let Some(registry) = config.prom_registry {
-            let span_lat_layer =
-                PrometheusSpanLatencyLayer::try_new(&registry, 15).expect("Could not initialize span latency layer");
+            let span_lat_layer = PrometheusSpanLatencyLayer::try_new(&registry, 15)
+                .expect("Could not initialize span latency layer");
             layers.push(span_lat_layer.with_filter(span_filter.clone()).boxed());
         }
 
@@ -364,41 +381,62 @@ impl TelemetryConfig {
 
         if config.enable_otlp_tracing {
             let trace_file = env::var("TRACE_FILE").ok();
+            let mut otel_kv_vec = vec![opentelemetry::KeyValue::new(
+                "service.name",
+                service_name.clone(),
+            )];
+            if let Ok(namespace) = env::var("NAMESPACE") {
+                otel_kv_vec.push(opentelemetry::KeyValue::new("service.namespace", namespace));
+            }
+            if let Ok(hostname) = env::var("HOSTNAME") {
+                otel_kv_vec.push(opentelemetry::KeyValue::new("host", hostname));
+            }
+            if let Ok(network) = env::var("NETWORK") {
+                otel_kv_vec.push(opentelemetry::KeyValue::new("network", network));
+            }
 
-            let config = opentelemetry_sdk::trace::Config::default()
-                .with_resource(Resource::new(vec![opentelemetry::KeyValue::new("service.name", service_name.clone())]))
-                .with_sampler(Sampler::ParentBased(Box::new(sampler.clone())));
+            let resource = Resource::new(otel_kv_vec);
+            let sampler = Sampler::ParentBased(Box::new(sampler.clone()));
 
             // We can either do file output or OTLP, but not both. tracing-opentelemetry
             // only supports a single tracer at a time.
             let telemetry = if let Some(trace_file) = trace_file {
-                let exporter = FileExporter::new(Some(trace_file.into())).expect("Failed to create exporter");
+                let exporter =
+                    FileExporter::new(Some(trace_file.into())).expect("Failed to create exporter");
                 file_output = exporter.cached_open_file.clone();
                 let processor = BatchSpanProcessor::builder(exporter, runtime::Tokio).build();
 
-                let p = TracerProvider::builder().with_config(config).with_span_processor(processor).build();
+                let p = TracerProvider::builder()
+                    .with_resource(resource)
+                    .with_sampler(sampler)
+                    .with_span_processor(processor)
+                    .build();
 
                 let tracer = p.tracer(service_name);
                 provider = Some(p);
 
                 tracing_opentelemetry::layer().with_tracer(tracer)
             } else {
-                let endpoint = env::var("OTLP_ENDPOINT").unwrap_or_else(|_| "http://localhost:4317".to_string());
-
-                let p = opentelemetry_otlp::new_pipeline()
-                    .tracing()
-                    .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_endpoint(endpoint))
-                    .with_trace_config(config)
-                    .install_batch(runtime::Tokio)
-                    .expect("Could not create async Tracer");
-
-                let tracer = p.tracer(service_name);
-
+                let endpoint = env::var("OTLP_ENDPOINT")
+                    .unwrap_or_else(|_| "http://localhost:4317".to_string());
+                let otlp_exporter = opentelemetry_otlp::SpanExporter::builder()
+                    .with_tonic()
+                    .with_endpoint(endpoint)
+                    .build()
+                    .unwrap();
+                let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
+                    .with_resource(resource)
+                    .with_sampler(sampler)
+                    .with_batch_exporter(otlp_exporter, runtime::Tokio)
+                    .build();
+                let tracer = tracer_provider.tracer(service_name);
                 tracing_opentelemetry::layer().with_tracer(tracer)
             };
 
             // Enable Trace Contexts for tying spans together
-            opentelemetry::global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
+            opentelemetry::global::set_text_map_propagator(
+                opentelemetry_sdk::propagation::TraceContextPropagator::new(),
+            );
 
             let trace_env_filter = EnvFilter::try_from_env("TRACE_FILTER").unwrap();
             let (trace_env_filter, reload_handle) = reload::Layer::new(trace_env_filter);
@@ -429,7 +467,8 @@ impl TelemetryConfig {
         }
 
         let subscriber = tracing_subscriber::registry().with(layers);
-        ::tracing::subscriber::set_global_default(subscriber).expect("unable to initialize tracing subscriber");
+        ::tracing::subscriber::set_global_default(subscriber)
+            .expect("unable to initialize tracing subscriber");
 
         if config.panic_hook {
             set_panic_hook(config.crash_on_panic);
@@ -439,7 +478,15 @@ impl TelemetryConfig {
         // gets flushed and closed. If this is dropped too early then no output will appear!
         let guards = TelemetryGuards::new(config_clone, worker_guard, provider);
 
-        (guards, TracingHandle { log: log_filter_handle, trace: trace_filter_handle, file_output, sampler })
+        (
+            guards,
+            TracingHandle {
+                log: log_filter_handle,
+                trace: trace_filter_handle,
+                file_output,
+                sampler,
+            },
+        )
     }
 }
 
@@ -452,7 +499,9 @@ struct SamplingFilter {
 
 impl SamplingFilter {
     fn new(sample_rate: f64) -> Self {
-        SamplingFilter { sample_rate: Arc::new(AtomicF64::new(Self::clamp(sample_rate))) }
+        SamplingFilter {
+            sample_rate: Arc::new(AtomicF64::new(Self::clamp(sample_rate))),
+        }
     }
 
     fn clamp(sample_rate: f64) -> f64 {
@@ -488,12 +537,17 @@ impl ShouldSample for SamplingFilter {
 pub fn init_for_testing() {
     static LOGGER: Lazy<()> = Lazy::new(|| {
         let subscriber = ::tracing_subscriber::FmtSubscriber::builder()
-            .with_env_filter(EnvFilter::builder().with_default_directive(LevelFilter::INFO.into()).from_env_lossy())
+            .with_env_filter(
+                EnvFilter::builder()
+                    .with_default_directive(LevelFilter::INFO.into())
+                    .from_env_lossy(),
+            )
             .with_file(true)
             .with_line_number(true)
             .with_test_writer()
             .finish();
-        ::tracing::subscriber::set_global_default(subscriber).expect("unable to initialize logging for tests");
+        ::tracing::subscriber::set_global_default(subscriber)
+            .expect("unable to initialize logging for tests");
     });
 
     Lazy::force(&LOGGER);
@@ -511,7 +565,9 @@ mod tests {
     fn test_telemetry_init() {
         let registry = prometheus::Registry::new();
         // Default logging level is INFO, but here we set the span level to DEBUG.  TRACE spans should be ignored.
-        let config = TelemetryConfig::new().with_span_level(Level::DEBUG).with_prom_registry(&registry);
+        let config = TelemetryConfig::new()
+            .with_span_level(Level::DEBUG)
+            .with_prom_registry(&registry);
         let _guard = config.init();
 
         info!(a = 1, "This will be INFO.");

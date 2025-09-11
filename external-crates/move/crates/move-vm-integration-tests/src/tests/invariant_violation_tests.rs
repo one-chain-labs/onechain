@@ -2,23 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::{
+    Bytecode::*, CodeUnit, Constant, ConstantPoolIndex, FunctionDefinition, FunctionHandle,
+    FunctionHandleIndex, IdentifierIndex, Signature, SignatureIndex, SignatureToken::*, Visibility,
     empty_module,
-    Bytecode::*,
-    CodeUnit,
-    Constant,
-    ConstantPoolIndex,
-    FunctionDefinition,
-    FunctionHandle,
-    FunctionHandleIndex,
-    IdentifierIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken::*,
-    Visibility,
 };
 use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 use move_vm_runtime::move_vm::MoveVM;
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_test_utils::{InMemoryStorage, gas_schedule::GasStatus};
 
 use crate::compiler::serialize_module_at_max_version;
 
@@ -37,7 +27,10 @@ fn merge_borrow_states_infinite_loop() {
             MutableReference(Box::new(U64)),
         ]),
     ];
-    m.constant_pool = vec![Constant { type_: Vector(Box::new(U8)), data: vec![0] }];
+    m.constant_pool = vec![Constant {
+        type_: Vector(Box::new(U8)),
+        data: vec![0],
+    }];
     m.function_handles = vec![FunctionHandle {
         module: m.self_module_handle_idx,
         name: IdentifierIndex(0),
@@ -91,11 +84,22 @@ fn merge_borrow_states_infinite_loop() {
     let mut module_bytes = vec![];
     serialize_module_at_max_version(&m, &mut module_bytes).unwrap();
     let meter = &mut GasStatus::new_unmetered();
-    session.publish_module(module_bytes, AccountAddress::ZERO, meter).unwrap();
+    session
+        .publish_module(module_bytes, AccountAddress::ZERO, meter)
+        .unwrap();
 
     let err = session
-        .execute_entry_function(&module_id, &fname, vec![], Vec::<Vec<u8>>::new(), &mut GasStatus::new_unmetered())
+        .execute_entry_function(
+            &module_id,
+            &fname,
+            vec![],
+            Vec::<Vec<u8>>::new(),
+            &mut GasStatus::new_unmetered(),
+        )
         .unwrap_err();
 
-    assert_eq!(err.major_status(), StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR);
+    assert_eq!(
+        err.major_status(),
+        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+    );
 }

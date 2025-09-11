@@ -59,7 +59,9 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                     // Emit trace instructions for return values.
                     builder.set_loc_from_attr(*id);
                     for (i, l) in locals.iter().enumerate() {
-                        builder.emit_with(|id| Call(id, vec![], Operation::TraceReturn(i), vec![*l], None));
+                        builder.emit_with(|id| {
+                            Call(id, vec![], Operation::TraceReturn(i), vec![*l], None)
+                        });
                     }
                     builder.emit(bc);
                 }
@@ -71,20 +73,32 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                 Call(_, _, Operation::WriteRef, srcs, _) if srcs[0] < fun_env.get_local_count() => {
                     builder.set_loc_from_attr(bc.get_attr_id());
                     builder.emit(bc.clone());
-                    builder.emit_with(|id| Call(id, vec![], Operation::TraceLocal(srcs[0]), vec![srcs[0]], None));
+                    builder.emit_with(|id| {
+                        Call(
+                            id,
+                            vec![],
+                            Operation::TraceLocal(srcs[0]),
+                            vec![srcs[0]],
+                            None,
+                        )
+                    });
                 }
                 _ => {
                     builder.set_loc_from_attr(bc.get_attr_id());
                     builder.emit(bc.clone());
                     // Emit trace instructions for modified values.
                     let (val_targets, mut_targets) = bc.modifies(&builder.get_target());
-                    let affected_variables: BTreeSet<_> =
-                        val_targets.into_iter().chain(mut_targets.into_iter().map(|(idx, _)| idx)).collect();
+                    let affected_variables: BTreeSet<_> = val_targets
+                        .into_iter()
+                        .chain(mut_targets.into_iter().map(|(idx, _)| idx))
+                        .collect();
                     for idx in affected_variables {
                         // Only emit this for user declared locals, not for ones introduced
                         // by stack elimination.
                         if !fun_env.is_temporary(idx) {
-                            builder.emit_with(|id| Call(id, vec![], Operation::TraceLocal(idx), vec![idx], None));
+                            builder.emit_with(|id| {
+                                Call(id, vec![], Operation::TraceLocal(idx), vec![idx], None)
+                            });
                         }
                     }
                 }

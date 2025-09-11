@@ -11,27 +11,16 @@ mod checked {
         sync::Arc,
     };
 
-    use crate::{
-        adapter::new_native_extensions,
-        error::convert_vm_error,
-        execution_mode::ExecutionMode,
-        execution_value::{
-            CommandKind,
-            ExecutionState,
-            InputObjectMetadata,
-            InputValue,
-            ObjectContents,
-            ObjectValue,
-            RawValueType,
-            ResultValue,
-            TryFromValue,
-            UsageKind,
-            Value,
-        },
-        gas_charger::GasCharger,
-        programmable_transactions::linkage_view::{LinkageInfo, LinkageView, SavedLinkage},
-        type_resolver::TypeTagResolver,
+    use crate::adapter::new_native_extensions;
+    use crate::error::convert_vm_error;
+    use crate::execution_mode::ExecutionMode;
+    use crate::execution_value::{
+        CommandKind, ExecutionState, InputObjectMetadata, InputValue, ObjectContents, ObjectValue,
+        RawValueType, ResultValue, TryFromValue, UsageKind, Value,
     };
+    use crate::gas_charger::GasCharger;
+    use crate::programmable_transactions::linkage_view::{LinkageInfo, LinkageView, SavedLinkage};
+    use crate::type_resolver::TypeTagResolver;
     use move_binary_format::{
         errors::{Location, VMError, VMResult},
         file_format::{CodeOffset, FunctionDefinitionIndex, TypeParameterIndex},
@@ -43,8 +32,12 @@ mod checked {
     };
     use move_vm_runtime::{move_vm::MoveVM, session::Session};
     use move_vm_types::loaded_data::runtime_types::Type;
-    use sui_move_natives::object_runtime::{self, get_all_uids, max_event_error, ObjectRuntime, RuntimeResults};
+    use sui_move_natives::object_runtime::{
+        self, get_all_uids, max_event_error, ObjectRuntime, RuntimeResults,
+    };
     use sui_protocol_config::ProtocolConfig;
+    use sui_types::execution_status::CommandArgumentError;
+    use sui_types::storage::PackageObject;
     use sui_types::{
         balance::Balance,
         base_types::{MoveObjectType, ObjectID, SequenceNumber, SuiAddress, TxContext},
@@ -52,18 +45,12 @@ mod checked {
         error::{command_argument_error, ExecutionError, ExecutionErrorKind},
         event::Event,
         execution::{ExecutionResults, ExecutionResultsV1},
-        execution_status::CommandArgumentError,
         metrics::LimitsMetrics,
         move_package::MovePackage,
         object::{Data, MoveObject, Object, ObjectInner, Owner},
         storage::{
-            BackingPackageStore,
-            ChildObjectResolver,
-            DeleteKind,
-            DeleteKindWithOldVersion,
-            ObjectChange,
-            PackageObject,
-            WriteKind,
+            BackingPackageStore, ChildObjectResolver, DeleteKind, DeleteKindWithOldVersion,
+            ObjectChange, WriteKind,
         },
         transaction::{Argument, CallArg, ObjectArg},
     };
@@ -127,8 +114,11 @@ mod checked {
             gas_charger: &'a mut GasCharger,
             inputs: Vec<CallArg>,
         ) -> Result<Self, ExecutionError> {
-            let init_linkage =
-                if protocol_config.package_upgrades_supported() { LinkageInfo::Unset } else { LinkageInfo::Universal };
+            let init_linkage = if protocol_config.package_upgrades_supported() {
+                LinkageInfo::Unset
+            } else {
+                LinkageInfo::Universal
+            };
 
             // we need a new session just for loading types, which is sad
             // TODO remove this
@@ -145,7 +135,15 @@ mod checked {
             let mut input_object_map = BTreeMap::new();
             let inputs = inputs
                 .into_iter()
-                .map(|call_arg| load_call_arg(vm, state_view, &mut tmp_session, &mut input_object_map, call_arg))
+                .map(|call_arg| {
+                    load_call_arg(
+                        vm,
+                        state_view,
+                        &mut tmp_session,
+                        &mut input_object_map,
+                        call_arg,
+                    )
+                })
                 .collect::<Result<_, ExecutionError>>()?;
             let gas = if let Some(gas_coin) = gas_charger.gas_coin() {
                 let mut gas = load_object(
@@ -159,18 +157,29 @@ mod checked {
                 // subtract the max gas budget. This amount is off limits in the programmable transaction,
                 // so to mimic this "off limits" behavior, we act as if the coin has less balance than
                 // it really does
-                let Some(Value::Object(ObjectValue { contents: ObjectContents::Coin(coin), .. })) = &mut gas.inner.value
+                let Some(Value::Object(ObjectValue {
+                    contents: ObjectContents::Coin(coin),
+                    ..
+                })) = &mut gas.inner.value
                 else {
                     invariant_violation!("Gas object should be a populated coin")
                 };
                 let max_gas_in_balance = gas_charger.gas_budget();
                 let Some(new_balance) = coin.balance.value().checked_sub(max_gas_in_balance) else {
-                    invariant_violation!("Transaction input checker should check that there is enough gas");
+                    invariant_violation!(
+                        "Transaction input checker should check that there is enough gas"
+                    );
                 };
                 coin.balance = Balance::new(new_balance);
                 gas
             } else {
-                InputValue { object_metadata: None, inner: ResultValue { last_usage_kind: None, value: None } }
+                InputValue {
+                    object_metadata: None,
+                    inner: ResultValue {
+                        last_usage_kind: None,
+                        value: None,
+                    },
+                }
             };
             // the session was just used for ability and layout metadata fetching, no changes should
             // exist. Plus, Sui Move does not use these changes or events
@@ -193,18 +202,18 @@ mod checked {
             move_vm_profiler::tracing_feature_enabled! {
                 use move_vm_profiler::GasProfiler;
                 use move_vm_types::gas::GasMeter;
+                use crate::gas_meter::SuiGasMeter;
 
                 let tx_digest = tx_context.digest();
-                let remaining_gas: u64 =
-                    move_vm_types::gas::GasMeter::remaining_gas(gas_charger.move_gas_status())
-                        .into();
-                gas_charger
-                    .move_gas_status_mut()
-                    .set_profiler(GasProfiler::init(
-                        &vm.config().profiler_config,
-                        format!("{}", tx_digest),
-                        remaining_gas,
-                    ));
+                let remaining_gas: u64 = move_vm_types::gas::GasMeter::remaining_gas(&SuiGasMeter(
+                    gas_charger.move_gas_status_mut(),
+                ))
+                .into();
+                SuiGasMeter(gas_charger.move_gas_status_mut()).set_profiler(GasProfiler::init(
+                    &vm.config().profiler_config,
+                    format!("{}", tx_digest),
+                    remaining_gas,
+                ));
             }
 
             Ok(Self {
@@ -229,33 +238,44 @@ mod checked {
         pub fn fresh_id(&mut self) -> Result<ObjectID, ExecutionError> {
             let object_id = self.tx_context.fresh_id();
             let object_runtime: &mut ObjectRuntime = self.session.get_native_extensions().get_mut();
-            object_runtime.new_id(object_id).map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))?;
+            object_runtime
+                .new_id(object_id)
+                .map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))?;
             Ok(object_id)
         }
 
         /// Delete an ID and update the state
         pub fn delete_id(&mut self, object_id: ObjectID) -> Result<(), ExecutionError> {
             let object_runtime: &mut ObjectRuntime = self.session.get_native_extensions().get_mut();
-            object_runtime.delete_id(object_id).map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))
+            object_runtime
+                .delete_id(object_id)
+                .map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))
         }
 
         /// Set the link context for the session from the linkage information in the MovePackage found
         /// at `package_id`.  Returns the runtime ID of the link context package on success.
-        pub fn set_link_context(&mut self, package_id: ObjectID) -> Result<AccountAddress, ExecutionError> {
+        pub fn set_link_context(
+            &mut self,
+            package_id: ObjectID,
+        ) -> Result<AccountAddress, ExecutionError> {
             let resolver = self.session.get_resolver();
             if resolver.has_linkage(package_id) {
                 // Setting same context again, can skip.
                 return Ok(resolver.original_package_id().unwrap_or(*package_id));
             }
 
-            let package = package_for_linkage(&self.session, package_id).map_err(|e| self.convert_vm_error(e))?;
+            let package = package_for_linkage(&self.session, package_id)
+                .map_err(|e| self.convert_vm_error(e))?;
 
             set_linkage(&mut self.session, package.move_package())
         }
 
         /// Set the link context for the session from the linkage information in the `package`.  Returns
         /// the runtime ID of the link context package on success.
-        pub fn set_linkage(&mut self, package: &MovePackage) -> Result<AccountAddress, ExecutionError> {
+        pub fn set_linkage(
+            &mut self,
+            package: &MovePackage,
+        ) -> Result<AccountAddress, ExecutionError> {
             set_linkage(&mut self.session, package)
         }
 
@@ -271,7 +291,10 @@ mod checked {
         }
 
         /// Restore a previously stolen/saved link context.
-        pub fn restore_linkage(&mut self, saved: Option<SavedLinkage>) -> Result<(), ExecutionError> {
+        pub fn restore_linkage(
+            &mut self,
+            saved: Option<SavedLinkage>,
+        ) -> Result<(), ExecutionError> {
             restore_linkage(&mut self.session, saved)
         }
 
@@ -301,7 +324,10 @@ mod checked {
             let new_events = events
                 .into_iter()
                 .map(|(ty, tag, value)| {
-                    let layout = self.session.type_to_type_layout(&ty).map_err(|e| self.convert_vm_error(e))?;
+                    let layout = self
+                        .session
+                        .type_to_type_layout(&ty)
+                        .map_err(|e| self.convert_vm_error(e))?;
                     let Some(bytes) = value.simple_serialize(&layout) else {
                         invariant_violation!("Failed to deserialize already serialized Move value");
                     };
@@ -322,9 +348,9 @@ mod checked {
             arg_idx: usize,
             arg: Argument,
         ) -> Result<V, ExecutionError> {
-            self.by_value_arg_(command_kind, arg).map_err(|e| command_argument_error(e, arg_idx))
+            self.by_value_arg_(command_kind, arg)
+                .map_err(|e| command_argument_error(e, arg_idx))
         }
-
         fn by_value_arg_<V: TryFromValue>(
             &mut self,
             command_kind: CommandKind<'_>,
@@ -346,17 +372,26 @@ mod checked {
                 return Err(CommandArgumentError::InvalidValueUsage);
             }
             // Gas coin cannot be taken by value, except in TransferObjects
-            if matches!(arg, Argument::GasCoin) && !matches!(command_kind, CommandKind::TransferObjects) {
+            if matches!(arg, Argument::GasCoin)
+                && !matches!(command_kind, CommandKind::TransferObjects)
+            {
                 return Err(CommandArgumentError::InvalidGasCoinUsage);
             }
             // Immutable objects and shared objects cannot be taken by value
             if matches!(
                 input_metadata_opt,
-                Some(InputObjectMetadata::InputObject { owner: Owner::Immutable | Owner::Shared { .. }, .. })
+                Some(InputObjectMetadata::InputObject {
+                    owner: Owner::Immutable | Owner::Shared { .. },
+                    ..
+                })
             ) {
                 return Err(CommandArgumentError::InvalidObjectByValue);
             }
-            let val = if is_copyable { val_opt.as_ref().unwrap().clone() } else { val_opt.take().unwrap() };
+            let val = if is_copyable {
+                val_opt.as_ref().unwrap().clone()
+            } else {
+                val_opt.take().unwrap()
+            };
             V::try_from_value(val)
         }
 
@@ -365,11 +400,18 @@ mod checked {
         /// restore_arg
         /// Errors if out of bounds, if the argument is borrowed, if it is unavailable (already taken),
         /// or if it is an object that cannot be mutably borrowed (immutable)
-        pub fn borrow_arg_mut<V: TryFromValue>(&mut self, arg_idx: usize, arg: Argument) -> Result<V, ExecutionError> {
-            self.borrow_arg_mut_(arg).map_err(|e| command_argument_error(e, arg_idx))
+        pub fn borrow_arg_mut<V: TryFromValue>(
+            &mut self,
+            arg_idx: usize,
+            arg: Argument,
+        ) -> Result<V, ExecutionError> {
+            self.borrow_arg_mut_(arg)
+                .map_err(|e| command_argument_error(e, arg_idx))
         }
-
-        fn borrow_arg_mut_<V: TryFromValue>(&mut self, arg: Argument) -> Result<V, CommandArgumentError> {
+        fn borrow_arg_mut_<V: TryFromValue>(
+            &mut self,
+            arg: Argument,
+        ) -> Result<V, CommandArgumentError> {
             // mutable borrowing requires unique usage
             if self.arg_is_borrowed(&arg) {
                 return Err(CommandArgumentError::InvalidValueUsage);
@@ -382,23 +424,38 @@ mod checked {
                 // error if taken
                 return Err(CommandArgumentError::InvalidValueUsage);
             };
-            if let Some(InputObjectMetadata::InputObject { is_mutable_input: false, .. }) = input_metadata_opt {
+            if let Some(InputObjectMetadata::InputObject {
+                is_mutable_input: false,
+                ..
+            }) = input_metadata_opt
+            {
                 return Err(CommandArgumentError::InvalidObjectByMutRef);
             }
             // if it is copyable, don't take it as we allow for the value to be copied even if
             // mutably borrowed
-            let val = if is_copyable { val_opt.as_ref().unwrap().clone() } else { val_opt.take().unwrap() };
+            let val = if is_copyable {
+                val_opt.as_ref().unwrap().clone()
+            } else {
+                val_opt.take().unwrap()
+            };
             V::try_from_value(val)
         }
 
         /// Mimics an immutable borrow by cloning the argument value without setting its value to None
         /// Errors if out of bounds, if the argument is mutably borrowed,
         /// or if it is unavailable (already taken)
-        pub fn borrow_arg<V: TryFromValue>(&mut self, arg_idx: usize, arg: Argument) -> Result<V, ExecutionError> {
-            self.borrow_arg_(arg).map_err(|e| command_argument_error(e, arg_idx))
+        pub fn borrow_arg<V: TryFromValue>(
+            &mut self,
+            arg_idx: usize,
+            arg: Argument,
+        ) -> Result<V, ExecutionError> {
+            self.borrow_arg_(arg)
+                .map_err(|e| command_argument_error(e, arg_idx))
         }
-
-        fn borrow_arg_<V: TryFromValue>(&mut self, arg: Argument) -> Result<V, CommandArgumentError> {
+        fn borrow_arg_<V: TryFromValue>(
+            &mut self,
+            arg: Argument,
+        ) -> Result<V, CommandArgumentError> {
             // immutable borrowing requires the value was not mutably borrowed.
             // If it was copied, that is okay.
             // If it was taken/moved, we will find out below
@@ -441,7 +498,11 @@ mod checked {
         }
 
         /// Transfer the object to a new owner
-        pub fn transfer_object(&mut self, obj: ObjectValue, addr: SuiAddress) -> Result<(), ExecutionError> {
+        pub fn transfer_object(
+            &mut self,
+            obj: ObjectValue,
+            addr: SuiAddress,
+        ) -> Result<(), ExecutionError> {
             self.additional_transfers.push((addr, obj));
             Ok(())
         }
@@ -455,8 +516,7 @@ mod checked {
             Object::new_package(
                 modules,
                 self.tx_context.digest(),
-                self.protocol_config.max_move_package_size(),
-                self.protocol_config.move_binary_format_version(),
+                self.protocol_config,
                 dependencies,
             )
         }
@@ -488,10 +548,14 @@ mod checked {
 
         /// Finish a command: clearing the borrows and adding the results to the result vector
         pub fn push_command_results(&mut self, results: Vec<Value>) -> Result<(), ExecutionError> {
-            assert_invariant!(self.borrowed.values().all(|is_mut| !is_mut), "all mut borrows should be restored");
+            assert_invariant!(
+                self.borrowed.values().all(|is_mut| !is_mut),
+                "all mut borrows should be restored"
+            );
             // clear borrow state
             self.borrowed = HashMap::new();
-            self.results.push(results.into_iter().map(ResultValue::new).collect());
+            self.results
+                .push(results.into_iter().map(ResultValue::new).collect());
             Ok(())
         }
 
@@ -521,11 +585,20 @@ mod checked {
             // to increase)
             let mut by_value_inputs = BTreeSet::new();
             let mut add_input_object_write = |input| -> Result<(), ExecutionError> {
-                let InputValue { object_metadata: object_metadata_opt, inner: ResultValue { value, .. } } = input;
+                let InputValue {
+                    object_metadata: object_metadata_opt,
+                    inner: ResultValue { value, .. },
+                } = input;
                 let Some(object_metadata) = object_metadata_opt else {
                     return Ok(());
                 };
-                let InputObjectMetadata::InputObject { is_mutable_input, owner, id, .. } = &object_metadata else {
+                let InputObjectMetadata::InputObject {
+                    is_mutable_input,
+                    owner,
+                    id,
+                    ..
+                } = &object_metadata
+                else {
                     unreachable!("Found non-input object metadata for input object when adding writes to input objects -- impossible in v0");
                 };
                 input_object_metadata.insert(object_metadata.id(), object_metadata.clone());
@@ -548,7 +621,10 @@ mod checked {
             if !Mode::allow_arbitrary_values() {
                 for (i, command_result) in results.iter().enumerate() {
                     for (j, result_value) in command_result.iter().enumerate() {
-                        let ResultValue { last_usage_kind, value } = result_value;
+                        let ResultValue {
+                            last_usage_kind,
+                            value,
+                        } = result_value;
                         match value {
                             None => (),
                             Some(Value::Object(_)) => {
@@ -566,7 +642,8 @@ mod checked {
                                 //   last usage is actually a take instead of a clone
                                 // - Otherwise, an error
                                 if abilities.has_drop()
-                                    || (abilities.has_copy() && matches!(last_usage_kind, Some(UsageKind::ByValue)))
+                                    || (abilities.has_copy()
+                                        && matches!(last_usage_kind, Some(UsageKind::ByValue)))
                                 {
                                 } else {
                                     let msg = if abilities.has_copy() {
@@ -602,14 +679,22 @@ mod checked {
             }
 
             let (res, linkage) = session.finish_with_extensions();
-            let (_, mut native_context_extensions) = res.map_err(|e| convert_vm_error(e, vm, &linkage))?;
+            let (_, mut native_context_extensions) =
+                res.map_err(|e| convert_vm_error(e, vm, &linkage))?;
             let object_runtime: ObjectRuntime = native_context_extensions.remove();
             let new_ids = object_runtime.new_ids().clone();
             // tell the object runtime what input objects were taken and which were transferred
             let external_transfers = additional_writes.keys().copied().collect();
-            let RuntimeResults { writes, deletions, user_events: remaining_events, loaded_child_objects } =
-                object_runtime.finish(by_value_inputs, external_transfers)?;
-            assert_invariant!(remaining_events.is_empty(), "Events should be taken after every Move call");
+            let RuntimeResults {
+                writes,
+                deletions,
+                user_events: remaining_events,
+                loaded_child_objects,
+            } = object_runtime.finish(by_value_inputs, external_transfers)?;
+            assert_invariant!(
+                remaining_events.is_empty(),
+                "Events should be taken after every Move call"
+            );
             let mut object_changes = BTreeMap::new();
             for package in new_packages {
                 let id = package.id();
@@ -628,9 +713,19 @@ mod checked {
                 metrics,
             );
             for (id, additional_write) in additional_writes {
-                let AdditionalWrite { recipient, type_, has_public_transfer, bytes } = additional_write;
-                let write_kind = if input_object_metadata.contains_key(&id) || loaded_child_objects.contains_key(&id) {
-                    assert_invariant!(!new_ids.contains_key(&id), "new id should not be in mutations");
+                let AdditionalWrite {
+                    recipient,
+                    type_,
+                    has_public_transfer,
+                    bytes,
+                } = additional_write;
+                let write_kind = if input_object_metadata.contains_key(&id)
+                    || loaded_child_objects.contains_key(&id)
+                {
+                    assert_invariant!(
+                        !new_ids.contains_key(&id),
+                        "new id should not be in mutations"
+                    );
                     WriteKind::Mutate
                 } else if new_ids.contains_key(&id) {
                     WriteKind::Create
@@ -696,23 +791,20 @@ mod checked {
                 let delete_kind_with_seq = match delete_kind {
                     DeleteKind::Normal | DeleteKind::Wrap => {
                         let old_version = match input_object_metadata.get(&id) {
-                            Some(metadata) => {
-                                assert_invariant!(
-                                    !matches!(metadata, InputObjectMetadata::InputObject {
-                                        owner: Owner::Immutable,
-                                        ..
-                                    }),
-                                    "Attempting to delete immutable object {id} via delete kind {delete_kind}"
-                                );
-                                metadata.version()
-                            }
-                            None => match loaded_child_objects.get(&id) {
+                        Some(metadata) => {
+                            assert_invariant!(
+                                !matches!(metadata, InputObjectMetadata::InputObject { owner: Owner::Immutable, .. }),
+                                "Attempting to delete immutable object {id} via delete kind {delete_kind}"
+                            );
+                            metadata.version()
+                        }
+                        None => {
+                            match loaded_child_objects.get(&id) {
                                 Some(version) => *version,
-                                None => invariant_violation!(
-                                    "Deleted/wrapped object {id} must be either in input or loaded child objects"
-                                ),
-                            },
-                        };
+                                None => invariant_violation!("Deleted/wrapped object {id} must be either in input or loaded child objects")
+                            }
+                        }
+                    };
                         if delete_kind == DeleteKind::Normal {
                             DeleteKindWithOldVersion::Normal(old_version)
                         } else {
@@ -723,12 +815,13 @@ mod checked {
                         if protocol_config.simplified_unwrap_then_delete() {
                             DeleteKindWithOldVersion::UnwrapThenDelete
                         } else {
-                            let old_version = match state_view.get_latest_parent_entry_ref_deprecated(id) {
-                                Some((_, previous_version, _)) => previous_version,
-                                // This object was not created this transaction but has never existed in
-                                // storage, skip it.
-                                None => continue,
-                            };
+                            let old_version =
+                                match state_view.get_latest_parent_entry_ref_deprecated(id) {
+                                    Some((_, previous_version, _)) => previous_version,
+                                    // This object was not created this transaction but has never existed in
+                                    // storage, skip it.
+                                    None => continue,
+                                };
                             DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(old_version)
                         }
                     }
@@ -748,7 +841,13 @@ mod checked {
                 user_events: user_events
                     .into_iter()
                     .map(|(module_id, tag, contents)| {
-                        Event::new(module_id.address(), module_id.name(), tx_context.sender(), tag, contents)
+                        Event::new(
+                            module_id.address(),
+                            module_id.name(),
+                            tx_context.sender(),
+                            tag,
+                            contents,
+                        )
                     })
                     .collect(),
             }))
@@ -764,7 +863,9 @@ mod checked {
             use move_core_types::vm_status::StatusCode;
             use sui_types::execution_status::TypeArgumentError;
             match error.major_status() {
-                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH => ExecutionErrorKind::TypeArityMismatch.into(),
+                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH => {
+                    ExecutionErrorKind::TypeArityMismatch.into()
+                }
                 StatusCode::TYPE_RESOLUTION_FAILURE => ExecutionErrorKind::TypeArgumentError {
                     argument_idx: idx as TypeParameterIndex,
                     kind: TypeArgumentError::TypeNotFound,
@@ -794,7 +895,8 @@ mod checked {
             &mut self,
             arg: Argument,
             usage: UsageKind,
-        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError> {
+        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError>
+        {
             self.borrow_mut_impl(arg, Some(usage))
         }
 
@@ -804,7 +906,8 @@ mod checked {
             &mut self,
             arg: Argument,
             update_last_usage: Option<UsageKind>,
-        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError> {
+        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError>
+        {
             let (metadata, result_value) = match arg {
                 Argument::GasCoin => (self.gas.object_metadata.as_ref(), &mut self.gas.inner),
                 Argument::Input(i) => {
@@ -827,7 +930,10 @@ mod checked {
                         return Err(CommandArgumentError::IndexOutOfBounds { idx: i });
                     };
                     let Some(result_value) = command_result.get_mut(j as usize) else {
-                        return Err(CommandArgumentError::SecondaryIndexOutOfBounds { result_idx: i, secondary_idx: j });
+                        return Err(CommandArgumentError::SecondaryIndexOutOfBounds {
+                            result_idx: i,
+                            secondary_idx: j,
+                        });
                     };
                     (None, result_value)
                 }
@@ -839,9 +945,11 @@ mod checked {
         }
     }
 
-    impl<'vm, 'state, 'a> TypeTagResolver for ExecutionContext<'vm, 'state, 'a> {
+    impl TypeTagResolver for ExecutionContext<'_, '_, '_> {
         fn get_type_tag(&self, type_: &Type) -> Result<TypeTag, ExecutionError> {
-            self.session.get_type_tag(type_).map_err(|e| self.convert_vm_error(e))
+            self.session
+                .get_type_tag(type_)
+                .map_err(|e| self.convert_vm_error(e))
         }
     }
 
@@ -856,7 +964,13 @@ mod checked {
     ) -> Session<'state, 'vm, LinkageView<'state>> {
         vm.new_session_with_extensions(
             linkage,
-            new_native_extensions(child_resolver, input_objects, is_metered, protocol_config, metrics),
+            new_native_extensions(
+                child_resolver,
+                input_objects,
+                is_metered,
+                protocol_config,
+                metrics,
+            ),
         )
     }
 
@@ -895,7 +1009,10 @@ mod checked {
 
     /// Fetch the package at `package_id` with a view to using it as a link context.  Produces an error
     /// if the object at that ID does not exist, or is not a package.
-    fn package_for_linkage(session: &Session<LinkageView>, package_id: ObjectID) -> VMResult<PackageObject> {
+    fn package_for_linkage(
+        session: &Session<LinkageView>,
+        package_id: ObjectID,
+    ) -> VMResult<PackageObject> {
         use move_binary_format::errors::PartialVMError;
         use move_core_types::vm_status::StatusCode;
 
@@ -905,7 +1022,9 @@ mod checked {
                 .with_message(format!("Cannot find link context {package_id} in store"))
                 .finish(Location::Undefined)),
             Err(err) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!("Error loading link context {package_id} from store: {err}"))
+                .with_message(format!(
+                    "Error loading link context {package_id} from store: {err}"
+                ))
                 .finish(Location::Undefined)),
         }
     }
@@ -933,7 +1052,12 @@ mod checked {
 
             TypeTag::Vector(inner) => Type::Vector(Box::new(load_type(session, inner)?)),
             TypeTag::Struct(struct_tag) => {
-                let StructTag { address, module, name, type_params } = struct_tag.as_ref();
+                let StructTag {
+                    address,
+                    module,
+                    name,
+                    type_params,
+                } = struct_tag.as_ref();
 
                 // Load the package that the struct is defined in, in storage
                 let defining_id = ObjectID::from_address(*address);
@@ -941,11 +1065,12 @@ mod checked {
 
                 // Set the defining package as the link context on the session while loading the
                 // struct
-                let original_address = set_linkage(session, package.move_package()).map_err(|e| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(e.to_string())
-                        .finish(Location::Undefined)
-                })?;
+                let original_address =
+                    set_linkage(session, package.move_package()).map_err(|e| {
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(e.to_string())
+                            .finish(Location::Undefined)
+                    })?;
 
                 let runtime_id = ModuleId::new(original_address, module.clone());
                 let res = session.load_struct(&runtime_id, name);
@@ -989,7 +1114,9 @@ mod checked {
         contents: &[u8],
     ) -> Result<ObjectValue, ExecutionError> {
         let contents = if type_.is_coin() {
-            let Ok(coin) = Coin::from_bcs_bytes(contents) else { invariant_violation!("Could not deserialize a coin") };
+            let Ok(coin) = Coin::from_bcs_bytes(contents) else {
+                invariant_violation!("Could not deserialize a coin")
+            };
             ObjectContents::Coin(coin)
         } else {
             ObjectContents::Raw(contents.to_vec())
@@ -998,7 +1125,12 @@ mod checked {
         let tag: StructTag = type_.into();
         let type_ = load_type(session, &TypeTag::Struct(Box::new(tag)))
             .map_err(|e| crate::error::convert_vm_error(e, vm, session.get_resolver()))?;
-        Ok(ObjectValue { type_, has_public_transfer, used_in_non_entry_move_call, contents })
+        Ok(ObjectValue {
+            type_,
+            has_public_transfer,
+            used_in_non_entry_move_call,
+            contents,
+        })
     }
 
     pub(crate) fn value_from_object<'vm, 'state>(
@@ -1006,7 +1138,11 @@ mod checked {
         session: &mut Session<'state, 'vm, LinkageView<'state>>,
         object: &Object,
     ) -> Result<ObjectValue, ExecutionError> {
-        let ObjectInner { data: Data::Move(object), .. } = object.as_inner() else {
+        let ObjectInner {
+            data: Data::Move(object),
+            ..
+        } = object.as_inner()
+        else {
             invariant_violation!("Expected a Move object");
         };
 
@@ -1047,18 +1183,24 @@ mod checked {
                 // protected by transaction input checker
                 invariant_violation!("ObjectOwner objects cannot be input")
             }
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         };
         let owner = obj.owner.clone();
         let version = obj.version();
-        let object_metadata = InputObjectMetadata::InputObject { id, is_mutable_input, owner: owner.clone(), version };
+        let object_metadata = InputObjectMetadata::InputObject {
+            id,
+            is_mutable_input,
+            owner: owner.clone(),
+            version,
+        };
         let obj_value = value_from_object(vm, session, obj)?;
         let contained_uids = {
-            let fully_annotated_layout = session
-                .type_to_fully_annotated_layout(&obj_value.type_)
-                .map_err(|e| convert_vm_error(e, vm, session.get_resolver()))?;
+            let fully_annotated_layout =
+                session
+                    .type_to_fully_annotated_layout(&obj_value.type_)
+                    .map_err(|e| convert_vm_error(e, vm, session.get_resolver()))?;
             let mut bytes = vec![];
             obj_value.write_bcs_bytes(&mut bytes);
             match get_all_uids(&fully_annotated_layout, &bytes) {
@@ -1068,14 +1210,18 @@ mod checked {
                 Ok(uids) => uids,
             }
         };
-        let runtime_input = object_runtime::InputObject { contained_uids, owner, version };
+        let runtime_input = object_runtime::InputObject {
+            contained_uids,
+            owner,
+            version,
+        };
         let prev = input_object_map.insert(id, runtime_input);
         // protected by transaction input checker
         assert_invariant!(prev.is_none(), "Duplicate input object {}", id);
         Ok(InputValue::new_object(object_metadata, obj_value))
     }
 
-    /// Load an a CallArg, either an object or a raw set of BCS bytes
+    /// Load a CallArg, either an object or a raw set of BCS bytes
     fn load_call_arg<'vm, 'state>(
         vm: &'vm MoveVM,
         state_view: &'state dyn ExecutionState,
@@ -1085,7 +1231,10 @@ mod checked {
     ) -> Result<InputValue, ExecutionError> {
         Ok(match call_arg {
             CallArg::Pure(bytes) => InputValue::new_raw(RawValueType::Any, bytes),
-            CallArg::Object(obj_arg) => load_object_arg(vm, state_view, session, input_object_map, obj_arg)?,
+            CallArg::Object(obj_arg) => {
+                load_object_arg(vm, state_view, session, input_object_map, obj_arg)?
+            }
+            CallArg::BalanceWithdraw(_) => unreachable!("Impossible to hit BalanceWithdraw in v0"),
         })
     }
 
@@ -1098,12 +1247,22 @@ mod checked {
         obj_arg: ObjectArg,
     ) -> Result<InputValue, ExecutionError> {
         match obj_arg {
-            ObjectArg::ImmOrOwnedObject((id, _, _)) => {
-                load_object(vm, state_view, session, input_object_map, /* imm override */ false, id)
-            }
-            ObjectArg::SharedObject { id, mutable, .. } => {
-                load_object(vm, state_view, session, input_object_map, /* imm override */ !mutable, id)
-            }
+            ObjectArg::ImmOrOwnedObject((id, _, _)) => load_object(
+                vm,
+                state_view,
+                session,
+                input_object_map,
+                /* imm override */ false,
+                id,
+            ),
+            ObjectArg::SharedObject { id, mutable, .. } => load_object(
+                vm,
+                state_view,
+                session,
+                input_object_map,
+                /* imm override */ !mutable,
+                id,
+            ),
             ObjectArg::Receiving(_) => unreachable!("Impossible to hit Receiving in v0"),
         }
     }
@@ -1114,14 +1273,25 @@ mod checked {
         owner: Owner,
         object_value: ObjectValue,
     ) -> Result<(), ExecutionError> {
-        let ObjectValue { type_, has_public_transfer, contents, .. } = object_value;
+        let ObjectValue {
+            type_,
+            has_public_transfer,
+            contents,
+            ..
+        } = object_value;
         let bytes = match contents {
             ObjectContents::Coin(coin) => coin.to_bcs_bytes(),
             ObjectContents::Raw(bytes) => bytes,
         };
-        let object_id = MoveObject::id_opt(&bytes)
-            .map_err(|e| ExecutionError::invariant_violation(format!("No id for Raw object bytes. {e}")))?;
-        let additional_write = AdditionalWrite { recipient: owner, type_, has_public_transfer, bytes };
+        let object_id = MoveObject::id_opt(&bytes).map_err(|e| {
+            ExecutionError::invariant_violation(format!("No id for Raw object bytes. {e}"))
+        })?;
+        let additional_write = AdditionalWrite {
+            recipient: owner,
+            type_,
+            has_public_transfer,
+            bytes,
+        };
         additional_writes.insert(object_id, additional_write);
         Ok(())
     }
@@ -1136,7 +1306,9 @@ mod checked {
         let Some(AdditionalWrite { bytes, .. }) = additional_writes.get_mut(&gas_id) else {
             invariant_violation!("Gas object cannot be wrapped or destroyed")
         };
-        let Ok(mut coin) = Coin::from_bcs_bytes(bytes) else { invariant_violation!("Gas object must be a coin") };
+        let Ok(mut coin) = Coin::from_bcs_bytes(bytes) else {
+            invariant_violation!("Gas object must be a coin")
+        };
         let Some(new_balance) = coin.balance.value().checked_add(gas_charger.gas_budget()) else {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::CoinBalanceOverflow,
@@ -1165,7 +1337,10 @@ mod checked {
         contents: Vec<u8>,
         write_kind: WriteKind,
     ) -> Result<MoveObject, ExecutionError> {
-        debug_assert_eq!(id, MoveObject::id_opt(&contents).expect("object contents should start with an id"));
+        debug_assert_eq!(
+            id,
+            MoveObject::id_opt(&contents).expect("object contents should start with an id")
+        );
         let metadata_opt = input_object_metadata.get(&id);
         let loaded_child_version_opt = loaded_child_objects.get(&id);
         assert_invariant!(
@@ -1173,15 +1348,18 @@ mod checked {
             "Loaded {id} as a child, but that object was an input object",
         );
 
-        let old_obj_ver = metadata_opt.map(|metadata| metadata.version()).or_else(|| loaded_child_version_opt.copied());
+        let old_obj_ver = metadata_opt
+            .map(|metadata| metadata.version())
+            .or_else(|| loaded_child_version_opt.copied());
 
         debug_assert!(
             (write_kind == WriteKind::Mutate) == old_obj_ver.is_some(),
             "Inconsistent state: write_kind: {write_kind:?}, old ver: {old_obj_ver:?}"
         );
 
-        let type_tag =
-            session.get_type_tag(&type_).map_err(|e| crate::error::convert_vm_error(e, vm, session.get_resolver()))?;
+        let type_tag = session
+            .get_type_tag(&type_)
+            .map_err(|e| crate::error::convert_vm_error(e, vm, session.get_resolver()))?;
 
         let struct_tag = match type_tag {
             TypeTag::Struct(inner) => *inner,
@@ -1193,6 +1371,7 @@ mod checked {
             old_obj_ver.unwrap_or_default(),
             contents,
             protocol_config,
+            /* system_mutation */ false,
         )
     }
 }

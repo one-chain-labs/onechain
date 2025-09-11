@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::authority::authority_per_epoch_store::EPOCH_DB_PREFIX;
 use itertools::Itertools;
-use std::{fs, path::PathBuf, time::Duration};
+use std::fs;
+use std::path::PathBuf;
+use std::time::Duration;
 use sui_config::node::AuthorityStorePruningConfig;
 use tokio::sync::oneshot;
-use tracing::log::{error, info};
+use tracing::log::{info, warn};
 use typed_store::rocks::safe_drop_db;
 
 pub struct AuthorityPerEpochStorePruner {
@@ -20,15 +22,16 @@ impl AuthorityPerEpochStorePruner {
             info!("Skipping pruning of epoch tables as we want to retain all versions");
             return Self { _cancel_handle };
         }
-        let mut prune_interval = tokio::time::interval(Duration::from_secs(config.epoch_db_pruning_period_secs));
+        let mut prune_interval =
+            tokio::time::interval(Duration::from_secs(config.epoch_db_pruning_period_secs));
         tokio::task::spawn(async move {
             loop {
                 tokio::select! {
                     _ = prune_interval.tick() => {
                         info!("Starting pruning of epoch tables");
-                        match Self::prune_old_directories(&parent_path, num_latest_epoch_dbs_to_retain) {
+                        match Self::prune_old_directories(&parent_path, num_latest_epoch_dbs_to_retain).await {
                             Ok(pruned_count) => info!("Finished pruning old epoch databases. Pruned {} dbs", pruned_count),
-                            Err(err) => error!("Error while removing old epoch databases {:?}", err),
+                            Err(err) => warn!("Error while removing old epoch databases {:?}", err),
                         }
                     }
                     _ = &mut recv => break,
@@ -38,7 +41,7 @@ impl AuthorityPerEpochStorePruner {
         Self { _cancel_handle }
     }
 
-    fn prune_old_directories(
+    async fn prune_old_directories(
         parent_path: &PathBuf,
         num_latest_epoch_dbs_to_retain: usize,
     ) -> Result<usize, anyhow::Error> {
@@ -53,17 +56,23 @@ impl AuthorityPerEpochStorePruner {
             }
         }
         let mut pruned = 0;
-        let mut gc_results = vec![];
+        let mut gc_tasks = vec![];
         if num_latest_epoch_dbs_to_retain < candidates.len() {
             let to_prune = candidates.len() - num_latest_epoch_dbs_to_retain;
             for (_, path) in candidates.into_iter().sorted().take(to_prune) {
                 info!("Dropping epoch directory {:?}", path);
                 pruned += 1;
-                gc_results.push(safe_drop_db(path.join("recovery_log")));
-                gc_results.push(safe_drop_db(path));
+                gc_tasks.push(safe_drop_db(
+                    path.join("recovery_log"),
+                    Duration::from_secs(30),
+                ));
+                gc_tasks.push(safe_drop_db(path, Duration::from_secs(30)));
             }
         }
-        gc_results.into_iter().collect::<Result<Vec<_>, _>>()?;
+        futures::future::join_all(gc_tasks)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(pruned)
     }
 }
@@ -73,8 +82,8 @@ mod tests {
     use crate::authority::authority_per_epoch_store_pruner::AuthorityPerEpochStorePruner;
     use std::fs;
 
-    #[test]
-    fn test_basic_epoch_pruner() {
+    #[tokio::test]
+    async fn test_basic_epoch_pruner() {
         let parent_directory = tempfile::tempdir().unwrap().keep();
         let directories: Vec<_> = vec!["epoch_0", "epoch_1", "epoch_3", "epoch_4"]
             .into_iter()
@@ -84,10 +93,16 @@ mod tests {
             fs::create_dir(directory).expect("failed to create directory");
         }
 
-        let pruned = AuthorityPerEpochStorePruner::prune_old_directories(&parent_directory, 2).unwrap();
+        let pruned = AuthorityPerEpochStorePruner::prune_old_directories(&parent_directory, 2)
+            .await
+            .unwrap();
         assert_eq!(pruned, 2);
-        assert_eq!(directories.into_iter().map(|f| fs::metadata(f).is_ok()).collect::<Vec<_>>(), vec![
-            false, false, true, true
-        ]);
+        assert_eq!(
+            directories
+                .into_iter()
+                .map(|f| fs::metadata(f).is_ok())
+                .collect::<Vec<_>>(),
+            vec![false, false, true, true]
+        );
     }
 }

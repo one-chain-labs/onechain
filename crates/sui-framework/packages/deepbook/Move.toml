@@ -6,7 +6,7 @@ edition = "2024.beta"
 
 [dependencies]
 MoveStdlib = { local = "../move-stdlib" }
-One = { local = "../one-framework" }
+Sui = { local = "../one-framework" }
 
 [addresses]
 deepbook = "0xdee9"

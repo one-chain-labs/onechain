@@ -1,11 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{committee::EpochId, crypto::AuthorityStrongQuorumSignInfo, messages_checkpoint::CheckpointSequenceNumber};
+use crate::crypto::AccountKeyPair;
+use crate::messages_checkpoint::CheckpointSequenceNumber;
+use crate::utils::to_sender_signed_transaction;
+use crate::{committee::EpochId, crypto::AuthorityStrongQuorumSignInfo};
 
-use crate::{
-    message_envelope::{Envelope, TrustedEnvelope, VerifiedEnvelope},
-    transaction::{SenderSignedData, TransactionDataAPI},
+use crate::message_envelope::{Envelope, TrustedEnvelope, VerifiedEnvelope};
+use crate::transaction::{
+    SenderSignedData, TransactionData, TransactionDataAPI, VerifiedTransaction,
 };
 use serde::{Deserialize, Serialize};
 
@@ -66,5 +69,10 @@ pub type TrustedExecutableTransaction = TrustedEnvelope<SenderSignedData, Certif
 impl VerifiedExecutableTransaction {
     pub fn gas_budget(&self) -> u64 {
         self.data().transaction_data().gas_budget()
+    }
+
+    pub fn new_for_testing(tx_data: TransactionData, keypair: &AccountKeyPair) -> Self {
+        let tx = to_sender_signed_transaction(tx_data, keypair);
+        Self::new_from_quorum_execution(VerifiedTransaction::new_unchecked(tx), 0)
     }
 }

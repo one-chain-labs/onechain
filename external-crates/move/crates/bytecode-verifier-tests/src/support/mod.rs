@@ -3,24 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{
-    file_format::{
-        empty_module,
-        Bytecode,
-        CodeUnit,
-        FunctionDefinition,
-        FunctionHandle,
-        IdentifierIndex,
-        ModuleHandleIndex,
-        SignatureIndex,
-    },
     CompiledModule,
+    file_format::{
+        Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, IdentifierIndex, ModuleHandleIndex,
+        SignatureIndex, empty_module,
+    },
 };
 
 /// Create a dummy module to wrap the bytecode program in local@code
 pub fn dummy_procedure_module(code: Vec<Bytecode>) -> CompiledModule {
     let mut module = empty_module();
-    let code_unit = CodeUnit { code, ..Default::default() };
-    let fun_def = FunctionDefinition { code: Some(code_unit), ..Default::default() };
+    let code_unit = CodeUnit {
+        code,
+        ..Default::default()
+    };
+    let fun_def = FunctionDefinition {
+        code: Some(code_unit),
+        ..Default::default()
+    };
 
     let fun_handle = FunctionHandle {
         module: ModuleHandleIndex(0),

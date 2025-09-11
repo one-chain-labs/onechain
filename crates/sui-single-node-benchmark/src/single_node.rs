@@ -1,45 +1,40 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{command::Component, mock_storage::InMemoryObjectStore};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
+use crate::command::Component;
+use crate::mock_storage::InMemoryObjectStore;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
+use sui_core::authority::authority_per_epoch_store::AuthorityPerEpochStore;
+use sui_core::authority::authority_store_tables::LiveObject;
+use sui_core::authority::shared_object_version_manager::{
+    AssignedTxAndVersions, AssignedVersions, Schedulable,
 };
-use sui_core::{
-    authority::{
-        authority_per_epoch_store::AuthorityPerEpochStore,
-        authority_store_tables::LiveObject,
-        test_authority_builder::TestAuthorityBuilder,
-        AuthorityState,
-    },
-    authority_server::{ValidatorService, ValidatorServiceMetrics},
-    checkpoints::checkpoint_executor::CheckpointExecutor,
-    consensus_adapter::{ConnectionMonitorStatusForTests, ConsensusAdapter, ConsensusAdapterMetrics},
-    mock_consensus::{ConsensusMode, MockConsensusClient},
-    state_accumulator::StateAccumulator,
+use sui_core::authority::test_authority_builder::TestAuthorityBuilder;
+use sui_core::authority::{AuthorityState, ExecutionEnv};
+use sui_core::authority_server::{ValidatorService, ValidatorServiceMetrics};
+use sui_core::checkpoints::checkpoint_executor::CheckpointExecutor;
+use sui_core::consensus_adapter::{
+    ConnectionMonitorStatusForTests, ConsensusAdapter, ConsensusAdapterMetrics,
 };
+use sui_core::execution_scheduler::{ExecutionSchedulerAPI, SchedulingSource};
+use sui_core::global_state_hasher::GlobalStateHasher;
+use sui_core::mock_consensus::{ConsensusMode, MockConsensusClient};
 use sui_test_transaction_builder::{PublishData, TestTransactionBuilder};
-use sui_types::{
-    base_types::{AuthorityName, ObjectRef, SuiAddress, TransactionDigest},
-    committee::Committee,
-    crypto::{AccountKeyPair, AuthoritySignature, Signer},
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    executable_transaction::VerifiedExecutableTransaction,
-    messages_checkpoint::{VerifiedCheckpoint, VerifiedCheckpointContents},
-    messages_grpc::HandleTransactionResponse,
-    mock_checkpoint_builder::{MockCheckpointBuilder, ValidatorKeypairProvider},
-    object::Object,
-    transaction::{
-        CertifiedTransaction,
-        Transaction,
-        TransactionDataAPI,
-        VerifiedCertificate,
-        VerifiedTransaction,
-        DEFAULT_VALIDATOR_GAS_PRICE,
-    },
+use sui_types::base_types::{AuthorityName, ObjectRef, SuiAddress, TransactionDigest};
+use sui_types::committee::Committee;
+use sui_types::crypto::{AccountKeyPair, AuthoritySignature, Signer};
+use sui_types::effects::{TransactionEffects, TransactionEffectsAPI};
+use sui_types::executable_transaction::VerifiedExecutableTransaction;
+use sui_types::execution_params::ExecutionOrEarlyError;
+use sui_types::messages_checkpoint::{VerifiedCheckpoint, VerifiedCheckpointContents};
+use sui_types::messages_grpc::HandleTransactionResponse;
+use sui_types::mock_checkpoint_builder::{MockCheckpointBuilder, ValidatorKeypairProvider};
+use sui_types::object::Object;
+use sui_types::transaction::{
+    CertifiedTransaction, Transaction, TransactionDataAPI, VerifiedCertificate,
+    VerifiedTransaction, DEFAULT_VALIDATOR_GAS_PRICE,
 };
-use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct SingleValidator {
@@ -62,7 +57,11 @@ impl SingleValidator {
             _ => ConsensusMode::Noop,
         };
         let consensus_adapter = Arc::new(ConsensusAdapter::new(
-            Arc::new(MockConsensusClient::new(Arc::downgrade(&validator), consensus_mode)),
+            Arc::new(MockConsensusClient::new(
+                Arc::downgrade(&validator),
+                consensus_mode,
+            )),
+            validator.checkpoint_store.clone(),
             validator.name,
             Arc::new(ConnectionMonitorStatusForTests {}),
             100_000,
@@ -80,7 +79,10 @@ impl SingleValidator {
             consensus_adapter,
             Arc::new(ValidatorServiceMetrics::new_for_tests()),
         ));
-        Self { validator_service, epoch_store }
+        Self {
+            validator_service,
+            epoch_store,
+        }
     }
 
     pub fn get_validator(&self) -> &Arc<AuthorityState> {
@@ -99,8 +101,8 @@ impl SingleValidator {
         keypair: &AccountKeyPair,
         gas: ObjectRef,
     ) -> (ObjectRef, ObjectRef) {
-        let tx_builder =
-            TestTransactionBuilder::new(sender, gas, DEFAULT_VALIDATOR_GAS_PRICE).publish_with_data(publish_data);
+        let tx_builder = TestTransactionBuilder::new(sender, gas, DEFAULT_VALIDATOR_GAS_PRICE)
+            .publish_with_data(publish_data);
         let transaction = tx_builder.build_and_sign(keypair);
         let effects = self.execute_raw_transaction(transaction).await;
         let package = effects
@@ -114,10 +116,20 @@ impl SingleValidator {
     }
 
     pub async fn execute_raw_transaction(&self, transaction: Transaction) -> TransactionEffects {
-        let executable =
-            VerifiedExecutableTransaction::new_from_quorum_execution(VerifiedTransaction::new_unchecked(transaction), 0);
-        let effects =
-            self.get_validator().try_execute_immediately(&executable, None, &self.epoch_store).await.unwrap().0;
+        let executable = VerifiedExecutableTransaction::new_from_quorum_execution(
+            VerifiedTransaction::new_unchecked(transaction),
+            0,
+        );
+        let effects = self
+            .get_validator()
+            .try_execute_immediately(
+                &executable,
+                ExecutionEnv::new().with_scheduling_source(SchedulingSource::NonFastPath),
+                &self.epoch_store,
+            )
+            .await
+            .unwrap()
+            .0;
         assert!(effects.status().is_ok());
         effects
     }
@@ -125,31 +137,63 @@ impl SingleValidator {
     pub async fn execute_dry_run(&self, transaction: Transaction) -> TransactionEffects {
         let effects = self
             .get_validator()
-            .dry_exec_transaction_for_benchmark(transaction.data().intent_message().value.clone(), *transaction.digest())
-            .await
+            .dry_exec_transaction_for_benchmark(
+                transaction.data().intent_message().value.clone(),
+                *transaction.digest(),
+            )
             .unwrap()
             .2;
         assert!(effects.status().is_ok());
         effects
     }
 
-    pub async fn execute_certificate(&self, cert: CertifiedTransaction, component: Component) -> TransactionEffects {
+    pub async fn execute_certificate(
+        &self,
+        cert: CertifiedTransaction,
+        assigned_versions: &AssignedVersions,
+        component: Component,
+    ) -> TransactionEffects {
         let effects = match component {
             Component::Baseline => {
-                let cert = VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(cert));
-                self.get_validator().try_execute_immediately(&cert, None, &self.epoch_store).await.unwrap().0
+                let cert = VerifiedExecutableTransaction::new_from_certificate(
+                    VerifiedCertificate::new_unchecked(cert),
+                );
+                self.get_validator()
+                    .try_execute_immediately(
+                        &cert,
+                        ExecutionEnv::new().with_assigned_versions(assigned_versions.clone()),
+                        &self.epoch_store,
+                    )
+                    .await
+                    .unwrap()
+                    .0
             }
             Component::WithTxManager => {
                 let cert = VerifiedCertificate::new_unchecked(cert);
-                if cert.contains_shared_object() {
+                if cert.is_consensus_tx() {
                     // For shared objects transactions, `execute_certificate` won't enqueue it because
                     // it expects consensus to do so. However we don't have consensus, hence the manual enqueue.
-                    self.get_validator().enqueue_certificates_for_execution(vec![cert.clone()], &self.epoch_store);
+                    self.get_validator().execution_scheduler().enqueue(
+                        vec![(
+                            VerifiedExecutableTransaction::new_from_certificate(cert.clone())
+                                .into(),
+                            ExecutionEnv::new().with_assigned_versions(assigned_versions.clone()),
+                        )],
+                        &self.epoch_store,
+                    );
                 }
-                self.get_validator().execute_certificate(&cert, &self.epoch_store).await.unwrap()
+                self.get_validator()
+                    .wait_for_certificate_execution(&cert, &self.epoch_store)
+                    .await
+                    .unwrap()
             }
             Component::ValidatorWithoutConsensus | Component::ValidatorWithFakeConsensus => {
-                let response = self.validator_service.execute_certificate_for_testing(cert).await.unwrap().into_inner();
+                let response = self
+                    .validator_service
+                    .execute_certificate_for_testing(cert)
+                    .await
+                    .unwrap()
+                    .into_inner();
                 response.signed_effects.into_data()
             }
             Component::TxnSigning | Component::CheckpointExecutor | Component::ExecutionOnly => {
@@ -164,12 +208,16 @@ impl SingleValidator {
         &self,
         store: InMemoryObjectStore,
         transaction: CertifiedTransaction,
+        assigned_versions: &AssignedVersions,
     ) -> TransactionEffects {
         let input_objects = transaction.transaction_data().input_objects().unwrap();
-        let objects = store.read_objects_for_execution(&*self.epoch_store, &transaction.key(), &input_objects).unwrap();
+        let objects = store
+            .read_objects_for_execution(&transaction.key(), assigned_versions, &input_objects)
+            .unwrap();
 
-        let executable =
-            VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(transaction));
+        let executable = VerifiedExecutableTransaction::new_from_certificate(
+            VerifiedCertificate::new_unchecked(transaction),
+        );
         let (gas_status, input_objects) = sui_transaction_checks::check_certificate_input(
             &executable,
             objects,
@@ -177,29 +225,35 @@ impl SingleValidator {
             self.epoch_store.reference_gas_price(),
         )
         .unwrap();
-        let (kind, signer, gas) = executable.transaction_data().execution_parts();
-        let (inner_temp_store, _, effects, _) = self.epoch_store.executor().execute_transaction_to_effects(
-            &store,
-            self.epoch_store.protocol_config(),
-            self.get_validator().metrics.limits_metrics.clone(),
-            false,
-            &HashSet::new(),
-            &self.epoch_store.epoch(),
-            0,
-            input_objects,
-            gas,
-            gas_status,
-            kind,
-            signer,
-            *executable.digest(),
-        );
+        let (kind, signer, gas_data) = executable.transaction_data().execution_parts();
+        let (inner_temp_store, _, effects, _timings, _) =
+            self.epoch_store.executor().execute_transaction_to_effects(
+                &store,
+                self.epoch_store.protocol_config(),
+                self.get_validator().metrics.limits_metrics.clone(),
+                false,
+                ExecutionOrEarlyError::Ok(()),
+                &self.epoch_store.epoch(),
+                0,
+                input_objects,
+                gas_data,
+                gas_status,
+                kind,
+                signer,
+                *executable.digest(),
+                &mut None,
+            );
         assert!(effects.status().is_ok());
         store.commit_objects(inner_temp_store);
         effects
     }
 
     pub async fn sign_transaction(&self, transaction: Transaction) -> HandleTransactionResponse {
-        self.validator_service.handle_transaction_for_benchmarking(transaction).await.unwrap().into_inner()
+        self.validator_service
+            .handle_transaction_for_benchmarking(transaction)
+            .await
+            .unwrap()
+            .into_inner()
     }
 
     pub(crate) async fn build_checkpoints(
@@ -209,12 +263,19 @@ impl SingleValidator {
         checkpoint_size: usize,
     ) -> Vec<(VerifiedCheckpoint, VerifiedCheckpointContents)> {
         let mut builder = MockCheckpointBuilder::new(
-            self.get_validator().get_checkpoint_store().get_latest_certified_checkpoint().unwrap(),
+            self.get_validator()
+                .get_checkpoint_store()
+                .get_latest_certified_checkpoint()
+                .unwrap()
+                .unwrap(),
         );
         let mut checkpoints = vec![];
         for transaction in transactions {
             let effects = all_effects.remove(transaction.digest()).unwrap();
-            builder.push_transaction(VerifiedTransaction::new_unchecked(transaction.into_unsigned()), effects);
+            builder.push_transaction(
+                VerifiedTransaction::new_unchecked(transaction.into_unsigned()),
+                effects,
+            );
             if builder.size() == checkpoint_size {
                 let (checkpoint, _, full_contents) = builder.build(self, 0);
                 checkpoints.push((checkpoint, full_contents));
@@ -227,22 +288,22 @@ impl SingleValidator {
         checkpoints
     }
 
-    pub fn create_checkpoint_executor(&self) -> (CheckpointExecutor, broadcast::Sender<VerifiedCheckpoint>) {
+    pub fn create_checkpoint_executor(&self) -> CheckpointExecutor {
         let validator = self.get_validator();
-        let (ckpt_sender, ckpt_receiver) = broadcast::channel(1000000);
-        let checkpoint_executor = CheckpointExecutor::new_for_tests(
-            ckpt_receiver,
+        CheckpointExecutor::new_for_tests(
+            self.epoch_store.clone(),
             validator.get_checkpoint_store().clone(),
             validator.clone(),
-            Arc::new(StateAccumulator::new_for_tests(validator.get_accumulator_store().clone(), self.get_epoch_store())),
-        );
-        (checkpoint_executor, ckpt_sender)
+            Arc::new(GlobalStateHasher::new_for_tests(
+                validator.get_global_state_hash_store().clone(),
+            )),
+        )
     }
 
     pub(crate) fn create_in_memory_store(&self) -> InMemoryObjectStore {
         let objects: HashMap<_, _> = self
             .get_validator()
-            .get_accumulator_store()
+            .get_global_state_hash_store()
             .iter_cached_live_object_set_for_testing(false)
             .map(|o| match o {
                 LiveObject::Normal(object) => (object.id(), object),
@@ -252,20 +313,25 @@ impl SingleValidator {
         InMemoryObjectStore::new(objects)
     }
 
-    pub(crate) async fn assigned_shared_object_versions(&self, transactions: &[CertifiedTransaction]) {
+    pub(crate) async fn assigned_shared_object_versions(
+        &self,
+        transactions: &[CertifiedTransaction],
+    ) -> AssignedTxAndVersions {
         let transactions: Vec<_> = transactions
             .iter()
             .map(|tx| {
-                VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(tx.clone()))
+                VerifiedExecutableTransaction::new_from_certificate(
+                    VerifiedCertificate::new_unchecked(tx.clone()),
+                )
             })
             .collect();
+        let assignables: Vec<_> = transactions.iter().map(Schedulable::Transaction).collect();
         self.epoch_store
             .assign_shared_object_versions_idempotent(
                 self.get_validator().get_object_cache_reader().as_ref(),
-                &transactions,
+                assignables.iter(),
             )
-            .await
-            .unwrap();
+            .unwrap()
     }
 }
 

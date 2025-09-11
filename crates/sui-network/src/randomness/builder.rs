@@ -7,13 +7,8 @@ use std::{
 };
 
 use super::{
-    auth::AllowedPeersUpdatable,
-    metrics::Metrics,
-    server::Server,
-    Handle,
-    RandomnessEventLoop,
-    RandomnessMessage,
-    RandomnessServer,
+    auth::AllowedPeersUpdatable, metrics::Metrics, server::Server, Handle, RandomnessEventLoop,
+    RandomnessMessage, RandomnessServer,
 };
 use anemo::codegen::InboundRequestLayer;
 use anemo_tower::{auth::RequireAuthorizationLayer, inflight_limit};
@@ -30,8 +25,16 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new(name: AuthorityName, randomness_tx: mpsc::Sender<(EpochId, RandomnessRound, Vec<u8>)>) -> Self {
-        Self { name, config: None, metrics: None, randomness_tx }
+    pub fn new(
+        name: AuthorityName,
+        randomness_tx: mpsc::Sender<(EpochId, RandomnessRound, Vec<u8>)>,
+    ) -> Self {
+        Self {
+            name,
+            config: None,
+            metrics: None,
+            randomness_tx,
+        }
     }
 
     pub fn config(mut self, config: RandomnessConfig) -> Self {
@@ -45,19 +48,28 @@ impl Builder {
     }
 
     pub fn build(self) -> (UnstartedRandomness, anemo::Router) {
-        let Builder { name, config, metrics, randomness_tx } = self;
+        let Builder {
+            name,
+            config,
+            metrics,
+            randomness_tx,
+        } = self;
         let config = config.unwrap_or_default();
         let metrics = metrics.unwrap_or_else(Metrics::disabled);
         let (sender, mailbox) = mpsc::channel(config.mailbox_capacity());
         let mailbox_sender = sender.downgrade();
-        let handle = Handle { sender: sender.clone() };
-        let server = Server { sender: sender.downgrade() };
-        let randomness_server = RandomnessServer::new(server).add_layer_for_send_signatures(InboundRequestLayer::new(
-            inflight_limit::InflightLimitLayer::new(
+        let handle = Handle {
+            sender: sender.clone(),
+        };
+        let server = Server {
+            sender: sender.downgrade(),
+        };
+        let randomness_server = RandomnessServer::new(server).add_layer_for_send_signatures(
+            InboundRequestLayer::new(inflight_limit::InflightLimitLayer::new(
                 config.send_partial_signatures_inflight_limit(),
                 inflight_limit::WaitMode::ReturnError,
-            ),
-        ));
+            )),
+        );
 
         let allowed_peers = AllowedPeersUpdatable::new(Arc::new(HashSet::new()));
         let router = anemo::Router::new()
@@ -65,7 +77,16 @@ impl Builder {
             .add_rpc_service(randomness_server);
 
         (
-            UnstartedRandomness { name, config, handle, mailbox, mailbox_sender, allowed_peers, metrics, randomness_tx },
+            UnstartedRandomness {
+                name,
+                config,
+                handle,
+                mailbox,
+                mailbox_sender,
+                allowed_peers,
+                metrics,
+                randomness_tx,
+            },
             router,
         )
     }
@@ -85,7 +106,16 @@ pub struct UnstartedRandomness {
 
 impl UnstartedRandomness {
     pub(super) fn build(self, network: anemo::Network) -> (RandomnessEventLoop, Handle) {
-        let Self { name, config, handle, mailbox, mailbox_sender, allowed_peers, metrics, randomness_tx } = self;
+        let Self {
+            name,
+            config,
+            handle,
+            mailbox,
+            mailbox_sender,
+            allowed_peers,
+            metrics,
+            randomness_tx,
+        } = self;
         (
             RandomnessEventLoop {
                 name,

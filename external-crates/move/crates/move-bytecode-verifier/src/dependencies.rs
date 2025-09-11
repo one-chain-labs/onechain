@@ -4,24 +4,15 @@
 
 //! This module contains verification of usage of dependencies for modules and scripts.
 use move_binary_format::{
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+    IndexKind,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult, verification_error},
     file_format::{
-        AbilitySet,
-        Bytecode,
-        CodeOffset,
-        CompiledModule,
-        DatatypeHandleIndex,
-        DatatypeTyParameter,
-        FunctionDefinitionIndex,
-        FunctionHandleIndex,
-        ModuleHandleIndex,
-        SignatureToken,
-        TableIndex,
-        Visibility,
+        AbilitySet, Bytecode, CodeOffset, CompiledModule, DatatypeHandleIndex, DatatypeTyParameter,
+        FunctionDefinitionIndex, FunctionHandleIndex, ModuleHandleIndex, SignatureToken,
+        TableIndex, Visibility,
     },
     file_format_common::VERSION_5,
     safe_unwrap,
-    IndexKind,
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use std::collections::{BTreeMap, BTreeSet};
@@ -43,18 +34,31 @@ struct Context<'a, 'b> {
 }
 
 impl<'a, 'b> Context<'a, 'b> {
-    fn module(module: &'a CompiledModule, dependencies: impl IntoIterator<Item = &'b CompiledModule>) -> Self {
+    fn module(
+        module: &'a CompiledModule,
+        dependencies: impl IntoIterator<Item = &'b CompiledModule>,
+    ) -> Self {
         Self::new(module, dependencies)
     }
 
-    fn new(module: &'a CompiledModule, dependencies: impl IntoIterator<Item = &'b CompiledModule>) -> Self {
+    fn new(
+        module: &'a CompiledModule,
+        dependencies: impl IntoIterator<Item = &'b CompiledModule>,
+    ) -> Self {
         let self_module = module.self_id();
         let self_module_idx = module.self_handle_idx();
         let self_function_defs = module.function_defs();
-        let dependency_map =
-            dependencies.into_iter().filter(|d| d.self_id() != self_module).map(|d| (d.self_id(), d)).collect();
+        let dependency_map = dependencies
+            .into_iter()
+            .filter(|d| d.self_id() != self_module)
+            .map(|d| (d.self_id(), d))
+            .collect();
 
-        let script_functions = if module.version() < VERSION_5 { Some(BTreeSet::new()) } else { None };
+        let script_functions = if module.version() < VERSION_5 {
+            Some(BTreeSet::new())
+        } else {
+            None
+        };
         let mut context = Self {
             module,
             dependency_map,
@@ -72,48 +76,61 @@ impl<'a, 'b> Context<'a, 'b> {
             for struct_def in module.struct_defs() {
                 let struct_handle = module.datatype_handle_at(struct_def.struct_handle);
                 let struct_name = module.identifier_at(struct_handle.name);
-                context
-                    .datatype_id_to_handle_map
-                    .insert((module_id.clone(), struct_name.to_owned()), struct_def.struct_handle);
+                context.datatype_id_to_handle_map.insert(
+                    (module_id.clone(), struct_name.to_owned()),
+                    struct_def.struct_handle,
+                );
             }
             for enum_def in module.enum_defs() {
                 let enum_handle = module.datatype_handle_at(enum_def.enum_handle);
                 let enum_name = module.identifier_at(enum_handle.name);
-                context
-                    .datatype_id_to_handle_map
-                    .insert((module_id.clone(), enum_name.to_owned()), enum_def.enum_handle);
+                context.datatype_id_to_handle_map.insert(
+                    (module_id.clone(), enum_name.to_owned()),
+                    enum_def.enum_handle,
+                );
             }
             // Module::FuncName -> def handle idx
             for func_def in module.function_defs() {
                 let func_handle = module.function_handle_at(func_def.function);
                 let func_name = module.identifier_at(func_handle.name);
-                dependency_visibilities
-                    .insert((module_id.clone(), func_name.to_owned()), (func_def.visibility, func_def.is_entry));
+                dependency_visibilities.insert(
+                    (module_id.clone(), func_name.to_owned()),
+                    (func_def.visibility, func_def.is_entry),
+                );
                 let may_be_called = match func_def.visibility {
                     Visibility::Public => true,
                     Visibility::Friend => friend_module_ids.contains(&self_module),
                     Visibility::Private => false,
                 };
                 if may_be_called {
-                    context.func_id_to_handle_map.insert((module_id.clone(), func_name.to_owned()), func_def.function);
+                    context
+                        .func_id_to_handle_map
+                        .insert((module_id.clone(), func_name.to_owned()), func_def.function);
                 }
             }
         }
 
         for function_def in self_function_defs {
-            context.function_visibilities.insert(function_def.function, function_def.visibility);
+            context
+                .function_visibilities
+                .insert(function_def.function, function_def.visibility);
             if function_def.is_entry {
-                context.script_functions.as_mut().map(|s| s.insert(function_def.function));
+                context
+                    .script_functions
+                    .as_mut()
+                    .map(|s| s.insert(function_def.function));
             }
         }
         for (idx, function_handle) in context.module.function_handles().iter().enumerate() {
             if function_handle.module == self_module_idx {
                 continue;
             }
-            let dep_module_id =
-                context.module.module_id_for_handle(context.module.module_handle_at(function_handle.module));
+            let dep_module_id = context
+                .module
+                .module_id_for_handle(context.module.module_handle_at(function_handle.module));
             let function_name = context.module.identifier_at(function_handle.name);
-            let dep_file_format_version = context.dependency_map.get(&dep_module_id).unwrap().version;
+            let dep_file_format_version =
+                context.dependency_map.get(&dep_module_id).unwrap().version;
             let dep_function = (dep_module_id, function_name.to_owned());
             let (visibility, is_entry) = match dependency_visibilities.get(&dep_function) {
                 // The visibility does not need to be set here. If the function does not
@@ -122,9 +139,14 @@ impl<'a, 'b> Context<'a, 'b> {
                 Some(vis_entry) => *vis_entry,
             };
             let fhandle_idx = FunctionHandleIndex(idx as TableIndex);
-            context.function_visibilities.insert(fhandle_idx, visibility);
+            context
+                .function_visibilities
+                .insert(fhandle_idx, visibility);
             if dep_file_format_version < VERSION_5 && is_entry {
-                context.script_functions.as_mut().map(|s| s.insert(fhandle_idx));
+                context
+                    .script_functions
+                    .as_mut()
+                    .map(|s| s.insert(fhandle_idx));
             }
         }
 
@@ -136,7 +158,8 @@ pub fn verify_module<'a>(
     module: &CompiledModule,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> VMResult<()> {
-    verify_module_impl(module, dependencies).map_err(|e| e.finish(Location::Module(module.self_id())))
+    verify_module_impl(module, dependencies)
+        .map_err(|e| e.finish(Location::Module(module.self_id())))
 }
 
 fn verify_module_impl<'a>(
@@ -155,8 +178,14 @@ fn verify_imported_modules(context: &Context) -> PartialVMResult<()> {
     let self_module = context.module.self_handle_idx();
     for (idx, module_handle) in context.module.module_handles().iter().enumerate() {
         let module_id = context.module.module_id_for_handle(module_handle);
-        if ModuleHandleIndex(idx as u16) != self_module && !context.dependency_map.contains_key(&module_id) {
-            return Err(verification_error(StatusCode::MISSING_DEPENDENCY, IndexKind::ModuleHandle, idx as TableIndex));
+        if ModuleHandleIndex(idx as u16) != self_module
+            && !context.dependency_map.contains_key(&module_id)
+        {
+            return Err(verification_error(
+                StatusCode::MISSING_DEPENDENCY,
+                IndexKind::ModuleHandle,
+                idx as TableIndex,
+            ));
         }
     }
     Ok(())
@@ -168,15 +197,23 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
         if struct_handle.module == self_module {
             continue;
         }
-        let owner_module_id = context.module.module_id_for_handle(context.module.module_handle_at(struct_handle.module));
+        let owner_module_id = context
+            .module
+            .module_id_for_handle(context.module.module_handle_at(struct_handle.module));
         // TODO: remove unwrap
         let owner_module = safe_unwrap!(context.dependency_map.get(&owner_module_id));
         let struct_name = context.module.identifier_at(struct_handle.name);
-        match context.datatype_id_to_handle_map.get(&(owner_module_id, struct_name.to_owned())) {
+        match context
+            .datatype_id_to_handle_map
+            .get(&(owner_module_id, struct_name.to_owned()))
+        {
             Some(def_idx) => {
                 let def_handle = owner_module.datatype_handle_at(*def_idx);
                 if !compatible_struct_abilities(struct_handle.abilities, def_handle.abilities)
-                    || !compatible_struct_type_parameters(&struct_handle.type_parameters, &def_handle.type_parameters)
+                    || !compatible_struct_type_parameters(
+                        &struct_handle.type_parameters,
+                        &def_handle.type_parameters,
+                    )
                 {
                     return Err(verification_error(
                         StatusCode::TYPE_MISMATCH,
@@ -186,7 +223,11 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
                 }
             }
             None => {
-                return Err(verification_error(StatusCode::LOOKUP_FAILED, IndexKind::DatatypeHandle, idx as TableIndex))
+                return Err(verification_error(
+                    StatusCode::LOOKUP_FAILED,
+                    IndexKind::DatatypeHandle,
+                    idx as TableIndex,
+                ));
             }
         }
     }
@@ -199,15 +240,22 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
         if function_handle.module == self_module {
             continue;
         }
-        let owner_module_id =
-            context.module.module_id_for_handle(context.module.module_handle_at(function_handle.module));
+        let owner_module_id = context
+            .module
+            .module_id_for_handle(context.module.module_handle_at(function_handle.module));
         let function_name = context.module.identifier_at(function_handle.name);
         let owner_module = safe_unwrap!(context.dependency_map.get(&owner_module_id));
-        match context.func_id_to_handle_map.get(&(owner_module_id.clone(), function_name.to_owned())) {
+        match context
+            .func_id_to_handle_map
+            .get(&(owner_module_id.clone(), function_name.to_owned()))
+        {
             Some(def_idx) => {
                 let def_handle = owner_module.function_handle_at(*def_idx);
                 // compatible type parameter constraints
-                if !compatible_fun_type_parameters(&function_handle.type_parameters, &def_handle.type_parameters) {
+                if !compatible_fun_type_parameters(
+                    &function_handle.type_parameters,
+                    &def_handle.type_parameters,
+                ) {
                     return Err(verification_error(
                         StatusCode::TYPE_MISMATCH,
                         IndexKind::FunctionHandle,
@@ -223,12 +271,17 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                             StatusCode::LOOKUP_FAILED,
                             IndexKind::FunctionHandle,
                             idx as TableIndex,
-                        ))
+                        ));
                     }
                 };
 
-                compare_cross_module_signatures(context, &handle_params.0, &def_params.0, owner_module)
-                    .map_err(|e| e.at_index(IndexKind::FunctionHandle, idx as TableIndex))?;
+                compare_cross_module_signatures(
+                    context,
+                    &handle_params.0,
+                    &def_params.0,
+                    owner_module,
+                )
+                .map_err(|e| e.at_index(IndexKind::FunctionHandle, idx as TableIndex))?;
 
                 // same return_
                 let handle_return = context.module.signature_at(function_handle.return_);
@@ -239,15 +292,24 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                             StatusCode::LOOKUP_FAILED,
                             IndexKind::FunctionHandle,
                             idx as TableIndex,
-                        ))
+                        ));
                     }
                 };
 
-                compare_cross_module_signatures(context, &handle_return.0, &def_return.0, owner_module)
-                    .map_err(|e| e.at_index(IndexKind::FunctionHandle, idx as TableIndex))?;
+                compare_cross_module_signatures(
+                    context,
+                    &handle_return.0,
+                    &def_return.0,
+                    owner_module,
+                )
+                .map_err(|e| e.at_index(IndexKind::FunctionHandle, idx as TableIndex))?;
             }
             None => {
-                return Err(verification_error(StatusCode::LOOKUP_FAILED, IndexKind::FunctionHandle, idx as TableIndex));
+                return Err(verification_error(
+                    StatusCode::LOOKUP_FAILED,
+                    IndexKind::FunctionHandle,
+                    idx as TableIndex,
+                ));
             }
         }
     }
@@ -273,14 +335,20 @@ fn compatible_fun_type_parameters(
     defined_type_parameters: &[AbilitySet],
 ) -> bool {
     local_type_parameters_declaration.len() == defined_type_parameters.len()
-        && local_type_parameters_declaration.iter().zip(defined_type_parameters).all(
-            |(local_type_parameter_constraints_declaration, defined_type_parameter_constraints)| {
-                compatible_type_parameter_constraints(
-                    *local_type_parameter_constraints_declaration,
-                    *defined_type_parameter_constraints,
-                )
-            },
-        )
+        && local_type_parameters_declaration
+            .iter()
+            .zip(defined_type_parameters)
+            .all(
+                |(
+                    local_type_parameter_constraints_declaration,
+                    defined_type_parameter_constraints,
+                )| {
+                    compatible_type_parameter_constraints(
+                        *local_type_parameter_constraints_declaration,
+                        *defined_type_parameter_constraints,
+                    )
+                },
+            )
 }
 
 // - The number of type parameters must be the same
@@ -290,15 +358,20 @@ fn compatible_struct_type_parameters(
     defined_type_parameters: &[DatatypeTyParameter],
 ) -> bool {
     local_type_parameters_declaration.len() == defined_type_parameters.len()
-        && local_type_parameters_declaration.iter().zip(defined_type_parameters).all(
-            |(local_type_parameter_declaration, defined_type_parameter)| {
-                compatible_type_parameter_phantom_decl(local_type_parameter_declaration, defined_type_parameter)
-                    && compatible_type_parameter_constraints(
+        && local_type_parameters_declaration
+            .iter()
+            .zip(defined_type_parameters)
+            .all(
+                |(local_type_parameter_declaration, defined_type_parameter)| {
+                    compatible_type_parameter_phantom_decl(
+                        local_type_parameter_declaration,
+                        defined_type_parameter,
+                    ) && compatible_type_parameter_constraints(
                         local_type_parameter_declaration.constraints,
                         defined_type_parameter.constraints,
                     )
-            },
-        )
+                },
+            )
 }
 
 //  The local view of a type parameter must be a superset of (or equal to) the defined
@@ -352,11 +425,16 @@ fn compare_types(
         | (SignatureToken::U256, SignatureToken::U256)
         | (SignatureToken::Address, SignatureToken::Address)
         | (SignatureToken::Signer, SignatureToken::Signer) => Ok(()),
-        (SignatureToken::Vector(ty1), SignatureToken::Vector(ty2)) => compare_types(context, ty1, ty2, def_module),
+        (SignatureToken::Vector(ty1), SignatureToken::Vector(ty2)) => {
+            compare_types(context, ty1, ty2, def_module)
+        }
         (SignatureToken::Datatype(idx1), SignatureToken::Datatype(idx2)) => {
             compare_structs(context, *idx1, *idx2, def_module)
         }
-        (SignatureToken::DatatypeInstantiation(inst1), SignatureToken::DatatypeInstantiation(inst2)) => {
+        (
+            SignatureToken::DatatypeInstantiation(inst1),
+            SignatureToken::DatatypeInstantiation(inst2),
+        ) => {
             let (idx1, inst1) = &**inst1;
             let (idx2, inst2) = &**inst2;
             compare_structs(context, *idx1, *idx2, def_module)?;
@@ -455,19 +533,23 @@ fn verify_script_visibility_usage(
         let idx = idx as CodeOffset;
         let fhandle_idx = match instr {
             Bytecode::Call(fhandle_idx) => fhandle_idx,
-            Bytecode::CallGeneric(finst_idx) => &module.function_instantiation_at(*finst_idx).handle,
+            Bytecode::CallGeneric(finst_idx) => {
+                &module.function_instantiation_at(*finst_idx).handle
+            }
             _ => continue,
         };
         match (current_is_entry, script_functions.contains(fhandle_idx)) {
             (true, true) => (),
             (_, true) => {
-                return Err(PartialVMError::new(StatusCode::CALLED_SCRIPT_VISIBLE_FROM_NON_SCRIPT_VISIBLE)
-                    .at_code_offset(fdef_idx, idx)
-                    .with_message(
-                        "script-visible functions can only be called from scripts or other \
+                return Err(PartialVMError::new(
+                    StatusCode::CALLED_SCRIPT_VISIBLE_FROM_NON_SCRIPT_VISIBLE,
+                )
+                .at_code_offset(fdef_idx, idx)
+                .with_message(
+                    "script-visible functions can only be called from scripts or other \
                     script-visible functions"
-                            .to_string(),
-                    ));
+                        .to_string(),
+                ));
             }
             _ => (),
         }

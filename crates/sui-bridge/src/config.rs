@@ -1,40 +1,40 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    abi::EthBridgeConfig,
-    crypto::BridgeAuthorityKeyPair,
-    error::BridgeError,
-    eth_client::EthClient,
-    metered_eth_provider::{new_metered_eth_provider, MeteredEthHttpProvier},
-    metrics::BridgeMetrics,
-    sui_client::SuiClient,
-    types::{is_route_valid, BridgeAction},
-    utils::get_eth_contract_addresses,
-};
+use crate::abi::EthBridgeConfig;
+use crate::crypto::BridgeAuthorityKeyPair;
+use crate::error::BridgeError;
+use crate::eth_client::EthClient;
+use crate::metered_eth_provider::new_metered_eth_provider;
+use crate::metered_eth_provider::MeteredEthHttpProvier;
+use crate::metrics::BridgeMetrics;
+use crate::sui_client::SuiClient;
+use crate::types::{is_route_valid, BridgeAction};
+use crate::utils::get_eth_contract_addresses;
 use anyhow::anyhow;
-use ethers::{providers::Middleware, types::Address as EthAddress};
-use futures::{future, StreamExt};
+use ethers::providers::Middleware;
+use ethers::types::Address as EthAddress;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::PathBuf,
-    str::FromStr,
-    sync::Arc,
-};
+use std::collections::BTreeMap;
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 use sui_config::Config;
 use sui_json_rpc_types::Coin;
 use sui_keys::keypair_file::read_key;
-use sui_sdk::{apis::CoinReadApi, SuiClient as SuiSdkClient, SuiClientBuilder};
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    bridge::BridgeChainId,
-    crypto::{get_key_pair_from_rng, KeypairTraits, NetworkKeyPair, SuiKeyPair},
-    digests::{get_mainnet_chain_identifier, get_testnet_chain_identifier},
-    event::EventID,
-    object::Owner,
-};
+use sui_sdk::apis::CoinReadApi;
+use sui_sdk::{SuiClient as SuiSdkClient, SuiClientBuilder};
+use sui_types::base_types::ObjectRef;
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::bridge::BridgeChainId;
+use sui_types::crypto::KeypairTraits;
+use sui_types::crypto::{get_key_pair_from_rng, NetworkKeyPair, SuiKeyPair};
+use sui_types::digests::{get_mainnet_chain_identifier, get_testnet_chain_identifier};
+use sui_types::event::EventID;
+use sui_types::object::Owner;
 use tracing::info;
 
 #[serde_as]
@@ -151,6 +151,7 @@ impl BridgeNodeConfig {
         &self,
         metrics: Arc<BridgeMetrics>,
     ) -> anyhow::Result<(BridgeServerConfig, Option<BridgeClientConfig>)> {
+        info!("Starting config validation");
         if !is_route_valid(
             BridgeChainId::try_from(self.sui.sui_bridge_chain_id)?,
             BridgeChainId::try_from(self.eth.eth_bridge_chain_id)?,
@@ -169,16 +170,23 @@ impl BridgeNodeConfig {
 
         // we do this check here instead of `prepare_for_sui` below because
         // that is only called when `run_client` is true.
-        let sui_client = Arc::new(SuiClient::<SuiSdkClient>::new(&self.sui.sui_rpc_url, metrics.clone()).await?);
-        let bridge_committee =
-            sui_client.get_bridge_committee().await.map_err(|e| anyhow!("Error getting bridge committee: {:?}", e))?;
+        let sui_client =
+            Arc::new(SuiClient::<SuiSdkClient>::new(&self.sui.sui_rpc_url, metrics.clone()).await?);
+        let bridge_committee = sui_client
+            .get_bridge_committee()
+            .await
+            .map_err(|e| anyhow!("Error getting bridge committee: {:?}", e))?;
         if !bridge_committee.is_active_member(&bridge_authority_key.public().into()) {
-            return Err(anyhow!("Bridge authority key is not part of bridge committee"));
+            return Err(anyhow!(
+                "Bridge authority key is not part of bridge committee"
+            ));
         }
 
         let (eth_client, eth_contracts) = self.prepare_for_eth(metrics.clone()).await?;
-        let bridge_summary =
-            sui_client.get_bridge_summary().await.map_err(|e| anyhow!("Error getting bridge summary: {:?}", e))?;
+        let bridge_summary = sui_client
+            .get_bridge_summary()
+            .await
+            .map_err(|e| anyhow!("Error getting bridge summary: {:?}", e))?;
         if bridge_summary.chain_id != self.sui.sui_bridge_chain_id {
             anyhow::bail!(
                 "Bridge chain id mismatch: expected {}, but connected to {}",
@@ -190,7 +198,10 @@ impl BridgeNodeConfig {
         // Validate approved actions that must be governace actions
         for action in &self.approved_governance_actions {
             if !action.is_governace_action() {
-                anyhow::bail!(format!("{:?}", BridgeError::ActionIsNotGovernanceAction(action.clone())));
+                anyhow::bail!(format!(
+                    "{:?}",
+                    BridgeError::ActionIsNotGovernanceAction(action.clone())
+                ));
             }
         }
         let approved_governance_actions = self.approved_governance_actions.clone();
@@ -212,7 +223,10 @@ impl BridgeNodeConfig {
         let (bridge_client_key, client_sui_address, gas_object_ref) =
             self.prepare_for_sui(sui_client.clone(), metrics).await?;
 
-        let db_path = self.db_path.clone().ok_or(anyhow!("`db_path` is required when `run_client` is true"))?;
+        let db_path = self
+            .db_path
+            .clone()
+            .ok_or(anyhow!("`db_path` is required when `run_client` is true"))?;
 
         let bridge_client_config = BridgeClientConfig {
             sui_address: client_sui_address,
@@ -224,13 +238,17 @@ impl BridgeNodeConfig {
             db_path,
             eth_contracts,
             // in `prepare_for_eth` we check if this is None when `run_client` is true. Safe to unwrap here.
-            eth_contracts_start_block_fallback: self.eth.eth_contracts_start_block_fallback.unwrap(),
+            eth_contracts_start_block_fallback: self
+                .eth
+                .eth_contracts_start_block_fallback
+                .unwrap(),
             eth_contracts_start_block_override: self.eth.eth_contracts_start_block_override,
             sui_bridge_module_last_processed_event_id_override: self
                 .sui
                 .sui_bridge_module_last_processed_event_id_override,
         };
 
+        info!("Config validation complete");
         Ok((bridge_server_config, Some(bridge_client_config)))
     }
 
@@ -238,6 +256,7 @@ impl BridgeNodeConfig {
         &self,
         metrics: Arc<BridgeMetrics>,
     ) -> anyhow::Result<(Arc<EthClient<MeteredEthHttpProvier>>, Vec<EthAddress>)> {
+        info!("Creating Ethereum client provider");
         let bridge_proxy_address = EthAddress::from_str(&self.eth.eth_bridge_proxy_address)?;
         let provider = Arc::new(
             new_metered_eth_provider(&self.eth.eth_rpc_url, metrics.clone())
@@ -245,12 +264,22 @@ impl BridgeNodeConfig {
                 .interval(std::time::Duration::from_millis(2000)),
         );
         let chain_id = provider.get_chainid().await?;
-        let (committee_address, limiter_address, vault_address, config_address, _weth_address, _usdt_address) =
-            get_eth_contract_addresses(bridge_proxy_address, &provider).await?;
+        let (
+            committee_address,
+            limiter_address,
+            vault_address,
+            config_address,
+            _weth_address,
+            _usdt_address,
+            _wbtc_address,
+            _lbtc_address,
+        ) = get_eth_contract_addresses(bridge_proxy_address, &provider).await?;
         let config = EthBridgeConfig::new(config_address, provider.clone());
 
         if self.run_client && self.eth.eth_contracts_start_block_fallback.is_none() {
-            return Err(anyhow!("eth_contracts_start_block_fallback is required when run_client is true"));
+            return Err(anyhow!(
+                "eth_contracts_start_block_fallback is required when run_client is true"
+            ));
         }
 
         // If bridge chain id is Eth Mainent or Sepolia, we expect to see chain
@@ -264,12 +293,22 @@ impl BridgeNodeConfig {
             ));
         }
         if bridge_chain_id == BridgeChainId::EthMainnet as u8 && chain_id.as_u64() != 1 {
-            anyhow::bail!("Expected Eth chain id 1, but connected to {}", chain_id.as_u64());
+            anyhow::bail!(
+                "Expected Eth chain id 1, but connected to {}",
+                chain_id.as_u64()
+            );
         }
         if bridge_chain_id == BridgeChainId::EthSepolia as u8 && chain_id.as_u64() != 11155111 {
-            anyhow::bail!("Expected Eth chain id 11155111, but connected to {}", chain_id.as_u64());
+            anyhow::bail!(
+                "Expected Eth chain id 11155111, but connected to {}",
+                chain_id.as_u64()
+            );
         }
-        info!("Connected to Eth chain: {}, Bridge chain id: {}", chain_id.as_u64(), bridge_chain_id,);
+        info!(
+            "Connected to Eth chain: {}, Bridge chain id: {}",
+            chain_id.as_u64(),
+            bridge_chain_id,
+        );
 
         let eth_client = Arc::new(
             EthClient::<MeteredEthHttpProvier>::new(
@@ -285,8 +324,14 @@ impl BridgeNodeConfig {
             )
             .await?,
         );
-        let contract_addresses =
-            vec![bridge_proxy_address, committee_address, config_address, limiter_address, vault_address];
+        let contract_addresses = vec![
+            bridge_proxy_address,
+            committee_address,
+            config_address,
+            limiter_address,
+            vault_address,
+        ];
+        info!("Ethereum client setup complete");
         Ok((eth_client, contract_addresses))
     }
 
@@ -324,14 +369,20 @@ impl BridgeNodeConfig {
                 sui_identifier
             );
         }
-        info!("Connected to Sui chain: {}, Bridge chain id: {}", sui_identifier, self.sui.sui_bridge_chain_id,);
+        info!(
+            "Connected to Sui chain: {}, Bridge chain id: {}",
+            sui_identifier, self.sui.sui_bridge_chain_id,
+        );
 
         let client_sui_address = SuiAddress::from(&bridge_client_key.public());
 
         let gas_object_id = match self.sui.bridge_client_gas_object {
             Some(id) => id,
             None => {
-                let sui_client = SuiClientBuilder::default().build(&self.sui.sui_rpc_url).await?;
+                info!("No gas object configured, finding gas object with highest balance");
+                let sui_client = SuiClientBuilder::default()
+                    .build(&self.sui.sui_rpc_url)
+                    .await?;
                 let coin =
                     // Minimum balance for gas object is 10 SUI
                     pick_highest_balance_coin(sui_client.coin_read_api(), client_sui_address, 10_000_000_000)
@@ -339,22 +390,17 @@ impl BridgeNodeConfig {
                 coin.coin_object_id
             }
         };
-        let (gas_coin, gas_object_ref, owner) = sui_client.get_gas_data_panic_if_not_gas(gas_object_id).await;
+        let (gas_coin, gas_object_ref, owner) = sui_client
+            .get_gas_data_panic_if_not_gas(gas_object_id)
+            .await;
         if owner != Owner::AddressOwner(client_sui_address) {
-            return Err(anyhow!(
-                "Gas object {:?} is not owned by bridge client key's associated OneChain address {:?}, but {:?}",
-                gas_object_id,
-                client_sui_address,
-                owner
-            ));
+            return Err(anyhow!("Gas object {:?} is not owned by bridge client key's associated sui address {:?}, but {:?}", gas_object_id, client_sui_address, owner));
         }
         let balance = gas_coin.value();
+        info!("Gas object balance: {}", balance);
         metrics.gas_coin_balance.set(balance as i64);
-        info!(
-            "Starting bridge client with address: {:?}, gas object {:?}, balance: {}",
-            client_sui_address, gas_object_ref.0, balance,
-        );
 
+        info!("Sui client setup complete");
         Ok((bridge_client_key, client_sui_address, gas_object_ref))
     }
 }
@@ -399,29 +445,43 @@ pub async fn pick_highest_balance_coin(
     address: SuiAddress,
     minimal_amount: u64,
 ) -> anyhow::Result<Coin> {
-    let mut highest_balance = 0;
-    let mut highest_balance_coin = None;
-    coin_read_api
-        .get_coins_stream(address, None)
-        .for_each(|coin: Coin| {
-            if coin.balance > highest_balance {
-                highest_balance = coin.balance;
-                highest_balance_coin = Some(coin.clone());
-            }
-            future::ready(())
-        })
-        .await;
-    if highest_balance_coin.is_none() {
-        return Err(anyhow!("No Sui coins found for address {:?}", address));
+    info!("Looking for a suitable gas coin for address {:?}", address);
+
+    // Only look at SUI coins specifically
+    let mut stream = coin_read_api
+        .get_coins_stream(address, Some("0x2::oct::OCT".to_string()))
+        .boxed();
+
+    let mut coins_checked = 0;
+
+    while let Some(coin) = stream.next().await {
+        info!(
+            "Checking coin: {:?}, balance: {}",
+            coin.coin_object_id, coin.balance
+        );
+        coins_checked += 1;
+
+        // Take the first coin with a sufficient balance
+        if coin.balance >= minimal_amount {
+            info!(
+                "Found suitable gas coin with {} mist (object ID: {:?})",
+                coin.balance, coin.coin_object_id
+            );
+            return Ok(coin);
+        }
+
+        // Only check a small number of coins before giving up
+        if coins_checked >= 1000 {
+            break;
+        }
     }
-    if highest_balance < minimal_amount {
-        return Err(anyhow!(
-            "Found no single coin that has >= {} balance Sui for address {:?}",
-            minimal_amount,
-            address,
-        ));
-    }
-    Ok(highest_balance_coin.unwrap())
+
+    Err(anyhow!(
+        "No suitable gas coin with >= {} mist found for address {:?} after checking {} coins",
+        minimal_amount,
+        address,
+        coins_checked
+    ))
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

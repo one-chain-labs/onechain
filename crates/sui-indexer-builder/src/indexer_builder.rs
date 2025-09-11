@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{cmp::min, sync::Arc};
+use std::cmp::min;
+use std::sync::Arc;
 
 use anyhow::Error;
 use async_trait::async_trait;
@@ -9,7 +10,8 @@ use futures::StreamExt;
 use prometheus::{IntGauge, IntGaugeVec};
 use tokio::task::JoinHandle;
 
-use crate::{metrics::IndexerMetricProvider, Task, Tasks};
+use crate::metrics::IndexerMetricProvider;
+use crate::{Task, Tasks};
 use mysten_metrics::{metered_channel, spawn_monitored_task};
 use tap::tap::TapFallible;
 
@@ -29,7 +31,12 @@ pub struct IndexerBuilder<D, M, P> {
 }
 
 impl<D, M, P> IndexerBuilder<D, M, P> {
-    pub fn new<R>(name: &str, datasource: D, data_mapper: M, persistent: P) -> IndexerBuilder<D, M, P>
+    pub fn new<R>(
+        name: &str,
+        datasource: D,
+        data_mapper: M,
+        persistent: P,
+    ) -> IndexerBuilder<D, M, P>
     where
         P: Persistent<R>,
     {
@@ -42,7 +49,6 @@ impl<D, M, P> IndexerBuilder<D, M, P> {
             persistent,
         }
     }
-
     pub fn build(self) -> Indexer<P, D, M> {
         Indexer {
             name: self.name,
@@ -110,8 +116,11 @@ impl<P, D, M> Indexer<P, D, M> {
         // tasks won't be empty here, ok to unwrap.
         let live_task_future = match ongoing_tasks.live_task() {
             Some(live_task) if !self.disable_live_task => {
-                let live_task_future =
-                    self.datasource.start_ingestion_task(live_task, self.storage.clone(), self.data_mapper.clone());
+                let live_task_future = self.datasource.start_ingestion_task(
+                    live_task,
+                    self.storage.clone(),
+                    self.data_mapper.clone(),
+                );
                 Some(live_task_future)
             }
             _ => None,
@@ -127,7 +136,11 @@ impl<P, D, M> Indexer<P, D, M> {
             for backfill_task in backfill_tasks {
                 if backfill_task.start_checkpoint < backfill_task.target_checkpoint {
                     datasource_clone
-                        .start_ingestion_task(backfill_task, storage_clone.clone(), data_mapper_clone.clone())
+                        .start_ingestion_task(
+                            backfill_task,
+                            storage_clone.clone(),
+                            data_mapper_clone.clone(),
+                        )
                         .await
                         .expect("Backfill task failed");
                 }
@@ -150,7 +163,10 @@ impl<P, D, M> Indexer<P, D, M> {
         T: Send,
     {
         let ongoing_tasks = self.storage.get_ongoing_tasks(&self.name).await?;
-        let largest_checkpoint = self.storage.get_largest_indexed_checkpoint(&self.name).await?;
+        let largest_checkpoint = self
+            .storage
+            .get_largest_indexed_checkpoint(&self.name)
+            .await?;
         let live_task_from_checkpoint = self.datasource.get_live_task_starting_checkpoint().await?;
 
         // Create and update live task if needed
@@ -162,7 +178,10 @@ impl<P, D, M> Indexer<P, D, M> {
             match ongoing_tasks.live_task() {
                 None => {
                     self.storage
-                        .register_live_task(format!("{} - Live", self.name), live_task_from_checkpoint)
+                        .register_live_task(
+                            format!("{} - Live", self.name),
+                            live_task_from_checkpoint,
+                        )
                         .await
                         .tap_ok(|_| {
                             tracing::info!(
@@ -172,7 +191,11 @@ impl<P, D, M> Indexer<P, D, M> {
                             );
                         })
                         .tap_err(|e| {
-                            tracing::error!("Failed to register live task ({}-MAX): {:?}", live_task_from_checkpoint, e);
+                            tracing::error!(
+                                "Failed to register live task ({}-MAX): {:?}",
+                                live_task_from_checkpoint,
+                                e
+                            );
                         })?;
                 }
                 Some(mut live_task) => {
@@ -210,7 +233,9 @@ impl<P, D, M> Indexer<P, D, M> {
 
         // TODO: when there is a hole, we create one task for the hole, but ideally we should
         // honor the partition size and create as needed.
-        let from_checkpoint = largest_checkpoint.map(|cp| cp + 1).unwrap_or(self.datasource.get_genesis_height());
+        let from_checkpoint = largest_checkpoint
+            .map(|cp| cp + 1)
+            .unwrap_or(self.datasource.get_genesis_height());
         if from_checkpoint < live_task_from_checkpoint {
             self.create_backfill_tasks(from_checkpoint, live_task_from_checkpoint - 1)
                 .await
@@ -242,14 +267,24 @@ impl<P, D, M> Indexer<P, D, M> {
     {
         match self.backfill_strategy {
             BackfillStrategy::Simple => {
-                self.storage.register_task(format!("{} - backfill - {from_cp}:{to_cp}", self.name), from_cp, to_cp).await
+                self.storage
+                    .register_task(
+                        format!("{} - backfill - {from_cp}:{to_cp}", self.name),
+                        from_cp,
+                        to_cp,
+                    )
+                    .await
             }
             BackfillStrategy::Partitioned { task_size } => {
                 // TODO: register all tasks in one DB write
                 while from_cp < to_cp {
                     let target_cp = min(from_cp + task_size - 1, to_cp);
                     self.storage
-                        .register_task(format!("{} - backfill - {from_cp}:{target_cp}", self.name), from_cp, target_cp)
+                        .register_task(
+                            format!("{} - backfill - {from_cp}:{target_cp}", self.name),
+                            from_cp,
+                            target_cp,
+                        )
                         .await?;
                     from_cp = target_cp + 1;
                 }
@@ -295,7 +330,11 @@ pub trait IndexerProgressStore: Send {
     /// the progress may be cached somewhere instead of flushing to persistent storage.
     /// Returns saved checkpoint number if any. Caller can use this value as a signal
     /// to see if we have reached the target checkpoint.
-    async fn save_progress(&mut self, task: &Task, checkpoint_numbers: &[u64]) -> anyhow::Result<Option<u64>>;
+    async fn save_progress(
+        &mut self,
+        task: &Task,
+        checkpoint_numbers: &[u64],
+    ) -> anyhow::Result<Option<u64>>;
 
     async fn get_ongoing_tasks(&self, task_prefix: &str) -> Result<Tasks, Error>;
 
@@ -308,14 +347,23 @@ pub trait IndexerProgressStore: Send {
         target_checkpoint: u64,
     ) -> Result<(), anyhow::Error>;
 
-    async fn register_live_task(&mut self, task_name: String, start_checkpoint: u64) -> Result<(), anyhow::Error>;
+    async fn register_live_task(
+        &mut self,
+        task_name: String,
+        start_checkpoint: u64,
+    ) -> Result<(), anyhow::Error>;
 
     async fn update_task(&mut self, task: Task) -> Result<(), Error>;
 }
 
 #[async_trait]
 pub trait Datasource<T: Send>: Sync + Send {
-    async fn start_ingestion_task<M, P, R>(&self, task: Task, mut storage: P, data_mapper: M) -> Result<(), Error>
+    async fn start_ingestion_task<M, P, R>(
+        &self,
+        task: Task,
+        mut storage: P,
+        data_mapper: M,
+    ) -> Result<(), Error>
     where
         M: DataMapper<T, R>,
         P: Persistent<R>,
@@ -325,8 +373,10 @@ pub trait Datasource<T: Send>: Sync + Send {
         let task_type_label = task.type_str();
         let starting_checkpoint = task.start_checkpoint;
         let target_checkpoint = task.target_checkpoint;
-        let ingestion_batch_size =
-            std::env::var("INGESTION_BATCH_SIZE").unwrap_or(INGESTION_BATCH_SIZE.to_string()).parse::<usize>().unwrap();
+        let ingestion_batch_size = std::env::var("INGESTION_BATCH_SIZE")
+            .unwrap_or(INGESTION_BATCH_SIZE.to_string())
+            .parse::<usize>()
+            .unwrap();
         let checkpoint_channel_size = std::env::var("RETRIEVED_CHECKPOINT_CHANNEL_SIZE")
             .unwrap_or(RETRIEVED_CHECKPOINT_CHANNEL_SIZE.to_string())
             .parse::<usize>()
@@ -350,7 +400,12 @@ pub trait Datasource<T: Send>: Sync + Send {
         );
         let is_live_task = task.is_live_task;
         let _live_tasks_tracker = if is_live_task {
-            Some(LiveTasksTracker::new(self.metric_provider().get_inflight_live_tasks_metrics().clone(), &task_name))
+            Some(LiveTasksTracker::new(
+                self.metric_provider()
+                    .get_inflight_live_tasks_metrics()
+                    .clone(),
+                &task_name,
+            ))
         } else {
             None
         };
@@ -361,16 +416,18 @@ pub trait Datasource<T: Send>: Sync + Send {
             .with_label_values(&[task_name_prefix, task_type_label]);
         // track remaining checkpoints per task, except for live task
         let remaining_checkpoints_metric = if !is_live_task {
-            let remaining =
-                self.metric_provider().get_tasks_remaining_checkpoints_metric().with_label_values(&[task_name_prefix]);
+            let remaining = self
+                .metric_provider()
+                .get_tasks_remaining_checkpoints_metric()
+                .with_label_values(&[task_name_prefix]);
             remaining.set((target_checkpoint - starting_checkpoint + 1) as i64);
             Some(remaining)
         } else {
             None
         };
 
-        let mut stream =
-            mysten_metrics::metered_channel::ReceiverStream::new(data_rx).ready_chunks(ingestion_batch_size);
+        let mut stream = mysten_metrics::metered_channel::ReceiverStream::new(data_rx)
+            .ready_chunks(ingestion_batch_size);
         let mut last_saved_checkpoint = None;
         loop {
             let batch_option = stream.next().await;
@@ -385,14 +442,23 @@ pub trait Datasource<T: Send>: Sync + Send {
             for (height, d) in batch {
                 // Filter out data with height > target_checkpoint, in case data source returns any
                 if height > target_checkpoint {
-                    tracing::warn!(task_name, height, "Received data with height > target_checkpoint, skipping.");
+                    tracing::warn!(
+                        task_name,
+                        height,
+                        "Received data with height > target_checkpoint, skipping."
+                    );
                     continue;
                 }
                 max_height = std::cmp::max(max_height, height);
                 heights.push(height);
                 data.extend(d);
             }
-            tracing::debug!(task_name, max_height, "Ingestion task received {} blocks.", heights.len(),);
+            tracing::debug!(
+                task_name,
+                max_height,
+                "Ingestion task received {} blocks.",
+                heights.len(),
+            );
             let timer = tokio::time::Instant::now();
 
             if !data.is_empty() {
@@ -432,7 +498,10 @@ pub trait Datasource<T: Send>: Sync + Send {
             processed_checkpoints_metrics.inc_by(heights.len() as u64);
             if let Some(m) = &remaining_checkpoints_metric {
                 // Note this is only approximate as the data may come in out of order
-                m.set(std::cmp::max(target_checkpoint as i64 - max_height as i64, 0));
+                m.set(std::cmp::max(
+                    target_checkpoint as i64 - max_height as i64,
+                    0,
+                ));
             }
             // If we have reached the target checkpoint, exit proactively
             if let Some(cp) = last_saved_checkpoint {
@@ -447,12 +516,19 @@ pub trait Datasource<T: Send>: Sync + Send {
             tracing::error!(task_name, "Live task exiting unexpectedly");
         } else if let Some(last_saved_checkpoint) = last_saved_checkpoint {
             if last_saved_checkpoint < target_checkpoint {
-                tracing::error!(task_name, last_saved_checkpoint, "Task exiting before reaching target checkpoint",);
+                tracing::error!(
+                    task_name,
+                    last_saved_checkpoint,
+                    "Task exiting before reaching target checkpoint",
+                );
             } else {
                 tracing::info!(task_name, "Backfill task is done, exiting");
             }
         } else {
-            tracing::error!(task_name, "Task exiting unexpectedly with no progress saved");
+            tracing::error!(
+                task_name,
+                "Task exiting unexpectedly with no progress saved"
+            );
         }
         join_handle.abort();
         if let Some(m) = &remaining_checkpoints_metric {

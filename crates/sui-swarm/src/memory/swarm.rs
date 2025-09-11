@@ -5,37 +5,33 @@ use super::Node;
 use anyhow::Result;
 use futures::future::try_join_all;
 use rand::rngs::OsRng;
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::num::NonZeroUsize;
+use std::time::Duration;
 use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    num::NonZeroUsize,
     ops,
     path::{Path, PathBuf},
-    time::Duration,
 };
 use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
 
-use one_node::SuiNodeHandle;
-use sui_config::{
-    node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange},
-    ExecutionCacheConfig,
-    NodeConfig,
-};
+#[cfg(msim)]
+use sui_config::node::ExecutionTimeObserverConfig;
+use sui_config::node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange};
+use sui_config::{ExecutionCacheConfig, NodeConfig};
 use sui_macros::nondeterministic;
-use sui_protocol_config::ProtocolVersion;
-use sui_swarm_config::{
-    genesis_config::{AccountConfig, GenesisConfig, ValidatorGenesisConfig},
-    network_config::NetworkConfig,
-    network_config_builder::{
-        CommitteeConfig,
-        ConfigBuilder,
-        ProtocolVersionsConfig,
-        StateAccumulatorV2EnabledConfig,
-        SupportedProtocolVersionsCallback,
-    },
-    node_config_builder::FullnodeConfigBuilder,
+use one_node::SuiNodeHandle;
+use sui_protocol_config::{Chain, ProtocolVersion};
+use sui_swarm_config::genesis_config::{AccountConfig, GenesisConfig, ValidatorGenesisConfig};
+use sui_swarm_config::network_config::NetworkConfig;
+use sui_swarm_config::network_config_builder::{
+    CommitteeConfig, ConfigBuilder, GlobalStateHashV2EnabledConfig, ProtocolVersionsConfig,
+    SupportedProtocolVersionsCallback,
 };
-use sui_types::{base_types::AuthorityName, object::Object, supported_protocol_versions::SupportedProtocolVersions};
+use sui_swarm_config::node_config_builder::FullnodeConfigBuilder;
+use sui_types::base_types::AuthorityName;
+use sui_types::object::Object;
+use sui_types::supported_protocol_versions::SupportedProtocolVersions;
 use tempfile::TempDir;
 use tracing::info;
 
@@ -46,6 +42,7 @@ pub struct SwarmBuilder<R = OsRng> {
     committee: CommitteeConfig,
     genesis_config: Option<GenesisConfig>,
     network_config: Option<NetworkConfig>,
+    chain_override: Option<Chain>,
     additional_objects: Vec<Object>,
     fullnode_count: usize,
     fullnode_rpc_port: Option<u16>,
@@ -64,8 +61,10 @@ pub struct SwarmBuilder<R = OsRng> {
     fullnode_fw_config: Option<RemoteFirewallConfig>,
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
-    state_accumulator_v2_enabled_config: StateAccumulatorV2EnabledConfig,
+    global_state_hash_v2_enabled_config: GlobalStateHashV2EnabledConfig,
     disable_fullnode_pruning: bool,
+    #[cfg(msim)]
+    execution_time_observer_config: Option<ExecutionTimeObserverConfig>,
 }
 
 impl SwarmBuilder {
@@ -77,6 +76,7 @@ impl SwarmBuilder {
             committee: CommitteeConfig::Size(NonZeroUsize::new(1).unwrap()),
             genesis_config: None,
             network_config: None,
+            chain_override: None,
             additional_objects: vec![],
             fullnode_count: 0,
             fullnode_rpc_port: None,
@@ -94,8 +94,10 @@ impl SwarmBuilder {
             fullnode_fw_config: None,
             max_submit_position: None,
             submit_delay_step_override_millis: None,
-            state_accumulator_v2_enabled_config: StateAccumulatorV2EnabledConfig::Global(true),
+            global_state_hash_v2_enabled_config: GlobalStateHashV2EnabledConfig::Global(true),
             disable_fullnode_pruning: false,
+            #[cfg(msim)]
+            execution_time_observer_config: None,
         }
     }
 }
@@ -108,12 +110,14 @@ impl<R> SwarmBuilder<R> {
             committee: self.committee,
             genesis_config: self.genesis_config,
             network_config: self.network_config,
+            chain_override: self.chain_override,
             additional_objects: self.additional_objects,
             fullnode_count: self.fullnode_count,
             fullnode_rpc_port: self.fullnode_rpc_port,
             fullnode_rpc_addr: self.fullnode_rpc_addr,
             supported_protocol_versions_config: self.supported_protocol_versions_config,
-            fullnode_supported_protocol_versions_config: self.fullnode_supported_protocol_versions_config,
+            fullnode_supported_protocol_versions_config: self
+                .fullnode_supported_protocol_versions_config,
             db_checkpoint_config: self.db_checkpoint_config,
             jwk_fetch_interval: self.jwk_fetch_interval,
             num_unpruned_validators: self.num_unpruned_validators,
@@ -125,8 +129,10 @@ impl<R> SwarmBuilder<R> {
             fullnode_fw_config: self.fullnode_fw_config,
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
-            state_accumulator_v2_enabled_config: self.state_accumulator_v2_enabled_config,
+            global_state_hash_v2_enabled_config: self.global_state_hash_v2_enabled_config,
             disable_fullnode_pruning: self.disable_fullnode_pruning,
+            #[cfg(msim)]
+            execution_time_observer_config: self.execution_time_observer_config,
         }
     }
 
@@ -156,6 +162,12 @@ impl<R> SwarmBuilder<R> {
     pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
         assert!(self.network_config.is_none() && self.genesis_config.is_none());
         self.genesis_config = Some(genesis_config);
+        self
+    }
+
+    pub fn with_chain_override(mut self, chain: Chain) -> Self {
+        assert!(self.chain_override.is_none());
+        self.chain_override = Some(chain);
         self
     }
 
@@ -204,12 +216,16 @@ impl<R> SwarmBuilder<R> {
     }
 
     pub fn with_epoch_duration_ms(mut self, epoch_duration_ms: u64) -> Self {
-        self.get_or_init_genesis_config().parameters.epoch_duration_ms = epoch_duration_ms;
+        self.get_or_init_genesis_config()
+            .parameters
+            .epoch_duration_ms = epoch_duration_ms;
         self
     }
 
     pub fn with_protocol_version(mut self, v: ProtocolVersion) -> Self {
-        self.get_or_init_genesis_config().parameters.protocol_version = v;
+        self.get_or_init_genesis_config()
+            .parameters
+            .protocol_version = v;
         self
     }
 
@@ -218,7 +234,10 @@ impl<R> SwarmBuilder<R> {
         self
     }
 
-    pub fn with_supported_protocol_version_callback(mut self, func: SupportedProtocolVersionsCallback) -> Self {
+    pub fn with_supported_protocol_version_callback(
+        mut self,
+        func: SupportedProtocolVersionsCallback,
+    ) -> Self {
         self.supported_protocol_versions_config = ProtocolVersionsConfig::PerValidator(func);
         self
     }
@@ -228,12 +247,24 @@ impl<R> SwarmBuilder<R> {
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled_config(mut self, c: StateAccumulatorV2EnabledConfig) -> Self {
-        self.state_accumulator_v2_enabled_config = c;
+    pub fn with_global_state_hash_v2_enabled_config(
+        mut self,
+        c: GlobalStateHashV2EnabledConfig,
+    ) -> Self {
+        self.global_state_hash_v2_enabled_config = c;
         self
     }
 
-    pub fn with_fullnode_supported_protocol_versions_config(mut self, c: ProtocolVersionsConfig) -> Self {
+    #[cfg(msim)]
+    pub fn with_execution_time_observer_config(mut self, c: ExecutionTimeObserverConfig) -> Self {
+        self.execution_time_observer_config = Some(c);
+        self
+    }
+
+    pub fn with_fullnode_supported_protocol_versions_config(
+        mut self,
+        c: ProtocolVersionsConfig,
+    ) -> Self {
         self.fullnode_supported_protocol_versions_config = Some(c);
         self
     }
@@ -243,13 +274,19 @@ impl<R> SwarmBuilder<R> {
         self
     }
 
-    pub fn with_authority_overload_config(mut self, authority_overload_config: AuthorityOverloadConfig) -> Self {
+    pub fn with_authority_overload_config(
+        mut self,
+        authority_overload_config: AuthorityOverloadConfig,
+    ) -> Self {
         assert!(self.network_config.is_none());
         self.authority_overload_config = Some(authority_overload_config);
         self
     }
 
-    pub fn with_execution_cache_config(mut self, execution_cache_config: ExecutionCacheConfig) -> Self {
+    pub fn with_execution_cache_config(
+        mut self,
+        execution_cache_config: ExecutionCacheConfig,
+    ) -> Self {
         self.execution_cache_config = Some(execution_cache_config);
         self
     }
@@ -294,7 +331,10 @@ impl<R> SwarmBuilder<R> {
         self
     }
 
-    pub fn with_submit_delay_step_override_millis(mut self, submit_delay_step_override_millis: u64) -> Self {
+    pub fn with_submit_delay_step_override_millis(
+        mut self,
+        submit_delay_step_override_millis: u64,
+    ) -> Self {
         self.submit_delay_step_override_millis = Some(submit_delay_step_override_millis);
         self
     }
@@ -303,8 +343,11 @@ impl<R> SwarmBuilder<R> {
 impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
     /// Create the configured Swarm.
     pub fn build(self) -> Swarm {
-        let dir =
-            if let Some(dir) = self.dir { SwarmDirectory::Persistent(dir) } else { SwarmDirectory::new_temporary() };
+        let dir = if let Some(dir) = self.dir {
+            SwarmDirectory::Persistent(dir)
+        } else {
+            SwarmDirectory::new_temporary()
+        };
 
         let ingest_data = self.data_ingestion_dir.clone();
 
@@ -315,8 +358,13 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
                 config_builder = config_builder.with_genesis_config(genesis_config);
             }
 
+            if let Some(chain_override) = self.chain_override {
+                config_builder = config_builder.with_chain_override(chain_override);
+            }
+
             if let Some(num_unpruned_validators) = self.num_unpruned_validators {
-                config_builder = config_builder.with_num_unpruned_validators(num_unpruned_validators);
+                config_builder =
+                    config_builder.with_num_unpruned_validators(num_unpruned_validators);
             }
 
             if let Some(jwk_fetch_interval) = self.jwk_fetch_interval {
@@ -324,7 +372,8 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
             }
 
             if let Some(authority_overload_config) = self.authority_overload_config {
-                config_builder = config_builder.with_authority_overload_config(authority_overload_config);
+                config_builder =
+                    config_builder.with_authority_overload_config(authority_overload_config);
             }
 
             if let Some(execution_cache_config) = self.execution_cache_config {
@@ -339,25 +388,41 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
                 config_builder = config_builder.with_max_submit_position(max_submit_position);
             }
 
-            if let Some(submit_delay_step_override_millis) = self.submit_delay_step_override_millis {
-                config_builder =
-                    config_builder.with_submit_delay_step_override_millis(submit_delay_step_override_millis);
+            if let Some(submit_delay_step_override_millis) = self.submit_delay_step_override_millis
+            {
+                config_builder = config_builder
+                    .with_submit_delay_step_override_millis(submit_delay_step_override_millis);
             }
 
-            config_builder
+            #[allow(unused_mut)]
+            let mut final_builder = config_builder
                 .committee(self.committee)
                 .rng(self.rng)
                 .with_objects(self.additional_objects)
-                .with_supported_protocol_versions_config(self.supported_protocol_versions_config.clone())
-                .with_state_accumulator_v2_enabled_config(self.state_accumulator_v2_enabled_config.clone())
-                .build()
+                .with_supported_protocol_versions_config(
+                    self.supported_protocol_versions_config.clone(),
+                )
+                .with_global_state_hash_v2_enabled_config(
+                    self.global_state_hash_v2_enabled_config.clone(),
+                );
+
+            #[cfg(msim)]
+            if let Some(execution_time_observer_config) = self.execution_time_observer_config {
+                final_builder = final_builder
+                    .with_execution_time_observer_config(execution_time_observer_config);
+            }
+
+            final_builder.build()
         });
 
         let mut nodes: HashMap<_, _> = network_config
             .validator_configs()
             .iter()
             .map(|config| {
-                info!("SwarmBuilder configuring validator with name {}", config.protocol_public_key());
+                info!(
+                    "SwarmBuilder configuring validator with name {}",
+                    config.protocol_public_key()
+                );
                 (config.protocol_public_key(), Node::new(config.to_owned()))
             })
             .collect();
@@ -371,13 +436,18 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
             .with_fw_config(self.fullnode_fw_config)
             .with_disable_pruning(self.disable_fullnode_pruning);
 
+        if let Some(chain) = self.chain_override {
+            fullnode_config_builder = fullnode_config_builder.with_chain_override(chain);
+        }
+
         if let Some(spvc) = &self.fullnode_supported_protocol_versions_config {
             let supported_versions = match spvc {
                 ProtocolVersionsConfig::Default => SupportedProtocolVersions::SYSTEM_DEFAULT,
                 ProtocolVersionsConfig::Global(v) => *v,
                 ProtocolVersionsConfig::PerValidator(func) => func(0, None),
             };
-            fullnode_config_builder = fullnode_config_builder.with_supported_protocol_versions(supported_versions);
+            fullnode_config_builder =
+                fullnode_config_builder.with_supported_protocol_versions(supported_versions);
         }
 
         if self.fullnode_count > 0 {
@@ -394,11 +464,19 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
                     }
                 }
                 let config = builder.build(&mut OsRng, &network_config);
-                info!("SwarmBuilder configuring full node with name {}", config.protocol_public_key());
+                info!(
+                    "SwarmBuilder configuring full node with name {}",
+                    config.protocol_public_key()
+                );
                 nodes.insert(config.protocol_public_key(), Node::new(config));
             });
         }
-        Swarm { dir, network_config, nodes, fullnode_config_builder }
+        Swarm {
+            dir,
+            network_config,
+            nodes,
+            fullnode_config_builder,
+        }
     }
 }
 
@@ -467,17 +545,21 @@ impl Swarm {
     /// This means that they have a consensus config. This however doesn't mean this validator is
     /// currently active (i.e. it's not necessarily in the validator set at the moment).
     pub fn validator_nodes(&self) -> impl Iterator<Item = &Node> {
-        self.nodes.values().filter(|node| node.config().consensus_config.is_some())
+        self.nodes
+            .values()
+            .filter(|node| node.config().consensus_config.is_some())
     }
 
     pub fn validator_node_handles(&self) -> Vec<SuiNodeHandle> {
-        self.validator_nodes().map(|node| node.get_node_handle().unwrap()).collect()
+        self.validator_nodes()
+            .map(|node| node.get_node_handle().unwrap())
+            .collect()
     }
 
     /// Returns an iterator over all currently active validators.
     pub fn active_validators(&self) -> impl Iterator<Item = &Node> {
         self.validator_nodes().filter(|node| {
-            node.get_node_handle().map_or(false, |handle| {
+            node.get_node_handle().is_some_and(|handle| {
                 let state = handle.state();
                 state.is_validator(&state.epoch_store_for_testing())
             })
@@ -486,7 +568,9 @@ impl Swarm {
 
     /// Return an iterator over shared references of all Fullnodes.
     pub fn fullnodes(&self) -> impl Iterator<Item = &Node> {
-        self.nodes.values().filter(|node| node.config().consensus_config.is_none())
+        self.nodes
+            .values()
+            .filter(|node| node.config().consensus_config.is_none())
     }
 
     pub async fn spawn_new_node(&mut self, config: NodeConfig) -> SuiNodeHandle {
@@ -543,7 +627,10 @@ mod test {
     #[tokio::test]
     async fn launch() {
         telemetry_subscribers::init_for_testing();
-        let mut swarm = Swarm::builder().committee_size(NonZeroUsize::new(4).unwrap()).with_fullnode_count(1).build();
+        let mut swarm = Swarm::builder()
+            .committee_size(NonZeroUsize::new(4).unwrap())
+            .with_fullnode_count(1)
+            .build();
 
         swarm.launch().await.unwrap();
 

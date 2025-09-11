@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 move-model.workspace = true
@@ -29,8 +29,8 @@ petgraph.workspace = true
 [dev-dependencies]
 move-stdlib.workspace = true
 datatest-stable.workspace = true
-move-prover-test-utils.workspace = true
 anyhow.workspace = true
+regex.workspace = true
 
 [[test]]
 name = "testsuite"

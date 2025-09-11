@@ -7,17 +7,18 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 pub mod checked {
 
-    use crate::{sui_types::gas::SuiGasStatusAPI, temporary_store::TemporaryStore};
+    use crate::sui_types::gas::SuiGasStatusAPI;
+    use crate::temporary_store::TemporaryStore;
     use sui_protocol_config::ProtocolConfig;
+    use sui_types::gas::{deduct_gas, GasCostSummary, SuiGasStatus};
+    use sui_types::gas_model::gas_predicates::{
+        charge_upgrades, dont_charge_budget_on_storage_oog,
+    };
     use sui_types::{
         base_types::{ObjectID, ObjectRef},
         digests::TransactionDigest,
         error::ExecutionError,
-        gas::{deduct_gas, GasCostSummary, SuiGasStatus},
-        gas_model::{
-            gas_predicates::{charge_upgrades, dont_charge_budget_on_storage_oog},
-            tables::GasStatus,
-        },
+        gas_model::tables::GasStatus,
         is_system_package,
         object::Data,
     };
@@ -50,7 +51,13 @@ pub mod checked {
             protocol_config: &ProtocolConfig,
         ) -> Self {
             let gas_model_version = protocol_config.gas_model_version();
-            Self { tx_digest, gas_model_version, gas_coins, smashed_gas_coin: None, gas_status }
+            Self {
+                tx_digest,
+                gas_model_version,
+                gas_coins,
+                smashed_gas_coin: None,
+                gas_status,
+            }
         }
 
         pub fn new_unmetered(tx_digest: TransactionDigest) -> Self {
@@ -118,7 +125,8 @@ pub mod checked {
         // are correct.
         pub fn smash_gas(&mut self, temporary_store: &mut TemporaryStore<'_>) {
             let gas_coin_count = self.gas_coins.len();
-            if gas_coin_count == 0 || (gas_coin_count == 1 && self.gas_coins[0].0 == ObjectID::ZERO) {
+            if gas_coin_count == 0 || (gas_coin_count == 1 && self.gas_coins[0].0 == ObjectID::ZERO)
+            {
                 return; // self.smashed_gas_coin is None
             }
             // set the first coin to be the transaction only gas coin.
@@ -192,8 +200,14 @@ pub mod checked {
         // Gas charging operations
         //
 
-        pub fn track_storage_mutation(&mut self, object_id: ObjectID, new_size: usize, storage_rebate: u64) -> u64 {
-            self.gas_status.track_storage_mutation(object_id, new_size, storage_rebate)
+        pub fn track_storage_mutation(
+            &mut self,
+            object_id: ObjectID,
+            new_size: usize,
+            storage_rebate: u64,
+        ) -> u64 {
+            self.gas_status
+                .track_storage_mutation(object_id, new_size, storage_rebate)
         }
 
         pub fn reset_storage_cost_and_rebate(&mut self) {
@@ -212,7 +226,10 @@ pub mod checked {
             }
         }
 
-        pub fn charge_input_objects(&mut self, temporary_store: &TemporaryStore<'_>) -> Result<(), ExecutionError> {
+        pub fn charge_input_objects(
+            &mut self,
+            temporary_store: &TemporaryStore<'_>,
+        ) -> Result<(), ExecutionError> {
             let objects = temporary_store.objects();
             // TODO: Charge input object count.
             let _object_count = objects.len();
@@ -257,7 +274,7 @@ pub mod checked {
 
             if self.smashed_gas_coin.is_some() {
                 // bucketize computation cost
-                if let Err(err) = self.gas_status.bucketize_computation() {
+                if let Err(err) = self.gas_status.bucketize_computation(None) {
                     if execution_result.is_ok() {
                         *execution_result = Err(err);
                     }

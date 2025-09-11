@@ -3,13 +3,14 @@
 
 use std::sync::Arc;
 
-use consensus_core::{TransactionIndex, TransactionVerifier, ValidationError};
+use consensus_core::{TransactionVerifier, ValidationError};
+use consensus_types::block::{BlockRef, TransactionIndex};
 use fastcrypto_tbls::dkg_v1;
 use mysten_metrics::monitored_scope;
 use prometheus::{register_int_counter_with_registry, IntCounter, Registry};
 use sui_types::{
     error::{SuiError, SuiResult},
-    messages_consensus::{ConsensusTransaction, ConsensusTransactionKind},
+    messages_consensus::{ConsensusPosition, ConsensusTransaction, ConsensusTransactionKind},
     transaction::Transaction,
 };
 use tap::TapFallible;
@@ -19,7 +20,6 @@ use crate::{
     authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
     checkpoints::CheckpointServiceNotify,
     consensus_adapter::ConsensusOverloadChecker,
-    transaction_manager::TransactionManager,
 };
 
 /// Allows verifying the validity of transactions
@@ -28,7 +28,6 @@ pub struct SuiTxValidator {
     authority_state: Arc<AuthorityState>,
     consensus_overload_checker: Arc<dyn ConsensusOverloadChecker>,
     checkpoint_service: Arc<dyn CheckpointServiceNotify + Send + Sync>,
-    _transaction_manager: Arc<TransactionManager>,
     metrics: Arc<SuiTxValidatorMetrics>,
 }
 
@@ -37,16 +36,17 @@ impl SuiTxValidator {
         authority_state: Arc<AuthorityState>,
         consensus_overload_checker: Arc<dyn ConsensusOverloadChecker>,
         checkpoint_service: Arc<dyn CheckpointServiceNotify + Send + Sync>,
-        transaction_manager: Arc<TransactionManager>,
         metrics: Arc<SuiTxValidatorMetrics>,
     ) -> Self {
         let epoch_store = authority_state.load_epoch_store_one_call_per_task().clone();
-        info!("SuiTxValidator constructed for epoch {}", epoch_store.epoch());
+        info!(
+            "SuiTxValidator constructed for epoch {}",
+            epoch_store.epoch()
+        );
         Self {
             authority_state,
             consensus_overload_checker,
             checkpoint_service,
-            _transaction_manager: transaction_manager,
             metrics,
         }
     }
@@ -95,6 +95,22 @@ impl SuiTxValidator {
                     // TODO(fastpath): move deterministic verifications of user transactions here,
                     // for example validity_check() and verify_transaction().
                 }
+
+                ConsensusTransactionKind::ExecutionTimeObservation(obs) => {
+                    // TODO: Use a separate limit for this that may truncate shared observations.
+                    if obs.estimates.len()
+                        > epoch_store
+                            .protocol_config()
+                            .max_programmable_tx_commands()
+                            .try_into()
+                            .unwrap()
+                    {
+                        return Err(SuiError::UnexpectedMessage(format!(
+                            "ExecutionTimeObservation contains too many estimates: {}",
+                            obs.estimates.len()
+                        )));
+                    }
+                }
             }
         }
 
@@ -109,15 +125,24 @@ impl SuiTxValidator {
 
         // All checkpoint sigs have been verified, forward them to the checkpoint service
         for ckpt in ckpt_messages {
-            self.checkpoint_service.notify_checkpoint_signature(&epoch_store, ckpt)?;
+            self.checkpoint_service
+                .notify_checkpoint_signature(&epoch_store, ckpt)?;
         }
 
-        self.metrics.certificate_signatures_verified.inc_by(cert_count as u64);
-        self.metrics.checkpoint_signatures_verified.inc_by(ckpt_count as u64);
+        self.metrics
+            .certificate_signatures_verified
+            .inc_by(cert_count as u64);
+        self.metrics
+            .checkpoint_signatures_verified
+            .inc_by(ckpt_count as u64);
         Ok(())
     }
 
-    async fn vote_transactions(&self, txs: Vec<ConsensusTransactionKind>) -> Vec<TransactionIndex> {
+    fn vote_transactions(
+        &self,
+        block_ref: &BlockRef,
+        txs: Vec<ConsensusTransactionKind>,
+    ) -> Vec<TransactionIndex> {
         let epoch_store = self.authority_state.load_epoch_store_one_call_per_task();
         if !epoch_store.protocol_config().mysticeti_fastpath() {
             return vec![];
@@ -129,19 +154,33 @@ impl SuiTxValidator {
                 continue;
             };
 
-            if let Err(e) = self.vote_transaction(&epoch_store, tx).await {
-                debug!("Failed to vote transaction: {:?}", e);
+            if let Err(error) = self.vote_transaction(&epoch_store, tx) {
+                debug!("Failed to vote transaction: {:?}", error);
                 result.push(i as TransactionIndex);
+
+                // Cache the rejection vote reason (error) for the transaction
+                epoch_store.set_rejection_vote_reason(
+                    ConsensusPosition {
+                        epoch: epoch_store.epoch(),
+                        block: *block_ref,
+                        index: i as TransactionIndex,
+                    },
+                    &error,
+                );
             }
         }
 
         result
     }
 
-    async fn vote_transaction(&self, epoch_store: &Arc<AuthorityPerEpochStore>, tx: Box<Transaction>) -> SuiResult<()> {
+    fn vote_transaction(
+        &self,
+        epoch_store: &Arc<AuthorityPerEpochStore>,
+        tx: Box<Transaction>,
+    ) -> SuiResult<()> {
         // Currently validity_check() and verify_transaction() are not required to be consistent across validators,
         // so they do not run in validate_transactions(). They can run there once we confirm it is safe.
-        tx.validity_check(epoch_store.protocol_config(), epoch_store.epoch())?;
+        tx.validity_check(&epoch_store.tx_validity_check_context())?;
 
         self.authority_state.check_system_overload(
             &*self.consensus_overload_checker,
@@ -151,7 +190,8 @@ impl SuiTxValidator {
 
         let tx = epoch_store.verify_transaction(*tx)?;
 
-        self.authority_state.handle_transaction_v2(epoch_store, tx).await?;
+        self.authority_state
+            .handle_vote_transaction(epoch_store, tx)?;
 
         Ok(())
     }
@@ -159,28 +199,44 @@ impl SuiTxValidator {
 
 fn tx_kind_from_bytes(tx: &[u8]) -> Result<ConsensusTransactionKind, ValidationError> {
     bcs::from_bytes::<ConsensusTransaction>(tx)
-        .map_err(|e| ValidationError::InvalidTransaction(format!("Failed to parse transaction bytes: {:?}", e)))
+        .map_err(|e| {
+            ValidationError::InvalidTransaction(format!(
+                "Failed to parse transaction bytes: {:?}",
+                e
+            ))
+        })
         .map(|tx| tx.kind)
 }
 
-#[async_trait::async_trait]
 impl TransactionVerifier for SuiTxValidator {
     fn verify_batch(&self, batch: &[&[u8]]) -> Result<(), ValidationError> {
         let _scope = monitored_scope("ValidateBatch");
 
-        let txs: Vec<_> = batch.iter().map(|tx| tx_kind_from_bytes(tx)).collect::<Result<Vec<_>, _>>()?;
+        let txs: Vec<_> = batch
+            .iter()
+            .map(|tx| tx_kind_from_bytes(tx))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        self.validate_transactions(&txs).map_err(|e| ValidationError::InvalidTransaction(e.to_string()))
+        self.validate_transactions(&txs)
+            .map_err(|e| ValidationError::InvalidTransaction(e.to_string()))
     }
 
-    async fn verify_and_vote_batch(&self, batch: &[&[u8]]) -> Result<Vec<TransactionIndex>, ValidationError> {
+    fn verify_and_vote_batch(
+        &self,
+        block_ref: &BlockRef,
+        batch: &[&[u8]],
+    ) -> Result<Vec<TransactionIndex>, ValidationError> {
         let _scope = monitored_scope("VerifyAndVoteBatch");
 
-        let txs: Vec<_> = batch.iter().map(|tx| tx_kind_from_bytes(tx)).collect::<Result<Vec<_>, _>>()?;
+        let txs: Vec<_> = batch
+            .iter()
+            .map(|tx| tx_kind_from_bytes(tx))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        self.validate_transactions(&txs).map_err(|e| ValidationError::InvalidTransaction(e.to_string()))?;
+        self.validate_transactions(&txs)
+            .map_err(|e| ValidationError::InvalidTransaction(e.to_string()))?;
 
-        Ok(self.vote_transactions(txs).await)
+        Ok(self.vote_transactions(block_ref, txs))
     }
 }
 
@@ -210,22 +266,26 @@ impl SuiTxValidatorMetrics {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
     use std::sync::Arc;
 
     use consensus_core::TransactionVerifier as _;
+    use consensus_types::block::BlockRef;
+    use sui_config::transaction_deny_config::TransactionDenyConfigBuilder;
     use sui_macros::sim_test;
+    use sui_types::crypto::deterministic_random_account_key;
+    use sui_types::error::{SuiError, UserInputError};
+    use sui_types::messages_consensus::ConsensusPosition;
     use sui_types::{
-        crypto::Ed25519SuiSignature,
-        messages_consensus::ConsensusTransaction,
-        object::Object,
-        signature::GenericSignature,
+        base_types::ObjectID, crypto::Ed25519SuiSignature,
+        messages_consensus::ConsensusTransaction, object::Object, signature::GenericSignature,
     };
 
     use crate::{
         authority::test_authority_builder::TestAuthorityBuilder,
         checkpoints::CheckpointServiceNoop,
         consensus_adapter::{
-            consensus_tests::{test_certificates, test_gas_objects},
+            consensus_tests::{test_certificates, test_gas_objects, test_user_transaction},
             NoopConsensusOverloadChecker,
         },
         consensus_validator::{SuiTxValidator, SuiTxValidatorMetrics},
@@ -239,24 +299,29 @@ mod tests {
         let shared_object = Object::shared_for_testing();
         objects.push(shared_object.clone());
 
-        let network_config = sui_swarm_config::network_config_builder::ConfigBuilder::new_with_temp_dir()
-            .with_objects(objects.clone())
-            .build();
+        let network_config =
+            sui_swarm_config::network_config_builder::ConfigBuilder::new_with_temp_dir()
+                .with_objects(objects.clone())
+                .build();
 
-        let state = TestAuthorityBuilder::new().with_network_config(&network_config, 0).build().await;
+        let state = TestAuthorityBuilder::new()
+            .with_network_config(&network_config, 0)
+            .build()
+            .await;
         let name1 = state.name;
         let certificates = test_certificates(&state, shared_object).await;
 
         let first_transaction = certificates[0].clone();
-        let first_transaction_bytes: Vec<u8> =
-            bcs::to_bytes(&ConsensusTransaction::new_certificate_message(&name1, first_transaction)).unwrap();
+        let first_transaction_bytes: Vec<u8> = bcs::to_bytes(
+            &ConsensusTransaction::new_certificate_message(&name1, first_transaction),
+        )
+        .unwrap();
 
         let metrics = SuiTxValidatorMetrics::new(&Default::default());
         let validator = SuiTxValidator::new(
             state.clone(),
             Arc::new(NoopConsensusOverloadChecker {}),
             Arc::new(CheckpointServiceNoop {}),
-            state.transaction_manager().clone(),
             metrics,
         );
         let res = validator.verify_batch(&[&first_transaction_bytes]);
@@ -265,7 +330,9 @@ mod tests {
         let transaction_bytes: Vec<_> = certificates
             .clone()
             .into_iter()
-            .map(|cert| bcs::to_bytes(&ConsensusTransaction::new_certificate_message(&name1, cert)).unwrap())
+            .map(|cert| {
+                bcs::to_bytes(&ConsensusTransaction::new_certificate_message(&name1, cert)).unwrap()
+            })
             .collect();
 
         let batch: Vec<_> = transaction_bytes.iter().map(|t| t.as_slice()).collect();
@@ -276,15 +343,133 @@ mod tests {
             .into_iter()
             .map(|mut cert| {
                 // set it to an all-zero user signature
-                cert.tx_signatures_mut_for_testing()[0] = GenericSignature::Signature(
-                    sui_types::crypto::Signature::Ed25519SuiSignature(Ed25519SuiSignature::default()),
-                );
+                cert.tx_signatures_mut_for_testing()[0] =
+                    GenericSignature::Signature(sui_types::crypto::Signature::Ed25519SuiSignature(
+                        Ed25519SuiSignature::default(),
+                    ));
                 bcs::to_bytes(&ConsensusTransaction::new_certificate_message(&name1, cert)).unwrap()
             })
             .collect();
 
-        let batch: Vec<_> = bogus_transaction_bytes.iter().map(|t| t.as_slice()).collect();
+        let batch: Vec<_> = bogus_transaction_bytes
+            .iter()
+            .map(|t| t.as_slice())
+            .collect();
         let res_batch = validator.verify_batch(&batch);
         assert!(res_batch.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_verify_and_vote_batch() {
+        // 1 account keypair
+        let (sender, keypair) = deterministic_random_account_key();
+
+        // 8 gas objects.
+        let gas_objects: Vec<Object> = (0..8)
+            .map(|_| Object::with_id_owner_for_testing(ObjectID::random(), sender))
+            .collect();
+
+        // 2 owned objects.
+        let owned_objects: Vec<Object> = (0..2)
+            .map(|_| Object::with_id_owner_for_testing(ObjectID::random(), sender))
+            .collect();
+        let denied_object = owned_objects[1].clone();
+
+        let mut objects = gas_objects.clone();
+        objects.extend(owned_objects.clone());
+
+        let network_config =
+            sui_swarm_config::network_config_builder::ConfigBuilder::new_with_temp_dir()
+                .committee_size(NonZeroUsize::new(1).unwrap())
+                .with_objects(objects.clone())
+                .build();
+
+        // Add the 2nd object in the deny list. Once we try to process/vote on the transaction that depends on this object, it will be rejected.
+        let transaction_deny_config = TransactionDenyConfigBuilder::new()
+            .add_denied_object(denied_object.id())
+            .build();
+        let state = TestAuthorityBuilder::new()
+            .with_network_config(&network_config, 0)
+            .with_transaction_deny_config(transaction_deny_config)
+            .build()
+            .await;
+
+        // Create two user transactions
+
+        // A valid transaction
+        let valid_transaction = test_user_transaction(
+            &state,
+            sender,
+            &keypair,
+            gas_objects[0].clone(),
+            vec![owned_objects[0].clone()],
+        )
+        .await;
+
+        // An invalid transaction where the input object is denied
+        let invalid_transaction = test_user_transaction(
+            &state,
+            sender,
+            &keypair,
+            gas_objects[1].clone(),
+            vec![denied_object.clone()],
+        )
+        .await;
+
+        // Now create the vector with the transactions and serialize them.
+        let transactions = vec![valid_transaction, invalid_transaction];
+        let serialized_transactions: Vec<_> = transactions
+            .into_iter()
+            .map(|t| {
+                bcs::to_bytes(&ConsensusTransaction::new_user_transaction_message(
+                    &state.name,
+                    t.inner().clone(),
+                ))
+                .unwrap()
+            })
+            .collect();
+        let batch: Vec<_> = serialized_transactions
+            .iter()
+            .map(|t| t.as_slice())
+            .collect();
+
+        let validator = SuiTxValidator::new(
+            state.clone(),
+            Arc::new(NoopConsensusOverloadChecker {}),
+            Arc::new(CheckpointServiceNoop {}),
+            SuiTxValidatorMetrics::new(&Default::default()),
+        );
+
+        // WHEN
+        let rejected_transactions = validator
+            .verify_and_vote_batch(&BlockRef::MAX, &batch)
+            .unwrap();
+
+        // THEN
+        // The 2nd transaction should be rejected
+        assert_eq!(rejected_transactions, vec![1]);
+
+        // AND
+        // The reject reason should get cached
+        let epoch_store = state.load_epoch_store_one_call_per_task();
+        let reason = epoch_store
+            .get_rejection_vote_reason(ConsensusPosition {
+                epoch: state.load_epoch_store_one_call_per_task().epoch(),
+                block: BlockRef::MAX,
+                index: 1,
+            })
+            .expect("Rejection vote reason should be set");
+
+        assert_eq!(
+            reason,
+            SuiError::UserInputError {
+                error: UserInputError::TransactionDenied {
+                    error: format!(
+                        "Access to input object {:?} is temporarily disabled",
+                        denied_object.id()
+                    )
+                }
+            }
+        );
     }
 }

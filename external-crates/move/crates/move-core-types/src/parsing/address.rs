@@ -1,11 +1,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_address::AccountAddress,
-    parsing::parser::{parse_address_number, NumberFormat},
-    u256::U256,
-};
+use crate::account_address::AccountAddress;
+use crate::parsing::parser::{NumberFormat, parse_address_number};
+use crate::u256::U256;
 use anyhow::anyhow;
 use std::{fmt, hash::Hash};
 
@@ -32,7 +30,9 @@ impl ParsedAddress {
         mapping: &impl Fn(&str) -> Option<AccountAddress>,
     ) -> anyhow::Result<AccountAddress> {
         match self {
-            Self::Named(n) => mapping(n.as_str()).ok_or_else(|| anyhow!("Unbound named address: '{}'", n)),
+            Self::Named(n) => {
+                mapping(n.as_str()).ok_or_else(|| anyhow!("Unbound named address: '{}'", n))
+            }
             Self::Numerical(a) => Ok(a.into_inner()),
         }
     }
@@ -40,10 +40,16 @@ impl ParsedAddress {
 
 impl NumericalAddress {
     // bytes used for errors when an address is not known but is needed
-    pub const DEFAULT_ERROR_ADDRESS: Self = NumericalAddress { bytes: AccountAddress::ONE, format: NumberFormat::Hex };
+    pub const DEFAULT_ERROR_ADDRESS: Self = NumericalAddress {
+        bytes: AccountAddress::ONE,
+        format: NumberFormat::Hex,
+    };
 
     pub const fn new(bytes: [u8; AccountAddress::LENGTH], format: NumberFormat) -> Self {
-        Self { bytes: AccountAddress::new(bytes), format }
+        Self {
+            bytes: AccountAddress::new(bytes),
+            format,
+        }
     }
 
     pub fn into_inner(self) -> AccountAddress {
@@ -98,7 +104,10 @@ impl fmt::Debug for NumericalAddress {
 impl fmt::UpperHex for NumericalAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let encoded = hex::encode_upper(self.as_ref());
-        let dropped = encoded.chars().skip_while(|c| c == &'0').collect::<String>();
+        let dropped = encoded
+            .chars()
+            .skip_while(|c| c == &'0')
+            .collect::<String>();
         let prefix = if f.alternate() { "0x" } else { "" };
         if dropped.is_empty() {
             write!(f, "{}0", prefix)
@@ -111,7 +120,10 @@ impl fmt::UpperHex for NumericalAddress {
 impl fmt::LowerHex for NumericalAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let encoded = hex::encode(self.as_ref());
-        let dropped = encoded.chars().skip_while(|c| c == &'0').collect::<String>();
+        let dropped = encoded
+            .chars()
+            .skip_while(|c| c == &'0')
+            .collect::<String>();
         let prefix = if f.alternate() { "0x" } else { "" };
         if dropped.is_empty() {
             write!(f, "{}0", prefix)
@@ -137,16 +149,28 @@ impl PartialOrd for NumericalAddress {
 }
 impl Ord for NumericalAddress {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let Self { bytes: self_bytes, format: _ } = self;
-        let Self { bytes: other_bytes, format: _ } = other;
+        let Self {
+            bytes: self_bytes,
+            format: _,
+        } = self;
+        let Self {
+            bytes: other_bytes,
+            format: _,
+        } = other;
         self_bytes.cmp(other_bytes)
     }
 }
 
 impl PartialEq for NumericalAddress {
     fn eq(&self, other: &Self) -> bool {
-        let Self { bytes: self_bytes, format: _ } = self;
-        let Self { bytes: other_bytes, format: _ } = other;
+        let Self {
+            bytes: self_bytes,
+            format: _,
+        } = self;
+        let Self {
+            bytes: other_bytes,
+            format: _,
+        } = other;
         self_bytes == other_bytes
     }
 }
@@ -154,14 +178,20 @@ impl Eq for NumericalAddress {}
 
 impl PartialEq<AccountAddress> for NumericalAddress {
     fn eq(&self, other: &AccountAddress) -> bool {
-        let Self { bytes: self_bytes, format: _ } = self;
+        let Self {
+            bytes: self_bytes,
+            format: _,
+        } = self;
         self_bytes == other
     }
 }
 
 impl Hash for NumericalAddress {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let Self { bytes: self_bytes, format: _ } = self;
+        let Self {
+            bytes: self_bytes,
+            format: _,
+        } = self;
         self_bytes.hash(state)
     }
 }

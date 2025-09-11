@@ -7,6 +7,10 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use sui_types::base_types::{ObjectID, SuiAddress};
 
+use crate::dynamic_transaction_signing_checks::{
+    DynamicCheckRunnerContext, DynamicCheckRunnerError,
+};
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct TransactionDenyConfig {
@@ -29,7 +33,7 @@ pub struct TransactionDenyConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     package_deny_list: Vec<ObjectID>,
 
-    /// A list of OneChain addresses that are not allowed to be used as the sender or sponsor.
+    /// A list of sui addresses that are not allowed to be used as the sender or sponsor.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     address_deny_list: Vec<SuiAddress>,
 
@@ -71,21 +75,35 @@ pub struct TransactionDenyConfig {
     /// A list of disabled OAuth providers for zkLogin
     #[serde(default)]
     zklogin_disabled_providers: HashSet<String>,
+
+    /// Dynamic transaction checks to run on transactions.
+    /// Program is loaded at deserialization time to ensure that any syntactic issues are caught
+    /// immediately.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::dynamic_transaction_signing_checks::serialize_dynamic_transaction_checks",
+        deserialize_with = "crate::dynamic_transaction_signing_checks::deserialize_dynamic_transaction_checks"
+    )]
+    dynamic_transaction_checks: Option<DynamicCheckRunnerContext>,
     // TODO: We could consider add a deny list for types that we want to disable public transfer.
     // TODO: We could also consider disable more types of commands, such as transfer, split and etc.
 }
 
 impl TransactionDenyConfig {
     pub fn get_object_deny_set(&self) -> &HashSet<ObjectID> {
-        self.object_deny_set.get_or_init(|| self.object_deny_list.iter().cloned().collect())
+        self.object_deny_set
+            .get_or_init(|| self.object_deny_list.iter().cloned().collect())
     }
 
     pub fn get_package_deny_set(&self) -> &HashSet<ObjectID> {
-        self.package_deny_set.get_or_init(|| self.package_deny_list.iter().cloned().collect())
+        self.package_deny_set
+            .get_or_init(|| self.package_deny_list.iter().cloned().collect())
     }
 
     pub fn get_address_deny_set(&self) -> &HashSet<SuiAddress> {
-        self.address_deny_set.get_or_init(|| self.address_deny_list.iter().cloned().collect())
+        self.address_deny_set
+            .get_or_init(|| self.address_deny_list.iter().cloned().collect())
     }
 
     pub fn package_publish_disabled(&self) -> bool {
@@ -114,6 +132,10 @@ impl TransactionDenyConfig {
 
     pub fn zklogin_disabled_providers(&self) -> &HashSet<String> {
         &self.zklogin_disabled_providers
+    }
+
+    pub fn dynamic_transaction_checks(&self) -> &Option<DynamicCheckRunnerContext> {
+        &self.dynamic_transaction_checks
     }
 }
 
@@ -179,5 +201,13 @@ impl TransactionDenyConfigBuilder {
     pub fn add_zklogin_disabled_provider(mut self, provider: String) -> Self {
         self.config.zklogin_disabled_providers.insert(provider);
         self
+    }
+
+    pub fn add_dynamic_transaction_checks(
+        mut self,
+        checks: String,
+    ) -> Result<Self, DynamicCheckRunnerError> {
+        self.config.dynamic_transaction_checks = Some(DynamicCheckRunnerContext::new(checks)?);
+        Ok(self)
     }
 }

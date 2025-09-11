@@ -14,7 +14,12 @@ pub fn run() -> crate::Result<()> {
     std::env::set_current_dir(&path).expect("Unable to change into `external-crates` directory");
 
     // execute a command to cd to path and run the ls command
-    let mut cmd = Command::new("sh").arg("tests.sh").stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap();
+    let mut cmd = Command::new("sh")
+        .arg("tests.sh")
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
 
     match cmd.wait() {
         Ok(status) => {

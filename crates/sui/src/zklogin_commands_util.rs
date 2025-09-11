@@ -2,34 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use fastcrypto::{
-    ed25519::Ed25519KeyPair,
-    encoding::{Base64, Encoding},
-    jwt_utils::parse_and_validate_jwt,
-    traits::{EncodeDecodeBase64, KeyPair},
-};
-use fastcrypto_zkp::bn254::{
-    utils::{gen_address_seed, get_proof, get_salt},
-    zk_login::ZkLoginInputs,
-};
-use rand::{rngs::StdRng, SeedableRng};
+use fastcrypto::ed25519::Ed25519KeyPair;
+use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto::jwt_utils::parse_and_validate_jwt;
+use fastcrypto::traits::{EncodeDecodeBase64, KeyPair};
+use fastcrypto_zkp::bn254::utils::get_proof;
+use fastcrypto_zkp::bn254::utils::{gen_address_seed, get_salt};
+use fastcrypto_zkp::bn254::zk_login::ZkLoginInputs;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use regex::Regex;
 use reqwest::Client;
 use serde_json::json;
 use shared_crypto::intent::Intent;
-use std::{io, io::Write, thread::sleep, time::Duration};
+use std::io;
+use std::io::Write;
+use std::thread::sleep;
+use std::time::Duration;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::SuiClientBuilder;
-use sui_types::{
-    base_types::SuiAddress,
-    committee::EpochId,
-    crypto::{PublicKey, SuiKeyPair},
-    multisig::{MultiSig, MultiSigPublicKey},
-    signature::GenericSignature,
-    transaction::Transaction,
-    zk_login_authenticator::ZkLoginAuthenticator,
-};
+use sui_types::base_types::SuiAddress;
+use sui_types::committee::EpochId;
+use sui_types::crypto::{PublicKey, SuiKeyPair};
+use sui_types::multisig::{MultiSig, MultiSigPublicKey};
+use sui_types::signature::GenericSignature;
+use sui_types::transaction::Transaction;
+use sui_types::zk_login_authenticator::ZkLoginAuthenticator;
 
 /// Read a line from stdin, parse the id_token field and return.
 pub fn read_cli_line() -> Result<String, anyhow::Error> {
@@ -48,7 +47,10 @@ pub fn read_cli_line() -> Result<String, anyhow::Error> {
 }
 
 /// A util function to request gas token from faucet for the given address.
-pub(crate) async fn request_tokens_from_faucet(address: SuiAddress, gas_url: &str) -> Result<(), anyhow::Error> {
+pub(crate) async fn request_tokens_from_faucet(
+    address: SuiAddress,
+    gas_url: &str,
+) -> Result<(), anyhow::Error> {
     let client = Client::new();
     client
         .post(gas_url)
@@ -73,7 +75,7 @@ pub async fn perform_zk_login_test_tx(
     keystore: &mut Keystore,
     network: &str,
     test_multisig: bool, // if true, put zklogin in a multisig address with another traditional pubkey.
-    sign_with_sk: bool,  // if true, submit tx with the traditional sig, otherwise submit with zklogin sig.
+    sign_with_sk: bool, // if true, submit tx with the traditional sig, otherwise submit with zklogin sig.
 ) -> Result<String, anyhow::Error> {
     let (gas_url, fullnode_url) = get_config(network);
     let user_salt = get_salt(parsed_token, "https://salt.api.mystenlabs.com/get_salt")
@@ -98,11 +100,17 @@ pub async fn perform_zk_login_test_tx(
     let zk_login_inputs = ZkLoginInputs::from_reader(reader, &address_seed)?;
 
     let skp1 = SuiKeyPair::Ed25519(Ed25519KeyPair::generate(&mut StdRng::from_seed([1; 32])));
-    let multisig_pk =
-        MultiSigPublicKey::new(vec![PublicKey::from_zklogin_inputs(&zk_login_inputs)?, skp1.public()], vec![1, 1], 1)?;
+    let multisig_pk = MultiSigPublicKey::new(
+        vec![
+            PublicKey::from_zklogin_inputs(&zk_login_inputs)?,
+            skp1.public(),
+        ],
+        vec![1, 1],
+        1,
+    )?;
 
     let sender = if test_multisig {
-        keystore.add_key(None, skp1)?;
+        keystore.import(None, skp1)?;
         println!("Use multisig address as sender");
         SuiAddress::from(&multisig_pk)
     } else {
@@ -117,10 +125,13 @@ pub async fn perform_zk_login_test_tx(
     request_tokens_from_faucet(sender, gas_url).await?; // gas coin
     sleep(Duration::from_secs(10));
 
-    let response = sui.coin_read_api().get_coins(sender, None, None, Some(2)).await?;
+    let response = sui
+        .coin_read_api()
+        .get_coins(sender, None, None, Some(2))
+        .await?;
 
     if response.data.len() != 2 {
-        panic!("Faucet did not work correctly and the provided OneChain address has no coins")
+        panic!("Faucet did not work correctly and the provided Sui address has no coins")
     }
 
     let transfer_coin = response.data[0].coin_object_id;
@@ -136,7 +147,10 @@ pub async fn perform_zk_login_test_tx(
             SuiAddress::ZERO, // as a demo, send to a dummy address
         )
         .await?;
-    println!("Faucet requested and created test transaction: {:?}", Base64::encode(bcs::to_bytes(&txb_res).unwrap()));
+    println!(
+        "Faucet requested and created test transaction: {:?}",
+        Base64::encode(bcs::to_bytes(&txb_res).unwrap())
+    );
 
     let final_sig = if test_multisig {
         let sig = if sign_with_sk {
@@ -148,9 +162,17 @@ pub async fn perform_zk_login_test_tx(
             )?)
         } else {
             // Sign transaction with the ephemeral key
-            let signature = keystore.sign_secure(&ephemeral_key_identifier, &txb_res, Intent::sui_transaction())?;
+            let signature = keystore.sign_secure(
+                &ephemeral_key_identifier,
+                &txb_res,
+                Intent::sui_transaction(),
+            )?;
 
-            GenericSignature::from(ZkLoginAuthenticator::new(zk_login_inputs, max_epoch, signature))
+            GenericSignature::from(ZkLoginAuthenticator::new(
+                zk_login_inputs,
+                max_epoch,
+                signature,
+            ))
         };
 
         let multisig = GenericSignature::MultiSig(MultiSig::combine(vec![sig], multisig_pk)?);
@@ -158,10 +180,21 @@ pub async fn perform_zk_login_test_tx(
         multisig
     } else {
         // Sign transaction with the ephemeral key
-        let signature = keystore.sign_secure(&ephemeral_key_identifier, &txb_res, Intent::sui_transaction())?;
+        let signature = keystore.sign_secure(
+            &ephemeral_key_identifier,
+            &txb_res,
+            Intent::sui_transaction(),
+        )?;
 
-        let single_sig = GenericSignature::from(ZkLoginAuthenticator::new(zk_login_inputs, max_epoch, signature));
-        println!("Single zklogin sig Serialized: {:?}", single_sig.encode_base64());
+        let single_sig = GenericSignature::from(ZkLoginAuthenticator::new(
+            zk_login_inputs,
+            max_epoch,
+            signature,
+        ));
+        println!(
+            "Single zklogin sig Serialized: {:?}",
+            single_sig.encode_base64()
+        );
         single_sig
     };
     let transaction_response = sui
@@ -177,8 +210,11 @@ pub async fn perform_zk_login_test_tx(
 
 fn get_config(network: &str) -> (&str, &str) {
     match network {
-        "devnet" => ("https://faucet-devnet.onelabs.cc/gas", "https://rpc-devnet.onelabs.cc:443"),
-        "localnet" => ("http://127.0.0.1:9123/gas", "http://127.0.0.1:9000"),
+        "devnet" => (
+            "https://faucet-devnet.onelabs.cc/v1/gas",
+            "https://rpc-devnet.onelabs.cc:443",
+        ),
+        "localnet" => ("http://127.0.0.1:9123/v2/gas", "http://127.0.0.1:9000"),
         _ => panic!("Invalid network"),
     }
 }

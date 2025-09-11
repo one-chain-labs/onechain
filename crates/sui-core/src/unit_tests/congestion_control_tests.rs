@@ -2,16 +2,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::authority::shared_object_congestion_tracker::SharedObjectCongestionTracker;
+use crate::authority::ExecutionEnv;
 use crate::{
     authority::{
         authority_tests::{
-            build_programmable_transaction,
-            certify_shared_obj_transaction_no_execution,
-            execute_programmable_transaction,
-            send_and_confirm_transaction_,
+            build_programmable_transaction, certify_shared_obj_transaction_no_execution,
+            execute_programmable_transaction, send_and_confirm_transaction_,
         },
         move_integration_tests::build_and_publish_test_package,
-        shared_object_congestion_tracker::SharedObjectCongestionTracker,
         test_authority_builder::TestAuthorityBuilder,
         AuthorityState,
     },
@@ -21,16 +20,18 @@ use move_core_types::ident_str;
 use std::sync::Arc;
 use sui_macros::{register_fail_point_arg, sim_test};
 use sui_protocol_config::{Chain, PerObjectCongestionControlMode, ProtocolConfig, ProtocolVersion};
+use sui_types::base_types::ConsensusObjectSequenceKey;
+use sui_types::digests::TransactionDigest;
+use sui_types::effects::{InputSharedObject, TransactionEffectsAPI};
+use sui_types::executable_transaction::VerifiedExecutableTransaction;
+use sui_types::transaction::{ObjectArg, Transaction};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
-    digests::TransactionDigest,
-    effects::{InputSharedObject, TransactionEffects, TransactionEffectsAPI},
-    executable_transaction::VerifiedExecutableTransaction,
+    effects::TransactionEffects,
     execution_status::{CongestedObjects, ExecutionFailureStatus, ExecutionStatus},
     object::Object,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{ObjectArg, Transaction},
 };
 
 pub const TEST_ONLY_GAS_PRICE: u64 = 1000;
@@ -50,12 +51,15 @@ impl TestSetup {
     async fn new() -> Self {
         let (sender, sender_key): (_, AccountKeyPair) = get_key_pair();
 
-        let mut protocol_config = ProtocolConfig::get_for_version(ProtocolVersion::max(), Chain::Unknown);
-        protocol_config
-            .set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::TotalGasBudget);
+        let mut protocol_config =
+            ProtocolConfig::get_for_version(ProtocolVersion::max(), Chain::Unknown);
+        protocol_config.set_per_object_congestion_control_mode_for_testing(
+            PerObjectCongestionControlMode::TotalGasBudget,
+        );
 
         // Set shared object congestion control such that it only allows 1 transaction to go through.
-        let max_accumulated_txn_cost_per_object_in_commit = TEST_ONLY_GAS_PRICE * TEST_ONLY_GAS_UNIT;
+        let max_accumulated_txn_cost_per_object_in_commit =
+            TEST_ONLY_GAS_PRICE * TEST_ONLY_GAS_UNIT;
         protocol_config.set_max_accumulated_txn_cost_per_object_in_narwhal_commit_for_testing(
             max_accumulated_txn_cost_per_object_in_commit,
         );
@@ -74,7 +78,9 @@ impl TestSetup {
 
         let gas_object_id = ObjectID::random();
         let gas_object = Object::with_id_owner_for_testing(gas_object_id, sender);
-        setup_authority_state.insert_genesis_object(gas_object.clone()).await;
+        setup_authority_state
+            .insert_genesis_object(gas_object.clone())
+            .await;
 
         let package = build_and_publish_test_package(
             &setup_authority_state,
@@ -86,7 +92,14 @@ impl TestSetup {
         )
         .await;
 
-        Self { setup_authority_state, protocol_config, sender, sender_key, package, gas_object_id }
+        Self {
+            setup_authority_state,
+            protocol_config,
+            sender,
+            sender_key,
+            package,
+            gas_object_id,
+        }
     }
 
     // Creates a shared object in `setup_authority_state` and returns the object reference.
@@ -117,7 +130,7 @@ impl TestSetup {
         create_shared_object_effects.created()[0].0
     }
 
-    // Creates a owned object in `setup_authority_state` and returns the object reference.
+    // Creates an owned object in `setup_authority_state` and returns the object reference.
     async fn create_owned_object(&self) -> ObjectRef {
         let mut builder = ProgrammableTransactionBuilder::new();
         move_call! {
@@ -154,18 +167,28 @@ impl TestSetup {
 
     // Returns a list of objects that can be used as genesis object for a brand new authority state,
     // including the gas object, the package object, and the objects passed in `objects`.
-    async fn create_genesis_objects_for_new_authority_state(&self, objects: &[ObjectID]) -> Vec<Object> {
+    async fn create_genesis_objects_for_new_authority_state(
+        &self,
+        objects: &[ObjectID],
+    ) -> Vec<Object> {
         let mut genesis_objects = Vec::new();
         genesis_objects.push(TestSetup::convert_to_genesis_obj(
-            self.setup_authority_state.get_object(&self.package.0).await.unwrap(),
+            self.setup_authority_state
+                .get_object(&self.package.0)
+                .await
+                .unwrap(),
         ));
         genesis_objects.push(TestSetup::convert_to_genesis_obj(
-            self.setup_authority_state.get_object(&self.gas_object_id).await.unwrap(),
+            self.setup_authority_state
+                .get_object(&self.gas_object_id)
+                .await
+                .unwrap(),
         ));
 
         for obj in objects {
-            genesis_objects
-                .push(TestSetup::convert_to_genesis_obj(self.setup_authority_state.get_object(obj).await.unwrap()));
+            genesis_objects.push(TestSetup::convert_to_genesis_obj(
+                self.setup_authority_state.get_object(obj).await.unwrap(),
+            ));
         }
         genesis_objects
     }
@@ -179,30 +202,50 @@ async fn update_objects(
     sender: &SuiAddress,
     sender_key: &AccountKeyPair,
     gas_object_id: &ObjectID,
-    shared_object_1: &(ObjectID, SequenceNumber),
-    shared_object_2: &(ObjectID, SequenceNumber),
+    shared_object_1: &ConsensusObjectSequenceKey,
+    shared_object_2: &ConsensusObjectSequenceKey,
     owned_object: &ObjectRef,
 ) -> (Transaction, TransactionEffects) {
     let mut txn_builder = ProgrammableTransactionBuilder::new();
     let arg1 = txn_builder
-        .obj(ObjectArg::SharedObject { id: shared_object_1.0, initial_shared_version: shared_object_1.1, mutable: true })
+        .obj(ObjectArg::SharedObject {
+            id: shared_object_1.0,
+            initial_shared_version: shared_object_1.1,
+            mutable: true,
+        })
         .unwrap();
     let arg2 = txn_builder
-        .obj(ObjectArg::SharedObject { id: shared_object_2.0, initial_shared_version: shared_object_2.1, mutable: true })
+        .obj(ObjectArg::SharedObject {
+            id: shared_object_2.0,
+            initial_shared_version: shared_object_2.1,
+            mutable: true,
+        })
         .unwrap();
-    let arg3 = txn_builder.obj(ObjectArg::ImmOrOwnedObject(*owned_object)).unwrap();
+    let arg3 = txn_builder
+        .obj(ObjectArg::ImmOrOwnedObject(*owned_object))
+        .unwrap();
     move_call! {
         txn_builder,
         (package.0)::congestion_control::increment(arg1, arg2, arg3)
     };
     let pt = txn_builder.finish();
-    let transaction =
-        build_programmable_transaction(authority_state, gas_object_id, sender, sender_key, pt, TEST_ONLY_GAS_UNIT)
-            .await
-            .unwrap();
+    let transaction = build_programmable_transaction(
+        authority_state,
+        gas_object_id,
+        sender,
+        sender_key,
+        pt,
+        TEST_ONLY_GAS_UNIT,
+    )
+    .await
+    .unwrap();
 
     let execution_effects =
-        send_and_confirm_transaction_(authority_state, None, transaction.clone(), true).await.unwrap().1.into_data();
+        send_and_confirm_transaction_(authority_state, None, transaction.clone(), true)
+            .await
+            .unwrap()
+            .1
+            .into_data();
     (transaction, execution_effects)
 }
 
@@ -223,7 +266,11 @@ async fn test_congestion_control_execution_cancellation() {
 
     // Gets objects that can be used as genesis objects for new authority states.
     let genesis_objects = test_setup
-        .create_genesis_objects_for_new_authority_state(&[shared_object_1.0, shared_object_2.0, owned_object.0])
+        .create_genesis_objects_for_new_authority_state(&[
+            shared_object_1.0,
+            shared_object_2.0,
+            owned_object.0,
+        ])
         .await;
 
     // Creates two authority states with the same genesis objects for the actual test.
@@ -232,27 +279,37 @@ async fn test_congestion_control_execution_cancellation() {
         .with_protocol_config(test_setup.protocol_config.clone())
         .build()
         .await;
-    authority_state.insert_genesis_objects(&genesis_objects).await;
+    authority_state
+        .insert_genesis_objects(&genesis_objects)
+        .await;
     let authority_state_2 = TestAuthorityBuilder::new()
         .with_reference_gas_price(TEST_ONLY_GAS_PRICE)
         .with_protocol_config(test_setup.protocol_config.clone())
         .build()
         .await;
-    authority_state_2.insert_genesis_objects(&genesis_objects).await;
+    authority_state_2
+        .insert_genesis_objects(&genesis_objects)
+        .await;
 
     // Initialize shared object queue so that any transaction touches shared_object_1 should result in congestion and cancellation.
     register_fail_point_arg("initial_congestion_tracker", move || {
         Some(SharedObjectCongestionTracker::new(
             [(shared_object_1.0, 10)],
             PerObjectCongestionControlMode::TotalGasBudget,
-            Some(test_setup.protocol_config.max_accumulated_txn_cost_per_object_in_mysticeti_commit()),
+            false,
+            Some(
+                test_setup
+                    .protocol_config
+                    .max_accumulated_txn_cost_per_object_in_mysticeti_commit(),
+            ),
             Some(1000), // Not used.
             None,       // Not used.
             0,          // Disable overage.
+            0,
         ))
     });
 
-    // Runs a transaction that touches shared_object_1, shared_object_2 and a owned object.
+    // Runs a transaction that touches shared_object_1, shared_object_2 and an owned object.
     let (congested_tx, effects) = update_objects(
         &authority_state,
         &test_setup.package,
@@ -261,36 +318,51 @@ async fn test_congestion_control_execution_cancellation() {
         &test_setup.gas_object_id,
         &(shared_object_1.0, shared_object_1.1),
         &(shared_object_2.0, shared_object_2.1),
-        &authority_state.get_object(&owned_object.0).await.unwrap().compute_object_reference(),
+        &authority_state
+            .get_object(&owned_object.0)
+            .await
+            .unwrap()
+            .compute_object_reference(),
     )
     .await;
 
     // Transaction should be cancelled with `shared_object_1` as the congested object.
-    assert_eq!(effects.status(), &ExecutionStatus::Failure {
-        error: ExecutionFailureStatus::ExecutionCancelledDueToSharedObjectCongestion {
-            congested_objects: CongestedObjects(vec![shared_object_1.0]),
-        },
-        command: None
-    });
+    assert_eq!(
+        effects.status(),
+        &ExecutionStatus::Failure {
+            error: ExecutionFailureStatus::ExecutionCancelledDueToSharedObjectCongestion {
+                congested_objects: CongestedObjects(vec![shared_object_1.0]),
+            },
+            command: None
+        }
+    );
 
     // Tests shared object versions in effects are set correctly.
-    assert_eq!(effects.input_shared_objects(), vec![
-        InputSharedObject::Cancelled(shared_object_1.0, SequenceNumber::CONGESTED),
-        InputSharedObject::Cancelled(shared_object_2.0, SequenceNumber::CANCELLED_READ)
-    ]);
+    assert_eq!(
+        effects.input_shared_objects(),
+        vec![
+            InputSharedObject::Cancelled(shared_object_1.0, SequenceNumber::CONGESTED),
+            InputSharedObject::Cancelled(shared_object_2.0, SequenceNumber::CANCELLED_READ)
+        ]
+    );
 
     // Run the same transaction in `authority_state_2`, but using the above effects for the execution.
-    let cert = certify_shared_obj_transaction_no_execution(&authority_state_2, congested_tx).await.unwrap();
-    authority_state_2
+    let (cert, _) = certify_shared_obj_transaction_no_execution(&authority_state_2, congested_tx)
+        .await
+        .unwrap();
+    let assigned_versions = authority_state_2
         .epoch_store_for_testing()
-        .acquire_shared_locks_from_effects(
+        .acquire_shared_version_assignments_from_effects(
             &VerifiedExecutableTransaction::new_from_certificate(cert.clone()),
             &effects,
             authority_state_2.get_object_cache_reader().as_ref(),
         )
+        .unwrap();
+    let execution_env = ExecutionEnv::new().with_assigned_versions(assigned_versions);
+    let (effects_2, execution_error) = authority_state_2
+        .try_execute_for_test(&cert, execution_env)
         .await
         .unwrap();
-    let (effects_2, execution_error) = authority_state_2.try_execute_for_test(&cert).await.unwrap();
 
     // Should result in the same cancellation.
     assert_eq!(

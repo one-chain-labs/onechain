@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    pool::Entry,
-    static_symbols::{STATIC_SYMBOLS, STATIC_SYMBOL_IDX},
     SYMBOL_POOL,
+    pool::Entry,
+    static_symbols::{STATIC_SYMBOL_IDX, STATIC_SYMBOLS},
 };
 use serde::{de::Deserialize, ser::Serialize};
 use std::{borrow::Cow, cmp::Ordering, fmt, num::NonZeroU64, ops::Deref};
@@ -306,9 +306,9 @@ macro_rules! static_symbols {
 #[cfg(test)]
 mod tests {
     use crate::{
-        static_symbols::{STATIC_SYMBOLS, STATIC_SYMBOL_IDX},
-        symbol::{Tag, MAX_INLINE_LEN},
         Symbol,
+        static_symbols::{STATIC_SYMBOL_IDX, STATIC_SYMBOLS},
+        symbol::{MAX_INLINE_LEN, Tag},
     };
 
     use std::mem::size_of;
@@ -327,7 +327,11 @@ mod tests {
         for n in 0..=s.len() {
             let sym = Symbol::from(&s[..n]);
             assert_eq!(sym.len(), n);
-            let expected_tag = if n <= MAX_INLINE_LEN { Tag::Inlined } else { Tag::Dynamic };
+            let expected_tag = if n <= MAX_INLINE_LEN {
+                Tag::Inlined
+            } else {
+                Tag::Dynamic
+            };
             assert_eq!(sym.tag(), expected_tag)
         }
     }
@@ -385,7 +389,9 @@ mod tests {
         let mut entries = STATIC_SYMBOL_IDX.entries().collect::<Vec<_>>();
         entries.sort_by_key(|(_, idx)| *idx);
         assert_eq!(entries.len(), STATIC_SYMBOLS.len());
-        for ((map_s, map_idx), (sym_idx, sym_s)) in entries.iter().zip(STATIC_SYMBOLS.iter().enumerate()) {
+        for ((map_s, map_idx), (sym_idx, sym_s)) in
+            entries.iter().zip(STATIC_SYMBOLS.iter().enumerate())
+        {
             let map_s = *map_s;
             let map_idx = **map_idx as usize;
             assert_eq!(map_idx, sym_idx);

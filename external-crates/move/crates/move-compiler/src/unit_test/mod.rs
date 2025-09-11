@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    compiled_unit::NamedCompiledModule,
-    shared::{files::MappedFiles, NumericalAddress},
+    compiled_unit::NamedCompiledModule, shared::NumericalAddress, shared::files::MappedFiles,
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
@@ -64,7 +63,11 @@ pub enum MoveErrorType {
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq)]
-pub struct ExpectedMoveError(pub StatusCode, pub Option<MoveErrorType>, pub move_binary_format::errors::Location);
+pub struct ExpectedMoveError(
+    pub StatusCode,
+    pub Option<MoveErrorType>,
+    pub move_binary_format::errors::Location,
+);
 
 pub struct ExpectedMoveErrorDisplay<'a> {
     error: &'a ExpectedMoveError,
@@ -73,7 +76,11 @@ pub struct ExpectedMoveErrorDisplay<'a> {
 }
 
 impl ModuleTestPlan {
-    pub fn new(addr: &NumericalAddress, module_name: &str, tests: BTreeMap<TestName, TestCase>) -> Self {
+    pub fn new(
+        addr: &NumericalAddress,
+        module_name: &str,
+        tests: BTreeMap<TestName, TestCase>,
+    ) -> Self {
         let addr = AccountAddress::new((*addr).into_bytes());
         let name = Identifier::new(module_name.to_owned()).unwrap();
         let module_id = ModuleId::new(addr, name);
@@ -88,22 +95,39 @@ impl TestPlan {
         units: Vec<NamedCompiledModule>,
         bytecode_deps_modules: Vec<CompiledModule>,
     ) -> Self {
-        let module_tests: BTreeMap<_, _> =
-            tests.into_iter().map(|module_test| (module_test.module_id.clone(), module_test)).collect();
+        let module_tests: BTreeMap<_, _> = tests
+            .into_iter()
+            .map(|module_test| (module_test.module_id.clone(), module_test))
+            .collect();
 
-        let module_info = units.into_iter().map(|unit| (unit.module.self_id(), unit)).collect();
+        let module_info = units
+            .into_iter()
+            .map(|unit| (unit.module.self_id(), unit))
+            .collect();
 
-        Self { mapped_files, module_tests, module_info, bytecode_deps_modules }
+        Self {
+            mapped_files,
+            module_tests,
+            module_info,
+            bytecode_deps_modules,
+        }
     }
 }
 
 impl<'a> ExpectedMoveError {
-    pub fn with_context(&'a self, context: &'a BTreeMap<ModuleId, NamedCompiledModule>) -> ExpectedMoveErrorDisplay<'a> {
-        ExpectedMoveErrorDisplay { error: self, context, is_past_tense: false }
+    pub fn with_context(
+        &'a self,
+        context: &'a BTreeMap<ModuleId, NamedCompiledModule>,
+    ) -> ExpectedMoveErrorDisplay<'a> {
+        ExpectedMoveErrorDisplay {
+            error: self,
+            context,
+            is_past_tense: false,
+        }
     }
 }
 
-impl<'a> ExpectedMoveErrorDisplay<'a> {
+impl ExpectedMoveErrorDisplay<'_> {
     pub fn past_tense(mut self) -> Self {
         self.is_past_tense = true;
         self
@@ -124,10 +148,14 @@ impl fmt::Display for MoveErrorType {
     }
 }
 
-impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
+impl fmt::Display for ExpectedMoveErrorDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use move_binary_format::errors::Location;
-        let Self { error: ExpectedMoveError(status, sub_status, location), context, is_past_tense } = self;
+        let Self {
+            error: ExpectedMoveError(status, sub_status, location),
+            context,
+            is_past_tense,
+        } = self;
         let status_val: u64 = (*status).into();
         if *is_past_tense {
             match status {
@@ -141,7 +169,9 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
             match status {
                 StatusCode::ABORTED => write!(f, "to abort")?,
                 StatusCode::ARITHMETIC_ERROR => write!(f, "to give an arithmetic error")?,
-                StatusCode::VECTOR_OPERATION_ERROR => write!(f, "to give a vector operation error")?,
+                StatusCode::VECTOR_OPERATION_ERROR => {
+                    write!(f, "to give a vector operation error")?
+                }
                 StatusCode::OUT_OF_GAS => write!(f, "to run out of gas")?,
                 _ => write!(f, "to give a {status:?} (code {status_val}) error")?,
             };
@@ -149,7 +179,9 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
         if status == &StatusCode::ABORTED {
             match sub_status {
                 Some(MoveErrorType::Code(code)) => write!(f, " with code {}", code)?,
-                Some(MoveErrorType::ConstantName(name)) => write!(f, " with error constant '{}'", name)?,
+                Some(MoveErrorType::ConstantName(name)) => {
+                    write!(f, " with error constant '{}'", name)?
+                }
                 None => (),
             }
         } else if let Some(code) = sub_status {
@@ -161,11 +193,12 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
         match location {
             Location::Undefined => write!(f, " in an unknown location"),
             Location::Module(id) => {
-                let module_id = if let Some(address_name) = context.get(id).and_then(|m| m.address_name()) {
-                    format!("{}::{}", address_name, id.name())
-                } else {
-                    id.short_str_lossless()
-                };
+                let module_id =
+                    if let Some(address_name) = context.get(id).and_then(|m| m.address_name()) {
+                        format!("{}::{}", address_name, id.name())
+                    } else {
+                        id.short_str_lossless()
+                    };
                 write!(f, " in the module {}", module_id)
             }
         }

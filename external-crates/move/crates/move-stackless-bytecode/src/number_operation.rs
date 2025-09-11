@@ -33,11 +33,7 @@ impl NumOperation {
 
     /// Return the operation according to the partial order in NumOperation
     pub fn merge(&self, other: &NumOperation) -> NumOperation {
-        if self.ge(other) {
-            *self
-        } else {
-            *other
-        }
+        if self.ge(other) { *self } else { *other }
     }
 }
 
@@ -76,7 +72,12 @@ impl GlobalNumberOperationState {
         &mut self.ret_operation_map
     }
 
-    pub fn get_non_param_local_map(&self, mid: ModuleId, fid: FunId, baseline_flag: bool) -> &OperationMap {
+    pub fn get_non_param_local_map(
+        &self,
+        mid: ModuleId,
+        fid: FunId,
+        baseline_flag: bool,
+    ) -> &OperationMap {
         if baseline_flag {
             self.local_oper_baseline.get(&(mid, fid)).unwrap()
         } else {
@@ -84,7 +85,12 @@ impl GlobalNumberOperationState {
         }
     }
 
-    pub fn get_mut_non_param_local_map(&mut self, mid: ModuleId, fid: FunId, baseline_flag: bool) -> &mut OperationMap {
+    pub fn get_mut_non_param_local_map(
+        &mut self,
+        mid: ModuleId,
+        fid: FunId,
+        baseline_flag: bool,
+    ) -> &mut OperationMap {
         if baseline_flag {
             self.local_oper_baseline.get_mut(&(mid, fid)).unwrap()
         } else {
@@ -100,15 +106,26 @@ impl GlobalNumberOperationState {
         baseline_flag: bool,
     ) -> Option<&NumOperation> {
         if baseline_flag {
-            if self.local_oper_baseline.get(&(mid, fid)).unwrap().contains_key(&idx) {
+            if self
+                .local_oper_baseline
+                .get(&(mid, fid))
+                .unwrap()
+                .contains_key(&idx)
+            {
                 self.local_oper_baseline.get(&(mid, fid)).unwrap().get(&idx)
             } else {
-                self.temp_index_operation_map.get(&(mid, fid)).unwrap().get(&idx)
+                self.temp_index_operation_map
+                    .get(&(mid, fid))
+                    .unwrap()
+                    .get(&idx)
             }
         } else if self.local_oper.get(&(mid, fid)).unwrap().contains_key(&idx) {
             self.local_oper.get(&(mid, fid)).unwrap().get(&idx)
         } else {
-            self.temp_index_operation_map.get(&(mid, fid)).unwrap().get(&idx)
+            self.temp_index_operation_map
+                .get(&(mid, fid))
+                .unwrap()
+                .get(&idx)
         }
     }
 
@@ -120,15 +137,29 @@ impl GlobalNumberOperationState {
         baseline_flag: bool,
     ) -> Option<&mut NumOperation> {
         if baseline_flag {
-            if self.local_oper_baseline.get(&(mid, fid)).unwrap().contains_key(&idx) {
-                self.local_oper_baseline.get_mut(&(mid, fid)).unwrap().get_mut(&idx)
+            if self
+                .local_oper_baseline
+                .get(&(mid, fid))
+                .unwrap()
+                .contains_key(&idx)
+            {
+                self.local_oper_baseline
+                    .get_mut(&(mid, fid))
+                    .unwrap()
+                    .get_mut(&idx)
             } else {
-                self.temp_index_operation_map.get_mut(&(mid, fid)).unwrap().get_mut(&idx)
+                self.temp_index_operation_map
+                    .get_mut(&(mid, fid))
+                    .unwrap()
+                    .get_mut(&idx)
             }
         } else if self.local_oper.get(&(mid, fid)).unwrap().contains_key(&idx) {
             self.local_oper.get_mut(&(mid, fid)).unwrap().get_mut(&idx)
         } else {
-            self.temp_index_operation_map.get_mut(&(mid, fid)).unwrap().get_mut(&idx)
+            self.temp_index_operation_map
+                .get_mut(&(mid, fid))
+                .unwrap()
+                .get_mut(&idx)
         }
     }
 
@@ -177,10 +208,12 @@ impl GlobalNumberOperationState {
             }
         }
 
-        self.temp_index_operation_map.insert((mid, fid), default_map);
+        self.temp_index_operation_map
+            .insert((mid, fid), default_map);
         self.local_oper_baseline.insert((mid, fid), BTreeMap::new());
         self.local_oper.insert((mid, fid), BTreeMap::new());
-        self.ret_operation_map.insert((mid, fid), default_ret_operation_map);
+        self.ret_operation_map
+            .insert((mid, fid), default_ret_operation_map);
     }
 
     /// Populate default state for struct operation map
@@ -211,7 +244,12 @@ impl GlobalNumberOperationState {
     }
 
     /// Updates the number operation for the given node id.
-    pub fn update_node_oper(&mut self, node_id: NodeId, num_oper: NumOperation, allow: bool) -> bool {
+    pub fn update_node_oper(
+        &mut self,
+        node_id: NodeId,
+        num_oper: NumOperation,
+        allow: bool,
+    ) -> bool {
         let mods = &mut self.exp_operation_map;
         let oper = mods.get_mut(&node_id).expect("node exist");
         if !allow && oper.conflict(&num_oper) {
@@ -224,7 +262,8 @@ impl GlobalNumberOperationState {
 
     /// Gets the number operation of the given node.
     pub fn get_node_num_oper(&self, node_id: NodeId) -> NumOperation {
-        self.get_node_num_oper_opt(node_id).expect("node number oper defined")
+        self.get_node_num_oper_opt(node_id)
+            .expect("node number oper defined")
     }
 
     /// Gets the number operation of the given node, if available.

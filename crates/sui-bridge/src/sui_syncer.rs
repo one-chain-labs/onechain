@@ -13,7 +13,8 @@ use crate::{
 use mysten_metrics::spawn_logged_monitored_task;
 use std::{collections::HashMap, sync::Arc};
 use sui_json_rpc_types::SuiEvent;
-use sui_types::{event::EventID, Identifier, BRIDGE_PACKAGE_ID};
+use sui_types::BRIDGE_PACKAGE_ID;
+use sui_types::{event::EventID, Identifier};
 use tokio::{
     sync::Notify,
     task::JoinHandle,
@@ -37,41 +38,58 @@ impl<C> SuiSyncer<C>
 where
     C: SuiClientInner + 'static,
 {
-    pub fn new(sui_client: Arc<SuiClient<C>>, cursors: SuiTargetModules, metrics: Arc<BridgeMetrics>) -> Self {
-        Self { sui_client, cursors, metrics }
+    pub fn new(
+        sui_client: Arc<SuiClient<C>>,
+        cursors: SuiTargetModules,
+        metrics: Arc<BridgeMetrics>,
+    ) -> Self {
+        Self {
+            sui_client,
+            cursors,
+            metrics,
+        }
     }
 
     pub async fn run(
         self,
         query_interval: Duration,
-    ) -> BridgeResult<(Vec<JoinHandle<()>>, mysten_metrics::metered_channel::Receiver<(Identifier, Vec<SuiEvent>)>)>
-    {
+    ) -> BridgeResult<(
+        Vec<JoinHandle<()>>,
+        mysten_metrics::metered_channel::Receiver<(Identifier, Vec<SuiEvent>)>,
+    )> {
         let (events_tx, events_rx) = mysten_metrics::metered_channel::channel(
             SUI_EVENTS_CHANNEL_SIZE,
-            &mysten_metrics::get_metrics().unwrap().channel_inflight.with_label_values(&["sui_events_queue"]),
+            &mysten_metrics::get_metrics()
+                .unwrap()
+                .channel_inflight
+                .with_label_values(&["sui_events_queue"]),
         );
 
         let mut task_handles = vec![];
         for (module, cursor) in self.cursors {
             let metrics = self.metrics.clone();
-            let events_rx_clone: mysten_metrics::metered_channel::Sender<(Identifier, Vec<SuiEvent>)> =
-                events_tx.clone();
+            let events_rx_clone: mysten_metrics::metered_channel::Sender<(
+                Identifier,
+                Vec<SuiEvent>,
+            )> = events_tx.clone();
             let sui_client_clone = self.sui_client.clone();
-            task_handles.push(spawn_logged_monitored_task!(Self::run_event_listening_task(
-                module,
-                cursor,
-                events_rx_clone,
-                sui_client_clone,
-                query_interval,
-                metrics,
-            )));
+            task_handles.push(spawn_logged_monitored_task!(
+                Self::run_event_listening_task(
+                    module,
+                    cursor,
+                    events_rx_clone,
+                    sui_client_clone,
+                    query_interval,
+                    metrics,
+                )
+            ));
         }
         Ok((task_handles, events_rx))
     }
 
     async fn run_event_listening_task(
         // The module where interested events are defined.
-        // Moudle is always of bridge package 0x9.
+        // Module is always of bridge package 0x9.
         module: Identifier,
         mut cursor: Option<EventID>,
         events_sender: mysten_metrics::metered_channel::Sender<(Identifier, Vec<SuiEvent>)>,
@@ -87,8 +105,9 @@ where
         let notify = Arc::new(Notify::new());
         let notify_clone = notify.clone();
         let sui_client_clone = sui_client.clone();
-        let last_synced_sui_checkpoints_metric =
-            metrics.last_synced_sui_checkpoints.with_label_values(&[&module.to_string()]);
+        let last_synced_sui_checkpoints_metric = metrics
+            .last_synced_sui_checkpoints
+            .with_label_values(&[&module.to_string()]);
         spawn_logged_monitored_task!(async move {
             loop {
                 notify_clone.notified().await;
@@ -154,15 +173,22 @@ mod tests {
         let module_foo = Identifier::new("Foo").unwrap();
         let module_bar = Identifier::new("Bar").unwrap();
         let empty_events = EventPage::empty();
-        let cursor = EventID { tx_digest: TransactionDigest::random(), event_seq: 0 };
+        let cursor = EventID {
+            tx_digest: TransactionDigest::random(),
+            event_seq: 0,
+        };
         add_event_response(&mock, module_foo.clone(), cursor, empty_events.clone());
         add_event_response(&mock, module_bar.clone(), cursor, empty_events.clone());
 
-        let target_modules =
-            HashMap::from_iter(vec![(module_foo.clone(), Some(cursor)), (module_bar.clone(), Some(cursor))]);
+        let target_modules = HashMap::from_iter(vec![
+            (module_foo.clone(), Some(cursor)),
+            (module_bar.clone(), Some(cursor)),
+        ]);
         let interval = Duration::from_millis(200);
-        let (_handles, mut events_rx) =
-            SuiSyncer::new(client, target_modules, metrics.clone()).run(interval).await.unwrap();
+        let (_handles, mut events_rx) = SuiSyncer::new(client, target_modules, metrics.clone())
+            .run(interval)
+            .await
+            .unwrap();
 
         // Initially there are no events
         assert_no_more_events(interval, &mut events_rx).await;
@@ -179,7 +205,12 @@ mod tests {
             has_next_page: false,
         };
         add_event_response(&mock, module_foo.clone(), event_1.id, empty_events.clone());
-        add_event_response(&mock, module_foo.clone(), cursor, module_foo_events_1.clone());
+        add_event_response(
+            &mock,
+            module_foo.clone(),
+            cursor,
+            module_foo_events_1.clone(),
+        );
 
         let (identifier, received_events) = events_rx.recv().await.unwrap();
         assert_eq!(identifier, module_foo);
@@ -188,7 +219,14 @@ mod tests {
         assert_eq!(received_events[1].id, event_1.id);
         // No more
         assert_no_more_events(interval, &mut events_rx).await;
-        assert_eq!(metrics.last_synced_sui_checkpoints.get_metric_with_label_values(&["Foo"]).unwrap().get(), 999);
+        assert_eq!(
+            metrics
+                .last_synced_sui_checkpoints
+                .get_metric_with_label_values(&["Foo"])
+                .unwrap()
+                .get(),
+            999
+        );
 
         // Module Bar has new events
         let mut event_2: SuiEvent = SuiEvent::random_for_testing();
@@ -210,7 +248,11 @@ mod tests {
         // No more
         assert_no_more_events(interval, &mut events_rx).await;
         assert_eq!(
-            metrics.last_synced_sui_checkpoints.get_metric_with_label_values(&["Bar"]).unwrap().get(),
+            metrics
+                .last_synced_sui_checkpoints
+                .get_metric_with_label_values(&["Bar"])
+                .unwrap()
+                .get(),
             0, // Not updated
         );
 
@@ -227,7 +269,12 @@ mod tests {
         };
     }
 
-    fn add_event_response(mock: &SuiMockClient, module: Identifier, cursor: EventID, events: EventPage) {
+    fn add_event_response(
+        mock: &SuiMockClient,
+        module: Identifier,
+        cursor: EventID,
+        events: EventPage,
+    ) {
         mock.add_event_response(BRIDGE_PACKAGE_ID, module.clone(), cursor, events.clone());
     }
 }

@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::one_system {
+module oct_system::sui_system {
     use std::vector;
 
-    use one::balance::Balance;
-    use one::object::UID;
-    use one::oct::OCT;
-    use one::transfer;
-    use one::tx_context::{Self, TxContext};
-    use one::dynamic_field;
+    use sui::balance::Balance;
+    use sui::object::UID;
+    use sui::oct::OCT;
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
+    use sui::dynamic_field;
 
     use one_system::validator::Validator;
     use one_system::sui_system_state_inner::SuiSystemStateInner;

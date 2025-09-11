@@ -12,8 +12,7 @@ use once_cell::sync::Lazy;
 
 use crate::compilation::build_plan::BuildPlan;
 
-pub const MIGRATION_MSG: &str =
-    "Package toml does not specify an edition. As of 2024, Move requires all packages to define \
+pub const MIGRATION_MSG: &str = "Package toml does not specify an edition. As of 2024, Move requires all packages to define \
     a language edition.";
 
 pub const EDITION_SELECT_PROMPT: &str = "Please select one of the following editions:";
@@ -27,7 +26,8 @@ pub static EDITION_OPTIONS: Lazy<BTreeMap<String, Edition>> = Lazy::new(|| {
 
 pub const EDITION_RECORDED_MSG: &str = "Recorded edition in 'Move.toml'";
 
-pub const MIGRATION_PROMPT: &str = "Would you like the Move compiler to migrate your code to Move 2024?";
+pub const MIGRATION_PROMPT: &str =
+    "Would you like the Move compiler to migrate your code to Move 2024?";
 
 pub const NOMIGRATION_HELP_MSG: &str = "No migration was performed.";
 
@@ -49,7 +49,7 @@ pub const NO_MIGRATION_NEEDED_MSG: &str = "No migration is required. Enjoy!";
 pub const BAR: &str = "============================================================";
 
 pub struct MigrationContext<'a, W: Write, R: BufRead> {
-    build_plan: BuildPlan,
+    build_plan: &'a BuildPlan<'a>,
     terminal: Terminal<'a, W, R>,
 }
 
@@ -58,7 +58,7 @@ pub struct MigrationOptions {
 }
 
 pub fn migrate<W: Write, R: BufRead>(
-    build_plan: BuildPlan,
+    build_plan: &BuildPlan,
     writer: &mut W,
     reader: &mut R,
 ) -> anyhow::Result<MigrationOptions> {
@@ -66,10 +66,17 @@ pub fn migrate<W: Write, R: BufRead>(
     mcontext.prompt_for_migration()
 }
 
-impl<'a, W: Write, R: BufRead> MigrationContext<'a, W, R> {
-    pub fn new<'new>(build_plan: BuildPlan, writer: &'new mut W, reader: &'new mut R) -> MigrationContext<'new, W, R> {
+impl<W: Write, R: BufRead> MigrationContext<'_, W, R> {
+    pub fn new<'new>(
+        build_plan: &'new BuildPlan,
+        writer: &'new mut W,
+        reader: &'new mut R,
+    ) -> MigrationContext<'new, W, R> {
         let terminal = Terminal::new(writer, reader);
-        MigrationContext { build_plan, terminal }
+        MigrationContext {
+            build_plan,
+            terminal,
+        }
     }
 
     pub fn prompt_for_migration(&mut self) -> anyhow::Result<MigrationOptions> {
@@ -101,7 +108,8 @@ impl<'a, W: Write, R: BufRead> MigrationContext<'a, W, R> {
     }
 
     fn select_edition(&mut self) -> anyhow::Result<Edition> {
-        self.terminal.option_prompt(EDITION_SELECT_PROMPT, &EDITION_OPTIONS)
+        self.terminal
+            .option_prompt(EDITION_SELECT_PROMPT, &EDITION_OPTIONS)
     }
 
     fn perform_upgrade(&mut self) -> anyhow::Result<()> {
@@ -128,7 +136,9 @@ impl<'a, W: Write, R: BufRead> MigrationContext<'a, W, R> {
         self.terminal.writeln(&migration.render_output())?;
         self.terminal.newline()?;
         self.terminal.writeln(BAR)?;
-        let apply = self.terminal.yes_no_prompt(APPLY_MIGRATION_PATCH_PROMPT, true)?;
+        let apply = self
+            .terminal
+            .yes_no_prompt(APPLY_MIGRATION_PATCH_PROMPT, true)?;
         if apply {
             migration.apply_changes(self.terminal.writer)?;
             self.terminal.newline()?;

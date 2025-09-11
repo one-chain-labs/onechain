@@ -4,58 +4,30 @@
 
 use crate::{
     file_format::{
-        AbilitySet,
-        Bytecode,
-        CodeOffset,
-        CodeUnit,
-        ConstantPoolIndex,
-        DatatypeHandle,
-        EnumDefInstantiation,
-        EnumDefInstantiationIndex,
-        EnumDefinition,
-        EnumDefinitionIndex,
-        FieldHandle,
-        FieldHandleIndex,
-        FieldInstantiation,
-        FieldInstantiationIndex,
-        FunctionDefinition,
-        FunctionHandle,
-        FunctionHandleIndex,
-        FunctionInstantiation,
-        FunctionInstantiationIndex,
-        IdentifierIndex,
-        JumpTableInner,
-        LocalIndex,
-        ModuleHandleIndex,
-        Signature,
-        SignatureIndex,
-        SignatureToken,
-        StructDefInstantiation,
-        StructDefInstantiationIndex,
-        StructDefinition,
-        StructDefinitionIndex,
-        TableIndex,
-        VariantHandle,
-        VariantHandleIndex,
-        VariantInstantiationHandle,
-        VariantInstantiationHandleIndex,
-        VariantJumpTable,
-        VariantJumpTableIndex,
-        Visibility,
+        AbilitySet, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex, DatatypeHandle,
+        EnumDefInstantiation, EnumDefInstantiationIndex, EnumDefinition, EnumDefinitionIndex,
+        FieldHandle, FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex,
+        FunctionDefinition, FunctionHandle, FunctionHandleIndex, FunctionInstantiation,
+        FunctionInstantiationIndex, IdentifierIndex, JumpTableInner, LocalIndex, ModuleHandleIndex,
+        Signature, SignatureIndex, SignatureToken, StructDefInstantiation,
+        StructDefInstantiationIndex, StructDefinition, StructDefinitionIndex, TableIndex,
+        VariantHandle, VariantHandleIndex, VariantInstantiationHandle,
+        VariantInstantiationHandleIndex, VariantJumpTable, VariantJumpTableIndex, Visibility,
     },
-    file_format_common::{VARIANT_COUNT_MAX, VARIANT_HANDLE_INDEX_MAX, VARIANT_INSTANTIATION_HANDLE_INDEX_MAX},
+    file_format_common::{
+        VARIANT_HANDLE_INDEX_MAX, VARIANT_INSTANTIATION_HANDLE_INDEX_MAX, VARIANT_TAG_MAX_VALUE,
+    },
     internals::ModuleIndex,
     proptest_types::{
-        prop_index_avoid,
+        TableSize, prop_index_avoid,
         signature::{AbilitySetGen, SignatureGen, SignatureTokenGen},
-        TableSize,
     },
 };
 use move_core_types::u256::U256;
 use proptest::{
-    collection::{vec, SizeRange},
+    collection::{SizeRange, vec},
     prelude::*,
-    sample::{select, Index as PropIndex},
+    sample::{Index as PropIndex, select},
 };
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
@@ -166,7 +138,9 @@ impl VariantInstantiationHandleState {
         if let Some(idx) = self.variant_map.get(&vh) {
             return Some(*idx);
         }
-        if self.variant_instantiation_handles.len() >= VARIANT_INSTANTIATION_HANDLE_INDEX_MAX as usize {
+        if self.variant_instantiation_handles.len()
+            >= VARIANT_INSTANTIATION_HANDLE_INDEX_MAX as usize
+        {
             return None;
         }
         let idx = VariantInstantiationHandleIndex(self.variant_instantiation_handles.len() as u16);
@@ -191,7 +165,10 @@ where
     T: Eq + Clone + Hash,
 {
     fn new() -> Self {
-        InstantiationState { instantiations: vec![], instantiation_map: HashMap::new() }
+        InstantiationState {
+            instantiations: vec![],
+            instantiation_map: HashMap::new(),
+        }
     }
 
     #[allow(unused)]
@@ -274,17 +251,23 @@ impl FunctionHandleGen {
             SignatureGen::strategy(return_count),
             vec(AbilitySetGen::strategy(), type_parameter_count),
         )
-            .prop_map(|(module, name, parameters, return_, type_parameters)| Self {
-                module,
-                name,
-                parameters,
-                return_,
-                type_parameters,
-            })
+            .prop_map(
+                |(module, name, parameters, return_, type_parameters)| Self {
+                    module,
+                    name,
+                    parameters,
+                    return_,
+                    type_parameters,
+                },
+            )
     }
 
     pub fn materialize(self, state: &mut FnHandleMaterializeState) -> Option<FunctionHandle> {
-        let idx = prop_index_avoid(self.module, state.self_module_handle_idx.into_index(), state.module_handles_len);
+        let idx = prop_index_avoid(
+            self.module,
+            state.self_module_handle_idx.into_index(),
+            state.module_handles_len,
+        );
         let mod_idx = ModuleHandleIndex(idx as TableIndex);
         let iden_idx = IdentifierIndex(self.name.index(state.identifiers_len) as TableIndex);
         if state.function_handles.contains(&(mod_idx, iden_idx)) {
@@ -295,7 +278,11 @@ impl FunctionHandleGen {
         let params_idx = state.add_signature(parameters);
         let return_ = self.return_.materialize(state.datatype_handles);
         let return_idx = state.add_signature(return_);
-        let type_parameters = self.type_parameters.into_iter().map(|abilities| abilities.materialize()).collect();
+        let type_parameters = self
+            .type_parameters
+            .into_iter()
+            .map(|abilities| abilities.materialize())
+            .collect();
         Some(FunctionHandle {
             module: mod_idx,
             name: iden_idx,
@@ -361,6 +348,7 @@ impl<'a> FnDefnMaterializeState<'a> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn return_tables(
         self,
     ) -> (
@@ -383,7 +371,8 @@ impl<'a> FnDefnMaterializeState<'a> {
             self.field_instantiations.instantiations(),
             self.enum_instantiations.instantiations(),
             self.variant_handles.variant_handles(),
-            self.variant_instantiation_handles.variant_instantiation_handles(),
+            self.variant_instantiation_handles
+                .variant_instantiation_handles(),
         )
     }
 
@@ -397,7 +386,10 @@ impl<'a> FnDefnMaterializeState<'a> {
         FunctionHandleIndex((self.function_handles.len() - 1) as TableIndex)
     }
 
-    fn get_signature_from_type_params(&mut self, abilities: impl IntoIterator<Item = AbilitySet>) -> Signature {
+    fn get_signature_from_type_params(
+        &mut self,
+        abilities: impl IntoIterator<Item = AbilitySet>,
+    ) -> Signature {
         let mut type_params = vec![];
         for abs in abilities {
             assert!(!abs.has_key());
@@ -409,7 +401,10 @@ impl<'a> FnDefnMaterializeState<'a> {
         Signature(type_params)
     }
 
-    fn add_signature_from_type_params(&mut self, abilities: impl IntoIterator<Item = AbilitySet>) -> SignatureIndex {
+    fn add_signature_from_type_params(
+        &mut self,
+        abilities: impl IntoIterator<Item = AbilitySet>,
+    ) -> SignatureIndex {
         let sig = self.get_signature_from_type_params(abilities);
         self.signatures.add_signature(sig)
     }
@@ -417,7 +412,10 @@ impl<'a> FnDefnMaterializeState<'a> {
     fn get_function_instantiation(&mut self, fh_idx: usize) -> FunctionInstantiationIndex {
         let abilities = self.function_handles[fh_idx].type_parameters.clone();
         let sig_idx = self.add_signature_from_type_params(abilities.iter().copied());
-        let fi = FunctionInstantiation { handle: FunctionHandleIndex(fh_idx as TableIndex), type_parameters: sig_idx };
+        let fi = FunctionInstantiation {
+            handle: FunctionHandleIndex(fh_idx as TableIndex),
+            type_parameters: sig_idx,
+        };
         FunctionInstantiationIndex(self.function_instantiations.add_instantiation(fi))
     }
 
@@ -425,7 +423,10 @@ impl<'a> FnDefnMaterializeState<'a> {
         let sd = &self.struct_defs[sd_idx];
         let struct_handle = &self.datatype_handles[sd.struct_handle.0 as usize];
         let sig_idx = self.add_signature_from_type_params(struct_handle.type_param_constraints());
-        let si = StructDefInstantiation { def: StructDefinitionIndex(sd_idx as TableIndex), type_parameters: sig_idx };
+        let si = StructDefInstantiation {
+            def: StructDefinitionIndex(sd_idx as TableIndex),
+            type_parameters: sig_idx,
+        };
         StructDefInstantiationIndex(self.struct_instantiations.add_instantiation(si))
     }
 
@@ -433,7 +434,10 @@ impl<'a> FnDefnMaterializeState<'a> {
         let sd = &self.enum_defs[sd_idx];
         let enum_handle = &self.datatype_handles[sd.enum_handle.0 as usize];
         let sig_idx = self.add_signature_from_type_params(enum_handle.type_param_constraints());
-        let si = EnumDefInstantiation { def: EnumDefinitionIndex(sd_idx as TableIndex), type_parameters: sig_idx };
+        let si = EnumDefInstantiation {
+            def: EnumDefinitionIndex(sd_idx as TableIndex),
+            type_parameters: sig_idx,
+        };
         EnumDefInstantiationIndex(self.enum_instantiations.add_instantiation(si))
     }
 }
@@ -469,25 +473,32 @@ impl FunctionDefinitionGen {
             vec(any::<PropIndex>(), acquires_count.into()),
             CodeUnitGen::strategy(arg_count, code_len, jump_table_len),
         )
-            .prop_map(|(name, parameters, return_, visibility, is_entry, acquires, code)| Self {
-                name,
-                parameters,
-                return_,
-                visibility,
-                is_entry,
-                acquires,
-                code,
-            })
+            .prop_map(
+                |(name, parameters, return_, visibility, is_entry, acquires, code)| Self {
+                    name,
+                    parameters,
+                    return_,
+                    visibility,
+                    is_entry,
+                    acquires,
+                    code,
+                },
+            )
     }
 
     pub fn materialize(self, state: &mut FnDefnMaterializeState) -> Option<FunctionDefinition> {
         // This precondition should never fail because the table size cannot be greater
         // than TableSize::MAX
         let iden_idx = IdentifierIndex(self.name.index(state.identifiers_len) as TableIndex);
-        if state.def_function_handles.contains(&(state.self_module_handle_idx, iden_idx)) {
+        if state
+            .def_function_handles
+            .contains(&(state.self_module_handle_idx, iden_idx))
+        {
             return None;
         }
-        state.def_function_handles.insert((state.self_module_handle_idx, iden_idx));
+        state
+            .def_function_handles
+            .insert((state.self_module_handle_idx, iden_idx));
 
         let parameters = self.parameters.materialize(state.datatype_handles);
         let params_idx = state.add_signature(parameters);
@@ -503,7 +514,9 @@ impl FunctionDefinitionGen {
         let function_handle = state.add_function_handle(handle);
         let mut acquires_set = BTreeSet::new();
         for acquire in self.acquires {
-            acquires_set.insert(StructDefinitionIndex(acquire.index(state.struct_defs.len()) as TableIndex));
+            acquires_set.insert(StructDefinitionIndex(
+                acquire.index(state.struct_defs.len()) as TableIndex,
+            ));
         }
         let acquires_global_resources = acquires_set.into_iter().collect();
         // TODO: consider generating native functions?
@@ -536,7 +549,10 @@ impl VariantJumpTableGen {
         let head_enum = EnumDefinitionIndex(sd_idx as TableIndex);
         let sd = &state.enum_defs[sd_idx];
         let jump_table = JumpTableInner::Full((0..sd.variants.len()).map(|_| 0).collect());
-        Some(VariantJumpTable { head_enum, jump_table })
+        Some(VariantJumpTable {
+            head_enum,
+            jump_table,
+        })
     }
 }
 
@@ -558,12 +574,20 @@ impl CodeUnitGen {
             vec(BytecodeGen::garbage_strategy(), code_len),
             vec(VariantJumpTableGen::strategy(), jump_table_len),
         )
-            .prop_map(|(locals_signature, code, jump_tables)| Self { locals_signature, code, jump_tables })
+            .prop_map(|(locals_signature, code, jump_tables)| Self {
+                locals_signature,
+                code,
+                jump_tables,
+            })
     }
 
     fn materialize(self, state: &mut FnDefnMaterializeState) -> CodeUnit {
-        let locals_signature =
-            Signature(self.locals_signature.into_iter().map(|sig| sig.materialize(state.datatype_handles)).collect());
+        let locals_signature = Signature(
+            self.locals_signature
+                .into_iter()
+                .map(|sig| sig.materialize(state.datatype_handles))
+                .collect(),
+        );
 
         let mut jump_tables = vec![];
         for jump_table in self.jump_tables {
@@ -574,7 +598,9 @@ impl CodeUnitGen {
 
         let mut code = vec![];
         for bytecode_gen in self.code {
-            if let Some(bytecode) = bytecode_gen.materialize(state, code.len(), &locals_signature, jump_tables.len()) {
+            if let Some(bytecode) =
+                bytecode_gen.materialize(state, code.len(), &locals_signature, jump_tables.len())
+            {
                 code.push(bytecode)
             }
         }
@@ -584,7 +610,11 @@ impl CodeUnitGen {
             jump_tables = vec![];
         }
 
-        CodeUnit { locals: state.add_signature(locals_signature), code, jump_tables }
+        CodeUnit {
+            locals: state.add_signature(locals_signature),
+            code,
+            jump_tables,
+        }
     }
 }
 
@@ -678,7 +708,9 @@ impl BytecodeGen {
                 if state.constant_pool_len == 0 {
                     return None;
                 }
-                Bytecode::LdConst(ConstantPoolIndex(idx.index(state.constant_pool_len) as TableIndex))
+                Bytecode::LdConst(ConstantPoolIndex(
+                    idx.index(state.constant_pool_len) as TableIndex
+                ))
             }
             BytecodeGen::MutBorrowField((def, field)) => {
                 let sd_idx = def.index(state.struct_defs.len());
@@ -691,14 +723,19 @@ impl BytecodeGen {
                     field: field.index(*field_count) as TableIndex,
                 });
 
-                let struct_handle = &state.datatype_handles[state.struct_defs[sd_idx].struct_handle.0 as usize];
+                let struct_handle =
+                    &state.datatype_handles[state.struct_defs[sd_idx].struct_handle.0 as usize];
                 if struct_handle.type_parameters.is_empty() {
                     Bytecode::MutBorrowField(fh_idx)
                 } else {
-                    let sig_idx = state.add_signature_from_type_params(struct_handle.type_param_constraints());
+                    let sig_idx = state
+                        .add_signature_from_type_params(struct_handle.type_param_constraints());
                     let fi_idx = state
                         .field_instantiations
-                        .add_instantiation(FieldInstantiation { handle: fh_idx, type_parameters: sig_idx });
+                        .add_instantiation(FieldInstantiation {
+                            handle: fh_idx,
+                            type_parameters: sig_idx,
+                        });
                     Bytecode::MutBorrowFieldGeneric(FieldInstantiationIndex(fi_idx))
                 }
             }
@@ -713,14 +750,19 @@ impl BytecodeGen {
                     field: field.index(*field_count) as TableIndex,
                 });
 
-                let struct_handle = &state.datatype_handles[state.struct_defs[sd_idx].struct_handle.0 as usize];
+                let struct_handle =
+                    &state.datatype_handles[state.struct_defs[sd_idx].struct_handle.0 as usize];
                 if struct_handle.type_parameters.is_empty() {
                     Bytecode::ImmBorrowField(fh_idx)
                 } else {
-                    let sig_idx = state.add_signature_from_type_params(struct_handle.type_param_constraints());
+                    let sig_idx = state
+                        .add_signature_from_type_params(struct_handle.type_param_constraints());
                     let fi_idx = state
                         .field_instantiations
-                        .add_instantiation(FieldInstantiation { handle: fh_idx, type_parameters: sig_idx });
+                        .add_instantiation(FieldInstantiation {
+                            handle: fh_idx,
+                            type_parameters: sig_idx,
+                        });
                     Bytecode::ImmBorrowFieldGeneric(FieldInstantiationIndex(fi_idx))
                 }
             }
@@ -739,7 +781,10 @@ impl BytecodeGen {
                 let sd_idx = idx.index(struct_defs_len);
 
                 let sd = &state.struct_defs[sd_idx];
-                if state.datatype_handles[sd.struct_handle.0 as usize].type_parameters.is_empty() {
+                if state.datatype_handles[sd.struct_handle.0 as usize]
+                    .type_parameters
+                    .is_empty()
+                {
                     Bytecode::Pack(StructDefinitionIndex(sd_idx as TableIndex))
                 } else {
                     Bytecode::PackGeneric(state.get_type_instantiation(sd_idx))
@@ -750,7 +795,10 @@ impl BytecodeGen {
                 let sd_idx = idx.index(struct_defs_len);
 
                 let sd = &state.struct_defs[sd_idx];
-                if state.datatype_handles[sd.struct_handle.0 as usize].type_parameters.is_empty() {
+                if state.datatype_handles[sd.struct_handle.0 as usize]
+                    .type_parameters
+                    .is_empty()
+                {
                     Bytecode::Unpack(StructDefinitionIndex(sd_idx as TableIndex))
                 } else {
                     Bytecode::UnpackGeneric(state.get_type_instantiation(sd_idx))
@@ -908,7 +956,7 @@ impl BytecodeGen {
             }
             BytecodeGen::PackVariant(idx, tag) => {
                 let enum_defs_len = state.enum_defs.len();
-                if tag as u64 >= VARIANT_COUNT_MAX || enum_defs_len == 0 {
+                if tag as u64 > VARIANT_TAG_MAX_VALUE || enum_defs_len == 0 {
                     return None;
                 }
                 let ed_idx = idx.index(enum_defs_len);
@@ -916,7 +964,10 @@ impl BytecodeGen {
                 if ed.variants.len() <= tag as usize {
                     return None;
                 }
-                if state.datatype_handles[ed.enum_handle.0 as usize].type_parameters.is_empty() {
+                if state.datatype_handles[ed.enum_handle.0 as usize]
+                    .type_parameters
+                    .is_empty()
+                {
                     let handle = state.variant_handles.add_variant_handle(VariantHandle {
                         enum_def: EnumDefinitionIndex(ed_idx as TableIndex),
                         variant: tag,
@@ -926,13 +977,16 @@ impl BytecodeGen {
                     let enum_def = state.get_enum_type_instantiation(ed_idx);
                     let handle = state
                         .variant_instantiation_handles
-                        .add_variant_instantiation_handle(VariantInstantiationHandle { enum_def, variant: tag })?;
+                        .add_variant_instantiation_handle(VariantInstantiationHandle {
+                            enum_def,
+                            variant: tag,
+                        })?;
                     Bytecode::PackVariantGeneric(handle)
                 }
             }
             BytecodeGen::UnpackVariant(idx, tag) => {
                 let enum_defs_len = state.enum_defs.len();
-                if tag as u64 >= VARIANT_COUNT_MAX || enum_defs_len == 0 {
+                if tag as u64 > VARIANT_TAG_MAX_VALUE || enum_defs_len == 0 {
                     return None;
                 }
                 let ed_idx = idx.index(enum_defs_len);
@@ -941,7 +995,10 @@ impl BytecodeGen {
                 if ed.variants.len() <= tag as usize {
                     return None;
                 }
-                if state.datatype_handles[ed.enum_handle.0 as usize].type_parameters.is_empty() {
+                if state.datatype_handles[ed.enum_handle.0 as usize]
+                    .type_parameters
+                    .is_empty()
+                {
                     let handle = state.variant_handles.add_variant_handle(VariantHandle {
                         enum_def: EnumDefinitionIndex(ed_idx as TableIndex),
                         variant: tag,
@@ -951,13 +1008,16 @@ impl BytecodeGen {
                     let enum_def = state.get_enum_type_instantiation(ed_idx);
                     let handle = state
                         .variant_instantiation_handles
-                        .add_variant_instantiation_handle(VariantInstantiationHandle { enum_def, variant: tag })?;
+                        .add_variant_instantiation_handle(VariantInstantiationHandle {
+                            enum_def,
+                            variant: tag,
+                        })?;
                     Bytecode::UnpackVariantGeneric(handle)
                 }
             }
             BytecodeGen::UnpackVariantImmRef(idx, tag) => {
                 let enum_defs_len = state.enum_defs.len();
-                if tag as u64 >= VARIANT_COUNT_MAX || enum_defs_len == 0 {
+                if tag as u64 > VARIANT_TAG_MAX_VALUE || enum_defs_len == 0 {
                     return None;
                 }
                 let ed_idx = idx.index(enum_defs_len);
@@ -966,7 +1026,10 @@ impl BytecodeGen {
                 if ed.variants.len() <= tag as usize {
                     return None;
                 }
-                if state.datatype_handles[ed.enum_handle.0 as usize].type_parameters.is_empty() {
+                if state.datatype_handles[ed.enum_handle.0 as usize]
+                    .type_parameters
+                    .is_empty()
+                {
                     let handle = state.variant_handles.add_variant_handle(VariantHandle {
                         enum_def: EnumDefinitionIndex(ed_idx as TableIndex),
                         variant: tag,
@@ -976,13 +1039,16 @@ impl BytecodeGen {
                     let enum_def = state.get_enum_type_instantiation(ed_idx);
                     let handle = state
                         .variant_instantiation_handles
-                        .add_variant_instantiation_handle(VariantInstantiationHandle { enum_def, variant: tag })?;
+                        .add_variant_instantiation_handle(VariantInstantiationHandle {
+                            enum_def,
+                            variant: tag,
+                        })?;
                     Bytecode::UnpackVariantGenericImmRef(handle)
                 }
             }
             BytecodeGen::UnpackVariantMutRef(idx, tag) => {
                 let enum_defs_len = state.enum_defs.len();
-                if tag as u64 >= VARIANT_COUNT_MAX || enum_defs_len == 0 {
+                if tag as u64 > VARIANT_TAG_MAX_VALUE || enum_defs_len == 0 {
                     return None;
                 }
                 let ed_idx = idx.index(enum_defs_len);
@@ -990,7 +1056,10 @@ impl BytecodeGen {
                 if ed.variants.len() <= tag as usize {
                     return None;
                 }
-                if state.datatype_handles[ed.enum_handle.0 as usize].type_parameters.is_empty() {
+                if state.datatype_handles[ed.enum_handle.0 as usize]
+                    .type_parameters
+                    .is_empty()
+                {
                     let handle = state.variant_handles.add_variant_handle(VariantHandle {
                         enum_def: EnumDefinitionIndex(ed_idx as TableIndex),
                         variant: tag,
@@ -1000,7 +1069,10 @@ impl BytecodeGen {
                     let enum_def = state.get_enum_type_instantiation(ed_idx);
                     let handle = state
                         .variant_instantiation_handles
-                        .add_variant_instantiation_handle(VariantInstantiationHandle { enum_def, variant: tag })?;
+                        .add_variant_instantiation_handle(VariantInstantiationHandle {
+                            enum_def,
+                            variant: tag,
+                        })?;
                     Bytecode::UnpackVariantGenericMutRef(handle)
                 }
             }
@@ -1008,7 +1080,9 @@ impl BytecodeGen {
                 if jump_table_len == 0 {
                     return None;
                 }
-                Bytecode::VariantSwitch(VariantJumpTableIndex(idx.index(jump_table_len) as TableIndex))
+                Bytecode::VariantSwitch(VariantJumpTableIndex(
+                    idx.index(jump_table_len) as TableIndex
+                ))
             }
         };
 
@@ -1020,11 +1094,14 @@ impl BytecodeGen {
     fn check_signature_token(token: &SignatureToken) -> bool {
         use SignatureToken::*;
         match token {
-            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address | Signer | Datatype(_) | TypeParameter(_) => true,
+            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address | Signer | Datatype(_)
+            | TypeParameter(_) => true,
             Vector(element_token) => BytecodeGen::check_signature_token(element_token),
             DatatypeInstantiation(inst) => {
                 let (_, type_arguments) = &**inst;
-                type_arguments.iter().all(BytecodeGen::check_signature_token)
+                type_arguments
+                    .iter()
+                    .all(BytecodeGen::check_signature_token)
             }
             Reference(_) | MutableReference(_) => false,
         }
@@ -1054,9 +1131,9 @@ impl BytecodeGen {
         use Bytecode::*;
 
         static JUST_BYTECODES: &[Bytecode] = &[
-            FreezeRef, Pop, Ret, LdTrue, LdFalse, ReadRef, WriteRef, Add, Sub, Mul, Mod, Div, BitOr, BitAnd, Xor, Or,
-            And, Eq, Neq, Lt, Gt, Le, Ge, Abort, CastU8, CastU64, CastU128, CastU16, CastU32, CastU256, Not, Nop, Shl,
-            Shr,
+            FreezeRef, Pop, Ret, LdTrue, LdFalse, ReadRef, WriteRef, Add, Sub, Mul, Mod, Div,
+            BitOr, BitAnd, Xor, Or, And, Eq, Neq, Lt, Gt, Le, Ge, Abort, CastU8, CastU64, CastU128,
+            CastU16, CastU32, CastU256, Not, Nop, Shl, Shr,
         ];
         select(JUST_BYTECODES)
     }

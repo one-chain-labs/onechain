@@ -4,10 +4,11 @@
 //! Detects and suggests simplification for `if (c) e1 else e2` can be removed
 use move_proc_macros::growing_stack;
 
+use crate::expansion::ast::Value;
+use crate::linters::StyleCodes;
 use crate::{
     diag,
-    expansion::ast::{Value, Value_},
-    linters::StyleCodes,
+    expansion::ast::Value_,
     typing::{
         ast::{self as T, SequenceItem_, UnannotatedExp_},
         visitor::simple_visitor,
@@ -28,13 +29,17 @@ simple_visitor!(
         };
 
         match (&vtrue.value, &vfalse.value) {
-            (Value_::Bool(v1 @ true), Value_::Bool(false)) | (Value_::Bool(v1 @ false), Value_::Bool(true)) => {
+            (Value_::Bool(v1 @ true), Value_::Bool(false))
+            | (Value_::Bool(v1 @ false), Value_::Bool(true)) => {
                 let negation = if *v1 { "" } else { "!" };
                 let msg = format!(
                     "Detected an unnecessary conditional expression 'if (cond)'. Consider using \
                     the condition directly, i.e. '{negation}cond'",
                 );
-                self.add_diag(diag!(StyleCodes::UnnecessaryConditional.diag_info(), (exp.exp.loc, msg)));
+                self.add_diag(diag!(
+                    StyleCodes::UnnecessaryConditional.diag_info(),
+                    (exp.exp.loc, msg)
+                ));
             }
             (v1, v2) if v1 == v2 => {
                 let msg = "Detected a redundant conditional expression 'if (..) v else v', where each \

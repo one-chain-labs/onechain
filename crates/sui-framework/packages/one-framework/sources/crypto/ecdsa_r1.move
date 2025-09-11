@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one::ecdsa_r1;
+module oct::ecdsa_r1;
 
 #[allow(unused_const)]
 /// Error if the public key cannot be recovered from the signature.

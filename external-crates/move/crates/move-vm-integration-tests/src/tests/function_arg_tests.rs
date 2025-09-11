@@ -18,9 +18,23 @@ use move_vm_types::gas::UnmeteredGasMeter;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
-fn run(ty_params: &[&str], params: &[&str], ty_arg_tags: Vec<TypeTag>, args: Vec<MoveValue>) -> VMResult<()> {
-    let ty_params = ty_params.iter().map(|var| format!("{}: copy + drop", var)).collect::<Vec<_>>().join(", ");
-    let params = params.iter().enumerate().map(|(idx, ty)| format!("_x{}: {}", idx, ty)).collect::<Vec<_>>().join(", ");
+fn run(
+    ty_params: &[&str],
+    params: &[&str],
+    ty_arg_tags: Vec<TypeTag>,
+    args: Vec<MoveValue>,
+) -> VMResult<()> {
+    let ty_params = ty_params
+        .iter()
+        .map(|var| format!("{}: copy + drop", var))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let params = params
+        .iter()
+        .enumerate()
+        .map(|(idx, ty)| format!("_x{}: {}", idx, ty))
+        .collect::<Vec<_>>()
+        .join(", ");
 
     let code = format!(
         r#"
@@ -48,11 +62,24 @@ fn run(ty_params: &[&str], params: &[&str], ty_arg_tags: Vec<TypeTag>, args: Vec
 
     let fun_name = Identifier::new("foo").unwrap();
 
-    let ty_args: Vec<_> = ty_arg_tags.into_iter().map(|tag| sess.load_type(&tag)).collect::<VMResult<_>>()?;
+    let ty_args: Vec<_> = ty_arg_tags
+        .into_iter()
+        .map(|tag| sess.load_type(&tag))
+        .collect::<VMResult<_>>()?;
 
-    let args: Vec<_> = args.into_iter().map(|val| val.simple_serialize().unwrap()).collect();
+    let args: Vec<_> = args
+        .into_iter()
+        .map(|val| val.simple_serialize().unwrap())
+        .collect();
 
-    sess.execute_function_bypass_visibility(&module_id, &fun_name, ty_args, args, &mut UnmeteredGasMeter)?;
+    sess.execute_function_bypass_visibility(
+        &module_id,
+        &fun_name,
+        ty_args,
+        args,
+        &mut UnmeteredGasMeter,
+        None,
+    )?;
 
     Ok(())
 }
@@ -68,14 +95,24 @@ fn expect_err_generic(
     args: Vec<MoveValue>,
     expected_status: StatusCode,
 ) {
-    assert!(run(ty_params, params, ty_args, args).unwrap_err().major_status() == expected_status);
+    assert!(
+        run(ty_params, params, ty_args, args)
+            .unwrap_err()
+            .major_status()
+            == expected_status
+    );
 }
 
 fn expect_ok(params: &[&str], args: Vec<MoveValue>) {
     run(&[], params, vec![], args).unwrap()
 }
 
-fn expect_ok_generic(ty_params: &[&str], params: &[&str], ty_args: Vec<TypeTag>, args: Vec<MoveValue>) {
+fn expect_ok_generic(
+    ty_params: &[&str],
+    params: &[&str],
+    ty_args: Vec<TypeTag>,
+    args: Vec<MoveValue>,
+) {
     run(ty_params, params, ty_args, args).unwrap()
 }
 
@@ -86,7 +123,11 @@ fn expected_0_args_got_0() {
 
 #[test]
 fn expected_0_args_got_1() {
-    expect_err(&[], vec![MoveValue::U64(0)], StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH)
+    expect_err(
+        &[],
+        vec![MoveValue::U64(0)],
+        StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+    )
 }
 
 #[test]
@@ -96,14 +137,22 @@ fn expected_1_arg_got_0() {
 
 #[test]
 fn expected_2_arg_got_1() {
-    expect_err(&["u64", "bool"], vec![MoveValue::U64(0)], StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH)
+    expect_err(
+        &["u64", "bool"],
+        vec![MoveValue::U64(0)],
+        StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+    )
 }
 
 #[test]
 fn expected_2_arg_got_3() {
     expect_err(
         &["u64", "bool"],
-        vec![MoveValue::U64(0), MoveValue::Bool(true), MoveValue::Bool(false)],
+        vec![
+            MoveValue::U64(0),
+            MoveValue::Bool(true),
+            MoveValue::Bool(false),
+        ],
         StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
     )
 }
@@ -116,7 +165,10 @@ fn expected_u64_got_u64() {
 #[test]
 #[allow(non_snake_case)]
 fn expected_Foo_got_Foo() {
-    expect_ok(&["Foo"], vec![MoveValue::Struct(MoveStruct::new(vec![MoveValue::U64(0)]))])
+    expect_ok(
+        &["Foo"],
+        vec![MoveValue::Struct(MoveStruct::new(vec![MoveValue::U64(0)]))],
+    )
 }
 
 #[test]
@@ -126,12 +178,19 @@ fn expected_signer_ref_got_signer() {
 
 #[test]
 fn expected_u64_signer_ref_got_u64_signer() {
-    expect_ok(&["u64", "&signer"], vec![MoveValue::U64(0), MoveValue::Signer(TEST_ADDR)])
+    expect_ok(
+        &["u64", "&signer"],
+        vec![MoveValue::U64(0), MoveValue::Signer(TEST_ADDR)],
+    )
 }
 
 #[test]
 fn expected_u64_got_bool() {
-    expect_err(&["u64"], vec![MoveValue::Bool(false)], StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
+    expect_err(
+        &["u64"],
+        vec![MoveValue::Bool(false)],
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    )
 }
 
 #[test]
@@ -148,35 +207,58 @@ fn expected_T__T_got_u64__u64() {
 #[test]
 #[allow(non_snake_case)]
 fn expected_A_B__A_u64_vector_B_got_u8_u128__u8_u64_vector_u128() {
-    expect_ok_generic(&["A", "B"], &["A", "u64", "vector<B>"], vec![TypeTag::U8, TypeTag::U128], vec![
-        MoveValue::U8(0),
-        MoveValue::U64(0),
-        MoveValue::Vector(vec![MoveValue::U128(0), MoveValue::U128(0)]),
-    ])
+    expect_ok_generic(
+        &["A", "B"],
+        &["A", "u64", "vector<B>"],
+        vec![TypeTag::U8, TypeTag::U128],
+        vec![
+            MoveValue::U8(0),
+            MoveValue::U64(0),
+            MoveValue::Vector(vec![MoveValue::U128(0), MoveValue::U128(0)]),
+        ],
+    )
 }
 
 #[test]
 #[allow(non_snake_case)]
 fn expected_A_B__A_u32_vector_B_got_u16_u256__u16_u32_vector_u256() {
-    expect_ok_generic(&["A", "B"], &["A", "u32", "vector<B>"], vec![TypeTag::U16, TypeTag::U256], vec![
-        MoveValue::U16(0),
-        MoveValue::U32(0),
-        MoveValue::Vector(vec![MoveValue::U256(U256::from(0u8)), MoveValue::U256(U256::from(0u8))]),
-    ])
+    expect_ok_generic(
+        &["A", "B"],
+        &["A", "u32", "vector<B>"],
+        vec![TypeTag::U16, TypeTag::U256],
+        vec![
+            MoveValue::U16(0),
+            MoveValue::U32(0),
+            MoveValue::Vector(vec![
+                MoveValue::U256(U256::from(0u8)),
+                MoveValue::U256(U256::from(0u8)),
+            ]),
+        ],
+    )
 }
 
 #[test]
 #[allow(non_snake_case)]
 fn expected_T__Bar_T_got_bool__Bar_bool() {
-    expect_ok_generic(&["T"], &["Bar<T>"], vec![TypeTag::Bool], vec![MoveValue::Struct(MoveStruct::new(vec![
-        MoveValue::Bool(false),
-    ]))])
+    expect_ok_generic(
+        &["T"],
+        &["Bar<T>"],
+        vec![TypeTag::Bool],
+        vec![MoveValue::Struct(MoveStruct::new(vec![MoveValue::Bool(
+            false,
+        )]))],
+    )
 }
 
 #[test]
 #[allow(non_snake_case)]
 fn expected_T__T_got_bool__bool() {
-    expect_ok_generic(&["T"], &["T"], vec![TypeTag::Bool], vec![MoveValue::Bool(false)])
+    expect_ok_generic(
+        &["T"],
+        &["T"],
+        vec![TypeTag::Bool],
+        vec![MoveValue::Bool(false)],
+    )
 }
 
 #[test]

@@ -26,9 +26,13 @@ impl ObjectChange {
             return Ok(None);
         };
 
-        Object::query(ctx, self.native.id.into(), Object::at_version(version.value(), self.checkpoint_viewed_at))
-            .await
-            .extend()
+        Object::query(
+            ctx,
+            self.native.id.into(),
+            Object::at_version(version.value(), self.checkpoint_viewed_at),
+        )
+        .await
+        .extend()
     }
 
     /// The contents of the object immediately after the transaction.
@@ -37,9 +41,13 @@ impl ObjectChange {
             return Ok(None);
         };
 
-        Object::query(ctx, self.native.id.into(), Object::at_version(version.value(), self.checkpoint_viewed_at))
-            .await
-            .extend()
+        Object::query(
+            ctx,
+            self.native.id.into(),
+            Object::at_version(version.value(), self.checkpoint_viewed_at),
+        )
+        .await
+        .extend()
     }
 
     /// Whether the ID was created in this transaction.

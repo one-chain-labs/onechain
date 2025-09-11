@@ -14,7 +14,7 @@ module a::m {
     public entry fun t3(): Copyable {
         abort 0
     }
-    struct Obj has key, store { id: one::object::UID }
+    struct Obj has key, store { id: sui::object::UID }
     public entry fun t4(): Obj {
         abort 0
     }
@@ -23,7 +23,7 @@ module a::m {
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

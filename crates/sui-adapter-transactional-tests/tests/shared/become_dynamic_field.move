@@ -8,7 +8,7 @@
 
 //# publish
 module a::m {
-    use one::dynamic_field::{add, remove};
+    use sui::dynamic_field::{add, remove};
 
     public struct Outer has key, store {
         id: object::UID,

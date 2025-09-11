@@ -4,13 +4,11 @@
 use crate::{object_runtime::ObjectRuntime, NativesCostTable};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    account_address::AccountAddress,
-    gas_algebra::InternalGas,
-    language_storage::StructTag,
-    runtime_value as R,
-    vm_status::StatusCode,
+    account_address::AccountAddress, gas_algebra::InternalGas, language_storage::StructTag,
+    runtime_value as R, vm_status::StatusCode,
 };
-use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
+use move_vm_runtime::native_charge_gas_early_exit;
+use move_vm_runtime::native_functions::NativeContext;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
@@ -30,7 +28,7 @@ pub struct ConfigReadSettingImplCostParams {
     pub config_read_setting_impl_cost_per_byte: Option<InternalGas>,
 }
 
-#[instrument(level = "trace", skip_all, err)]
+#[instrument(level = "trace", skip_all)]
 pub fn read_setting_impl(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
@@ -39,17 +37,25 @@ pub fn read_setting_impl(
     assert_eq!(ty_args.len(), 4);
     assert_eq!(args.len(), 3);
 
-    let ConfigReadSettingImplCostParams { config_read_setting_impl_cost_base, config_read_setting_impl_cost_per_byte } =
-        context.extensions_mut().get::<NativesCostTable>().config_read_setting_impl_cost_params.clone();
+    let ConfigReadSettingImplCostParams {
+        config_read_setting_impl_cost_base,
+        config_read_setting_impl_cost_per_byte,
+    } = context
+        .extensions_mut()
+        .get::<NativesCostTable>()?
+        .config_read_setting_impl_cost_params
+        .clone();
 
-    let config_read_setting_impl_cost_base = config_read_setting_impl_cost_base.ok_or_else(|| {
-        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .with_message("gas cost is not set".to_string())
-    })?;
-    let config_read_setting_impl_cost_per_byte = config_read_setting_impl_cost_per_byte.ok_or_else(|| {
-        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .with_message("gas cost is not set".to_string())
-    })?;
+    let config_read_setting_impl_cost_base =
+        config_read_setting_impl_cost_base.ok_or_else(|| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("gas cost is not set".to_string())
+        })?;
+    let config_read_setting_impl_cost_per_byte = config_read_setting_impl_cost_per_byte
+        .ok_or_else(|| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("gas cost is not set".to_string())
+        })?;
     // Charge base fee
     native_charge_gas_early_exit!(context, config_read_setting_impl_cost_base);
 
@@ -65,18 +71,22 @@ pub fn read_setting_impl(
     let field_setting_tag: StructTag = match context.type_to_type_tag(&field_setting_ty)? {
         TypeTag::Struct(s) => *s,
         _ => {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Sui verifier guarantees this is a struct".to_string()))
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Sui verifier guarantees this is a struct".to_string()),
+            )
         }
     };
     let Some(field_setting_layout) = context.type_to_type_layout(&field_setting_ty)? else {
-        return Ok(NativeResult::err(context.gas_used(), E_BCS_SERIALIZATION_FAILURE));
+        return Ok(NativeResult::err(
+            context.gas_used(),
+            E_BCS_SERIALIZATION_FAILURE,
+        ));
     };
-    let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
+    let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut()?;
 
     let read_value_opt = consistent_value_before_current_epoch(
         object_runtime,
-        &field_setting_ty,
         field_setting_tag,
         &field_setting_layout,
         &setting_value_ty,
@@ -92,12 +102,14 @@ pub fn read_setting_impl(
         config_read_setting_impl_cost_per_byte * u64::from(read_value_opt.legacy_size()).into()
     );
 
-    Ok(NativeResult::ok(context.gas_used(), smallvec![read_value_opt]))
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![read_value_opt],
+    ))
 }
 
 fn consistent_value_before_current_epoch(
     object_runtime: &mut ObjectRuntime,
-    field_setting_ty: &Type,
     field_setting_tag: StructTag,
     field_setting_layout: &R::MoveTypeLayout,
     _setting_value_ty: &Type,
@@ -111,7 +123,6 @@ fn consistent_value_before_current_epoch(
     let Some(field) = object_runtime.config_setting_unsequenced_read(
         config_addr.into(),
         name_df_addr.into(),
-        field_setting_ty,
         field_setting_layout,
         &field_setting_obj_ty,
     ) else {
@@ -139,14 +150,18 @@ fn consistent_value_before_current_epoch(
         unpack_option(newer_value.copy_value()?, value_ty)?.is_some()
             || unpack_option(older_value_opt.copy_value()?, value_ty)?.is_some()
     );
-    Ok(if current_epoch > newer_value_epoch { newer_value } else { older_value_opt })
+    Ok(if current_epoch > newer_value_epoch {
+        newer_value
+    } else {
+        older_value_opt
+    })
 }
 
 fn unpack_struct<const N: usize>(s: Value) -> PartialVMResult<[Value; N]> {
     let s: Struct = s.value_as()?;
     s.unpack()?.collect::<Vec<_>>().try_into().map_err(|e| {
         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .with_message(format!("struct expected to have have {N} fields: {e:?}"))
+            .with_message(format!("struct expected to have {N} fields: {e:?}"))
     })
 }
 
@@ -165,5 +180,7 @@ fn unpack_option(option: Value, type_param: &Type) -> PartialVMResult<Option<Val
 }
 
 fn option_none(type_param: &Type) -> PartialVMResult<Value> {
-    Ok(Value::struct_(Struct::pack(vec![Vector::empty(type_param)?])))
+    Ok(Value::struct_(Struct::pack(vec![Vector::empty(
+        type_param.try_into()?,
+    )?])))
 }

@@ -4,20 +4,12 @@
 
 use crate::{
     diagnostics::warning_filters::{WarningFilters, WarningFiltersTable},
-    expansion::ast::{Attributes, Friend, ModuleIdent, Mutability, TargetKind},
+    expansion::ast::{Attributes, Friend, ModuleIdent, Mutability},
     hlir::ast::{
-        BaseType,
-        Command,
-        Command_,
-        EnumDefinition,
-        FunctionSignature,
-        Label,
-        SingleType,
-        StructDefinition,
-        Var,
-        Visibility,
+        BaseType, Command, Command_, EnumDefinition, FunctionSignature, Label, SingleType,
+        StructDefinition, Var, Visibility,
     },
-    parser::ast::{ConstantName, DatatypeName, FunctionName, ENTRY_MODIFIER},
+    parser::ast::{ConstantName, DatatypeName, ENTRY_MODIFIER, FunctionName, TargetKind},
     shared::{ast_debug::*, program_info::TypingProgramInfo, unique_map::UniqueMap},
 };
 use move_core_types::runtime_value::MoveValue;
@@ -155,7 +147,11 @@ impl LoopEnd {
 // Label util
 //**************************************************************************************************
 
-pub fn remap_labels(remapping: &BTreeMap<Label, Label>, start: Label, blocks: BasicBlocks) -> (Label, BasicBlocks) {
+pub fn remap_labels(
+    remapping: &BTreeMap<Label, Label>,
+    start: Label,
+    blocks: BasicBlocks,
+) -> (Label, BasicBlocks) {
     let blocks = blocks
         .into_iter()
         .map(|(lbl, mut block)| {
@@ -178,7 +174,9 @@ fn remap_labels_cmd(remapping: &BTreeMap<Label, Label>, sp!(_, cmd_): &mut Comma
         Break(_) | Continue(_) => panic!("ICE break/continue not translated to jumps"),
         Mutate(_, _) | Assign(_, _, _) | IgnoreAndPop { .. } | Abort(_, _) | Return { .. } => (),
         Jump { target, .. } => *target = remapping[target],
-        JumpIf { if_true, if_false, .. } => {
+        JumpIf {
+            if_true, if_false, ..
+        } => {
             *if_true = remapping[if_true];
             *if_false = remapping[if_false];
         }
@@ -196,7 +194,11 @@ fn remap_labels_cmd(remapping: &BTreeMap<Label, Label>, sp!(_, cmd_): &mut Comma
 
 impl AstDebug for Program {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let Program { modules, info: _, warning_filters_table: _ } = self;
+        let Program {
+            modules,
+            info: _,
+            warning_filters_table: _,
+        } = self;
 
         for (m, mdef) in modules.key_cloned_iter() {
             w.write(format!("module {}", m));
@@ -225,11 +227,7 @@ impl AstDebug for ModuleDefinition {
             w.writeln(format!("{}", n))
         }
         attributes.ast_debug(w);
-        w.writeln(match target_kind {
-            TargetKind::Source { is_root_package: true } => "root module",
-            TargetKind::Source { is_root_package: false } => "dependency module",
-            TargetKind::External => "external module",
-        });
+        target_kind.ast_debug(w);
         w.writeln(format!("dependency order #{}", dependency_order));
         for (mident, _loc) in friends.key_cloned_iter() {
             w.write(format!("friend {};", mident));
@@ -256,7 +254,17 @@ impl AstDebug for ModuleDefinition {
 
 impl AstDebug for (ConstantName, &Constant) {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let (name, Constant { warning_filter, index, attributes, loc: _loc, signature, value }) = self;
+        let (
+            name,
+            Constant {
+                warning_filter,
+                index,
+                attributes,
+                loc: _loc,
+                signature,
+                value,
+            },
+        ) = self;
         warning_filter.ast_debug(w);
         attributes.ast_debug(w);
         w.write(format!("const#{index} {name}:"));
@@ -326,7 +334,12 @@ impl AstDebug for (FunctionName, &Function) {
         w.write(format!("fun#{index} {name}"));
         signature.ast_debug(w);
         match &body.value {
-            FunctionBody_::Defined { locals, start, block_info, blocks } => w.block(|w| {
+            FunctionBody_::Defined {
+                locals,
+                start,
+                block_info,
+                blocks,
+            } => w.block(|w| {
                 w.write("locals:");
                 w.indent(4, |w| {
                     w.list(locals, ",", |w, (_, v, (mut_, st))| {
@@ -381,8 +394,14 @@ impl AstDebug for BlockInfo {
 
 impl AstDebug for LoopInfo {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let Self { is_loop_stmt, loop_end } = self;
-        w.write(format!("{{ is_loop_stmt: {}, end: ", if *is_loop_stmt { "true" } else { "false" }));
+        let Self {
+            is_loop_stmt,
+            loop_end,
+        } = self;
+        w.write(format!(
+            "{{ is_loop_stmt: {}, end: ",
+            if *is_loop_stmt { "true" } else { "false" }
+        ));
         loop_end.ast_debug(w);
         w.write(" }}")
     }

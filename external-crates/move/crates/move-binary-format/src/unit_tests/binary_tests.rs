@@ -76,6 +76,9 @@ fn test_flavor() {
     for i in 7..1024 {
         let flavored = BinaryFlavor::encode_version(i);
         assert_eq!(BinaryFlavor::decode_version(flavored), i);
-        assert_eq!(BinaryFlavor::decode_flavor(flavored), Some(BinaryFlavor::SUI_FLAVOR));
+        assert_eq!(
+            BinaryFlavor::decode_flavor(flavored),
+            Some(BinaryFlavor::SUI_FLAVOR)
+        );
     }
 }

@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::authority::authority_per_epoch_store::{AuthorityPerEpochStore, LockDetails};
-use dashmap::{mapref::entry::Entry as DashMapEntry, DashMap};
+use dashmap::mapref::entry::Entry as DashMapEntry;
+use dashmap::DashMap;
 use mysten_common::*;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef},
-    digests::TransactionDigest,
-    error::{SuiError, SuiResult, UserInputError},
-    object::Object,
-    storage::ObjectStore,
-    transaction::VerifiedSignedTransaction,
-};
+use sui_types::base_types::{ObjectID, ObjectRef};
+use sui_types::digests::TransactionDigest;
+use sui_types::error::{SuiError, SuiResult, UserInputError};
+use sui_types::object::Object;
+use sui_types::storage::ObjectStore;
+use sui_types::transaction::VerifiedSignedTransaction;
 use tracing::{debug, info, instrument, trace};
 
 use super::writeback_cache::WritebackCache;
@@ -33,7 +32,9 @@ pub(super) struct ObjectLocks {
 
 impl ObjectLocks {
     pub fn new() -> Self {
-        Self { locked_transactions: DashMap::new() }
+        Self {
+            locked_transactions: DashMap::new(),
+        }
     }
 
     pub(crate) fn get_transaction_lock(
@@ -95,8 +96,14 @@ impl ObjectLocks {
         };
 
         if prev_lock != new_lock {
-            debug!("lock conflict detected: {:?} != {:?}", prev_lock, new_lock);
-            Err(SuiError::ObjectLockConflict { obj_ref: *obj_ref, pending_transaction: prev_lock })
+            debug!(
+                "lock conflict detected for {:?}: {:?} != {:?}",
+                obj_ref, prev_lock, new_lock
+            );
+            Err(SuiError::ObjectLockConflict {
+                obj_ref: *obj_ref,
+                pending_transaction: prev_lock,
+            })
         } else {
             Ok(())
         }
@@ -110,7 +117,11 @@ impl ObjectLocks {
     fn verify_live_object(obj_ref: &ObjectRef, live_object: &Object) -> SuiResult {
         debug_assert_eq!(obj_ref.0, live_object.id());
         if obj_ref.1 != live_object.version() {
-            debug!("object version unavailable for consumption: {:?} (current: {})", obj_ref, live_object.version());
+            debug!(
+                "object version unavailable for consumption: {:?} (current: {})",
+                obj_ref,
+                live_object.version()
+            );
             return Err(SuiError::UserInputError {
                 error: UserInputError::ObjectVersionUnavailableForConsumption {
                     provided_obj_ref: *obj_ref,
@@ -122,7 +133,10 @@ impl ObjectLocks {
         let live_digest = live_object.digest();
         if obj_ref.2 != live_digest {
             return Err(SuiError::UserInputError {
-                error: UserInputError::InvalidObjectDigest { object_id: obj_ref.0, expected_digest: live_digest },
+                error: UserInputError::InvalidObjectDigest {
+                    object_id: obj_ref.0,
+                    expected_digest: live_digest,
+                },
             });
         }
 
@@ -155,7 +169,10 @@ impl ObjectLocks {
         }
     }
 
-    fn multi_get_objects_must_exist(cache: &WritebackCache, object_ids: &[ObjectID]) -> SuiResult<Vec<Object>> {
+    fn multi_get_objects_must_exist(
+        cache: &WritebackCache,
+        object_ids: &[ObjectID],
+    ) -> SuiResult<Vec<Object>> {
         let objects = cache.multi_get_objects(object_ids);
         let mut result = Vec::with_capacity(objects.len());
         for (i, object) in objects.into_iter().enumerate() {
@@ -163,7 +180,10 @@ impl ObjectLocks {
                 result.push(object);
             } else {
                 return Err(SuiError::UserInputError {
-                    error: UserInputError::ObjectNotFound { object_id: object_ids[i], version: None },
+                    error: UserInputError::ObjectNotFound {
+                        object_id: object_ids[i],
+                        version: None,
+                    },
                 });
             }
         }
@@ -171,7 +191,7 @@ impl ObjectLocks {
     }
 
     #[instrument(level = "debug", skip_all)]
-    pub(crate) async fn acquire_transaction_locks(
+    pub(crate) fn acquire_transaction_locks(
         &self,
         cache: &WritebackCache,
         epoch_store: &AuthorityPerEpochStore,
@@ -187,7 +207,8 @@ impl ObjectLocks {
             Self::verify_live_object(obj_ref, live_object)?;
         }
 
-        let mut locks_to_write: Vec<(_, LockDetails)> = Vec::with_capacity(owned_input_objects.len());
+        let mut locks_to_write: Vec<(_, LockDetails)> =
+            Vec::with_capacity(owned_input_objects.len());
 
         // Sort the objects before locking. This is not required by the protocol (since it's okay to
         // reject any equivocating tx). However, this does prevent a confusing error on the client.
@@ -223,7 +244,9 @@ impl ObjectLocks {
         }
 
         // commit all writes to DB
-        epoch_store.tables()?.write_transaction_locks(signed_transaction, locks_to_write.iter().cloned())?;
+        epoch_store
+            .tables()?
+            .write_transaction_locks(signed_transaction, locks_to_write.iter().cloned())?;
 
         // remove pending locks from unbounded storage
         self.clear_cached_locks(&locks_to_write);
@@ -234,8 +257,9 @@ impl ObjectLocks {
 
 #[cfg(test)]
 mod tests {
-    use crate::execution_cache::{writeback_cache::writeback_cache_tests::Scenario, ExecutionCacheWrite};
-    use futures::FutureExt;
+    use crate::execution_cache::{
+        writeback_cache::writeback_cache_tests::Scenario, ExecutionCacheWrite,
+    };
 
     #[tokio::test]
     async fn test_transaction_locks_are_exclusive() {
@@ -258,7 +282,6 @@ mod tests {
 
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx1.digest(), Some(tx1))
-                .await
                 .expect("locks should be available");
 
             // this tx doesn't use the actual objects in question, but we just need something
@@ -269,20 +292,32 @@ mod tests {
 
             // both locks are held by tx1, so this should fail
             s.cache
-                .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx2.digest(), Some(tx2.clone()))
-                .await
+                .acquire_transaction_locks(
+                    &s.epoch_store,
+                    &[new1, new2],
+                    *tx2.digest(),
+                    Some(tx2.clone()),
+                )
                 .unwrap_err();
 
             // new3 is lockable, but new2 is not, so this should fail
             s.cache
-                .acquire_transaction_locks(&s.epoch_store, &[new3, new2], *tx2.digest(), Some(tx2.clone()))
-                .await
+                .acquire_transaction_locks(
+                    &s.epoch_store,
+                    &[new3, new2],
+                    *tx2.digest(),
+                    Some(tx2.clone()),
+                )
                 .unwrap_err();
 
             // new3 is unlocked
             s.cache
-                .acquire_transaction_locks(&s.epoch_store, &[new3], *tx2.digest(), Some(tx2.clone()))
-                .await
+                .acquire_transaction_locks(
+                    &s.epoch_store,
+                    &[new3],
+                    *tx2.digest(),
+                    Some(tx2.clone()),
+                )
                 .expect("new3 should be unlocked");
         })
         .await;
@@ -310,15 +345,23 @@ mod tests {
 
             // fails because we are referring to an old object
             s.cache
-                .acquire_transaction_locks(&s.epoch_store, &[new1, old2], *tx.digest(), Some(tx.clone()))
-                .await
+                .acquire_transaction_locks(
+                    &s.epoch_store,
+                    &[new1, old2],
+                    *tx.digest(),
+                    Some(tx.clone()),
+                )
                 .unwrap_err();
 
             // succeeds because the above call releases the lock on new1 after failing
             // to get the lock on old2
             s.cache
-                .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx.digest(), Some(tx.clone()))
-                .await
+                .acquire_transaction_locks(
+                    &s.epoch_store,
+                    &[new1, new2],
+                    *tx.digest(),
+                    Some(tx.clone()),
+                )
                 .expect("new1 should be unlocked after revert");
         })
         .await;
@@ -346,8 +389,12 @@ mod tests {
 
             // fails because we are referring to an old object
             s.cache
-                .acquire_transaction_locks(&s.epoch_store, &[new1, old2], *tx.digest(), Some(tx.clone()))
-                .await
+                .acquire_transaction_locks(
+                    &s.epoch_store,
+                    &[new1, old2],
+                    *tx.digest(),
+                    Some(tx.clone()),
+                )
                 .unwrap_err();
 
             // this tx doesn't use the actual objects in question, but we just need something
@@ -360,7 +407,6 @@ mod tests {
             // to get the lock on old2
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx2.digest(), Some(tx2))
-                .await
                 .expect("new1 should be unlocked after revert");
         })
         .await;
@@ -373,8 +419,10 @@ mod tests {
             s.with_created(&[1, 2]);
             s.do_tx().await;
 
-            let objects: Vec<_> =
-                vec![s.object(1), s.object(2)].into_iter().map(|o| o.compute_object_reference()).collect();
+            let objects: Vec<_> = vec![s.object(1), s.object(2)]
+                .into_iter()
+                .map(|o| o.compute_object_reference())
+                .collect();
 
             s.with_mutated(&[1, 2]);
             let outputs = s.take_outputs();
@@ -383,9 +431,12 @@ mod tests {
             // assert that acquire_transaction_locks is sync in non-simtest, which causes the
             // fail_point_async! macros above to be elided
             s.cache
-                .acquire_transaction_locks(&s.epoch_store, &objects, *tx2.digest(), Some(tx2.clone()))
-                .now_or_never()
-                .unwrap()
+                .acquire_transaction_locks(
+                    &s.epoch_store,
+                    &objects,
+                    *tx2.digest(),
+                    Some(tx2.clone()),
+                )
                 .unwrap();
         })
         .await;

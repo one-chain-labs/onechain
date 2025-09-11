@@ -5,9 +5,9 @@
 // It identifies and reports unnecessary temporary borrow followed by a deref, suggesting either
 // removal or conversion to `copy`.
 
+use crate::linters::StyleCodes;
 use crate::{
     diag,
-    linters::StyleCodes,
     typing::{
         ast::{Exp, UnannotatedExp_ as TE},
         visitor::simple_visitor,

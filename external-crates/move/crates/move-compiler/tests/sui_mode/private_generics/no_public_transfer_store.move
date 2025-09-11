@@ -2,9 +2,9 @@
 // even if it has store
 
 module a::m {
-    use one::transfer::{Self, Receiving};
+    use sui::transfer::{Self, Receiving};
     use a::other;
-    use one::object::UID;
+    use sui::object::UID;
 
     public fun t1(s: other::S) {
         transfer::transfer(s, @0x100);
@@ -21,22 +21,26 @@ module a::m {
     public fun t4(p: &mut UID, s: Receiving<other::S>): other::S {
         transfer::receive(p, s)
     }
+
+    public fun t6(s: other::S, p: sui::party::Party) {
+        transfer::party_transfer(s, p);
+    }
 }
 
 module a::other {
     struct S has key, store {
-        id: one::object::UID,
+        id: sui::object::UID,
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }
 }
 
-module one::transfer {
-    use one::object::UID;
+module oct::transfer {
+    use sui::object::UID;
 
     struct Receiving<phantom T: key> { }
 
@@ -45,6 +49,14 @@ module one::transfer {
     }
 
     public fun public_transfer<T: key + store>(_: T, _: address) {
+        abort 0
+    }
+
+    public fun party_transfer<T: key>(_: T, _: sui::party::Party) {
+        abort 0
+    }
+
+    public fun public_party_transfer<T: key + store>(_: T, _: sui::party::Party) {
         abort 0
     }
 
@@ -71,4 +83,8 @@ module one::transfer {
     public fun public_receive<T: key + store>(_: &mut UID, _: Receiving<T>): T {
         abort 0
     }
+}
+
+module oct::party {
+    struct Party has copy, drop {}
 }

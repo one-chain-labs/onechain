@@ -21,16 +21,16 @@
 /// of their types and collect profits if a fee is required on sales. Custom
 /// policies can be removed at any moment, and the change will affect all instances
 /// of the type at once.
-module one::transfer_policy;
+module oct::transfer_policy;
 
 use std::type_name::{Self, TypeName};
-use one::balance::{Self, Balance};
-use one::coin::{Self, Coin};
-use one::dynamic_field as df;
-use one::event;
-use one::package::{Self, Publisher};
-use one::oct::OCT;
-use one::vec_set::{Self, VecSet};
+use sui::balance::{Self, Balance};
+use sui::coin::{Self, Coin};
+use sui::dynamic_field as df;
+use sui::event;
+use sui::package::{Self, Publisher};
+use sui::oct::OCT;
+use sui::vec_set::{Self, VecSet};
 
 /// The number of receipts does not match the `TransferPolicy` requirement.
 const EPolicyNotSatisfied: u64 = 0;
@@ -98,7 +98,7 @@ public struct TransferPolicyCreated<phantom T> has copy, drop { id: ID }
 public struct TransferPolicyDestroyed<phantom T> has copy, drop { id: ID }
 
 /// Key to store "Rule" configuration for a specific `TransferPolicy`.
-public struct RuleKey<phantom T: drop> has copy, store, drop {}
+public struct RuleKey<phantom T: drop> has copy, drop, store {}
 
 /// Construct a new `TransferRequest` hot potato which requires an
 /// approving action from the creator to be destroyed / resolved. Once
@@ -131,8 +131,8 @@ public fun new<T>(pub: &Publisher, ctx: &mut TxContext): (TransferPolicy<T>, Tra
 /// sender.
 entry fun default<T>(pub: &Publisher, ctx: &mut TxContext) {
     let (policy, cap) = new<T>(pub, ctx);
-    one::transfer::share_object(policy);
-    one::transfer::transfer(cap, ctx.sender());
+    sui::transfer::share_object(policy);
+    sui::transfer::transfer(cap, ctx.sender());
 }
 
 /// Withdraw some amount of profits from the `TransferPolicy`. If amount

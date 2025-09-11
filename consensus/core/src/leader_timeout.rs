@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{block::Round, context::Context, core::CoreSignalsReceivers, core_thread::CoreThreadDispatcher};
 use std::{sync::Arc, time::Duration};
+
+use consensus_types::block::Round;
 use tokio::{
     sync::{
         oneshot::{Receiver, Sender},
@@ -11,6 +12,8 @@ use tokio::{
     time::{sleep_until, Instant},
 };
 use tracing::{debug, warn};
+
+use crate::{context::Context, core::CoreSignalsReceivers, core_thread::CoreThreadDispatcher};
 
 pub(crate) struct LeaderTimeoutTaskHandle {
     handle: JoinHandle<()>,
@@ -48,7 +51,10 @@ impl<D: CoreThreadDispatcher> LeaderTimeoutTask<D> {
         };
         let handle = tokio::spawn(async move { me.run().await });
 
-        LeaderTimeoutTaskHandle { handle, stop: stop_sender }
+        LeaderTimeoutTaskHandle {
+            handle,
+            stop: stop_sender,
+        }
     }
 
     async fn run(&mut self) {
@@ -120,16 +126,17 @@ mod tests {
 
     use async_trait::async_trait;
     use consensus_config::Parameters;
+    use consensus_types::block::{BlockRef, Round};
     use parking_lot::Mutex;
     use tokio::time::{sleep, Instant};
 
     use crate::{
-        block::{BlockRef, Round, VerifiedBlock},
+        block::VerifiedBlock,
+        commit::CertifiedCommits,
         context::Context,
         core::CoreSignals,
         core_thread::{CoreError, CoreThreadDispatcher},
         leader_timeout::LeaderTimeoutTask,
-        round_prober::QuorumRound,
     };
 
     #[derive(Clone, Default)]
@@ -147,12 +154,31 @@ mod tests {
 
     #[async_trait]
     impl CoreThreadDispatcher for MockCoreThreadDispatcher {
-        async fn add_blocks(&self, _blocks: Vec<VerifiedBlock>) -> Result<BTreeSet<BlockRef>, CoreError> {
+        async fn add_blocks(
+            &self,
+            _blocks: Vec<VerifiedBlock>,
+        ) -> Result<BTreeSet<BlockRef>, CoreError> {
+            todo!()
+        }
+
+        async fn check_block_refs(
+            &self,
+            _block_refs: Vec<BlockRef>,
+        ) -> Result<BTreeSet<BlockRef>, CoreError> {
+            todo!()
+        }
+
+        async fn add_certified_commits(
+            &self,
+            _commits: CertifiedCommits,
+        ) -> Result<BTreeSet<BlockRef>, CoreError> {
             todo!()
         }
 
         async fn new_block(&self, round: Round, force: bool) -> Result<(), CoreError> {
-            self.new_block_calls.lock().push((round, force, Instant::now()));
+            self.new_block_calls
+                .lock()
+                .push((round, force, Instant::now()));
             Ok(())
         }
 
@@ -160,16 +186,11 @@ mod tests {
             todo!()
         }
 
-        fn set_subscriber_exists(&self, _exists: bool) -> Result<(), CoreError> {
+        fn set_propagation_delay(&self, _propagation_delay: Round) -> Result<(), CoreError> {
             todo!()
         }
 
-        fn set_propagation_delay_and_quorum_rounds(
-            &self,
-            _delay: Round,
-            _received_quorum_rounds: Vec<QuorumRound>,
-            _accepted_quorum_rounds: Vec<QuorumRound>,
-        ) -> Result<(), CoreError> {
+        fn set_subscriber_exists(&self, _exists: bool) -> Result<(), CoreError> {
             todo!()
         }
 
@@ -188,7 +209,11 @@ mod tests {
         let dispatcher = Arc::new(MockCoreThreadDispatcher::default());
         let leader_timeout = Duration::from_millis(500);
         let min_round_delay = Duration::from_millis(50);
-        let parameters = Parameters { leader_timeout, min_round_delay, ..Default::default() };
+        let parameters = Parameters {
+            leader_timeout,
+            min_round_delay,
+            ..Default::default()
+        };
         let context = Arc::new(context.with_parameters(parameters));
         let start = Instant::now();
 
@@ -243,7 +268,11 @@ mod tests {
         let dispatcher = Arc::new(MockCoreThreadDispatcher::default());
         let leader_timeout = Duration::from_millis(500);
         let min_round_delay = Duration::from_millis(50);
-        let parameters = Parameters { leader_timeout, min_round_delay, ..Default::default() };
+        let parameters = Parameters {
+            leader_timeout,
+            min_round_delay,
+            ..Default::default()
+        };
         let context = Arc::new(context.with_parameters(parameters));
         let now = Instant::now();
 

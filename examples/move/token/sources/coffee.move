@@ -5,13 +5,11 @@
 /// only rely on `TreasuryCap` for minting and burning tokens.
 module examples::coffee;
 
-use one::{
-    balance::{Self, Balance},
-    coin::{Self, TreasuryCap, Coin},
-    oct::OCT,
-    token::{Self, Token},
-    tx_context::sender
-};
+use sui::balance::{Self, Balance};
+use sui::coin::{Self, TreasuryCap, Coin};
+use sui::oct::OCT;
+use sui::token::{Self, Token};
+use sui::tx_context::sender;
 
 /// Error code for incorrect amount.
 const EIncorrectAmount: u64 = 0;
@@ -26,7 +24,7 @@ const COFFEE_PRICE: u64 = 10_000_000_000;
 public struct COFFEE has drop {}
 
 /// The shop that sells Coffee and allows to buy a Coffee if the customer
-/// has 10 COFFEE points.
+/// has 10 SUI or 4 COFFEE points.
 public struct CoffeeShop has key {
     id: UID,
     /// The treasury cap for the `COFFEE` points.
@@ -37,7 +35,7 @@ public struct CoffeeShop has key {
 
 /// Event marking that a Coffee was purchased; transaction sender serves as
 /// the customer ID.
-public struct CoffeePurchased has copy, store, drop {}
+public struct CoffeePurchased has copy, drop, store {}
 
 // Create and share the `CoffeeShop` object.
 fun init(otw: COFFEE, ctx: &mut TxContext) {
@@ -51,8 +49,8 @@ fun init(otw: COFFEE, ctx: &mut TxContext) {
         ctx,
     );
 
-    one::transfer::public_freeze_object(metadata);
-    one::transfer::share_object(CoffeeShop {
+    sui::transfer::public_freeze_object(metadata);
+    sui::transfer::share_object(CoffeeShop {
         coffee_points,
         id: object::new(ctx),
         balance: balance::zero(),
@@ -63,14 +61,14 @@ fun init(otw: COFFEE, ctx: &mut TxContext) {
 /// shop and the customer gets a free coffee after 4 purchases.
 public fun buy_coffee(app: &mut CoffeeShop, payment: Coin<OCT>, ctx: &mut TxContext) {
     // Check if the customer has enough SUI to pay for the coffee.
-    assert!(coin::value(&payment) > COFFEE_PRICE, EIncorrectAmount);
+    assert!(coin::value(&payment) == COFFEE_PRICE, EIncorrectAmount);
 
     let token = token::mint(&mut app.coffee_points, 1, ctx);
     let request = token::transfer(token, ctx.sender(), ctx);
 
     token::confirm_with_treasury_cap(&mut app.coffee_points, request, ctx);
     coin::put(&mut app.balance, payment);
-    one::event::emit(CoffeePurchased {})
+    sui::event::emit(CoffeePurchased {})
 }
 
 /// Claim a free coffee from the shop. Emitted event is tracked by the real
@@ -83,7 +81,7 @@ public fun claim_free(app: &mut CoffeeShop, points: Token<COFFEE>, ctx: &mut TxC
     // While we could use `burn`, spend illustrates another way of doing this
     let request = token::spend(points, ctx);
     token::confirm_with_treasury_cap(&mut app.coffee_points, request, ctx);
-    one::event::emit(CoffeePurchased {})
+    sui::event::emit(CoffeePurchased {})
 }
 
 /// We allow transfer of `COFFEE` points to other customers but we charge 1

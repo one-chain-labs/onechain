@@ -4,8 +4,8 @@ version = "0.0.1"
 edition = "2024.beta"
 
 [dependencies]
-OneSystem = { local = "../../../../sui-framework/packages/one-system" }
-One = { local = "../../../../sui-framework/packages/one-framework" }
+OneSystem = { local = "../../../../sui-framework/packages/sui-system" }
+Sui = { local = "../../../../sui-framework/packages/sui-framework" }
 MoveStdlib = { local = "../../../../sui-framework/packages/move-stdlib" }
 
 [addresses]

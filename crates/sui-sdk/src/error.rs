@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub use crate::json_rpc_error::Error as JsonRpcError;
-use sui_types::{
-    base_types::{SuiAddress, TransactionDigest},
-    error::UserInputError,
-};
+use sui_types::base_types::{SuiAddress, TransactionDigest};
+use sui_types::error::UserInputError;
 use thiserror::Error;
 
 pub type SuiRpcResult<T = ()> = Result<T, Error>;
@@ -13,11 +11,13 @@ pub type SuiRpcResult<T = ()> = Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    RpcError(#[from] jsonrpsee::core::Error),
+    RpcError(#[from] jsonrpsee::core::ClientError),
     #[error(transparent)]
     JsonRpcError(JsonRpcError),
     #[error(transparent)]
     BcsSerialisationError(#[from] bcs::Error),
+    #[error(transparent)]
+    JsonSerializationError(#[from] serde_json::Error),
     #[error(transparent)]
     UserInputError(#[from] UserInputError),
     #[error("Subscription error : {0}")]
@@ -27,7 +27,14 @@ pub enum Error {
     #[error("Data error: {0}")]
     DataError(String),
     #[error("Client/Server api version mismatch, client api version : {client_version}, server api version : {server_version}")]
-    ServerVersionMismatch { client_version: String, server_version: String },
+    ServerVersionMismatch {
+        client_version: String,
+        server_version: String,
+    },
     #[error("Insufficient fund for address [{address}], requested amount: {amount}")]
     InsufficientFund { address: SuiAddress, amount: u128 },
+    #[error("Invalid signature")]
+    InvalidSignature,
+    #[error("Invalid Header key-value pair: {0}")]
+    CustomHeadersError(String),
 }

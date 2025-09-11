@@ -6,9 +6,9 @@ use crate::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
-    transaction_argument::TransactionArgument,
 };
 use proptest::{collection::vec, prelude::*};
+
 impl Arbitrary for TypeTag {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
@@ -31,28 +31,22 @@ impl Arbitrary for TypeTag {
             16, // max size
             4,  // max number of items per collection
             |inner| {
-                (any::<AccountAddress>(), any::<Identifier>(), any::<Identifier>(), vec(inner, 0..4)).prop_map(
-                    |(address, module, name, type_params)| {
-                        Struct(Box::new(StructTag { address, module, name, type_params }))
-                    },
+                (
+                    any::<AccountAddress>(),
+                    any::<Identifier>(),
+                    any::<Identifier>(),
+                    vec(inner, 0..4),
                 )
+                    .prop_map(|(address, module, name, type_params)| {
+                        Struct(Box::new(StructTag {
+                            address,
+                            module,
+                            name,
+                            type_params,
+                        }))
+                    })
             },
         )
-        .boxed()
-    }
-}
-
-impl Arbitrary for TransactionArgument {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
-    fn arbitrary_with(_args: ()) -> Self::Strategy {
-        prop_oneof![
-            any::<bool>().prop_map(TransactionArgument::Bool),
-            any::<u64>().prop_map(TransactionArgument::U64),
-            any::<AccountAddress>().prop_map(TransactionArgument::Address),
-            vec(any::<u8>(), 0..10).prop_map(TransactionArgument::U8Vector),
-        ]
         .boxed()
     }
 }

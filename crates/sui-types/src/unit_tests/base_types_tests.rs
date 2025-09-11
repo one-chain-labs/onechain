@@ -6,27 +6,18 @@
 
 use std::str::FromStr;
 
-use fastcrypto::{encoding::Base58, traits::EncodeDecodeBase64};
+use fastcrypto::encoding::Base58;
+use fastcrypto::traits::EncodeDecodeBase64;
 use move_binary_format::file_format;
 
-use crate::{
-    crypto::{
-        bcs_signable_test::{Bar, Foo},
-        get_key_pair,
-        get_key_pair_from_bytes,
-        AccountKeyPair,
-        AuthorityKeyPair,
-        AuthoritySignature,
-        Signature,
-        SuiAuthoritySignature,
-        SuiSignature,
-    },
-    digests::Digest,
-    gas_coin::GasCoin,
-    id::{ID, UID},
-    object::Object,
-    SUI_FRAMEWORK_ADDRESS,
+use crate::crypto::bcs_signable_test::{Bar, Foo};
+use crate::crypto::{
+    get_key_pair, get_key_pair_from_bytes, AccountKeyPair, AuthorityKeyPair, AuthoritySignature,
+    Signature, SuiAuthoritySignature, SuiSignature,
 };
+use crate::digests::Digest;
+use crate::id::{ID, UID};
+use crate::{gas_coin::GasCoin, object::Object, SUI_FRAMEWORK_ADDRESS};
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
 use sui_protocol_config::ProtocolConfig;
 
@@ -35,7 +26,9 @@ use super::*;
 #[test]
 fn test_bcs_enum() {
     let address = Owner::AddressOwner(SuiAddress::random_for_testing_only());
-    let shared = Owner::Shared { initial_shared_version: 1.into() };
+    let shared = Owner::Shared {
+        initial_shared_version: 1.into(),
+    };
 
     let address_ser = bcs::to_bytes(&address).unwrap();
     let shared_ser = bcs::to_bytes(&shared).unwrap();
@@ -55,19 +48,30 @@ fn test_signatures() {
     let bar = IntentMessage::new(Intent::sui_transaction(), Bar("hello".into()));
 
     let s = Signature::new_secure(&foo, &sec1);
-    assert!(s.verify_secure(&foo, addr1, SignatureScheme::ED25519).is_ok());
-    assert!(s.verify_secure(&foo, addr2, SignatureScheme::ED25519).is_err());
-    assert!(s.verify_secure(&foox, addr1, SignatureScheme::ED25519).is_err());
+    assert!(s
+        .verify_secure(&foo, addr1, SignatureScheme::ED25519)
+        .is_ok());
+    assert!(s
+        .verify_secure(&foo, addr2, SignatureScheme::ED25519)
+        .is_err());
+    assert!(s
+        .verify_secure(&foox, addr1, SignatureScheme::ED25519)
+        .is_err());
     assert!(s
         .verify_secure(
-            &IntentMessage::new(Intent::sui_app(IntentScope::SenderSignedTransaction), Foo("hello".into())),
+            &IntentMessage::new(
+                Intent::sui_app(IntentScope::SenderSignedTransaction),
+                Foo("hello".into())
+            ),
             addr1,
             SignatureScheme::ED25519
         )
         .is_err());
 
     // The struct type is different, but the serialization is the same.
-    assert!(s.verify_secure(&bar, addr1, SignatureScheme::ED25519).is_ok());
+    assert!(s
+        .verify_secure(&bar, addr1, SignatureScheme::ED25519)
+        .is_ok());
 }
 
 #[test]
@@ -101,8 +105,12 @@ fn test_gas_coin_ser_deser_roundtrip() {
 
 #[test]
 fn test_lamport_increment_version() {
-    let versions =
-        [SequenceNumber::from(1), SequenceNumber::from(3), SequenceNumber::from(257), SequenceNumber::from(42)];
+    let versions = [
+        SequenceNumber::from(1),
+        SequenceNumber::from(3),
+        SequenceNumber::from(257),
+        SequenceNumber::from(42),
+    ];
 
     let incremented = SequenceNumber::lamport_increment(versions);
 
@@ -123,9 +131,14 @@ fn test_object_id_display() {
 
 #[test]
 fn test_object_id_str_lossless() {
-    let id = ObjectID::from_str("0000000000000000000000000000000000c0f1f95c5b1c5f0eda533eff269000").unwrap();
-    let id_empty = ObjectID::from_str("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
-    let id_one = ObjectID::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+    let id = ObjectID::from_str("0000000000000000000000000000000000c0f1f95c5b1c5f0eda533eff269000")
+        .unwrap();
+    let id_empty =
+        ObjectID::from_str("0000000000000000000000000000000000000000000000000000000000000000")
+            .unwrap();
+    let id_one =
+        ObjectID::from_str("0000000000000000000000000000000000000000000000000000000000000001")
+            .unwrap();
 
     assert_eq!(id.short_str_lossless(), "c0f1f95c5b1c5f0eda533eff269000",);
     assert_eq!(id_empty.short_str_lossless(), "0",);
@@ -146,8 +159,14 @@ fn test_object_id_from_hex_literal() {
     // Missing '0x'
     ObjectID::from_hex_literal(hex).unwrap_err();
     // Too long
-    ObjectID::from_hex_literal("0x10000000000000000000000000000000000000000000000000000000000000001").unwrap_err();
-    assert_eq!("0x0000000000000000000000000000000000000000000000000000000000000001", obj_id.to_hex_uncompressed());
+    ObjectID::from_hex_literal(
+        "0x10000000000000000000000000000000000000000000000000000000000000001",
+    )
+    .unwrap_err();
+    assert_eq!(
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+        obj_id.to_hex_uncompressed()
+    );
 }
 
 #[test]
@@ -166,7 +185,8 @@ fn test_object_id_from_proto_invalid_length() {
 fn test_object_id_deserialize_from_json_value() {
     let obj_id = ObjectID::random();
     let json_value = serde_json::to_value(obj_id).expect("serde_json::to_value fail.");
-    let obj_id2: ObjectID = serde_json::from_value(json_value).expect("serde_json::from_value fail.");
+    let obj_id2: ObjectID =
+        serde_json::from_value(json_value).expect("serde_json::from_value fail.");
     assert_eq!(obj_id, obj_id2)
 }
 
@@ -279,7 +299,10 @@ fn test_transaction_digest_serde_not_human_readable() {
 fn test_transaction_digest_serde_human_readable() {
     let digest = TransactionDigest::random();
     let serialized = serde_json::to_string(&digest).unwrap();
-    assert_eq!(format!("\"{}\"", Base58::encode(digest.inner())), serialized);
+    assert_eq!(
+        format!("\"{}\"", Base58::encode(digest.inner())),
+        serialized
+    );
     let deserialized: TransactionDigest = serde_json::from_str(&serialized).unwrap();
     assert_eq!(deserialized, digest);
 }
@@ -321,7 +344,10 @@ fn test_object_id_from_empty_string() {
 
 #[test]
 fn test_move_object_size_for_gas_metering() {
-    let object = Object::with_id_owner_for_testing(ObjectID::random(), SuiAddress::random_for_testing_only());
+    let object = Object::with_id_owner_for_testing(
+        ObjectID::random(),
+        SuiAddress::random_for_testing_only(),
+    );
     let size = object.object_size_for_gas_metering();
     let serialized = bcs::to_bytes(&object).unwrap();
     // If the following assertion breaks, it's likely you have changed MoveObject's fields.
@@ -336,8 +362,7 @@ fn test_move_package_size_for_gas_metering() {
     let package = Object::new_package(
         &[module],
         TransactionDigest::genesis_marker(),
-        config.max_move_package_size(),
-        config.move_binary_format_version(),
+        &config,
         &[], // empty dependencies for empty package (no modules)
     )
     .unwrap();
@@ -352,16 +377,17 @@ fn test_move_package_size_for_gas_metering() {
 #[cfg(test)]
 const SAMPLE_ADDRESS: &str = "af306e86c74e937552df132b41a6cb3af58559f5342c6e82a98f7d1f7a4a9f30";
 const SAMPLE_ADDRESS_VEC: [u8; 32] = [
-    175, 48, 110, 134, 199, 78, 147, 117, 82, 223, 19, 43, 65, 166, 203, 58, 245, 133, 89, 245, 52, 44, 110, 130, 169,
-    143, 125, 31, 122, 74, 159, 48,
+    175, 48, 110, 134, 199, 78, 147, 117, 82, 223, 19, 43, 65, 166, 203, 58, 245, 133, 89, 245, 52,
+    44, 110, 130, 169, 143, 125, 31, 122, 74, 159, 48,
 ];
 
 // Derive a sample address and public key tuple from KeyPair bytes.
 fn derive_sample_address() -> (SuiAddress, AccountKeyPair) {
     let (address, pub_key) = get_key_pair_from_bytes(&[
-        10, 112, 5, 142, 174, 127, 187, 146, 251, 68, 22, 191, 128, 68, 84, 13, 102, 71, 77, 57, 92, 154, 128, 240, 158,
-        45, 13, 123, 57, 21, 194, 214, 189, 215, 127, 86, 129, 189, 1, 4, 90, 106, 17, 10, 123, 200, 40, 18, 34, 173,
-        240, 91, 213, 72, 183, 249, 213, 210, 39, 181, 105, 254, 59, 163,
+        10, 112, 5, 142, 174, 127, 187, 146, 251, 68, 22, 191, 128, 68, 84, 13, 102, 71, 77, 57,
+        92, 154, 128, 240, 158, 45, 13, 123, 57, 21, 194, 214, 189, 215, 127, 86, 129, 189, 1, 4,
+        90, 106, 17, 10, 123, 200, 40, 18, 34, 173, 240, 91, 213, 72, 183, 249, 213, 210, 39, 181,
+        105, 254, 59, 163,
     ])
     .unwrap();
     (address, pub_key)
@@ -400,7 +426,12 @@ fn move_object_type_consistency() {
         assert_eq!(ty.module_id(), tag.module_id());
         // sanity check special cases
         assert!(!ty.is_gas_coin() || ty.is_coin());
-        let cases = [ty.is_coin(), ty.is_staked_oct(), ty.is_coin_metadata(), ty.is_dynamic_field()];
+        let cases = [
+            ty.is_coin(),
+            ty.is_staked_oct(),
+            ty.is_coin_metadata(),
+            ty.is_dynamic_field(),
+        ];
         assert!(cases.into_iter().map(|is_ty| is_ty as u8).sum::<u8>() <= 1);
         ty
     }
@@ -414,8 +445,10 @@ fn move_object_type_consistency() {
     assert!(ty.is_coin());
     let ty = assert_consistent(&CoinMetadata::type_(GasCoin::type_()));
     assert!(ty.is_coin_metadata());
-    let ty =
-        assert_consistent(&DynamicFieldInfo::dynamic_field_type(TypeTag::Struct(Box::new(ID::type_())), TypeTag::U64));
+    let ty = assert_consistent(&DynamicFieldInfo::dynamic_field_type(
+        TypeTag::Struct(Box::new(ID::type_())),
+        TypeTag::U64,
+    ));
     assert!(ty.is_dynamic_field());
     assert_consistent(&UID::type_());
     assert_consistent(&ID::type_());
@@ -425,17 +458,26 @@ fn move_object_type_consistency() {
 fn next_lexicographical_digest() {
     let mut output = [0; 32];
     output[31] = 1;
-    assert_eq!(TransactionDigest::ZERO.next_lexicographical(), Some(TransactionDigest::from(output)));
+    assert_eq!(
+        TransactionDigest::ZERO.next_lexicographical(),
+        Some(TransactionDigest::from(output))
+    );
 
     let max = [255; 32];
     let mut input = max;
     input[31] = 254;
     assert_eq!(Digest::from(max).next_lexicographical(), None);
-    assert_eq!(Digest::from(input).next_lexicographical(), Some(Digest::from(max)));
+    assert_eq!(
+        Digest::from(input).next_lexicographical(),
+        Some(Digest::from(max))
+    );
 
     input = max;
     input[0] = 0;
     output = [0; 32];
     output[0] = 1;
-    assert_eq!(Digest::from(input).next_lexicographical(), Some(Digest::from(output)));
+    assert_eq!(
+        Digest::from(input).next_lexicographical(),
+        Some(Digest::from(output))
+    );
 }

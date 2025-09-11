@@ -1,14 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
-use fastcrypto::{
-    error::{FastCryptoError, FastCryptoResult},
-    groups::{bls12381 as bls, FromTrustedByteArray, GroupElement, HashToGroupElement, MultiScalarMul, Pairing},
-    serde_helpers::ToFromByteArray,
+use crate::object_runtime::ObjectRuntime;
+use crate::NativesCostTable;
+use fastcrypto::error::{FastCryptoError, FastCryptoResult};
+use fastcrypto::groups::{
+    bls12381 as bls, FromTrustedByteArray, GroupElement, HashToGroupElement, MultiScalarMul,
+    Pairing,
 };
+use fastcrypto::serde_helpers::ToFromByteArray;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{gas_algebra::InternalGas, vm_status::StatusCode};
-use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
+use move_core_types::gas_algebra::InternalGas;
+use move_core_types::vm_status::StatusCode;
+use move_vm_runtime::native_charge_gas_early_exit;
+use move_vm_runtime::native_functions::NativeContext;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
@@ -22,24 +26,43 @@ pub const NOT_SUPPORTED_ERROR: u64 = 0;
 pub const INVALID_INPUT_ERROR: u64 = 1;
 pub const INPUT_TOO_LONG_ERROR: u64 = 2;
 
-fn is_supported(context: &NativeContext) -> bool {
-    context.extensions().get::<ObjectRuntime>().protocol_config.enable_group_ops_native_functions()
+fn is_supported(context: &NativeContext) -> PartialVMResult<bool> {
+    Ok(context
+        .extensions()
+        .get::<ObjectRuntime>()?
+        .protocol_config
+        .enable_group_ops_native_functions())
 }
 
-fn is_msm_supported(context: &NativeContext) -> bool {
-    context.extensions().get::<ObjectRuntime>().protocol_config.enable_group_ops_native_function_msm()
+fn is_msm_supported(context: &NativeContext) -> PartialVMResult<bool> {
+    Ok(context
+        .extensions()
+        .get::<ObjectRuntime>()?
+        .protocol_config
+        .enable_group_ops_native_function_msm())
 }
 
-fn is_uncompressed_g1_supported(context: &NativeContext) -> bool {
-    context.extensions().get::<ObjectRuntime>().protocol_config.uncompressed_g1_group_elements()
+fn is_uncompressed_g1_supported(context: &NativeContext) -> PartialVMResult<bool> {
+    Ok(context
+        .extensions()
+        .get::<ObjectRuntime>()?
+        .protocol_config
+        .uncompressed_g1_group_elements())
 }
 
-fn v2_native_charge(context: &NativeContext, cost: InternalGas) -> InternalGas {
-    if context.extensions().get::<ObjectRuntime>().protocol_config.native_charging_v2() {
-        context.gas_used()
-    } else {
-        cost
-    }
+fn v2_native_charge(context: &NativeContext, cost: InternalGas) -> PartialVMResult<InternalGas> {
+    Ok(
+        if context
+            .extensions()
+            .get::<ObjectRuntime>()?
+            .protocol_config
+            .native_charging_v2()
+        {
+            context.gas_used()
+        } else {
+            cost
+        },
+    )
 }
 
 fn map_op_result(
@@ -48,9 +71,15 @@ fn map_op_result(
     result: FastCryptoResult<Vec<u8>>,
 ) -> PartialVMResult<NativeResult> {
     match result {
-        Ok(bytes) => Ok(NativeResult::ok(v2_native_charge(context, cost), smallvec![Value::vector_u8(bytes)])),
+        Ok(bytes) => Ok(NativeResult::ok(
+            v2_native_charge(context, cost)?,
+            smallvec![Value::vector_u8(bytes)],
+        )),
         // Since all Element<G> are validated on construction, this error should never happen unless the requested type is wrong or inputs are invalid.
-        Err(_) => Ok(NativeResult::err(v2_native_charge(context, cost), INVALID_INPUT_ERROR)),
+        Err(_) => Ok(NativeResult::err(
+            v2_native_charge(context, cost)?,
+            INVALID_INPUT_ERROR,
+        )),
     }
 }
 
@@ -145,11 +174,15 @@ impl Groups {
     }
 }
 
-fn parse_untrusted<G: ToFromByteArray<S> + FromTrustedByteArray<S>, const S: usize>(e: &[u8]) -> FastCryptoResult<G> {
+fn parse_untrusted<G: ToFromByteArray<S> + FromTrustedByteArray<S>, const S: usize>(
+    e: &[u8],
+) -> FastCryptoResult<G> {
     G::from_byte_array(e.try_into().map_err(|_| FastCryptoError::InvalidInput)?)
 }
 
-fn parse_trusted<G: ToFromByteArray<S> + FromTrustedByteArray<S>, const S: usize>(e: &[u8]) -> FastCryptoResult<G> {
+fn parse_trusted<G: ToFromByteArray<S> + FromTrustedByteArray<S>, const S: usize>(
+    e: &[u8],
+) -> FastCryptoResult<G> {
     G::from_trusted_byte_array(e.try_into().map_err(|_| FastCryptoError::InvalidInput)?)
 }
 
@@ -198,7 +231,7 @@ pub fn internal_validate(
     debug_assert!(args.len() == 2);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -206,7 +239,11 @@ pub fn internal_validate(
     let bytes = bytes_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -224,7 +261,10 @@ pub fn internal_validate(
         _ => false,
     };
 
-    Ok(NativeResult::ok(v2_native_charge(context, cost), smallvec![Value::bool(result)]))
+    Ok(NativeResult::ok(
+        v2_native_charge(context, cost)?,
+        smallvec![Value::bool(result)],
+    ))
 }
 
 /***************************************************************************************************
@@ -241,7 +281,7 @@ pub fn internal_add(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -251,7 +291,11 @@ pub fn internal_add(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -290,7 +334,7 @@ pub fn internal_sub(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -300,7 +344,11 @@ pub fn internal_sub(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -339,7 +387,7 @@ pub fn internal_mul(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -349,7 +397,11 @@ pub fn internal_mul(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -358,27 +410,30 @@ pub fn internal_mul(
         }
         Some(Groups::BLS12381G1) => {
             native_charge_gas_early_exit_option!(context, cost_params.bls12381_g1_mul_cost);
-            binary_op_diff::<bls::Scalar, bls::G1Element, { bls::Scalar::BYTE_LENGTH }, { bls::G1Element::BYTE_LENGTH }>(
-                |a, b| Ok(b * a),
-                &e1,
-                &e2,
-            )
+            binary_op_diff::<
+                bls::Scalar,
+                bls::G1Element,
+                { bls::Scalar::BYTE_LENGTH },
+                { bls::G1Element::BYTE_LENGTH },
+            >(|a, b| Ok(b * a), &e1, &e2)
         }
         Some(Groups::BLS12381G2) => {
             native_charge_gas_early_exit_option!(context, cost_params.bls12381_g2_mul_cost);
-            binary_op_diff::<bls::Scalar, bls::G2Element, { bls::Scalar::BYTE_LENGTH }, { bls::G2Element::BYTE_LENGTH }>(
-                |a, b| Ok(b * a),
-                &e1,
-                &e2,
-            )
+            binary_op_diff::<
+                bls::Scalar,
+                bls::G2Element,
+                { bls::Scalar::BYTE_LENGTH },
+                { bls::G2Element::BYTE_LENGTH },
+            >(|a, b| Ok(b * a), &e1, &e2)
         }
         Some(Groups::BLS12381GT) => {
             native_charge_gas_early_exit_option!(context, cost_params.bls12381_gt_mul_cost);
-            binary_op_diff::<bls::Scalar, bls::GTElement, { bls::Scalar::BYTE_LENGTH }, { bls::GTElement::BYTE_LENGTH }>(
-                |a, b| Ok(b * a),
-                &e1,
-                &e2,
-            )
+            binary_op_diff::<
+                bls::Scalar,
+                bls::GTElement,
+                { bls::Scalar::BYTE_LENGTH },
+                { bls::GTElement::BYTE_LENGTH },
+            >(|a, b| Ok(b * a), &e1, &e2)
         }
         _ => Err(FastCryptoError::InvalidInput),
     };
@@ -400,7 +455,7 @@ pub fn internal_div(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -410,7 +465,11 @@ pub fn internal_div(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -419,27 +478,30 @@ pub fn internal_div(
         }
         Some(Groups::BLS12381G1) => {
             native_charge_gas_early_exit_option!(context, cost_params.bls12381_g1_div_cost);
-            binary_op_diff::<bls::Scalar, bls::G1Element, { bls::Scalar::BYTE_LENGTH }, { bls::G1Element::BYTE_LENGTH }>(
-                |a, b| b / a,
-                &e1,
-                &e2,
-            )
+            binary_op_diff::<
+                bls::Scalar,
+                bls::G1Element,
+                { bls::Scalar::BYTE_LENGTH },
+                { bls::G1Element::BYTE_LENGTH },
+            >(|a, b| b / a, &e1, &e2)
         }
         Some(Groups::BLS12381G2) => {
             native_charge_gas_early_exit_option!(context, cost_params.bls12381_g2_div_cost);
-            binary_op_diff::<bls::Scalar, bls::G2Element, { bls::Scalar::BYTE_LENGTH }, { bls::G2Element::BYTE_LENGTH }>(
-                |a, b| b / a,
-                &e1,
-                &e2,
-            )
+            binary_op_diff::<
+                bls::Scalar,
+                bls::G2Element,
+                { bls::Scalar::BYTE_LENGTH },
+                { bls::G2Element::BYTE_LENGTH },
+            >(|a, b| b / a, &e1, &e2)
         }
         Some(Groups::BLS12381GT) => {
             native_charge_gas_early_exit_option!(context, cost_params.bls12381_gt_div_cost);
-            binary_op_diff::<bls::Scalar, bls::GTElement, { bls::Scalar::BYTE_LENGTH }, { bls::GTElement::BYTE_LENGTH }>(
-                |a, b| b / a,
-                &e1,
-                &e2,
-            )
+            binary_op_diff::<
+                bls::Scalar,
+                bls::GTElement,
+                { bls::Scalar::BYTE_LENGTH },
+                { bls::GTElement::BYTE_LENGTH },
+            >(|a, b| b / a, &e1, &e2)
         }
         _ => Err(FastCryptoError::InvalidInput),
     };
@@ -462,7 +524,7 @@ pub fn internal_hash_to(
     debug_assert!(args.len() == 2);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -474,26 +536,38 @@ pub fn internal_hash_to(
         return Ok(NativeResult::err(cost, INVALID_INPUT_ERROR));
     }
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381G1) => {
             native_charge_gas_early_exit_option!(
                 context,
-                cost_params.bls12381_g1_hash_to_base_cost.and_then(|base_cost| cost_params
-                    .bls12381_g1_hash_to_cost_per_byte
-                    .map(|per_byte| base_cost + per_byte * (m.len() as u64).into()))
+                cost_params
+                    .bls12381_g1_hash_to_base_cost
+                    .and_then(|base_cost| cost_params
+                        .bls12381_g1_hash_to_cost_per_byte
+                        .map(|per_byte| base_cost + per_byte * (m.len() as u64).into()))
             );
-            Ok(bls::G1Element::hash_to_group_element(&m).to_byte_array().to_vec())
+            Ok(bls::G1Element::hash_to_group_element(&m)
+                .to_byte_array()
+                .to_vec())
         }
         Some(Groups::BLS12381G2) => {
             native_charge_gas_early_exit_option!(
                 context,
-                cost_params.bls12381_g2_hash_to_base_cost.and_then(|base_cost| cost_params
-                    .bls12381_g2_hash_to_cost_per_byte
-                    .map(|per_byte| base_cost + per_byte * (m.len() as u64).into()))
+                cost_params
+                    .bls12381_g2_hash_to_base_cost
+                    .and_then(|base_cost| cost_params
+                        .bls12381_g2_hash_to_cost_per_byte
+                        .map(|per_byte| base_cost + per_byte * (m.len() as u64).into()))
             );
-            Ok(bls::G2Element::hash_to_group_element(&m).to_byte_array().to_vec())
+            Ok(bls::G2Element::hash_to_group_element(&m)
+                .to_byte_array()
+                .to_vec())
         }
         _ => Err(FastCryptoError::InvalidInput),
     };
@@ -535,7 +609,10 @@ fn multi_scalar_mul<G, const SCALAR_SIZE: usize, const POINT_SIZE: usize>(
     points: &[u8],
 ) -> PartialVMResult<NativeResult>
 where
-    G: GroupElement + ToFromByteArray<POINT_SIZE> + FromTrustedByteArray<POINT_SIZE> + MultiScalarMul,
+    G: GroupElement
+        + ToFromByteArray<POINT_SIZE>
+        + FromTrustedByteArray<POINT_SIZE>
+        + MultiScalarMul,
     G::ScalarType: ToFromByteArray<SCALAR_SIZE> + FromTrustedByteArray<SCALAR_SIZE>,
 {
     if points.is_empty()
@@ -555,27 +632,35 @@ where
         context,
         scalar_decode_cost.map(|cost| cost * ((scalars.len() / SCALAR_SIZE) as u64).into())
     );
-    let scalars =
-        scalars.chunks(SCALAR_SIZE).map(parse_trusted::<G::ScalarType, { SCALAR_SIZE }>).collect::<Result<Vec<_>, _>>();
+    let scalars = scalars
+        .chunks(SCALAR_SIZE)
+        .map(parse_trusted::<G::ScalarType, { SCALAR_SIZE }>)
+        .collect::<Result<Vec<_>, _>>();
 
     native_charge_gas_early_exit_option!(
         context,
         point_decode_cost.map(|cost| cost * ((points.len() / POINT_SIZE) as u64).into())
     );
-    let points = points.chunks(POINT_SIZE).map(parse_trusted::<G, { POINT_SIZE }>).collect::<Result<Vec<_>, _>>();
+    let points = points
+        .chunks(POINT_SIZE)
+        .map(parse_trusted::<G, { POINT_SIZE }>)
+        .collect::<Result<Vec<_>, _>>();
 
     if let (Ok(scalars), Ok(points)) = (scalars, points) {
         // Checked above that len()>0
         let num_of_additions = msm_num_of_additions(scalars.len() as u64);
         native_charge_gas_early_exit_option!(
             context,
-            base_cost.and_then(
-                |base| base_cost_per_addition.map(|per_addition| base + per_addition * num_of_additions.into())
-            )
+            base_cost.and_then(|base| base_cost_per_addition
+                .map(|per_addition| base + per_addition * num_of_additions.into()))
         );
 
-        let r = G::multi_scalar_mul(&scalars, &points).expect("Already checked the lengths of the vectors");
-        Ok(NativeResult::ok(context.gas_used(), smallvec![Value::vector_u8(r.to_byte_array().to_vec())]))
+        let r = G::multi_scalar_mul(&scalars, &points)
+            .expect("Already checked the lengths of the vectors");
+        Ok(NativeResult::ok(
+            context.gas_used(),
+            smallvec![Value::vector_u8(r.to_byte_array().to_vec())],
+        ))
     } else {
         Ok(NativeResult::err(context.gas_used(), INVALID_INPUT_ERROR))
     }
@@ -596,7 +681,7 @@ pub fn internal_multi_scalar_mul(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_msm_supported(context) {
+    if !is_msm_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -606,7 +691,11 @@ pub fn internal_multi_scalar_mul(
     let scalars = scalars_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let max_len = cost_params.bls12381_msm_max_len.ok_or_else(|| {
         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -615,31 +704,38 @@ pub fn internal_multi_scalar_mul(
 
     // TODO: can potentially improve performance when some of the points are the generator.
     match Groups::from_u8(group_type) {
-        Some(Groups::BLS12381G1) => {
-            multi_scalar_mul::<bls::G1Element, { bls::Scalar::BYTE_LENGTH }, { bls::G1Element::BYTE_LENGTH }>(
-                context,
-                cost_params.bls12381_decode_scalar_cost,
-                cost_params.bls12381_decode_g1_cost,
-                cost_params.bls12381_g1_msm_base_cost,
-                cost_params.bls12381_g1_msm_base_cost_per_input,
-                max_len,
-                scalars.as_ref(),
-                elements.as_ref(),
-            )
-        }
-        Some(Groups::BLS12381G2) => {
-            multi_scalar_mul::<bls::G2Element, { bls::Scalar::BYTE_LENGTH }, { bls::G2Element::BYTE_LENGTH }>(
-                context,
-                cost_params.bls12381_decode_scalar_cost,
-                cost_params.bls12381_decode_g2_cost,
-                cost_params.bls12381_g2_msm_base_cost,
-                cost_params.bls12381_g2_msm_base_cost_per_input,
-                max_len,
-                scalars.as_ref(),
-                elements.as_ref(),
-            )
-        }
-        _ => Ok(NativeResult::err(v2_native_charge(context, cost), INVALID_INPUT_ERROR)),
+        Some(Groups::BLS12381G1) => multi_scalar_mul::<
+            bls::G1Element,
+            { bls::Scalar::BYTE_LENGTH },
+            { bls::G1Element::BYTE_LENGTH },
+        >(
+            context,
+            cost_params.bls12381_decode_scalar_cost,
+            cost_params.bls12381_decode_g1_cost,
+            cost_params.bls12381_g1_msm_base_cost,
+            cost_params.bls12381_g1_msm_base_cost_per_input,
+            max_len,
+            scalars.as_ref(),
+            elements.as_ref(),
+        ),
+        Some(Groups::BLS12381G2) => multi_scalar_mul::<
+            bls::G2Element,
+            { bls::Scalar::BYTE_LENGTH },
+            { bls::G2Element::BYTE_LENGTH },
+        >(
+            context,
+            cost_params.bls12381_decode_scalar_cost,
+            cost_params.bls12381_decode_g2_cost,
+            cost_params.bls12381_g2_msm_base_cost,
+            cost_params.bls12381_g2_msm_base_cost_per_input,
+            max_len,
+            scalars.as_ref(),
+            elements.as_ref(),
+        ),
+        _ => Ok(NativeResult::err(
+            v2_native_charge(context, cost)?,
+            INVALID_INPUT_ERROR,
+        )),
     }
 }
 
@@ -657,7 +753,7 @@ pub fn internal_pairing(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -667,7 +763,11 @@ pub fn internal_pairing(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381G1) => {
@@ -700,7 +800,7 @@ pub fn internal_convert(
 
     let cost = context.gas_used();
 
-    if !(is_uncompressed_g1_supported(context)) {
+    if !(is_uncompressed_g1_supported(context))? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -709,11 +809,18 @@ pub fn internal_convert(
     let to_type = pop_arg!(args, u8);
     let from_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     let result = match (Groups::from_u8(from_type), Groups::from_u8(to_type)) {
         (Some(Groups::BLS12381UncompressedG1), Some(Groups::BLS12381G1)) => {
-            native_charge_gas_early_exit_option!(context, cost_params.bls12381_uncompressed_g1_to_g1_cost);
+            native_charge_gas_early_exit_option!(
+                context,
+                cost_params.bls12381_uncompressed_g1_to_g1_cost
+            );
             e.to_vec()
                 .try_into()
                 .map_err(|_| FastCryptoError::InvalidInput)
@@ -722,7 +829,10 @@ pub fn internal_convert(
                 .map(|e| e.to_byte_array().to_vec())
         }
         (Some(Groups::BLS12381G1), Some(Groups::BLS12381UncompressedG1)) => {
-            native_charge_gas_early_exit_option!(context, cost_params.bls12381_g1_to_uncompressed_g1_cost);
+            native_charge_gas_early_exit_option!(
+                context,
+                cost_params.bls12381_g1_to_uncompressed_g1_cost
+            );
             parse_trusted::<bls::G1Element, { bls::G1Element::BYTE_LENGTH }>(&e)
                 .map(|e| bls::G1ElementUncompressed::from(&e))
                 .map(|e| e.into_byte_array().to_vec())
@@ -748,24 +858,32 @@ pub fn internal_sum(
 
     let cost = context.gas_used();
 
-    if !(is_uncompressed_g1_supported(context)) {
+    if !(is_uncompressed_g1_supported(context))? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .group_ops_cost_params
+        .clone();
 
     // The input is a reference to a vector of vector<u8>'s
     let inputs = pop_arg!(args, VectorRef);
     let group_type = pop_arg!(args, u8);
 
-    let length = inputs.len(&Type::Vector(Box::new(Type::U8)))?.value_as::<u64>()?;
+    let length = inputs
+        .len(&Type::Vector(Box::new(Type::U8)))?
+        .value_as::<u64>()?;
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381UncompressedG1) => {
-            let max_terms = cost_params.bls12381_uncompressed_g1_sum_max_terms.ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Max number of terms is not set".to_string())
-            })?;
+            let max_terms = cost_params
+                .bls12381_uncompressed_g1_sum_max_terms
+                .ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Max number of terms is not set".to_string())
+                })?;
 
             if length > max_terms {
                 return Ok(NativeResult::err(cost, INPUT_TOO_LONG_ERROR));
@@ -773,9 +891,11 @@ pub fn internal_sum(
 
             native_charge_gas_early_exit_option!(
                 context,
-                cost_params.bls12381_uncompressed_g1_sum_base_cost.and_then(|base| cost_params
-                    .bls12381_uncompressed_g1_sum_cost_per_term
-                    .map(|per_term| base + per_term * length.into()))
+                cost_params
+                    .bls12381_uncompressed_g1_sum_base_cost
+                    .and_then(|base| cost_params
+                        .bls12381_uncompressed_g1_sum_cost_per_term
+                        .map(|per_term| base + per_term * length.into()))
             );
 
             // Read the input vector
@@ -785,7 +905,12 @@ pub fn internal_sum(
                         .borrow_elem(i as usize, &Type::Vector(Box::new(Type::U8)))
                         .and_then(Value::value_as::<VectorRef>)
                         .map_err(|_| FastCryptoError::InvalidInput)
-                        .and_then(|v| v.as_bytes_ref().to_vec().try_into().map_err(|_| FastCryptoError::InvalidInput))
+                        .and_then(|v| {
+                            v.as_bytes_ref()
+                                .to_vec()
+                                .try_into()
+                                .map_err(|_| FastCryptoError::InvalidInput)
+                        })
                         .map(bls::G1ElementUncompressed::from_trusted_byte_array)
                 })
                 .collect::<FastCryptoResult<Vec<_>>>()

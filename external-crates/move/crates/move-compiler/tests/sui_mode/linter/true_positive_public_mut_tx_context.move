@@ -1,7 +1,7 @@
 // tests the lint for preferring &mut TxContext over &TxContext in public functions
 // these cases correctly should trigger the lint
 module 0x42::true_positive {
-    use one::tx_context::TxContext;
+    use sui::tx_context::TxContext;
 
     struct CustomStruct has drop {}
 
@@ -24,6 +24,6 @@ module 0x42::true_positive {
     ) {}
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

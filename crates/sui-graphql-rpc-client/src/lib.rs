@@ -15,9 +15,15 @@ pub enum ClientError {
     #[error("Service version header value invalid string: {error}")]
     ServiceVersionHeaderValueInvalidString { error: ToStrError },
     #[error("Invalid usage number for {usage_name}: {usage_number}")]
-    InvalidUsageNumber { usage_name: String, usage_number: Number },
+    InvalidUsageNumber {
+        usage_name: String,
+        usage_number: Number,
+    },
     #[error("Invalid usage field for {usage_name}: {usage_value}")]
-    InvalidUsageValue { usage_name: String, usage_value: Value },
+    InvalidUsageValue {
+        usage_name: String,
+        usage_value: Value,
+    },
     #[error("{item_type} at pos {idx} must not be empty")]
     InvalidEmptyItem { item_type: String, idx: usize },
     #[error(
@@ -25,10 +31,20 @@ pub enum ClientError {
     )]
     InvalidVariableName { var_name: String },
 
-    #[error("Conflicting type definitions for variable {var_name}: {var_type_prev} vs {var_type_curr}")]
-    VariableDefinitionConflict { var_name: String, var_type_prev: String, var_type_curr: String },
+    #[error(
+        "Conflicting type definitions for variable {var_name}: {var_type_prev} vs {var_type_curr}"
+    )]
+    VariableDefinitionConflict {
+        var_name: String,
+        var_type_prev: String,
+        var_type_curr: String,
+    },
     #[error("Conflicting values for variable {var_name}: {var_val_prev} vs {var_val_curr}")]
-    VariableValueConflict { var_name: String, var_val_prev: serde_json::Value, var_val_curr: serde_json::Value },
+    VariableValueConflict {
+        var_name: String,
+        var_val_prev: serde_json::Value,
+        var_val_curr: serde_json::Value,
+    },
     #[error(transparent)]
     InnerClientError(#[from] reqwest::Error),
 }

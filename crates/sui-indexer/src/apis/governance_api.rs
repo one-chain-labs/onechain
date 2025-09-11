@@ -10,7 +10,9 @@ use jsonrpsee::{core::RpcResult, RpcModule};
 use cached::{proc_macro::cached, SizedCache};
 use sui_json_rpc::{governance_api::ValidatorExchangeRates, SuiRpcModule};
 use sui_json_rpc_api::GovernanceReadApiServer;
-use sui_json_rpc_types::{DelegatedStake, EpochInfo, StakeStatus, SuiCommittee, SuiObjectDataFilter, ValidatorApys};
+use sui_json_rpc_types::{
+    DelegatedStake, EpochInfo, StakeStatus, SuiCommittee, SuiObjectDataFilter, ValidatorApys,
+};
 use sui_open_rpc::Module;
 use sui_types::{
     base_types::{MoveObjectType, ObjectID, SuiAddress},
@@ -33,7 +35,9 @@ impl GovernanceReadApi {
     pub async fn get_epoch_info(&self, epoch: Option<EpochId>) -> Result<EpochInfo, IndexerError> {
         match self.inner.get_epoch_info(epoch).await {
             Ok(Some(epoch_info)) => Ok(epoch_info),
-            Ok(None) => Err(IndexerError::InvalidArgumentError(format!("Missing epoch {epoch:?}"))),
+            Ok(None) => Err(IndexerError::InvalidArgumentError(format!(
+                "Missing epoch {epoch:?}"
+            ))),
             Err(e) => Err(e),
         }
     }
@@ -42,7 +46,10 @@ impl GovernanceReadApi {
         self.inner.get_latest_sui_system_state().await
     }
 
-    async fn get_stakes_by_ids(&self, ids: Vec<ObjectID>) -> Result<Vec<DelegatedStake>, IndexerError> {
+    async fn get_stakes_by_ids(
+        &self,
+        ids: Vec<ObjectID>,
+    ) -> Result<Vec<DelegatedStake>, IndexerError> {
         let mut stakes = vec![];
         for stored_object in self.inner.multi_get_objects(ids).await? {
             let object = sui_types::object::Object::try_from(stored_object)?;
@@ -53,13 +60,18 @@ impl GovernanceReadApi {
         self.get_delegated_stakes(stakes).await
     }
 
-    async fn get_staked_by_owner(&self, owner: SuiAddress) -> Result<Vec<DelegatedStake>, IndexerError> {
+    async fn get_staked_by_owner(
+        &self,
+        owner: SuiAddress,
+    ) -> Result<Vec<DelegatedStake>, IndexerError> {
         let mut stakes = vec![];
         for stored_object in self
             .inner
             .get_owned_objects(
                 owner,
-                Some(SuiObjectDataFilter::StructType(MoveObjectType::staked_oct().into())),
+                Some(SuiObjectDataFilter::StructType(
+                    MoveObjectType::staked_oct().into(),
+                )),
                 None,
                 // Allow querying for up to 1000 staked objects
                 1000,
@@ -74,11 +86,16 @@ impl GovernanceReadApi {
         self.get_delegated_stakes(stakes).await
     }
 
-    pub async fn get_delegated_stakes(&self, stakes: Vec<StakedOct>) -> Result<Vec<DelegatedStake>, IndexerError> {
-        let pools = stakes.into_iter().fold(BTreeMap::<_, Vec<_>>::new(), |mut pools, stake| {
-            pools.entry(stake.pool_id()).or_default().push(stake);
-            pools
-        });
+    pub async fn get_delegated_stakes(
+        &self,
+        stakes: Vec<StakedOct>,
+    ) -> Result<Vec<DelegatedStake>, IndexerError> {
+        let pools = stakes
+            .into_iter()
+            .fold(BTreeMap::<_, Vec<_>>::new(), |mut pools, stake| {
+                pools.entry(stake.pool_id()).or_default().push(stake);
+                pools
+            });
 
         let system_state_summary = self.get_latest_sui_system_state().await?;
         let epoch = system_state_summary.epoch;
@@ -93,7 +110,9 @@ impl GovernanceReadApi {
         for (pool_id, stakes) in pools {
             // Rate table and rate can be null when the pool is not active
             let rate_table = rates.get(&pool_id).ok_or_else(|| {
-                IndexerError::InvalidArgumentError("Cannot find rates for staking pool {pool_id}".to_string())
+                IndexerError::InvalidArgumentError(
+                    "Cannot find rates for staking pool {pool_id}".to_string(),
+                )
             })?;
             let current_rate = rate_table.rates.first().map(|(_, rate)| rate);
 
@@ -104,18 +123,16 @@ impl GovernanceReadApi {
                         let stake_rate = rate_table
                             .rates
                             .iter()
-                            .find_map(
-                                |(epoch, rate)| {
-                                    if *epoch == stake.activation_epoch() {
-                                        Some(rate.clone())
-                                    } else {
-                                        None
-                                    }
-                                },
-                            )
+                            .find_map(|(epoch, rate)| {
+                                if *epoch == stake.activation_epoch() {
+                                    Some(rate.clone())
+                                } else {
+                                    None
+                                }
+                            })
                             .unwrap_or_default();
-                        let estimated_reward =
-                            ((stake_rate.rate() / current_rate.rate()) - 1.0) * stake.principal() as f64;
+                        let estimated_reward = ((stake_rate.rate() / current_rate.rate()) - 1.0)
+                            * stake.principal() as f64;
                         std::cmp::max(0, estimated_reward.round() as u64)
                     } else {
                         0
@@ -130,7 +147,6 @@ impl GovernanceReadApi {
                     stake_request_epoch: stake.activation_epoch().saturating_sub(1),
                     stake_active_epoch: stake.activation_epoch(),
                     principal: stake.principal(),
-                    lock: stake.lock(),
                     status,
                 })
             }
@@ -179,10 +195,16 @@ pub async fn exchange_rates(
         )
         .await?
     {
-        let pool_id: sui_types::id::ID = bcs::from_bytes(&df.bcs_name)
-            .map_err(|e| sui_types::error::SuiError::ObjectDeserializationError { error: e.to_string() })?;
+        let pool_id: sui_types::id::ID = bcs::from_bytes(&df.bcs_name).map_err(|e| {
+            sui_types::error::SuiError::ObjectDeserializationError {
+                error: e.to_string(),
+            }
+        })?;
         let inactive_pools_id = system_state_summary.inactive_pools_id;
-        let validator = state.inner.get_validator_from_table(inactive_pools_id, pool_id).await?;
+        let validator = state
+            .inner
+            .get_validator_from_table(inactive_pools_id, pool_id)
+            .await?;
         tables.push((
             validator.sui_address,
             validator.staking_pool_id,
@@ -196,25 +218,41 @@ pub async fn exchange_rates(
     // Get exchange rates for each validator
     for (address, pool_id, exchange_rates_id, exchange_rates_size, active) in tables {
         let mut rates = vec![];
-        for df in state.inner.get_dynamic_fields_raw(exchange_rates_id, None, exchange_rates_size as usize).await? {
-            let dynamic_field = df.to_dynamic_field::<EpochId, PoolTokenExchangeRate>().ok_or_else(|| {
-                sui_types::error::SuiError::ObjectDeserializationError { error: "dynamic field malformed".to_owned() }
-            })?;
+        for df in state
+            .inner
+            .get_dynamic_fields_raw(exchange_rates_id, None, exchange_rates_size as usize)
+            .await?
+        {
+            let dynamic_field = df
+                .to_dynamic_field::<EpochId, PoolTokenExchangeRate>()
+                .ok_or_else(|| sui_types::error::SuiError::ObjectDeserializationError {
+                    error: "dynamic field malformed".to_owned(),
+                })?;
 
             rates.push((dynamic_field.name, dynamic_field.value));
         }
 
         rates.sort_by(|(a, _), (b, _)| a.cmp(b).reverse());
 
-        exchange_rates.push(ValidatorExchangeRates { address, pool_id, active, rates });
+        exchange_rates.push(ValidatorExchangeRates {
+            address,
+            pool_id,
+            active,
+            rates,
+        });
     }
     Ok(exchange_rates)
 }
 
 #[async_trait]
 impl GovernanceReadApiServer for GovernanceReadApi {
-    async fn get_stakes_by_ids(&self, staked_oct_ids: Vec<ObjectID>) -> RpcResult<Vec<DelegatedStake>> {
-        self.get_stakes_by_ids(staked_oct_ids).await.map_err(Into::into)
+    async fn get_stakes_by_ids(
+        &self,
+        staked_oct_ids: Vec<ObjectID>,
+    ) -> RpcResult<Vec<DelegatedStake>> {
+        self.get_stakes_by_ids(staked_oct_ids)
+            .await
+            .map_err(Into::into)
     }
 
     async fn get_stakes(&self, owner: SuiAddress) -> RpcResult<Vec<DelegatedStake>> {
@@ -232,9 +270,13 @@ impl GovernanceReadApiServer for GovernanceReadApi {
 
     async fn get_reference_gas_price(&self) -> RpcResult<BigInt<u64>> {
         let epoch = self.get_epoch_info(None).await?;
-        Ok(BigInt::from(epoch.reference_gas_price.ok_or_else(|| {
-            IndexerError::PersistentStorageDataCorruptionError("missing latest reference gas price".to_owned())
-        })?))
+        Ok(BigInt::from(epoch.reference_gas_price.ok_or_else(
+            || {
+                IndexerError::PersistentStorageDataCorruptionError(
+                    "missing latest reference gas price".to_owned(),
+                )
+            },
+        )?))
     }
 
     async fn get_validators_apy(&self) -> RpcResult<ValidatorApys> {

@@ -32,9 +32,8 @@ impl DateTime {
 impl ScalarType for DateTime {
     fn parse(value: Value) -> InputValueResult<Self> {
         match value {
-            Value::String(s) => {
-                DateTime::from_str(&s).map_err(|e| InputValueError::custom(format!("Error parsing DateTime: {}", e)))
-            }
+            Value::String(s) => DateTime::from_str(&s)
+                .map_err(|e| InputValueError::custom(format!("Error parsing DateTime: {}", e))),
             _ => Err(InputValueError::expected_type(value)),
         }
     }

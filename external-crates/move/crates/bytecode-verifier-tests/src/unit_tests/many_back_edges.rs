@@ -3,18 +3,8 @@
 
 use crate::unit_tests::production_config;
 use move_binary_format::file_format::{
-    empty_module,
-    Bytecode,
-    CodeUnit,
-    FunctionDefinition,
-    FunctionHandle,
-    FunctionHandleIndex,
-    IdentifierIndex,
-    ModuleHandleIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken,
-    Visibility::Public,
+    Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, Visibility::Public, empty_module,
 };
 use move_bytecode_verifier_meter::bound::BoundMeter;
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
@@ -29,11 +19,17 @@ fn many_backedges() {
     let mut m = empty_module();
 
     // signature of locals in f1..f<NUM_FUNCTIONS>
-    m.signatures.push(Signature(std::iter::repeat(SignatureToken::U8).take(MAX_LOCALS as usize).collect()));
+    m.signatures.push(Signature(
+        std::iter::repeat(SignatureToken::U8)
+            .take(MAX_LOCALS as usize)
+            .collect(),
+    ));
 
     // create returns_bool_and_u64
-    m.signatures.push(Signature(vec![SignatureToken::Bool, SignatureToken::U8]));
-    m.identifiers.push(Identifier::new("returns_bool_and_u64").unwrap());
+    m.signatures
+        .push(Signature(vec![SignatureToken::Bool, SignatureToken::U8]));
+    m.identifiers
+        .push(Identifier::new("returns_bool_and_u64").unwrap());
     m.function_handles.push(FunctionHandle {
         module: ModuleHandleIndex(0),
         name: IdentifierIndex(1),
@@ -55,7 +51,8 @@ fn many_backedges() {
 
     // create other functions
     for i in 1..(NUM_FUNCTIONS + 1) {
-        m.identifiers.push(Identifier::new(format!("f{}", i)).unwrap());
+        m.identifiers
+            .push(Identifier::new(format!("f{}", i)).unwrap());
         m.function_handles.push(FunctionHandle {
             module: ModuleHandleIndex(0),
             name: IdentifierIndex(i + 1), // the +1 accounts for returns_bool_and_u64
@@ -68,7 +65,11 @@ fn many_backedges() {
             visibility: Public,
             is_entry: false,
             acquires_global_resources: vec![],
-            code: Some(CodeUnit { locals: SignatureIndex(1), code: vec![], jump_tables: vec![] }),
+            code: Some(CodeUnit {
+                locals: SignatureIndex(1),
+                code: vec![],
+                jump_tables: vec![],
+            }),
         });
 
         let code = &mut m.function_defs[i as usize].code.as_mut().unwrap().code;
@@ -87,7 +88,14 @@ fn many_backedges() {
 
     let (verifier_config, meter_config) = production_config();
     let mut meter = BoundMeter::new(meter_config);
-    let result =
-        move_bytecode_verifier::verify_module_with_config_for_test("many_backedges", &verifier_config, &m, &mut meter);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::CONSTRAINT_NOT_SATISFIED);
+    let result = move_bytecode_verifier::verify_module_with_config_for_test(
+        "many_backedges",
+        &verifier_config,
+        &m,
+        &mut meter,
+    );
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::CONSTRAINT_NOT_SATISFIED
+    );
 }

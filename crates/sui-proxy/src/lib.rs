@@ -34,13 +34,19 @@ macro_rules! var {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{admin::Labels, histogram_relay::HistogramRelay, prom_to_mimir::tests::*};
+    use crate::admin::Labels;
+    use crate::histogram_relay::HistogramRelay;
+    use crate::prom_to_mimir::tests::*;
 
     use crate::{admin::CertKeyPair, config::RemoteWriteConfig, peers::SuiNodeProvider};
-    use axum::{http::StatusCode, routing::post, Router};
-    use prometheus::{Encoder, PROTOBUF_FORMAT};
+    use axum::http::StatusCode;
+    use axum::routing::post;
+    use axum::Router;
+    use prometheus::Encoder;
+    use prometheus::PROTOBUF_FORMAT;
     use protobuf::RepeatedField;
-    use std::{net::TcpListener, time::Duration};
+    use std::net::TcpListener;
+    use std::time::Duration;
     use sui_tls::{ClientCertVerifier, TlsAcceptor};
 
     async fn run_dummy_remote_write(listener: TcpListener) {
@@ -91,15 +97,25 @@ mod tests {
         // create a fake rpc server
         let dummy_remote_write_listener = std::net::TcpListener::bind("localhost:0").unwrap();
         let dummy_remote_write_address = dummy_remote_write_listener.local_addr().unwrap();
-        let dummy_remote_write_url = format!("http://localhost:{}/v1/push", dummy_remote_write_address.port());
+        let dummy_remote_write_url = format!(
+            "http://localhost:{}/v1/push",
+            dummy_remote_write_address.port()
+        );
 
-        let _dummy_remote_write = tokio::spawn(async move { run_dummy_remote_write(dummy_remote_write_listener).await });
+        let _dummy_remote_write =
+            tokio::spawn(async move { run_dummy_remote_write(dummy_remote_write_listener).await });
 
         // init the tls config and allower
         let mut allower = SuiNodeProvider::new("".into(), Duration::from_secs(30), vec![]);
-        let tls_config = ClientCertVerifier::new(allower.clone(), sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string())
-            .rustls_server_config(vec![server_priv_cert.rustls_certificate()], server_priv_cert.rustls_private_key())
-            .unwrap();
+        let tls_config = ClientCertVerifier::new(
+            allower.clone(),
+            sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
+        )
+        .rustls_server_config(
+            vec![server_priv_cert.rustls_certificate()],
+            server_priv_cert.rustls_private_key(),
+        )
+        .unwrap();
 
         let client = admin::make_reqwest_client(
             RemoteWriteConfig {
@@ -112,15 +128,22 @@ mod tests {
         );
 
         let app = admin::app(
-            Labels { network: "unittest-network".into(), inventory_hostname: "ansible_inventory_name".into() },
+            Labels {
+                network: "unittest-network".into(),
+                inventory_hostname: "ansible_inventory_name".into(),
+            },
             client,
             HistogramRelay::new(),
             Some(allower.clone()),
+            None,
         );
 
         let listener = std::net::TcpListener::bind("localhost:0").unwrap();
         let server_address = listener.local_addr().unwrap();
-        let server_url = format!("https://localhost:{}/publish/metrics", server_address.port());
+        let server_url = format!(
+            "https://localhost:{}/publish/metrics",
+            server_address.port()
+        );
 
         let acceptor = TlsAcceptor::new(tls_config);
         let _server = tokio::spawn(async move {
@@ -139,10 +162,13 @@ mod tests {
         client.get(&server_url).send().await.unwrap_err();
 
         // Insert the client's public key into the allowlist and verify the request is successful
-        allower.get_sui_mut().write().unwrap().insert(client_pub_key.to_owned(), peers::AllowedPeer {
-            name: "some-node".into(),
-            public_key: client_pub_key.to_owned(),
-        });
+        allower.get_sui_mut().write().unwrap().insert(
+            client_pub_key.to_owned(),
+            peers::AllowedPeer {
+                name: "some-node".into(),
+                public_key: client_pub_key.to_owned(),
+            },
+        );
 
         let mf = create_metric_family(
             "foo_metric",
@@ -181,16 +207,26 @@ mod tests {
         // create a fake rpc server
         let dummy_remote_write_listener = std::net::TcpListener::bind("localhost:0").unwrap();
         let dummy_remote_write_address = dummy_remote_write_listener.local_addr().unwrap();
-        let dummy_remote_write_url = format!("http://localhost:{}/v1/push", dummy_remote_write_address.port());
+        let dummy_remote_write_url = format!(
+            "http://localhost:{}/v1/push",
+            dummy_remote_write_address.port()
+        );
 
-        let _dummy_remote_write =
-            tokio::spawn(async move { run_dummy_remote_write_very_slow(dummy_remote_write_listener).await });
+        let _dummy_remote_write = tokio::spawn(async move {
+            run_dummy_remote_write_very_slow(dummy_remote_write_listener).await
+        });
 
         // init the tls config and allower
         let mut allower = SuiNodeProvider::new("".into(), Duration::from_secs(30), vec![]);
-        let tls_config = ClientCertVerifier::new(allower.clone(), sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string())
-            .rustls_server_config(vec![server_priv_cert.rustls_certificate()], server_priv_cert.rustls_private_key())
-            .unwrap();
+        let tls_config = ClientCertVerifier::new(
+            allower.clone(),
+            sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
+        )
+        .rustls_server_config(
+            vec![server_priv_cert.rustls_certificate()],
+            server_priv_cert.rustls_private_key(),
+        )
+        .unwrap();
 
         let client = admin::make_reqwest_client(
             RemoteWriteConfig {
@@ -202,21 +238,25 @@ mod tests {
             "dummy user agent",
         );
 
-        // this will affect other tests if they are run in parallel, but we only have two tests, so it shouldn't be an issue (yet)
-        // even still, the other tests complete very fast so those tests would also need to slow down by orders and orders to be
-        // bothered by this env var
-        std::env::set_var("NODE_CLIENT_TIMEOUT", "5");
+        let timeout_secs = Some(2u64);
 
         let app = admin::app(
-            Labels { network: "unittest-network".into(), inventory_hostname: "ansible_inventory_name".into() },
+            Labels {
+                network: "unittest-network".into(),
+                inventory_hostname: "ansible_inventory_name".into(),
+            },
             client,
             HistogramRelay::new(),
             Some(allower.clone()),
+            timeout_secs,
         );
 
         let listener = std::net::TcpListener::bind("localhost:0").unwrap();
         let server_address = listener.local_addr().unwrap();
-        let server_url = format!("https://localhost:{}/publish/metrics", server_address.port());
+        let server_url = format!(
+            "https://localhost:{}/publish/metrics",
+            server_address.port()
+        );
 
         let acceptor = TlsAcceptor::new(tls_config);
         let _server = tokio::spawn(async move {
@@ -235,10 +275,13 @@ mod tests {
         client.get(&server_url).send().await.unwrap_err();
 
         // Insert the client's public key into the allowlist and verify the request is successful
-        allower.get_sui_mut().write().unwrap().insert(client_pub_key.to_owned(), peers::AllowedPeer {
-            name: "some-node".into(),
-            public_key: client_pub_key.to_owned(),
-        });
+        allower.get_sui_mut().write().unwrap().insert(
+            client_pub_key.to_owned(),
+            peers::AllowedPeer {
+                name: "some-node".into(),
+                public_key: client_pub_key.to_owned(),
+            },
+        );
 
         let mf = create_metric_family(
             "foo_metric",
@@ -263,7 +306,5 @@ mod tests {
             .expect("expected a successful post with a self-signed certificate");
         let status = res.status();
         assert_eq!(status, StatusCode::REQUEST_TIMEOUT);
-        // Clean up the environment variable
-        std::env::remove_var("NODE_CLIENT_TIMEOUT");
     }
 }

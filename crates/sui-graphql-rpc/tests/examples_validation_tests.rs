@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Context, Result};
-use std::{cmp::max, collections::BTreeMap, fs, path::PathBuf};
-use sui_graphql_rpc::{
-    config::Limits,
-    test_infra::cluster::{prep_executor_cluster, ExecutorCluster},
-};
+use std::cmp::max;
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
+use sui_graphql_rpc::config::Limits;
+use sui_graphql_rpc::test_infra::cluster::{prep_executor_cluster, ExecutorCluster};
 
 struct Example {
     contents: String,
@@ -19,12 +20,15 @@ fn good_examples() -> Result<BTreeMap<String, Example>> {
     let mut dirs = vec![examples.clone()];
     let mut queries = BTreeMap::new();
     while let Some(dir) = dirs.pop() {
-        let entries = fs::read_dir(&dir).with_context(|| format!("Looking in {}", dir.display()))?;
+        let entries =
+            fs::read_dir(&dir).with_context(|| format!("Looking in {}", dir.display()))?;
 
         for entry in entries {
             let entry = entry.with_context(|| format!("Entry in {}", dir.display()))?;
             let path = entry.path();
-            let typ_ = entry.file_type().with_context(|| format!("Metadata for {}", path.display()))?;
+            let typ_ = entry
+                .file_type()
+                .with_context(|| format!("Metadata for {}", path.display()))?;
 
             if typ_.is_dir() {
                 dirs.push(entry.path());
@@ -32,16 +36,25 @@ fn good_examples() -> Result<BTreeMap<String, Example>> {
             }
 
             if path.ends_with(".graphql") {
-                let contents = fs::read_to_string(&path).with_context(|| format!("Reading {}", path.display()))?;
+                let contents = fs::read_to_string(&path)
+                    .with_context(|| format!("Reading {}", path.display()))?;
 
                 let rel_path = path
                     .strip_prefix(&examples)
                     .with_context(|| format!("Generating name from {}", path.display()))?
                     .with_extension("");
 
-                let name = rel_path.to_str().ok_or_else(|| anyhow!("Generating name from {}", path.display()))?;
+                let name = rel_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("Generating name from {}", path.display()))?;
 
-                queries.insert(name.to_string(), Example { contents, path: Some(path) });
+                queries.insert(
+                    name.to_string(),
+                    Example {
+                        contents,
+                        path: Some(path),
+                    },
+                );
             }
         }
     }
@@ -51,13 +64,34 @@ fn good_examples() -> Result<BTreeMap<String, Example>> {
 
 fn bad_examples() -> BTreeMap<String, Example> {
     BTreeMap::from_iter([
-        ("multiple_queries".to_string(), Example {
-            contents: "{ chainIdentifier } { chainIdentifier }".to_string(),
-            path: None,
-        }),
-        ("malformed".to_string(), Example { contents: "query { }}".to_string(), path: None }),
-        ("invalid".to_string(), Example { contents: "djewfbfo".to_string(), path: None }),
-        ("empty".to_string(), Example { contents: "     ".to_string(), path: None }),
+        (
+            "multiple_queries".to_string(),
+            Example {
+                contents: "{ chainIdentifier } { chainIdentifier }".to_string(),
+                path: None,
+            },
+        ),
+        (
+            "malformed".to_string(),
+            Example {
+                contents: "query { }}".to_string(),
+                path: None,
+            },
+        ),
+        (
+            "invalid".to_string(),
+            Example {
+                contents: "djewfbfo".to_string(),
+                path: None,
+            },
+        ),
+        (
+            "empty".to_string(),
+            Example {
+                contents: "     ".to_string(),
+                path: None,
+            },
+        ),
     ])
 }
 
@@ -70,11 +104,18 @@ async fn test_query(
     max_depth: &mut u64,
     max_payload: &mut u64,
 ) -> Vec<String> {
-    let resp = cluster.graphql_client.execute_to_graphql(query.contents.clone(), true, vec![], vec![]).await.unwrap();
+    let resp = cluster
+        .graphql_client
+        .execute_to_graphql(query.contents.clone(), true, vec![], vec![])
+        .await
+        .unwrap();
 
     let errors = resp.errors();
     if errors.is_empty() {
-        let usage = resp.usage().expect("Usage not found").expect("Usage not found");
+        let usage = resp
+            .usage()
+            .expect("Usage not found")
+            .expect("Usage not found");
         *max_nodes = max(*max_nodes, usage["inputNodes"]);
         *max_output_nodes = max(*max_output_nodes, usage["outputNodes"]);
         *max_depth = max(*max_depth, usage["depth"]);

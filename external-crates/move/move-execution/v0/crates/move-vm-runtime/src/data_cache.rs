@@ -20,7 +20,9 @@ pub struct AccountDataCache {
 
 impl AccountDataCache {
     fn new() -> Self {
-        Self { module_map: BTreeMap::new() }
+        Self {
+            module_map: BTreeMap::new(),
+        }
     }
 }
 
@@ -39,7 +41,10 @@ impl<S: MoveResolver> TransactionDataCache<S> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
     pub(crate) fn new(remote: S) -> Self {
-        TransactionDataCache { remote, module_map: BTreeMap::new() }
+        TransactionDataCache {
+            remote,
+            module_map: BTreeMap::new(),
+        }
     }
 
     pub(crate) fn into_effects(mut self) -> (PartialVMResult<ChangeSet>, S) {
@@ -80,15 +85,23 @@ impl<S: MoveResolver> DataStore for TransactionDataCache<S> {
 
     fn relocate(&self, module_id: &ModuleId) -> PartialVMResult<ModuleId> {
         self.remote.relocate(module_id).map_err(|err| {
-            PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!("Error relocating {module_id}: {err:?}"))
+            PartialVMError::new(StatusCode::LINKER_ERROR)
+                .with_message(format!("Error relocating {module_id}: {err:?}"))
         })
     }
 
-    fn defining_module(&self, module_id: &ModuleId, struct_: &IdentStr) -> PartialVMResult<ModuleId> {
-        self.remote.defining_module(module_id, struct_).map_err(|err| {
-            PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!("Error finding defining module for {module_id}::{struct_}: {err:?}"))
-        })
+    fn defining_module(
+        &self,
+        module_id: &ModuleId,
+        struct_: &IdentStr,
+    ) -> PartialVMResult<ModuleId> {
+        self.remote
+            .defining_module(module_id, struct_)
+            .map_err(|err| {
+                PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
+                    "Error finding defining module for {module_id}::{struct_}: {err:?}"
+                ))
+            })
     }
 
     fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
@@ -104,17 +117,24 @@ impl<S: MoveResolver> DataStore for TransactionDataCache<S> {
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);
-                Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(msg)
-                    .finish(Location::Undefined))
+                Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg)
+                        .finish(Location::Undefined),
+                )
             }
         }
     }
 
     fn publish_module(&mut self, module_id: &ModuleId, blob: Vec<u8>) -> VMResult<()> {
-        let account_cache = self.module_map.entry(*module_id.address()).or_insert_with(AccountDataCache::new);
+        let account_cache = self
+            .module_map
+            .entry(*module_id.address())
+            .or_insert_with(AccountDataCache::new);
 
-        account_cache.module_map.insert(module_id.name().to_owned(), blob);
+        account_cache
+            .module_map
+            .insert(module_id.name().to_owned(), blob);
 
         Ok(())
     }

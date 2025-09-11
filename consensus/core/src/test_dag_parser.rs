@@ -4,6 +4,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use consensus_config::AuthorityIndex;
+use consensus_types::block::{BlockRef, Round};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1, take_while_m_n},
@@ -14,11 +15,7 @@ use nom::{
     IResult,
 };
 
-use crate::{
-    block::{BlockRef, Round, Slot},
-    context::Context,
-    test_dag_builder::DagBuilder,
-};
+use crate::{block::Slot, context::Context, test_dag_builder::DagBuilder};
 
 /// DagParser
 ///
@@ -51,7 +48,6 @@ use crate::{
 /// dag_builder.print(); // print the parsed DAG
 /// dag_builder.persist_all_blocks(dag_state.clone()); // persist all blocks to DagState
 /// ```
-
 pub(crate) fn parse_dag(dag_string: &str) -> IResult<&str, DagBuilder> {
     let (input, _) = tuple((tag("DAG"), multispace0, char('{')))(dag_string)?;
 
@@ -95,8 +91,17 @@ fn parse_fully_connected<'a>(
     input: &'a str,
     dag_builder: &DagBuilder,
 ) -> IResult<&'a str, Vec<(AuthorityIndex, Vec<BlockRef>)>> {
-    let (input, _) =
-        tuple((space0, char(':'), space0, char('{'), space0, char('*'), space0, char('}'), opt(char(','))))(input)?;
+    let (input, _) = tuple((
+        space0,
+        char(':'),
+        space0,
+        char('{'),
+        space0,
+        char('*'),
+        space0,
+        char('}'),
+        opt(char(',')),
+    ))(input)?;
 
     let ancestors = dag_builder.last_ancestors.clone();
     let connections = dag_builder
@@ -155,9 +160,17 @@ fn parse_specified_connections<'a>(
 fn get_blocks(slot: Slot, dag_builder: &DagBuilder) -> Vec<BlockRef> {
     // note: special case for genesis blocks as they are cached separately
     let block_refs = if slot.round == 0 {
-        dag_builder.genesis_block_refs().into_iter().filter(|block| Slot::from(*block) == slot).collect::<Vec<_>>()
+        dag_builder
+            .genesis_block_refs()
+            .into_iter()
+            .filter(|block| Slot::from(*block) == slot)
+            .collect::<Vec<_>>()
     } else {
-        dag_builder.get_uncommitted_blocks_at_slot(slot).iter().map(|block| block.reference()).collect::<Vec<_>>()
+        dag_builder
+            .get_uncommitted_blocks_at_slot(slot)
+            .iter()
+            .map(|block| block.reference())
+            .collect::<Vec<_>>()
     };
     block_refs
 }
@@ -166,7 +179,10 @@ fn parse_author_and_connections(input: &str) -> IResult<&str, (AuthorityIndex, V
     // parse author
     let (input, author) = preceded(
         multispace0,
-        terminated(take_while1(|c: char| c.is_alphabetic()), preceded(opt(space0), tag("->"))),
+        terminated(
+            take_while1(|c: char| c.is_alphabetic()),
+            preceded(opt(space0), tag("->")),
+        ),
     )(input)?;
 
     // parse connections
@@ -176,19 +192,38 @@ fn parse_author_and_connections(input: &str) -> IResult<&str, (AuthorityIndex, V
         terminated(char(']'), opt(char(','))),
     )(input)?;
     let (input, _) = opt(multispace1)(input)?;
-    Ok((input, (str_to_authority_index(author).expect("Invalid authority index"), connections)))
+    Ok((
+        input,
+        (
+            str_to_authority_index(author).expect("Invalid authority index"),
+            connections,
+        ),
+    ))
 }
 
 fn parse_block(input: &str) -> IResult<&str, &str> {
     alt((
         map_res(tag("*"), |s: &str| Ok::<_, nom::error::ErrorKind>(s)),
-        map_res(take_while1(|c: char| c.is_alphanumeric() || c == '-'), |s: &str| Ok::<_, nom::error::ErrorKind>(s)),
+        map_res(
+            take_while1(|c: char| c.is_alphanumeric() || c == '-'),
+            |s: &str| Ok::<_, nom::error::ErrorKind>(s),
+        ),
     ))(input)
 }
 
 fn parse_genesis(input: &str) -> IResult<&str, u32> {
     let (input, num_authorities) = preceded(
-        tuple((multispace0, tag("Round"), space1, char('0'), space0, char(':'), space0, char('{'), space0)),
+        tuple((
+            multispace0,
+            tag("Round"),
+            space1,
+            char('0'),
+            space0,
+            char(':'),
+            space0,
+            char('{'),
+            space0,
+        )),
         |i| parse_authority_count(i),
     )(input)?;
     let (input, _) = tuple((space0, char('}'), opt(char(','))))(input)?;
@@ -202,10 +237,14 @@ fn parse_authority_count(input: &str) -> IResult<&str, u32> {
 }
 
 fn parse_slot(input: &str) -> IResult<&str, Slot> {
-    let parse_authority =
-        map_res(take_while_m_n(1, 1, |c: char| c.is_alphabetic() && c.is_uppercase()), |letter: &str| {
-            Ok::<_, nom::error::ErrorKind>(str_to_authority_index(letter).expect("Invalid authority index"))
-        });
+    let parse_authority = map_res(
+        take_while_m_n(1, 1, |c: char| c.is_alphabetic() && c.is_uppercase()),
+        |letter: &str| {
+            Ok::<_, nom::error::ErrorKind>(
+                str_to_authority_index(letter).expect("Invalid authority index"),
+            )
+        },
+    );
 
     let parse_round = map_res(digit1, |digits: &str| digits.parse::<Round>());
 
@@ -218,7 +257,10 @@ fn parse_slot(input: &str) -> IResult<&str, Slot> {
 // Helper function to convert a string representation (e.g., 'A' or '[26]') to an AuthorityIndex
 fn str_to_authority_index(input: &str) -> Option<AuthorityIndex> {
     if input.starts_with('[') && input.ends_with(']') && input.len() > 2 {
-        input[1..input.len() - 1].parse::<u32>().ok().map(AuthorityIndex::new_for_test)
+        input[1..input.len() - 1]
+            .parse::<u32>()
+            .ok()
+            .map(AuthorityIndex::new_for_test)
     } else if input.len() == 1 && input.chars().next()?.is_ascii_uppercase() {
         // Handle single uppercase ASCII alphabetic character
         let alpha_char = input.chars().next().unwrap();
@@ -275,7 +317,8 @@ mod tests {
         assert_eq!(dag_builder.blocks.len(), 23);
 
         // Check the blocks were correctly parsed in Round 6
-        let blocks_a6 = dag_builder.get_uncommitted_blocks_at_slot(Slot::new(6, AuthorityIndex::new_for_test(0)));
+        let blocks_a6 = dag_builder
+            .get_uncommitted_blocks_at_slot(Slot::new(6, AuthorityIndex::new_for_test(0)));
         assert_eq!(blocks_a6.len(), 1);
         let block_a6 = blocks_a6.first().unwrap();
         assert_eq!(block_a6.round(), 6);
@@ -292,7 +335,8 @@ mod tests {
             assert!(expected_block_a6_ancestor_slots.contains(&Slot::from(*ancestor)));
         }
 
-        let blocks_b6 = dag_builder.get_uncommitted_blocks_at_slot(Slot::new(6, AuthorityIndex::new_for_test(1)));
+        let blocks_b6 = dag_builder
+            .get_uncommitted_blocks_at_slot(Slot::new(6, AuthorityIndex::new_for_test(1)));
         assert_eq!(blocks_b6.len(), 1);
         let block_b6 = blocks_b6.first().unwrap();
         assert_eq!(block_b6.round(), 6);
@@ -309,7 +353,8 @@ mod tests {
             assert!(expected_block_b6_ancestor_slots.contains(&Slot::from(*ancestor)));
         }
 
-        let blocks_c6 = dag_builder.get_uncommitted_blocks_at_slot(Slot::new(6, AuthorityIndex::new_for_test(2)));
+        let blocks_c6 = dag_builder
+            .get_uncommitted_blocks_at_slot(Slot::new(6, AuthorityIndex::new_for_test(2)));
         assert_eq!(blocks_c6.len(), 1);
         let block_c6 = blocks_c6.first().unwrap();
         assert_eq!(block_c6.round(), 6);
@@ -379,7 +424,11 @@ mod tests {
         let mut expected_references = [
             dag_builder.last_ancestors.clone(),
             dag_builder.last_ancestors.clone(),
-            dag_builder.last_ancestors.into_iter().filter(|ancestor| Slot::from(*ancestor) != skipped_slot).collect(),
+            dag_builder
+                .last_ancestors
+                .into_iter()
+                .filter(|ancestor| Slot::from(*ancestor) != skipped_slot)
+                .collect(),
         ];
 
         assert_eq!(round, 1);
@@ -432,10 +481,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_str_to_authority_index() {
-        assert_eq!(str_to_authority_index("A"), Some(AuthorityIndex::new_for_test(0)));
-        assert_eq!(str_to_authority_index("Z"), Some(AuthorityIndex::new_for_test(25)));
-        assert_eq!(str_to_authority_index("[26]"), Some(AuthorityIndex::new_for_test(26)));
-        assert_eq!(str_to_authority_index("[100]"), Some(AuthorityIndex::new_for_test(100)));
+        assert_eq!(
+            str_to_authority_index("A"),
+            Some(AuthorityIndex::new_for_test(0))
+        );
+        assert_eq!(
+            str_to_authority_index("Z"),
+            Some(AuthorityIndex::new_for_test(25))
+        );
+        assert_eq!(
+            str_to_authority_index("[26]"),
+            Some(AuthorityIndex::new_for_test(26))
+        );
+        assert_eq!(
+            str_to_authority_index("[100]"),
+            Some(AuthorityIndex::new_for_test(100))
+        );
         assert_eq!(str_to_authority_index("a"), None);
         assert_eq!(str_to_authority_index("0"), None);
         assert_eq!(str_to_authority_index(" "), None);

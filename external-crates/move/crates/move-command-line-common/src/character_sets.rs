@@ -37,8 +37,10 @@ pub fn is_permitted_newline_crlf_chars(c1: char, c2: char) -> bool {
 
 // Taken from https://en.wikipedia.org/wiki/Bidirectional_text
 // TODO Double check 200F 200E 061C
-const UNICODE_TEXT_DIRECTIONALITY_CONTROL_CHARS: &[char] =
-    &['\u{202A}', '\u{202B}', '\u{202C}', '\u{202D}', '\u{202E}', '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}'];
+const UNICODE_TEXT_DIRECTIONALITY_CONTROL_CHARS: &[char] = &[
+    '\u{202A}', '\u{202B}', '\u{202C}', '\u{202D}', '\u{202E}', '\u{2066}', '\u{2067}', '\u{2068}',
+    '\u{2069}',
+];
 
 /// Is some other non-whitespace unicode character
 pub fn is_permitted_non_ascii_unicode(c: char) -> bool {
@@ -50,7 +52,9 @@ pub fn is_permitted_non_ascii_unicode(c: char) -> bool {
 /// A permitted character is either a permitted printable character, or a permitted
 /// newline. Any other characters are disallowed from appearing in the file.
 pub fn is_permitted_char(c: char) -> bool {
-    is_permitted_printable_char(c) || is_permitted_newline_lf_char(c) || is_permitted_non_ascii_unicode(c)
+    is_permitted_printable_char(c)
+        || is_permitted_newline_lf_char(c)
+        || is_permitted_non_ascii_unicode(c)
 }
 
 /// Determine if the characters is permitted characters.
@@ -103,7 +107,10 @@ mod tests {
         let mut good_chars = (0x20..=0x7Eu8).map(|u| u as char).collect::<Vec<char>>();
         good_chars.push('\r');
 
-        assert!(!super::is_permitted_chars(&good_chars, good_chars.len() - 1));
+        assert!(!super::is_permitted_chars(
+            &good_chars,
+            good_chars.len() - 1
+        ));
     }
 
     #[test]
@@ -113,7 +120,11 @@ mod tests {
         bad_chars.push(0x7Fu8 as char);
 
         for idx in 0..bad_chars.len() {
-            assert!(!super::is_permitted_chars(&bad_chars, idx), "{:X?} is permitted", bad_chars[idx] as u8);
+            assert!(
+                !super::is_permitted_chars(&bad_chars, idx),
+                "{:X?} is permitted",
+                bad_chars[idx] as u8
+            );
         }
     }
 }

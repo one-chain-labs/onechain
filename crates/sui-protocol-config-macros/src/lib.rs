@@ -57,13 +57,18 @@ pub fn accessors_macro(input: TokenStream) -> TokenStream {
                 // Check if field is of type Option<T>
                 match field_type {
                     Type::Path(type_path)
-                        if type_path.path.segments.last().map_or(false, |segment| segment.ident == "Option") =>
+                        if type_path
+                            .path
+                            .segments
+                            .last().is_some_and(|segment| segment.ident == "Option") =>
                     {
                         // Extract inner type T from Option<T>
-                        let inner_type = if let syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) =
-                            &type_path.path.segments.last().unwrap().arguments
+                        let inner_type = if let syn::PathArguments::AngleBracketed(
+                            angle_bracketed_generic_arguments,
+                        ) = &type_path.path.segments.last().unwrap().arguments
                         {
-                            if let Some(syn::GenericArgument::Type(ty)) = angle_bracketed_generic_arguments.args.first()
+                            if let Some(syn::GenericArgument::Type(ty)) =
+                                angle_bracketed_generic_arguments.args.first()
                             {
                                 ty.clone()
                             } else {
@@ -74,7 +79,8 @@ pub fn accessors_macro(input: TokenStream) -> TokenStream {
                         };
 
                         let as_option_name = format!("{field_name}_as_option");
-                        let as_option_name: proc_macro2::TokenStream = as_option_name.parse().unwrap();
+                        let as_option_name: proc_macro2::TokenStream =
+                        as_option_name.parse().unwrap();
                         let test_setter_name: proc_macro2::TokenStream =
                             format!("set_{field_name}_for_testing").parse().unwrap();
                         let test_un_setter_name: proc_macro2::TokenStream =
@@ -114,6 +120,7 @@ pub fn accessors_macro(input: TokenStream) -> TokenStream {
                         let value_setter = quote! {
                             stringify!(#field_name) => self.#test_setter_from_str_name(val),
                         };
+
 
                         let value_lookup = quote! {
                             stringify!(#field_name) => self.#field_name.map(|v| ProtocolConfigValue::#inner_type(v)),
@@ -222,7 +229,8 @@ pub fn protocol_config_override_macro(input: TokenStream) -> TokenStream {
 
     // Create a new struct name by appending "Optional".
     let struct_name = &ast.ident;
-    let optional_struct_name = syn::Ident::new(&format!("{}Optional", struct_name), struct_name.span());
+    let optional_struct_name =
+        syn::Ident::new(&format!("{}Optional", struct_name), struct_name.span());
 
     // Extract the fields from the struct
     let fields = match &ast.data {
@@ -290,7 +298,11 @@ pub fn feature_flag_getters_macro(input: TokenStream) -> TokenStream {
                 // Check if field is of type bool
                 match field_type {
                     Type::Path(type_path)
-                        if type_path.path.segments.last().map_or(false, |segment| segment.ident == "bool") =>
+                        if type_path
+                            .path
+                            .segments
+                            .last()
+                            .is_some_and(|segment| segment.ident == "bool") =>
                     {
                         Some((
                             quote! {
@@ -317,7 +329,8 @@ pub fn feature_flag_getters_macro(input: TokenStream) -> TokenStream {
         _ => panic!("Only structs supported."),
     };
 
-    let (by_fn_getters, (string_name_getters, field_names)): (Vec<_>, (Vec<_>, Vec<_>)) = getters.unzip();
+    let (by_fn_getters, (string_name_getters, field_names)): (Vec<_>, (Vec<_>, Vec<_>)) =
+        getters.unzip();
 
     let output = quote! {
         // For each getter, expand it out into a function in the impl block

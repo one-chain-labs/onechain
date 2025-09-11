@@ -6,7 +6,8 @@ use crate::{
     types::{address::Address, sui_address::SuiAddress, validator::Validator},
 };
 use std::{collections::BTreeMap, time::Duration};
-use sui_indexer::{apis::GovernanceReadApi, db::ConnectionPoolConfig, indexer_reader::IndexerReader};
+use sui_indexer::db::ConnectionPoolConfig;
+use sui_indexer::{apis::GovernanceReadApi, indexer_reader::IndexerReader};
 use sui_json_rpc_types::Stake as RpcStakedOct;
 use sui_types::{
     governance::StakedOct as NativeStakedOct,
@@ -51,16 +52,22 @@ impl PgManager {
             if epoch_id == latest_sui_system_state.epoch {
                 Ok(latest_sui_system_state)
             } else {
-                Ok(self.inner.get_epoch_sui_system_state(Some(epoch_id)).await?)
+                Ok(self
+                    .inner
+                    .get_epoch_sui_system_state(Some(epoch_id))
+                    .await?)
             }
         } else {
             Ok(latest_sui_system_state)
         }
     }
 
-    /// Make a request to the RPC for its representations of the staked oct we parsed out of the
+    /// Make a request to the RPC for its representations of the staked sui we parsed out of the
     /// object.  Used to implement fields that are implemented in JSON-RPC but not GraphQL (yet).
-    pub(crate) async fn fetch_rpc_staked_oct(&self, stake: NativeStakedOct) -> Result<RpcStakedOct, Error> {
+    pub(crate) async fn fetch_rpc_staked_oct(
+        &self,
+        stake: NativeStakedOct,
+    ) -> Result<RpcStakedOct, Error> {
         let governance_api = GovernanceReadApi::new(self.inner.clone());
 
         let mut delegated_stakes = governance_api
@@ -69,11 +76,15 @@ impl PgManager {
             .map_err(|e| Error::Internal(format!("Error fetching delegated stake. {e}")))?;
 
         let Some(mut delegated_stake) = delegated_stakes.pop() else {
-            return Err(Error::Internal("Error fetching delegated stake. No pools returned.".to_string()));
+            return Err(Error::Internal(
+                "Error fetching delegated stake. No pools returned.".to_string(),
+            ));
         };
 
         let Some(stake) = delegated_stake.stakes.pop() else {
-            return Err(Error::Internal("Error fetching delegated stake. No stake in pool.".to_string()));
+            return Err(Error::Internal(
+                "Error fetching delegated stake. No stake in pool.".to_string(),
+            ));
         };
 
         Ok(stake)
@@ -97,10 +108,23 @@ pub(crate) fn convert_to_validators(
         .map(move |validator_summary| {
             let at_risk = at_risk.get(&validator_summary.sui_address).copied();
             let report_records = reports.get(&validator_summary.sui_address).map(|addrs| {
-                addrs.iter().cloned().map(|a| Address { address: SuiAddress::from(a), checkpoint_viewed_at }).collect()
+                addrs
+                    .iter()
+                    .cloned()
+                    .map(|a| Address {
+                        address: SuiAddress::from(a),
+                        checkpoint_viewed_at,
+                    })
+                    .collect()
             });
 
-            Validator { validator_summary, at_risk, report_records, checkpoint_viewed_at, requested_for_epoch }
+            Validator {
+                validator_summary,
+                at_risk,
+                report_records,
+                checkpoint_viewed_at,
+                requested_for_epoch,
+            }
         })
         .collect()
 }

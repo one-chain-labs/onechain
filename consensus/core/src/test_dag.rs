@@ -4,11 +4,12 @@
 use std::sync::Arc;
 
 use consensus_config::AuthorityIndex;
+use consensus_types::block::{BlockRef, BlockTimestampMs, Round};
 use parking_lot::RwLock;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use crate::{
-    block::{genesis_blocks, BlockRef, BlockTimestampMs, Round, TestBlock, VerifiedBlock},
+    block::{genesis_blocks, TestBlock, VerifiedBlock},
     context::Context,
     dag_state::DagState,
     test_dag_builder::DagBuilder,
@@ -29,10 +30,16 @@ pub(crate) fn build_dag(
     let mut ancestors = match start {
         Some(start) => {
             assert!(!start.is_empty());
-            assert_eq!(start.iter().map(|x| x.round).max(), start.iter().map(|x| x.round).min());
+            assert_eq!(
+                start.iter().map(|x| x.round).max(),
+                start.iter().map(|x| x.round).min()
+            );
             start
         }
-        None => genesis_blocks(context.clone()).iter().map(|x| x.reference()).collect::<Vec<_>>(),
+        None => genesis_blocks(context.as_ref())
+            .iter()
+            .map(|x| x.reference())
+            .collect::<Vec<_>>(),
     };
 
     let num_authorities = context.committee.size();
@@ -44,10 +51,13 @@ pub(crate) fn build_dag(
             .map(|authority| {
                 let author_idx = authority.0.value() as u32;
                 // Test the case where a block from round R+1 has smaller timestamp than a block from round R.
-                let ts =
-                    round as BlockTimestampMs / 2 * num_authorities as BlockTimestampMs + author_idx as BlockTimestampMs;
+                let ts = round as BlockTimestampMs / 2 * num_authorities as BlockTimestampMs
+                    + author_idx as BlockTimestampMs;
                 let block = VerifiedBlock::new_for_test(
-                    TestBlock::new(round, author_idx).set_timestamp_ms(ts).set_ancestors(ancestors.clone()).build(),
+                    TestBlock::new(round, author_idx)
+                        .set_timestamp_ms(ts)
+                        .set_ancestors(ancestors.clone())
+                        .build(),
                 );
 
                 (block.reference(), block)
@@ -71,7 +81,11 @@ pub(crate) fn build_dag_layer(
     for (authority, ancestors) in connections {
         let round = ancestors.first().unwrap().round + 1;
         let author = authority.value() as u32;
-        let block = VerifiedBlock::new_for_test(TestBlock::new(round, author).set_ancestors(ancestors).build());
+        let block = VerifiedBlock::new_for_test(
+            TestBlock::new(round, author)
+                .set_ancestors(ancestors)
+                .build(),
+        );
         references.push(block.reference());
         dag_state.write().accept_block(block);
     }
@@ -84,7 +98,10 @@ pub(crate) fn create_random_dag(
     num_rounds: Round,
     context: Arc<Context>,
 ) -> DagBuilder {
-    assert!((0..=100).contains(&include_leader_percentage), "include_leader_percentage must be in the range 0..100");
+    assert!(
+        (0..=100).contains(&include_leader_percentage),
+        "include_leader_percentage must be in the range 0..100"
+    );
 
     let mut rng = StdRng::seed_from_u64(seed);
     let mut dag_builder = DagBuilder::new(context);
@@ -92,7 +109,9 @@ pub(crate) fn create_random_dag(
     for r in 1..=num_rounds {
         let random_num = rng.gen_range(0..100);
         let include_leader = random_num <= include_leader_percentage;
-        dag_builder.layer(r).min_ancestor_links(include_leader, Some(random_num));
+        dag_builder
+            .layer(r)
+            .min_ancestor_links(include_leader, Some(random_num));
     }
 
     dag_builder

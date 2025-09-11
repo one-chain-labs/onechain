@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2024.beta"
 
 [dependencies]
-One = { local = "../../../../../sui-framework/packages/one-framework" }
+Sui = { local = "../../../../../sui-framework/packages/sui-framework" }
 
 [addresses]
 entry_point_types =  "0x0"

@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use sui_core::authority::AuthorityState;
 use tracing::trace;
 
@@ -46,20 +44,35 @@ pub async fn send_telemetry_event(state: Arc<AuthorityState>, is_validator: bool
     let chain_identifier = match state.get_chain_identifier() {
         Some(chain_identifier) => chain_identifier.to_string(),
         None => "Unknown".to_string(),
-    };
-    let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("Now should be later than epoch!");
+    };    
+    let since_the_epoch = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Now should be later than epoch!");
     let telemetry_event = TelemetryEvent {
         name: GA_EVENT_NAME.into(),
         params: BTreeMap::from([
             ("chain_identifier".into(), chain_identifier),
             ("node_address".into(), ip_address),
-            ("node_type".into(), if is_validator { "validator".into() } else { "full_node".into() }),
+            (
+                "node_type".into(),
+                if is_validator {
+                    "validator".into()
+                } else {
+                    "full_node".into()
+                },
+            ),
             ("git_rev".into(), git_rev),
-            ("seconds_since_epoch".into(), since_the_epoch.as_secs().to_string()),
+            (
+                "seconds_since_epoch".into(),
+                since_the_epoch.as_secs().to_string(),
+            ),
         ]),
     };
 
-    let telemetry_payload = TelemetryPayload { client_id: HARDCODED_CLIENT_ID.into(), events: vec![telemetry_event] };
+    let telemetry_payload = TelemetryPayload {
+        client_id: HARDCODED_CLIENT_ID.into(),
+        events: vec![telemetry_event],
+    };
 
     send_telemetry_event_impl(telemetry_payload).await
 }
@@ -78,7 +91,10 @@ async fn get_ip() -> String {
 async fn send_telemetry_event_impl(telemetry_payload: TelemetryPayload) {
     let client = reqwest::Client::new();
     let response_result = client
-        .post(format!("{}?&measurement_id={}&api_secret={}", GA_URL, GA_MEASUREMENT_ID, GA_API_SECRET))
+        .post(format!(
+            "{}?&measurement_id={}&api_secret={}",
+            GA_URL, GA_MEASUREMENT_ID, GA_API_SECRET
+        ))
         .json::<TelemetryPayload>(&telemetry_payload)
         .send()
         .await;
@@ -97,7 +113,10 @@ async fn send_telemetry_event_impl(telemetry_payload: TelemetryPayload) {
             }
         }
         Err(error) => {
-            trace!("FAIL: Sending telemetry event failed with error: {:?}", error);
+            trace!(
+                "FAIL: Sending telemetry event failed with error: {:?}",
+                error
+            );
         }
     }
 }

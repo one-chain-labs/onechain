@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use itertools::Itertools;
@@ -12,47 +13,35 @@ use tracing::{info, warn};
 use move_core_types::language_storage::{StructTag, TypeTag};
 use mysten_metrics::{get_metrics, spawn_monitored_task};
 use sui_data_ingestion_core::Worker;
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::{
-    dynamic_field::DynamicFieldType,
-    effects::{ObjectChange, TransactionEffectsAPI},
-    event::SystemEpochInfoEvent,
-    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber},
-    object::{Object, Owner},
-    sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
-    transaction::TransactionDataAPI,
+use sui_types::dynamic_field::DynamicFieldType;
+use sui_types::effects::{ObjectChange, TransactionEffectsAPI};
+use sui_types::event::SystemEpochInfoEvent;
+use sui_types::full_checkpoint_content::{CheckpointData, CheckpointTransaction};
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber,
+};
+use sui_types::object::Object;
+use sui_types::object::Owner;
+use sui_types::sui_system_state::{get_sui_system_state, SuiSystemStateTrait};
+use sui_types::transaction::TransactionDataAPI;
+
+use crate::errors::IndexerError;
+use crate::handlers::committer::start_tx_checkpoint_commit_task;
+use crate::metrics::IndexerMetrics;
+use crate::models::display::StoredDisplay;
+use crate::models::epoch::{EndOfEpochUpdate, EpochEndInfo, EpochStartInfo, StartOfEpochUpdate};
+use crate::models::obj_indices::StoredObjectVersion;
+use crate::store::{IndexerStore, PgIndexerStore};
+use crate::types::{
+    EventIndex, IndexedCheckpoint, IndexedDeletedObject, IndexedEvent, IndexedObject,
+    IndexedPackage, IndexedTransaction, IndexerResult, TransactionKind, TxIndex,
 };
 
-use crate::{
-    errors::IndexerError,
-    handlers::committer::start_tx_checkpoint_commit_task,
-    metrics::IndexerMetrics,
-    models::{
-        display::StoredDisplay,
-        epoch::{EndOfEpochUpdate, EpochEndInfo, EpochStartInfo, StartOfEpochUpdate},
-        obj_indices::StoredObjectVersion,
-    },
-    store::{IndexerStore, PgIndexerStore},
-    types::{
-        EventIndex,
-        IndexedCheckpoint,
-        IndexedDeletedObject,
-        IndexedEvent,
-        IndexedObject,
-        IndexedPackage,
-        IndexedTransaction,
-        IndexerResult,
-        TransactionKind,
-        TxIndex,
-    },
-};
-
-use super::{
-    tx_processor::{EpochEndIndexingObjectStore, TxChangesProcessor},
-    CheckpointDataToCommit,
-    EpochToCommit,
-    TransactionObjectChangesToCommit,
-};
+use super::tx_processor::EpochEndIndexingObjectStore;
+use super::tx_processor::TxChangesProcessor;
+use super::CheckpointDataToCommit;
+use super::EpochToCommit;
+use super::TransactionObjectChangesToCommit;
 
 const CHECKPOINT_QUEUE_SIZE: usize = 100;
 
@@ -62,22 +51,28 @@ pub async fn new_handlers(
     cancel: CancellationToken,
     start_checkpoint_opt: Option<CheckpointSequenceNumber>,
     end_checkpoint_opt: Option<CheckpointSequenceNumber>,
-    mvr_mode: bool,
 ) -> Result<(CheckpointHandler, u64), IndexerError> {
     let start_checkpoint = match start_checkpoint_opt {
         Some(start_checkpoint) => start_checkpoint,
-        None => {
-            state.get_latest_checkpoint_sequence_number().await?.map(|seq| seq.saturating_add(1)).unwrap_or_default()
-        }
+        None => state
+            .get_latest_checkpoint_sequence_number()
+            .await?
+            .map(|seq| seq.saturating_add(1))
+            .unwrap_or_default(),
     };
 
-    let checkpoint_queue_size =
-        std::env::var("CHECKPOINT_QUEUE_SIZE").unwrap_or(CHECKPOINT_QUEUE_SIZE.to_string()).parse::<usize>().unwrap();
+    let checkpoint_queue_size = std::env::var("CHECKPOINT_QUEUE_SIZE")
+        .unwrap_or(CHECKPOINT_QUEUE_SIZE.to_string())
+        .parse::<usize>()
+        .unwrap();
     let global_metrics = get_metrics().unwrap();
-    let (indexed_checkpoint_sender, indexed_checkpoint_receiver) = mysten_metrics::metered_channel::channel(
-        checkpoint_queue_size,
-        &global_metrics.channel_inflight.with_label_values(&["checkpoint_indexing"]),
-    );
+    let (indexed_checkpoint_sender, indexed_checkpoint_receiver) =
+        mysten_metrics::metered_channel::channel(
+            checkpoint_queue_size,
+            &global_metrics
+                .channel_inflight
+                .with_label_values(&["checkpoint_indexing"]),
+        );
 
     let state_clone = state.clone();
     let metrics_clone = metrics.clone();
@@ -88,9 +83,11 @@ pub async fn new_handlers(
         cancel.clone(),
         start_checkpoint,
         end_checkpoint_opt,
-        mvr_mode
     ));
-    Ok((CheckpointHandler::new(state, metrics, indexed_checkpoint_sender), start_checkpoint))
+    Ok((
+        CheckpointHandler::new(state, metrics, indexed_checkpoint_sender),
+        start_checkpoint,
+    ))
 }
 
 pub struct CheckpointHandler {
@@ -102,7 +99,6 @@ pub struct CheckpointHandler {
 #[async_trait]
 impl Worker for CheckpointHandler {
     type Result = ();
-
     async fn process_checkpoint(&self, checkpoint: &CheckpointData) -> anyhow::Result<()> {
         let time_now_ms = chrono::Utc::now().timestamp_millis();
         let cp_download_lag = time_now_ms - checkpoint.checkpoint_summary.timestamp_ms as i64;
@@ -111,11 +107,17 @@ impl Worker for CheckpointHandler {
             checkpoint.checkpoint_summary.sequence_number, cp_download_lag
         );
         self.metrics.download_lag_ms.set(cp_download_lag);
-        self.metrics.max_downloaded_checkpoint_sequence_number.set(checkpoint.checkpoint_summary.sequence_number as i64);
-        self.metrics.downloaded_checkpoint_timestamp_ms.set(checkpoint.checkpoint_summary.timestamp_ms as i64);
+        self.metrics
+            .max_downloaded_checkpoint_sequence_number
+            .set(checkpoint.checkpoint_summary.sequence_number as i64);
+        self.metrics
+            .downloaded_checkpoint_timestamp_ms
+            .set(checkpoint.checkpoint_summary.timestamp_ms as i64);
         info!(
             "Indexer lag: downloaded checkpoint {} with time now {} and checkpoint time {}",
-            checkpoint.checkpoint_summary.sequence_number, time_now_ms, checkpoint.checkpoint_summary.timestamp_ms
+            checkpoint.checkpoint_summary.sequence_number,
+            time_now_ms,
+            checkpoint.checkpoint_summary.timestamp_ms
         );
         let checkpoint_data = Self::index_checkpoint(
             &self.state,
@@ -135,18 +137,30 @@ impl CheckpointHandler {
         metrics: IndexerMetrics,
         indexed_checkpoint_sender: mysten_metrics::metered_channel::Sender<CheckpointDataToCommit>,
     ) -> Self {
-        Self { state, metrics, indexed_checkpoint_sender }
+        Self {
+            state,
+            metrics,
+            indexed_checkpoint_sender,
+        }
     }
 
-    async fn index_epoch(state: &PgIndexerStore, data: &CheckpointData) -> Result<Option<EpochToCommit>, IndexerError> {
+    async fn index_epoch(
+        state: &PgIndexerStore,
+        data: &CheckpointData,
+    ) -> Result<Option<EpochToCommit>, IndexerError> {
         let checkpoint_object_store = EpochEndIndexingObjectStore::new(data);
 
-        let CheckpointData { transactions, checkpoint_summary, checkpoint_contents: _ } = data;
+        let CheckpointData {
+            transactions,
+            checkpoint_summary,
+            checkpoint_contents: _,
+        } = data;
 
         // Genesis epoch
         if *checkpoint_summary.sequence_number() == 0 {
             info!("Processing genesis epoch");
-            let system_state_summary = get_sui_system_state(&checkpoint_object_store)?.into_sui_system_state_summary();
+            let system_state_summary =
+                get_sui_system_state(&checkpoint_object_store)?.into_sui_system_state_summary();
             return Ok(Some(EpochToCommit {
                 last_epoch: None,
                 new_epoch: StartOfEpochUpdate::new(system_state_summary, EpochStartInfo::default()),
@@ -158,7 +172,8 @@ impl CheckpointHandler {
             return Ok(None);
         }
 
-        let system_state_summary = get_sui_system_state(&checkpoint_object_store)?.into_sui_system_state_summary();
+        let system_state_summary =
+            get_sui_system_state(&checkpoint_object_store)?.into_sui_system_state_summary();
 
         let epoch_event_opt = transactions
             .iter()
@@ -192,12 +207,15 @@ impl CheckpointHandler {
             1 => Ok(0),
             _ => {
                 let last_epoch = system_state_summary.epoch - 2;
-                state.get_network_total_transactions_by_end_of_epoch(last_epoch).await?.ok_or_else(|| {
-                    IndexerError::PersistentStorageDataCorruptionError(format!(
-                        "Network total transactions for epoch {} not found",
-                        last_epoch
-                    ))
-                })
+                state
+                    .get_network_total_transactions_by_end_of_epoch(last_epoch)
+                    .await?
+                    .ok_or_else(|| {
+                        IndexerError::PersistentStorageDataCorruptionError(format!(
+                            "Network total transactions for epoch {} not found",
+                            last_epoch
+                        ))
+                    })
             }
         }?;
 
@@ -209,12 +227,18 @@ impl CheckpointHandler {
         );
 
         Ok(Some(EpochToCommit {
-            last_epoch: Some(EndOfEpochUpdate::new(checkpoint_summary, first_tx_sequence_number, epoch_end_info)),
+            last_epoch: Some(EndOfEpochUpdate::new(
+                checkpoint_summary,
+                first_tx_sequence_number,
+                epoch_end_info,
+            )),
             new_epoch: StartOfEpochUpdate::new(system_state_summary, epoch_start_info),
         }))
     }
 
-    fn derive_object_versions(object_history_changes: &TransactionObjectChangesToCommit) -> Vec<StoredObjectVersion> {
+    fn derive_object_versions(
+        object_history_changes: &TransactionObjectChangesToCommit,
+    ) -> Vec<StoredObjectVersion> {
         let mut object_versions = vec![];
         for changed_obj in object_history_changes.changed_objects.iter() {
             object_versions.push(StoredObjectVersion {
@@ -246,15 +270,27 @@ impl CheckpointHandler {
         let epoch = Self::index_epoch(state, data).await?;
 
         // Index Objects
-        let object_changes: TransactionObjectChangesToCommit = Self::index_objects(data, &metrics).await?;
-        let object_history_changes: TransactionObjectChangesToCommit = Self::index_objects_history(data).await?;
+        let object_changes: TransactionObjectChangesToCommit =
+            Self::index_objects(data, &metrics).await?;
+        let object_history_changes: TransactionObjectChangesToCommit =
+            Self::index_objects_history(data).await?;
         let object_versions = Self::derive_object_versions(&object_history_changes);
 
         let (checkpoint, db_transactions, db_events, db_tx_indices, db_event_indices, db_displays) = {
-            let CheckpointData { transactions, checkpoint_summary, checkpoint_contents } = data;
+            let CheckpointData {
+                transactions,
+                checkpoint_summary,
+                checkpoint_contents,
+            } = data;
 
             let (db_transactions, db_events, db_tx_indices, db_event_indices, db_displays) =
-                Self::index_transactions(transactions, checkpoint_summary, checkpoint_contents, &metrics).await?;
+                Self::index_transactions(
+                    transactions,
+                    checkpoint_summary,
+                    checkpoint_contents,
+                    &metrics,
+                )
+                .await?;
 
             let successful_tx_num: u64 = db_transactions.iter().map(|t| t.successful_tx_num).sum();
             (
@@ -271,9 +307,15 @@ impl CheckpointHandler {
             )
         };
         let time_now_ms = chrono::Utc::now().timestamp_millis();
-        metrics.index_lag_ms.set(time_now_ms - checkpoint.timestamp_ms as i64);
-        metrics.max_indexed_checkpoint_sequence_number.set(checkpoint.sequence_number as i64);
-        metrics.indexed_checkpoint_timestamp_ms.set(checkpoint.timestamp_ms as i64);
+        metrics
+            .index_lag_ms
+            .set(time_now_ms - checkpoint.timestamp_ms as i64);
+        metrics
+            .max_indexed_checkpoint_sequence_number
+            .set(checkpoint.sequence_number as i64);
+        metrics
+            .indexed_checkpoint_timestamp_ms
+            .set(checkpoint.timestamp_ms as i64);
         info!(
             "Indexer lag: indexed checkpoint {} with time now {} and checkpoint time {}",
             checkpoint.sequence_number, time_now_ms, checkpoint.timestamp_ms
@@ -345,7 +387,10 @@ impl CheckpointHandler {
             }
 
             let tx = sender_signed_data.transaction_data();
-            let events = events.as_ref().map(|events| events.data.clone()).unwrap_or_default();
+            let events = events
+                .as_ref()
+                .map(|events| events.data.clone())
+                .unwrap_or_default();
 
             let transaction_kind = if tx.is_system_tx() {
                 TransactionKind::SystemTransaction
@@ -365,10 +410,9 @@ impl CheckpointHandler {
             }));
 
             db_event_indices.extend(
-                events
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, event)| EventIndex::from_event(tx_sequence_number, idx as u64, event)),
+                events.iter().enumerate().map(|(idx, event)| {
+                    EventIndex::from_event(tx_sequence_number, idx as u64, event)
+                }),
             );
 
             db_displays.extend(
@@ -381,7 +425,9 @@ impl CheckpointHandler {
             let objects: Vec<_> = input_objects.iter().chain(output_objects.iter()).collect();
 
             let (balance_change, object_changes) =
-                TxChangesProcessor::new(&objects, metrics.clone()).get_changes(tx, fx, &tx_digest).await?;
+                TxChangesProcessor::new(&objects, metrics.clone())
+                    .get_changes(tx, fx, &tx_digest)
+                    .await?;
 
             let db_txn = IndexedTransaction {
                 tx_sequence_number,
@@ -394,7 +440,11 @@ impl CheckpointHandler {
                 balance_change,
                 events,
                 transaction_kind: transaction_kind.clone(),
-                successful_tx_num: if fx.status().is_ok() { tx.kind().tx_count() as u64 } else { 0 },
+                successful_tx_num: if fx.status().is_ok() {
+                    tx.kind().tx_count() as u64
+                } else {
+                    0
+                },
             };
 
             db_transactions.push(db_txn);
@@ -408,11 +458,18 @@ impl CheckpointHandler {
                 .collect();
 
             // Changed Objects
-            let changed_objects =
-                fx.all_changed_objects().into_iter().map(|(object_ref, _owner, _write_kind)| object_ref.0).collect();
+            let changed_objects = fx
+                .all_changed_objects()
+                .into_iter()
+                .map(|(object_ref, _owner, _write_kind)| object_ref.0)
+                .collect();
 
             // Affected Objects
-            let affected_objects = fx.object_changes().into_iter().map(|ObjectChange { id, .. }| id).collect();
+            let affected_objects = fx
+                .object_changes()
+                .into_iter()
+                .map(|ObjectChange { id, .. }| id)
+                .collect();
 
             // Payers
             let payers = vec![tx.gas_owner()];
@@ -432,7 +489,11 @@ impl CheckpointHandler {
                 .collect();
 
             // Move Calls
-            let move_calls = tx.move_calls().into_iter().map(|(p, m, f)| (*p, m.to_string(), f.to_string())).collect();
+            let move_calls = tx
+                .move_calls()
+                .into_iter()
+                .map(|(p, m, f)| (*p, m.to_string(), f.to_string()))
+                .collect();
 
             db_tx_indices.push(TxIndex {
                 tx_sequence_number,
@@ -448,7 +509,13 @@ impl CheckpointHandler {
                 tx_kind: transaction_kind,
             });
         }
-        Ok((db_transactions, db_events, db_tx_indices, db_event_indices, db_displays))
+        Ok((
+            db_transactions,
+            db_events,
+            db_tx_indices,
+            db_event_indices,
+            db_displays,
+        ))
     }
 
     pub(crate) async fn index_objects(
@@ -458,7 +525,8 @@ impl CheckpointHandler {
         let _timer = metrics.indexing_objects_latency.start_timer();
         let checkpoint_seq = data.checkpoint_summary.sequence_number;
 
-        let eventually_removed_object_refs_post_version = data.eventually_removed_object_refs_post_version();
+        let eventually_removed_object_refs_post_version =
+            data.eventually_removed_object_refs_post_version();
         let indexed_eventually_removed_objects = eventually_removed_object_refs_post_version
             .into_iter()
             .map(|obj_ref| IndexedDeletedObject {
@@ -472,18 +540,27 @@ impl CheckpointHandler {
         let changed_objects = latest_live_output_objects
             .into_iter()
             .map(|o| {
-                try_extract_df_kind(o).map(|df_kind| IndexedObject::from_object(checkpoint_seq, o.clone(), df_kind))
+                try_extract_df_kind(o)
+                    .map(|df_kind| IndexedObject::from_object(checkpoint_seq, o.clone(), df_kind))
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(TransactionObjectChangesToCommit { changed_objects, deleted_objects: indexed_eventually_removed_objects })
+        Ok(TransactionObjectChangesToCommit {
+            changed_objects,
+            deleted_objects: indexed_eventually_removed_objects,
+        })
     }
 
     // similar to index_objects, but objects_history keeps all versions of objects
-    async fn index_objects_history(data: &CheckpointData) -> Result<TransactionObjectChangesToCommit, IndexerError> {
+    async fn index_objects_history(
+        data: &CheckpointData,
+    ) -> Result<TransactionObjectChangesToCommit, IndexerError> {
         let checkpoint_seq = data.checkpoint_summary.sequence_number;
-        let deleted_objects =
-            data.transactions.iter().flat_map(|tx| tx.removed_object_refs_post_version()).collect::<Vec<_>>();
+        let deleted_objects = data
+            .transactions
+            .iter()
+            .flat_map(|tx| tx.removed_object_refs_post_version())
+            .collect::<Vec<_>>();
         let indexed_deleted_objects: Vec<IndexedDeletedObject> = deleted_objects
             .into_iter()
             .map(|obj_ref| IndexedDeletedObject {
@@ -493,21 +570,32 @@ impl CheckpointHandler {
             })
             .collect();
 
-        let output_objects: Vec<_> = data.transactions.iter().flat_map(|tx| &tx.output_objects).collect();
+        let output_objects: Vec<_> = data
+            .transactions
+            .iter()
+            .flat_map(|tx| &tx.output_objects)
+            .collect();
 
         // TODO(gegaowp): the current df_info implementation is not correct,
         // but we have decided remove all df_* except df_kind.
         let changed_objects = output_objects
             .into_iter()
             .map(|o| {
-                try_extract_df_kind(o).map(|df_kind| IndexedObject::from_object(checkpoint_seq, o.clone(), df_kind))
+                try_extract_df_kind(o)
+                    .map(|df_kind| IndexedObject::from_object(checkpoint_seq, o.clone(), df_kind))
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(TransactionObjectChangesToCommit { changed_objects, deleted_objects: indexed_deleted_objects })
+        Ok(TransactionObjectChangesToCommit {
+            changed_objects,
+            deleted_objects: indexed_deleted_objects,
+        })
     }
 
-    fn index_packages(checkpoint_data: &[CheckpointData], metrics: &IndexerMetrics) -> Vec<IndexedPackage> {
+    fn index_packages(
+        checkpoint_data: &[CheckpointData],
+        metrics: &IndexerMetrics,
+    ) -> Vec<IndexedPackage> {
         let _timer = metrics.indexing_packages_latency.start_timer();
         checkpoint_data
             .iter()
@@ -550,9 +638,12 @@ fn try_extract_df_kind(o: &Object) -> IndexerResult<Option<DynamicFieldType>> {
         return Ok(None);
     };
 
-    Ok(Some(if matches!(name, TypeTag::Struct(s) if DynamicFieldInfo::is_dynamic_object_field_wrapper(s)) {
-        DynamicFieldType::DynamicObject
-    } else {
-        DynamicFieldType::DynamicField
-    }))
+    Ok(Some(
+        if matches!(name, TypeTag::Struct(s) if DynamicFieldInfo::is_dynamic_object_field_wrapper(s))
+        {
+            DynamicFieldType::DynamicObject
+        } else {
+            DynamicFieldType::DynamicField
+        },
+    ))
 }

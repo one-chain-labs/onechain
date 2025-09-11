@@ -13,9 +13,17 @@ use move_core_types::vm_status::StatusCode;
 use move_vm_config::verifier::VerifierConfig;
 
 fn verify_module(verifier_config: &VerifierConfig, module: &CompiledModule) -> PartialVMResult<()> {
-    for (idx, function_definition) in module.function_defs().iter().enumerate().filter(|(_, def)| !def.is_native()) {
+    for (idx, function_definition) in module
+        .function_defs()
+        .iter()
+        .enumerate()
+        .filter(|(_, def)| !def.is_native())
+    {
         let current_function = FunctionDefinitionIndex(idx as TableIndex);
-        let code = function_definition.code.as_ref().expect("unexpected native function");
+        let code = function_definition
+            .code
+            .as_ref()
+            .expect("unexpected native function");
 
         control_flow::verify_function(
             verifier_config,
@@ -37,7 +45,10 @@ fn verify_module(verifier_config: &VerifierConfig, module: &CompiledModule) -> P
 fn empty_bytecode() {
     let module = dummy_procedure_module(vec![]);
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::EMPTY_CODE_UNIT,);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::EMPTY_CODE_UNIT,
+    );
 }
 
 #[test]
@@ -46,21 +57,30 @@ fn empty_bytecode_v5() {
     module.version = 5;
 
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::EMPTY_CODE_UNIT,);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::EMPTY_CODE_UNIT,
+    );
 }
 
 #[test]
 fn invalid_fallthrough_br_true() {
     let module = dummy_procedure_module(vec![Bytecode::LdFalse, Bytecode::BrTrue(1)]);
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::INVALID_FALL_THROUGH);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::INVALID_FALL_THROUGH
+    );
 }
 
 #[test]
 fn invalid_fallthrough_br_false() {
     let module = dummy_procedure_module(vec![Bytecode::LdTrue, Bytecode::BrFalse(1)]);
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::INVALID_FALL_THROUGH);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::INVALID_FALL_THROUGH
+    );
 }
 
 // all non-branch instructions should trigger invalid fallthrough; just check one of them
@@ -68,7 +88,10 @@ fn invalid_fallthrough_br_false() {
 fn invalid_fallthrough_non_branch() {
     let module = dummy_procedure_module(vec![Bytecode::LdTrue, Bytecode::Pop]);
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::INVALID_FALL_THROUGH);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::INVALID_FALL_THROUGH
+    );
 }
 
 #[test]
@@ -101,7 +124,13 @@ fn nested_loops_max_depth() {
         Bytecode::BrFalse(0),
         Bytecode::Ret,
     ]);
-    let result = verify_module(&VerifierConfig { max_loop_depth: Some(2), ..VerifierConfig::default() }, &module);
+    let result = verify_module(
+        &VerifierConfig {
+            max_loop_depth: Some(2),
+            ..VerifierConfig::default()
+        },
+        &module,
+    );
     assert!(result.is_ok());
 }
 
@@ -116,24 +145,44 @@ fn nested_loops_exceed_max_depth() {
         Bytecode::BrFalse(0),
         Bytecode::Ret,
     ]);
-    let result = verify_module(&VerifierConfig { max_loop_depth: Some(2), ..VerifierConfig::default() }, &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::LOOP_MAX_DEPTH_REACHED);
+    let result = verify_module(
+        &VerifierConfig {
+            max_loop_depth: Some(2),
+            ..VerifierConfig::default()
+        },
+        &module,
+    );
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::LOOP_MAX_DEPTH_REACHED
+    );
 }
 
 #[test]
 fn non_loop_backward_jump() {
-    let module = dummy_procedure_module(vec![Bytecode::Branch(2), Bytecode::Ret, Bytecode::Branch(1)]);
+    let module = dummy_procedure_module(vec![
+        Bytecode::Branch(2),
+        Bytecode::Ret,
+        Bytecode::Branch(1),
+    ]);
     let result = verify_module(&Default::default(), &module);
     assert!(result.is_ok());
 }
 
 #[test]
 fn non_loop_backward_jump_v5() {
-    let mut module = dummy_procedure_module(vec![Bytecode::Branch(2), Bytecode::Ret, Bytecode::Branch(1)]);
+    let mut module = dummy_procedure_module(vec![
+        Bytecode::Branch(2),
+        Bytecode::Ret,
+        Bytecode::Branch(1),
+    ]);
 
     module.version = 5;
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::INVALID_LOOP_SPLIT,);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::INVALID_LOOP_SPLIT,
+    );
 }
 
 #[test]
@@ -147,7 +196,10 @@ fn irreducible_control_flow_graph() {
         Bytecode::Ret,
     ]);
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::INVALID_LOOP_SPLIT,);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::INVALID_LOOP_SPLIT,
+    );
 }
 
 #[test]
@@ -181,5 +233,8 @@ fn nested_loop_break_v5() {
 
     module.version = 5;
     let result = verify_module(&Default::default(), &module);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::INVALID_LOOP_BREAK,);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::INVALID_LOOP_BREAK,
+    );
 }

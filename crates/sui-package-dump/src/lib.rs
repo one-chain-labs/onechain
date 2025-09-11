@@ -25,17 +25,23 @@ mod query;
 /// it. If the path exists but is empty, the invocation writes to the directory. If the directory
 /// has been written to in the past, the invocation picks back up where the previous invocation
 /// left off.
-pub async fn dump(rpc_url: String, output_dir: PathBuf, before_checkpoint: Option<u64>) -> Result<()> {
+pub async fn dump(
+    rpc_url: String,
+    output_dir: PathBuf,
+    before_checkpoint: Option<u64>,
+) -> Result<()> {
     ensure_output_directory(&output_dir)?;
 
     let client = Client::new(rpc_url)?;
     let after_checkpoint = read_last_checkpoint(&output_dir)?;
     let limit = max_page_size(&client).await?;
-    let (last_checkpoint, packages) = fetch_packages(&client, limit, after_checkpoint, before_checkpoint).await?;
+    let (last_checkpoint, packages) =
+        fetch_packages(&client, limit, after_checkpoint, before_checkpoint).await?;
 
     for package in &packages {
         let SuiAddress(address) = &package.address;
-        dump_package(&output_dir, package).with_context(|| format!("Failed to dump package {address}"))?;
+        dump_package(&output_dir, package)
+            .with_context(|| format!("Failed to dump package {address}"))?;
     }
 
     if let Some(last_checkpoint) = last_checkpoint {
@@ -54,11 +60,19 @@ fn ensure_output_directory(path: impl Into<PathBuf>) -> Result<()> {
         return Ok(());
     }
 
-    ensure!(path.is_dir(), "Output path is not a directory: {}", path.display());
+    ensure!(
+        path.is_dir(),
+        "Output path is not a directory: {}",
+        path.display()
+    );
 
     let metadata = fs::metadata(&path).context("Getting metadata for output path")?;
 
-    ensure!(!metadata.permissions().readonly(), "Output directory is not writable: {}", path.display());
+    ensure!(
+        !metadata.permissions().readonly(),
+        "Output directory is not writable: {}",
+        path.display()
+    );
 
     Ok(())
 }
@@ -72,7 +86,8 @@ fn read_last_checkpoint(output: &Path) -> Result<Option<u64>> {
     }
 
     let content = fs::read_to_string(&path).context("Failed to read last checkpoint")?;
-    let checkpoint: u64 = serde_json::from_str(&content).context("Failed to parse last checkpoint")?;
+    let checkpoint: u64 =
+        serde_json::from_str(&content).context("Failed to parse last checkpoint")?;
 
     info!("Resuming download after checkpoint {checkpoint}");
 
@@ -82,7 +97,8 @@ fn read_last_checkpoint(output: &Path) -> Result<Option<u64>> {
 /// Write the max checkpoint that we have seen a package from back to the output directory.
 fn write_last_checkpoint(output: &Path, checkpoint: u64) -> Result<()> {
     let path = output.join("last-checkpoint");
-    let content = serde_json::to_string(&checkpoint).context("Failed to serialize last checkpoint")?;
+    let content =
+        serde_json::to_string(&checkpoint).context("Failed to serialize last checkpoint")?;
 
     fs::write(path, content).context("Failed to write last checkpoint")?;
     Ok(())
@@ -90,7 +106,12 @@ fn write_last_checkpoint(output: &Path, checkpoint: u64) -> Result<()> {
 
 /// Read the max page size supported by the GraphQL service.
 async fn max_page_size(client: &Client) -> Result<i32> {
-    Ok(client.query(limits::build()).await.context("Failed to fetch max page size")?.service_config.max_page_size)
+    Ok(client
+        .query(limits::build())
+        .await
+        .context("Failed to fetch max page size")?
+        .service_config
+        .max_page_size)
 }
 
 /// Read all the packages between `after_checkpoint` and `before_checkpoint`, in batches of
@@ -109,9 +130,18 @@ async fn fetch_packages(
 ) -> Result<(Option<u64>, Vec<packages::MovePackage>)> {
     let packages::Query {
         checkpoint: checkpoint_viewed_at,
-        packages: packages::MovePackageConnection { mut page_info, mut nodes },
+        packages:
+            packages::MovePackageConnection {
+                mut page_info,
+                mut nodes,
+            },
     } = client
-        .query(packages::build(page_size, None, after_checkpoint.map(UInt53), before_checkpoint.map(UInt53)))
+        .query(packages::build(
+            page_size,
+            None,
+            after_checkpoint.map(UInt53),
+            before_checkpoint.map(UInt53),
+        ))
         .await
         .with_context(|| "Failed to fetch page 1 of packages.")?;
 
@@ -134,13 +164,28 @@ async fn fetch_packages(
         nodes.extend(packages.nodes);
         page_info = packages.page_info;
 
-        info!("Fetched page {i} ({} package{} so far).", nodes.len(), if nodes.len() == 1 { "" } else { "s" },);
+        info!(
+            "Fetched page {i} ({} package{} so far).",
+            nodes.len(),
+            if nodes.len() == 1 { "" } else { "s" },
+        );
     }
 
     use packages::Checkpoint as C;
     let last_checkpoint = match (checkpoint_viewed_at, before_checkpoint) {
-        (Some(C { sequence_number: UInt53(v) }), Some(b)) if b > 0 => Some(v.min(b - 1)),
-        (Some(C { sequence_number: UInt53(c) }), _) | (_, Some(c)) => Some(c),
+        (
+            Some(C {
+                sequence_number: UInt53(v),
+            }),
+            Some(b),
+        ) if b > 0 => Some(v.min(b - 1)),
+        (
+            Some(C {
+                sequence_number: UInt53(c),
+            }),
+            _,
+        )
+        | (_, Some(c)) => Some(c),
         _ => None,
     };
 
@@ -176,22 +221,31 @@ fn dump_package(output_dir: &Path, pkg: &packages::MovePackage) -> Result<()> {
     let origins: BTreeMap<_, _> = package
         .type_origin_table()
         .iter()
-        .map(|o| (format!("{}::{}", o.module_name, o.datatype_name), o.package.to_string()))
+        .map(|o| {
+            (
+                format!("{}::{}", o.module_name, o.datatype_name),
+                o.package.to_string(),
+            )
+        })
         .collect();
 
     let package_dir = output_dir.join(format!("{}.{}", id, package.version().value()));
     fs::create_dir(&package_dir).context("Failed to make output directory")?;
 
-    let linkage_json = serde_json::to_string_pretty(package.linkage_table()).context("Failed to serialize linkage")?;
-    let origins_json = serde_json::to_string_pretty(&origins).context("Failed to serialize type origins")?;
+    let linkage_json = serde_json::to_string_pretty(package.linkage_table())
+        .context("Failed to serialize linkage")?;
+    let origins_json =
+        serde_json::to_string_pretty(&origins).context("Failed to serialize type origins")?;
 
     fs::write(package_dir.join("object.bcs"), bytes).context("Failed to write object BCS")?;
     fs::write(package_dir.join("linkage.json"), linkage_json).context("Failed to write linkage")?;
-    fs::write(package_dir.join("origins.json"), origins_json).context("Failed to write type origins")?;
+    fs::write(package_dir.join("origins.json"), origins_json)
+        .context("Failed to write type origins")?;
 
     for (module_name, module_bytes) in package.serialized_module_map() {
         let module_path = package_dir.join(format!("{module_name}.mv"));
-        fs::write(module_path, module_bytes).with_context(|| format!("Failed to write module: {module_name}"))?
+        fs::write(module_path, module_bytes)
+            .with_context(|| format!("Failed to write module: {module_name}"))?
     }
 
     Ok(())

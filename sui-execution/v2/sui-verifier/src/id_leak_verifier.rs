@@ -16,44 +16,32 @@ use move_abstract_stack::AbstractStack;
 use move_binary_format::{
     errors::PartialVMError,
     file_format::{
-        Bytecode,
-        CodeOffset,
-        CompiledModule,
-        FunctionDefinitionIndex,
-        FunctionHandle,
-        LocalIndex,
-        StructDefinition,
-        StructFieldInformation,
+        Bytecode, CodeOffset, CompiledModule, FunctionDefinitionIndex, FunctionHandle, LocalIndex,
+        StructDefinition, StructFieldInformation,
     },
 };
 use move_bytecode_verifier::absint::{
-    AbstractDomain,
-    AbstractInterpreter,
-    FunctionContext,
-    JoinResult,
-    TransferFunctions,
+    AbstractDomain, AbstractInterpreter, FunctionContext, JoinResult, TransferFunctions,
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
-use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, identifier::IdentStr, vm_status::StatusCode,
+};
 use std::{collections::BTreeMap, error::Error, num::NonZeroU64};
+use sui_types::bridge::BRIDGE_MODULE_NAME;
+use sui_types::deny_list_v1::{DENY_LIST_CREATE_FUNC, DENY_LIST_MODULE};
 use sui_types::{
     authenticator_state::AUTHENTICATOR_STATE_MODULE_NAME,
-    bridge::BRIDGE_MODULE_NAME,
     clock::CLOCK_MODULE_NAME,
-    deny_list_v1::{DENY_LIST_CREATE_FUNC, DENY_LIST_MODULE},
     error::{ExecutionError, VMMVerifierErrorSubStatusCode},
     id::OBJECT_MODULE_NAME,
     randomness_state::RANDOMNESS_MODULE_NAME,
     sui_system_state::SUI_SYSTEM_MODULE_NAME,
-    BRIDGE_ADDRESS,
-    SUI_FRAMEWORK_ADDRESS,
-    SUI_SYSTEM_ADDRESS,
+    BRIDGE_ADDRESS, SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS,
 };
 
 use crate::{
-    check_for_verifier_timeout,
-    to_verification_timeout_error,
-    verification_failure,
+    check_for_verifier_timeout, to_verification_timeout_error, verification_failure,
     TEST_SCENARIO_MODULE_NAME,
 };
 pub(crate) const JOIN_BASE_COST: u128 = 10;
@@ -67,20 +55,49 @@ enum AbstractValue {
 }
 
 type FunctionIdent<'a> = (&'a AccountAddress, &'a IdentStr, &'a IdentStr);
-const OBJECT_NEW: FunctionIdent = (&SUI_FRAMEWORK_ADDRESS, OBJECT_MODULE_NAME, ident_str!("new"));
-const OBJECT_NEW_UID_FROM_HASH: FunctionIdent =
-    (&SUI_FRAMEWORK_ADDRESS, OBJECT_MODULE_NAME, ident_str!("new_uid_from_hash"));
-const TS_NEW_OBJECT: FunctionIdent =
-    (&SUI_FRAMEWORK_ADDRESS, ident_str!(TEST_SCENARIO_MODULE_NAME), ident_str!("new_object"));
-const SUI_SYSTEM_CREATE: FunctionIdent = (&SUI_SYSTEM_ADDRESS, SUI_SYSTEM_MODULE_NAME, ident_str!("create"));
-const SUI_CLOCK_CREATE: FunctionIdent = (&SUI_FRAMEWORK_ADDRESS, CLOCK_MODULE_NAME, ident_str!("create"));
-const SUI_AUTHENTICATOR_STATE_CREATE: FunctionIdent =
-    (&SUI_FRAMEWORK_ADDRESS, AUTHENTICATOR_STATE_MODULE_NAME, ident_str!("create"));
-const SUI_RANDOMNESS_STATE_CREATE: FunctionIdent =
-    (&SUI_FRAMEWORK_ADDRESS, RANDOMNESS_MODULE_NAME, ident_str!("create"));
-const SUI_DENY_LIST_CREATE: FunctionIdent = (&SUI_FRAMEWORK_ADDRESS, DENY_LIST_MODULE, DENY_LIST_CREATE_FUNC);
+const OBJECT_NEW: FunctionIdent = (
+    &SUI_FRAMEWORK_ADDRESS,
+    OBJECT_MODULE_NAME,
+    ident_str!("new"),
+);
+const OBJECT_NEW_UID_FROM_HASH: FunctionIdent = (
+    &SUI_FRAMEWORK_ADDRESS,
+    OBJECT_MODULE_NAME,
+    ident_str!("new_uid_from_hash"),
+);
+const TS_NEW_OBJECT: FunctionIdent = (
+    &SUI_FRAMEWORK_ADDRESS,
+    ident_str!(TEST_SCENARIO_MODULE_NAME),
+    ident_str!("new_object"),
+);
+const SUI_SYSTEM_CREATE: FunctionIdent = (
+    &SUI_SYSTEM_ADDRESS,
+    SUI_SYSTEM_MODULE_NAME,
+    ident_str!("create"),
+);
+const SUI_CLOCK_CREATE: FunctionIdent = (
+    &SUI_FRAMEWORK_ADDRESS,
+    CLOCK_MODULE_NAME,
+    ident_str!("create"),
+);
+const SUI_AUTHENTICATOR_STATE_CREATE: FunctionIdent = (
+    &SUI_FRAMEWORK_ADDRESS,
+    AUTHENTICATOR_STATE_MODULE_NAME,
+    ident_str!("create"),
+);
+const SUI_RANDOMNESS_STATE_CREATE: FunctionIdent = (
+    &SUI_FRAMEWORK_ADDRESS,
+    RANDOMNESS_MODULE_NAME,
+    ident_str!("create"),
+);
+const SUI_DENY_LIST_CREATE: FunctionIdent = (
+    &SUI_FRAMEWORK_ADDRESS,
+    DENY_LIST_MODULE,
+    DENY_LIST_CREATE_FUNC,
+);
 
-const SUI_BRIDGE_CREATE: FunctionIdent = (&BRIDGE_ADDRESS, BRIDGE_MODULE_NAME, ident_str!("create"));
+const SUI_BRIDGE_CREATE: FunctionIdent =
+    (&BRIDGE_ADDRESS, BRIDGE_MODULE_NAME, ident_str!("create"));
 const FRESH_ID_FUNCTIONS: &[FunctionIdent] = &[OBJECT_NEW, OBJECT_NEW_UID_FROM_HASH, TS_NEW_OBJECT];
 const FUNCTIONS_TO_SKIP: &[FunctionIdent] = &[
     SUI_SYSTEM_CREATE,
@@ -101,36 +118,52 @@ impl AbstractValue {
     }
 }
 
-pub fn verify_module(module: &CompiledModule, meter: &mut (impl Meter + ?Sized)) -> Result<(), ExecutionError> {
+pub fn verify_module(
+    module: &CompiledModule,
+    meter: &mut (impl Meter + ?Sized),
+) -> Result<(), ExecutionError> {
     verify_id_leak(module, meter)
 }
 
-fn verify_id_leak(module: &CompiledModule, meter: &mut (impl Meter + ?Sized)) -> Result<(), ExecutionError> {
+fn verify_id_leak(
+    module: &CompiledModule,
+    meter: &mut (impl Meter + ?Sized),
+) -> Result<(), ExecutionError> {
     for (index, func_def) in module.function_defs.iter().enumerate() {
         let code = match func_def.code.as_ref() {
             Some(code) => code,
             None => continue,
         };
         let handle = module.function_handle_at(func_def.function);
-        let func_view = FunctionContext::new(module, FunctionDefinitionIndex(index as u16), code, handle);
+        let func_view =
+            FunctionContext::new(module, FunctionDefinitionIndex(index as u16), code, handle);
         let initial_state = AbstractState::new(&func_view);
         let mut verifier = IDLeakAnalysis::new(module, &func_view);
         let function_to_verify = verifier.cur_function();
-        if FUNCTIONS_TO_SKIP.iter().any(|to_skip| function_to_verify == *to_skip) {
+        if FUNCTIONS_TO_SKIP
+            .iter()
+            .any(|to_skip| function_to_verify == *to_skip)
+        {
             continue;
         }
-        verifier.analyze_function(initial_state, &func_view, meter).map_err(|err| {
-            // Handle verifificaiton timeout specially
-            if check_for_verifier_timeout(&err.major_status()) {
-                to_verification_timeout_error(err.to_string())
-            } else if let Some(message) = err.source().as_ref() {
-                let function_name = module.identifier_at(module.function_handle_at(func_def.function).name);
-                let module_name = module.self_id();
-                verification_failure(format!("{} Found in {module_name}::{function_name}", message))
-            } else {
-                verification_failure(err.to_string())
-            }
-        })?;
+        verifier
+            .analyze_function(initial_state, &func_view, meter)
+            .map_err(|err| {
+                // Handle verifificaiton timeout specially
+                if check_for_verifier_timeout(&err.major_status()) {
+                    to_verification_timeout_error(err.to_string())
+                } else if let Some(message) = err.source().as_ref() {
+                    let function_name =
+                        module.identifier_at(module.function_handle_at(func_def.function).name);
+                    let module_name = module.self_id();
+                    verification_failure(format!(
+                        "{} Found in {module_name}::{function_name}",
+                        message
+                    ))
+                } else {
+                    verification_failure(err.to_string())
+                }
+            })?;
     }
 
     Ok(())
@@ -144,10 +177,14 @@ pub(crate) struct AbstractState {
 impl AbstractState {
     /// create a new abstract state
     pub fn new(function_context: &FunctionContext) -> Self {
-        let mut state = AbstractState { locals: BTreeMap::new() };
+        let mut state = AbstractState {
+            locals: BTreeMap::new(),
+        };
 
         for param_idx in 0..function_context.parameters().len() {
-            state.locals.insert(param_idx as LocalIndex, AbstractValue::Other);
+            state
+                .locals
+                .insert(param_idx as LocalIndex, AbstractValue::Other);
         }
 
         state
@@ -156,7 +193,11 @@ impl AbstractState {
 
 impl AbstractDomain for AbstractState {
     /// attempts to join state to self and returns the result
-    fn join(&mut self, state: &AbstractState, meter: &mut (impl Meter + ?Sized)) -> Result<JoinResult, PartialVMError> {
+    fn join(
+        &mut self,
+        state: &AbstractState,
+        meter: &mut (impl Meter + ?Sized),
+    ) -> Result<JoinResult, PartialVMError> {
         meter.add(Scope::Function, JOIN_BASE_COST)?;
         meter.add_items(Scope::Function, JOIN_PER_LOCAL_COST, state.locals.len())?;
         let mut changed = false;
@@ -182,7 +223,11 @@ struct IDLeakAnalysis<'a> {
 
 impl<'a> IDLeakAnalysis<'a> {
     fn new(binary_view: &'a CompiledModule, function_context: &'a FunctionContext<'a>) -> Self {
-        Self { binary_view, function_context, stack: AbstractStack::new() }
+        Self {
+            binary_view,
+            function_context,
+            stack: AbstractStack::new(),
+        }
     }
 
     fn stack_popn(&mut self, n: u64) -> Result<(), PartialVMError> {
@@ -218,13 +263,15 @@ impl<'a> IDLeakAnalysis<'a> {
     }
 
     fn cur_function(&self) -> FunctionIdent<'a> {
-        let fdef = self.binary_view.function_def_at(self.function_context.index().unwrap());
+        let fdef = self
+            .binary_view
+            .function_def_at(self.function_context.index().unwrap());
         let handle = self.binary_view.function_handle_at(fdef.function);
         self.resolve_function(handle)
     }
 }
 
-impl<'a> TransferFunctions for IDLeakAnalysis<'a> {
+impl TransferFunctions for IDLeakAnalysis<'_> {
     type Error = ExecutionError;
     type State = AbstractState;
 
@@ -241,28 +288,41 @@ impl<'a> TransferFunctions for IDLeakAnalysis<'a> {
         // If it is not, something is wrong with the implementation, so throw an invariant
         // violation
         if index == last_index && !self.stack.is_empty() {
-            let msg = "Invalid stack transitions. Non-zero stack size at the end of the block".to_string();
+            let msg = "Invalid stack transitions. Non-zero stack size at the end of the block"
+                .to_string();
             debug_assert!(false, "{msg}",);
-            return Err(PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(msg));
+            return Err(
+                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(msg),
+            );
         }
         Ok(())
     }
 }
 
-impl<'a> AbstractInterpreter for IDLeakAnalysis<'a> {}
+impl AbstractInterpreter for IDLeakAnalysis<'_> {}
 
-fn call(verifier: &mut IDLeakAnalysis, function_handle: &FunctionHandle) -> Result<(), PartialVMError> {
-    let parameters = verifier.binary_view.signature_at(function_handle.parameters);
+fn call(
+    verifier: &mut IDLeakAnalysis,
+    function_handle: &FunctionHandle,
+) -> Result<(), PartialVMError> {
+    let parameters = verifier
+        .binary_view
+        .signature_at(function_handle.parameters);
     verifier.stack_popn(parameters.len() as u64)?;
 
     let return_ = verifier.binary_view.signature_at(function_handle.return_);
     let function = verifier.resolve_function(function_handle);
-    if FRESH_ID_FUNCTIONS.iter().any(|makes_fresh| function == *makes_fresh) {
+    if FRESH_ID_FUNCTIONS
+        .iter()
+        .any(|makes_fresh| function == *makes_fresh)
+    {
         if return_.0.len() != 1 {
             debug_assert!(false, "{:?} should have a single return value", function);
             return Err(PartialVMError::new(StatusCode::UNKNOWN_VERIFICATION_ERROR)
                 .with_message("Should have a single return value".to_string())
-                .with_sub_status(VMMVerifierErrorSubStatusCode::MULTIPLE_RETURN_VALUES_NOT_ALLOWED as u64));
+                .with_sub_status(
+                    VMMVerifierErrorSubStatusCode::MULTIPLE_RETURN_VALUES_NOT_ALLOWED as u64,
+                ));
         }
         verifier.stack_push(AbstractValue::Fresh)?;
     } else {
@@ -278,10 +338,15 @@ fn num_fields(struct_def: &StructDefinition) -> u64 {
     }
 }
 
-fn pack(verifier: &mut IDLeakAnalysis, struct_def: &StructDefinition) -> Result<(), PartialVMError> {
+fn pack(
+    verifier: &mut IDLeakAnalysis,
+    struct_def: &StructDefinition,
+) -> Result<(), PartialVMError> {
     // When packing, an object whose struct type has key ability must have the first field as
     // "id". That fields must come from one of the functions that creates a new UID.
-    let handle = verifier.binary_view.datatype_handle_at(struct_def.struct_handle);
+    let handle = verifier
+        .binary_view
+        .datatype_handle_at(struct_def.struct_handle);
     let num_fields = num_fields(struct_def);
     verifier.stack_popn(num_fields - 1)?;
     let last_value = verifier.stack.pop().unwrap();
@@ -290,8 +355,8 @@ fn pack(verifier: &mut IDLeakAnalysis, struct_def: &StructDefinition) -> Result<
         let msg = format!(
             "Invalid object creation in {cur_package}::{cur_module}::{cur_function}. \
                 Object created without a newly created UID. \
-                The UID must come directly from one::{}::{}. \
-                Or for tests, it can come from one::{}::{}",
+                The UID must come directly from sui::{}::{}. \
+                Or for tests, it can come from sui::{}::{}",
             OBJECT_NEW.1, OBJECT_NEW.2, TS_NEW_OBJECT.1, TS_NEW_OBJECT.2,
         );
 
@@ -303,7 +368,10 @@ fn pack(verifier: &mut IDLeakAnalysis, struct_def: &StructDefinition) -> Result<
     Ok(())
 }
 
-fn unpack(verifier: &mut IDLeakAnalysis, struct_def: &StructDefinition) -> Result<(), PartialVMError> {
+fn unpack(
+    verifier: &mut IDLeakAnalysis,
+    struct_def: &StructDefinition,
+) -> Result<(), PartialVMError> {
     verifier.stack.pop().unwrap();
     verifier.stack_pushn(num_fields(struct_def), AbstractValue::Other)
 }

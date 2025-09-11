@@ -5,7 +5,9 @@ use crate::unit_tests::production_config;
 use move_binary_format::file_format::*;
 use move_bytecode_verifier::{limits::LimitsVerifier, verify_module_with_config_for_test};
 use move_bytecode_verifier_meter::dummy::DummyMeter;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+};
 use move_vm_config::verifier::{VerifierConfig, DEFAULT_MAX_IDENTIFIER_LENGTH};
 
 #[test]
@@ -21,7 +23,10 @@ fn test_function_handle_type_instantiation() {
 
     assert_eq!(
         LimitsVerifier::verify_module(
-            &VerifierConfig { max_generic_instantiation_length: Some(9), ..Default::default() },
+            &VerifierConfig {
+                max_generic_instantiation_length: Some(9),
+                ..Default::default()
+            },
             &m
         )
         .unwrap_err()
@@ -37,14 +42,20 @@ fn test_struct_handle_type_instantiation() {
         module: ModuleHandleIndex::new(0),
         name: IdentifierIndex::new(0),
         abilities: AbilitySet::ALL,
-        type_parameters: std::iter::repeat(DatatypeTyParameter { constraints: AbilitySet::ALL, is_phantom: false })
-            .take(10)
-            .collect(),
+        type_parameters: std::iter::repeat(DatatypeTyParameter {
+            constraints: AbilitySet::ALL,
+            is_phantom: false,
+        })
+        .take(10)
+        .collect(),
     });
 
     assert_eq!(
         LimitsVerifier::verify_module(
-            &VerifierConfig { max_generic_instantiation_length: Some(9), ..Default::default() },
+            &VerifierConfig {
+                max_generic_instantiation_length: Some(9),
+                ..Default::default()
+            },
             &m
         )
         .unwrap_err()
@@ -56,7 +67,9 @@ fn test_struct_handle_type_instantiation() {
 #[test]
 fn test_function_handle_parameters() {
     let mut m = basic_test_module();
-    m.signatures.push(Signature(std::iter::repeat(SignatureToken::Bool).take(10).collect()));
+    m.signatures.push(Signature(
+        std::iter::repeat(SignatureToken::Bool).take(10).collect(),
+    ));
     m.function_handles.push(FunctionHandle {
         module: ModuleHandleIndex::new(0),
         name: IdentifierIndex::new(0),
@@ -66,9 +79,15 @@ fn test_function_handle_parameters() {
     });
 
     assert_eq!(
-        LimitsVerifier::verify_module(&VerifierConfig { max_function_parameters: Some(9), ..Default::default() }, &m)
-            .unwrap_err()
-            .major_status(),
+        LimitsVerifier::verify_module(
+            &VerifierConfig {
+                max_function_parameters: Some(9),
+                ..Default::default()
+            },
+            &m
+        )
+        .unwrap_err()
+        .major_status(),
         StatusCode::TOO_MANY_PARAMETERS
     );
 }
@@ -96,11 +115,18 @@ fn big_vec_unpacks() {
         code.push(Bytecode::Pop);
     }
     code.push(Bytecode::Ret);
-    let type_param_constraints = DatatypeTyParameter { constraints: AbilitySet::EMPTY, is_phantom: false };
+    let type_param_constraints = DatatypeTyParameter {
+        constraints: AbilitySet::EMPTY,
+        is_phantom: false,
+    };
     let module = CompiledModule {
         version: 5,
+        publishable: true,
         self_module_handle_idx: ModuleHandleIndex(0),
-        module_handles: vec![ModuleHandle { address: AddressIdentifierIndex(0), name: IdentifierIndex(0) }],
+        module_handles: vec![ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex(0),
+        }],
         datatype_handles: vec![DatatypeHandle {
             module: ModuleHandleIndex(0),
             name: IdentifierIndex(1),
@@ -120,7 +146,10 @@ fn big_vec_unpacks() {
         function_instantiations: vec![],
         field_instantiations: vec![],
         signatures: vec![Signature(vec![]), Signature(vec![st])],
-        identifiers: vec![Identifier::new("f").unwrap(), Identifier::new("generic_struct").unwrap()],
+        identifiers: vec![
+            Identifier::new("f").unwrap(),
+            Identifier::new("generic_struct").unwrap(),
+        ],
         address_identifiers: vec![AccountAddress::ONE],
         constant_pool: vec![],
         metadata: vec![],
@@ -133,7 +162,11 @@ fn big_vec_unpacks() {
             visibility: Visibility::Public,
             is_entry: true,
             acquires_global_resources: vec![],
-            code: Some(CodeUnit { locals: SignatureIndex(0), code, jump_tables: vec![] }),
+            code: Some(CodeUnit {
+                locals: SignatureIndex(0),
+                code,
+                jump_tables: vec![],
+            }),
         }],
         enum_defs: vec![],
         enum_def_instantiations: vec![],
@@ -159,7 +192,10 @@ fn big_vec_unpacks() {
         &module,
         &mut DummyMeter,
     );
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::VALUE_STACK_PUSH_OVERFLOW);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::VALUE_STACK_PUSH_OVERFLOW
+    );
 }
 
 const MAX_STRUCTS: usize = 200;
@@ -192,11 +228,17 @@ fn max_struct_test() {
     let mut module = leaf_module("M");
     multi_struct(&mut module, MAX_STRUCTS * 2);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, MAX_STRUCTS + 1);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,
+    );
 }
 
 #[test]
@@ -226,27 +268,42 @@ fn max_fields_test() {
     multi_struct(&mut module, 100);
     multi_fields(&mut module, MAX_FIELDS + 1);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FIELD_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, 2);
     multi_fields(&mut module, MAX_FIELDS * 2);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FIELD_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, 50);
     multi_fields_except_one(&mut module, 0, 2, MAX_FIELDS + 1);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FIELD_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, 20);
     multi_fields_except_one(&mut module, 19, MAX_FIELDS, MAX_FIELDS + 1);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FIELD_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, 100);
     multi_fields_except_one(&mut module, 50, 1, MAX_FIELDS * 2);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FIELD_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+    );
 }
 
 #[test]
@@ -281,11 +338,17 @@ fn max_functions_test() {
     multi_struct(&mut module, 5);
     multi_functions(&mut module, MAX_FUNCTIONS + 1);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_functions(&mut module, MAX_FUNCTIONS * 2);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,
+    );
 }
 
 #[test]
@@ -362,13 +425,19 @@ fn max_mixed_config_test() {
     multi_fields(&mut module, MAX_FIELDS);
     multi_functions(&mut module, MAX_FUNCTIONS + 1);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, MAX_STRUCTS);
     multi_fields(&mut module, MAX_FIELDS * 2);
     multi_functions(&mut module, MAX_FUNCTIONS * 3);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FIELD_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+    );
 
     let config = VerifierConfig {
         max_data_definitions: Some(MAX_STRUCTS),
@@ -398,13 +467,19 @@ fn max_mixed_config_test() {
     multi_fields(&mut module, MAX_FIELDS * 3);
     multi_functions(&mut module, MAX_FUNCTIONS);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, MAX_STRUCTS);
     multi_fields(&mut module, MAX_FIELDS * 2);
     multi_functions(&mut module, MAX_FUNCTIONS * 2);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,
+    );
 
     let config = VerifierConfig {
         max_fields_in_struct: Some(MAX_FIELDS),
@@ -434,46 +509,78 @@ fn max_mixed_config_test() {
     multi_fields(&mut module, MAX_FIELDS * 3);
     multi_functions(&mut module, MAX_FUNCTIONS);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FIELD_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+    );
     let mut module = leaf_module("M");
     multi_struct(&mut module, MAX_STRUCTS * 2);
     multi_fields(&mut module, MAX_FIELDS);
     multi_functions(&mut module, MAX_FUNCTIONS * 2);
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,
+    );
 }
 
 #[test]
 fn max_identifier_len() {
     let (config, _) = production_config();
-    let max_ident = "z".repeat(config.max_idenfitier_len.unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize);
+    let max_ident = "z".repeat(
+        config
+            .max_idenfitier_len
+            .unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize,
+    );
     let good_module = leaf_module(&max_ident);
 
     let res = LimitsVerifier::verify_module(&config, &good_module);
     assert!(res.is_ok());
 
-    let max_ident = "z".repeat((config.max_idenfitier_len.unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize) / 2);
+    let max_ident = "z".repeat(
+        (config
+            .max_idenfitier_len
+            .unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize)
+            / 2,
+    );
     let good_module = leaf_module(&max_ident);
 
     let res = LimitsVerifier::verify_module(&config, &good_module);
     assert!(res.is_ok());
 
-    let over_max_ident = "z".repeat(1 + config.max_idenfitier_len.unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize);
+    let over_max_ident = "z".repeat(
+        1 + config
+            .max_idenfitier_len
+            .unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize,
+    );
     let bad_module = leaf_module(&over_max_ident);
     let res = LimitsVerifier::verify_module(&config, &bad_module);
 
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::IDENTIFIER_TOO_LONG,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::IDENTIFIER_TOO_LONG,
+    );
 
-    let over_max_ident = "zx".repeat(1 + config.max_idenfitier_len.unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize);
+    let over_max_ident = "zx".repeat(
+        1 + config
+            .max_idenfitier_len
+            .unwrap_or(DEFAULT_MAX_IDENTIFIER_LENGTH) as usize,
+    );
     let bad_module = leaf_module(&over_max_ident);
     let res = LimitsVerifier::verify_module(&config, &bad_module);
 
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::IDENTIFIER_TOO_LONG,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::IDENTIFIER_TOO_LONG,
+    );
 }
 
 #[test]
 fn max_vec_len() {
-    let config = VerifierConfig { max_constant_vector_len: Some(0xFFFF - 1), ..Default::default() };
+    let config = VerifierConfig {
+        max_constant_vector_len: Some(0xFFFF - 1),
+        ..Default::default()
+    };
     let double_vec = |item: Vec<u8>| -> Vec<u8> {
         let mut items = vec![2];
         items.extend(item.clone());
@@ -490,38 +597,84 @@ fn max_vec_len() {
     }
 
     let mut module = empty_module();
-    module.constant_pool = vec![Constant { type_: tvec(SignatureToken::Bool), data: large_vec(vec![0]) }];
+    module.constant_pool = vec![Constant {
+        type_: tvec(SignatureToken::Bool),
+        data: large_vec(vec![0]),
+    }];
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::TOO_MANY_VECTOR_ELEMENTS,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::TOO_MANY_VECTOR_ELEMENTS,
+    );
 
     let mut module = empty_module();
     module.constant_pool = vec![Constant {
         type_: tvec(SignatureToken::U256),
         data: large_vec(vec![
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
         ]),
     }];
     let res = LimitsVerifier::verify_module(&config, &module);
-    assert_eq!(res.unwrap_err().major_status(), StatusCode::TOO_MANY_VECTOR_ELEMENTS,);
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::TOO_MANY_VECTOR_ELEMENTS,
+    );
 
-    let config = VerifierConfig { max_constant_vector_len: Some(0xFFFF), ..Default::default() };
+    let config = VerifierConfig {
+        max_constant_vector_len: Some(0xFFFF),
+        ..Default::default()
+    };
 
     let mut module = empty_module();
     module.constant_pool = vec![
         // empty
-        Constant { type_: tvec(SignatureToken::Bool), data: vec![0] },
-        Constant { type_: tvec(tvec(SignatureToken::Bool)), data: vec![0] },
-        Constant { type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))), data: vec![0] },
-        Constant { type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))), data: double_vec(vec![0]) },
+        Constant {
+            type_: tvec(SignatureToken::Bool),
+            data: vec![0],
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::Bool)),
+            data: vec![0],
+        },
+        Constant {
+            type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))),
+            data: vec![0],
+        },
+        Constant {
+            type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))),
+            data: double_vec(vec![0]),
+        },
         // small
-        Constant { type_: tvec(SignatureToken::Bool), data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
-        Constant { type_: tvec(SignatureToken::U8), data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
+        Constant {
+            type_: tvec(SignatureToken::Bool),
+            data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        Constant {
+            type_: tvec(SignatureToken::U8),
+            data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
         // large
-        Constant { type_: tvec(SignatureToken::Bool), data: large_vec(vec![0]) },
-        Constant { type_: tvec(SignatureToken::U8), data: large_vec(vec![0]) },
-        Constant { type_: tvec(SignatureToken::U16), data: large_vec(vec![0, 0]) },
-        Constant { type_: tvec(SignatureToken::U32), data: large_vec(vec![0, 0, 0, 0]) },
-        Constant { type_: tvec(SignatureToken::U64), data: large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0]) },
+        Constant {
+            type_: tvec(SignatureToken::Bool),
+            data: large_vec(vec![0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U8),
+            data: large_vec(vec![0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U16),
+            data: large_vec(vec![0, 0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U32),
+            data: large_vec(vec![0, 0, 0, 0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U64),
+            data: large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+        },
         Constant {
             type_: tvec(SignatureToken::U128),
             data: large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -529,35 +682,56 @@ fn max_vec_len() {
         Constant {
             type_: tvec(SignatureToken::U256),
             data: large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ]),
         },
         Constant {
             type_: tvec(SignatureToken::Address),
             data: large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ]),
         },
         // double large
-        Constant { type_: tvec(tvec(SignatureToken::Bool)), data: double_vec(large_vec(vec![0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U8)), data: double_vec(large_vec(vec![0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U16)), data: double_vec(large_vec(vec![0, 0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U32)), data: double_vec(large_vec(vec![0, 0, 0, 0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U64)), data: double_vec(large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0])) },
+        Constant {
+            type_: tvec(tvec(SignatureToken::Bool)),
+            data: double_vec(large_vec(vec![0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U8)),
+            data: double_vec(large_vec(vec![0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U16)),
+            data: double_vec(large_vec(vec![0, 0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U32)),
+            data: double_vec(large_vec(vec![0, 0, 0, 0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U64)),
+            data: double_vec(large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0])),
+        },
         Constant {
             type_: tvec(tvec(SignatureToken::U128)),
-            data: double_vec(large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
+            data: double_vec(large_vec(vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ])),
         },
         Constant {
             type_: tvec(tvec(SignatureToken::U256)),
             data: double_vec(large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ])),
         },
         Constant {
             type_: tvec(tvec(SignatureToken::Address)),
             data: double_vec(large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ])),
         },
     ];
@@ -568,7 +742,9 @@ fn max_vec_len() {
 
 fn multi_struct(module: &mut CompiledModule, count: usize) {
     for i in 0..count {
-        module.identifiers.push(Identifier::new(format!("A_{}", i)).unwrap());
+        module
+            .identifiers
+            .push(Identifier::new(format!("A_{}", i)).unwrap());
         module.datatype_handles.push(DatatypeHandle {
             module: module.self_module_handle_idx,
             name: IdentifierIndex((module.identifiers.len() - 1) as u16),
@@ -586,8 +762,13 @@ fn multi_fields(module: &mut CompiledModule, count: usize) {
     for def in &mut module.struct_defs {
         let mut fields = vec![];
         for i in 0..count {
-            module.identifiers.push(Identifier::new(format!("f_{}", i)).unwrap());
-            fields.push(FieldDefinition { name: Default::default(), signature: TypeSignature(SignatureToken::U8) });
+            module
+                .identifiers
+                .push(Identifier::new(format!("f_{}", i)).unwrap());
+            fields.push(FieldDefinition {
+                name: Default::default(),
+                signature: TypeSignature(SignatureToken::U8),
+            });
         }
         def.field_information = StructFieldInformation::Declared(fields);
     }
@@ -598,8 +779,13 @@ fn multi_fields_except_one(module: &mut CompiledModule, idx: usize, count: usize
         let mut fields = vec![];
         let count = if struct_idx == idx { one } else { count };
         for i in 0..count {
-            module.identifiers.push(Identifier::new(format!("f_{}", i)).unwrap());
-            fields.push(FieldDefinition { name: Default::default(), signature: TypeSignature(SignatureToken::U8) });
+            module
+                .identifiers
+                .push(Identifier::new(format!("f_{}", i)).unwrap());
+            fields.push(FieldDefinition {
+                name: Default::default(),
+                signature: TypeSignature(SignatureToken::U8),
+            });
         }
         def.field_information = StructFieldInformation::Declared(fields);
     }
@@ -608,7 +794,9 @@ fn multi_fields_except_one(module: &mut CompiledModule, idx: usize, count: usize
 fn multi_functions(module: &mut CompiledModule, count: usize) {
     module.signatures.push(Signature(vec![]));
     for i in 0..count {
-        module.identifiers.push(Identifier::new(format!("func_{}", i)).unwrap());
+        module
+            .identifiers
+            .push(Identifier::new(format!("func_{}", i)).unwrap());
         module.function_handles.push(FunctionHandle {
             module: module.self_module_handle_idx,
             name: IdentifierIndex((module.identifiers.len() - 1) as u16),

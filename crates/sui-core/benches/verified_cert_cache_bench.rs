@@ -5,16 +5,23 @@ use criterion::*;
 
 use criterion::Criterion;
 use sui_core::signature_verifier::SignatureVerifierMetrics;
-use sui_types::{digests::CertificateDigest, signature_verification::VerifiedDigestCache};
+use sui_types::digests::CertificateDigest;
+use sui_types::signature_verification::VerifiedDigestCache;
 
 fn verified_cert_cache_bench(c: &mut Criterion) {
-    let mut digests: Vec<_> = (0..(1 << 18)).map(|_| CertificateDigest::random()).collect();
+    let mut digests: Vec<_> = (0..(1 << 18))
+        .map(|_| CertificateDigest::random())
+        .collect();
     digests.extend_from_slice(&digests.clone());
     rand::seq::SliceRandom::shuffle(digests.as_mut_slice(), &mut rand::rngs::OsRng);
 
     let cpus = num_cpus::get();
     let chunk_size = digests.len() / cpus;
-    let chunks: Vec<Vec<CertificateDigest>> = digests.chunks(chunk_size).take(cpus).map(|c| c.to_vec()).collect();
+    let chunks: Vec<Vec<CertificateDigest>> = digests
+        .chunks(chunk_size)
+        .take(cpus)
+        .map(|c| c.to_vec())
+        .collect();
     assert_eq!(chunks.len(), cpus);
 
     let registry = prometheus::Registry::new();

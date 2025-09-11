@@ -5,7 +5,7 @@
 
 //# publish --sender A
 module P0::fake {
-    use one::coin;
+    use sui::coin;
 
     public struct FAKE has drop {}
 

@@ -4,22 +4,10 @@
 
 use crate::{borrow_graph::BorrowGraph, error::VMError};
 use move_binary_format::file_format::{
-    empty_module,
-    Ability,
-    AbilitySet,
-    CompiledModule,
-    FieldInstantiation,
-    FieldInstantiationIndex,
-    FunctionHandleIndex,
-    FunctionInstantiation,
-    FunctionInstantiationIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken,
-    StructDefInstantiation,
-    StructDefInstantiationIndex,
-    StructDefinitionIndex,
-    TableIndex,
+    Ability, AbilitySet, CompiledModule, FieldInstantiation, FieldInstantiationIndex,
+    FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex, Signature,
+    SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
+    StructDefinitionIndex, TableIndex, empty_module,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -81,13 +69,19 @@ impl AbstractValue {
             },
             "AbstractValue::new_primitive must be applied with primitive type"
         );
-        AbstractValue { token, abilities: AbilitySet::PRIMITIVES }
+        AbstractValue {
+            token,
+            abilities: AbilitySet::PRIMITIVES,
+        }
     }
 
     /// Create a new reference `AbstractValue` given its type and kind
     pub fn new_reference(token: SignatureToken, abilities: AbilitySet) -> AbstractValue {
         assert!(
-            matches!(token, SignatureToken::Reference(_) | SignatureToken::MutableReference(_)),
+            matches!(
+                token,
+                SignatureToken::Reference(_) | SignatureToken::MutableReference(_)
+            ),
             "AbstractValue::new_reference must be applied with a reference type"
         );
         AbstractValue { token, abilities }
@@ -116,7 +110,9 @@ impl AbstractValue {
         match token {
             SignatureToken::TypeParameter(_) => true,
             SignatureToken::DatatypeInstantiation(_) => true,
-            SignatureToken::Reference(tok) | SignatureToken::MutableReference(tok) => Self::is_generic_token(tok),
+            SignatureToken::Reference(tok) | SignatureToken::MutableReference(tok) => {
+                Self::is_generic_token(tok)
+            }
             _ => false,
         }
     }
@@ -130,7 +126,10 @@ pub struct CallGraph {
 
 impl CallGraph {
     pub fn new(max_function_handle_index: usize) -> Self {
-        Self { calls: HashMap::new(), max_function_handle_index }
+        Self {
+            calls: HashMap::new(),
+            max_function_handle_index,
+        }
     }
 
     pub fn add_call(&mut self, caller: FunctionHandleIndex, callee: FunctionHandleIndex) {
@@ -140,7 +139,10 @@ impl CallGraph {
     pub fn can_call(&self, my_index: FunctionHandleIndex) -> Vec<FunctionHandleIndex> {
         // We want the set of function handles that don't lead to a recursive call-graph
         (0..self.max_function_handle_index)
-            .filter(|index| self.call_depth(my_index, FunctionHandleIndex(*index as TableIndex)).is_some())
+            .filter(|index| {
+                self.call_depth(my_index, FunctionHandleIndex(*index as TableIndex))
+                    .is_some()
+            })
             .map(|i| FunctionHandleIndex(i as TableIndex))
             .collect()
     }
@@ -160,7 +162,11 @@ impl CallGraph {
 
     /// None if recursive, Some(index) if non-recursive, and index is the length of the maximal call
     /// graph path originating at caller, and calling through callee.
-    pub fn call_depth(&self, caller: FunctionHandleIndex, callee: FunctionHandleIndex) -> Option<usize> {
+    pub fn call_depth(
+        &self,
+        caller: FunctionHandleIndex,
+        callee: FunctionHandleIndex,
+    ) -> Option<usize> {
         if caller == callee {
             return None;
         }
@@ -220,7 +226,11 @@ impl InstantiableModule {
                 .enumerate()
                 .map(|(index, sig)| (sig.0.clone(), SignatureIndex(index as TableIndex)))
                 .collect::<HashMap<_, _>>(),
-            sig_instance_for_offset: module.signatures().iter().map(|loc_sig| loc_sig.0.clone()).collect(),
+            sig_instance_for_offset: module
+                .signatures()
+                .iter()
+                .map(|loc_sig| loc_sig.0.clone())
+                .collect(),
 
             struct_instantiations: module
                 .struct_instantiations()
@@ -256,8 +266,10 @@ impl InstantiableModule {
         match self.instantiations.get(&instantiant) {
             Some(index) => *index,
             None => {
-                let current_index = SignatureIndex(self.sig_instance_for_offset.len() as TableIndex);
-                self.instantiations.insert(instantiant.clone(), current_index);
+                let current_index =
+                    SignatureIndex(self.sig_instance_for_offset.len() as TableIndex);
+                self.instantiations
+                    .insert(instantiant.clone(), current_index);
                 self.sig_instance_for_offset.push(instantiant);
                 current_index
             }
@@ -268,12 +280,18 @@ impl InstantiableModule {
     /// instantiant to the `struct_instance_for_offset` for table, and adds the index to the
     /// reverse lookup table.
     /// Returns the SignatureIndex for the `instantiant`.
-    pub fn add_struct_instantiation(&mut self, instantiant: StructDefInstantiation) -> StructDefInstantiationIndex {
+    pub fn add_struct_instantiation(
+        &mut self,
+        instantiant: StructDefInstantiation,
+    ) -> StructDefInstantiationIndex {
         match self.struct_instantiations.get(&instantiant) {
             Some(index) => *index,
             None => {
-                let current_index = StructDefInstantiationIndex(self.struct_instance_for_offset.len() as TableIndex);
-                self.struct_instantiations.insert(instantiant.clone(), current_index);
+                let current_index = StructDefInstantiationIndex(
+                    self.struct_instance_for_offset.len() as TableIndex,
+                );
+                self.struct_instantiations
+                    .insert(instantiant.clone(), current_index);
                 self.struct_instance_for_offset.push(instantiant);
                 current_index
             }
@@ -284,12 +302,17 @@ impl InstantiableModule {
     /// instantiant to the `func_instance_for_offset` for table, and adds the index to the
     /// reverse lookup table.
     /// Returns the SignatureIndex for the `instantiant`.
-    pub fn add_function_instantiation(&mut self, instantiant: FunctionInstantiation) -> FunctionInstantiationIndex {
+    pub fn add_function_instantiation(
+        &mut self,
+        instantiant: FunctionInstantiation,
+    ) -> FunctionInstantiationIndex {
         match self.function_instantiations.get(&instantiant) {
             Some(index) => *index,
             None => {
-                let current_index = FunctionInstantiationIndex(self.func_instance_for_offset.len() as TableIndex);
-                self.function_instantiations.insert(instantiant.clone(), current_index);
+                let current_index =
+                    FunctionInstantiationIndex(self.func_instance_for_offset.len() as TableIndex);
+                self.function_instantiations
+                    .insert(instantiant.clone(), current_index);
                 self.func_instance_for_offset.push(instantiant);
                 current_index
             }
@@ -300,12 +323,17 @@ impl InstantiableModule {
     /// instantiant to the `field_instance_for_offset` for table, and adds the index to the
     /// reverse lookup table.
     /// Returns the SignatureIndex for the `instantiant`.
-    pub fn add_field_instantiation(&mut self, instantiant: FieldInstantiation) -> FieldInstantiationIndex {
+    pub fn add_field_instantiation(
+        &mut self,
+        instantiant: FieldInstantiation,
+    ) -> FieldInstantiationIndex {
         match self.field_instantiations.get(&instantiant) {
             Some(index) => *index,
             None => {
-                let current_index = FieldInstantiationIndex(self.field_instance_for_offset.len() as TableIndex);
-                self.field_instantiations.insert(instantiant.clone(), current_index);
+                let current_index =
+                    FieldInstantiationIndex(self.field_instance_for_offset.len() as TableIndex);
+                self.field_instantiations
+                    .insert(instantiant.clone(), current_index);
                 self.field_instance_for_offset.push(instantiant);
                 current_index
             }
@@ -323,7 +351,10 @@ impl InstantiableModule {
     }
 
     /// Returns the struct instantiation at `index`. Errors if the instantiation does not exist.
-    pub fn struct_instantiantiation_at(&self, index: StructDefInstantiationIndex) -> &StructDefInstantiation {
+    pub fn struct_instantiantiation_at(
+        &self,
+        index: StructDefInstantiationIndex,
+    ) -> &StructDefInstantiation {
         match self.struct_instance_for_offset.get(index.0 as usize) {
             Some(struct_inst) => struct_inst,
             None => {
@@ -333,7 +364,10 @@ impl InstantiableModule {
     }
 
     /// Returns the struct instantiation at `index`. Errors if the instantiation does not exist.
-    pub fn function_instantiantiation_at(&self, index: FunctionInstantiationIndex) -> &FunctionInstantiation {
+    pub fn function_instantiantiation_at(
+        &self,
+        index: FunctionInstantiationIndex,
+    ) -> &FunctionInstantiation {
         match self.func_instance_for_offset.get(index.0 as usize) {
             Some(func_inst) => func_inst,
             None => {
@@ -343,7 +377,10 @@ impl InstantiableModule {
     }
 
     /// Returns the struct instantiation at `index`. Errors if the instantiation does not exist.
-    pub fn field_instantiantiation_at(&self, index: FieldInstantiationIndex) -> &FieldInstantiation {
+    pub fn field_instantiantiation_at(
+        &self,
+        index: FieldInstantiationIndex,
+    ) -> &FieldInstantiation {
         match self.field_instance_for_offset.get(index.0 as usize) {
             Some(field_inst) => field_inst,
             None => {
@@ -356,7 +393,11 @@ impl InstantiableModule {
     /// module, and returns the resultant compiled module.
     pub fn instantiate(self) -> CompiledModule {
         let mut module = self.module;
-        module.signatures = self.sig_instance_for_offset.into_iter().map(Signature).collect();
+        module.signatures = self
+            .sig_instance_for_offset
+            .into_iter()
+            .map(Signature)
+            .collect();
         module.struct_def_instantiations = self.struct_instance_for_offset;
         module.function_instantiations = self.func_instance_for_offset;
         module.field_instantiations = self.field_instance_for_offset;
@@ -540,11 +581,20 @@ impl AbstractState {
     pub fn local_take_borrow(&mut self, i: usize, mutability: Mutability) -> Result<(), VMError> {
         if let Some((abstract_value, _)) = self.locals.get(&i) {
             let ref_token = match mutability {
-                Mutability::Mutable => SignatureToken::MutableReference(Box::new(abstract_value.token.clone())),
-                Mutability::Immutable => SignatureToken::Reference(Box::new(abstract_value.token.clone())),
-                Mutability::Either => return Err(VMError::new("Mutability cannot be Either".to_string())),
+                Mutability::Mutable => {
+                    SignatureToken::MutableReference(Box::new(abstract_value.token.clone()))
+                }
+                Mutability::Immutable => {
+                    SignatureToken::Reference(Box::new(abstract_value.token.clone()))
+                }
+                Mutability::Either => {
+                    return Err(VMError::new("Mutability cannot be Either".to_string()));
+                }
             };
-            self.register = Some(AbstractValue::new_reference(ref_token, abstract_value.abilities));
+            self.register = Some(AbstractValue::new_reference(
+                ref_token,
+                abstract_value.abilities,
+            ));
             Ok(())
         } else {
             Err(VMError::new(format!("Local does not exist at index {}", i)))
@@ -555,7 +605,8 @@ impl AbstractState {
     /// If it does not exist return a `VMError`.
     pub fn local_set(&mut self, i: usize, availability: BorrowState) -> Result<(), VMError> {
         if let Some((abstract_value, _)) = self.locals.clone().get(&i) {
-            self.locals.insert(i, (abstract_value.clone(), availability));
+            self.locals
+                .insert(i, (abstract_value.clone(), availability));
             Ok(())
         } else {
             Err(VMError::new(format!("Local does not exist at index {}", i)))
@@ -564,7 +615,11 @@ impl AbstractState {
 
     /// Check whether a local is in a particular `BorrowState`
     /// If the local does not exist return a `VMError`.
-    pub fn local_availability_is(&self, i: usize, availability: BorrowState) -> Result<bool, VMError> {
+    pub fn local_availability_is(
+        &self,
+        i: usize,
+        availability: BorrowState,
+    ) -> Result<bool, VMError> {
         if let Some((_, availability1)) = self.locals.get(&i) {
             Ok(availability == *availability1)
         } else {
@@ -583,7 +638,12 @@ impl AbstractState {
     }
 
     /// Insert a local at index `i` as `Available`
-    pub fn local_insert(&mut self, i: usize, abstract_value: AbstractValue, availability: BorrowState) {
+    pub fn local_insert(
+        &mut self,
+        i: usize,
+        abstract_value: AbstractValue,
+        availability: BorrowState,
+    ) {
         self.locals.insert(i, (abstract_value, availability));
     }
 
@@ -591,10 +651,13 @@ impl AbstractState {
     /// If the register value is `None` return a `VMError`.
     pub fn local_place(&mut self, i: usize) -> Result<(), VMError> {
         if let Some(abstract_value) = self.register_move() {
-            self.locals.insert(i, (abstract_value, BorrowState::Available));
+            self.locals
+                .insert(i, (abstract_value, BorrowState::Available));
             Ok(())
         } else {
-            Err(VMError::new("Could not insert local, register is empty".to_string()))
+            Err(VMError::new(
+                "Could not insert local, register is empty".to_string(),
+            ))
         }
     }
 
@@ -632,7 +695,11 @@ impl AbstractState {
 
 impl fmt::Display for AbstractState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Stack: {:?} | Locals: {:?} | Instantiation: {:?}", self.stack, self.locals, self.instantiation)
+        write!(
+            f,
+            "Stack: {:?} | Locals: {:?} | Instantiation: {:?}",
+            self.stack, self.locals, self.instantiation
+        )
     }
 }
 

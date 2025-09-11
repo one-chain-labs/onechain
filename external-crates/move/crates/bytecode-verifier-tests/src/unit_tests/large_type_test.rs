@@ -3,18 +3,8 @@
 
 use crate::unit_tests::production_config;
 use move_binary_format::file_format::{
-    empty_module,
-    Bytecode,
-    CodeUnit,
-    FunctionDefinition,
-    FunctionHandle,
-    FunctionHandleIndex,
-    IdentifierIndex,
-    ModuleHandleIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken,
-    Visibility::Public,
+    Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, Visibility::Public, empty_module,
 };
 use move_bytecode_verifier_meter::bound::BoundMeter;
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
@@ -83,7 +73,8 @@ fn test_large_types() {
     });
 
     // takes_and_returns_vecs
-    m.identifiers.push(Identifier::new("takes_and_returns_vecs").unwrap());
+    m.identifiers
+        .push(Identifier::new("takes_and_returns_vecs").unwrap());
     m.function_handles.push(FunctionHandle {
         module: ModuleHandleIndex(0),
         name: IdentifierIndex(2),
@@ -117,12 +108,17 @@ fn test_large_types() {
         visibility: Public,
         is_entry: false,
         acquires_global_resources: vec![],
-        code: Some(CodeUnit { locals: SignatureIndex(0), code: vec![Bytecode::Ret], jump_tables: vec![] }),
+        code: Some(CodeUnit {
+            locals: SignatureIndex(0),
+            code: vec![Bytecode::Ret],
+            jump_tables: vec![],
+        }),
     });
 
     // other fcts
     for i in 0..NUM_FUNCTIONS {
-        m.identifiers.push(Identifier::new(format!("f{}", i)).unwrap());
+        m.identifiers
+            .push(Identifier::new(format!("f{}", i)).unwrap());
         m.function_handles.push(FunctionHandle {
             module: ModuleHandleIndex(0),
             name: IdentifierIndex(i + 4),
@@ -135,7 +131,11 @@ fn test_large_types() {
             visibility: Public,
             is_entry: false,
             acquires_global_resources: vec![],
-            code: Some(CodeUnit { locals: SignatureIndex(0), code: vec![], jump_tables: vec![] }),
+            code: Some(CodeUnit {
+                locals: SignatureIndex(0),
+                code: vec![],
+                jump_tables: vec![],
+            }),
         });
 
         let code = &mut m.function_defs[i as usize + 4].code.as_mut().unwrap().code;
@@ -150,7 +150,14 @@ fn test_large_types() {
 
     let (verifier_config, meter_config) = production_config();
     let mut meter = BoundMeter::new(meter_config);
-    let result =
-        move_bytecode_verifier::verify_module_with_config_for_test("test_large_types", &verifier_config, &m, &mut meter);
-    assert_eq!(result.unwrap_err().major_status(), StatusCode::CONSTRAINT_NOT_SATISFIED,);
+    let result = move_bytecode_verifier::verify_module_with_config_for_test(
+        "test_large_types",
+        &verifier_config,
+        &m,
+        &mut meter,
+    );
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::CONSTRAINT_NOT_SATISFIED,
+    );
 }

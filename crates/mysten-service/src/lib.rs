@@ -7,7 +7,8 @@ pub mod metrics;
 pub mod server_timing;
 mod service;
 
-pub use service::{get_mysten_service, serve};
+pub use service::get_mysten_service;
+pub use service::serve;
 
 pub const DEFAULT_PORT: u16 = 2024;
 
@@ -31,11 +32,11 @@ mod tests {
 
     #[test]
     fn package_name_works() {
-        assert_eq!(package_name!(), "mysten-service",);
+        assert_eq!(package_name!(), "mysten-service");
     }
 
     #[test]
     fn package_version_works() {
-        assert_eq!(package_version!(), "0.0.1",);
+        assert_eq!(package_version!(), "0.0.1");
     }
 }

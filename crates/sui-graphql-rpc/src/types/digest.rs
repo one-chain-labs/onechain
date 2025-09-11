@@ -49,7 +49,10 @@ impl TryFrom<&[u8]> for Digest {
         let mut result = [0u8; BASE58_DIGEST_LENGTH];
 
         if value.len() != BASE58_DIGEST_LENGTH {
-            return Err(Error::BadDigestLength { expect: BASE58_DIGEST_LENGTH, actual: value.len() });
+            return Err(Error::BadDigestLength {
+                expect: BASE58_DIGEST_LENGTH,
+                actual: value.len(),
+            });
         }
 
         result.copy_from_slice(value);
@@ -77,18 +80,25 @@ impl fmt::Display for Digest {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, *};
+    use super::Error;
+    use super::*;
 
     #[test]
     fn test_base58_digest() {
         let digest = [
-            183u8, 119, 223, 39, 204, 68, 220, 4, 126, 234, 232, 146, 106, 249, 98, 12, 170, 209, 98, 203, 243, 77, 154,
-            225, 177, 216, 169, 101, 51, 116, 79, 223,
+            183u8, 119, 223, 39, 204, 68, 220, 4, 126, 234, 232, 146, 106, 249, 98, 12, 170, 209,
+            98, 203, 243, 77, 154, 225, 177, 216, 169, 101, 51, 116, 79, 223,
         ];
 
-        assert_eq!(Digest::from_str("DMBdBZnpYR4EeTXzXL8A6BtVafqGjAWGsFZhP2zJYmXU").unwrap(), Digest(digest));
+        assert_eq!(
+            Digest::from_str("DMBdBZnpYR4EeTXzXL8A6BtVafqGjAWGsFZhP2zJYmXU").unwrap(),
+            Digest(digest)
+        );
 
-        assert!(matches!(Digest::from_str("ILoveBase58").unwrap_err(), Error::InvalidBase58(_),));
+        assert!(matches!(
+            Digest::from_str("ILoveBase58").unwrap_err(),
+            Error::InvalidBase58(_),
+        ));
 
         let long_digest = {
             let mut bytes = vec![];
@@ -97,6 +107,9 @@ mod tests {
             Base58::encode(bytes)
         };
 
-        assert!(matches!(Digest::from_str(&long_digest).unwrap_err(), Error::BadDigestLength { .. },))
+        assert!(matches!(
+            Digest::from_str(&long_digest).unwrap_err(),
+            Error::BadDigestLength { .. },
+        ))
     }
 }

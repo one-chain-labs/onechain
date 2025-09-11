@@ -19,7 +19,7 @@
   }
 
   address(address: "@{C}") {
-    stakedOcts {
+    stakedSuis {
       edges {
         cursor
         node {
@@ -41,7 +41,7 @@
 //# advance-epoch
 
 //# run-graphql
-{ # This query should pick up the recently Staked OCT as well.
+{ # This query should pick up the recently Staked SUI as well.
   objects(filter: { type: "0x3::staking_pool::StakedOct" }) {
     edges {
       cursor
@@ -57,7 +57,7 @@
   }
 
   address(address: "@{C}") {
-    stakedOcts {
+    stakedSuis {
       edges {
         cursor
         node {

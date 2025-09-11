@@ -8,12 +8,8 @@ use async_graphql::{
     *,
 };
 use diesel::{
-    deserialize::FromSqlRow,
-    query_builder::QueryFragment,
-    sql_types::Untyped,
-    QueryDsl,
-    QueryResult,
-    QuerySource,
+    deserialize::FromSqlRow, query_builder::QueryFragment, sql_types::Untyped, QueryDsl,
+    QueryResult, QuerySource,
 };
 use diesel_async::methods::LoadQuery;
 use fastcrypto::encoding::{Base64, Encoding};
@@ -48,7 +44,7 @@ pub(crate) struct Page<C> {
     limit: u64,
 
     /// In case there are more than `limit` entries in the range described by `(after, before)`,
-    /// this field states whether the entries up to limit are taken fron the `Front` or `Back` of
+    /// this field states whether the entries up to limit are taken from the `Front` or `Back` of
     /// that range.
     end: End,
 }
@@ -66,11 +62,17 @@ pub(crate) trait Paginated<C: CursorType>: Target<C> {
 
     /// Adds a filter to `query` to bound its result to be greater than or equal to `cursor`
     /// (returning the new query).
-    fn filter_ge<ST, GB>(cursor: &C, query: Query<ST, Self::Source, GB>) -> Query<ST, Self::Source, GB>;
+    fn filter_ge<ST, GB>(
+        cursor: &C,
+        query: Query<ST, Self::Source, GB>,
+    ) -> Query<ST, Self::Source, GB>;
 
     /// Adds a filter to `query` to bound its results to be less than or equal to `cursor`
     /// (returning the new query).
-    fn filter_le<ST, GB>(cursor: &C, query: Query<ST, Self::Source, GB>) -> Query<ST, Self::Source, GB>;
+    fn filter_le<ST, GB>(
+        cursor: &C,
+        query: Query<ST, Self::Source, GB>,
+    ) -> Query<ST, Self::Source, GB>;
 
     /// Adds an `ORDER BY` clause to `query` to order rows according to their cursor values
     /// (returning the new query). The `asc` parameter controls whether the ordering is ASCending
@@ -151,11 +153,19 @@ impl<C> Page<C> {
         let page = match (first, after, last, before) {
             (Some(_), _, Some(_), _) => return Err(Error::CursorNoFirstLast.extend()),
 
-            (limit, after, None, before) => {
-                Page { after, before, limit: limit.unwrap_or(limits.default_page_size as u64), end: End::Front }
-            }
+            (limit, after, None, before) => Page {
+                after,
+                before,
+                limit: limit.unwrap_or(limits.default_page_size as u64),
+                end: End::Front,
+            },
 
-            (None, after, Some(limit), before) => Page { after, before, limit, end: End::Back },
+            (None, after, Some(limit), before) => Page {
+                after,
+                before,
+                limit,
+                end: End::Back,
+            },
         };
 
         if page.limit > limits.max_page_size as u64 {
@@ -167,7 +177,12 @@ impl<C> Page<C> {
 
     /// A page that just limits the number of results, without applying any other bounds.
     pub(crate) fn bounded(limit: u64) -> Self {
-        Page { after: None, before: None, limit, end: End::Front }
+        Page {
+            after: None,
+            before: None,
+            limit,
+            end: End::Front,
+        }
     }
 
     pub(crate) fn after(&self) -> Option<&C> {
@@ -223,11 +238,20 @@ impl Page<JsonCursor<ConsistentIndexCursor>> {
     /// cursors of the page are consistent, and returns two booleans indicating whether there is a
     /// previous or next page in the range, the `checkpoint_viewed_at` to set for consistency, and
     /// an iterator of cursors within that Page.
+    #[allow(clippy::type_complexity)]
     pub(crate) fn paginate_consistent_indices(
         &self,
         total: usize,
         checkpoint_viewed_at: u64,
-    ) -> Result<Option<(bool, bool, u64, impl Iterator<Item = JsonCursor<ConsistentIndexCursor>>)>, Error> {
+    ) -> Result<
+        Option<(
+            bool,
+            bool,
+            u64,
+            impl Iterator<Item = JsonCursor<ConsistentIndexCursor>>,
+        )>,
+        Error,
+    > {
         let cursor_viewed_at = self.validate_cursor_consistency()?;
         let checkpoint_viewed_at = cursor_viewed_at.unwrap_or(checkpoint_viewed_at);
 
@@ -248,7 +272,12 @@ impl Page<JsonCursor<ConsistentIndexCursor>> {
             0 < lo,
             hi < total,
             checkpoint_viewed_at,
-            (lo..hi).map(move |ix| JsonCursor::new(ConsistentIndexCursor { ix, c: checkpoint_viewed_at })),
+            (lo..hi).map(move |ix| {
+                JsonCursor::new(ConsistentIndexCursor {
+                    ix,
+                    c: checkpoint_viewed_at,
+                })
+            }),
         )))
     }
 }
@@ -370,61 +399,62 @@ impl<C: CursorType + ScanLimited + Eq + Clone + Send + Sync + 'static> Page<C> {
         T: Target<C> + Send + 'static,
     {
         // Detect whether the results imply the existence of a previous or next page.
-        let (prev, next, prefix, suffix) = match (self.after(), f_cursor, l_cursor, self.before(), self.end) {
-            // Results came back empty, despite supposedly including the `after` and `before`
-            // cursors, so the bounds must have been invalid, no matter which end the page was
-            // drawn from.
-            (_, None, _, _, _) | (_, _, None, _, _) => {
-                return (false, false, vec![].into_iter());
-            }
+        let (prev, next, prefix, suffix) =
+            match (self.after(), f_cursor, l_cursor, self.before(), self.end) {
+                // Results came back empty, despite supposedly including the `after` and `before`
+                // cursors, so the bounds must have been invalid, no matter which end the page was
+                // drawn from.
+                (_, None, _, _, _) | (_, _, None, _, _) => {
+                    return (false, false, vec![].into_iter());
+                }
 
-            // Page drawn from the front, and the cursor for the first element does not match
-            // `after`. If that cursor is not from a scan limit, then it must have appeared in
-            // the previous page, and should also be at the tip of the current page. This
-            // absence implies the bound was invalid, so we return an empty result.
-            (Some(a), Some(f), _, _, End::Front) if f != *a && !a.is_scan_limited() => {
-                return (false, false, vec![].into_iter());
-            }
+                // Page drawn from the front, and the cursor for the first element does not match
+                // `after`. If that cursor is not from a scan limit, then it must have appeared in
+                // the previous page, and should also be at the tip of the current page. This
+                // absence implies the bound was invalid, so we return an empty result.
+                (Some(a), Some(f), _, _, End::Front) if f != *a && !a.is_scan_limited() => {
+                    return (false, false, vec![].into_iter());
+                }
 
-            // Similar to above case, but for back of results.
-            (_, _, Some(l), Some(b), End::Back) if l != *b && !b.is_scan_limited() => {
-                return (false, false, vec![].into_iter());
-            }
+                // Similar to above case, but for back of results.
+                (_, _, Some(l), Some(b), End::Back) if l != *b && !b.is_scan_limited() => {
+                    return (false, false, vec![].into_iter());
+                }
 
-            // From here onwards, we know that the results are non-empty. In the forward
-            // pagination scenario, the presence of a previous page is determined by whether a
-            // cursor supplied on the end the page is being drawn from is found in the first
-            // position. The presence of a next page is determined by whether we have more
-            // results than the provided limit, and/ or if the end cursor element appears in the
-            // result set.
-            (after, Some(f), Some(l), before, End::Front) => {
-                let has_previous_page = after.is_some_and(|a| a.unlimited() == f);
-                let prefix = has_previous_page as usize;
+                // From here onwards, we know that the results are non-empty. In the forward
+                // pagination scenario, the presence of a previous page is determined by whether a
+                // cursor supplied on the end the page is being drawn from is found in the first
+                // position. The presence of a next page is determined by whether we have more
+                // results than the provided limit, and/ or if the end cursor element appears in the
+                // result set.
+                (after, Some(f), Some(l), before, End::Front) => {
+                    let has_previous_page = after.is_some_and(|a| a.unlimited() == f);
+                    let prefix = has_previous_page as usize;
 
-                // If results end with the before cursor, we will at least need to trim one element
-                // from the suffix and we trim more off the end if there is more after applying the
-                // limit.
-                let mut suffix = before.is_some_and(|b| b.unlimited() == l) as usize;
-                suffix += results.len().saturating_sub(self.limit() + prefix + suffix);
-                let has_next_page = suffix > 0;
+                    // If results end with the before cursor, we will at least need to trim one element
+                    // from the suffix and we trim more off the end if there is more after applying the
+                    // limit.
+                    let mut suffix = before.is_some_and(|b| b.unlimited() == l) as usize;
+                    suffix += results.len().saturating_sub(self.limit() + prefix + suffix);
+                    let has_next_page = suffix > 0;
 
-                (has_previous_page, has_next_page, prefix, suffix)
-            }
+                    (has_previous_page, has_next_page, prefix, suffix)
+                }
 
-            // Symmetric to the previous case, but drawing from the back.
-            (after, Some(f), Some(l), before, End::Back) => {
-                // There is a next page if the last element of the results matches the `before`.
-                // This last element will get pruned from the result set.
-                let has_next_page = before.is_some_and(|b| b.unlimited() == l);
-                let suffix = has_next_page as usize;
+                // Symmetric to the previous case, but drawing from the back.
+                (after, Some(f), Some(l), before, End::Back) => {
+                    // There is a next page if the last element of the results matches the `before`.
+                    // This last element will get pruned from the result set.
+                    let has_next_page = before.is_some_and(|b| b.unlimited() == l);
+                    let suffix = has_next_page as usize;
 
-                let mut prefix = after.is_some_and(|a| a.unlimited() == f) as usize;
-                prefix += results.len().saturating_sub(self.limit() + prefix + suffix);
-                let has_previous_page = prefix > 0;
+                    let mut prefix = after.is_some_and(|a| a.unlimited() == f) as usize;
+                    prefix += results.len().saturating_sub(self.limit() + prefix + suffix);
+                    let has_previous_page = prefix > 0;
 
-                (has_previous_page, has_next_page, prefix, suffix)
-            }
-        };
+                    (has_previous_page, has_next_page, prefix, suffix)
+                }
+            };
 
         // If after trimming, we're going to return no elements, then forget whether there's a
         // previous or next page, because there will be no start or end cursor for this page to
@@ -609,7 +639,8 @@ mod tests {
     #[test]
     fn test_default_page() {
         let config = ServiceConfig::default();
-        let page: Page<JsonCursor<u64>> = Page::from_params(&config, None, None, None, None).unwrap();
+        let page: Page<JsonCursor<u64>> =
+            Page::from_params(&config, None, None, None, None).unwrap();
 
         let expect = expect![[r#"
             Page {
@@ -696,8 +727,14 @@ mod tests {
     #[test]
     fn test_between_page_prefix() {
         let config = ServiceConfig::default();
-        let page: Page<JsonCursor<u64>> =
-            Page::from_params(&config, Some(10), Some(JsonCursor::new(40)), None, Some(JsonCursor::new(42))).unwrap();
+        let page: Page<JsonCursor<u64>> = Page::from_params(
+            &config,
+            Some(10),
+            Some(JsonCursor::new(40)),
+            None,
+            Some(JsonCursor::new(42)),
+        )
+        .unwrap();
 
         let expect = expect![[r#"
             Page {
@@ -716,8 +753,14 @@ mod tests {
     #[test]
     fn test_between_page_suffix() {
         let config = ServiceConfig::default();
-        let page: Page<JsonCursor<u64>> =
-            Page::from_params(&config, None, Some(JsonCursor::new(40)), Some(10), Some(JsonCursor::new(42))).unwrap();
+        let page: Page<JsonCursor<u64>> = Page::from_params(
+            &config,
+            None,
+            Some(JsonCursor::new(40)),
+            Some(10),
+            Some(JsonCursor::new(42)),
+        )
+        .unwrap();
 
         let expect = expect![[r#"
             Page {
@@ -736,8 +779,14 @@ mod tests {
     #[test]
     fn test_between_page() {
         let config = ServiceConfig::default();
-        let page: Page<JsonCursor<u64>> =
-            Page::from_params(&config, None, Some(JsonCursor::new(40)), None, Some(JsonCursor::new(42))).unwrap();
+        let page: Page<JsonCursor<u64>> = Page::from_params(
+            &config,
+            None,
+            Some(JsonCursor::new(40)),
+            None,
+            Some(JsonCursor::new(42)),
+        )
+        .unwrap();
 
         let expect = expect![[r#"
             Page {
@@ -756,7 +805,8 @@ mod tests {
     #[test]
     fn test_err_first_and_last() {
         let config = ServiceConfig::default();
-        let err = Page::<JsonCursor<u64>>::from_params(&config, Some(1), None, Some(1), None).unwrap_err();
+        let err = Page::<JsonCursor<u64>>::from_params(&config, Some(1), None, Some(1), None)
+            .unwrap_err();
 
         let expect = expect![[r#"
             Error {
@@ -778,7 +828,8 @@ mod tests {
     fn test_err_page_too_big() {
         let config = ServiceConfig::default();
         let too_big = config.limits.max_page_size as u64 + 1;
-        let err = Page::<JsonCursor<u64>>::from_params(&config, Some(too_big), None, None, None).unwrap_err();
+        let err = Page::<JsonCursor<u64>>::from_params(&config, Some(too_big), None, None, None)
+            .unwrap_err();
 
         let expect = expect![[r#"
             Error {

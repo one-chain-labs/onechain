@@ -4,8 +4,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::account_universe::AccountCurrent;
 use crate::{
-    account_universe::{AUTransactionGen, AccountCurrent, AccountPairGen, AccountTriple, AccountUniverse},
+    account_universe::{AUTransactionGen, AccountPairGen, AccountTriple, AccountUniverse},
     executor::{ExecutionResult, Executor},
 };
 use once_cell::sync::Lazy;
@@ -13,10 +14,11 @@ use proptest::prelude::*;
 use proptest_derive::Arbitrary;
 use std::sync::Arc;
 use sui_protocol_config::ProtocolConfig;
+use sui_types::base_types::ObjectRef;
+use sui_types::execution_status::{ExecutionFailureStatus, ExecutionStatus};
 use sui_types::{
-    base_types::{ObjectRef, SuiAddress},
+    base_types::SuiAddress,
     error::{SuiError, UserInputError},
-    execution_status::{ExecutionFailureStatus, ExecutionStatus},
     object::Object,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{GasData, Transaction, TransactionData, TransactionKind},
@@ -30,7 +32,8 @@ const P2P_SUCCESS_STORAGE_USAGE: u64 = 1976000;
 const P2P_FAILURE_STORAGE_USAGE: u64 = 988000;
 const INSUFFICIENT_GAS_UNITS_THRESHOLD: u64 = 2;
 
-static PROTOCOL_CONFIG: Lazy<ProtocolConfig> = Lazy::new(ProtocolConfig::get_for_max_version_UNSAFE);
+static PROTOCOL_CONFIG: Lazy<ProtocolConfig> =
+    Lazy::new(ProtocolConfig::get_for_max_version_UNSAFE);
 
 /// Represents a peer-to-peer transaction performed in the account universe.
 ///
@@ -135,7 +138,11 @@ impl TransactionSponsorship {
                     gas_coin_refs.push(gas_object.compute_object_reference());
                     gas_amount += *accounts.account_1.current_balances.last().unwrap();
                 }
-                (gas_coin_refs, (gas_amount, gas_object), accounts.account_1.initial_data.account.address)
+                (
+                    gas_coin_refs,
+                    (gas_amount, gas_object),
+                    accounts.account_1.initial_data.account.address,
+                )
             }
             TransactionSponsorship::Good => {
                 let gas_object = accounts.account_3.new_gas_object(exec);
@@ -146,7 +153,11 @@ impl TransactionSponsorship {
                     gas_coin_refs.push(gas_object.compute_object_reference());
                     gas_amount += *accounts.account_3.current_balances.last().unwrap();
                 }
-                (gas_coin_refs, (gas_amount, gas_object), accounts.account_3.initial_data.account.address)
+                (
+                    gas_coin_refs,
+                    (gas_amount, gas_object),
+                    accounts.account_3.initial_data.account.address,
+                )
             }
             TransactionSponsorship::WrongGasOwner => {
                 let gas_object = accounts.account_1.new_gas_object(exec);
@@ -157,7 +168,11 @@ impl TransactionSponsorship {
                     gas_coin_refs.push(gas_object.compute_object_reference());
                     gas_amount += *accounts.account_1.current_balances.last().unwrap();
                 }
-                (gas_coin_refs, (gas_amount, gas_object), accounts.account_3.initial_data.account.address)
+                (
+                    gas_coin_refs,
+                    (gas_amount, gas_object),
+                    accounts.account_3.initial_data.account.address,
+                )
             }
         }
     }
@@ -168,10 +183,13 @@ impl TransactionSponsorship {
                 to_sender_signed_transaction(txn, &accounts.account_1.initial_data.account.key)
             }
             TransactionSponsorship::Good | TransactionSponsorship::WrongGasOwner => {
-                to_sender_signed_transaction_with_multi_signers(txn, vec![
-                    &accounts.account_1.initial_data.account.key,
-                    &accounts.account_3.initial_data.account.key,
-                ])
+                to_sender_signed_transaction_with_multi_signers(
+                    txn,
+                    vec![
+                        &accounts.account_1.initial_data.account.key,
+                        &accounts.account_3.initial_data.account.key,
+                    ],
+                )
             }
         }
     }
@@ -179,7 +197,9 @@ impl TransactionSponsorship {
     pub fn sponsor<'a>(&self, account_triple: &'a mut AccountTriple) -> &'a mut AccountCurrent {
         match self {
             TransactionSponsorship::None => account_triple.account_1,
-            TransactionSponsorship::Good | TransactionSponsorship::WrongGasOwner => account_triple.account_3,
+            TransactionSponsorship::Good | TransactionSponsorship::WrongGasOwner => {
+                account_triple.account_3
+            }
         }
     }
 }
@@ -229,7 +249,11 @@ fn gas_coins_selection_strategy() -> impl Strategy<Value = u32> {
 }
 
 impl AUTransactionGen for P2PTransferGenGoodGas {
-    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult) {
+    fn apply(
+        &self,
+        universe: &mut AccountUniverse,
+        exec: &mut Executor,
+    ) -> (Transaction, ExecutionResult) {
         P2PTransferGenRandomGas {
             sender_receiver: self.sender_receiver.clone(),
             amount: self.amount,
@@ -240,7 +264,11 @@ impl AUTransactionGen for P2PTransferGenGoodGas {
 }
 
 impl AUTransactionGen for P2PTransferGenRandomGas {
-    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult) {
+    fn apply(
+        &self,
+        universe: &mut AccountUniverse,
+        exec: &mut Executor,
+    ) -> (Transaction, ExecutionResult) {
         P2PTransferGenRandomGasRandomPriceRandomSponsorship {
             sender_receiver: self.sender_receiver.clone(),
             amount: self.amount,
@@ -254,7 +282,11 @@ impl AUTransactionGen for P2PTransferGenRandomGas {
 }
 
 impl AUTransactionGen for P2PTransferGenGasPriceInRange {
-    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult) {
+    fn apply(
+        &self,
+        universe: &mut AccountUniverse,
+        exec: &mut Executor,
+    ) -> (Transaction, ExecutionResult) {
         P2PTransferGenRandomGasRandomPriceRandomSponsorship {
             sender_receiver: self.sender_receiver.clone(),
             amount: DEFAULT_TRANSFER_AMOUNT,
@@ -268,7 +300,11 @@ impl AUTransactionGen for P2PTransferGenGasPriceInRange {
 }
 
 impl AUTransactionGen for P2PTransferGenRandomGasRandomPrice {
-    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult) {
+    fn apply(
+        &self,
+        universe: &mut AccountUniverse,
+        exec: &mut Executor,
+    ) -> (Transaction, ExecutionResult) {
         P2PTransferGenRandomGasRandomPriceRandomSponsorship {
             sender_receiver: self.sender_receiver.clone(),
             amount: self.amount,
@@ -282,7 +318,11 @@ impl AUTransactionGen for P2PTransferGenRandomGasRandomPrice {
 }
 
 impl AUTransactionGen for P2PTransferGenRandGasRandPriceRandCoins {
-    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult) {
+    fn apply(
+        &self,
+        universe: &mut AccountUniverse,
+        exec: &mut Executor,
+    ) -> (Transaction, ExecutionResult) {
         P2PTransferGenRandomGasRandomPriceRandomSponsorship {
             sender_receiver: self.sender_receiver.clone(),
             amount: self.amount,
@@ -312,7 +352,11 @@ struct RunInfo {
 }
 
 impl RunInfo {
-    pub fn new(payer_balance: u64, rgp: u64, p2p: &P2PTransferGenRandomGasRandomPriceRandomSponsorship) -> Self {
+    pub fn new(
+        payer_balance: u64,
+        rgp: u64,
+        p2p: &P2PTransferGenRandomGasRandomPriceRandomSponsorship,
+    ) -> Self {
         let to_deduct = p2p.amount as u128 + p2p.gas as u128;
         let enough_max_gas = payer_balance >= p2p.gas;
         let enough_computation_gas = p2p.gas >= p2p.gas_price * P2P_COMPUTE_GAS_USAGE;
@@ -323,7 +367,8 @@ impl RunInfo {
         let gas_price_too_low = p2p.gas_price < rgp;
         let gas_price_too_high = p2p.gas_price >= PROTOCOL_CONFIG.max_gas_price();
         let gas_price_greater_than_budget = p2p.gas_price > p2p.gas;
-        let gas_units_too_low = p2p.gas_price > 0 && p2p.gas / p2p.gas_price < INSUFFICIENT_GAS_UNITS_THRESHOLD
+        let gas_units_too_low = p2p.gas_price > 0
+            && p2p.gas / p2p.gas_price < INSUFFICIENT_GAS_UNITS_THRESHOLD
             || gas_price_greater_than_budget;
         let too_many_gas_coins = p2p.gas_coins >= PROTOCOL_CONFIG.max_gas_payment_objects();
         Self {
@@ -343,12 +388,21 @@ impl RunInfo {
 }
 
 impl AUTransactionGen for P2PTransferGenRandomGasRandomPriceRandomSponsorship {
-    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult) {
+    fn apply(
+        &self,
+        universe: &mut AccountUniverse,
+        exec: &mut Executor,
+    ) -> (Transaction, ExecutionResult) {
         let mut account_triple = self.sender_receiver.pick(universe);
         let (gas_coin_refs, (gas_balance, gas_object), gas_payer) =
-            self.sponsorship.select_gas(&mut account_triple, exec, self.gas_coins);
+            self.sponsorship
+                .select_gas(&mut account_triple, exec, self.gas_coins);
 
-        let AccountTriple { account_1: sender, account_2: recipient, .. } = &account_triple;
+        let AccountTriple {
+            account_1: sender,
+            account_2: recipient,
+            ..
+        } = &account_triple;
         // construct a p2p transfer of a random amount of SUI
         let txn = {
             let mut builder = ProgrammableTransactionBuilder::new();
@@ -357,12 +411,16 @@ impl AUTransactionGen for P2PTransferGenRandomGasRandomPriceRandomSponsorship {
         };
         let sender_address = sender.initial_data.account.address;
         let kind = TransactionKind::ProgrammableTransaction(txn);
-        let tx_data = TransactionData::new_with_gas_data(kind, sender_address, GasData {
-            payment: gas_coin_refs,
-            owner: gas_payer,
-            price: self.gas_price,
-            budget: self.gas,
-        });
+        let tx_data = TransactionData::new_with_gas_data(
+            kind,
+            sender_address,
+            GasData {
+                payment: gas_coin_refs,
+                owner: gas_payer,
+                price: self.gas_price,
+                budget: self.gas,
+            },
+        );
         let signed_txn = self.sponsorship.sign_transaction(&account_triple, tx_data);
         let payer = self.sponsorship.sponsor(&mut account_triple);
         // *sender.current_balances.last().unwrap();
@@ -385,56 +443,93 @@ impl AUTransactionGen for P2PTransferGenRandomGasRandomPriceRandomSponsorship {
                 self.fix_balance_and_gas_coins(payer, true);
                 Ok(ExecutionStatus::Success)
             }
-            RunInfo { too_many_gas_coins: true, .. } => Err(SuiError::UserInputError {
+            RunInfo {
+                too_many_gas_coins: true,
+                ..
+            } => Err(SuiError::UserInputError {
                 error: UserInputError::SizeLimitExceeded {
                     limit: "maximum number of gas payment objects".to_string(),
                     value: "256".to_string(),
                 },
             }),
-            RunInfo { gas_price_too_low: true, .. } => Err(SuiError::UserInputError {
+            RunInfo {
+                gas_price_too_low: true,
+                ..
+            } => Err(SuiError::UserInputError {
                 error: UserInputError::GasPriceUnderRGP {
                     gas_price: self.gas_price,
                     reference_gas_price: exec.get_reference_gas_price(),
                 },
             }),
-            RunInfo { gas_price_too_high: true, .. } => Err(SuiError::UserInputError {
-                error: UserInputError::GasPriceTooHigh { max_gas_price: PROTOCOL_CONFIG.max_gas_price() },
-            }),
-            RunInfo { gas_budget_too_low: true, .. } => Err(SuiError::UserInputError {
-                error: UserInputError::GasBudgetTooLow {
-                    gas_budget: self.gas,
-                    min_budget: PROTOCOL_CONFIG.base_tx_cost_fixed() * self.gas_price,
+            RunInfo {
+                gas_price_too_high: true,
+                ..
+            } => Err(SuiError::UserInputError {
+                error: UserInputError::GasPriceTooHigh {
+                    max_gas_price: PROTOCOL_CONFIG.max_gas_price(),
                 },
             }),
-            RunInfo { gas_budget_too_high: true, .. } => Err(SuiError::UserInputError {
+            RunInfo {
+                gas_budget_too_high: true,
+                ..
+            } => Err(SuiError::UserInputError {
                 error: UserInputError::GasBudgetTooHigh {
                     gas_budget: self.gas,
                     max_budget: PROTOCOL_CONFIG.max_tx_gas(),
                 },
             }),
-            RunInfo { enough_max_gas: false, .. } => Err(SuiError::UserInputError {
+            RunInfo {
+                gas_budget_too_low: true,
+                ..
+            } => Err(SuiError::UserInputError {
+                error: UserInputError::GasBudgetTooLow {
+                    gas_budget: self.gas,
+                    min_budget: PROTOCOL_CONFIG.base_tx_cost_fixed() * self.gas_price,
+                },
+            }),
+            RunInfo {
+                enough_max_gas: false,
+                ..
+            } => Err(SuiError::UserInputError {
                 error: UserInputError::GasBalanceTooLow {
                     gas_balance: gas_balance as u128,
                     needed_gas_amount: self.gas as u128,
                 },
             }),
-            RunInfo { wrong_gas_owner: true, .. } => Err(SuiError::UserInputError {
+            RunInfo {
+                wrong_gas_owner: true,
+                ..
+            } => Err(SuiError::UserInputError {
                 error: UserInputError::IncorrectUserSignature {
                     error: format!(
-                        "Object {} is owned by account address {}, but given owner/signer address is {}",
-                        gas_object.id(),
-                        sender_address,
-                        payer.initial_data.account.address,
-                    ),
-                },
+                               "Object {} is owned by account address {}, but given owner/signer address is {}",
+                               gas_object.id(),
+                                   sender_address,
+                                   payer.initial_data.account.address,
+                           )
+                }
             }),
-            RunInfo { enough_max_gas: true, enough_to_succeed: false, gas_units_too_low: false, .. } => {
+            RunInfo {
+                enough_max_gas: true,
+                enough_to_succeed: false,
+                gas_units_too_low: false,
+                ..
+            } => {
                 self.fix_balance_and_gas_coins(payer, false);
-                Ok(ExecutionStatus::Failure { error: ExecutionFailureStatus::InsufficientCoinBalance, command: Some(0) })
+                Ok(ExecutionStatus::Failure {
+                    error: ExecutionFailureStatus::InsufficientCoinBalance,
+                    command: Some(0),
+                })
             }
-            RunInfo { enough_max_gas: true, .. } => {
+            RunInfo {
+                enough_max_gas: true,
+                ..
+            } => {
                 self.fix_balance_and_gas_coins(payer, false);
-                Ok(ExecutionStatus::Failure { error: ExecutionFailureStatus::InsufficientGas, command: None })
+                Ok(ExecutionStatus::Failure {
+                    error: ExecutionFailureStatus::InsufficientGas,
+                    command: None,
+                })
             }
         };
         (signed_txn, status)
@@ -456,14 +551,19 @@ impl P2PTransferGenRandomGasRandomPriceRandomSponsorship {
         // Fine to cast to u64 at this point, since otherwise enough_max_gas would be false
         // since sender_balance is a u64.
         if success {
-            *sender.current_balances.last_mut().unwrap() -= self.amount + p2p_success_gas(self.gas_price);
+            *sender.current_balances.last_mut().unwrap() -=
+                self.amount + p2p_success_gas(self.gas_price);
         } else {
-            *sender.current_balances.last_mut().unwrap() -= std::cmp::min(self.gas, p2p_failure_gas(self.gas_price));
+            *sender.current_balances.last_mut().unwrap() -=
+                std::cmp::min(self.gas, p2p_failure_gas(self.gas_price));
         }
     }
 }
 
-pub fn p2p_transfer_strategy(min: u64, max: u64) -> impl Strategy<Value = Arc<dyn AUTransactionGen + 'static>> {
+pub fn p2p_transfer_strategy(
+    min: u64,
+    max: u64,
+) -> impl Strategy<Value = Arc<dyn AUTransactionGen + 'static>> {
     prop_oneof![
         3 => any_with::<P2PTransferGenGoodGas>((min, max)).prop_map(P2PTransferGenGoodGas::arced),
         2 => any_with::<P2PTransferGenRandomGasRandomPrice>((min, max)).prop_map(P2PTransferGenRandomGasRandomPrice::arced),

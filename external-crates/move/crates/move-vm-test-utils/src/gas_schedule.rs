@@ -10,32 +10,17 @@
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode,
-        ConstantPoolIndex,
-        FieldHandleIndex,
-        FieldInstantiationIndex,
-        FunctionHandleIndex,
-        FunctionInstantiationIndex,
-        SignatureIndex,
-        StructDefInstantiationIndex,
-        StructDefinitionIndex,
-        VariantHandleIndex,
-        VariantInstantiationHandleIndex,
-        VariantJumpTableIndex,
+        Bytecode, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
+        FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
+        VariantInstantiationHandleIndex, VariantJumpTableIndex,
     },
-    file_format_common::{instruction_key, Opcodes},
+    file_format_common::{Opcodes, instruction_key},
 };
 use move_core_types::{
     gas_algebra::{
-        AbstractMemorySize,
-        GasQuantity,
-        InternalGas,
-        InternalGasPerAbstractMemoryUnit,
-        InternalGasUnit,
-        NumArgs,
-        NumBytes,
-        ToUnit,
-        ToUnitFractional,
+        AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
+        InternalGasUnit, NumArgs, NumBytes, ToUnit, ToUnitFractional,
     },
     language_storage::ModuleId,
     u256,
@@ -58,8 +43,8 @@ impl ToUnit<InternalGasUnit> for GasUnit {
 }
 
 impl ToUnitFractional<GasUnit> for InternalGasUnit {
-    const DENOMINATOR: u64 = 1000;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1000;
 }
 
 /// The size in bytes for a non-string or address constant on the stack
@@ -101,7 +86,10 @@ pub struct GasCost {
 
 impl GasCost {
     pub fn new(instruction_gas: u64, memory_gas: u64) -> Self {
-        Self { instruction_gas, memory_gas }
+        Self {
+            instruction_gas,
+            memory_gas,
+        }
     }
 
     /// Convert a GasCost to a total gas charge in `InternalGas`.
@@ -132,7 +120,12 @@ impl<'a> GasStatus<'a> {
     /// Charge for every operation and fail when there is no more gas to pay for operations.
     /// This is the instantiation that must be used when executing a user script.
     pub fn new(cost_table: &'a CostTable, gas_left: Gas) -> Self {
-        Self { gas_left: gas_left.to_unit(), cost_table, charge: true, profiler: None }
+        Self {
+            gas_left: gas_left.to_unit(),
+            cost_table,
+            charge: true,
+            profiler: None,
+        }
     }
 
     /// Initialize the gas state with metering disabled.
@@ -140,7 +133,12 @@ impl<'a> GasStatus<'a> {
     /// It should be used by clients in very specific cases and when executing system
     /// code that does not have to charge the user.
     pub fn new_unmetered() -> Self {
-        Self { gas_left: InternalGas::new(0), cost_table: &ZERO_COST_SCHEDULE, charge: false, profiler: None }
+        Self {
+            gas_left: InternalGas::new(0),
+            cost_table: &ZERO_COST_SCHEDULE,
+            charge: false,
+            profiler: None,
+        }
     }
 
     /// Return the `CostTable` behind this `GasStatus`.
@@ -172,16 +170,28 @@ impl<'a> GasStatus<'a> {
     }
 
     fn charge_instr(&mut self, opcode: Opcodes) -> PartialVMResult<()> {
-        self.deduct_gas(self.cost_table.instruction_cost(opcode as u8).total().into())
+        self.deduct_gas(
+            self.cost_table
+                .instruction_cost(opcode as u8)
+                .total()
+                .into(),
+        )
     }
 
     /// Charge an instruction over data with a given size and fail if not enough gas units are left.
-    fn charge_instr_with_size(&mut self, opcode: Opcodes, size: AbstractMemorySize) -> PartialVMResult<()> {
+    fn charge_instr_with_size(
+        &mut self,
+        opcode: Opcodes,
+        size: AbstractMemorySize,
+    ) -> PartialVMResult<()> {
         // Make sure that the size is always non-zero
         let size = std::cmp::max(1.into(), size);
         debug_assert!(size > 0.into());
         self.deduct_gas(
-            InternalGasPerAbstractMemoryUnit::new(self.cost_table.instruction_cost(opcode as u8).total()).mul(size),
+            InternalGasPerAbstractMemoryUnit::new(
+                self.cost_table.instruction_cost(opcode as u8).total(),
+            )
+            .mul(size),
         )
     }
 
@@ -251,7 +261,7 @@ fn get_simple_instruction_opcode(instr: SimpleInstruction) -> Opcodes {
     }
 }
 
-impl<'b> GasMeter for GasStatus<'b> {
+impl GasMeter for GasStatus<'_> {
     /// Charge an instruction and fail if not enough gas units are left.
     fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()> {
         self.charge_instr(get_simple_instruction_opcode(instr))
@@ -295,14 +305,20 @@ impl<'b> GasMeter for GasStatus<'b> {
         args: impl ExactSizeIterator<Item = impl ValueView>,
         _num_locals: NumArgs,
     ) -> PartialVMResult<()> {
-        self.charge_instr_with_size(Opcodes::CALL_GENERIC, ((ty_args.len() + args.len() + 1) as u64).into())
+        self.charge_instr_with_size(
+            Opcodes::CALL_GENERIC,
+            ((ty_args.len() + args.len() + 1) as u64).into(),
+        )
     }
 
     fn charge_ld_const(&mut self, size: NumBytes) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::LD_CONST, u64::from(size).into())
     }
 
-    fn charge_ld_const_after_deserialization(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_ld_const_after_deserialization(
+        &mut self,
+        _val: impl ValueView,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -325,8 +341,14 @@ impl<'b> GasMeter for GasStatus<'b> {
     ) -> PartialVMResult<()> {
         let field_count = AbstractMemorySize::new(args.len() as u64);
         self.charge_instr_with_size(
-            if is_generic { Opcodes::PACK_GENERIC } else { Opcodes::PACK },
-            args.fold(field_count, |acc, val| acc + val.legacy_abstract_memory_size()),
+            if is_generic {
+                Opcodes::PACK_GENERIC
+            } else {
+                Opcodes::PACK
+            },
+            args.fold(field_count, |acc, val| {
+                acc + val.legacy_abstract_memory_size()
+            }),
         )
     }
 
@@ -337,8 +359,14 @@ impl<'b> GasMeter for GasStatus<'b> {
     ) -> PartialVMResult<()> {
         let field_count = AbstractMemorySize::new(args.len() as u64);
         self.charge_instr_with_size(
-            if is_generic { Opcodes::UNPACK_GENERIC } else { Opcodes::UNPACK },
-            args.fold(field_count, |acc, val| acc + val.legacy_abstract_memory_size()),
+            if is_generic {
+                Opcodes::UNPACK_GENERIC
+            } else {
+                Opcodes::UNPACK
+            },
+            args.fold(field_count, |acc, val| {
+                acc + val.legacy_abstract_memory_size()
+            }),
         )
     }
 
@@ -350,16 +378,26 @@ impl<'b> GasMeter for GasStatus<'b> {
         self.charge_instr_with_size(Opcodes::READ_REF, ref_val.legacy_abstract_memory_size())
     }
 
-    fn charge_write_ref(&mut self, new_val: impl ValueView, _old_val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_write_ref(
+        &mut self,
+        new_val: impl ValueView,
+        _old_val: impl ValueView,
+    ) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::WRITE_REF, new_val.legacy_abstract_memory_size())
     }
 
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        self.charge_instr_with_size(Opcodes::EQ, lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size())
+        self.charge_instr_with_size(
+            Opcodes::EQ,
+            lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size(),
+        )
     }
 
     fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        self.charge_instr_with_size(Opcodes::NEQ, lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size())
+        self.charge_instr_with_size(
+            Opcodes::NEQ,
+            lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size(),
+        )
     }
 
     fn charge_vec_pack<'a>(
@@ -374,17 +412,34 @@ impl<'b> GasMeter for GasStatus<'b> {
         self.charge_instr(Opcodes::VEC_LEN)
     }
 
-    fn charge_vec_borrow(&mut self, is_mut: bool, _ty: impl TypeView, _is_success: bool) -> PartialVMResult<()> {
+    fn charge_vec_borrow(
+        &mut self,
+        is_mut: bool,
+        _ty: impl TypeView,
+        _is_success: bool,
+    ) -> PartialVMResult<()> {
         use Opcodes::*;
 
-        self.charge_instr(if is_mut { VEC_MUT_BORROW } else { VEC_IMM_BORROW })
+        self.charge_instr(if is_mut {
+            VEC_MUT_BORROW
+        } else {
+            VEC_IMM_BORROW
+        })
     }
 
-    fn charge_vec_push_back(&mut self, _ty: impl TypeView, val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_vec_push_back(
+        &mut self,
+        _ty: impl TypeView,
+        val: impl ValueView,
+    ) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::VEC_PUSH_BACK, val.legacy_abstract_memory_size())
     }
 
-    fn charge_vec_pop_back(&mut self, _ty: impl TypeView, _val: Option<impl ValueView>) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(
+        &mut self,
+        _ty: impl TypeView,
+        _val: Option<impl ValueView>,
+    ) -> PartialVMResult<()> {
         self.charge_instr(Opcodes::VEC_POP_BACK)
     }
 
@@ -394,14 +449,20 @@ impl<'b> GasMeter for GasStatus<'b> {
         expect_num_elements: NumArgs,
         _elems: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
-        self.charge_instr_with_size(Opcodes::VEC_PUSH_BACK, u64::from(expect_num_elements).into())
+        self.charge_instr_with_size(
+            Opcodes::VEC_PUSH_BACK,
+            u64::from(expect_num_elements).into(),
+        )
     }
 
     fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
         self.charge_instr(Opcodes::VEC_SWAP)
     }
 
-    fn charge_drop_frame(&mut self, _locals: impl Iterator<Item = impl ValueView>) -> PartialVMResult<()> {
+    fn charge_drop_frame(
+        &mut self,
+        _locals: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -430,9 +491,15 @@ pub fn new_from_instructions(mut instrs: Vec<(Bytecode, GasCost)>) -> CostTable 
                 instructions_covered += 1;
             }
         }
-        debug_assert!(instructions_covered == Bytecode::VARIANT_COUNT, "all instructions must be in the cost table");
+        debug_assert!(
+            instructions_covered == Bytecode::VARIANT_COUNT,
+            "all instructions must be in the cost table"
+        );
     }
-    let instruction_table = instrs.into_iter().map(|(_, cost)| cost).collect::<Vec<GasCost>>();
+    let instruction_table = instrs
+        .into_iter()
+        .map(|(_, cost)| cost)
+        .collect::<Vec<GasCost>>();
     CostTable { instruction_table }
 }
 
@@ -440,10 +507,22 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
     use Bytecode::*;
 
     vec![
-        (MoveToDeprecated(StructDefinitionIndex::new(0)), GasCost::new(0, 0)),
-        (MoveToGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(0, 0)),
-        (MoveFromDeprecated(StructDefinitionIndex::new(0)), GasCost::new(0, 0)),
-        (MoveFromGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            MoveToDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            MoveToGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            MoveFromDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            MoveFromGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (BrTrue(0), GasCost::new(0, 0)),
         (WriteRef, GasCost::new(0, 0)),
         (Mul, GasCost::new(0, 0)),
@@ -454,9 +533,15 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
         (ReadRef, GasCost::new(0, 0)),
         (Sub, GasCost::new(0, 0)),
         (MutBorrowField(FieldHandleIndex::new(0)), GasCost::new(0, 0)),
-        (MutBorrowFieldGeneric(FieldInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            MutBorrowFieldGeneric(FieldInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (ImmBorrowField(FieldHandleIndex::new(0)), GasCost::new(0, 0)),
-        (ImmBorrowFieldGeneric(FieldInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            ImmBorrowFieldGeneric(FieldInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (Add, GasCost::new(0, 0)),
         (CopyLoc(0), GasCost::new(0, 0)),
         (StLoc(0), GasCost::new(0, 0)),
@@ -479,29 +564,56 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
         (Neq, GasCost::new(0, 0)),
         (Not, GasCost::new(0, 0)),
         (Call(FunctionHandleIndex::new(0)), GasCost::new(0, 0)),
-        (CallGeneric(FunctionInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            CallGeneric(FunctionInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (Le, GasCost::new(0, 0)),
         (Branch(0), GasCost::new(0, 0)),
         (Unpack(StructDefinitionIndex::new(0)), GasCost::new(0, 0)),
-        (UnpackGeneric(StructDefInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            UnpackGeneric(StructDefInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (Or, GasCost::new(0, 0)),
         (LdFalse, GasCost::new(0, 0)),
         (LdTrue, GasCost::new(0, 0)),
         (Mod, GasCost::new(0, 0)),
         (BrFalse(0), GasCost::new(0, 0)),
-        (ExistsDeprecated(StructDefinitionIndex::new(0)), GasCost::new(0, 0)),
-        (ExistsGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            ExistsDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            ExistsGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (BitOr, GasCost::new(0, 0)),
         (FreezeRef, GasCost::new(0, 0)),
-        (MutBorrowGlobalDeprecated(StructDefinitionIndex::new(0)), GasCost::new(0, 0)),
-        (MutBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(0, 0)),
-        (ImmBorrowGlobalDeprecated(StructDefinitionIndex::new(0)), GasCost::new(0, 0)),
-        (ImmBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            MutBorrowGlobalDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            MutBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            ImmBorrowGlobalDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            ImmBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (Div, GasCost::new(0, 0)),
         (Eq, GasCost::new(0, 0)),
         (Gt, GasCost::new(0, 0)),
         (Pack(StructDefinitionIndex::new(0)), GasCost::new(0, 0)),
-        (PackGeneric(StructDefInstantiationIndex::new(0)), GasCost::new(0, 0)),
+        (
+            PackGeneric(StructDefInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
         (Nop, GasCost::new(0, 0)),
         (VecPack(SignatureIndex::new(0), 0), GasCost::new(0, 0)),
         (VecLen(SignatureIndex::new(0)), GasCost::new(0, 0)),
@@ -518,14 +630,38 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
         (CastU32, GasCost::new(0, 0)),
         (CastU256, GasCost::new(0, 0)),
         (PackVariant(VariantHandleIndex::new(0)), GasCost::new(0, 0)),
-        (PackVariantGeneric(VariantInstantiationHandleIndex::new(0)), GasCost::new(0, 0)),
-        (UnpackVariant(VariantHandleIndex::new(0)), GasCost::new(0, 0)),
-        (UnpackVariantImmRef(VariantHandleIndex::new(0)), GasCost::new(0, 0)),
-        (UnpackVariantMutRef(VariantHandleIndex::new(0)), GasCost::new(0, 0)),
-        (UnpackVariantGeneric(VariantInstantiationHandleIndex::new(0)), GasCost::new(0, 0)),
-        (UnpackVariantGenericImmRef(VariantInstantiationHandleIndex::new(0)), GasCost::new(0, 0)),
-        (UnpackVariantGenericMutRef(VariantInstantiationHandleIndex::new(0)), GasCost::new(0, 0)),
-        (VariantSwitch(VariantJumpTableIndex::new(0)), GasCost::new(0, 0)),
+        (
+            PackVariantGeneric(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            UnpackVariant(VariantHandleIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            UnpackVariantImmRef(VariantHandleIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            UnpackVariantMutRef(VariantHandleIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            UnpackVariantGeneric(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            UnpackVariantGenericImmRef(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            UnpackVariantGenericMutRef(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            VariantSwitch(VariantJumpTableIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
     ]
 }
 
@@ -542,17 +678,32 @@ pub fn zero_cost_schedule() -> CostTable {
 
 pub fn unit_cost_schedule() -> CostTable {
     new_from_instructions(
-        zero_cost_instruction_table().into_iter().map(|(bytecode, _)| (bytecode, GasCost::new(1, 1))).collect(),
+        zero_cost_instruction_table()
+            .into_iter()
+            .map(|(bytecode, _)| (bytecode, GasCost::new(1, 1)))
+            .collect(),
     )
 }
 
 pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
     use Bytecode::*;
     vec![
-        (MoveToDeprecated(StructDefinitionIndex::new(0)), GasCost::new(13, 1)),
-        (MoveToGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(27, 1)),
-        (MoveFromDeprecated(StructDefinitionIndex::new(0)), GasCost::new(459, 1)),
-        (MoveFromGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(13, 1)),
+        (
+            MoveToDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(13, 1),
+        ),
+        (
+            MoveToGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(27, 1),
+        ),
+        (
+            MoveFromDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(459, 1),
+        ),
+        (
+            MoveFromGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(13, 1),
+        ),
         (BrTrue(0), GasCost::new(1, 1)),
         (WriteRef, GasCost::new(1, 1)),
         (Mul, GasCost::new(1, 1)),
@@ -563,9 +714,15 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
         (ReadRef, GasCost::new(1, 1)),
         (Sub, GasCost::new(1, 1)),
         (MutBorrowField(FieldHandleIndex::new(0)), GasCost::new(1, 1)),
-        (MutBorrowFieldGeneric(FieldInstantiationIndex::new(0)), GasCost::new(1, 1)),
+        (
+            MutBorrowFieldGeneric(FieldInstantiationIndex::new(0)),
+            GasCost::new(1, 1),
+        ),
         (ImmBorrowField(FieldHandleIndex::new(0)), GasCost::new(1, 1)),
-        (ImmBorrowFieldGeneric(FieldInstantiationIndex::new(0)), GasCost::new(1, 1)),
+        (
+            ImmBorrowFieldGeneric(FieldInstantiationIndex::new(0)),
+            GasCost::new(1, 1),
+        ),
         (Add, GasCost::new(1, 1)),
         (CopyLoc(0), GasCost::new(1, 1)),
         (StLoc(0), GasCost::new(1, 1)),
@@ -588,29 +745,56 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
         (Neq, GasCost::new(1, 1)),
         (Not, GasCost::new(1, 1)),
         (Call(FunctionHandleIndex::new(0)), GasCost::new(1132, 1)),
-        (CallGeneric(FunctionInstantiationIndex::new(0)), GasCost::new(582, 1)),
+        (
+            CallGeneric(FunctionInstantiationIndex::new(0)),
+            GasCost::new(582, 1),
+        ),
         (Le, GasCost::new(2, 1)),
         (Branch(0), GasCost::new(1, 1)),
         (Unpack(StructDefinitionIndex::new(0)), GasCost::new(2, 1)),
-        (UnpackGeneric(StructDefInstantiationIndex::new(0)), GasCost::new(2, 1)),
+        (
+            UnpackGeneric(StructDefInstantiationIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
         (Or, GasCost::new(2, 1)),
         (LdFalse, GasCost::new(1, 1)),
         (LdTrue, GasCost::new(1, 1)),
         (Mod, GasCost::new(1, 1)),
         (BrFalse(0), GasCost::new(1, 1)),
-        (ExistsDeprecated(StructDefinitionIndex::new(0)), GasCost::new(41, 1)),
-        (ExistsGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(34, 1)),
+        (
+            ExistsDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(41, 1),
+        ),
+        (
+            ExistsGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(34, 1),
+        ),
         (BitOr, GasCost::new(2, 1)),
         (FreezeRef, GasCost::new(1, 1)),
-        (MutBorrowGlobalDeprecated(StructDefinitionIndex::new(0)), GasCost::new(21, 1)),
-        (MutBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(15, 1)),
-        (ImmBorrowGlobalDeprecated(StructDefinitionIndex::new(0)), GasCost::new(23, 1)),
-        (ImmBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)), GasCost::new(14, 1)),
+        (
+            MutBorrowGlobalDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(21, 1),
+        ),
+        (
+            MutBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(15, 1),
+        ),
+        (
+            ImmBorrowGlobalDeprecated(StructDefinitionIndex::new(0)),
+            GasCost::new(23, 1),
+        ),
+        (
+            ImmBorrowGlobalGenericDeprecated(StructDefInstantiationIndex::new(0)),
+            GasCost::new(14, 1),
+        ),
         (Div, GasCost::new(3, 1)),
         (Eq, GasCost::new(1, 1)),
         (Gt, GasCost::new(1, 1)),
         (Pack(StructDefinitionIndex::new(0)), GasCost::new(2, 1)),
-        (PackGeneric(StructDefInstantiationIndex::new(0)), GasCost::new(2, 1)),
+        (
+            PackGeneric(StructDefInstantiationIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
         (Nop, GasCost::new(1, 1)),
         (VecPack(SignatureIndex::new(0), 0), GasCost::new(84, 1)),
         (VecLen(SignatureIndex::new(0)), GasCost::new(98, 1)),
@@ -627,14 +811,38 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
         (CastU32, GasCost::new(2, 1)),
         (CastU256, GasCost::new(2, 1)),
         (PackVariant(VariantHandleIndex::new(0)), GasCost::new(2, 1)),
-        (PackVariantGeneric(VariantInstantiationHandleIndex::new(0)), GasCost::new(2, 1)),
-        (UnpackVariant(VariantHandleIndex::new(0)), GasCost::new(2, 1)),
-        (UnpackVariantImmRef(VariantHandleIndex::new(0)), GasCost::new(2, 1)),
-        (UnpackVariantMutRef(VariantHandleIndex::new(0)), GasCost::new(2, 1)),
-        (UnpackVariantGeneric(VariantInstantiationHandleIndex::new(0)), GasCost::new(2, 1)),
-        (UnpackVariantGenericImmRef(VariantInstantiationHandleIndex::new(0)), GasCost::new(2, 1)),
-        (UnpackVariantGenericMutRef(VariantInstantiationHandleIndex::new(0)), GasCost::new(2, 1)),
-        (VariantSwitch(VariantJumpTableIndex::new(0)), GasCost::new(2, 1)),
+        (
+            PackVariantGeneric(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            UnpackVariant(VariantHandleIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            UnpackVariantImmRef(VariantHandleIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            UnpackVariantMutRef(VariantHandleIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            UnpackVariantGeneric(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            UnpackVariantGenericImmRef(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            UnpackVariantGenericMutRef(VariantInstantiationHandleIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            VariantSwitch(VariantJumpTableIndex::new(0)),
+            GasCost::new(2, 1),
+        ),
     ]
 }
 

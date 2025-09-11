@@ -1,7 +1,7 @@
 // invalid, otw type packed
 
 module a::m {
-    use one::tx_context;
+    use sui::tx_context;
 
     struct M has drop { dummy: bool }
 
@@ -13,6 +13,6 @@ module a::m {
     }
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

@@ -38,7 +38,7 @@ impl CompilerInfo {
                     // TODO: should we check this is not also an expanded lambda?
                     // TODO: what if we find two macro calls?
                     if let Some(_old) = self.macro_info.insert(loc, *info) {
-                        eprintln!("Repeated macro info");
+                        //                        eprintln!("Repeated macro info");
                     }
                 }
                 CI::IDEAnnotation::ExpandedLambda => {
@@ -47,9 +47,13 @@ impl CompilerInfo {
                 CI::IDEAnnotation::DotAutocompleteInfo(info) => {
                     // TODO: what if we find two autocomplete info sets? Intersection may be better
                     // than union, as it's likely in a lambda body.
-                    if let Some(_old) = self.dot_autocomplete_info.entry(loc.file_hash()).or_default().insert(loc, *info)
+                    if let Some(_old) = self
+                        .dot_autocomplete_info
+                        .entry(loc.file_hash())
+                        .or_default()
+                        .insert(loc, *info)
                     {
-                        eprintln!("Repeated autocomplete info");
+                        //                        eprintln!("Repeated autocomplete info");
                     }
                 }
                 CI::IDEAnnotation::MissingMatchArms(_) => {
@@ -73,13 +77,27 @@ impl CompilerInfo {
         self.expanded_lambdas.contains(loc)
     }
 
-    pub fn get_autocomplete_info(&self, fhash: FileHash, loc: &Loc) -> Option<&CI::DotAutocompleteInfo> {
-        self.dot_autocomplete_info
-            .get(&fhash)
-            .and_then(|a| a.iter().find_map(|(aloc, ainfo)| if aloc.contains(loc) { Some(ainfo) } else { None }))
+    pub fn get_autocomplete_info(
+        &self,
+        fhash: FileHash,
+        loc: &Loc,
+    ) -> Option<&CI::DotAutocompleteInfo> {
+        self.dot_autocomplete_info.get(&fhash).and_then(|a| {
+            a.iter().find_map(|(aloc, ainfo)| {
+                if aloc.contains(loc) {
+                    Some(ainfo)
+                } else {
+                    None
+                }
+            })
+        })
     }
 
     pub fn inside_guard(&self, fhash: FileHash, loc: &Loc, gloc: &Loc) -> bool {
-        self.guards.get(&fhash).and_then(|guard_locs| guard_locs.get(gloc)).is_some() && gloc.contains(loc)
+        self.guards
+            .get(&fhash)
+            .and_then(|guard_locs| guard_locs.get(gloc))
+            .is_some()
+            && gloc.contains(loc)
     }
 }

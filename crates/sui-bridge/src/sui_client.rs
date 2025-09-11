@@ -6,44 +6,54 @@ use async_trait::async_trait;
 use core::panic;
 use fastcrypto::traits::ToFromBytes;
 use serde::de::DeserializeOwned;
-use std::{collections::HashMap, str::from_utf8, sync::Arc, time::Duration};
+use std::collections::HashMap;
+use std::str::from_utf8;
+use std::sync::Arc;
+use std::time::Duration;
 use sui_json_rpc_api::BridgeReadApiClient;
+use sui_json_rpc_types::DevInspectResults;
+use sui_json_rpc_types::{EventFilter, Page, SuiEvent};
 use sui_json_rpc_types::{
-    DevInspectResults,
-    EventFilter,
-    EventPage,
-    Page,
-    SuiEvent,
-    SuiObjectDataOptions,
-    SuiTransactionBlockResponse,
+    EventPage, SuiObjectDataOptions, SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
 };
 use sui_sdk::{SuiClient as SuiSdkClient, SuiClientBuilder};
+use sui_types::base_types::ObjectRef;
+use sui_types::base_types::SequenceNumber;
+use sui_types::bridge::BridgeSummary;
+use sui_types::bridge::BridgeTreasurySummary;
+use sui_types::bridge::MoveTypeCommitteeMember;
+use sui_types::bridge::MoveTypeParsedTokenTransferMessage;
+use sui_types::gas_coin::GasCoin;
+use sui_types::object::Owner;
+use sui_types::parse_sui_type_tag;
+use sui_types::transaction::Argument;
+use sui_types::transaction::CallArg;
+use sui_types::transaction::Command;
+use sui_types::transaction::ObjectArg;
+use sui_types::transaction::ProgrammableTransaction;
+use sui_types::transaction::Transaction;
+use sui_types::transaction::TransactionKind;
+use sui_types::TypeTag;
+use sui_types::BRIDGE_PACKAGE_ID;
+use sui_types::SUI_BRIDGE_OBJECT_ID;
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    bridge::{BridgeSummary, BridgeTreasurySummary, MoveTypeCommitteeMember, MoveTypeParsedTokenTransferMessage},
+    base_types::{ObjectID, SuiAddress},
     digests::TransactionDigest,
     event::EventID,
-    gas_coin::GasCoin,
-    object::Owner,
-    parse_sui_type_tag,
-    transaction::{Argument, CallArg, Command, ObjectArg, ProgrammableTransaction, Transaction, TransactionKind},
     Identifier,
-    TypeTag,
-    BRIDGE_PACKAGE_ID,
-    SUI_BRIDGE_OBJECT_ID,
 };
 use tokio::sync::OnceCell;
 use tracing::{error, warn};
 
-use crate::{
-    crypto::BridgeAuthorityPublicKey,
-    error::{BridgeError, BridgeResult},
-    events::SuiBridgeEvent,
-    metrics::BridgeMetrics,
-    retry_with_max_elapsed_time,
-    types::{BridgeAction, BridgeActionStatus, BridgeAuthority, BridgeCommittee, ParsedTokenTransferMessage},
-};
+use crate::crypto::BridgeAuthorityPublicKey;
+use crate::error::{BridgeError, BridgeResult};
+use crate::events::SuiBridgeEvent;
+use crate::metrics::BridgeMetrics;
+use crate::retry_with_max_elapsed_time;
+use crate::types::BridgeActionStatus;
+use crate::types::ParsedTokenTransferMessage;
+use crate::types::{BridgeAction, BridgeAuthority, BridgeCommittee};
 
 pub struct SuiClient<P> {
     inner: P,
@@ -57,8 +67,13 @@ impl SuiBridgeClient {
         let inner = SuiClientBuilder::default()
             .build(rpc_url)
             .await
-            .map_err(|e| anyhow!("Can't establish connection with Sui Rpc {rpc_url}. Error: {e}"))?;
-        let self_ = Self { inner, bridge_metrics };
+            .map_err(|e| {
+                anyhow!("Can't establish connection with Sui Rpc {rpc_url}. Error: {e}")
+            })?;
+        let self_ = Self {
+            inner,
+            bridge_metrics,
+        };
         self_.describe().await?;
         Ok(self_)
     }
@@ -73,14 +88,19 @@ where
     P: SuiClientInner,
 {
     pub fn new_for_testing(inner: P) -> Self {
-        Self { inner, bridge_metrics: Arc::new(BridgeMetrics::new_for_testing()) }
+        Self {
+            inner,
+            bridge_metrics: Arc::new(BridgeMetrics::new_for_testing()),
+        }
     }
 
     // TODO assert chain identifier
     async fn describe(&self) -> anyhow::Result<()> {
         let chain_id = self.inner.get_chain_identifier().await?;
         let block_number = self.inner.get_latest_checkpoint_sequence_number().await?;
-        tracing::info!("SuiClient is connected to chain {chain_id}, current block number: {block_number}");
+        tracing::info!(
+            "SuiClient is connected to chain {chain_id}, current block number: {block_number}"
+        );
         Ok(())
     }
 
@@ -91,9 +111,10 @@ where
     pub async fn get_mutable_bridge_object_arg_must_succeed(&self) -> ObjectArg {
         static ARG: OnceCell<ObjectArg> = OnceCell::const_new();
         *ARG.get_or_init(|| async move {
-            let Ok(Ok(bridge_object_arg)) =
-                retry_with_max_elapsed_time!(self.inner.get_mutable_bridge_object_arg(), Duration::from_secs(30))
-            else {
+            let Ok(Ok(bridge_object_arg)) = retry_with_max_elapsed_time!(
+                self.inner.get_mutable_bridge_object_arg(),
+                Duration::from_secs(30)
+            ) else {
                 panic!("Failed to get bridge object arg after retries");
             };
             bridge_object_arg
@@ -109,14 +130,18 @@ where
         // cursor is exclusive
         cursor: Option<EventID>,
     ) -> BridgeResult<Page<SuiEvent, EventID>> {
-        let filter = EventFilter::MoveEventModule { package, module: module.clone() };
+        let filter = EventFilter::MoveEventModule {
+            package,
+            module: module.clone(),
+        };
         let events = self.inner.query_events(filter.clone(), cursor).await?;
 
         // Safeguard check that all events are emitted from requested package and module
         assert!(events
             .data
             .iter()
-            .all(|event| event.type_.address.as_ref() == package.as_ref() && event.type_.module == module));
+            .all(|event| event.type_.address.as_ref() == package.as_ref()
+                && event.type_.module == module));
         Ok(events)
     }
 
@@ -129,13 +154,18 @@ where
         event_idx: u16,
     ) -> BridgeResult<BridgeAction> {
         let events = self.inner.get_events_by_tx_digest(*tx_digest).await?;
-        let event = events.get(event_idx as usize).ok_or(BridgeError::NoBridgeEventsInTxPosition)?;
+        let event = events
+            .get(event_idx as usize)
+            .ok_or(BridgeError::NoBridgeEventsInTxPosition)?;
         if event.type_.address.as_ref() != BRIDGE_PACKAGE_ID.as_ref() {
             return Err(BridgeError::BridgeEventInUnrecognizedSuiPackage);
         }
-        let bridge_event = SuiBridgeEvent::try_from_sui_event(event)?.ok_or(BridgeError::NoBridgeEventsInTxPosition)?;
+        let bridge_event = SuiBridgeEvent::try_from_sui_event(event)?
+            .ok_or(BridgeError::NoBridgeEventsInTxPosition)?;
 
-        bridge_event.try_into_bridge_action(*tx_digest, event_idx).ok_or(BridgeError::BridgeEventNotActionable)
+        bridge_event
+            .try_into_bridge_action(*tx_digest, event_idx)
+            .ok_or(BridgeError::BridgeEventNotActionable)
     }
 
     pub async fn get_bridge_summary(&self) -> BridgeResult<BridgeSummary> {
@@ -146,7 +176,9 @@ where
     }
 
     pub async fn is_bridge_paused(&self) -> BridgeResult<bool> {
-        self.get_bridge_summary().await.map(|summary| summary.is_frozen)
+        self.get_bridge_summary()
+            .await
+            .map(|summary| summary.is_frozen)
     }
 
     pub async fn get_treasury_summary(&self) -> BridgeResult<BridgeTreasurySummary> {
@@ -160,9 +192,13 @@ where
             .id_token_type_map
             .into_iter()
             .map(|(id, name)| {
-                parse_sui_type_tag(&format!("0x{name}")).map(|name| (id, name)).map_err(|e| {
-                    BridgeError::InternalError(format!("Failed to retrieve token id mapping: {e}, type name: {name}"))
-                })
+                parse_sui_type_tag(&format!("0x{name}"))
+                    .map(|name| (id, name))
+                    .map_err(|e| {
+                        BridgeError::InternalError(format!(
+                            "Failed to retrieve token id mapping: {e}, type name: {name}"
+                        ))
+                    })
             })
             .collect()
     }
@@ -178,25 +214,37 @@ where
                     .treasury
                     .supported_tokens
                     .iter()
-                    .find_map(|(tn, metadata)| if type_name == tn { Some((*id, metadata.notional_value)) } else { None })
-                    .ok_or(BridgeError::InternalError("Error encountered when retrieving token notional values.".into()))
+                    .find_map(|(tn, metadata)| {
+                        if type_name == tn {
+                            Some((*id, metadata.notional_value))
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or(BridgeError::InternalError(
+                        "Error encountered when retrieving token notional values.".into(),
+                    ))
             })
             .collect()
     }
 
     pub async fn get_bridge_committee(&self) -> BridgeResult<BridgeCommittee> {
-        let bridge_summary = self
-            .inner
-            .get_bridge_summary()
-            .await
-            .map_err(|e| BridgeError::InternalError(format!("Can't get bridge committee: {e}")))?;
+        let bridge_summary =
+            self.inner.get_bridge_summary().await.map_err(|e| {
+                BridgeError::InternalError(format!("Can't get bridge committee: {e}"))
+            })?;
         let move_type_bridge_committee = bridge_summary.committee;
 
         let mut authorities = vec![];
         // TODO: move this to MoveTypeBridgeCommittee
         for (_, member) in move_type_bridge_committee.members {
-            let MoveTypeCommitteeMember { sui_address, bridge_pubkey_bytes, voting_power, http_rest_url, blocklisted } =
-                member;
+            let MoveTypeCommitteeMember {
+                sui_address,
+                bridge_pubkey_bytes,
+                voting_power,
+                http_rest_url,
+                blocklisted,
+            } = member;
             let pubkey = BridgeAuthorityPublicKey::from_bytes(&bridge_pubkey_bytes)?;
             let base_url = from_utf8(&http_rest_url).unwrap_or_else(|_e| {
                 warn!(
@@ -222,10 +270,14 @@ where
 
     pub async fn get_reference_gas_price_until_success(&self) -> u64 {
         loop {
-            let Ok(Ok(rgp)) =
-                retry_with_max_elapsed_time!(self.inner.get_reference_gas_price(), Duration::from_secs(30))
-            else {
-                self.bridge_metrics.sui_rpc_errors.with_label_values(&["get_reference_gas_price"]).inc();
+            let Ok(Ok(rgp)) = retry_with_max_elapsed_time!(
+                self.inner.get_reference_gas_price(),
+                Duration::from_secs(30)
+            ) else {
+                self.bridge_metrics
+                    .sui_rpc_errors
+                    .with_label_values(&["get_reference_gas_price"])
+                    .inc();
                 error!("Failed to get reference gas price");
                 continue;
             };
@@ -253,14 +305,21 @@ where
         loop {
             let bridge_object_arg = self.get_mutable_bridge_object_arg_must_succeed().await;
             let Ok(Ok(status)) = retry_with_max_elapsed_time!(
-                self.inner.get_token_transfer_action_onchain_status(bridge_object_arg, source_chain_id, seq_number),
+                self.inner.get_token_transfer_action_onchain_status(
+                    bridge_object_arg,
+                    source_chain_id,
+                    seq_number
+                ),
                 Duration::from_secs(30)
             ) else {
                 self.bridge_metrics
                     .sui_rpc_errors
                     .with_label_values(&["get_token_transfer_action_onchain_status"])
                     .inc();
-                error!(source_chain_id, seq_number, "Failed to get token transfer action onchain status");
+                error!(
+                    source_chain_id,
+                    seq_number, "Failed to get token transfer action onchain status"
+                );
                 continue;
             };
             return status;
@@ -275,14 +334,21 @@ where
         loop {
             let bridge_object_arg = self.get_mutable_bridge_object_arg_must_succeed().await;
             let Ok(Ok(sigs)) = retry_with_max_elapsed_time!(
-                self.inner.get_token_transfer_action_onchain_signatures(bridge_object_arg, source_chain_id, seq_number),
+                self.inner.get_token_transfer_action_onchain_signatures(
+                    bridge_object_arg,
+                    source_chain_id,
+                    seq_number
+                ),
                 Duration::from_secs(30)
             ) else {
                 self.bridge_metrics
                     .sui_rpc_errors
                     .with_label_values(&["get_token_transfer_action_onchain_signatures"])
                     .inc();
-                error!(source_chain_id, seq_number, "Failed to get token transfer action onchain signatures");
+                error!(
+                    source_chain_id,
+                    seq_number, "Failed to get token transfer action onchain signatures"
+                );
                 continue;
             };
             return sigs;
@@ -295,16 +361,23 @@ where
         seq_number: u64,
     ) -> BridgeResult<Option<ParsedTokenTransferMessage>> {
         let bridge_object_arg = self.get_mutable_bridge_object_arg_must_succeed().await;
-        let message =
-            self.inner.get_parsed_token_transfer_message(bridge_object_arg, source_chain_id, seq_number).await?;
+        let message = self
+            .inner
+            .get_parsed_token_transfer_message(bridge_object_arg, source_chain_id, seq_number)
+            .await?;
         Ok(match message {
             Some(payload) => Some(ParsedTokenTransferMessage::try_from(payload)?),
             None => None,
         })
     }
 
-    pub async fn get_gas_data_panic_if_not_gas(&self, gas_object_id: ObjectID) -> (GasCoin, ObjectRef, Owner) {
-        self.inner.get_gas_data_panic_if_not_gas(gas_object_id).await
+    pub async fn get_gas_data_panic_if_not_gas(
+        &self,
+        gas_object_id: ObjectID,
+    ) -> (GasCoin, ObjectRef, Owner) {
+        self.inner
+            .get_gas_data_panic_if_not_gas(gas_object_id)
+            .await
     }
 }
 
@@ -312,9 +385,16 @@ where
 #[async_trait]
 pub trait SuiClientInner: Send + Sync {
     type Error: Into<anyhow::Error> + Send + Sync + std::error::Error + 'static;
-    async fn query_events(&self, query: EventFilter, cursor: Option<EventID>) -> Result<EventPage, Self::Error>;
+    async fn query_events(
+        &self,
+        query: EventFilter,
+        cursor: Option<EventID>,
+    ) -> Result<EventPage, Self::Error>;
 
-    async fn get_events_by_tx_digest(&self, tx_digest: TransactionDigest) -> Result<Vec<SuiEvent>, Self::Error>;
+    async fn get_events_by_tx_digest(
+        &self,
+        tx_digest: TransactionDigest,
+    ) -> Result<Vec<SuiEvent>, Self::Error>;
 
     async fn get_chain_identifier(&self) -> Result<String, Self::Error>;
 
@@ -352,18 +432,30 @@ pub trait SuiClientInner: Send + Sync {
         seq_number: u64,
     ) -> Result<Option<MoveTypeParsedTokenTransferMessage>, BridgeError>;
 
-    async fn get_gas_data_panic_if_not_gas(&self, gas_object_id: ObjectID) -> (GasCoin, ObjectRef, Owner);
+    async fn get_gas_data_panic_if_not_gas(
+        &self,
+        gas_object_id: ObjectID,
+    ) -> (GasCoin, ObjectRef, Owner);
 }
 
 #[async_trait]
 impl SuiClientInner for SuiSdkClient {
     type Error = sui_sdk::error::Error;
 
-    async fn query_events(&self, query: EventFilter, cursor: Option<EventID>) -> Result<EventPage, Self::Error> {
-        self.event_api().query_events(query, cursor, None, false).await
+    async fn query_events(
+        &self,
+        query: EventFilter,
+        cursor: Option<EventID>,
+    ) -> Result<EventPage, Self::Error> {
+        self.event_api()
+            .query_events(query, cursor, None, false)
+            .await
     }
 
-    async fn get_events_by_tx_digest(&self, tx_digest: TransactionDigest) -> Result<Vec<SuiEvent>, Self::Error> {
+    async fn get_events_by_tx_digest(
+        &self,
+        tx_digest: TransactionDigest,
+    ) -> Result<Vec<SuiEvent>, Self::Error> {
         self.event_api().get_events(tx_digest).await
     }
 
@@ -376,11 +468,16 @@ impl SuiClientInner for SuiSdkClient {
     }
 
     async fn get_latest_checkpoint_sequence_number(&self) -> Result<u64, Self::Error> {
-        self.read_api().get_latest_checkpoint_sequence_number().await
+        self.read_api()
+            .get_latest_checkpoint_sequence_number()
+            .await
     }
 
     async fn get_mutable_bridge_object_arg(&self) -> Result<ObjectArg, Self::Error> {
-        let initial_shared_version = self.http().get_bridge_object_initial_shared_version().await?;
+        let initial_shared_version = self
+            .http()
+            .get_bridge_object_initial_shared_version()
+            .await?;
         Ok(ObjectArg::SharedObject {
             id: SUI_BRIDGE_OBJECT_ID,
             initial_shared_version: SequenceNumber::from_u64(initial_shared_version),
@@ -429,15 +526,11 @@ impl SuiClientInner for SuiSdkClient {
         &self,
         tx: Transaction,
     ) -> Result<SuiTransactionBlockResponse, BridgeError> {
-        match self
-            .quorum_driver_api()
-            .execute_transaction_block(
-                tx,
-                SuiTransactionBlockResponseOptions::new().with_effects().with_events(),
-                Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForEffectsCert),
-            )
-            .await
-        {
+        match self.quorum_driver_api().execute_transaction_block(
+            tx,
+            SuiTransactionBlockResponseOptions::new().with_effects().with_events(),
+            Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForEffectsCert),
+        ).await {
             Ok(response) => Ok(response),
             Err(e) => return Err(BridgeError::SuiTxFailureGeneric(e.to_string())),
         }
@@ -459,11 +552,17 @@ impl SuiClientInner for SuiSdkClient {
         .await
     }
 
-    async fn get_gas_data_panic_if_not_gas(&self, gas_object_id: ObjectID) -> (GasCoin, ObjectRef, Owner) {
+    async fn get_gas_data_panic_if_not_gas(
+        &self,
+        gas_object_id: ObjectID,
+    ) -> (GasCoin, ObjectRef, Owner) {
         loop {
             match self
                 .read_api()
-                .get_object_with_options(gas_object_id, SuiObjectDataOptions::default().with_owner().with_content())
+                .get_object_with_options(
+                    gas_object_id,
+                    SuiObjectDataOptions::default().with_owner().with_content(),
+                )
                 .await
                 .map(|resp| resp.data)
             {
@@ -510,8 +609,13 @@ where
         )],
     };
     let kind = TransactionKind::programmable(pt);
-    let resp = sui_client.read_api().dev_inspect_transaction_block(SuiAddress::ZERO, kind, None, None, None).await?;
-    let DevInspectResults { results, effects, .. } = resp;
+    let resp = sui_client
+        .read_api()
+        .dev_inspect_transaction_block(SuiAddress::ZERO, kind, None, None, None)
+        .await?;
+    let DevInspectResults {
+        results, effects, ..
+    } = resp;
     let Some(results) = results else {
         return Err(BridgeError::Generic(format!(
             "No results returned for '{}', effects: {:?}",
@@ -520,11 +624,15 @@ where
     };
     let return_values = &results
         .first()
-        .ok_or(BridgeError::Generic(format!("No return values for '{}', results: {:?}", function_name, results)))?
+        .ok_or(BridgeError::Generic(format!(
+            "No return values for '{}', results: {:?}",
+            function_name, results
+        )))?
         .return_values;
-    let (value_bytes, _type_tag) = return_values
-        .first()
-        .ok_or(BridgeError::Generic(format!("No first return value for '{}', results: {:?}", function_name, results)))?;
+    let (value_bytes, _type_tag) = return_values.first().ok_or(BridgeError::Generic(format!(
+        "No first return value for '{}', results: {:?}",
+        function_name, results
+    )))?;
     bcs::from_bytes::<T>(value_bytes).map_err(|e| {
         BridgeError::Generic(format!(
             "Failed to parse return value for '{}', error: {:?}, results: {:?}",
@@ -535,15 +643,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::crypto::BridgeAuthorityKeyPair;
+    use crate::e2e_tests::test_utils::TestClusterWrapperBuilder;
     use crate::{
-        crypto::BridgeAuthorityKeyPair,
-        e2e_tests::test_utils::TestClusterWrapperBuilder,
         events::{EmittedSuiToEthTokenBridgeV1, MoveTokenDepositedEvent},
         sui_mock_client::SuiMockClient,
         test_utils::{
-            approve_action_with_validator_secrets,
-            bridge_token,
-            get_test_eth_to_sui_bridge_action,
+            approve_action_with_validator_secrets, bridge_token, get_test_eth_to_sui_bridge_action,
             get_test_sui_to_eth_bridge_action,
         },
         types::SuiToEthBridgeAction,
@@ -553,10 +659,8 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
     use sui_json_rpc_types::BcsEvent;
-    use sui_types::{
-        bridge::{BridgeChainId, TOKEN_ID_SUI, TOKEN_ID_USDC},
-        crypto::get_key_pair,
-    };
+    use sui_types::bridge::{BridgeChainId, TOKEN_ID_SUI, TOKEN_ID_USDC};
+    use sui_types::crypto::get_key_pair;
 
     use super::*;
     use crate::events::{init_all_struct_tags, SuiToEthTokenBridgeV1};
@@ -611,19 +715,25 @@ mod tests {
         let mut sui_event_3 = sui_event_1.clone();
         sui_event_3.type_.address = AccountAddress::random();
 
-        mock_client.add_events_by_tx_digest(tx_digest, vec![
-            sui_event_1.clone(),
-            sui_event_2.clone(),
-            sui_event_1.clone(),
-            sui_event_3.clone(),
-        ]);
+        mock_client.add_events_by_tx_digest(
+            tx_digest,
+            vec![
+                sui_event_1.clone(),
+                sui_event_2.clone(),
+                sui_event_1.clone(),
+                sui_event_3.clone(),
+            ],
+        );
         let expected_action_1 = BridgeAction::SuiToEthBridgeAction(SuiToEthBridgeAction {
             sui_tx_digest: tx_digest,
             sui_tx_event_index: 0,
             sui_bridge_event: sanitized_event_1.clone(),
         });
         assert_eq!(
-            sui_client.get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 0).await.unwrap(),
+            sui_client
+                .get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 0)
+                .await
+                .unwrap(),
             expected_action_1,
         );
         let expected_action_2 = BridgeAction::SuiToEthBridgeAction(SuiToEthBridgeAction {
@@ -632,26 +742,41 @@ mod tests {
             sui_bridge_event: sanitized_event_1.clone(),
         });
         assert_eq!(
-            sui_client.get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 2).await.unwrap(),
+            sui_client
+                .get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 2)
+                .await
+                .unwrap(),
             expected_action_2,
         );
         assert!(matches!(
-            sui_client.get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 1).await.unwrap_err(),
+            sui_client
+                .get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 1)
+                .await
+                .unwrap_err(),
             BridgeError::NoBridgeEventsInTxPosition
         ),);
         assert!(matches!(
-            sui_client.get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 3).await.unwrap_err(),
+            sui_client
+                .get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 3)
+                .await
+                .unwrap_err(),
             BridgeError::BridgeEventInUnrecognizedSuiPackage
         ),);
         assert!(matches!(
-            sui_client.get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 4).await.unwrap_err(),
+            sui_client
+                .get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 4)
+                .await
+                .unwrap_err(),
             BridgeError::NoBridgeEventsInTxPosition
         ),);
 
         // if the StructTag matches with unparsable bcs, it returns an error
         sui_event_2.type_ = SuiToEthTokenBridgeV1.get().unwrap().clone();
         mock_client.add_events_by_tx_digest(tx_digest, vec![sui_event_2]);
-        sui_client.get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 2).await.unwrap_err();
+        sui_client
+            .get_bridge_action_by_tx_digest_and_event_idx_maybe(&tx_digest, 2)
+            .await
+            .unwrap_err();
     }
 
     // Test get_action_onchain_status.
@@ -672,15 +797,22 @@ mod tests {
             .await;
 
         let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
-        let sui_client = SuiClient::new(&test_cluster.inner.fullnode_handle.rpc_url, bridge_metrics).await.unwrap();
+        let sui_client =
+            SuiClient::new(&test_cluster.inner.fullnode_handle.rpc_url, bridge_metrics)
+                .await
+                .unwrap();
         let bridge_authority_keys = test_cluster.authority_keys_clone();
 
         // Wait until committee is set up
-        test_cluster.trigger_reconfiguration_if_not_yet_and_assert_bridge_committee_initialized().await;
+        test_cluster
+            .trigger_reconfiguration_if_not_yet_and_assert_bridge_committee_initialized()
+            .await;
         let context = &mut test_cluster.inner.wallet;
         let sender = context.active_address().unwrap();
         let usdc_amount = 5000000;
-        let bridge_object_arg = sui_client.get_mutable_bridge_object_arg_must_succeed().await;
+        let bridge_object_arg = sui_client
+            .get_mutable_bridge_object_arg_must_succeed()
+            .await;
         let id_token_map = sui_client.get_token_id_map().await.unwrap();
 
         // 1. Create a Eth -> Sui Transfer (recipient is sender address), approve with validator secrets and assert its status to be Claimed
@@ -698,7 +830,11 @@ mod tests {
 
         let status = sui_client
             .inner
-            .get_token_transfer_action_onchain_status(bridge_object_arg, action.chain_id() as u8, action.seq_number())
+            .get_token_transfer_action_onchain_status(
+                bridge_object_arg,
+                action.chain_id() as u8,
+                action.seq_number(),
+            )
             .await
             .unwrap();
         assert_eq!(status, BridgeActionStatus::Claimed);
@@ -733,7 +869,11 @@ mod tests {
         );
         let status = sui_client
             .inner
-            .get_token_transfer_action_onchain_status(bridge_object_arg, action.chain_id() as u8, action.seq_number())
+            .get_token_transfer_action_onchain_status(
+                bridge_object_arg,
+                action.chain_id() as u8,
+                action.seq_number(),
+            )
             .await
             .unwrap();
         // At this point, the record is created and the status is Pending
@@ -752,16 +892,25 @@ mod tests {
 
         let status = sui_client
             .inner
-            .get_token_transfer_action_onchain_status(bridge_object_arg, action.chain_id() as u8, action.seq_number())
+            .get_token_transfer_action_onchain_status(
+                bridge_object_arg,
+                action.chain_id() as u8,
+                action.seq_number(),
+            )
             .await
             .unwrap();
         assert_eq!(status, BridgeActionStatus::Approved);
 
         // 3. Create a random action and assert its status as NotFound
-        let action = get_test_sui_to_eth_bridge_action(None, None, Some(100), None, None, None, None);
+        let action =
+            get_test_sui_to_eth_bridge_action(None, None, Some(100), None, None, None, None);
         let status = sui_client
             .inner
-            .get_token_transfer_action_onchain_status(bridge_object_arg, action.chain_id() as u8, action.seq_number())
+            .get_token_transfer_action_onchain_status(
+                bridge_object_arg,
+                action.chain_id() as u8,
+                action.seq_number(),
+            )
             .await
             .unwrap();
         assert_eq!(status, BridgeActionStatus::NotFound);

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -159,7 +158,11 @@ where
 
     for entry in fs::read_dir(src)? {
         let entry = entry?;
-        deep_copy(src.join(entry.file_name()), dst.join(entry.file_name()), keep)?
+        deep_copy(
+            src.join(entry.file_name()),
+            dst.join(entry.file_name()),
+            keep,
+        )?
     }
 
     Ok(())
@@ -213,7 +216,10 @@ mod tests {
         // Paths relative to files will be relative to their directory, whereas paths relative to
         // directories will not.
         assert_eq!(path_relative_to(&toml, &src).unwrap(), PathBuf::from("src"));
-        assert_eq!(path_relative_to(&src, &toml).unwrap(), PathBuf::from("../Cargo.toml"));
+        assert_eq!(
+            path_relative_to(&src, &toml).unwrap(),
+            PathBuf::from("../Cargo.toml")
+        );
     }
 
     #[test]
@@ -227,9 +233,15 @@ mod tests {
         assert_eq!(path_relative_to(&cut, &src).unwrap(), PathBuf::from("src"));
         assert_eq!(path_relative_to(&src, &cut).unwrap(), PathBuf::from(".."));
 
-        assert_eq!(path_relative_to(&repo_root, &src).unwrap(), PathBuf::from("sui-execution/cut/src"),);
+        assert_eq!(
+            path_relative_to(&repo_root, &src).unwrap(),
+            PathBuf::from("sui-execution/cut/src"),
+        );
 
-        assert_eq!(path_relative_to(&src, &repo_root).unwrap(), PathBuf::from("../../.."),);
+        assert_eq!(
+            path_relative_to(&src, &repo_root).unwrap(),
+            PathBuf::from("../../.."),
+        );
     }
 
     #[test]
@@ -249,11 +261,15 @@ mod tests {
         let tmp = tempdir().unwrap();
         let i_dont_exist = tmp.path().join("i_dont_exist");
 
-        expect!["No such file or directory (os error 2)"]
-            .assert_eq(&format!("{}", path_relative_to(&i_dont_exist, &tmp).unwrap_err()));
+        expect!["No such file or directory (os error 2)"].assert_eq(&format!(
+            "{}",
+            path_relative_to(&i_dont_exist, &tmp).unwrap_err()
+        ));
 
-        expect!["No such file or directory (os error 2)"]
-            .assert_eq(&format!("{}", path_relative_to(&tmp, &i_dont_exist).unwrap_err()));
+        expect!["No such file or directory (os error 2)"].assert_eq(&format!(
+            "{}",
+            path_relative_to(&tmp, &i_dont_exist).unwrap_err()
+        ));
     }
 
     #[test]

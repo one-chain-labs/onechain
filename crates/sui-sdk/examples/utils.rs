@@ -5,7 +5,9 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::bail;
 use futures::{future, stream::StreamExt};
-use sui_config::{sui_config_dir, Config, PersistedConfig, SUI_CLIENT_CONFIG, SUI_KEYSTORE_FILENAME};
+use sui_config::{
+    sui_config_dir, Config, PersistedConfig, SUI_CLIENT_CONFIG, SUI_KEYSTORE_FILENAME,
+};
 use sui_json_rpc_types::{Coin, SuiObjectDataOptions};
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore};
 use sui_sdk::{
@@ -34,13 +36,14 @@ struct FaucetResponse {
     error: Option<String>,
 }
 
-// const SUI_FAUCET: &str = "https://faucet-devnet.onelabs.cc/gas"; // devnet faucet
+// const SUI_FAUCET: &str = "https://faucet.devnet.sui.io/v2/gas"; // devnet faucet
 
-pub const SUI_FAUCET: &str = "https://faucet-testnet.onelabs.cc/v1/gas"; // testnet faucet
+// Testnet faucet is under heavy rate limit, we recommend using devnet for these examples
+pub const SUI_FAUCET: &str = "https://faucet.testnet.sui.io/v2/gas"; // testnet faucet
 
-// const SUI_FAUCET: &str = "http://127.0.0.1:9123/gas";
+// const SUI_FAUCET: &str = "http://127.0.0.1:9123/v2/gas";
 
-/// Return a OneChain client to interact with the APIs,
+/// Return a sui client to interact with the APIs,
 /// the active address of the local wallet, and another address that can be used as a recipient.
 ///
 /// By default, this function will set up a wallet locally if there isn't any, or reuse the
@@ -55,13 +58,18 @@ pub async fn setup_for_write() -> Result<(SuiClient, SuiAddress, SuiAddress), an
     }
     let wallet = retrieve_wallet()?;
     let addresses = wallet.get_addresses();
-    let addresses = addresses.into_iter().filter(|address| address != &active_address).collect::<Vec<_>>();
-    let recipient = addresses.first().expect("Cannot get the recipient address needed for writing operations. Aborting");
+    let addresses = addresses
+        .into_iter()
+        .filter(|address| address != &active_address)
+        .collect::<Vec<_>>();
+    let recipient = addresses
+        .first()
+        .expect("Cannot get the recipient address needed for writing operations. Aborting");
 
     Ok((client, active_address, *recipient))
 }
 
-/// Return a OneChain client to interact with the APIs and an active address from the local wallet.
+/// Return a sui client to interact with the APIs and an active address from the local wallet.
 ///
 /// This function sets up a wallet in case there is no wallet locally,
 /// and ensures that the active address of the wallet has SUI on it.
@@ -80,7 +88,10 @@ pub async fn setup_for_read() -> Result<(SuiClient, SuiAddress), anyhow::Error> 
 
 /// Request tokens from the Faucet for the given address
 #[allow(unused_assignments)]
-pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiClient) -> Result<(), anyhow::Error> {
+pub async fn request_tokens_from_faucet(
+    address: SuiAddress,
+    sui_client: &SuiClient,
+) -> Result<(), anyhow::Error> {
     let address_str = address.to_string();
     let json_body = json![{
         "FixedAmountRequest": {
@@ -90,8 +101,16 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiCli
 
     // make the request to the faucet JSON RPC API for coin
     let client = Client::new();
-    let resp = client.post(SUI_FAUCET).header("Content-Type", "application/json").json(&json_body).send().await?;
-    println!("Faucet request for address {address_str} has status: {}", resp.status());
+    let resp = client
+        .post(SUI_FAUCET)
+        .header("Content-Type", "application/json")
+        .json(&json_body)
+        .send()
+        .await?;
+    println!(
+        "Faucet request for address {address_str} has status: {}",
+        resp.status()
+    );
     println!("Waiting for the faucet to complete the gas request...");
     let faucet_resp: FaucetResponse = resp.json().await?;
 
@@ -114,7 +133,7 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiCli
     // wait for the faucet to finish the batch of token requests
     loop {
         let resp = client
-            .get("https://faucet-testnet.onelabs.cc/v1/status")
+            .get("https://faucet.testnet.sui.io/v1/status")
             .header("Content-Type", "application/json")
             .json(&json_body)
             .send()
@@ -124,7 +143,11 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiCli
             let resp_json: serde_json::Value = serde_json::from_str(&text).unwrap();
 
             coin_id = <&str>::clone(
-                &resp_json.pointer("/status/transferred_gas_objects/sent/0/id").unwrap().as_str().unwrap(),
+                &resp_json
+                    .pointer("/status/transferred_gas_objects/sent/0/id")
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
             )
             .to_string();
 
@@ -138,7 +161,10 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiCli
     loop {
         let owner = sui_client
             .read_api()
-            .get_object_with_options(ObjectID::from_str(&coin_id)?, SuiObjectDataOptions::new().with_owner())
+            .get_object_with_options(
+                ObjectID::from_str(&coin_id)?,
+                SuiObjectDataOptions::new().with_owner(),
+            )
             .await?;
 
         if owner.owner().is_some() {
@@ -154,21 +180,33 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiCli
 }
 
 /// Return the coin owned by the address that has at least 5_000_000 MIST, otherwise returns None
-pub async fn fetch_coin(sui: &SuiClient, sender: &SuiAddress) -> Result<Option<Coin>, anyhow::Error> {
+pub async fn fetch_coin(
+    sui: &SuiClient,
+    sender: &SuiAddress,
+) -> Result<Option<Coin>, anyhow::Error> {
     let coin_type = "0x2::oct::OCT".to_string();
-    let coins_stream = sui.coin_read_api().get_coins_stream(*sender, Some(coin_type));
+    let coins_stream = sui
+        .coin_read_api()
+        .get_coins_stream(*sender, Some(coin_type));
 
-    let mut coins = coins_stream.skip_while(|c| future::ready(c.balance < 5_000_000)).boxed();
+    let mut coins = coins_stream
+        .skip_while(|c| future::ready(c.balance < 5_000_000))
+        .boxed();
     let coin = coins.next().await;
     Ok(coin)
 }
 
 /// Return a transaction digest from a split coin + merge coins transaction
-pub async fn split_coin_digest(sui: &SuiClient, sender: &SuiAddress) -> Result<TransactionDigest, anyhow::Error> {
+pub async fn split_coin_digest(
+    sui: &SuiClient,
+    sender: &SuiAddress,
+) -> Result<TransactionDigest, anyhow::Error> {
     let coin = match fetch_coin(sui, sender).await? {
         None => {
             request_tokens_from_faucet(*sender, sui).await?;
-            fetch_coin(sui, sender).await?.expect("Supposed to get a coin with SUI, but didn't. Aborting")
+            fetch_coin(sui, sender)
+                .await?
+                .expect("Supposed to get a coin with SUI, but didn't. Aborting")
         }
         Some(c) => c,
     };
@@ -189,19 +227,30 @@ pub async fn split_coin_digest(sui: &SuiClient, sender: &SuiAddress) -> Result<T
     // first, we want to split the coin, and we specify how much SUI (in MIST) we want
     // for the new coin
     let split_coin_amount = ptb.pure(1000u64)?; // note that we need to specify the u64 type here
-    ptb.command(Command::SplitCoins(Argument::GasCoin, vec![split_coin_amount]));
+    ptb.command(Command::SplitCoins(
+        Argument::GasCoin,
+        vec![split_coin_amount],
+    ));
     // now we want to merge the coins (so that we don't have many coins with very small values)
     // observe here that we pass Argument::Result(0), which instructs the PTB to get
     // the result from the previous command
-    ptb.command(Command::MergeCoins(Argument::GasCoin, vec![Argument::Result(0)]));
+    ptb.command(Command::MergeCoins(
+        Argument::GasCoin,
+        vec![Argument::Result(0)],
+    ));
 
     // we finished constructing our PTB and we need to call finish
     let builder = ptb.finish();
 
     // using the PTB that we just constructed, create the transaction data
     // that we will submit to the network
-    let tx_data =
-        TransactionData::new_programmable(*sender, vec![coin.object_ref()], builder, max_gas_budget, gas_price);
+    let tx_data = TransactionData::new_programmable(
+        *sender,
+        vec![coin.object_ref()],
+        builder,
+        max_gas_budget,
+        gas_price,
+    );
 
     // sign & execute the transaction
     let keystore = FileBasedKeystore::new(&sui_config_dir()?.join(SUI_KEYSTORE_FILENAME))?;
@@ -222,7 +271,7 @@ pub fn retrieve_wallet() -> Result<WalletContext, anyhow::Error> {
     let wallet_conf = sui_config_dir()?.join(SUI_CLIENT_CONFIG);
     let keystore_path = sui_config_dir()?.join(SUI_KEYSTORE_FILENAME);
 
-    // check if a wallet exists and if not, create a wallet and a OneChain client config
+    // check if a wallet exists and if not, create a wallet and a sui client config
     if !keystore_path.exists() {
         let keystore = FileBasedKeystore::new(&keystore_path)?;
         keystore.save()?;
@@ -250,17 +299,18 @@ pub fn retrieve_wallet() -> Result<WalletContext, anyhow::Error> {
     let default_active_address = if let Some(address) = keystore.addresses().first() {
         *address
     } else {
-        keystore.generate_and_add_new_key(ED25519, None, None, None)?.0
+        keystore.generate(ED25519, None, None, None)?.0
     };
 
     if keystore.addresses().len() < 2 {
-        keystore.generate_and_add_new_key(ED25519, None, None, None)?;
+        keystore.generate(ED25519, None, None, None)?;
     }
 
     client_config.active_address = Some(default_active_address);
     client_config.save(&wallet_conf)?;
 
-    let wallet = WalletContext::new(&wallet_conf, Some(std::time::Duration::from_secs(60)), None)?;
+    let wallet =
+        WalletContext::new(&wallet_conf)?.with_request_timeout(std::time::Duration::from_secs(60));
 
     Ok(wallet)
 }

@@ -3,7 +3,7 @@
 
 use async_graphql::{ErrorExtensionValues, ErrorExtensions, Pos, ServerError};
 use sui_indexer::errors::IndexerError;
-use sui_json_rpc::name_service::NameServiceError;
+use sui_name_service::NameServiceError;
 
 use crate::types::move_registry::error::MoveRegistryError;
 
@@ -24,14 +24,30 @@ pub(crate) fn graphql_error(code: &str, message: impl Into<String>) -> ServerErr
     let mut ext = ErrorExtensionValues::default();
     ext.set("code", code);
 
-    ServerError { message: message.into(), source: None, locations: vec![], path: vec![], extensions: Some(ext) }
+    ServerError {
+        message: message.into(),
+        source: None,
+        locations: vec![],
+        path: vec![],
+        extensions: Some(ext),
+    }
 }
 
-pub(crate) fn graphql_error_at_pos(code: &str, message: impl Into<String>, pos: Pos) -> ServerError {
+pub(crate) fn graphql_error_at_pos(
+    code: &str,
+    message: impl Into<String>,
+    pos: Pos,
+) -> ServerError {
     let mut ext = ErrorExtensionValues::default();
     ext.set("code", code);
 
-    ServerError { message: message.into(), source: None, locations: vec![pos], path: vec![], extensions: Some(ext) }
+    ServerError {
+        message: message.into(),
+        source: None,
+        locations: vec![pos],
+        path: vec![],
+        extensions: Some(ext),
+    }
 }
 
 #[derive(Clone, Debug, thiserror::Error)]

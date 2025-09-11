@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one::versioned;
+module oct::versioned;
 
-use one::dynamic_field;
+use sui::dynamic_field;
 
 /// Failed to upgrade the inner object due to invalid capability or new version.
 const EInvalidUpgrade: u64 = 0;

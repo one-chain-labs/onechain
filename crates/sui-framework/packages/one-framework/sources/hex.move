@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// HEX (Base16) encoding utility.
-module one::hex;
+module oct::hex;
 
 const EInvalidHexLength: u64 = 0;
 const ENotValidHexCharacter: u64 = 1;

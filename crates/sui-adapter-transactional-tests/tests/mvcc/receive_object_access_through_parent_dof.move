@@ -5,9 +5,9 @@
 
 //# publish
 module tto::M1 {
-    use one::transfer::Receiving;
-    use one::dynamic_object_field as dof;
-    use one::dynamic_field as df;
+    use sui::transfer::Receiving;
+    use sui::dynamic_object_field as dof;
+    use sui::dynamic_field as df;
 
     const KEY: u64 = 0;
     const BKEY: u64 = 1;

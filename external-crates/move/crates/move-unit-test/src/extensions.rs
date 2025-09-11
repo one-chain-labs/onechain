@@ -10,8 +10,9 @@ use move_vm_runtime::native_extensions::NativeContextExtensions;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
-static EXTENSION_HOOK: Lazy<Mutex<Option<Box<dyn Fn(&mut NativeContextExtensions<'_>) + Send + Sync>>>> =
-    Lazy::new(|| Mutex::new(None));
+static EXTENSION_HOOK: Lazy<
+    Mutex<Option<Box<dyn Fn(&mut NativeContextExtensions<'_>) + Send + Sync>>>,
+> = Lazy::new(|| Mutex::new(None));
 
 /// Sets a hook which is called to populate additional native extensions. This can be used to
 /// get extensions living outside of the Move repo into the unit testing environment.
@@ -43,7 +44,7 @@ pub(crate) fn new_extensions<'a>() -> NativeContextExtensions<'a> {
 mod tests {
     use crate::extensions::{new_extensions, set_extension_hook};
     use better_any::{Tid, TidAble};
-    use move_vm_runtime::native_extensions::NativeContextExtensions;
+    use move_vm_runtime::native_extensions::{NativeContextExtensions, NativeExtensionMarker};
 
     /// A test that extension hooks work as expected.
     #[test]
@@ -55,6 +56,7 @@ mod tests {
 
     #[derive(Tid)]
     struct TestExtension();
+    impl NativeExtensionMarker<'_> for TestExtension {}
 
     fn my_hook(ext: &mut NativeContextExtensions) {
         ext.add(TestExtension())

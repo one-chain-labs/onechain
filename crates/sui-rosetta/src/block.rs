@@ -1,27 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use axum::{extract::State, Extension, Json};
+use axum::extract::State;
+use axum::{Extension, Json};
 use axum_extra::extract::WithRejection;
 use tracing::debug;
 
-use crate::{
-    operations::Operations,
-    types::{
-        BlockRequest,
-        BlockResponse,
-        BlockTransactionRequest,
-        BlockTransactionResponse,
-        Transaction,
-        TransactionIdentifier,
-    },
-    Error,
-    OnlineServerContext,
-    SuiEnv,
+use crate::operations::Operations;
+use crate::types::{
+    BlockRequest, BlockResponse, BlockTransactionRequest, BlockTransactionResponse, Transaction,
+    TransactionIdentifier,
 };
+use crate::{Error, OnlineServerContext, SuiEnv};
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 
-/// This module implements the [Rosetta Block API](https://www.rosetta-api.org/docs/BlockApi.html)
+// This module implements the [Rosetta Block API](https://www.rosetta-api.org/docs/BlockApi.html)
 
 /// Get a block by its Block Identifier.
 /// [Rosetta API Spec](https://www.rosetta-api.org/docs/BlockApi.html#block)
@@ -56,7 +49,11 @@ pub async fn transaction(
         .read_api()
         .get_transaction_with_options(
             digest,
-            SuiTransactionBlockResponseOptions::new().with_input().with_events().with_effects().with_balance_changes(),
+            SuiTransactionBlockResponseOptions::new()
+                .with_input()
+                .with_events()
+                .with_effects()
+                .with_balance_changes(),
         )
         .await?;
     let hash = response.digest;

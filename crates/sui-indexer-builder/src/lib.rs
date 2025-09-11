@@ -51,7 +51,10 @@ impl Tasks {
         if live_tasks.len() > 1 {
             anyhow::bail!("More than one live task found: {:?}", live_tasks);
         }
-        Ok(Self { live_task: live_tasks.pop(), backfill_tasks })
+        Ok(Self {
+            live_task: live_tasks.pop(),
+            backfill_tasks,
+        })
     }
 
     pub fn live_task(&self) -> Option<Task> {

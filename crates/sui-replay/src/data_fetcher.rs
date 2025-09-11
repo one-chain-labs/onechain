@@ -1,34 +1,35 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{ReplayEngineError, EPOCH_CHANGE_STRUCT_TAG};
+use crate::types::ReplayEngineError;
+use crate::types::EPOCH_CHANGE_STRUCT_TAG;
 use async_trait::async_trait;
 use futures::future::join_all;
 use lru::LruCache;
 use move_core_types::language_storage::StructTag;
 use parking_lot::RwLock;
 use rand::Rng;
-use std::{collections::BTreeMap, num::NonZeroUsize, str::FromStr};
+use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
+use std::str::FromStr;
 use sui_core::authority::NodeStateDump;
 use sui_json_rpc_api::QUERY_MAX_RESULT_LIMIT;
-use sui_json_rpc_types::{
-    EventFilter,
-    SuiEvent,
-    SuiGetPastObjectRequest,
-    SuiObjectData,
-    SuiObjectDataOptions,
-    SuiObjectResponse,
-    SuiPastObjectResponse,
-    SuiTransactionBlockResponse,
-    SuiTransactionBlockResponseOptions,
-};
+use sui_json_rpc_types::EventFilter;
+use sui_json_rpc_types::SuiEvent;
+use sui_json_rpc_types::SuiGetPastObjectRequest;
+use sui_json_rpc_types::SuiObjectData;
+use sui_json_rpc_types::SuiObjectDataOptions;
+use sui_json_rpc_types::SuiObjectResponse;
+use sui_json_rpc_types::SuiPastObjectResponse;
+use sui_json_rpc_types::SuiTransactionBlockResponse;
+use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_sdk::SuiClient;
-use sui_types::{
-    base_types::{ObjectID, SequenceNumber, VersionNumber},
-    digests::TransactionDigest,
-    object::Object,
-    transaction::{EndOfEpochTransactionKind, SenderSignedData, TransactionDataAPI, TransactionKind},
-};
+use sui_types::base_types::{ObjectID, SequenceNumber, VersionNumber};
+use sui_types::digests::TransactionDigest;
+use sui_types::object::Object;
+use sui_types::transaction::SenderSignedData;
+use sui_types::transaction::TransactionDataAPI;
+use sui_types::transaction::{EndOfEpochTransactionKind, TransactionKind};
 
 /// This trait defines the interfaces for fetching data from some local or remote store
 #[async_trait]
@@ -41,10 +42,16 @@ pub(crate) trait DataFetcher {
     ) -> Result<Vec<Object>, ReplayEngineError>;
 
     /// Fetch the latest versions of objects
-    async fn multi_get_latest(&self, objects: &[ObjectID]) -> Result<Vec<Object>, ReplayEngineError>;
+    async fn multi_get_latest(
+        &self,
+        objects: &[ObjectID],
+    ) -> Result<Vec<Object>, ReplayEngineError>;
 
     /// Fetch the TXs for this checkpoint
-    async fn get_checkpoint_txs(&self, id: u64) -> Result<Vec<TransactionDigest>, ReplayEngineError>;
+    async fn get_checkpoint_txs(
+        &self,
+        id: u64,
+    ) -> Result<Vec<TransactionDigest>, ReplayEngineError>;
 
     /// Fetch the transaction info for a given transaction digest
     async fn get_transaction(
@@ -66,9 +73,15 @@ pub(crate) trait DataFetcher {
         checkpoint_id_end: Option<u64>,
     ) -> Result<TransactionDigest, ReplayEngineError>;
 
-    async fn get_epoch_start_timestamp_and_rgp(&self, epoch_id: u64) -> Result<(u64, u64), ReplayEngineError>;
+    async fn get_epoch_start_timestamp_and_rgp(
+        &self,
+        epoch_id: u64,
+    ) -> Result<(u64, u64), ReplayEngineError>;
 
-    async fn get_epoch_change_events(&self, reverse: bool) -> Result<Vec<SuiEvent>, ReplayEngineError>;
+    async fn get_epoch_change_events(
+        &self,
+        reverse: bool,
+    ) -> Result<Vec<SuiEvent>, ReplayEngineError>;
 
     async fn get_chain_id(&self) -> Result<String, ReplayEngineError>;
 
@@ -126,14 +139,20 @@ impl DataFetcher for Fetchers {
         }
     }
 
-    async fn multi_get_latest(&self, objects: &[ObjectID]) -> Result<Vec<Object>, ReplayEngineError> {
+    async fn multi_get_latest(
+        &self,
+        objects: &[ObjectID],
+    ) -> Result<Vec<Object>, ReplayEngineError> {
         match self {
             Fetchers::Remote(q) => q.multi_get_latest(objects).await,
             Fetchers::NodeStateDump(q) => q.multi_get_latest(objects).await,
         }
     }
 
-    async fn get_checkpoint_txs(&self, id: u64) -> Result<Vec<TransactionDigest>, ReplayEngineError> {
+    async fn get_checkpoint_txs(
+        &self,
+        id: u64,
+    ) -> Result<Vec<TransactionDigest>, ReplayEngineError> {
         match self {
             Fetchers::Remote(q) => q.get_checkpoint_txs(id).await,
             Fetchers::NodeStateDump(q) => q.get_checkpoint_txs(id).await,
@@ -173,32 +192,42 @@ impl DataFetcher for Fetchers {
         checkpoint_id_end: Option<u64>,
     ) -> Result<TransactionDigest, ReplayEngineError> {
         match self {
-            Fetchers::Remote(q) => q.fetch_random_transaction(checkpoint_id_start, checkpoint_id_end).await,
-            Fetchers::NodeStateDump(q) => q.fetch_random_transaction(checkpoint_id_start, checkpoint_id_end).await,
+            Fetchers::Remote(q) => {
+                q.fetch_random_transaction(checkpoint_id_start, checkpoint_id_end)
+                    .await
+            }
+            Fetchers::NodeStateDump(q) => {
+                q.fetch_random_transaction(checkpoint_id_start, checkpoint_id_end)
+                    .await
+            }
         }
     }
 
-    async fn get_epoch_start_timestamp_and_rgp(&self, epoch_id: u64) -> Result<(u64, u64), ReplayEngineError> {
+    async fn get_epoch_start_timestamp_and_rgp(
+        &self,
+        epoch_id: u64,
+    ) -> Result<(u64, u64), ReplayEngineError> {
         match self {
             Fetchers::Remote(q) => q.get_epoch_start_timestamp_and_rgp(epoch_id).await,
             Fetchers::NodeStateDump(q) => q.get_epoch_start_timestamp_and_rgp(epoch_id).await,
         }
     }
 
-    async fn get_epoch_change_events(&self, reverse: bool) -> Result<Vec<SuiEvent>, ReplayEngineError> {
+    async fn get_epoch_change_events(
+        &self,
+        reverse: bool,
+    ) -> Result<Vec<SuiEvent>, ReplayEngineError> {
         match self {
             Fetchers::Remote(q) => q.get_epoch_change_events(reverse).await,
             Fetchers::NodeStateDump(q) => q.get_epoch_change_events(reverse).await,
         }
     }
-
     async fn get_chain_id(&self) -> Result<String, ReplayEngineError> {
         match self {
             Fetchers::Remote(q) => q.get_chain_id().await,
             Fetchers::NodeStateDump(q) => q.get_chain_id().await,
         }
     }
-
     async fn get_child_object(
         &self,
         object_id: &ObjectID,
@@ -228,15 +257,20 @@ pub struct RemoteFetcher {
 
 impl Clone for RemoteFetcher {
     fn clone(&self) -> Self {
-        let mut latest = LruCache::new(LATEST_OBJECT_CACHE_CAPACITY.expect("Cache size must be non zero"));
+        let mut latest =
+            LruCache::new(LATEST_OBJECT_CACHE_CAPACITY.expect("Cache size must be non zero"));
         self.latest_object_cache.read().iter().for_each(|(k, v)| {
             latest.put(*k, v.clone());
         });
 
-        let mut versioned = LruCache::new(VERSIONED_OBJECT_CACHE_CAPACITY.expect("Cache size must be non zero"));
-        self.versioned_object_cache.read().iter().for_each(|(k, v)| {
-            versioned.put(*k, v.clone());
-        });
+        let mut versioned =
+            LruCache::new(VERSIONED_OBJECT_CACHE_CAPACITY.expect("Cache size must be non zero"));
+        self.versioned_object_cache
+            .read()
+            .iter()
+            .for_each(|(k, v)| {
+                versioned.put(*k, v.clone());
+            });
 
         let mut ep = LruCache::new(EPOCH_INFO_CACHE_CAPACITY.expect("Cache size must be non zero"));
         self.epoch_info_cache.read().iter().for_each(|(k, v)| {
@@ -275,7 +309,11 @@ impl RemoteFetcher {
         let mut to_fetch = Vec::new();
         let mut cached = Vec::new();
         for (object_id, version) in objects {
-            if let Some(obj) = self.versioned_object_cache.read().peek(&(*object_id, *version)) {
+            if let Some(obj) = self
+                .versioned_object_cache
+                .read()
+                .peek(&(*object_id, *version))
+            {
                 cached.push(obj.clone());
             } else {
                 to_fetch.push((*object_id, *version));
@@ -320,12 +358,17 @@ impl DataFetcher for RemoteFetcher {
 
         let objs: Vec<_> = to_fetch
             .iter()
-            .map(|(object_id, version)| SuiGetPastObjectRequest { object_id: *object_id, version: *version })
+            .map(|(object_id, version)| SuiGetPastObjectRequest {
+                object_id: *object_id,
+                version: *version,
+            })
             .collect();
 
-        let objectsx = objs
-            .chunks(*QUERY_MAX_RESULT_LIMIT)
-            .map(|q| self.rpc_client.read_api().try_multi_get_parsed_past_object(q.to_vec(), options.clone()));
+        let objectsx = objs.chunks(*QUERY_MAX_RESULT_LIMIT).map(|q| {
+            self.rpc_client
+                .read_api()
+                .try_multi_get_parsed_past_object(q.to_vec(), options.clone())
+        });
 
         join_all(objectsx)
             .await
@@ -342,7 +385,9 @@ impl DataFetcher for RemoteFetcher {
                 // Backfill the cache
                 for obj in &x {
                     let r = obj.compute_object_reference();
-                    self.versioned_object_cache.write().put((r.0, r.1), obj.clone());
+                    self.versioned_object_cache
+                        .write()
+                        .put((r.0, r.1), obj.clone());
                 }
                 x
             })
@@ -362,15 +407,20 @@ impl DataFetcher for RemoteFetcher {
         convert_past_obj_response(response)
     }
 
-    async fn multi_get_latest(&self, objects: &[ObjectID]) -> Result<Vec<Object>, ReplayEngineError> {
+    async fn multi_get_latest(
+        &self,
+        objects: &[ObjectID],
+    ) -> Result<Vec<Object>, ReplayEngineError> {
         // First check which we have in cache
         let (cached, to_fetch) = self.check_latest_cache(objects);
 
         let options = SuiObjectDataOptions::bcs_lossless();
 
-        let objectsx = to_fetch
-            .chunks(*QUERY_MAX_RESULT_LIMIT)
-            .map(|q| self.rpc_client.read_api().multi_get_object_with_options(q.to_vec(), options.clone()));
+        let objectsx = to_fetch.chunks(*QUERY_MAX_RESULT_LIMIT).map(|q| {
+            self.rpc_client
+                .read_api()
+                .multi_get_object_with_options(q.to_vec(), options.clone())
+        });
 
         join_all(objectsx)
             .await
@@ -392,7 +442,10 @@ impl DataFetcher for RemoteFetcher {
             })
     }
 
-    async fn get_checkpoint_txs(&self, id: u64) -> Result<Vec<TransactionDigest>, ReplayEngineError> {
+    async fn get_checkpoint_txs(
+        &self,
+        id: u64,
+    ) -> Result<Vec<TransactionDigest>, ReplayEngineError> {
         Ok(self
             .rpc_client
             .read_api()
@@ -423,7 +476,11 @@ impl DataFetcher for RemoteFetcher {
     }
 
     async fn get_latest_checkpoint_sequence_number(&self) -> Result<u64, ReplayEngineError> {
-        self.rpc_client.read_api().get_latest_checkpoint_sequence_number().await.map_err(ReplayEngineError::from)
+        self.rpc_client
+            .read_api()
+            .get_latest_checkpoint_sequence_number()
+            .await
+            .map_err(ReplayEngineError::from)
     }
 
     async fn fetch_random_transaction(
@@ -432,8 +489,8 @@ impl DataFetcher for RemoteFetcher {
         checkpoint_id_start_inclusive: Option<u64>,
         checkpoint_id_end_inclusive: Option<u64>,
     ) -> Result<TransactionDigest, ReplayEngineError> {
-        let checkpoint_id_end =
-            checkpoint_id_end_inclusive.unwrap_or(self.get_latest_checkpoint_sequence_number().await?);
+        let checkpoint_id_end = checkpoint_id_end_inclusive
+            .unwrap_or(self.get_latest_checkpoint_sequence_number().await?);
         let checkpoint_id_start = checkpoint_id_start_inclusive.unwrap_or(1);
         let checkpoint_id = rand::thread_rng().gen_range(checkpoint_id_start..=checkpoint_id_end);
 
@@ -443,7 +500,10 @@ impl DataFetcher for RemoteFetcher {
         Ok(txs[tx_idx])
     }
 
-    async fn get_epoch_start_timestamp_and_rgp(&self, epoch_id: u64) -> Result<(u64, u64), ReplayEngineError> {
+    async fn get_epoch_start_timestamp_and_rgp(
+        &self,
+        epoch_id: u64,
+    ) -> Result<(u64, u64), ReplayEngineError> {
         // Check epoch info cache
         if let Some((ts, rgp)) = self.epoch_info_cache.read().peek(&epoch_id) {
             return Ok((*ts, *rgp));
@@ -462,7 +522,9 @@ impl DataFetcher for RemoteFetcher {
         let reference_gas_price = if let serde_json::Value::Object(w) = event.parsed_json {
             u64::from_str(&w["reference_gas_price"].to_string().replace('\"', "")).unwrap()
         } else {
-            return Err(ReplayEngineError::UnexpectedEventFormat { event: event.clone() });
+            return Err(ReplayEngineError::UnexpectedEventFormat {
+                event: event.clone(),
+            });
         };
 
         let epoch_change_tx = event.id.tx_digest;
@@ -476,7 +538,10 @@ impl DataFetcher for RemoteFetcher {
         match tx_kind_orig {
             TransactionKind::ChangeEpoch(change) => {
                 // Backfill cache
-                self.epoch_info_cache.write().put(epoch_id, (change.epoch_start_timestamp_ms, reference_gas_price));
+                self.epoch_info_cache.write().put(
+                    epoch_id,
+                    (change.epoch_start_timestamp_ms, reference_gas_price),
+                );
 
                 return Ok((change.epoch_start_timestamp_ms, reference_gas_price));
             }
@@ -484,9 +549,10 @@ impl DataFetcher for RemoteFetcher {
                 for kind in kinds {
                     if let EndOfEpochTransactionKind::ChangeEpoch(change) = kind {
                         // Backfill cache
-                        self.epoch_info_cache
-                            .write()
-                            .put(epoch_id, (change.epoch_start_timestamp_ms, reference_gas_price));
+                        self.epoch_info_cache.write().put(
+                            epoch_id,
+                            (change.epoch_start_timestamp_ms, reference_gas_price),
+                        );
 
                         return Ok((change.epoch_start_timestamp_ms, reference_gas_price));
                     }
@@ -497,7 +563,10 @@ impl DataFetcher for RemoteFetcher {
         Err(ReplayEngineError::InvalidEpochChangeTx { epoch: epoch_id })
     }
 
-    async fn get_epoch_change_events(&self, reverse: bool) -> Result<Vec<SuiEvent>, ReplayEngineError> {
+    async fn get_epoch_change_events(
+        &self,
+        reverse: bool,
+    ) -> Result<Vec<SuiEvent>, ReplayEngineError> {
         let struct_tag_str = EPOCH_CHANGE_STRUCT_TAG.to_string();
         let struct_tag = StructTag::from_str(&struct_tag_str)?;
 
@@ -509,9 +578,16 @@ impl DataFetcher for RemoteFetcher {
             let page_data = self
                 .rpc_client
                 .event_api()
-                .query_events(EventFilter::MoveEventType(struct_tag.clone()), cursor, None, reverse)
+                .query_events(
+                    EventFilter::MoveEventType(struct_tag.clone()),
+                    cursor,
+                    None,
+                    reverse,
+                )
                 .await
-                .map_err(|e| ReplayEngineError::UnableToQuerySystemEvents { rpc_err: e.to_string() })?;
+                .map_err(|e| ReplayEngineError::UnableToQuerySystemEvents {
+                    rpc_err: e.to_string(),
+                })?;
             epoch_change_events.extend(page_data.data);
             has_next_page = page_data.has_next_page;
             cursor = page_data.next_cursor;
@@ -531,27 +607,38 @@ impl DataFetcher for RemoteFetcher {
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn convert_past_obj_response(resp: SuiPastObjectResponse) -> Result<Object, ReplayEngineError> {
     match resp {
         SuiPastObjectResponse::VersionFound(o) => obj_from_sui_obj_data(&o),
-        SuiPastObjectResponse::ObjectDeleted(r) => {
-            Err(ReplayEngineError::ObjectDeleted { id: r.object_id, version: r.version, digest: r.digest })
-        }
+        SuiPastObjectResponse::ObjectDeleted(r) => Err(ReplayEngineError::ObjectDeleted {
+            id: r.object_id,
+            version: r.version,
+            digest: r.digest,
+        }),
         SuiPastObjectResponse::ObjectNotExists(id) => Err(ReplayEngineError::ObjectNotExist { id }),
         SuiPastObjectResponse::VersionNotFound(id, version) => {
             Err(ReplayEngineError::ObjectVersionNotFound { id, version })
         }
-        SuiPastObjectResponse::VersionTooHigh { object_id, asked_version, latest_version } => {
-            Err(ReplayEngineError::ObjectVersionTooHigh { id: object_id, asked_version, latest_version })
-        }
+        SuiPastObjectResponse::VersionTooHigh {
+            object_id,
+            asked_version,
+            latest_version,
+        } => Err(ReplayEngineError::ObjectVersionTooHigh {
+            id: object_id,
+            asked_version,
+            latest_version,
+        }),
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn obj_from_sui_obj_response(o: &SuiObjectResponse) -> Result<Object, ReplayEngineError> {
     let o = o.object().map_err(ReplayEngineError::from)?.clone();
     obj_from_sui_obj_data(&o)
 }
 
+#[allow(clippy::result_large_err)]
 fn obj_from_sui_obj_data(o: &SuiObjectData) -> Result<Object, ReplayEngineError> {
     match TryInto::<Object>::try_into(o.clone()) {
         Ok(obj) => Ok(obj),
@@ -559,6 +646,7 @@ fn obj_from_sui_obj_data(o: &SuiObjectData) -> Result<Object, ReplayEngineError>
     }
 }
 
+#[allow(clippy::result_large_err)]
 pub fn extract_epoch_and_version(ev: SuiEvent) -> Result<(u64, u64), ReplayEngineError> {
     if let serde_json::Value::Object(w) = ev.parsed_json {
         let epoch = u64::from_str(&w["epoch"].to_string().replace('\"', "")).unwrap();
@@ -584,24 +672,38 @@ impl From<NodeStateDump> for NodeStateDumpFetcher {
         let mut object_ref_pool = BTreeMap::new();
         let mut latest_object_version_pool: BTreeMap<ObjectID, Object> = BTreeMap::new();
 
-        node_state_dump.all_objects().iter().for_each(|current_obj| {
-            // Dense storage
-            object_ref_pool.insert((current_obj.id, current_obj.version), current_obj.object.clone());
+        node_state_dump
+            .all_objects()
+            .iter()
+            .for_each(|current_obj| {
+                // Dense storage
+                object_ref_pool.insert(
+                    (current_obj.id, current_obj.version),
+                    current_obj.object.clone(),
+                );
 
-            // Only most recent
-            if let Some(last_seen_obj) = latest_object_version_pool.get(&current_obj.id) {
-                if current_obj.version <= last_seen_obj.version() {
-                    return;
-                }
-            };
-            latest_object_version_pool.insert(current_obj.id, current_obj.object.clone());
-        });
-        Self { node_state_dump, object_ref_pool, latest_object_version_pool, backup_remote_fetcher: None }
+                // Only most recent
+                if let Some(last_seen_obj) = latest_object_version_pool.get(&current_obj.id) {
+                    if current_obj.version <= last_seen_obj.version() {
+                        return;
+                    }
+                };
+                latest_object_version_pool.insert(current_obj.id, current_obj.object.clone());
+            });
+        Self {
+            node_state_dump,
+            object_ref_pool,
+            latest_object_version_pool,
+            backup_remote_fetcher: None,
+        }
     }
 }
 
 impl NodeStateDumpFetcher {
-    pub fn new(node_state_dump: NodeStateDump, backup_remote_fetcher: Option<RemoteFetcher>) -> Self {
+    pub fn new(
+        node_state_dump: NodeStateDump,
+        backup_remote_fetcher: Option<RemoteFetcher>,
+    ) -> Self {
         let mut s = Self::from(node_state_dump);
         s.backup_remote_fetcher = backup_remote_fetcher;
         s
@@ -620,7 +722,10 @@ impl DataFetcher for NodeStateDumpFetcher {
                 resp.push(obj.clone());
                 return Ok(());
             }
-            Err(ReplayEngineError::ObjectVersionNotFound { id: *id, version: *version })
+            Err(ReplayEngineError::ObjectVersionNotFound {
+                id: *id,
+                version: *version,
+            })
         }) {
             Ok(_) => return Ok(resp),
             Err(e) => {
@@ -632,7 +737,10 @@ impl DataFetcher for NodeStateDumpFetcher {
         };
     }
 
-    async fn multi_get_latest(&self, objects: &[ObjectID]) -> Result<Vec<Object>, ReplayEngineError> {
+    async fn multi_get_latest(
+        &self,
+        objects: &[ObjectID],
+    ) -> Result<Vec<Object>, ReplayEngineError> {
         let mut resp = vec![];
         match objects.iter().try_for_each(|id| {
             if let Some(obj) = self.latest_object_version_pool.get(id) {
@@ -651,7 +759,10 @@ impl DataFetcher for NodeStateDumpFetcher {
         };
     }
 
-    async fn get_checkpoint_txs(&self, _id: u64) -> Result<Vec<TransactionDigest>, ReplayEngineError> {
+    async fn get_checkpoint_txs(
+        &self,
+        _id: u64,
+    ) -> Result<Vec<TransactionDigest>, ReplayEngineError> {
         unimplemented!("get_checkpoint_txs for state dump is not implemented")
     }
 
@@ -688,11 +799,20 @@ impl DataFetcher for NodeStateDumpFetcher {
         unimplemented!("fetch_random_tx for state dump is not implemented")
     }
 
-    async fn get_epoch_start_timestamp_and_rgp(&self, _epoch_id: u64) -> Result<(u64, u64), ReplayEngineError> {
-        Ok((self.node_state_dump.epoch_start_timestamp_ms, self.node_state_dump.reference_gas_price))
+    async fn get_epoch_start_timestamp_and_rgp(
+        &self,
+        _epoch_id: u64,
+    ) -> Result<(u64, u64), ReplayEngineError> {
+        Ok((
+            self.node_state_dump.epoch_start_timestamp_ms,
+            self.node_state_dump.reference_gas_price,
+        ))
     }
 
-    async fn get_epoch_change_events(&self, _reverse: bool) -> Result<Vec<SuiEvent>, ReplayEngineError> {
+    async fn get_epoch_change_events(
+        &self,
+        _reverse: bool,
+    ) -> Result<Vec<SuiEvent>, ReplayEngineError> {
         unimplemented!("get_epoch_change_events for state dump is not implemented")
     }
 

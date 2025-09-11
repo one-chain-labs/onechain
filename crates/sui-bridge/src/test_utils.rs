@@ -1,64 +1,51 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::abi::EthToSuiTokenBridgeV1;
+use crate::eth_mock_provider::EthMockProvider;
+use crate::events::SuiBridgeEvent;
+use crate::server::mock_handler::run_mock_server;
+use crate::sui_transaction_builder::build_sui_transaction;
+use crate::types::{
+    BridgeCommittee, BridgeCommitteeValiditySignInfo, CertifiedBridgeAction,
+    VerifiedCertifiedBridgeAction,
+};
 use crate::{
-    abi::EthToSuiTokenBridgeV1,
     crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKey, BridgeAuthoritySignInfo},
-    eth_mock_provider::EthMockProvider,
-    events::{EmittedSuiToEthTokenBridgeV1, SuiBridgeEvent},
-    server::mock_handler::{run_mock_server, BridgeRequestMockHandler},
-    sui_transaction_builder::build_sui_transaction,
+    events::EmittedSuiToEthTokenBridgeV1,
+    server::mock_handler::BridgeRequestMockHandler,
     types::{
-        BridgeAction,
-        BridgeAuthority,
-        BridgeCommittee,
-        BridgeCommitteeValiditySignInfo,
-        CertifiedBridgeAction,
-        EthToSuiBridgeAction,
-        SignedBridgeAction,
+        BridgeAction, BridgeAuthority, EthToSuiBridgeAction, SignedBridgeAction,
         SuiToEthBridgeAction,
-        VerifiedCertifiedBridgeAction,
     },
 };
-use ethers::{
-    abi::{long_signature, ParamType},
-    types::{
-        Address as EthAddress,
-        Block,
-        BlockNumber,
-        Filter,
-        FilterBlockOption,
-        Log,
-        TransactionReceipt,
-        TxHash,
-        ValueOrArray,
-        U64,
-    },
+use ethers::abi::{long_signature, ParamType};
+use ethers::types::Address as EthAddress;
+use ethers::types::{
+    Block, BlockNumber, Filter, FilterBlockOption, Log, TransactionReceipt, TxHash, ValueOrArray,
+    U64,
 };
-use fastcrypto::{
-    encoding::{Encoding, Hex},
-    traits::KeyPair,
-};
+use fastcrypto::encoding::{Encoding, Hex};
+use fastcrypto::traits::KeyPair;
 use hex_literal::hex;
 use move_core_types::language_storage::TypeTag;
-use std::{
-    collections::{BTreeMap, HashMap},
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-};
+use std::collections::{BTreeMap, HashMap};
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::SocketAddr;
 use sui_config::local_ip_utils;
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_sdk::wallet_context::WalletContext;
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{ObjectRef, SequenceNumber, SuiAddress},
-    bridge::{BridgeChainId, BridgeCommitteeSummary, MoveTypeCommitteeMember, TOKEN_ID_USDC},
-    crypto::{get_key_pair, ToFromBytes},
-    digests::TransactionDigest,
-    object::Owner,
-    transaction::{CallArg, ObjectArg},
-    BRIDGE_PACKAGE_ID,
-    SUI_BRIDGE_OBJECT_ID,
-};
+use sui_types::base_types::ObjectRef;
+use sui_types::base_types::SequenceNumber;
+use sui_types::bridge::MoveTypeCommitteeMember;
+use sui_types::bridge::{BridgeChainId, BridgeCommitteeSummary, TOKEN_ID_USDC};
+use sui_types::crypto::ToFromBytes;
+use sui_types::object::Owner;
+use sui_types::transaction::{CallArg, ObjectArg};
+use sui_types::{base_types::SuiAddress, crypto::get_key_pair, digests::TransactionDigest};
+use sui_types::{BRIDGE_PACKAGE_ID, SUI_BRIDGE_OBJECT_ID};
 use tokio::task::JoinHandle;
 
 pub const DUMMY_MUTALBE_BRIDGE_OBJECT_ARG: ObjectArg = ObjectArg::SharedObject {
@@ -70,7 +57,11 @@ pub const DUMMY_MUTALBE_BRIDGE_OBJECT_ARG: ObjectArg = ObjectArg::SharedObject {
 pub fn get_test_authority_and_key(
     voting_power: u64,
     port: u16,
-) -> (BridgeAuthority, BridgeAuthorityPublicKey, BridgeAuthorityKeyPair) {
+) -> (
+    BridgeAuthority,
+    BridgeAuthorityPublicKey,
+    BridgeAuthorityKeyPair,
+) {
     let (_, kp): (_, fastcrypto::secp256k1::Secp256k1KeyPair) = get_key_pair();
     let pubkey = kp.public().clone();
     let authority = BridgeAuthority {
@@ -130,15 +121,19 @@ pub fn get_test_eth_to_sui_bridge_action(
     })
 }
 
-pub fn run_mock_bridge_server(mock_handlers: Vec<BridgeRequestMockHandler>) -> (Vec<JoinHandle<()>>, Vec<u16>) {
+pub fn run_mock_bridge_server(
+    mock_handlers: Vec<BridgeRequestMockHandler>,
+) -> (Vec<JoinHandle<()>>, Vec<u16>) {
     let mut handles = vec![];
     let mut ports = vec![];
     for mock_handler in mock_handlers {
         let localhost = local_ip_utils::localhost_for_testing();
         let port = local_ip_utils::get_available_port(&localhost);
         // start server
-        let server_handle =
-            run_mock_server(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port), mock_handler.clone());
+        let server_handle = run_mock_server(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port),
+            mock_handler.clone(),
+        );
         ports.push(port);
         handles.push(server_handle);
     }
@@ -148,7 +143,11 @@ pub fn run_mock_bridge_server(mock_handlers: Vec<BridgeRequestMockHandler>) -> (
 pub fn get_test_authorities_and_run_mock_bridge_server(
     voting_power: Vec<u64>,
     mock_handlers: Vec<BridgeRequestMockHandler>,
-) -> (Vec<JoinHandle<()>>, Vec<BridgeAuthority>, Vec<BridgeAuthorityKeyPair>) {
+) -> (
+    Vec<JoinHandle<()>>,
+    Vec<BridgeAuthority>,
+    Vec<BridgeAuthorityKeyPair>,
+) {
     assert_eq!(voting_power.len(), mock_handlers.len());
     let (handles, ports) = run_mock_bridge_server(mock_handlers);
     let mut authorites = vec![];
@@ -162,14 +161,22 @@ pub fn get_test_authorities_and_run_mock_bridge_server(
     (handles, authorites, secrets)
 }
 
-pub fn sign_action_with_key(action: &BridgeAction, secret: &BridgeAuthorityKeyPair) -> SignedBridgeAction {
+pub fn sign_action_with_key(
+    action: &BridgeAction,
+    secret: &BridgeAuthorityKeyPair,
+) -> SignedBridgeAction {
     let sig = BridgeAuthoritySignInfo::new(action, secret);
     SignedBridgeAction::new_from_data_and_sig(action.clone(), sig)
 }
 
 pub fn mock_last_finalized_block(mock_provider: &EthMockProvider, block_number: u64) {
-    let block = Block::<ethers::types::TxHash> { number: Some(U64::from(block_number)), ..Default::default() };
-    mock_provider.add_response("eth_getBlockByNumber", ("finalized", false), block).unwrap();
+    let block = Block::<ethers::types::TxHash> {
+        number: Some(U64::from(block_number)),
+        ..Default::default()
+    };
+    mock_provider
+        .add_response("eth_getBlockByNumber", ("finalized", false), block)
+        .unwrap();
 }
 
 // Mocks eth_getLogs and eth_getTransactionReceipt for the given address and block range.
@@ -181,27 +188,31 @@ pub fn mock_get_logs(
     to_block: u64,
     logs: Vec<Log>,
 ) {
-    mock_provider
-        .add_response::<[ethers::types::Filter; 1], Vec<ethers::types::Log>, Vec<ethers::types::Log>>(
-            "eth_getLogs",
-            [Filter {
+    mock_provider.add_response::<[ethers::types::Filter; 1], Vec<ethers::types::Log>, Vec<ethers::types::Log>>(
+        "eth_getLogs",
+        [
+            Filter {
                 block_option: FilterBlockOption::Range {
                     from_block: Some(BlockNumber::Number(U64::from(from_block))),
                     to_block: Some(BlockNumber::Number(U64::from(to_block))),
                 },
                 address: Some(ValueOrArray::Value(address)),
                 topics: [None, None, None, None],
-            }],
-            logs.clone(),
-        )
-        .unwrap();
+            }
+        ],
+        logs.clone(),
+    ).unwrap();
 
     for log in logs {
         mock_provider
             .add_response::<[TxHash; 1], TransactionReceipt, TransactionReceipt>(
                 "eth_getTransactionReceipt",
                 [log.transaction_hash.unwrap()],
-                TransactionReceipt { block_number: log.block_number, logs: vec![log], ..Default::default() },
+                TransactionReceipt {
+                    block_number: log.block_number,
+                    logs: vec![log],
+                    ..Default::default()
+                },
             )
             .unwrap();
     }
@@ -209,7 +220,11 @@ pub fn mock_get_logs(
 
 /// Returns a test Log and corresponding BridgeAction
 // Refernece: https://github.com/rust-ethereum/ethabi/blob/master/ethabi/src/event.rs#L192
-pub fn get_test_log_and_action(contract_address: EthAddress, tx_hash: TxHash, event_index: u16) -> (Log, BridgeAction) {
+pub fn get_test_log_and_action(
+    contract_address: EthAddress,
+    tx_hash: TxHash,
+    event_index: u16,
+) -> (Log, BridgeAction) {
     let token_id = 3u8;
     let sui_adjusted_amount = 10000000u64;
     let source_address = EthAddress::random();
@@ -226,15 +241,18 @@ pub fn get_test_log_and_action(contract_address: EthAddress, tx_hash: TxHash, ev
     let log = Log {
         address: contract_address,
         topics: vec![
-            long_signature("TokensDeposited", &[
-                ParamType::Uint(8),
-                ParamType::Uint(64),
-                ParamType::Uint(8),
-                ParamType::Uint(8),
-                ParamType::Uint(64),
-                ParamType::Address,
-                ParamType::Bytes,
-            ]),
+            long_signature(
+                "TokensDeposited",
+                &[
+                    ParamType::Uint(8),
+                    ParamType::Uint(64),
+                    ParamType::Uint(8),
+                    ParamType::Uint(8),
+                    ParamType::Uint(64),
+                    ParamType::Address,
+                    ParamType::Bytes,
+                ],
+            ),
             hex!("0000000000000000000000000000000000000000000000000000000000000001").into(), // chain id: sui testnet
             hex!("0000000000000000000000000000000000000000000000000000000000000010").into(), // nonce: 16
             hex!("000000000000000000000000000000000000000000000000000000000000000b").into(), // chain id: sepolia
@@ -276,19 +294,27 @@ pub async fn bridge_token(
     let sender = context.active_address().unwrap();
     let gas_object = context.get_one_gas_object().await.unwrap().unwrap().1;
     let tx = TestTransactionBuilder::new(sender, gas_object, rgp)
-        .move_call(BRIDGE_PACKAGE_ID, "bridge", "send_token", vec![
-            CallArg::Object(bridge_object_arg),
-            CallArg::Pure(bcs::to_bytes(&(BridgeChainId::EthCustom as u8)).unwrap()),
-            CallArg::Pure(bcs::to_bytes(&recv_address.as_bytes()).unwrap()),
-            CallArg::Object(ObjectArg::ImmOrOwnedObject(token_ref)),
-        ])
+        .move_call(
+            BRIDGE_PACKAGE_ID,
+            "bridge",
+            "send_token",
+            vec![
+                CallArg::Object(bridge_object_arg),
+                CallArg::Pure(bcs::to_bytes(&(BridgeChainId::EthCustom as u8)).unwrap()),
+                CallArg::Pure(bcs::to_bytes(&recv_address.as_bytes()).unwrap()),
+                CallArg::Object(ObjectArg::ImmOrOwnedObject(token_ref)),
+            ],
+        )
         .with_type_args(vec![token_type])
         .build();
     let signed_tn = context.sign_transaction(&tx);
     let resp = context.execute_transaction_must_succeed(signed_tn).await;
     let events = resp.events.unwrap();
-    let bridge_events =
-        events.data.iter().filter_map(|event| SuiBridgeEvent::try_from_sui_event(event).unwrap()).collect::<Vec<_>>();
+    let bridge_events = events
+        .data
+        .iter()
+        .filter_map(|event| SuiBridgeEvent::try_from_sui_event(event).unwrap())
+        .collect::<Vec<_>>();
     bridge_events
         .iter()
         .find_map(|e| match e {
@@ -309,8 +335,10 @@ pub fn get_certified_action_with_validator_secrets(
         let signed_action = sign_action_with_key(&action, secret);
         sigs.insert(secret.public().into(), signed_action.into_sig().signature);
     }
-    let certified_action =
-        CertifiedBridgeAction::new_from_data_and_sig(action, BridgeCommitteeValiditySignInfo { signatures: sigs });
+    let certified_action = CertifiedBridgeAction::new_from_data_and_sig(
+        action,
+        BridgeCommitteeValiditySignInfo { signatures: sigs },
+    );
     VerifiedCertifiedBridgeAction::new_from_verified(certified_action)
 }
 
@@ -335,11 +363,25 @@ pub async fn approve_action_with_validator_secrets(
     let action_certificate = get_certified_action_with_validator_secrets(action, validator_secrets);
     let rgp = wallet_context.get_reference_gas_price().await.unwrap();
     let sui_address = wallet_context.active_address().unwrap();
-    let gas_obj_ref = wallet_context.get_one_gas_object().await.unwrap().unwrap().1;
-    let tx_data =
-        build_sui_transaction(sui_address, &gas_obj_ref, action_certificate, bridge_obj_org, id_token_map, rgp).unwrap();
+    let gas_obj_ref = wallet_context
+        .get_one_gas_object()
+        .await
+        .unwrap()
+        .unwrap()
+        .1;
+    let tx_data = build_sui_transaction(
+        sui_address,
+        &gas_obj_ref,
+        action_certificate,
+        bridge_obj_org,
+        id_token_map,
+        rgp,
+    )
+    .unwrap();
     let signed_tx = wallet_context.sign_transaction(&tx_data);
-    let resp = wallet_context.execute_transaction_must_succeed(signed_tx).await;
+    let resp = wallet_context
+        .execute_transaction_must_succeed(signed_tx)
+        .await;
 
     // If `expected_token_receiver` is None, return
     expected_token_receiver?;
@@ -350,23 +392,31 @@ pub async fn approve_action_with_validator_secrets(
             return Some(created.reference.to_object_ref());
         }
     }
-    panic!("Didn't find the creted object owned by {}", expected_token_receiver);
+    panic!(
+        "Didn't find the creted object owned by {}",
+        expected_token_receiver
+    );
 }
 
-pub fn bridge_committee_to_bridge_committee_summary(committee: BridgeCommittee) -> BridgeCommitteeSummary {
+pub fn bridge_committee_to_bridge_committee_summary(
+    committee: BridgeCommittee,
+) -> BridgeCommitteeSummary {
     BridgeCommitteeSummary {
         members: committee
             .members()
             .iter()
             .map(|(k, v)| {
                 let bytes = k.as_bytes().to_vec();
-                (bytes.clone(), MoveTypeCommitteeMember {
-                    sui_address: SuiAddress::random_for_testing_only(),
-                    bridge_pubkey_bytes: bytes,
-                    voting_power: v.voting_power,
-                    http_rest_url: v.base_url.as_bytes().to_vec(),
-                    blocklisted: v.is_blocklisted,
-                })
+                (
+                    bytes.clone(),
+                    MoveTypeCommitteeMember {
+                        sui_address: SuiAddress::random_for_testing_only(),
+                        bridge_pubkey_bytes: bytes,
+                        voting_power: v.voting_power,
+                        http_rest_url: v.base_url.as_bytes().to_vec(),
+                        blocklisted: v.is_blocklisted,
+                    },
+                )
             })
             .collect(),
         member_registration: vec![],

@@ -15,10 +15,14 @@ pub struct LimitsVerifier<'a> {
 
 impl<'a> LimitsVerifier<'a> {
     pub fn verify_module(config: &VerifierConfig, module: &'a CompiledModule) -> VMResult<()> {
-        Self::verify_module_impl(config, module).map_err(|e| e.finish(Location::Module(module.self_id())))
+        Self::verify_module_impl(config, module)
+            .map_err(|e| e.finish(Location::Module(module.self_id())))
     }
 
-    fn verify_module_impl(config: &VerifierConfig, module: &'a CompiledModule) -> PartialVMResult<()> {
+    fn verify_module_impl(
+        config: &VerifierConfig,
+        module: &'a CompiledModule,
+    ) -> PartialVMResult<()> {
         let limit_check = Self { resolver: module };
         limit_check.verify_constants(config)?;
         limit_check.verify_function_handles(config)?;
@@ -49,7 +53,13 @@ impl<'a> LimitsVerifier<'a> {
                 }
             };
             if let Some(limit) = config.max_function_parameters {
-                if self.resolver.signature_at(function_handle.parameters).0.len() > limit {
+                if self
+                    .resolver
+                    .signature_at(function_handle.parameters)
+                    .0
+                    .len()
+                    > limit
+                {
                     return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS)
                         .at_index(IndexKind::FunctionHandle, idx as u16));
                 }
@@ -80,7 +90,11 @@ impl<'a> LimitsVerifier<'a> {
         Ok(())
     }
 
-    fn verify_type_node(&self, config: &VerifierConfig, ty: &SignatureToken) -> PartialVMResult<()> {
+    fn verify_type_node(
+        &self,
+        config: &VerifierConfig,
+        ty: &SignatureToken,
+    ) -> PartialVMResult<()> {
         if let Some(max) = &config.max_type_nodes {
             // Structs and Parameters can expand to an unknown number of nodes, therefore
             // we give them a higher size weight here.
@@ -110,7 +124,9 @@ impl<'a> LimitsVerifier<'a> {
         {
             if let Some(max_function_definitions) = config.max_function_definitions {
                 if defs.len() > max_function_definitions {
-                    return Err(PartialVMError::new(StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED));
+                    return Err(PartialVMError::new(
+                        StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,
+                    ));
                 }
             }
         }
@@ -118,7 +134,9 @@ impl<'a> LimitsVerifier<'a> {
         {
             if let Some(max_struct_definitions) = config.max_data_definitions {
                 if defs.len() > max_struct_definitions {
-                    return Err(PartialVMError::new(StatusCode::MAX_STRUCT_DEFINITIONS_REACHED));
+                    return Err(PartialVMError::new(
+                        StatusCode::MAX_STRUCT_DEFINITIONS_REACHED,
+                    ));
                 }
             }
             if let Some(max_fields_in_struct) = config.max_fields_in_struct {
@@ -127,7 +145,9 @@ impl<'a> LimitsVerifier<'a> {
                         StructFieldInformation::Native => (),
                         StructFieldInformation::Declared(fields) => {
                             if fields.len() > max_fields_in_struct {
-                                return Err(PartialVMError::new(StatusCode::MAX_FIELD_DEFINITIONS_REACHED));
+                                return Err(PartialVMError::new(
+                                    StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+                                ));
                             }
                         }
                     }
@@ -140,9 +160,15 @@ impl<'a> LimitsVerifier<'a> {
     fn verify_constants(&self, config: &VerifierConfig) -> PartialVMResult<()> {
         for (idx, constant) in self.resolver.constant_pool().iter().enumerate() {
             if let SignatureToken::Vector(_) = constant.type_ {
-                if let MoveValue::Vector(cons) = constant.deserialize_constant().ok_or_else(|| {
-                    verification_error(StatusCode::MALFORMED_CONSTANT_DATA, IndexKind::ConstantPool, idx as TableIndex)
-                })? {
+                if let MoveValue::Vector(cons) =
+                    constant.deserialize_constant().ok_or_else(|| {
+                        verification_error(
+                            StatusCode::MALFORMED_CONSTANT_DATA,
+                            IndexKind::ConstantPool,
+                            idx as TableIndex,
+                        )
+                    })?
+                {
                     if let Some(lim) = config.max_constant_vector_len {
                         if cons.len() > lim as usize {
                             return Err(PartialVMError::new(StatusCode::TOO_MANY_VECTOR_ELEMENTS)

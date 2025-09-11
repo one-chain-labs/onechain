@@ -3,15 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    NativeFunctionRecord,
     sandbox::utils::{
-        explain_publish_changeset,
-        explain_publish_error,
-        get_gas_status,
+        explain_publish_changeset, explain_publish_error, get_gas_status,
         on_disk_state_view::OnDiskStateView,
     },
-    NativeFunctionRecord,
 };
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use move_binary_format::errors::Location;
 use move_package::compilation::compiled_package::CompiledPackage;
 use move_vm_runtime::move_vm::MoveVM;
@@ -30,8 +28,11 @@ pub fn publish(
     verbose: bool,
 ) -> Result<()> {
     // collect all modules compiled
-    let compiled_modules =
-        if with_deps { package.all_modules().collect::<Vec<_>>() } else { package.root_modules().collect::<Vec<_>>() };
+    let compiled_modules = if with_deps {
+        package.all_modules().collect::<Vec<_>>()
+    } else {
+        package.root_modules().collect::<Vec<_>>()
+    };
     if verbose {
         println!("Found {} modules", compiled_modules.len());
     }
@@ -39,8 +40,10 @@ pub fn publish(
     // order the modules for publishing
     let modules_to_publish = match override_ordering {
         Some(ordering) => {
-            let module_map: BTreeMap<_, _> =
-                compiled_modules.into_iter().map(|unit| (unit.unit.name().to_string(), unit)).collect();
+            let module_map: BTreeMap<_, _> = compiled_modules
+                .into_iter()
+                .map(|unit| (unit.unit.name().to_string(), unit))
+                .collect();
 
             let mut ordered_modules = vec![];
             for name in ordering {
@@ -69,7 +72,10 @@ pub fn publish(
         .collect::<Vec<_>>();
 
     if !republished.is_empty() {
-        eprintln!("Tried to republish the following modules: {}", republished.join(", "));
+        eprintln!(
+            "Tried to republish the following modules: {}",
+            republished.join(", ")
+        );
         return Ok(());
     }
 
@@ -103,7 +109,8 @@ pub fn publish(
             match sender_opt {
                 None => bail!("No modules to publish"),
                 Some(sender) => {
-                    let res = session.publish_module_bundle(module_bytes_vec, sender, &mut gas_status);
+                    let res =
+                        session.publish_module_bundle(module_bytes_vec, sender, &mut gas_status);
                     if let Err(err) = res {
                         println!("Invalid multi-module publishing: {}", err);
                         if let Location::Module(module_id) = err.location() {
@@ -114,7 +121,9 @@ pub fn publish(
                             {
                                 explain_publish_error(err, state, unit)?
                             } else {
-                                println!("Unable to locate the module in the multi-module publishing error");
+                                println!(
+                                    "Unable to locate the module in the multi-module publishing error"
+                                );
                             }
                         }
                         has_error = true;
@@ -144,7 +153,9 @@ pub fn publish(
             }
             let modules: Vec<_> = changeset
                 .into_modules()
-                .map(|(module_id, blob_opt)| (module_id, blob_opt.ok().expect("must be non-deletion")))
+                .map(|(module_id, blob_opt)| {
+                    (module_id, blob_opt.ok().expect("must be non-deletion"))
+                })
                 .collect();
             state.save_modules(&modules)?;
         }

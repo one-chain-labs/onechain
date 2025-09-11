@@ -4,35 +4,28 @@
 use async_trait::async_trait;
 use lru::LruCache;
 use move_binary_format::file_format::{
-    AbilitySet,
-    DatatypeTyParameter,
-    EnumDefinitionIndex,
-    FunctionDefinitionIndex,
-    Signature as MoveSignature,
-    SignatureIndex,
-    Visibility,
+    AbilitySet, DatatypeTyParameter, EnumDefinitionIndex, FunctionDefinitionIndex,
+    Signature as MoveSignature, SignatureIndex, Visibility,
 };
-use move_command_line_common::{
-    display::{try_render_constant, RenderResult},
-    error_bitset::ErrorBitset,
-};
-use move_core_types::{annotated_value::MoveEnumLayout, language_storage::ModuleId};
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
-    num::NonZeroUsize,
-    sync::{Arc, Mutex},
-};
-use sui_types::{
-    base_types::is_primitive_type_tag,
-    transaction::{Argument, CallArg, Command, ProgrammableTransaction},
-    type_input::{StructInput, TypeInput},
-};
+use move_command_line_common::display::RenderResult;
+use move_command_line_common::{display::try_render_constant, error_bitset::ErrorBitset};
+use move_core_types::annotated_value::MoveEnumLayout;
+use move_core_types::language_storage::ModuleId;
+use std::collections::BTreeSet;
+use std::num::NonZeroUsize;
+use std::sync::{Arc, Mutex};
+use std::{borrow::Cow, collections::BTreeMap};
+use sui_types::base_types::is_primitive_type_tag;
+use sui_types::transaction::{Argument, CallArg, Command, ProgrammableTransaction};
+use sui_types::type_input::{StructInput, TypeInput};
 
 use crate::error::Error;
+use move_binary_format::errors::Location;
 use move_binary_format::{
-    errors::Location,
-    file_format::{DatatypeHandleIndex, SignatureToken, StructDefinitionIndex, StructFieldInformation, TableIndex},
+    file_format::{
+        DatatypeHandleIndex, SignatureToken, StructDefinitionIndex, StructFieldInformation,
+        TableIndex,
+    },
     CompiledModule,
 };
 use move_core_types::{
@@ -40,12 +33,9 @@ use move_core_types::{
     annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     language_storage::{StructTag, TypeTag},
 };
-use sui_types::{
-    base_types::SequenceNumber,
-    move_package::{MovePackage, TypeOrigin},
-    object::Object,
-    Identifier,
-};
+use sui_types::move_package::{MovePackage, TypeOrigin};
+use sui_types::object::Object;
+use sui_types::{base_types::SequenceNumber, Identifier};
 
 pub mod error;
 
@@ -65,7 +55,7 @@ pub struct Resolver<S> {
 
 /// Optional configuration that imposes limits on the work that the resolver can do for each
 /// request.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Limits {
     /// Maximum recursion depth through type parameters.
     pub max_type_argument_depth: usize,
@@ -121,6 +111,8 @@ pub struct CleverError {
     pub error_info: ErrorConstants,
     /// The line number in the source file where the error occured.
     pub source_line_number: u16,
+    /// The error code of the abort
+    pub error_code: Option<u8>,
 }
 
 /// The `ErrorConstants` enum is used to represent the different kinds of error information that
@@ -335,11 +327,17 @@ macro_rules! check_max_limit {
 
 impl<S> Resolver<S> {
     pub fn new(package_store: S) -> Self {
-        Self { package_store, limits: None }
+        Self {
+            package_store,
+            limits: None,
+        }
     }
 
     pub fn new_with_limits(package_store: S, limits: Limits) -> Self {
-        Self { package_store, limits: Some(limits) }
+        Self {
+            package_store,
+            limits: Some(limits),
+        }
     }
 
     pub fn package_store(&self) -> &S {
@@ -365,7 +363,14 @@ impl<S: PackageStore> Resolver<S> {
 
         // (1). Fetch all the information from this store that is necessary to relocate package IDs
         // in the type.
-        context.add_type_tag(&mut tag, &self.package_store, /* visit_fields */ false, /* visit_phantoms */ true).await?;
+        context
+            .add_type_tag(
+                &mut tag,
+                &self.package_store,
+                /* visit_fields */ false,
+                /* visit_phantoms */ true,
+            )
+            .await?;
 
         // (2). Use that information to relocate package IDs in the type.
         context.canonicalize_type(&mut tag)?;
@@ -380,10 +385,20 @@ impl<S: PackageStore> Resolver<S> {
 
         // (1). Fetch all the information from this store that is necessary to resolve types
         // referenced by this tag.
-        context.add_type_tag(&mut tag, &self.package_store, /* visit_fields */ true, /* visit_phantoms */ true).await?;
+        context
+            .add_type_tag(
+                &mut tag,
+                &self.package_store,
+                /* visit_fields */ true,
+                /* visit_phantoms */ true,
+            )
+            .await?;
 
         // (2). Use that information to resolve the tag into a layout.
-        let max_depth = self.limits.as_ref().map_or(usize::MAX, |l| l.max_move_value_depth);
+        let max_depth = self
+            .limits
+            .as_ref()
+            .map_or(usize::MAX, |l| l.max_move_value_depth);
 
         Ok(context.resolve_type_layout(&tag, max_depth)?.0)
     }
@@ -399,7 +414,12 @@ impl<S: PackageStore> Resolver<S> {
         // (1). Fetch all the information from this store that is necessary to resolve types
         // referenced by this tag.
         context
-            .add_type_tag(&mut tag, &self.package_store, /* visit_fields */ false, /* visit_phantoms */ false)
+            .add_type_tag(
+                &mut tag,
+                &self.package_store,
+                /* visit_fields */ false,
+                /* visit_phantoms */ false,
+            )
             .await?;
 
         // (2). Use that information to calculate the type's abilities.
@@ -408,35 +428,42 @@ impl<S: PackageStore> Resolver<S> {
 
     /// Returns the signatures of parameters to function `pkg::module::function` in the package
     /// store, assuming the function exists.
-    pub async fn function_parameters(
+    pub async fn function_signature(
         &self,
         pkg: AccountAddress,
         module: &str,
         function: &str,
-    ) -> Result<Vec<OpenSignature>> {
+    ) -> Result<FunctionDef> {
         let mut context = ResolutionContext::new(self.limits.as_ref());
 
         let package = self.package_store.fetch(pkg).await?;
-        let Some(def) = package.module(module)?.function_def(function)? else {
-            return Err(Error::FunctionNotFound(pkg, module.to_string(), function.to_string()));
+        let Some(mut def) = package.module(module)?.function_def(function)? else {
+            return Err(Error::FunctionNotFound(
+                pkg,
+                module.to_string(),
+                function.to_string(),
+            ));
         };
-
-        let mut sigs = def.parameters.clone();
 
         // (1). Fetch all the information from this store that is necessary to resolve types
         // referenced by this tag.
-        for sig in &sigs {
+        for sig in def.parameters.iter().chain(def.return_.iter()) {
             context
-                .add_signature(sig.body.clone(), &self.package_store, package.as_ref(), /* visit_fields */ false)
+                .add_signature(
+                    sig.body.clone(),
+                    &self.package_store,
+                    package.as_ref(),
+                    /* visit_fields */ false,
+                )
                 .await?;
         }
 
         // (2). Use that information to relocate package IDs in the signature.
-        for sig in &mut sigs {
+        for sig in def.parameters.iter_mut().chain(def.return_.iter_mut()) {
             context.relocate_signature(&mut sig.body)?;
         }
 
-        Ok(sigs)
+        Ok(def)
     }
 
     /// Attempts to infer the type layouts for pure inputs to the programmable transaction.
@@ -448,31 +475,36 @@ impl<S: PackageStore> Resolver<S> {
     /// Layout resolution can fail if a type/module/package doesn't exist, if layout resolution hits
     /// a limit, or if a pure input is somehow used in multiple conflicting occasions (with
     /// different types).
-    pub async fn pure_input_layouts(&self, tx: &ProgrammableTransaction) -> Result<Vec<Option<MoveTypeLayout>>> {
+    pub async fn pure_input_layouts(
+        &self,
+        tx: &ProgrammableTransaction,
+    ) -> Result<Vec<Option<MoveTypeLayout>>> {
         let mut tags = vec![None; tx.inputs.len()];
         let mut register_type = |arg: &Argument, tag: &TypeTag| {
             let &Argument::Input(ix) = arg else {
-                return Ok(());
+                return;
             };
 
             if !matches!(tx.inputs.get(ix as usize), Some(CallArg::Pure(_))) {
-                return Ok(());
+                return;
             }
 
             let Some(type_) = tags.get_mut(ix as usize) else {
-                return Ok(());
+                return;
             };
 
+            // Types are initially `None`, and are set to `Some(Ok(_))` as long as the input can be
+            // mapped to a unique type, and to `Some(Err(()))` if the input is used with
+            // conflicting types at some point.
             match type_ {
-                None => *type_ = Some(tag.clone()),
-                Some(prev) => {
+                None => *type_ = Some(Ok(tag.clone())),
+                Some(Err(())) => {}
+                Some(Ok(prev)) => {
                     if prev != tag {
-                        return Err(Error::InputTypeConflict(ix, prev.clone(), tag.clone()));
+                        *type_ = Some(Err(()));
                     }
                 }
             }
-
-            Ok(())
         };
 
         // (1). Infer type tags for pure inputs from their uses.
@@ -480,20 +512,25 @@ impl<S: PackageStore> Resolver<S> {
             match cmd {
                 Command::MoveCall(call) => {
                     let params = self
-                        .function_parameters(call.package.into(), call.module.as_str(), call.function.as_str())
-                        .await?;
+                        .function_signature(
+                            call.package.into(),
+                            call.module.as_str(),
+                            call.function.as_str(),
+                        )
+                        .await?
+                        .parameters;
 
                     for (open_sig, arg) in params.iter().zip(call.arguments.iter()) {
                         let sig = open_sig.instantiate(&call.type_arguments)?;
-                        register_type(arg, &sig.body)?;
+                        register_type(arg, &sig.body);
                     }
                 }
 
-                Command::TransferObjects(_, arg) => register_type(arg, &TypeTag::Address)?,
+                Command::TransferObjects(_, arg) => register_type(arg, &TypeTag::Address),
 
                 Command::SplitCoins(_, amounts) => {
                     for amount in amounts {
-                        register_type(amount, &TypeTag::U64)?;
+                        register_type(amount, &TypeTag::U64);
                     }
                 }
 
@@ -501,7 +538,7 @@ impl<S: PackageStore> Resolver<S> {
                     let tag = as_type_tag(tag)?;
                     if is_primitive_type_tag(&tag) {
                         for elem in elems {
-                            register_type(elem, &tag)?;
+                            register_type(elem, &tag);
                         }
                     }
                 }
@@ -512,7 +549,11 @@ impl<S: PackageStore> Resolver<S> {
 
         // (2). Gather all the unique type tags to convert into layouts. There are relatively few
         // primitive types so this is worth doing to avoid redundant work.
-        let unique_tags: BTreeSet<_> = tags.iter().filter_map(|t| t.clone()).collect();
+        let unique_tags: BTreeSet<_> = tags
+            .iter()
+            .flat_map(|t| t.clone())
+            .flat_map(|t| t.ok())
+            .collect();
 
         // (3). Convert the type tags into layouts.
         let mut layouts = BTreeMap::new();
@@ -522,7 +563,14 @@ impl<S: PackageStore> Resolver<S> {
         }
 
         // (4) Prepare the result vector.
-        Ok(tags.iter().map(|t| t.as_ref().and_then(|t| layouts.get(t).cloned())).collect())
+        Ok(tags
+            .iter()
+            .map(|t| -> Option<_> {
+                let t = t.as_ref()?;
+                let t = t.as_ref().ok()?;
+                layouts.get(t).cloned()
+            })
+            .collect())
     }
 
     /// Resolves a runtime address in a `ModuleId` to a storage `ModuleId` according to the linkage
@@ -531,7 +579,11 @@ impl<S: PackageStore> Resolver<S> {
     ///   does not exist.
     /// * Will fail if an invalid `context` is provided for the `location`, i.e., the package at
     ///   `context` does not contain the module that `location` refers to.
-    pub async fn resolve_module_id(&self, module_id: ModuleId, context: AccountAddress) -> Result<ModuleId> {
+    pub async fn resolve_module_id(
+        &self,
+        module_id: ModuleId,
+        context: AccountAddress,
+    ) -> Result<ModuleId> {
         let package = self.package_store.fetch(context).await?;
         let storage_id = package.relocate(*module_id.address())?;
         Ok(ModuleId::new(storage_id, module_id.name().to_owned()))
@@ -550,40 +602,65 @@ impl<S: PackageStore> Resolver<S> {
     ///
     /// If for any reason we are unable to resolve the abort code to a `CleverError`, this function
     /// will return `None`.
-    pub async fn resolve_clever_error(&self, module_id: ModuleId, abort_code: u64) -> Option<CleverError> {
+    pub async fn resolve_clever_error(
+        &self,
+        module_id: ModuleId,
+        abort_code: u64,
+    ) -> Option<CleverError> {
         let bitset = ErrorBitset::from_u64(abort_code)?;
         let package = self.package_store.fetch(*module_id.address()).await.ok()?;
         let module = package.module(module_id.name().as_str()).ok()?.bytecode();
         let source_line_number = bitset.line_number()?;
+        let error_code = bitset.error_code();
 
         // We only have a line number in our clever error, so return early.
         if bitset.identifier_index().is_none() && bitset.constant_index().is_none() {
-            return Some(CleverError { module_id, error_info: ErrorConstants::None, source_line_number });
+            return Some(CleverError {
+                module_id,
+                error_info: ErrorConstants::None,
+                source_line_number,
+                error_code,
+            });
         } else if bitset.identifier_index().is_none() || bitset.constant_index().is_none() {
             return None;
         }
 
-        let error_identifier_constant = module.constant_pool().get(bitset.identifier_index()? as usize)?;
-        let error_value_constant = module.constant_pool().get(bitset.constant_index()? as usize)?;
+        let error_identifier_constant = module
+            .constant_pool()
+            .get(bitset.identifier_index()? as usize)?;
+        let error_value_constant = module
+            .constant_pool()
+            .get(bitset.constant_index()? as usize)?;
 
-        if !matches!(&error_identifier_constant.type_, SignatureToken::Vector(x) if x.as_ref() == &SignatureToken::U8) {
+        if !matches!(&error_identifier_constant.type_, SignatureToken::Vector(x) if x.as_ref() == &SignatureToken::U8)
+        {
             return None;
         };
 
-        let error_identifier =
-            bcs::from_bytes::<Vec<u8>>(&error_identifier_constant.data).ok().and_then(|x| String::from_utf8(x).ok())?;
+        let error_identifier = bcs::from_bytes::<Vec<u8>>(&error_identifier_constant.data)
+            .ok()
+            .and_then(|x| String::from_utf8(x).ok())?;
         let bytes = error_value_constant.data.clone();
 
         let rendered = try_render_constant(error_value_constant);
 
         let error_info = match rendered {
-            RenderResult::NotRendered => ErrorConstants::Raw { identifier: error_identifier, bytes },
-            RenderResult::AsString(s) | RenderResult::AsValue(s) => {
-                ErrorConstants::Rendered { identifier: error_identifier, constant: s }
-            }
+            RenderResult::NotRendered => ErrorConstants::Raw {
+                identifier: error_identifier,
+                bytes,
+            },
+            RenderResult::AsString(s) | RenderResult::AsValue(s) => ErrorConstants::Rendered {
+                identifier: error_identifier,
+                constant: s,
+            },
         };
 
-        Some(CleverError { module_id, error_info, source_line_number })
+        Some(CleverError {
+            module_id,
+            error_info,
+            source_line_number,
+            error_code,
+        })
     }
 }
 
@@ -650,7 +727,12 @@ impl Package {
     pub fn read_from_package(package: &MovePackage) -> Result<Self> {
         let storage_id = AccountAddress::from(package.id());
         let mut type_origins: BTreeMap<String, BTreeMap<String, AccountAddress>> = BTreeMap::new();
-        for TypeOrigin { module_name, datatype_name, package } in package.type_origin_table() {
+        for TypeOrigin {
+            module_name,
+            datatype_name,
+            package,
+        } in package.type_origin_table()
+        {
             type_origins
                 .entry(module_name.to_string())
                 .or_default()
@@ -677,14 +759,25 @@ impl Package {
             return Err(Error::EmptyPackage(storage_id));
         };
 
-        let linkage =
-            package.linkage_table().iter().map(|(&dep, linkage)| (dep.into(), linkage.upgraded_id.into())).collect();
+        let linkage = package
+            .linkage_table()
+            .iter()
+            .map(|(&dep, linkage)| (dep.into(), linkage.upgraded_id.into()))
+            .collect();
 
-        Ok(Package { storage_id, runtime_id, version: package.version(), modules, linkage })
+        Ok(Package {
+            storage_id,
+            runtime_id,
+            version: package.version(),
+            modules,
+            linkage,
+        })
     }
 
     pub fn module(&self, module: &str) -> Result<&Module> {
-        self.modules.get(module).ok_or_else(|| Error::ModuleNotFound(self.storage_id, module.to_string()))
+        self.modules
+            .get(module)
+            .ok_or_else(|| Error::ModuleNotFound(self.storage_id, module.to_string()))
     }
 
     pub fn modules(&self) -> &BTreeMap<String, Module> {
@@ -694,7 +787,11 @@ impl Package {
     fn data_def(&self, module_name: &str, datatype_name: &str) -> Result<DataDef> {
         let module = self.module(module_name)?;
         let Some(data_def) = module.data_def(datatype_name)? else {
-            return Err(Error::DatatypeNotFound(self.storage_id, module_name.to_string(), datatype_name.to_string()));
+            return Err(Error::DatatypeNotFound(
+                self.storage_id,
+                module_name.to_string(),
+                datatype_name.to_string(),
+            ));
         };
         Ok(data_def)
     }
@@ -708,7 +805,10 @@ impl Package {
             return Ok(self.storage_id);
         }
 
-        self.linkage.get(&runtime_id).ok_or_else(|| Error::LinkageNotFound(runtime_id)).copied()
+        self.linkage
+            .get(&runtime_id)
+            .ok_or_else(|| Error::LinkageNotFound(runtime_id))
+            .copied()
     }
 }
 
@@ -755,7 +855,12 @@ impl Module {
             function_index.insert(function, index);
         }
 
-        Ok(Module { bytecode, struct_index, enum_index, function_index })
+        Ok(Module {
+            bytecode,
+            struct_index,
+            enum_index,
+            function_index,
+        })
     }
 
     pub fn bytecode(&self) -> &CompiledModule {
@@ -764,32 +869,55 @@ impl Module {
 
     /// The module's name
     pub fn name(&self) -> &str {
-        self.bytecode.identifier_at(self.bytecode.self_handle().name).as_str()
+        self.bytecode
+            .identifier_at(self.bytecode.self_handle().name)
+            .as_str()
     }
 
     /// Iterate over the structs with names strictly after `after` (or from the beginning), and
     /// strictly before `before` (or to the end).
-    pub fn structs(&self, after: Option<&str>, before: Option<&str>) -> impl DoubleEndedIterator<Item = &str> + Clone {
+    pub fn structs(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> impl DoubleEndedIterator<Item = &str> + Clone {
         use std::ops::Bound as B;
         self.struct_index
-            .range::<str, _>((after.map_or(B::Unbounded, B::Excluded), before.map_or(B::Unbounded, B::Excluded)))
+            .range::<str, _>((
+                after.map_or(B::Unbounded, B::Excluded),
+                before.map_or(B::Unbounded, B::Excluded),
+            ))
             .map(|(name, _)| name.as_str())
     }
 
     /// Iterate over the enums with names strictly after `after` (or from the beginning), and
     /// strictly before `before` (or to the end).
-    pub fn enums(&self, after: Option<&str>, before: Option<&str>) -> impl DoubleEndedIterator<Item = &str> + Clone {
+    pub fn enums(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> impl DoubleEndedIterator<Item = &str> + Clone {
         use std::ops::Bound as B;
         self.enum_index
-            .range::<str, _>((after.map_or(B::Unbounded, B::Excluded), before.map_or(B::Unbounded, B::Excluded)))
+            .range::<str, _>((
+                after.map_or(B::Unbounded, B::Excluded),
+                before.map_or(B::Unbounded, B::Excluded),
+            ))
             .map(|(name, _)| name.as_str())
     }
 
     /// Iterate over the datatypes with names strictly after `after` (or from the beginning), and
     /// strictly before `before` (or to the end). Enums and structs will be interleaved, and will
     /// be sorted by their names.
-    pub fn datatypes(&self, after: Option<&str>, before: Option<&str>) -> impl DoubleEndedIterator<Item = &str> + Clone {
-        let mut names = self.structs(after, before).chain(self.enums(after, before)).collect::<Vec<_>>();
+    pub fn datatypes(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> impl DoubleEndedIterator<Item = &str> + Clone {
+        let mut names = self
+            .structs(after, before)
+            .chain(self.enums(after, before))
+            .collect::<Vec<_>>();
         names.sort();
         names.into_iter()
     }
@@ -820,7 +948,12 @@ impl Module {
                 .collect::<Result<_>>()?,
         };
 
-        Ok(Some(DataDef { defining_id, abilities, type_params, data: MoveData::Struct(fields) }))
+        Ok(Some(DataDef {
+            defining_id,
+            abilities,
+            type_params,
+            data: MoveData::Struct(fields),
+        }))
     }
 
     /// Get the enum definition corresponding to the enum with name `name` in this module.
@@ -840,7 +973,10 @@ impl Module {
             .variants
             .iter()
             .map(|variant| {
-                let name = self.bytecode.identifier_at(variant.variant_name).to_string();
+                let name = self
+                    .bytecode
+                    .identifier_at(variant.variant_name)
+                    .to_string();
                 let signatures = variant
                     .fields
                     .iter()
@@ -856,22 +992,37 @@ impl Module {
             })
             .collect::<Result<_>>()?;
 
-        Ok(Some(DataDef { defining_id, abilities, type_params, data: MoveData::Enum(variants) }))
+        Ok(Some(DataDef {
+            defining_id,
+            abilities,
+            type_params,
+            data: MoveData::Enum(variants),
+        }))
     }
 
     /// Get the data definition corresponding to the data type with name `name` in this module.
     /// Returns `Ok(None)` if the datatype cannot be found in this module, `Err(...)` if there was an
     /// error deserializing it, and `Ok(Some(def))` on success.
     pub fn data_def(&self, name: &str) -> Result<Option<DataDef>> {
-        self.struct_def(name).transpose().or_else(|| self.enum_def(name).transpose()).transpose()
+        self.struct_def(name)
+            .transpose()
+            .or_else(|| self.enum_def(name).transpose())
+            .transpose()
     }
 
     /// Iterate over the functions with names strictly after `after` (or from the beginning), and
     /// strictly before `before` (or to the end).
-    pub fn functions(&self, after: Option<&str>, before: Option<&str>) -> impl DoubleEndedIterator<Item = &str> + Clone {
+    pub fn functions(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> impl DoubleEndedIterator<Item = &str> + Clone {
         use std::ops::Bound as B;
         self.function_index
-            .range::<str, _>((after.map_or(B::Unbounded, B::Excluded), before.map_or(B::Unbounded, B::Excluded)))
+            .range::<str, _>((
+                after.map_or(B::Unbounded, B::Excluded),
+                before.map_or(B::Unbounded, B::Excluded),
+            ))
             .map(|(name, _)| name.as_str())
     }
 
@@ -900,15 +1051,20 @@ impl OpenSignature {
     fn read(sig: &SignatureToken, bytecode: &CompiledModule) -> Result<Self> {
         use SignatureToken as S;
         Ok(match sig {
-            S::Reference(sig) => {
-                OpenSignature { ref_: Some(Reference::Immutable), body: OpenSignatureBody::read(sig, bytecode)? }
-            }
+            S::Reference(sig) => OpenSignature {
+                ref_: Some(Reference::Immutable),
+                body: OpenSignatureBody::read(sig, bytecode)?,
+            },
 
-            S::MutableReference(sig) => {
-                OpenSignature { ref_: Some(Reference::Mutable), body: OpenSignatureBody::read(sig, bytecode)? }
-            }
+            S::MutableReference(sig) => OpenSignature {
+                ref_: Some(Reference::Mutable),
+                body: OpenSignatureBody::read(sig, bytecode)?,
+            },
 
-            sig => OpenSignature { ref_: None, body: OpenSignatureBody::read(sig, bytecode)? },
+            sig => OpenSignature {
+                ref_: None,
+                body: OpenSignatureBody::read(sig, bytecode)?,
+            },
         })
     }
 
@@ -917,7 +1073,10 @@ impl OpenSignature {
     /// the ability constraints of the struct or function this signature is part of), but will
     /// produce an error if the signature references a type parameter that is out of bounds.
     pub fn instantiate(&self, type_params: &[TypeInput]) -> Result<Signature> {
-        Ok(Signature { ref_: self.ref_, body: self.body.instantiate(type_params)? })
+        Ok(Signature {
+            ref_: self.ref_,
+            body: self.body.instantiate(type_params)?,
+        })
     }
 }
 
@@ -947,7 +1106,10 @@ impl OpenSignatureBody {
                 let (ix, params) = &**inst;
                 O::Datatype(
                     DatatypeKey::read(*ix, bytecode),
-                    params.iter().map(|sig| OpenSignatureBody::read(sig, bytecode)).collect::<Result<_>>()?,
+                    params
+                        .iter()
+                        .map(|sig| OpenSignatureBody::read(sig, bytecode))
+                        .collect::<Result<_>>()?,
                 )
             }
         })
@@ -972,19 +1134,28 @@ impl OpenSignatureBody {
                 address: key.package,
                 module: ident(&key.module)?,
                 name: ident(&key.name)?,
-                type_params: dty_params.iter().map(|p| p.instantiate(type_params)).collect::<Result<_>>()?,
+                type_params: dty_params
+                    .iter()
+                    .map(|p| p.instantiate(type_params))
+                    .collect::<Result<_>>()?,
             })),
 
-            O::TypeParameter(ix) => {
-                as_type_tag(type_params.get(*ix as usize).ok_or_else(|| Error::TypeParamOOB(*ix, type_params.len()))?)?
-            }
+            O::TypeParameter(ix) => as_type_tag(
+                type_params
+                    .get(*ix as usize)
+                    .ok_or_else(|| Error::TypeParamOOB(*ix, type_params.len()))?,
+            )?,
         })
     }
 }
 
-impl<'m, 'n> DatatypeRef<'m, 'n> {
+impl DatatypeRef<'_, '_> {
     pub fn as_key(&self) -> DatatypeKey {
-        DatatypeKey { package: self.package, module: self.module.to_string().into(), name: self.name.to_string().into() }
+        DatatypeKey {
+            package: self.package,
+            module: self.module.to_string().into(),
+            name: self.name.to_string().into(),
+        }
     }
 }
 
@@ -997,13 +1168,20 @@ impl DatatypeKey {
         let module = bytecode.identifier_at(mh.name).to_string().into();
         let name = bytecode.identifier_at(sh.name).to_string().into();
 
-        DatatypeKey { package, module, name }
+        DatatypeKey {
+            package,
+            module,
+            name,
+        }
     }
 }
 
 impl<'l> ResolutionContext<'l> {
     fn new(limits: Option<&'l Limits>) -> Self {
-        ResolutionContext { datatypes: BTreeMap::new(), limits }
+        ResolutionContext {
+            datatypes: BTreeMap::new(),
+            limits,
+        }
     }
 
     /// Gather definitions for types that contribute to the definition of `tag` into this resolution
@@ -1046,7 +1224,15 @@ impl<'l> ResolutionContext<'l> {
             }
 
             match tag {
-                T::Address | T::Bool | T::U8 | T::U16 | T::U32 | T::U64 | T::U128 | T::U256 | T::Signer => {
+                T::Address
+                | T::Bool
+                | T::U8
+                | T::U16
+                | T::U32
+                | T::U64
+                | T::U128
+                | T::U256
+                | T::Signer => {
                     // Nothing further to add to context
                 }
 
@@ -1054,7 +1240,9 @@ impl<'l> ResolutionContext<'l> {
 
                 T::Struct(s) => {
                     let context = store.fetch(s.address).await?;
-                    let def = context.clone().data_def(s.module.as_str(), s.name.as_str())?;
+                    let def = context
+                        .clone()
+                        .data_def(s.module.as_str(), s.name.as_str())?;
 
                     // Normalize `address` (the ID of a package that contains the definition of this
                     // struct) to be a runtime ID, because that's what the resolution context uses
@@ -1064,7 +1252,10 @@ impl<'l> ResolutionContext<'l> {
                     let key = DatatypeRef::from(s.as_ref()).as_key();
 
                     if def.type_params.len() != s.type_params.len() {
-                        return Err(Error::TypeArityMismatch(def.type_params.len(), s.type_params.len()));
+                        return Err(Error::TypeArityMismatch(
+                            def.type_params.len(),
+                            s.type_params.len(),
+                        ));
                     }
 
                     check_max_limit!(
@@ -1086,13 +1277,20 @@ impl<'l> ResolutionContext<'l> {
                         match &def.data {
                             MoveData::Struct(fields) => {
                                 for (_, sig) in fields {
-                                    self.add_signature(sig.clone(), store, &context, visit_fields).await?;
+                                    self.add_signature(sig.clone(), store, &context, visit_fields)
+                                        .await?;
                                 }
                             }
                             MoveData::Enum(variants) => {
                                 for variant in variants {
                                     for (_, sig) in &variant.signatures {
-                                        self.add_signature(sig.clone(), store, &context, visit_fields).await?;
+                                        self.add_signature(
+                                            sig.clone(),
+                                            store,
+                                            &context,
+                                            visit_fields,
+                                        )
+                                        .await?;
                                     }
                                 }
                             }
@@ -1126,7 +1324,15 @@ impl<'l> ResolutionContext<'l> {
         let mut frontier = vec![sig];
         while let Some(sig) = frontier.pop() {
             match sig {
-                O::Address | O::Bool | O::U8 | O::U16 | O::U32 | O::U64 | O::U128 | O::U256 | O::TypeParameter(_) => {
+                O::Address
+                | O::Bool
+                | O::U8
+                | O::U16
+                | O::U32
+                | O::U64
+                | O::U128
+                | O::U256
+                | O::TypeParameter(_) => {
                     // Nothing further to add to context
                 }
 
@@ -1162,7 +1368,10 @@ impl<'l> ResolutionContext<'l> {
                                 }
                                 MoveData::Enum(variants) => {
                                     frontier.extend(
-                                        variants.iter().flat_map(|v| v.signatures.iter().map(|(_, s)| s)).cloned(),
+                                        variants
+                                            .iter()
+                                            .flat_map(|v| v.signatures.iter().map(|(_, s)| s))
+                                            .cloned(),
                                     );
                                 }
                             };
@@ -1189,7 +1398,9 @@ impl<'l> ResolutionContext<'l> {
 
         match tag {
             T::Signer => return Err(Error::UnexpectedSigner),
-            T::Address | T::Bool | T::U8 | T::U16 | T::U32 | T::U64 | T::U128 | T::U256 => { /* nop */ }
+            T::Address | T::Bool | T::U8 | T::U16 | T::U32 | T::U64 | T::U128 | T::U256 => {
+                /* nop */
+            }
 
             T::Vector(tag) => self.canonicalize_type(tag.as_mut())?,
 
@@ -1215,12 +1426,18 @@ impl<'l> ResolutionContext<'l> {
     ///
     /// `max_depth` controls how deep the layout is allowed to grow to. The actual depth reached is
     /// returned alongside the layout (assuming it does not exceed `max_depth`).
-    fn resolve_type_layout(&self, tag: &TypeTag, max_depth: usize) -> Result<(MoveTypeLayout, usize)> {
+    fn resolve_type_layout(
+        &self,
+        tag: &TypeTag,
+        max_depth: usize,
+    ) -> Result<(MoveTypeLayout, usize)> {
         use MoveTypeLayout as L;
         use TypeTag as T;
 
         if max_depth == 0 {
-            return Err(Error::ValueNesting(self.limits.map_or(0, |l| l.max_move_value_depth)));
+            return Err(Error::ValueNesting(
+                self.limits.map_or(0, |l| l.max_move_value_depth),
+            ));
         }
 
         Ok(match tag {
@@ -1271,8 +1488,12 @@ impl<'l> ResolutionContext<'l> {
                 let key = DatatypeRef::from(s.as_ref());
                 let def = &self.datatypes[&key];
 
-                let type_ =
-                    StructTag { address: def.defining_id, module: s.module.clone(), name: s.name.clone(), type_params };
+                let type_ = StructTag {
+                    address: def.defining_id,
+                    module: s.module.clone(),
+                    name: s.name.clone(),
+                    type_params,
+                };
 
                 self.resolve_datatype_signature(def, type_, param_layouts, max_depth)?
             }
@@ -1297,14 +1518,21 @@ impl<'l> ResolutionContext<'l> {
                 let mut field_depth = 0;
 
                 for (name, sig) in fields {
-                    let (layout, depth) = self.resolve_signature_layout(sig, &param_layouts, max_depth - 1)?;
+                    let (layout, depth) =
+                        self.resolve_signature_layout(sig, &param_layouts, max_depth - 1)?;
 
                     field_depth = field_depth.max(depth);
-                    resolved_fields.push(MoveFieldLayout { name: ident(name.as_str())?, layout })
+                    resolved_fields.push(MoveFieldLayout {
+                        name: ident(name.as_str())?,
+                        layout,
+                    })
                 }
 
                 (
-                    MoveTypeLayout::Struct(Box::new(MoveStructLayout { type_, fields: Box::new(resolved_fields) })),
+                    MoveTypeLayout::Struct(Box::new(MoveStructLayout {
+                        type_,
+                        fields: resolved_fields,
+                    })),
                     field_depth + 1,
                 )
             }
@@ -1316,15 +1544,25 @@ impl<'l> ResolutionContext<'l> {
                     let mut fields = Vec::with_capacity(variant.signatures.len());
                     for (name, sig) in &variant.signatures {
                         // Note: We decrement the depth here because we're already under the variant
-                        let (layout, depth) = self.resolve_signature_layout(sig, &param_layouts, max_depth - 1)?;
+                        let (layout, depth) =
+                            self.resolve_signature_layout(sig, &param_layouts, max_depth - 1)?;
 
                         field_depth = field_depth.max(depth);
-                        fields.push(MoveFieldLayout { name: ident(name.as_str())?, layout })
+                        fields.push(MoveFieldLayout {
+                            name: ident(name.as_str())?,
+                            layout,
+                        })
                     }
                     resolved_variants.insert((ident(variant.name.as_str())?, tag as u16), fields);
                 }
 
-                (MoveTypeLayout::Enum(Box::new(MoveEnumLayout { type_, variants: resolved_variants })), field_depth + 1)
+                (
+                    MoveTypeLayout::Enum(Box::new(MoveEnumLayout {
+                        type_,
+                        variants: resolved_variants,
+                    })),
+                    field_depth + 1,
+                )
             }
         })
     }
@@ -1344,7 +1582,9 @@ impl<'l> ResolutionContext<'l> {
         use OpenSignatureBody as O;
 
         if max_depth == 0 {
-            return Err(Error::ValueNesting(self.limits.map_or(0, |l| l.max_move_value_depth)));
+            return Err(Error::ValueNesting(
+                self.limits.map_or(0, |l| l.max_move_value_depth),
+            ));
         }
 
         Ok(match sig {
@@ -1367,14 +1607,17 @@ impl<'l> ResolutionContext<'l> {
                 // been fine when it was created, but result in too deep a layout when we use it at
                 // this position.
                 if depth > max_depth {
-                    return Err(Error::ValueNesting(self.limits.map_or(0, |l| l.max_move_value_depth)));
+                    return Err(Error::ValueNesting(
+                        self.limits.map_or(0, |l| l.max_move_value_depth),
+                    ));
                 }
 
                 (layout, depth)
             }
 
             O::Vector(sig) => {
-                let (layout, depth) = self.resolve_signature_layout(sig.as_ref(), param_layouts, max_depth - 1)?;
+                let (layout, depth) =
+                    self.resolve_signature_layout(sig.as_ref(), param_layouts, max_depth - 1)?;
 
                 (L::Vector(Box::new(layout)), depth + 1)
             }
@@ -1391,7 +1634,8 @@ impl<'l> ResolutionContext<'l> {
                 // SAFETY: `param_layouts` contains `MoveTypeLayout`-s that are generated by this
                 // `ResolutionContext`, which guarantees that struct layouts come with types, which
                 // is necessary to avoid errors when converting layouts into type tags.
-                let type_params: Vec<TypeTag> = param_layouts.iter().map(|l| TypeTag::from(&l.0)).collect();
+                let type_params: Vec<TypeTag> =
+                    param_layouts.iter().map(|l| TypeTag::from(&l.0)).collect();
 
                 let type_ = StructTag {
                     address: def.defining_id,
@@ -1412,7 +1656,9 @@ impl<'l> ResolutionContext<'l> {
         Ok(match tag {
             T::Signer => return Err(Error::UnexpectedSigner),
 
-            T::Bool | T::U8 | T::U16 | T::U32 | T::U64 | T::U128 | T::U256 | T::Address => AbilitySet::PRIMITIVES,
+            T::Bool | T::U8 | T::U16 | T::U32 | T::U64 | T::U128 | T::U256 | T::Address => {
+                AbilitySet::PRIMITIVES
+            }
 
             T::Vector(tag) => self.resolve_abilities(tag)?.intersect(AbilitySet::VECTOR),
 
@@ -1422,14 +1668,23 @@ impl<'l> ResolutionContext<'l> {
                 let def = &self.datatypes[&key];
 
                 if def.type_params.len() != s.type_params.len() {
-                    return Err(Error::TypeArityMismatch(def.type_params.len(), s.type_params.len()));
+                    return Err(Error::TypeArityMismatch(
+                        def.type_params.len(),
+                        s.type_params.len(),
+                    ));
                 }
 
                 let param_abilities: Result<Vec<AbilitySet>> = s
                     .type_params
                     .iter()
                     .zip(def.type_params.iter())
-                    .map(|(p, d)| if d.is_phantom { Ok(AbilitySet::EMPTY) } else { self.resolve_abilities(p) })
+                    .map(|(p, d)| {
+                        if d.is_phantom {
+                            Ok(AbilitySet::EMPTY)
+                        } else {
+                            self.resolve_abilities(p)
+                        }
+                    })
                     .collect();
 
                 AbilitySet::polymorphic_abilities(
@@ -1451,7 +1706,9 @@ impl<'l> ResolutionContext<'l> {
         use OpenSignatureBody as O;
 
         match sig {
-            O::Address | O::Bool | O::U8 | O::U16 | O::U32 | O::U64 | O::U128 | O::U256 => { /* nop */ }
+            O::Address | O::Bool | O::U8 | O::U16 | O::U32 | O::U64 | O::U128 | O::U256 => {
+                /* nop */
+            }
 
             O::TypeParameter(_) => { /* nop */ }
 
@@ -1474,7 +1731,11 @@ impl<'l> ResolutionContext<'l> {
 
 impl<'s> From<&'s StructTag> for DatatypeRef<'s, 's> {
     fn from(tag: &'s StructTag) -> Self {
-        DatatypeRef { package: tag.address, module: tag.module.as_str().into(), name: tag.name.as_str().into() }
+        DatatypeRef {
+            package: tag.address,
+            module: tag.module.as_str().into(),
+            name: tag.name.as_str().into(),
+        }
     }
 }
 
@@ -1498,9 +1759,19 @@ pub fn as_type_tag(type_input: &TypeInput) -> Result<TypeTag> {
         I::Signer => T::Signer,
         I::Vector(t) => T::Vector(Box::new(as_type_tag(t)?)),
         I::Struct(s) => {
-            let StructInput { address, module, name, type_params } = s.as_ref();
+            let StructInput {
+                address,
+                module,
+                name,
+                type_params,
+            } = s.as_ref();
             let type_params = type_params.iter().map(as_type_tag).collect::<Result<_>>()?;
-            T::Struct(Box::new(StructTag { address: *address, module: ident(module)?, name: ident(name)?, type_params }))
+            T::Struct(Box::new(StructTag {
+                address: *address,
+                module: ident(module)?,
+                name: ident(name)?,
+                type_params,
+            }))
         }
     })
 }
@@ -1523,12 +1794,10 @@ mod tests {
     use async_trait::async_trait;
     use move_binary_format::file_format::Ability;
     use move_core_types::ident_str;
-    use std::{
-        path::PathBuf,
-        str::FromStr,
-        sync::{Arc, RwLock},
-    };
-    use sui_types::{base_types::random_object_ref, transaction::ObjectArg};
+    use std::sync::Arc;
+    use std::{path::PathBuf, str::FromStr, sync::RwLock};
+    use sui_types::base_types::random_object_ref;
+    use sui_types::transaction::ObjectArg;
 
     use move_compiler::compiled_unit::NamedCompiledModule;
     use sui_move_build::{BuildConfig, CompiledPackage};
@@ -1552,7 +1821,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_upgraded_canonical_type() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (2, build_package("a1"), a1_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (2, build_package("a1"), a1_types()),
+        ]);
 
         let package_resolver = Resolver::new(cache);
 
@@ -1564,7 +1836,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_latest_canonical_type() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (2, build_package("a1"), a1_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (2, build_package("a1"), a1_types()),
+        ]);
 
         let package_resolver = Resolver::new(cache);
 
@@ -1576,7 +1851,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_type_param_canonical_type() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (2, build_package("a1"), a1_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (2, build_package("a1"), a1_types()),
+        ]);
 
         let package_resolver = Resolver::new(cache);
 
@@ -1588,7 +1866,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_canonical_err_package_too_old() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (2, build_package("a1"), a1_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (2, build_package("a1"), a1_types()),
+        ]);
 
         let package_resolver = Resolver::new(cache);
 
@@ -1613,8 +1894,14 @@ mod tests {
     async fn test_simple_type_layout() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
         let package_resolver = Resolver::new(cache);
-        let struct_layout = package_resolver.type_layout(type_("0xa0::m::T0")).await.unwrap();
-        let enum_layout = package_resolver.type_layout(type_("0xa0::m::E0")).await.unwrap();
+        let struct_layout = package_resolver
+            .type_layout(type_("0xa0::m::T0"))
+            .await
+            .unwrap();
+        let enum_layout = package_resolver
+            .type_layout(type_("0xa0::m::E0"))
+            .await
+            .unwrap();
         insta::assert_snapshot!(fmt(struct_layout, enum_layout));
     }
 
@@ -1631,7 +1918,10 @@ mod tests {
     /// A type that refers to types a different package.
     #[tokio::test]
     async fn test_cross_package_layout() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (1, build_package("b0"), b0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (1, build_package("b0"), b0_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
         let struct_layout = resolver.type_layout(type_("0xb0::m::T0")).await.unwrap();
@@ -1643,7 +1933,10 @@ mod tests {
     /// upgraded package.
     #[tokio::test]
     async fn test_upgraded_package_layout() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (2, build_package("a1"), a1_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (2, build_package("a1"), a1_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
         let struct_layout = resolver.type_layout(type_("0xa1::n::T1")).await.unwrap();
@@ -1655,11 +1948,20 @@ mod tests {
     /// contexts from different versions of the same package.
     #[tokio::test]
     async fn test_multiple_linkage_contexts_layout() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (2, build_package("a1"), a1_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (2, build_package("a1"), a1_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
-        let struct_layout = resolver.type_layout(type_("0xa0::m::T1<0xa0::m::T0, 0xa1::m::T3>")).await.unwrap();
-        let enum_layout = resolver.type_layout(type_("0xa0::m::E1<0xa0::m::E0, 0xa1::m::E3>")).await.unwrap();
+        let struct_layout = resolver
+            .type_layout(type_("0xa0::m::T1<0xa0::m::T0, 0xa1::m::T3>"))
+            .await
+            .unwrap();
+        let enum_layout = resolver
+            .type_layout(type_("0xa0::m::E1<0xa0::m::E0, 0xa1::m::E3>"))
+            .await
+            .unwrap();
         insta::assert_snapshot!(fmt(struct_layout, enum_layout));
     }
 
@@ -1669,11 +1971,20 @@ mod tests {
     /// package that first declared it (whose ID is its defining ID).
     #[tokio::test]
     async fn test_upgraded_package_non_defining_id_layout() {
-        let (_, cache) = package_cache([(1, build_package("a0"), a0_types()), (2, build_package("a1"), a1_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (2, build_package("a1"), a1_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
-        let struct_layout = resolver.type_layout(type_("0xa1::m::T1<0xa1::m::T3, 0xa1::m::T0>")).await.unwrap();
-        let enum_layout = resolver.type_layout(type_("0xa1::m::E1<0xa1::m::E3, 0xa1::m::E0>")).await.unwrap();
+        let struct_layout = resolver
+            .type_layout(type_("0xa1::m::T1<0xa1::m::T3, 0xa1::m::T0>"))
+            .await
+            .unwrap();
+        let enum_layout = resolver
+            .type_layout(type_("0xa1::m::E1<0xa1::m::E3, 0xa1::m::E0>"))
+            .await
+            .unwrap();
         insta::assert_snapshot!(fmt(struct_layout, enum_layout));
     }
 
@@ -1699,16 +2010,25 @@ mod tests {
     async fn test_value_nesting_boundary_layout() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 100,
-            max_type_argument_depth: 100,
-            max_type_nodes: 100,
-            max_move_value_depth: 3,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 100,
+                max_type_argument_depth: 100,
+                max_type_nodes: 100,
+                max_move_value_depth: 3,
+            },
+        );
 
         // The layout of this type is fine, because it is *just* at the correct depth.
-        let struct_layout = resolver.type_layout(type_("0xa0::m::T1<u8, u8>")).await.unwrap();
-        let enum_layout = resolver.type_layout(type_("0xa0::m::E1<u8, u8>")).await.unwrap();
+        let struct_layout = resolver
+            .type_layout(type_("0xa0::m::T1<u8, u8>"))
+            .await
+            .unwrap();
+        let enum_layout = resolver
+            .type_layout(type_("0xa0::m::E1<u8, u8>"))
+            .await
+            .unwrap();
         insta::assert_snapshot!(fmt(struct_layout, enum_layout));
     }
 
@@ -1716,16 +2036,25 @@ mod tests {
     async fn test_err_value_nesting_simple_layout() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 100,
-            max_type_argument_depth: 100,
-            max_type_nodes: 100,
-            max_move_value_depth: 2,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 100,
+                max_type_argument_depth: 100,
+                max_type_nodes: 100,
+                max_move_value_depth: 2,
+            },
+        );
 
         // The depth limit is now too low, so this will fail.
-        let struct_err = resolver.type_layout(type_("0xa0::m::T1<u8, u8>")).await.unwrap_err();
-        let enum_err = resolver.type_layout(type_("0xa0::m::E1<u8, u8>")).await.unwrap_err();
+        let struct_err = resolver
+            .type_layout(type_("0xa0::m::T1<u8, u8>"))
+            .await
+            .unwrap_err();
+        let enum_err = resolver
+            .type_layout(type_("0xa0::m::E1<u8, u8>"))
+            .await
+            .unwrap_err();
         assert!(matches!(struct_err, Error::ValueNesting(2)));
         assert!(matches!(enum_err, Error::ValueNesting(2)));
     }
@@ -1734,60 +2063,99 @@ mod tests {
     async fn test_err_value_nesting_big_type_param_layout() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 100,
-            max_type_argument_depth: 100,
-            max_type_nodes: 100,
-            max_move_value_depth: 3,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 100,
+                max_type_argument_depth: 100,
+                max_type_nodes: 100,
+                max_move_value_depth: 3,
+            },
+        );
 
         // This layout calculation will fail early because we know that the type parameter we're
         // calculating will eventually contribute to a layout that exceeds the max depth.
-        let struct_err = resolver.type_layout(type_("0xa0::m::T1<vector<vector<u8>>, u8>")).await.unwrap_err();
-        let enum_err = resolver.type_layout(type_("0xa0::m::E1<vector<vector<u8>>, u8>")).await.unwrap_err();
+        let struct_err = resolver
+            .type_layout(type_("0xa0::m::T1<vector<vector<u8>>, u8>"))
+            .await
+            .unwrap_err();
+        let enum_err = resolver
+            .type_layout(type_("0xa0::m::E1<vector<vector<u8>>, u8>"))
+            .await
+            .unwrap_err();
         assert!(matches!(struct_err, Error::ValueNesting(3)));
         assert!(matches!(enum_err, Error::ValueNesting(3)));
     }
 
     #[tokio::test]
     async fn test_err_value_nesting_big_phantom_type_param_layout() {
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 100,
-            max_type_argument_depth: 100,
-            max_type_nodes: 100,
-            max_move_value_depth: 3,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 100,
+                max_type_argument_depth: 100,
+                max_type_nodes: 100,
+                max_move_value_depth: 3,
+            },
+        );
 
         // Check that this layout request would succeed.
-        let _ = resolver.type_layout(type_("0xd0::m::O<u8, u8>")).await.unwrap();
-        let _ = resolver.type_layout(type_("0xd0::m::EO<u8, u8>")).await.unwrap();
+        let _ = resolver
+            .type_layout(type_("0xd0::m::O<u8, u8>"))
+            .await
+            .unwrap();
+        let _ = resolver
+            .type_layout(type_("0xd0::m::EO<u8, u8>"))
+            .await
+            .unwrap();
 
         // But this one fails, even though the big layout is for a phantom type parameter. This may
         // change in future if we optimise the way we handle phantom type parameters to not
         // calculate their full layout, just their type tag.
-        let struct_err = resolver.type_layout(type_("0xd0::m::O<u8, vector<vector<u8>>>")).await.unwrap_err();
-        let enum_err = resolver.type_layout(type_("0xd0::m::EO<u8, vector<vector<u8>>>")).await.unwrap_err();
+        let struct_err = resolver
+            .type_layout(type_("0xd0::m::O<u8, vector<vector<u8>>>"))
+            .await
+            .unwrap_err();
+        let enum_err = resolver
+            .type_layout(type_("0xd0::m::EO<u8, vector<vector<u8>>>"))
+            .await
+            .unwrap_err();
         assert!(matches!(struct_err, Error::ValueNesting(3)));
         assert!(matches!(enum_err, Error::ValueNesting(3)));
     }
 
     #[tokio::test]
     async fn test_err_value_nesting_type_param_application_layout() {
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 100,
-            max_type_argument_depth: 100,
-            max_type_nodes: 100,
-            max_move_value_depth: 3,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 100,
+                max_type_argument_depth: 100,
+                max_type_nodes: 100,
+                max_move_value_depth: 3,
+            },
+        );
 
         // Make sure that even if all type parameters individually meet the depth requirements,
         // that we correctly fail if they extend the layout's depth on application.
-        let struct_err = resolver.type_layout(type_("0xd0::m::O<vector<u8>, u8>")).await.unwrap_err();
-        let enum_err = resolver.type_layout(type_("0xd0::m::EO<vector<u8>, u8>")).await.unwrap_err();
+        let struct_err = resolver
+            .type_layout(type_("0xd0::m::O<vector<u8>, u8>"))
+            .await
+            .unwrap_err();
+        let enum_err = resolver
+            .type_layout(type_("0xd0::m::EO<vector<u8>, u8>"))
+            .await
+            .unwrap_err();
 
         assert!(matches!(struct_err, Error::ValueNesting(3)));
         assert!(matches!(enum_err, Error::ValueNesting(3)));
@@ -1804,10 +2172,10 @@ mod tests {
         assert!(matches!(enum_not_found, Error::DatatypeNotFound(_, _, _)));
 
         // Add a new version of the system package into the store underlying the cache.
-        inner
-            .write()
-            .unwrap()
-            .replace(addr("0x1"), cached_package(2, BTreeMap::new(), &build_package("s1"), &s1_types()));
+        inner.write().unwrap().replace(
+            addr("0x1"),
+            cached_package(2, BTreeMap::new(), &build_package("s1"), &s1_types()),
+        );
 
         // Evict the package from the cache
         resolver.package_store().evict([addr("0x1")]);
@@ -1819,7 +2187,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_caching() {
-        let (inner, cache) = package_cache([(1, build_package("a0"), a0_types()), (1, build_package("s0"), s0_types())]);
+        let (inner, cache) = package_cache([
+            (1, build_package("a0"), a0_types()),
+            (1, build_package("s0"), s0_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
         assert_eq!(inner.read().unwrap().fetches, 0);
@@ -1857,10 +2228,10 @@ mod tests {
         assert_eq!(inner.read().unwrap().fetches, 2);
 
         // Upgrade the system package
-        inner
-            .write()
-            .unwrap()
-            .replace(addr("0x1"), cached_package(2, BTreeMap::new(), &build_package("s1"), &s1_types()));
+        inner.write().unwrap().replace(
+            addr("0x1"),
+            cached_package(2, BTreeMap::new(), &build_package("s1"), &s1_types()),
+        );
 
         // Evict the package from the cache
         resolver.package_store().evict([addr("0x1")]);
@@ -1877,7 +2248,10 @@ mod tests {
     async fn test_layout_err_not_a_package() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
         let resolver = Resolver::new(cache);
-        let err = resolver.type_layout(type_("0x42::m::T0")).await.unwrap_err();
+        let err = resolver
+            .type_layout(type_("0x42::m::T0"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::PackageNotFound(_)));
     }
 
@@ -1885,7 +2259,10 @@ mod tests {
     async fn test_layout_err_no_module() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
         let resolver = Resolver::new(cache);
-        let err = resolver.type_layout(type_("0xa0::l::T0")).await.unwrap_err();
+        let err = resolver
+            .type_layout(type_("0xa0::l::T0"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::ModuleNotFound(_, _)));
     }
 
@@ -1894,7 +2271,10 @@ mod tests {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
         let resolver = Resolver::new(cache);
 
-        let err = resolver.type_layout(type_("0xa0::m::T9")).await.unwrap_err();
+        let err = resolver
+            .type_layout(type_("0xa0::m::T9"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::DatatypeNotFound(_, _, _)));
     }
 
@@ -1904,11 +2284,17 @@ mod tests {
         let resolver = Resolver::new(cache);
 
         // Too few
-        let err = resolver.type_layout(type_("0xa0::m::T1<u8>")).await.unwrap_err();
+        let err = resolver
+            .type_layout(type_("0xa0::m::T1<u8>"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::TypeArityMismatch(2, 1)));
 
         // Too many
-        let err = resolver.type_layout(type_("0xa0::m::T1<u8, u16, u32>")).await.unwrap_err();
+        let err = resolver
+            .type_layout(type_("0xa0::m::T1<u8, u16, u32>"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::TypeArityMismatch(2, 3)));
     }
 
@@ -1918,11 +2304,17 @@ mod tests {
         let a0 = cache.fetch(addr("0xa0")).await.unwrap();
         let m = a0.module("m").unwrap();
 
-        assert_eq!(m.structs(None, None).collect::<Vec<_>>(), vec!["T0", "T1", "T2"],);
+        assert_eq!(
+            m.structs(None, None).collect::<Vec<_>>(),
+            vec!["T0", "T1", "T2"],
+        );
 
         assert_eq!(m.structs(None, Some("T1")).collect::<Vec<_>>(), vec!["T0"],);
 
-        assert_eq!(m.structs(Some("T0"), Some("T2")).collect::<Vec<_>>(), vec!["T1"],);
+        assert_eq!(
+            m.structs(Some("T0"), Some("T2")).collect::<Vec<_>>(),
+            vec!["T1"],
+        );
 
         assert_eq!(m.structs(Some("T1"), None).collect::<Vec<_>>(), vec!["T2"],);
 
@@ -1940,14 +2332,23 @@ mod tests {
     #[tokio::test]
     async fn test_enums() {
         let (_, cache) = package_cache([(1, build_package("a0"), a0_types())]);
-        let a0 = cache.fetch(AccountAddress::from_str("0xa0").unwrap()).await.unwrap();
+        let a0 = cache
+            .fetch(AccountAddress::from_str("0xa0").unwrap())
+            .await
+            .unwrap();
         let m = a0.module("m").unwrap();
 
-        assert_eq!(m.enums(None, None).collect::<Vec<_>>(), vec!["E0", "E1", "E2"],);
+        assert_eq!(
+            m.enums(None, None).collect::<Vec<_>>(),
+            vec!["E0", "E1", "E2"],
+        );
 
         assert_eq!(m.enums(None, Some("E1")).collect::<Vec<_>>(), vec!["E0"],);
 
-        assert_eq!(m.enums(Some("E0"), Some("E2")).collect::<Vec<_>>(), vec!["E1"],);
+        assert_eq!(
+            m.enums(Some("E0"), Some("E2")).collect::<Vec<_>>(),
+            vec!["E1"],
+        );
 
         assert_eq!(m.enums(Some("E1"), None).collect::<Vec<_>>(), vec!["E2"],);
 
@@ -1974,13 +2375,25 @@ mod tests {
         let c0 = cache.fetch(addr("0xc0")).await.unwrap();
         let m = c0.module("m").unwrap();
 
-        assert_eq!(m.functions(None, None).collect::<Vec<_>>(), vec!["bar", "baz", "foo"],);
+        assert_eq!(
+            m.functions(None, None).collect::<Vec<_>>(),
+            vec!["bar", "baz", "foo"],
+        );
 
-        assert_eq!(m.functions(None, Some("baz")).collect::<Vec<_>>(), vec!["bar"],);
+        assert_eq!(
+            m.functions(None, Some("baz")).collect::<Vec<_>>(),
+            vec!["bar"],
+        );
 
-        assert_eq!(m.functions(Some("bar"), Some("foo")).collect::<Vec<_>>(), vec!["baz"],);
+        assert_eq!(
+            m.functions(Some("bar"), Some("foo")).collect::<Vec<_>>(),
+            vec!["baz"],
+        );
 
-        assert_eq!(m.functions(Some("baz"), None).collect::<Vec<_>>(), vec!["foo"],);
+        assert_eq!(
+            m.functions(Some("baz"), None).collect::<Vec<_>>(),
+            vec!["foo"],
+        );
 
         let foo = m.function_def("foo").unwrap().unwrap();
         let bar = m.function_def("bar").unwrap().unwrap();
@@ -2005,9 +2418,9 @@ mod tests {
         let resolver = Resolver::new(cache);
         let c0 = addr("0xc0");
 
-        let foo = resolver.function_parameters(c0, "m", "foo").await.unwrap();
-        let bar = resolver.function_parameters(c0, "m", "bar").await.unwrap();
-        let baz = resolver.function_parameters(c0, "m", "baz").await.unwrap();
+        let foo = resolver.function_signature(c0, "m", "foo").await.unwrap();
+        let bar = resolver.function_signature(c0, "m", "bar").await.unwrap();
+        let baz = resolver.function_signature(c0, "m", "baz").await.unwrap();
 
         insta::assert_snapshot!(format!(
             "c0::m::foo: {foo:#?}\n\
@@ -2021,10 +2434,16 @@ mod tests {
         use OpenSignatureBody as O;
         use TypeInput as T;
 
-        let sig = O::Datatype(key("0x2::table::Table"), vec![
-            O::TypeParameter(1),
-            O::Vector(Box::new(O::Datatype(key("0x1::option::Option"), vec![O::TypeParameter(0)]))),
-        ]);
+        let sig = O::Datatype(
+            key("0x2::table::Table"),
+            vec![
+                O::TypeParameter(1),
+                O::Vector(Box::new(O::Datatype(
+                    key("0x1::option::Option"),
+                    vec![O::TypeParameter(0)],
+                ))),
+            ],
+        );
 
         insta::assert_debug_snapshot!(sig.instantiate(&[T::U64, T::Bool]).unwrap());
     }
@@ -2034,12 +2453,18 @@ mod tests {
         use OpenSignatureBody as O;
         use TypeInput as T;
 
-        let sig = O::Datatype(key("0x2::table::Table"), vec![
-            O::TypeParameter(1),
-            O::Vector(Box::new(O::Datatype(key("0x1::option::Option"), vec![O::TypeParameter(99)]))),
-        ]);
+        let sig = O::Datatype(
+            key("0x2::table::Table"),
+            vec![
+                O::TypeParameter(1),
+                O::Vector(Box::new(O::Datatype(
+                    key("0x1::option::Option"),
+                    vec![O::TypeParameter(99)],
+                ))),
+            ],
+        );
 
-        insta::assert_display_snapshot!(
+        insta::assert_snapshot!(
             sig.instantiate(&[T::U64, T::Bool]).unwrap_err(),
             @"Type Parameter 99 out of bounds (2)"
         );
@@ -2069,19 +2494,34 @@ mod tests {
         use Ability as A;
         use AbilitySet as S;
 
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
-        let a1 = resolver.abilities(type_("0xd0::m::T<u32, u64>")).await.unwrap();
+        let a1 = resolver
+            .abilities(type_("0xd0::m::T<u32, u64>"))
+            .await
+            .unwrap();
         assert_eq!(a1, S::EMPTY | A::Copy | A::Drop | A::Store);
 
-        let a2 = resolver.abilities(type_("0xd0::m::T<0xd0::m::S, u64>")).await.unwrap();
+        let a2 = resolver
+            .abilities(type_("0xd0::m::T<0xd0::m::S, u64>"))
+            .await
+            .unwrap();
         assert_eq!(a2, S::EMPTY | A::Drop | A::Store);
 
-        let a3 = resolver.abilities(type_("0xd0::m::T<0xd0::m::R, 0xd0::m::S>")).await.unwrap();
+        let a3 = resolver
+            .abilities(type_("0xd0::m::T<0xd0::m::R, 0xd0::m::S>"))
+            .await
+            .unwrap();
         assert_eq!(a3, S::EMPTY | A::Drop);
 
-        let a4 = resolver.abilities(type_("0xd0::m::T<0xd0::m::Q, 0xd0::m::R>")).await.unwrap();
+        let a4 = resolver
+            .abilities(type_("0xd0::m::T<0xd0::m::Q, 0xd0::m::R>"))
+            .await
+            .unwrap();
         assert_eq!(a4, S::EMPTY);
     }
 
@@ -2091,10 +2531,16 @@ mod tests {
         use Ability as A;
         use AbilitySet as S;
 
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
-        let a1 = resolver.abilities(type_("0xd0::m::T<0xd0::m::T<0xd0::m::R, u32>, u64>")).await.unwrap();
+        let a1 = resolver
+            .abilities(type_("0xd0::m::T<0xd0::m::T<0xd0::m::R, u32>, u64>"))
+            .await
+            .unwrap();
         assert_eq!(a1, S::EMPTY | A::Copy | A::Drop);
     }
 
@@ -2105,22 +2551,37 @@ mod tests {
         use Ability as A;
         use AbilitySet as S;
 
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
-        let a1 = resolver.abilities(type_("0xd0::m::O<u32, u64>")).await.unwrap();
+        let a1 = resolver
+            .abilities(type_("0xd0::m::O<u32, u64>"))
+            .await
+            .unwrap();
         assert_eq!(a1, S::EMPTY | A::Key | A::Store);
 
-        let a2 = resolver.abilities(type_("0xd0::m::O<0xd0::m::S, u64>")).await.unwrap();
+        let a2 = resolver
+            .abilities(type_("0xd0::m::O<0xd0::m::S, u64>"))
+            .await
+            .unwrap();
         assert_eq!(a2, S::EMPTY | A::Key | A::Store);
 
         // We would not be able to get an instance of this type, but in case the question is asked,
         // its abilities would be empty.
-        let a3 = resolver.abilities(type_("0xd0::m::O<0xd0::m::R, u64>")).await.unwrap();
+        let a3 = resolver
+            .abilities(type_("0xd0::m::O<0xd0::m::R, u64>"))
+            .await
+            .unwrap();
         assert_eq!(a3, S::EMPTY);
 
         // Key does not propagate up by itself, so this type is also uninhabitable.
-        let a4 = resolver.abilities(type_("0xd0::m::O<0xd0::m::P, u32>")).await.unwrap();
+        let a4 = resolver
+            .abilities(type_("0xd0::m::O<0xd0::m::P, u32>"))
+            .await
+            .unwrap();
         assert_eq!(a4, S::EMPTY);
     }
 
@@ -2130,24 +2591,39 @@ mod tests {
         use Ability as A;
         use AbilitySet as S;
 
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
-        let a1 = resolver.abilities(type_("0xd0::m::O<u32, 0xd0::m::R>")).await.unwrap();
+        let a1 = resolver
+            .abilities(type_("0xd0::m::O<u32, 0xd0::m::R>"))
+            .await
+            .unwrap();
         assert_eq!(a1, S::EMPTY | A::Key | A::Store);
     }
 
     #[tokio::test]
     async fn test_err_ability_arity() {
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
         let resolver = Resolver::new(cache);
 
         // Too few
-        let err = resolver.abilities(type_("0xd0::m::T<u8>")).await.unwrap_err();
+        let err = resolver
+            .abilities(type_("0xd0::m::T<u8>"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::TypeArityMismatch(2, 1)));
 
         // Too many
-        let err = resolver.abilities(type_("0xd0::m::T<u8, u16, u32>")).await.unwrap_err();
+        let err = resolver
+            .abilities(type_("0xd0::m::T<u8, u16, u32>"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::TypeArityMismatch(2, 3)));
     }
 
@@ -2162,16 +2638,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_err_too_many_type_params() {
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 1,
-            max_type_argument_depth: 100,
-            max_type_nodes: 100,
-            max_move_value_depth: 100,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 1,
+                max_type_argument_depth: 100,
+                max_type_nodes: 100,
+                max_move_value_depth: 100,
+            },
+        );
 
-        let err = resolver.abilities(type_("0xd0::m::O<u32, u64>")).await.unwrap_err();
+        let err = resolver
+            .abilities(type_("0xd0::m::O<u32, u64>"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::TooManyTypeParams(1, 2)));
     }
 
@@ -2180,22 +2665,34 @@ mod tests {
         use Ability as A;
         use AbilitySet as S;
 
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 100,
-            max_type_argument_depth: 100,
-            max_type_nodes: 2,
-            max_move_value_depth: 100,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 100,
+                max_type_argument_depth: 100,
+                max_type_nodes: 2,
+                max_move_value_depth: 100,
+            },
+        );
 
         // This request is OK, because one of O's type parameters is phantom, so we can avoid
         // loading its definition.
-        let a1 = resolver.abilities(type_("0xd0::m::O<0xd0::m::S, 0xd0::m::Q>")).await.unwrap();
+        let a1 = resolver
+            .abilities(type_("0xd0::m::O<0xd0::m::S, 0xd0::m::Q>"))
+            .await
+            .unwrap();
         assert_eq!(a1, S::EMPTY | A::Key | A::Store);
 
         // But this request will hit the limit
-        let err = resolver.abilities(type_("0xd0::m::T<0xd0::m::P, 0xd0::m::Q>")).await.unwrap_err();
+        let err = resolver
+            .abilities(type_("0xd0::m::T<0xd0::m::P, 0xd0::m::Q>"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::TooManyTypeNodes(2, _)));
     }
 
@@ -2204,23 +2701,36 @@ mod tests {
         use Ability as A;
         use AbilitySet as S;
 
-        let (_, cache) = package_cache([(1, build_package("sui"), sui_types()), (1, build_package("d0"), d0_types())]);
+        let (_, cache) = package_cache([
+            (1, build_package("sui"), sui_types()),
+            (1, build_package("d0"), d0_types()),
+        ]);
 
-        let resolver = Resolver::new_with_limits(cache, Limits {
-            max_type_argument_width: 100,
-            max_type_argument_depth: 2,
-            max_type_nodes: 100,
-            max_move_value_depth: 100,
-        });
+        let resolver = Resolver::new_with_limits(
+            cache,
+            Limits {
+                max_type_argument_width: 100,
+                max_type_argument_depth: 2,
+                max_type_nodes: 100,
+                max_move_value_depth: 100,
+            },
+        );
 
         // This request is OK, because one of O's type parameters is phantom, so we can avoid
         // loading its definition.
-        let a1 =
-            resolver.abilities(type_("0xd0::m::O<0xd0::m::S, 0xd0::m::T<vector<u32>, vector<u64>>>")).await.unwrap();
+        let a1 = resolver
+            .abilities(type_(
+                "0xd0::m::O<0xd0::m::S, 0xd0::m::T<vector<u32>, vector<u64>>>",
+            ))
+            .await
+            .unwrap();
         assert_eq!(a1, S::EMPTY | A::Key | A::Store);
 
         // But this request will hit the limit
-        let err = resolver.abilities(type_("vector<0xd0::m::T<0xd0::m::O<u64, u32>, u16>>")).await.unwrap_err();
+        let err = resolver
+            .abilities(type_("vector<0xd0::m::T<0xd0::m::O<u64, u32>, u16>>"))
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::TypeParamNesting(2, _)));
     }
 
@@ -2361,6 +2871,7 @@ mod tests {
 
         insta::assert_snapshot!(output);
     }
+
     #[tokio::test]
     async fn test_pure_input_layouts_conflicting() {
         use CallArg as I;
@@ -2400,10 +2911,19 @@ mod tests {
             ],
         };
 
-        insta::assert_display_snapshot!(
-            resolver.pure_input_layouts(&ptb).await.unwrap_err(),
-            @"Conflicting types for input 3: u64 and u32"
-        );
+        let inputs = resolver.pure_input_layouts(&ptb).await.unwrap();
+
+        // Make the output format a little nicer for the snapshot
+        let mut output = String::new();
+        for input in inputs {
+            if let Some(layout) = input {
+                output += &format!("{layout:#}\n");
+            } else {
+                output += "???\n";
+            }
+        }
+
+        insta::assert_snapshot!(output);
     }
 
     /***** Test Helpers ***************************************************************************/
@@ -2484,7 +3004,11 @@ mod tests {
     }
 
     fn std_types() -> TypeOriginTable {
-        vec![datakey("0x1", "ascii", "String"), datakey("0x1", "option", "Option"), datakey("0x1", "string", "String")]
+        vec![
+            datakey("0x1", "ascii", "String"),
+            datakey("0x1", "option", "Option"),
+            datakey("0x1", "string", "String"),
+        ]
     }
 
     /// Build an in-memory package cache from locally compiled packages.  Assumes that all packages
@@ -2492,10 +3016,15 @@ mod tests {
     /// have a 'published-at' address), and their transitive dependencies are also in `packages`.
     fn package_cache(
         packages: impl IntoIterator<Item = (u64, CompiledPackage, TypeOriginTable)>,
-    ) -> (Arc<RwLock<InnerStore>>, PackageStoreWithLruCache<InMemoryPackageStore>) {
+    ) -> (
+        Arc<RwLock<InnerStore>>,
+        PackageStoreWithLruCache<InMemoryPackageStore>,
+    ) {
         let packages_by_storage_id: BTreeMap<AccountAddress, _> = packages
             .into_iter()
-            .map(|(version, package, origins)| (package_storage_id(&package), (version, package, origins)))
+            .map(|(version, package, origins)| {
+                (package_storage_id(&package), (version, package, origins))
+            })
             .collect();
 
         let packages = packages_by_storage_id
@@ -2523,14 +3052,24 @@ mod tests {
             })
             .collect();
 
-        let inner = Arc::new(RwLock::new(InnerStore { packages, fetches: 0 }));
+        let inner = Arc::new(RwLock::new(InnerStore {
+            packages,
+            fetches: 0,
+        }));
 
-        let store = InMemoryPackageStore { inner: inner.clone() };
+        let store = InMemoryPackageStore {
+            inner: inner.clone(),
+        };
 
         (inner, PackageStoreWithLruCache::new(store))
     }
 
-    fn cached_package(version: u64, linkage: Linkage, package: &CompiledPackage, origins: &TypeOriginTable) -> Package {
+    fn cached_package(
+        version: u64,
+        linkage: Linkage,
+        package: &CompiledPackage,
+        origins: &TypeOriginTable,
+    ) -> Package {
         let storage_id = package_storage_id(package);
         let runtime_id = package_runtime_id(package);
         let version = SequenceNumber::from_u64(version);
@@ -2555,17 +3094,29 @@ mod tests {
             modules.insert(name.to_string(), module);
         }
 
-        Package { storage_id, runtime_id, linkage, version, modules }
+        Package {
+            storage_id,
+            runtime_id,
+            linkage,
+            version,
+            modules,
+        }
     }
 
     fn package_storage_id(package: &CompiledPackage) -> AccountAddress {
         AccountAddress::from(*package.published_at.as_ref().unwrap_or_else(|_| {
-            panic!("Package {} doesn't have published-at set", package.package.compiled_package_info.package_name,)
+            panic!(
+                "Package {} doesn't have published-at set",
+                package.package.compiled_package_info.package_name,
+            )
         }))
     }
 
     fn package_runtime_id(package: &CompiledPackage) -> AccountAddress {
-        *package.published_root_module().expect("No compiled module").address()
+        *package
+            .published_root_module()
+            .expect("No compiled module")
+            .address()
     }
 
     fn build_package(dir: &str) -> CompiledPackage {
@@ -2579,7 +3130,11 @@ mod tests {
     }
 
     fn datakey(a: &str, m: &'static str, n: &'static str) -> DatatypeKey {
-        DatatypeKey { package: addr(a), module: m.into(), name: n.into() }
+        DatatypeKey {
+            package: addr(a),
+            module: m.into(),
+            name: n.into(),
+        }
     }
 
     fn type_(t: &str) -> TypeTag {
@@ -2607,7 +3162,12 @@ mod tests {
         async fn fetch(&self, id: AccountAddress) -> Result<Arc<Package>> {
             let mut inner = self.inner.as_ref().write().unwrap();
             inner.fetches += 1;
-            inner.packages.get(&id).cloned().ok_or_else(|| Error::PackageNotFound(id)).map(Arc::new)
+            inner
+                .packages
+                .get(&id)
+                .cloned()
+                .ok_or_else(|| Error::PackageNotFound(id))
+                .map(Arc::new)
         }
     }
 

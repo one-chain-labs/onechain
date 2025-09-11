@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_nested_struct_field,
-    get_object_id,
+    get_nested_struct_field, get_object_id,
     object_runtime::{object_store::ObjectResult, ObjectRuntime},
     NativesCostTable,
 };
@@ -16,7 +15,8 @@ use move_core_types::{
     runtime_value as R,
     vm_status::StatusCode,
 };
-use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
+use move_vm_runtime::native_charge_gas_early_exit;
+use move_vm_runtime::native_functions::NativeContext;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
@@ -35,12 +35,20 @@ const E_BCS_SERIALIZATION_FAILURE: u64 = 3;
 macro_rules! get_or_fetch_object {
     ($context:ident, $ty_args:ident, $parent:ident, $child_id:ident, $ty_cost_per_byte:expr) => {{
         let child_ty = $ty_args.pop().unwrap();
-        native_charge_gas_early_exit!($context, $ty_cost_per_byte * u64::from(child_ty.size()).into());
+        native_charge_gas_early_exit!(
+            $context,
+            $ty_cost_per_byte * u64::from(child_ty.size()).into()
+        );
 
         assert!($ty_args.is_empty());
         let (tag, layout, annotated_layout) = match get_tag_and_layouts($context, &child_ty)? {
             Some(res) => res,
-            None => return Ok(NativeResult::err($context.gas_used(), E_BCS_SERIALIZATION_FAILURE)),
+            None => {
+                return Ok(NativeResult::err(
+                    $context.gas_used(),
+                    E_BCS_SERIALIZATION_FAILURE,
+                ))
+            }
         };
 
         let object_runtime: &mut ObjectRuntime = $context.extensions_mut().get_mut();
@@ -71,7 +79,7 @@ pub struct DynamicFieldHashTypeAndKeyCostParams {
  *              + dynamic_field_hash_type_and_key_value_cost_per_byte * size_of(k)  | covers cost of operating on the value `k`
  *              + dynamic_field_hash_type_and_key_type_tag_cost_per_byte * size_of(type_tag(k))    | covers cost of operating on the type tag of `K`
  **************************************************************************************************/
-#[instrument(level = "trace", skip_all, err)]
+#[instrument(level = "trace", skip_all)]
 pub fn hash_type_and_key(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
@@ -80,8 +88,11 @@ pub fn hash_type_and_key(
     assert_eq!(ty_args.len(), 1);
     assert_eq!(args.len(), 2);
 
-    let dynamic_field_hash_type_and_key_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().dynamic_field_hash_type_and_key_cost_params.clone();
+    let dynamic_field_hash_type_and_key_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .dynamic_field_hash_type_and_key_cost_params
+        .clone();
 
     // Charge base fee
     native_charge_gas_early_exit!(
@@ -98,9 +109,11 @@ pub fn hash_type_and_key(
     let k_value_size = u64::from(k.legacy_size());
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_hash_type_and_key_cost_params.dynamic_field_hash_type_and_key_type_cost_per_byte
+        dynamic_field_hash_type_and_key_cost_params
+            .dynamic_field_hash_type_and_key_type_cost_per_byte
             * k_ty_size.into()
-            + dynamic_field_hash_type_and_key_cost_params.dynamic_field_hash_type_and_key_value_cost_per_byte
+            + dynamic_field_hash_type_and_key_cost_params
+                .dynamic_field_hash_type_and_key_value_cost_per_byte
                 * k_value_size.into()
     );
 
@@ -109,7 +122,8 @@ pub fn hash_type_and_key(
 
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_hash_type_and_key_cost_params.dynamic_field_hash_type_and_key_type_tag_cost_per_byte
+        dynamic_field_hash_type_and_key_cost_params
+            .dynamic_field_hash_type_and_key_type_tag_cost_per_byte
             * k_tag_size.into()
     );
 
@@ -146,7 +160,7 @@ pub struct DynamicFieldAddChildObjectCostParams {
  *              + dynamic_field_add_child_object_value_cost_per_byte * size_of(child)       | covers cost of operating on the value `child`
  *              + dynamic_field_add_child_object_struct_tag_cost_per_byte * size_of(struct)tag(Child))  | covers cost of operating on the struct tag of `Child`
  **************************************************************************************************/
-#[instrument(level = "trace", skip_all, err)]
+#[instrument(level = "trace", skip_all)]
 pub fn add_child_object(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
@@ -155,8 +169,11 @@ pub fn add_child_object(
     assert!(ty_args.len() == 1);
     assert!(args.len() == 2);
 
-    let dynamic_field_add_child_object_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().dynamic_field_add_child_object_cost_params.clone();
+    let dynamic_field_add_child_object_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .dynamic_field_add_child_object_cost_params
+        .clone();
 
     // Charge base fee
     native_charge_gas_early_exit!(
@@ -172,18 +189,24 @@ pub fn add_child_object(
     // ID extraction step
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_add_child_object_cost_params.dynamic_field_add_child_object_value_cost_per_byte
+        dynamic_field_add_child_object_cost_params
+            .dynamic_field_add_child_object_value_cost_per_byte
             * child_value_size.into()
     );
 
     // TODO remove this copy_value, which will require VM changes
-    let child_id = get_object_id(child.copy_value().unwrap()).unwrap().value_as::<AccountAddress>().unwrap().into();
+    let child_id = get_object_id(child.copy_value().unwrap())
+        .unwrap()
+        .value_as::<AccountAddress>()
+        .unwrap()
+        .into();
     let child_ty = ty_args.pop().unwrap();
     let child_type_size = u64::from(child_ty.size());
 
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_add_child_object_cost_params.dynamic_field_add_child_object_type_cost_per_byte
+        dynamic_field_add_child_object_cost_params
+            .dynamic_field_add_child_object_type_cost_per_byte
             * child_type_size.into()
     );
 
@@ -191,20 +214,29 @@ pub fn add_child_object(
     let tag = match context.type_to_type_tag(&child_ty)? {
         TypeTag::Struct(s) => *s,
         _ => {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Sui verifier guarantees this is a struct".to_string()))
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Sui verifier guarantees this is a struct".to_string()),
+            )
         }
     };
 
     let struct_tag_size = u64::from(tag.abstract_size_for_gas_metering());
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_add_child_object_cost_params.dynamic_field_add_child_object_struct_tag_cost_per_byte
+        dynamic_field_add_child_object_cost_params
+            .dynamic_field_add_child_object_struct_tag_cost_per_byte
             * struct_tag_size.into()
     );
 
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
-    object_runtime.add_child_object(parent, child_id, &child_ty, MoveObjectType::from(tag), child)?;
+    object_runtime.add_child_object(
+        parent,
+        child_id,
+        &child_ty,
+        MoveObjectType::from(tag),
+        child,
+    )?;
     Ok(NativeResult::ok(context.gas_used(), smallvec![]))
 }
 
@@ -224,7 +256,7 @@ pub struct DynamicFieldBorrowChildObjectCostParams {
  *              + dynamic_field_borrow_child_object_child_ref_cost_per_byte  * size_of(&Child)  | covers cost of fetching and returning `&Child`
  *              + dynamic_field_borrow_child_object_type_cost_per_byte  * size_of(Child)        | covers cost of operating on type `Child`
  **************************************************************************************************/
-#[instrument(level = "trace", skip_all, err)]
+#[instrument(level = "trace", skip_all)]
 pub fn borrow_child_object(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
@@ -233,8 +265,11 @@ pub fn borrow_child_object(
     assert!(ty_args.len() == 1);
     assert!(args.len() == 2);
 
-    let dynamic_field_borrow_child_object_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().dynamic_field_borrow_child_object_cost_params.clone();
+    let dynamic_field_borrow_child_object_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .dynamic_field_borrow_child_object_cost_params
+        .clone();
     native_charge_gas_early_exit!(
         context,
         dynamic_field_borrow_child_object_cost_params.dynamic_field_borrow_child_object_cost_base
@@ -244,7 +279,11 @@ pub fn borrow_child_object(
 
     let parent_uid = pop_arg!(args, StructRef).read_ref().unwrap();
     // UID { id: ID { bytes: address } }
-    let parent = get_nested_struct_field(parent_uid, &[0, 0]).unwrap().value_as::<AccountAddress>().unwrap().into();
+    let parent = get_nested_struct_field(parent_uid, &[0, 0])
+        .unwrap()
+        .value_as::<AccountAddress>()
+        .unwrap()
+        .into();
 
     assert!(args.is_empty());
     let global_value_result = get_or_fetch_object!(
@@ -252,10 +291,13 @@ pub fn borrow_child_object(
         ty_args,
         parent,
         child_id,
-        dynamic_field_borrow_child_object_cost_params.dynamic_field_borrow_child_object_type_cost_per_byte
+        dynamic_field_borrow_child_object_cost_params
+            .dynamic_field_borrow_child_object_type_cost_per_byte
     );
     let global_value = match global_value_result {
-        ObjectResult::MismatchedType => return Ok(NativeResult::err(context.gas_used(), E_FIELD_TYPE_MISMATCH)),
+        ObjectResult::MismatchedType => {
+            return Ok(NativeResult::err(context.gas_used(), E_FIELD_TYPE_MISMATCH))
+        }
         ObjectResult::Loaded(gv) => gv,
     };
     if !global_value.exists()? {
@@ -267,7 +309,8 @@ pub fn borrow_child_object(
 
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_borrow_child_object_cost_params.dynamic_field_borrow_child_object_child_ref_cost_per_byte
+        dynamic_field_borrow_child_object_cost_params
+            .dynamic_field_borrow_child_object_child_ref_cost_per_byte
             * u64::from(child_ref.legacy_size()).into()
     );
 
@@ -289,7 +332,7 @@ pub struct DynamicFieldRemoveChildObjectCostParams {
  *              + dynamic_field_remove_child_object_type_cost_per_byte * size_of(Child)      | covers cost of operating on type `Child`
  *              + dynamic_field_remove_child_object_child_cost_per_byte  * size_of(child)     | covers cost of fetching and returning value of type `Child`
  **************************************************************************************************/
-#[instrument(level = "trace", skip_all, err)]
+#[instrument(level = "trace", skip_all)]
 pub fn remove_child_object(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
@@ -298,8 +341,11 @@ pub fn remove_child_object(
     assert!(ty_args.len() == 1);
     assert!(args.len() == 2);
 
-    let dynamic_field_remove_child_object_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().dynamic_field_remove_child_object_cost_params.clone();
+    let dynamic_field_remove_child_object_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .dynamic_field_remove_child_object_cost_params
+        .clone();
     native_charge_gas_early_exit!(
         context,
         dynamic_field_remove_child_object_cost_params.dynamic_field_remove_child_object_cost_base
@@ -313,10 +359,13 @@ pub fn remove_child_object(
         ty_args,
         parent,
         child_id,
-        dynamic_field_remove_child_object_cost_params.dynamic_field_remove_child_object_type_cost_per_byte
+        dynamic_field_remove_child_object_cost_params
+            .dynamic_field_remove_child_object_type_cost_per_byte
     );
     let global_value = match global_value_result {
-        ObjectResult::MismatchedType => return Ok(NativeResult::err(context.gas_used(), E_FIELD_TYPE_MISMATCH)),
+        ObjectResult::MismatchedType => {
+            return Ok(NativeResult::err(context.gas_used(), E_FIELD_TYPE_MISMATCH))
+        }
         ObjectResult::Loaded(gv) => gv,
     };
     if !global_value.exists()? {
@@ -328,7 +377,8 @@ pub fn remove_child_object(
 
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_remove_child_object_cost_params.dynamic_field_remove_child_object_child_cost_per_byte
+        dynamic_field_remove_child_object_cost_params
+            .dynamic_field_remove_child_object_child_cost_per_byte
             * u64::from(child.legacy_size()).into()
     );
 
@@ -345,7 +395,7 @@ pub struct DynamicFieldHasChildObjectCostParams {
  * Implementation of the Move native function `has_child_object(parent: address, id: address): bool`
  *   gas cost: dynamic_field_has_child_object_cost_base                    | covers various fixed costs in the oper
  **************************************************************************************************/
-#[instrument(level = "trace", skip_all, err)]
+#[instrument(level = "trace", skip_all)]
 pub fn has_child_object(
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -354,8 +404,11 @@ pub fn has_child_object(
     assert!(ty_args.is_empty());
     assert!(args.len() == 2);
 
-    let dynamic_field_has_child_object_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().dynamic_field_has_child_object_cost_params.clone();
+    let dynamic_field_has_child_object_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .dynamic_field_has_child_object_cost_params
+        .clone();
     native_charge_gas_early_exit!(
         context,
         dynamic_field_has_child_object_cost_params.dynamic_field_has_child_object_cost_base
@@ -365,7 +418,10 @@ pub fn has_child_object(
     let parent = pop_arg!(args, AccountAddress).into();
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     let has_child = object_runtime.child_object_exists(parent, child_id)?;
-    Ok(NativeResult::ok(context.gas_used(), smallvec![Value::bool(has_child)]))
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![Value::bool(has_child)],
+    ))
 }
 
 #[derive(Clone)]
@@ -381,7 +437,7 @@ pub struct DynamicFieldHasChildObjectWithTyCostParams {
  *              + dynamic_field_has_child_object_with_ty_type_cost_per_byte * size_of(Child)        | covers cost of operating on type `Child`
  *              + dynamic_field_has_child_object_with_ty_type_tag_cost_per_byte * size_of(Child)    | covers cost of fetching and returning value of type tag for `Child`
  **************************************************************************************************/
-#[instrument(level = "trace", skip_all, err)]
+#[instrument(level = "trace", skip_all)]
 pub fn has_child_object_with_ty(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
@@ -390,11 +446,15 @@ pub fn has_child_object_with_ty(
     assert!(ty_args.len() == 1);
     assert!(args.len() == 2);
 
-    let dynamic_field_has_child_object_with_ty_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().dynamic_field_has_child_object_with_ty_cost_params.clone();
+    let dynamic_field_has_child_object_with_ty_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .dynamic_field_has_child_object_with_ty_cost_params
+        .clone();
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_has_child_object_with_ty_cost_params.dynamic_field_has_child_object_with_ty_cost_base
+        dynamic_field_has_child_object_with_ty_cost_params
+            .dynamic_field_has_child_object_with_ty_cost_base
     );
 
     let child_id = pop_arg!(args, AccountAddress).into();
@@ -404,27 +464,38 @@ pub fn has_child_object_with_ty(
 
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_has_child_object_with_ty_cost_params.dynamic_field_has_child_object_with_ty_type_cost_per_byte
+        dynamic_field_has_child_object_with_ty_cost_params
+            .dynamic_field_has_child_object_with_ty_type_cost_per_byte
             * u64::from(ty.size()).into()
     );
 
     let tag: StructTag = match context.type_to_type_tag(&ty)? {
         TypeTag::Struct(s) => *s,
         _ => {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Sui verifier guarantees this is a struct".to_string()))
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Sui verifier guarantees this is a struct".to_string()),
+            )
         }
     };
 
     native_charge_gas_early_exit!(
         context,
-        dynamic_field_has_child_object_with_ty_cost_params.dynamic_field_has_child_object_with_ty_type_tag_cost_per_byte
+        dynamic_field_has_child_object_with_ty_cost_params
+            .dynamic_field_has_child_object_with_ty_type_tag_cost_per_byte
             * u64::from(tag.abstract_size_for_gas_metering()).into()
     );
 
     let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
-    let has_child = object_runtime.child_object_exists_and_has_type(parent, child_id, &MoveObjectType::from(tag))?;
-    Ok(NativeResult::ok(context.gas_used(), smallvec![Value::bool(has_child)]))
+    let has_child = object_runtime.child_object_exists_and_has_type(
+        parent,
+        child_id,
+        &MoveObjectType::from(tag),
+    )?;
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![Value::bool(has_child)],
+    ))
 }
 
 fn get_tag_and_layouts(
@@ -434,8 +505,10 @@ fn get_tag_and_layouts(
     let tag = match context.type_to_type_tag(ty)? {
         TypeTag::Struct(s) => s,
         _ => {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Sui verifier guarantees this is a struct".to_string()))
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Sui verifier guarantees this is a struct".to_string()),
+            )
         }
     };
     let Some(layout) = context.type_to_type_layout(ty)? else {

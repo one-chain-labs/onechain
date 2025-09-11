@@ -8,6 +8,8 @@ import * as path from 'path';
 
 export const MOVE_CONF_NAME = 'move';
 export const LINT_OPT = 'lint';
+export const AUTO_IMPORTS_OPT = 'auto-imports';
+export const FORCE_BUNDLED_OPT = 'force-bundled';
 export const TYPE_HINTS_OPT = 'inlay-hints.type';
 export const PARAM_HINTS_OPT = 'inlay-hints.param';
 export const SUI_PATH_OPT = 'sui.path';
@@ -33,7 +35,7 @@ export class Configuration {
 
     constructor() {
         this.configuration = vscode.workspace.getConfiguration(MOVE_CONF_NAME);
-        this.defaultServerDir = vscode.Uri.joinPath(vscode.Uri.file(os.homedir()), '.one', 'bin');
+        this.defaultServerDir = vscode.Uri.joinPath(vscode.Uri.file(os.homedir()), '.sui', 'bin');
         if (process.platform === 'win32') {
             this.serverName = 'move-analyzer.exe';
         } else {
@@ -74,12 +76,20 @@ export class Configuration {
         return this.configuration.get(LINT_OPT) ?? 'default';
     }
 
+    get autoImports(): boolean {
+        return this.configuration.get(AUTO_IMPORTS_OPT) ?? true;
+    }
+
+    get forceBundled(): boolean {
+        return this.configuration.get(FORCE_BUNDLED_OPT) ?? false;
+    }
+
     get inlayHintsForType(): boolean {
-        return this.configuration.get(TYPE_HINTS_OPT) ?? false;
+        return this.configuration.get(TYPE_HINTS_OPT) ?? true;
     }
 
     get inlayHintsForParam(): boolean {
-        return this.configuration.get(PARAM_HINTS_OPT) ?? false;
+        return this.configuration.get(PARAM_HINTS_OPT) ?? true;
     }
 
 

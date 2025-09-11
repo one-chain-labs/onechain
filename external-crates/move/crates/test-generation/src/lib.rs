@@ -15,12 +15,14 @@ pub mod transitions;
 
 use crate::config::{Args, EXECUTE_UNVERIFIED_MODULE, RUN_ON_VM};
 use bytecode_generator::BytecodeGenerator;
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 use getrandom::getrandom;
 use module_generation::generate_module;
 use move_binary_format::{
     errors::VMError,
-    file_format::{AbilitySet, CompiledModule, DatatypeHandleIndex, FunctionDefinitionIndex, SignatureToken},
+    file_format::{
+        AbilitySet, CompiledModule, DatatypeHandleIndex, FunctionDefinitionIndex, SignatureToken,
+    },
 };
 use move_bytecode_verifier::verify_module_unmetered;
 use move_compiler::Compiler;
@@ -36,7 +38,7 @@ use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::{fs, io::Write, panic, thread};
 use tracing::{debug, error, info};
 
@@ -50,11 +52,17 @@ fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
 
 static STORAGE_WITH_MOVE_STDLIB: Lazy<InMemoryStorage> = Lazy::new(|| {
     let mut storage = InMemoryStorage::new();
-    let (_, compiled_units) =
-        Compiler::from_files(None, move_stdlib::move_stdlib_files(), vec![], move_stdlib::move_stdlib_named_addresses())
-            .build_and_report()
-            .unwrap();
-    let compiled_modules = compiled_units.into_iter().map(|annot_module| annot_module.named_module.module);
+    let (_, compiled_units) = Compiler::from_files(
+        None,
+        move_stdlib::source_files(),
+        vec![],
+        move_stdlib::named_addresses(),
+    )
+    .build_and_report()
+    .unwrap();
+    let compiled_modules = compiled_units
+        .into_iter()
+        .map(|annot_module| annot_module.named_module.module);
     for module in compiled_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
@@ -77,7 +85,9 @@ fn run_vm(module: CompiledModule) -> Result<(), VMError> {
         .0
         .iter()
         .map(|sig_tok| match sig_tok {
-            SignatureToken::Address => MoveValue::Address(AccountAddress::ZERO).simple_serialize().unwrap(),
+            SignatureToken::Address => MoveValue::Address(AccountAddress::ZERO)
+                .simple_serialize()
+                .unwrap(),
             SignatureToken::U64 => MoveValue::U64(0).simple_serialize().unwrap(),
             SignatureToken::Bool => MoveValue::Bool(true).simple_serialize().unwrap(),
             SignatureToken::Vector(inner_tok) if **inner_tok == SignatureToken::U8 => {
@@ -98,7 +108,13 @@ fn run_vm(module: CompiledModule) -> Result<(), VMError> {
         })
         .collect();
 
-    execute_function_in_module(module, entry_idx, vec![], main_args, &*STORAGE_WITH_MOVE_STDLIB)
+    execute_function_in_module(
+        module,
+        entry_idx,
+        vec![],
+        main_args,
+        &*STORAGE_WITH_MOVE_STDLIB,
+    )
 }
 
 /// Execute the first function in a module
@@ -126,13 +142,25 @@ fn execute_function_in_module(
         let mut changeset = ChangeSet::new();
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        changeset.add_module_op(module_id.clone(), Op::New(blob)).unwrap();
+        changeset
+            .add_module_op(module_id.clone(), Op::New(blob))
+            .unwrap();
         let delta_storage = DeltaStorage::new(storage, &changeset);
         let mut sess = vm.new_session(&delta_storage);
 
-        let ty_args = ty_arg_tags.into_iter().map(|tag| sess.load_type(&tag)).collect::<Result<Vec<_>, _>>()?;
+        let ty_args = ty_arg_tags
+            .into_iter()
+            .map(|tag| sess.load_type(&tag))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        sess.execute_function_bypass_visibility(&module_id, entry_name, ty_args, args, &mut UnmeteredGasMeter)?;
+        sess.execute_function_bypass_visibility(
+            &module_id,
+            entry_name,
+            ty_args,
+            args,
+            &mut UnmeteredGasMeter,
+            None,
+        )?;
 
         Ok(())
     }
@@ -144,11 +172,14 @@ fn output_error_case(module: CompiledModule, output_path: Option<String>, case_i
     match output_path {
         Some(path) => {
             let mut out = vec![];
-            module.serialize(&mut out).expect("Unable to serialize module");
+            module
+                .serialize(&mut out)
+                .expect("Unable to serialize module");
             let output_file = format!("{}/case{}_{}.module", path, tid, case_id);
             let mut f = fs::File::create(output_file)
                 .unwrap_or_else(|err| panic!("Unable to open output file {}: {}", &path, err));
-            f.write_all(&out).unwrap_or_else(|err| panic!("Unable to write to output file {}: {}", &path, err));
+            f.write_all(&out)
+                .unwrap_or_else(|err| panic!("Unable to write to output file {}: {}", &path, err));
         }
         None => {
             debug!("{:#?}", module);
@@ -269,7 +300,7 @@ pub fn bytecode_generation(
             }
             Err(e) => {
                 error!("{}", e);
-                let uid = rng.gen::<u64>();
+                let uid = rng.r#gen::<u64>();
                 output_error_case(module.clone(), output_path.clone(), uid, tid);
                 if EXECUTE_UNVERIFIED_MODULE {
                     Some(module.clone())
@@ -293,7 +324,7 @@ pub fn bytecode_generation(
                         }
                         _ => {
                             error!("{}", e);
-                            let uid = rng.gen::<u64>();
+                            let uid = rng.r#gen::<u64>();
                             output_error_case(module.clone(), output_path.clone(), uid, tid);
                         }
                     },
@@ -311,8 +342,15 @@ pub fn bytecode_generation(
 /// Run generate_bytecode for the range passed in and test each generated module
 /// on the bytecode verifier.
 pub fn run_generation(args: Args) {
-    let num_threads = if let Some(num_threads) = args.num_threads { num_threads as usize } else { num_cpus::get() };
-    assert!(num_threads > 0, "Number of worker threads must be greater than 0");
+    let num_threads = if let Some(num_threads) = args.num_threads {
+        num_threads as usize
+    } else {
+        num_cpus::get()
+    };
+    assert!(
+        num_threads > 0,
+        "Number of worker threads must be greater than 0"
+    );
 
     let (sender, receiver) = bounded(num_threads);
     let (stats_sender, stats_receiver) = unbounded();
@@ -324,7 +362,9 @@ pub fn run_generation(args: Args) {
         let stats_sender = stats_sender.clone();
         let rng = StdRng::from_seed(seed);
         let output_path = args.output_path.clone();
-        threads.push(thread::spawn(move || bytecode_generation(output_path, tid as u64, rng, receiver, stats_sender)));
+        threads.push(thread::spawn(move || {
+            bytecode_generation(output_path, tid as u64, rng, receiver, stats_sender)
+        }));
     }
 
     // Need to drop this channel otherwise we'll get infinite blocking since the other channels are
@@ -333,7 +373,9 @@ pub fn run_generation(args: Args) {
     drop(stats_sender);
 
     let num_iters = args.num_iterations;
-    threads.push(thread::spawn(move || module_frame_generation(num_iters, seed, sender, stats_receiver)));
+    threads.push(thread::spawn(move || {
+        module_frame_generation(num_iters, seed, sender, stats_receiver)
+    }));
 
     for thread in threads {
         thread.join().unwrap();
@@ -357,7 +399,10 @@ pub(crate) fn substitute(token: &SignatureToken, tys: &[SignatureToken]) -> Sign
         Datatype(idx) => Datatype(*idx),
         DatatypeInstantiation(inst) => {
             let (idx, type_params) = &**inst;
-            DatatypeInstantiation(Box::new((*idx, type_params.iter().map(|ty| substitute(ty, tys)).collect())))
+            DatatypeInstantiation(Box::new((
+                *idx,
+                type_params.iter().map(|ty| substitute(ty, tys)).collect(),
+            )))
         }
         Reference(ty) => Reference(Box::new(substitute(ty, tys))),
         MutableReference(ty) => MutableReference(Box::new(substitute(ty, tys))),
@@ -370,7 +415,11 @@ pub(crate) fn substitute(token: &SignatureToken, tys: &[SignatureToken]) -> Sign
     }
 }
 
-pub fn abilities(module: &CompiledModule, ty: &SignatureToken, constraints: &[AbilitySet]) -> AbilitySet {
+pub fn abilities(
+    module: &CompiledModule,
+    ty: &SignatureToken,
+    constraints: &[AbilitySet],
+) -> AbilitySet {
     use SignatureToken::*;
 
     match ty {
@@ -379,10 +428,12 @@ pub fn abilities(module: &CompiledModule, ty: &SignatureToken, constraints: &[Ab
         Reference(_) | MutableReference(_) => AbilitySet::REFERENCES,
         Signer => AbilitySet::SIGNER,
         TypeParameter(idx) => constraints[*idx as usize],
-        Vector(ty) => {
-            AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![abilities(module, ty, constraints)])
-                .unwrap()
-        }
+        Vector(ty) => AbilitySet::polymorphic_abilities(
+            AbilitySet::VECTOR,
+            vec![false],
+            vec![abilities(module, ty, constraints)],
+        )
+        .unwrap(),
         Datatype(idx) => {
             let sh = module.datatype_handle_at(*idx);
             sh.abilities
@@ -391,14 +442,24 @@ pub fn abilities(module: &CompiledModule, ty: &SignatureToken, constraints: &[Ab
             let (idx, type_args) = &**inst;
             let sh = module.datatype_handle_at(*idx);
             let declared_abilities = sh.abilities;
-            let declared_phantom_parameters = sh.type_parameters.iter().map(|param| param.is_phantom);
-            let type_arguments = type_args.iter().map(|arg| abilities(module, arg, constraints));
-            AbilitySet::polymorphic_abilities(declared_abilities, declared_phantom_parameters, type_arguments).unwrap()
+            let declared_phantom_parameters =
+                sh.type_parameters.iter().map(|param| param.is_phantom);
+            let type_arguments = type_args
+                .iter()
+                .map(|arg| abilities(module, arg, constraints));
+            AbilitySet::polymorphic_abilities(
+                declared_abilities,
+                declared_phantom_parameters,
+                type_arguments,
+            )
+            .unwrap()
         }
     }
 }
 
-pub(crate) fn get_struct_handle_from_reference(reference_signature: &SignatureToken) -> Option<DatatypeHandleIndex> {
+pub(crate) fn get_struct_handle_from_reference(
+    reference_signature: &SignatureToken,
+) -> Option<DatatypeHandleIndex> {
     match reference_signature {
         SignatureToken::Reference(signature) => match &**signature {
             SignatureToken::Datatype(idx) => Some(*idx),
@@ -420,7 +481,9 @@ pub(crate) fn get_struct_handle_from_reference(reference_signature: &SignatureTo
     }
 }
 
-pub(crate) fn get_type_actuals_from_reference(token: &SignatureToken) -> Option<Vec<SignatureToken>> {
+pub(crate) fn get_type_actuals_from_reference(
+    token: &SignatureToken,
+) -> Option<Vec<SignatureToken>> {
     use SignatureToken::*;
 
     match token {

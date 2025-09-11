@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module a::test {
-    use one::random::{Random, RandomGenerator};
+    use sui::random::{Random, RandomGenerator};
     friend a::test2;
 
     entry fun basic_random(_r: &Random) {}
@@ -24,19 +24,19 @@ module a::test2 {
 
 #[test_only]
 module a::test3 {
-    use one::random::{Random, RandomGenerator};
+    use sui::random::{Random, RandomGenerator};
 
     public fun test_fn(_r: &Random, _rg: &RandomGenerator) {}
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }
 }
 
-module one::random {
-    use one::object::UID;
+module oct::random {
+    use sui::object::UID;
 
     struct Random has key { id: UID }
     struct RandomGenerator has drop {}

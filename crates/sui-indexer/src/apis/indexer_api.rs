@@ -2,43 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use async_trait::async_trait;
-use jsonrpsee::{
-    core::RpcResult,
-    types::{SubscriptionEmptyError, SubscriptionResult},
-    RpcModule,
-    SubscriptionSink,
-};
+use jsonrpsee::core::RpcResult;
+use jsonrpsee::core::SubscriptionResult;
+use jsonrpsee::{PendingSubscriptionSink, RpcModule};
 use tap::TapFallible;
 
-use sui_json_rpc::{
-    name_service::{Domain, NameRecord, NameServiceConfig, NameServiceError},
-    SuiRpcModule,
-};
+use sui_json_rpc::SuiRpcModule;
 use sui_json_rpc_api::{cap_page_limit, IndexerApiServer};
 use sui_json_rpc_types::{
-    DynamicFieldPage,
-    EventFilter,
-    EventPage,
-    ObjectsPage,
-    Page,
-    SuiObjectResponse,
-    SuiObjectResponseQuery,
-    SuiTransactionBlockResponseQuery,
-    TransactionBlocksPage,
+    DynamicFieldPage, EventFilter, EventPage, ObjectsPage, Page, SuiObjectResponse,
+    SuiObjectResponseQuery, SuiTransactionBlockResponseQuery, TransactionBlocksPage,
     TransactionFilter,
 };
+use sui_name_service::{Domain, NameRecord, NameServiceConfig, NameServiceError};
 use sui_open_rpc::Module;
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    digests::TransactionDigest,
-    dynamic_field::{DynamicFieldName, Field},
-    error::SuiObjectResponseError,
-    event::EventID,
-    object::ObjectRead,
-    TypeTag,
-};
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::digests::TransactionDigest;
+use sui_types::dynamic_field::{DynamicFieldName, Field};
+use sui_types::error::SuiObjectResponseError;
+use sui_types::event::EventID;
+use sui_types::object::ObjectRead;
+use sui_types::TypeTag;
 
-use crate::{indexer_reader::IndexerReader, IndexerError};
+use crate::indexer_reader::IndexerReader;
+use crate::IndexerError;
 
 pub(crate) struct IndexerApi {
     inner: IndexerReader,
@@ -47,7 +34,10 @@ pub(crate) struct IndexerApi {
 
 impl IndexerApi {
     pub fn new(inner: IndexerReader, name_service_config: NameServiceConfig) -> Self {
-        Self { inner, name_service_config }
+        Self {
+            inner,
+            name_service_config,
+        }
     }
 
     async fn get_owned_objects_internal(
@@ -59,11 +49,16 @@ impl IndexerApi {
     ) -> RpcResult<ObjectsPage> {
         let SuiObjectResponseQuery { filter, options } = query.unwrap_or_default();
         let options = options.unwrap_or_default();
-        let objects = self.inner.get_owned_objects(address, filter, cursor, limit + 1).await?;
+        let objects = self
+            .inner
+            .get_owned_objects(address, filter, cursor, limit + 1)
+            .await?;
 
         let mut object_futures = vec![];
         for object in objects {
-            object_futures.push(tokio::task::spawn(object.try_into_object_read(self.inner.package_resolver())));
+            object_futures.push(tokio::task::spawn(
+                object.try_into_object_read(self.inner.package_resolver()),
+            ));
         }
         let mut objects = futures::future::join_all(object_futures)
             .await
@@ -71,7 +66,7 @@ impl IndexerApi {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
                 tracing::error!("Error joining object read futures.");
-                jsonrpsee::core::Error::Custom(format!("Error joining object read futures. {}", e))
+                crate::errors::IndexerError::from(e)
             })?
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
@@ -82,35 +77,31 @@ impl IndexerApi {
         let next_cursor = objects.last().map(|o_read| o_read.object_id());
         let mut parallel_tasks = vec![];
         for o in objects {
-            let inner_clone = self.inner.clone();
             let options = options.clone();
             parallel_tasks.push(tokio::task::spawn(async move {
                 match o {
-                    ObjectRead::NotExists(id) => {
-                        Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::NotExists { object_id: id }))
-                    }
+                    ObjectRead::NotExists(id) => Ok(SuiObjectResponse::new_with_error(
+                        SuiObjectResponseError::NotExists { object_id: id },
+                    )),
                     ObjectRead::Exists(object_ref, o, layout) => {
                         if options.show_display {
-                            match inner_clone.get_display_fields(&o, &layout).await {
-                                Ok(rendered_fields) => Ok(SuiObjectResponse::new_with_data(
-                                    (object_ref, o, layout, options, Some(rendered_fields)).try_into()?,
-                                )),
-                                Err(e) => Ok(SuiObjectResponse::new(
-                                    Some((object_ref, o, layout, options, None).try_into()?),
-                                    Some(SuiObjectResponseError::DisplayError { error: e.to_string() }),
-                                )),
-                            }
+                            Err(IndexerError::NotSupportedError(
+                                "Display fields are not supported".to_owned(),
+                            )
+                            .into())
                         } else {
-                            Ok(SuiObjectResponse::new_with_data((object_ref, o, layout, options, None).try_into()?))
+                            Ok(SuiObjectResponse::new_with_data(
+                                (object_ref, o, layout, options, None).try_into()?,
+                            ))
                         }
                     }
-                    ObjectRead::Deleted((object_id, version, digest)) => {
-                        Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::Deleted {
+                    ObjectRead::Deleted((object_id, version, digest)) => Ok(
+                        SuiObjectResponse::new_with_error(SuiObjectResponseError::Deleted {
                             object_id,
                             version,
                             digest,
-                        }))
-                    }
+                        }),
+                    ),
                 }
             }));
         }
@@ -118,11 +109,17 @@ impl IndexerApi {
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e: tokio::task::JoinError| anyhow::anyhow!(e))?
+            .map_err(|e: tokio::task::JoinError| anyhow::anyhow!(e))
+            .map_err(IndexerError::from)?
             .into_iter()
-            .collect::<Result<Vec<_>, anyhow::Error>>()?;
+            .collect::<Result<Vec<_>, anyhow::Error>>()
+            .map_err(IndexerError::from)?;
 
-        Ok(Page { data, next_cursor, has_next_page })
+        Ok(Page {
+            data,
+            next_cursor,
+            has_next_page,
+        })
     }
 }
 
@@ -139,7 +136,8 @@ impl IndexerApiServer for IndexerApi {
         if limit == 0 {
             return Ok(ObjectsPage::empty());
         }
-        self.get_owned_objects_internal(address, query, cursor, limit).await
+        self.get_owned_objects_internal(address, query, cursor, limit)
+            .await
     }
 
     async fn query_transaction_blocks(
@@ -162,13 +160,16 @@ impl IndexerApiServer for IndexerApi {
                 limit + 1,
                 descending_order.unwrap_or(false),
             )
-            .await
-            .map_err(|e: IndexerError| anyhow::anyhow!(e))?;
+            .await?;
 
         let has_next_page = results.len() > limit;
         results.truncate(limit);
         let next_cursor = results.last().map(|o| o.digest);
-        Ok(Page { data: results, next_cursor, has_next_page })
+        Ok(Page {
+            data: results,
+            next_cursor,
+            has_next_page,
+        })
     }
 
     async fn query_events(
@@ -184,12 +185,19 @@ impl IndexerApiServer for IndexerApi {
             return Ok(EventPage::empty());
         }
         let descending_order = descending_order.unwrap_or(false);
-        let mut results = self.inner.query_events(query, cursor, limit + 1, descending_order).await?;
+        let mut results = self
+            .inner
+            .query_events(query, cursor, limit + 1, descending_order)
+            .await?;
 
         let has_next_page = results.len() > limit;
         results.truncate(limit);
         let next_cursor = results.last().map(|o| o.id);
-        Ok(Page { data: results, next_cursor, has_next_page })
+        Ok(Page {
+            data: results,
+            next_cursor,
+            has_next_page,
+        })
     }
 
     async fn get_dynamic_fields(
@@ -202,12 +210,19 @@ impl IndexerApiServer for IndexerApi {
         if limit == 0 {
             return Ok(DynamicFieldPage::empty());
         }
-        let mut results = self.inner.get_dynamic_fields(parent_object_id, cursor, limit + 1).await?;
+        let mut results = self
+            .inner
+            .get_dynamic_fields(parent_object_id, cursor, limit + 1)
+            .await?;
 
         let has_next_page = results.len() > limit;
         results.truncate(limit);
         let next_cursor = results.last().map(|o| o.object_id);
-        Ok(Page { data: results.into_iter().map(Into::into).collect(), next_cursor, has_next_page })
+        Ok(Page {
+            data: results.into_iter().map(Into::into).collect(),
+            next_cursor,
+            has_next_page,
+        })
     }
 
     async fn get_dynamic_field_object(
@@ -217,14 +232,23 @@ impl IndexerApiServer for IndexerApi {
     ) -> RpcResult<SuiObjectResponse> {
         let name_bcs_value = self.inner.bcs_name_from_dynamic_field_name(&name).await?;
         // Try as Dynamic Field
-        let id = sui_types::dynamic_field::derive_dynamic_field_id(parent_object_id, &name.type_, &name_bcs_value)
-            .expect("deriving dynamic field id can't fail");
+        let id = sui_types::dynamic_field::derive_dynamic_field_id(
+            parent_object_id,
+            &name.type_,
+            &name_bcs_value,
+        )
+        .expect("deriving dynamic field id can't fail");
 
         let options = sui_json_rpc_types::SuiObjectDataOptions::full_content();
         match self.inner.get_object_read(id).await? {
-            sui_types::object::ObjectRead::NotExists(_) | sui_types::object::ObjectRead::Deleted(_) => {}
+            sui_types::object::ObjectRead::NotExists(_)
+            | sui_types::object::ObjectRead::Deleted(_) => {}
             sui_types::object::ObjectRead::Exists(object_ref, o, layout) => {
-                return Ok(SuiObjectResponse::new_with_data((object_ref, o, layout, options, None).try_into()?));
+                return Ok(SuiObjectResponse::new_with_data(
+                    (object_ref, o, layout, options, None)
+                        .try_into()
+                        .map_err(IndexerError::from)?,
+                ));
             }
         }
 
@@ -239,23 +263,36 @@ impl IndexerApiServer for IndexerApi {
         )
         .expect("deriving dynamic field id can't fail");
         match self.inner.get_object_read(dynamic_object_field_id).await? {
-            sui_types::object::ObjectRead::NotExists(_) | sui_types::object::ObjectRead::Deleted(_) => {}
+            sui_types::object::ObjectRead::NotExists(_)
+            | sui_types::object::ObjectRead::Deleted(_) => {}
             sui_types::object::ObjectRead::Exists(object_ref, o, layout) => {
-                return Ok(SuiObjectResponse::new_with_data((object_ref, o, layout, options, None).try_into()?));
+                return Ok(SuiObjectResponse::new_with_data(
+                    (object_ref, o, layout, options, None)
+                        .try_into()
+                        .map_err(IndexerError::from)?,
+                ));
             }
         }
 
-        Ok(SuiObjectResponse::new_with_error(sui_types::error::SuiObjectResponseError::DynamicFieldNotFound {
-            parent_object_id,
-        }))
+        Ok(SuiObjectResponse::new_with_error(
+            sui_types::error::SuiObjectResponseError::DynamicFieldNotFound { parent_object_id },
+        ))
     }
 
-    fn subscribe_event(&self, _sink: SubscriptionSink, _filter: EventFilter) -> SubscriptionResult {
-        Err(SubscriptionEmptyError)
+    fn subscribe_event(
+        &self,
+        _sink: PendingSubscriptionSink,
+        _filter: EventFilter,
+    ) -> SubscriptionResult {
+        Err("disabled".into())
     }
 
-    fn subscribe_transaction(&self, _sink: SubscriptionSink, _filter: TransactionFilter) -> SubscriptionResult {
-        Err(SubscriptionEmptyError)
+    fn subscribe_transaction(
+        &self,
+        _sink: PendingSubscriptionSink,
+        _filter: TransactionFilter,
+    ) -> SubscriptionResult {
+        Err("disabled".into())
     }
 
     async fn resolve_name_service_address(&self, name: String) -> RpcResult<Option<SuiAddress>> {
@@ -290,8 +327,10 @@ impl IndexerApiServer for IndexerApi {
         // Find the requested object in the list of domains.
         // We need to loop (in an array of maximum size 2), as we cannot guarantee
         // the order of the returned objects.
-        let Some(requested_object) =
-            domains.iter().find(|o| o.as_ref().is_some_and(|o| o.id() == record_id)).and_then(|o| o.clone())
+        let Some(requested_object) = domains
+            .iter()
+            .find(|o| o.as_ref().is_some_and(|o| o.id() == record_id))
+            .and_then(|o| o.clone())
         else {
             return Ok(None);
         };
@@ -308,15 +347,19 @@ impl IndexerApiServer for IndexerApi {
         }
 
         // repeat the process for the parent object too.
-        let Some(requested_object) =
-            domains.iter().find(|o| o.as_ref().is_some_and(|o| o.id() == parent_record_id)).and_then(|o| o.clone())
+        let Some(requested_object) = domains
+            .iter()
+            .find(|o| o.as_ref().is_some_and(|o| o.id() == parent_record_id))
+            .and_then(|o| o.clone())
         else {
             return Err(IndexerError::NameServiceError(NameServiceError::NameExpired).into());
         };
 
         let parent_record: NameRecord = requested_object.try_into().map_err(IndexerError::from)?;
 
-        if parent_record.is_valid_leaf_parent(&name_record) && !parent_record.is_node_expired(current_timestamp) {
+        if parent_record.is_valid_leaf_parent(&name_record)
+            && !parent_record.is_node_expired(current_timestamp)
+        {
             Ok(name_record.target_address)
         } else {
             Err(IndexerError::NameServiceError(NameServiceError::NameExpired).into())
@@ -329,25 +372,37 @@ impl IndexerApiServer for IndexerApi {
         _cursor: Option<ObjectID>,
         _limit: Option<usize>,
     ) -> RpcResult<Page<String, ObjectID>> {
-        let reverse_record_id = self.name_service_config.reverse_record_field_id(address.as_ref());
+        let reverse_record_id = self
+            .name_service_config
+            .reverse_record_field_id(address.as_ref());
 
-        let mut result = Page { data: vec![], next_cursor: None, has_next_page: false };
+        let mut result = Page {
+            data: vec![],
+            next_cursor: None,
+            has_next_page: false,
+        };
 
-        let Some(field_reverse_record_object) = self.inner.get_object(&reverse_record_id, None).await? else {
+        let Some(field_reverse_record_object) =
+            self.inner.get_object(&reverse_record_id, None).await?
+        else {
             return Ok(result);
         };
 
         let domain = field_reverse_record_object
             .to_rust::<Field<SuiAddress, Domain>>()
             .ok_or_else(|| {
-                IndexerError::PersistentStorageDataCorruptionError(format!("Malformed Object {reverse_record_id}"))
+                IndexerError::PersistentStorageDataCorruptionError(format!(
+                    "Malformed Object {reverse_record_id}"
+                ))
             })?
             .value;
 
         let domain_name = domain.to_string();
 
         // Tries to resolve the name, to verify it is not expired.
-        let resolved_address = self.resolve_name_service_address(domain_name.clone()).await?;
+        let resolved_address = self
+            .resolve_name_service_address(domain_name.clone())
+            .await?;
 
         // If we do not have a resolved address, we do not include the domain in the result.
         if resolved_address.is_none() {

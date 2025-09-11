@@ -16,9 +16,9 @@
 /// // table1 does not equal table2, despite having the same entries
 /// assert!(&table1 != &table2);
 /// ```
-module one::table;
+module oct::table;
 
-use one::dynamic_field as field;
+use sui::dynamic_field as field;
 
 // Attempted to destroy a non-empty table
 const ETableNotEmpty: u64 = 0;
@@ -39,7 +39,7 @@ public fun new<K: copy + drop + store, V: store>(ctx: &mut TxContext): Table<K, 
 }
 
 /// Adds a key-value pair to the table `table: &mut Table<K, V>`
-/// Aborts with `one::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
+/// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
 /// that key `k: K`.
 public fun add<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: K, v: V) {
     field::add(&mut table.id, k, v);
@@ -48,7 +48,7 @@ public fun add<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: K, 
 
 #[syntax(index)]
 /// Immutable borrows the value associated with the key in the table `table: &Table<K, V>`.
-/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`.
 public fun borrow<K: copy + drop + store, V: store>(table: &Table<K, V>, k: K): &V {
     field::borrow(&table.id, k)
@@ -56,14 +56,14 @@ public fun borrow<K: copy + drop + store, V: store>(table: &Table<K, V>, k: K): 
 
 #[syntax(index)]
 /// Mutably borrows the value associated with the key in the table `table: &mut Table<K, V>`.
-/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`.
 public fun borrow_mut<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: K): &mut V {
     field::borrow_mut(&mut table.id, k)
 }
 
 /// Removes the key-value pair in the table `table: &mut Table<K, V>` and returns the value.
-/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`.
 public fun remove<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: K): V {
     let v = field::remove(&mut table.id, k);
@@ -71,7 +71,7 @@ public fun remove<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: 
     v
 }
 
-/// Returns true iff there is a value associated with the key `k: K` in table `table: &Table<K, V>`
+/// Returns true if there is a value associated with the key `k: K` in table `table: &Table<K, V>`
 public fun contains<K: copy + drop + store, V: store>(table: &Table<K, V>, k: K): bool {
     field::exists_with_type<K, V>(&table.id, k)
 }
@@ -81,7 +81,7 @@ public fun length<K: copy + drop + store, V: store>(table: &Table<K, V>): u64 {
     table.size
 }
 
-/// Returns true iff the table is empty (if `length` returns `0`)
+/// Returns true if the table is empty (if `length` returns `0`)
 public fun is_empty<K: copy + drop + store, V: store>(table: &Table<K, V>): bool {
     table.size == 0
 }

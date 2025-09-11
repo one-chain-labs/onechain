@@ -23,7 +23,12 @@ pub struct SuiClientConfig {
 
 impl SuiClientConfig {
     pub fn new(keystore: Keystore) -> Self {
-        SuiClientConfig { keystore, envs: vec![], active_env: None, active_address: None }
+        SuiClientConfig {
+            keystore,
+            envs: vec![],
+            active_env: None,
+            active_address: None,
+        }
     }
 
     pub fn get_env(&self, alias: &Option<String>) -> Option<&SuiEnv> {
@@ -36,12 +41,19 @@ impl SuiClientConfig {
 
     pub fn get_active_env(&self) -> Result<&SuiEnv, anyhow::Error> {
         self.get_env(&self.active_env).ok_or_else(|| {
-            anyhow!("Environment configuration not found for env [{}]", self.active_env.as_deref().unwrap_or("None"))
+            anyhow!(
+                "Environment configuration not found for env [{}]",
+                self.active_env.as_deref().unwrap_or("None")
+            )
         })
     }
 
     pub fn add_env(&mut self, env: SuiEnv) {
-        if !self.envs.iter().any(|other_env| other_env.alias == env.alias) {
+        if !self
+            .envs
+            .iter()
+            .any(|other_env| other_env.alias == env.alias)
+        {
             self.envs.push(env)
         }
     }
@@ -72,7 +84,9 @@ impl SuiEnv {
         if let Some(basic_auth) = &self.basic_auth {
             let fields: Vec<_> = basic_auth.split(':').collect();
             if fields.len() != 2 {
-                return Err(anyhow!("Basic auth should be in the format `username:password`"));
+                return Err(anyhow!(
+                    "Basic auth should be in the format `username:password`"
+                ));
             }
             builder = builder.basic_auth(fields[0], fields[1]);
         }
@@ -84,15 +98,29 @@ impl SuiEnv {
     }
 
     pub fn devnet() -> Self {
-        Self { alias: "devnet".to_string(), rpc: SUI_DEVNET_URL.into(), ws: None, basic_auth: None }
+        Self {
+            alias: "devnet".to_string(),
+            rpc: SUI_DEVNET_URL.into(),
+            ws: None,
+            basic_auth: None,
+        }
     }
-
     pub fn testnet() -> Self {
-        Self { alias: "testnet".to_string(), rpc: SUI_TESTNET_URL.into(), ws: None, basic_auth: None }
+        Self {
+            alias: "testnet".to_string(),
+            rpc: SUI_TESTNET_URL.into(),
+            ws: None,
+            basic_auth: None,
+        }
     }
 
     pub fn localnet() -> Self {
-        Self { alias: "local".to_string(), rpc: SUI_LOCAL_NETWORK_URL.into(), ws: None, basic_auth: None }
+        Self {
+            alias: "local".to_string(),
+            rpc: SUI_LOCAL_NETWORK_URL.into(),
+            ws: None,
+            basic_auth: None,
+        }
     }
 }
 
@@ -119,7 +147,11 @@ impl Display for SuiClientConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut writer = String::new();
 
-        writeln!(writer, "Managed addresses : {}", self.keystore.addresses().len())?;
+        writeln!(
+            writer,
+            "Managed addresses : {}",
+            self.keystore.addresses().len()
+        )?;
         write!(writer, "Active address: ")?;
         match self.active_address {
             Some(r) => writeln!(writer, "{}", r)?,

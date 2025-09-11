@@ -61,7 +61,7 @@ where
                     ingest_hi = subscribers_hi.values().copied().min().map(|hi| hi + buffer_size as u64);
                 }
 
-                res = checkpoint_tx.send(*cp), if ingest_hi.map_or(true, |hi| *cp <= hi) => if res.is_ok() {
+                res = checkpoint_tx.send(*cp), if ingest_hi.is_none_or(|hi| *cp <= hi) => if res.is_ok() {
                     checkpoints.next();
                 } else {
                     info!("Checkpoint channel closed, stopping regulator");
@@ -88,7 +88,9 @@ mod tests {
 
     /// Wait up to a second for a response on the channel, but expecting this operation to timeout.
     async fn expect_timeout(rx: &mut mpsc::Receiver<u64>) -> Elapsed {
-        timeout(Duration::from_secs(1), rx.recv()).await.unwrap_err()
+        timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .unwrap_err()
     }
 
     #[tokio::test]

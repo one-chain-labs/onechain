@@ -14,7 +14,8 @@
 /// - the current implementation is not optimized for a large number of records
 /// and the final one will feature better collection type;
 module examples::denylist_rule {
-    use one::{bag::{Self, Bag}, token::{Self, TokenPolicy, TokenPolicyCap, ActionRequest}};
+    use sui::bag::{Self, Bag};
+    use sui::token::{Self, TokenPolicy, TokenPolicyCap, ActionRequest};
 
     /// Trying to `verify` but the sender or the recipient is on the denylist.
     const EUserBlocked: u64 = 0;
@@ -105,14 +106,16 @@ module examples::denylist_rule {
 #[test_only]
 module examples::denylist_rule_tests {
     use examples::denylist_rule::{Self as denylist, Denylist};
-    use std::{option::{none, some}, string::utf8};
-    use one::{token, token_test_utils::{Self as test, TEST}};
+    use std::option::{none, some};
+    use std::string::utf8;
+    use sui::token;
+    use sui::token_test_utils::{Self as test, TEST};
 
     #[test]
     // Scenario: add a denylist with addresses, sender is not on the list and
     // transaction is confirmed.
     fun denylist_pass_not_on_the_list() {
-        let ctx = &mut one::tx_context::dummy();
+        let ctx = &mut sui::tx_context::dummy();
         let (mut policy, cap) = test::get_policy(ctx);
 
         // first add the list for action and then add records
@@ -130,7 +133,7 @@ module examples::denylist_rule_tests {
     // Scenario: add a denylist with addresses, sender is on the list and
     // transaction fails with `EUserBlocked`.
     fun denylist_on_the_list_banned_fail() {
-        let ctx = &mut one::tx_context::dummy();
+        let ctx = &mut sui::tx_context::dummy();
         let (mut policy, cap) = test::get_policy(ctx);
 
         token::add_rule_for_action<TEST, Denylist>(&mut policy, &cap, utf8(b"action"), ctx);
@@ -147,7 +150,7 @@ module examples::denylist_rule_tests {
     // Scenario: add a denylist with addresses, Recipient is on the list and
     // transaction fails with `EUserBlocked`.
     fun denylist_recipient_on_the_list_banned_fail() {
-        let ctx = &mut one::tx_context::dummy();
+        let ctx = &mut sui::tx_context::dummy();
         let (mut policy, cap) = test::get_policy(ctx);
 
         token::add_rule_for_action<TEST, Denylist>(&mut policy, &cap, utf8(b"action"), ctx);

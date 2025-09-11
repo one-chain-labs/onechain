@@ -6,18 +6,18 @@ pub use checked::*;
 
 #[sui_macros::with_checked_arithmetic]
 mod checked {
+    use crate::error::{UserInputError, UserInputResult};
+    use crate::gas::{self, GasCostSummary, GasUsageReport, SuiGasStatusAPI};
+    use crate::gas_model::gas_predicates::{cost_table_for_version, txn_base_cost_as_multiplier};
+    use crate::gas_model::units_types::CostTable;
+    use crate::transaction::ObjectReadResult;
     use crate::{
-        error::{ExecutionError, ExecutionErrorKind, UserInputError, UserInputResult},
-        gas::{self, GasCostSummary, SuiGasStatusAPI},
-        gas_model::{
-            gas_predicates::{cost_table_for_version, txn_base_cost_as_multiplier},
-            tables::{GasStatus, ZERO_COST_SCHEDULE},
-            units_types::CostTable,
-        },
-        transaction::ObjectReadResult,
+        error::{ExecutionError, ExecutionErrorKind},
+        gas_model::tables::{GasStatus, ZERO_COST_SCHEDULE},
         ObjectID,
     };
     use move_core_types::vm_status::StatusCode;
+    use serde::{Deserialize, Serialize};
     use sui_protocol_config::*;
 
     /// A bucket defines a range of units that will be priced the same.
@@ -102,6 +102,8 @@ mod checked {
         pub execution_cost_table: CostTable,
         /// Computation buckets to cost transaction in price groups
         computation_bucket: Vec<ComputationBucket>,
+        /// Max gas price for aborted transactions.
+        max_gas_price_rgp_factor_for_aborted_transactions: Option<u64>,
     }
 
     impl std::fmt::Debug for SuiCostTable {
@@ -115,8 +117,11 @@ mod checked {
         pub(crate) fn new(c: &ProtocolConfig, gas_price: u64) -> Self {
             // gas_price here is the Reference Gas Price, however we may decide
             // to change it to be the price passed in the transaction
-            let min_transaction_cost =
-                if txn_base_cost_as_multiplier(c) { c.base_tx_cost_fixed() * gas_price } else { c.base_tx_cost_fixed() };
+            let min_transaction_cost = if txn_base_cost_as_multiplier(c) {
+                c.base_tx_cost_fixed() * gas_price
+            } else {
+                c.base_tx_cost_fixed()
+            };
             Self {
                 min_transaction_cost,
                 max_gas_budget: c.max_tx_gas(),
@@ -125,6 +130,8 @@ mod checked {
                 storage_per_byte_cost: c.obj_data_cost_refundable(),
                 execution_cost_table: cost_table_for_version(c.gas_model_version()),
                 computation_bucket: computation_bucket(c.max_gas_computation_bucket()),
+                max_gas_price_rgp_factor_for_aborted_transactions: c
+                    .max_gas_price_rgp_factor_for_aborted_transactions_as_option(),
             }
         }
 
@@ -138,11 +145,12 @@ mod checked {
                 execution_cost_table: ZERO_COST_SCHEDULE.clone(),
                 // should not matter
                 computation_bucket: computation_bucket(5_000_000),
+                max_gas_price_rgp_factor_for_aborted_transactions: None,
             }
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct PerObjectStorage {
         /// storage_cost is the total storage gas to charge. This is computed
         /// at the end of execution while determining storage charges.
@@ -239,8 +247,11 @@ mod checked {
         ) -> SuiGasStatus {
             let storage_gas_price = config.storage_gas_price();
             let max_computation_budget = config.max_gas_computation_bucket() * gas_price;
-            let computation_budget =
-                if gas_budget > max_computation_budget { max_computation_budget } else { gas_budget };
+            let computation_budget = if gas_budget > max_computation_budget {
+                max_computation_budget
+            } else {
+                gas_budget
+            };
             let sui_cost_table = SuiCostTable::new(config, gas_price);
             let gas_rounding_step = config.gas_rounding_step_as_option();
             Self::new(
@@ -262,7 +273,17 @@ mod checked {
         }
 
         pub fn new_unmetered() -> SuiGasStatus {
-            Self::new(GasStatus::new_unmetered(), 0, false, 0, 0, 0, 0, None, SuiCostTable::unmetered())
+            Self::new(
+                GasStatus::new_unmetered(),
+                0,
+                false,
+                0,
+                0,
+                0,
+                0,
+                None,
+                SuiCostTable::unmetered(),
+            )
         }
 
         pub fn reference_gas_price(&self) -> u64 {
@@ -273,14 +294,20 @@ mod checked {
         // 1. Gas object has an address owner.
         // 2. Gas budget is between min and max budget allowed
         // 3. Gas balance (all gas coins together) is bigger or equal to budget
-        pub(crate) fn check_gas_balance(&self, gas_objs: &[&ObjectReadResult], gas_budget: u64) -> UserInputResult {
+        pub(crate) fn check_gas_balance(
+            &self,
+            gas_objs: &[&ObjectReadResult],
+            gas_budget: u64,
+        ) -> UserInputResult {
             // 1. All gas objects have an address owner
             for gas_object in gas_objs {
                 // if as_object() returns None, it means the object has been deleted (and therefore
                 // must be a shared object).
                 if let Some(obj) = gas_object.as_object() {
                     if !obj.is_address_owned() {
-                        return Err(UserInputError::GasObjectNotOwnedObject { owner: obj.owner.clone() });
+                        return Err(UserInputError::GasObjectNotOwnedObject {
+                            owner: obj.owner.clone(),
+                        });
                     }
                 } else {
                     // This case should never happen (because gas can't be a shared object), but we
@@ -291,7 +318,10 @@ mod checked {
 
             // 2. Gas budget is between min and max budget allowed
             if gas_budget > self.cost_table.max_gas_budget {
-                return Err(UserInputError::GasBudgetTooHigh { gas_budget, max_budget: self.cost_table.max_gas_budget });
+                return Err(UserInputError::GasBudgetTooHigh {
+                    gas_budget,
+                    max_budget: self.cost_table.max_gas_budget,
+                });
             }
             if gas_budget < self.cost_table.min_transaction_cost {
                 return Err(UserInputError::GasBudgetTooLow {
@@ -304,10 +334,15 @@ mod checked {
             let mut gas_balance = 0u128;
             for gas_obj in gas_objs {
                 // expect is safe because we already checked that all gas objects have an address owner
-                gas_balance += gas::get_gas_balance(gas_obj.as_object().expect("object must be owned"))? as u128;
+                gas_balance +=
+                    gas::get_gas_balance(gas_obj.as_object().expect("object must be owned"))?
+                        as u128;
             }
             if gas_balance < gas_budget as u128 {
-                Err(UserInputError::GasBalanceTooLow { gas_balance, needed_gas_amount: gas_budget as u128 })
+                Err(UserInputError::GasBalanceTooLow {
+                    gas_balance,
+                    needed_gas_amount: gas_budget as u128,
+                })
             } else {
                 Ok(())
             }
@@ -335,19 +370,37 @@ mod checked {
             &mut self.gas_status
         }
 
-        fn bucketize_computation(&mut self) -> Result<(), ExecutionError> {
+        fn bucketize_computation(&mut self, aborted: Option<bool>) -> Result<(), ExecutionError> {
             let gas_used = self.gas_status.gas_used_pre_gas_price();
+            let effective_gas_price = if self
+                .cost_table
+                .max_gas_price_rgp_factor_for_aborted_transactions
+                .is_some()
+                && aborted.unwrap_or(false)
+            {
+                // For aborts, cap at max but don't exceed user's price
+                // This minimizes the risk of competing for priority execution in the case that the txn may be aborted.
+                let max_gas_price_for_aborted_txns = self
+                    .cost_table
+                    .max_gas_price_rgp_factor_for_aborted_transactions
+                    .unwrap()
+                    * self.reference_gas_price;
+                self.gas_price.min(max_gas_price_for_aborted_txns)
+            } else {
+                // For all other cases, use the user's gas price
+                self.gas_price
+            };
             let gas_used = if let Some(gas_rounding) = self.gas_rounding_step {
                 if gas_used > 0 && gas_used % gas_rounding == 0 {
-                    gas_used * self.gas_price
+                    gas_used * effective_gas_price
                 } else {
-                    ((gas_used / gas_rounding) + 1) * gas_rounding * self.gas_price
+                    ((gas_used / gas_rounding) + 1) * gas_rounding * effective_gas_price
                 }
             } else {
                 let bucket_cost = get_bucket_cost(&self.cost_table.computation_bucket, gas_used);
                 // charge extra on top of `computation_cost` to make the total computation
                 // cost a bucket value
-                bucket_cost * self.gas_price
+                bucket_cost * effective_gas_price
             };
             if self.gas_budget <= gas_used {
                 self.computation_cost = self.gas_budget;
@@ -379,12 +432,26 @@ mod checked {
             self.gas_budget
         }
 
+        fn gas_price(&self) -> u64 {
+            self.gas_price
+        }
+
+        fn reference_gas_price(&self) -> u64 {
+            self.reference_gas_price
+        }
+
         fn storage_gas_units(&self) -> u64 {
-            self.per_object_storage.iter().map(|(_, per_object)| per_object.storage_cost).sum()
+            self.per_object_storage
+                .iter()
+                .map(|(_, per_object)| per_object.storage_cost)
+                .sum()
         }
 
         fn storage_rebate(&self) -> u64 {
-            self.per_object_storage.iter().map(|(_, per_object)| per_object.storage_rebate).sum()
+            self.per_object_storage
+                .iter()
+                .map(|(_, per_object)| per_object.storage_rebate)
+                .sum()
         }
 
         fn unmetered_storage_rebate(&self) -> u64 {
@@ -401,24 +468,33 @@ mod checked {
         }
 
         fn charge_storage_read(&mut self, size: usize) -> Result<(), ExecutionError> {
-            self.gas_status.charge_bytes(size, self.cost_table.object_read_per_byte_cost).map_err(|e| {
-                debug_assert_eq!(e.major_status(), StatusCode::OUT_OF_GAS);
-                ExecutionErrorKind::InsufficientGas.into()
-            })
+            self.gas_status
+                .charge_bytes(size, self.cost_table.object_read_per_byte_cost)
+                .map_err(|e| {
+                    debug_assert_eq!(e.major_status(), StatusCode::OUT_OF_GAS);
+                    ExecutionErrorKind::InsufficientGas.into()
+                })
         }
 
         fn charge_publish_package(&mut self, size: usize) -> Result<(), ExecutionError> {
-            self.gas_status.charge_bytes(size, self.cost_table.package_publish_per_byte_cost).map_err(|e| {
-                debug_assert_eq!(e.major_status(), StatusCode::OUT_OF_GAS);
-                ExecutionErrorKind::InsufficientGas.into()
-            })
+            self.gas_status
+                .charge_bytes(size, self.cost_table.package_publish_per_byte_cost)
+                .map_err(|e| {
+                    debug_assert_eq!(e.major_status(), StatusCode::OUT_OF_GAS);
+                    ExecutionErrorKind::InsufficientGas.into()
+                })
         }
 
         /// Update `storage_rebate` and `storage_gas_units` for each object in the transaction.
         /// There is no charge in this function. Charges will all be applied together at the end
         /// (`track_storage_mutation`).
         /// Return the new storage rebate (cost of object storage) according to `new_size`.
-        fn track_storage_mutation(&mut self, object_id: ObjectID, new_size: usize, storage_rebate: u64) -> u64 {
+        fn track_storage_mutation(
+            &mut self,
+            object_id: ObjectID,
+            new_size: usize,
+            storage_rebate: u64,
+        ) -> u64 {
             if self.is_unmetered() {
                 self.unmetered_storage_rebate += storage_rebate;
                 return 0;
@@ -426,10 +502,18 @@ mod checked {
 
             // compute and track cost (based on size)
             let new_size = new_size as u64;
-            let storage_cost = new_size * self.cost_table.storage_per_byte_cost * self.storage_gas_price;
+            let storage_cost =
+                new_size * self.cost_table.storage_per_byte_cost * self.storage_gas_price;
             // track rebate
 
-            self.per_object_storage.push((object_id, PerObjectStorage { storage_cost, storage_rebate, new_size }));
+            self.per_object_storage.push((
+                object_id,
+                PerObjectStorage {
+                    storage_cost,
+                    storage_rebate,
+                    new_size,
+                },
+            ));
             // return the new object rebate (object storage cost)
             storage_cost
         }
@@ -460,6 +544,19 @@ mod checked {
         fn adjust_computation_on_out_of_gas(&mut self) {
             self.per_object_storage = Vec::new();
             self.computation_cost = self.gas_budget;
+        }
+
+        fn gas_usage_report(&self) -> GasUsageReport {
+            GasUsageReport {
+                cost_summary: self.summary(),
+                gas_used: self.gas_used(),
+                gas_price: self.gas_price(),
+                reference_gas_price: self.reference_gas_price(),
+                per_object_storage: self.per_object_storage().clone(),
+                gas_budget: self.gas_budget(),
+                storage_gas_price: self.storage_gas_price,
+                rebate_rate: self.rebate_rate,
+            }
         }
     }
 }

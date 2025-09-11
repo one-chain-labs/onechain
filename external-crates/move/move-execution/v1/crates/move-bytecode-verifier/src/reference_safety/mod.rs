@@ -12,27 +12,19 @@ mod abstract_state;
 
 use crate::{
     absint::{AbstractInterpreter, FunctionContext, TransferFunctions},
-    reference_safety::abstract_state::{STEP_BASE_COST, STEP_PER_GRAPH_ITEM_COST, STEP_PER_LOCAL_COST},
+    reference_safety::abstract_state::{
+        STEP_BASE_COST, STEP_PER_GRAPH_ITEM_COST, STEP_PER_LOCAL_COST,
+    },
 };
 use abstract_state::{AbstractState, AbstractValue};
 use move_abstract_stack::AbstractStack;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode,
-        CodeOffset,
-        FunctionDefinitionIndex,
-        FunctionHandle,
-        IdentifierIndex,
-        SignatureIndex,
-        SignatureToken,
-        StructDefinition,
-        StructFieldInformation,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
+        SignatureIndex, SignatureToken, StructDefinition, StructFieldInformation,
     },
-    safe_assert,
-    safe_unwrap,
-    safe_unwrap_err,
-    CompiledModule,
+    safe_assert, safe_unwrap, safe_unwrap_err, CompiledModule,
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
 use move_core_types::vm_status::StatusCode;
@@ -54,7 +46,12 @@ impl<'a> ReferenceSafetyAnalysis<'a> {
         function_context: &'a FunctionContext<'a>,
         name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
     ) -> Self {
-        Self { resolver, function_context, name_def_map, stack: AbstractStack::new() }
+        Self {
+            resolver,
+            function_context,
+            name_def_map,
+            stack: AbstractStack::new(),
+        }
     }
 
     fn push(&mut self, v: AbstractValue) -> PartialVMResult<()> {
@@ -88,7 +85,12 @@ fn call(
     meter: &mut (impl Meter + ?Sized),
 ) -> PartialVMResult<()> {
     let parameters = verifier.resolver.signature_at(function_handle.parameters);
-    let arguments = parameters.0.iter().map(|_| verifier.stack.pop().unwrap()).rev().collect();
+    let arguments = parameters
+        .0
+        .iter()
+        .map(|_| verifier.stack.pop().unwrap())
+        .rev()
+        .collect();
 
     let acquired_resources = match verifier.name_def_map.get(&function_handle.name) {
         Some(idx) => {
@@ -117,7 +119,10 @@ fn num_fields(struct_def: &StructDefinition) -> usize {
     }
 }
 
-fn pack(verifier: &mut ReferenceSafetyAnalysis, struct_def: &StructDefinition) -> PartialVMResult<()> {
+fn pack(
+    verifier: &mut ReferenceSafetyAnalysis,
+    struct_def: &StructDefinition,
+) -> PartialVMResult<()> {
     for _ in 0..num_fields(struct_def) {
         safe_assert!(safe_unwrap_err!(verifier.stack.pop()).is_value())
     }
@@ -126,17 +131,25 @@ fn pack(verifier: &mut ReferenceSafetyAnalysis, struct_def: &StructDefinition) -
     Ok(())
 }
 
-fn unpack(verifier: &mut ReferenceSafetyAnalysis, struct_def: &StructDefinition) -> PartialVMResult<()> {
+fn unpack(
+    verifier: &mut ReferenceSafetyAnalysis,
+    struct_def: &StructDefinition,
+) -> PartialVMResult<()> {
     safe_assert!(safe_unwrap_err!(verifier.stack.pop()).is_value());
     // TODO maybe call state.value_for
     verifier.push_n(AbstractValue::NonReference, num_fields(struct_def) as u64)?;
     Ok(())
 }
 
-fn vec_element_type(verifier: &mut ReferenceSafetyAnalysis, idx: SignatureIndex) -> PartialVMResult<SignatureToken> {
+fn vec_element_type(
+    verifier: &mut ReferenceSafetyAnalysis,
+    idx: SignatureIndex,
+) -> PartialVMResult<SignatureToken> {
     match verifier.resolver.signature_at(idx).0.first() {
         Some(ty) => Ok(ty.clone()),
-        None => Err(PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)),
+        None => Err(PartialVMError::new(
+            StatusCode::VERIFIER_INVARIANT_VIOLATION,
+        )),
     }
 }
 
@@ -149,7 +162,11 @@ fn execute_inner(
 ) -> PartialVMResult<()> {
     meter.add(Scope::Function, STEP_BASE_COST)?;
     meter.add_items(Scope::Function, STEP_PER_LOCAL_COST, state.local_count())?;
-    meter.add_items(Scope::Function, STEP_PER_GRAPH_ITEM_COST, state.graph_size())?;
+    meter.add_items(
+        Scope::Function,
+        STEP_PER_GRAPH_ITEM_COST,
+        state.graph_size(),
+    )?;
 
     match bytecode {
         Bytecode::Pop => state.release_value(safe_unwrap_err!(verifier.stack.pop())),
@@ -162,7 +179,9 @@ fn execute_inner(
             let value = state.move_loc(offset, *local)?;
             verifier.push(value)?
         }
-        Bytecode::StLoc(local) => state.st_loc(offset, *local, safe_unwrap_err!(verifier.stack.pop()))?,
+        Bytecode::StLoc(local) => {
+            state.st_loc(offset, *local, safe_unwrap_err!(verifier.stack.pop()))?
+        }
 
         Bytecode::FreezeRef => {
             let id = safe_unwrap!(safe_unwrap_err!(verifier.stack.pop()).ref_id());
@@ -294,7 +313,9 @@ fn execute_inner(
             state.release_value(safe_unwrap_err!(verifier.stack.pop()));
         }
 
-        Bytecode::LdTrue | Bytecode::LdFalse => verifier.push(state.value_for(&SignatureToken::Bool))?,
+        Bytecode::LdTrue | Bytecode::LdFalse => {
+            verifier.push(state.value_for(&SignatureToken::Bool))?
+        }
         Bytecode::LdU8(_) => verifier.push(state.value_for(&SignatureToken::U8))?,
         Bytecode::LdU16(_) => verifier.push(state.value_for(&SignatureToken::U16))?,
         Bytecode::LdU32(_) => verifier.push(state.value_for(&SignatureToken::U32))?,
@@ -413,16 +434,18 @@ fn execute_inner(
         | Bytecode::UnpackVariantMutRef(_)
         | Bytecode::UnpackVariantGenericMutRef(_)
         | Bytecode::VariantSwitch(_) => {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Unexpected variant opcode in version 1".to_string()));
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Unexpected variant opcode in version 1".to_string()),
+            );
         }
     };
     Ok(())
 }
 
-impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {
-    type Error = PartialVMError;
+impl TransferFunctions for ReferenceSafetyAnalysis<'_> {
     type State = AbstractState;
+    type Error = PartialVMError;
 
     fn execute(
         &mut self,
@@ -441,4 +464,4 @@ impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {
     }
 }
 
-impl<'a> AbstractInterpreter for ReferenceSafetyAnalysis<'a> {}
+impl AbstractInterpreter for ReferenceSafetyAnalysis<'_> {}

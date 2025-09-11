@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use parking_lot::Mutex;
-use std::{
-    collections::VecDeque,
-    default::Default,
-    sync::atomic::{AtomicU64, Ordering},
-};
-use tokio::time::{Duration, Instant};
+use std::collections::VecDeque;
+use std::default::Default;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use tokio::time::Duration;
+use tokio::time::Instant;
 
 pub struct LatencyObserver {
     data: Mutex<LatencyObserverInner>,
@@ -22,7 +22,10 @@ struct LatencyObserverInner {
 
 impl LatencyObserver {
     pub fn new() -> Self {
-        Self { data: Mutex::new(LatencyObserverInner::default()), latency_ms: AtomicU64::new(u64::MAX) }
+        Self {
+            data: Mutex::new(LatencyObserverInner::default()),
+            latency_ms: AtomicU64::new(u64::MAX),
+        }
     }
 
     pub fn report(&self, latency: Duration) {
@@ -69,7 +72,7 @@ pub struct RateTracker {
     window_duration: Duration,
     total_bins: usize,
 
-    // We use the event time and the tracker start time to calculate the bin that a event
+    // We use the event time and the tracker start time to calculate the bin that an event
     // belongs to.
     // event_global_bin_index = (event_time - start_time) / BIN_DURATION.
     // event_index_in_buffer = event_global_bin_index % buffer_size.
@@ -147,7 +150,9 @@ impl RateTracker {
 mod tests {
     use super::*;
 
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rand::rngs::StdRng;
+    use rand::Rng;
+    use rand::SeedableRng;
     use tokio::time::advance;
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]

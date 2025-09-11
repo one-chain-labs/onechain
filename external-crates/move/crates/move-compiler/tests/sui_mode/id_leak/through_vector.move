@@ -1,6 +1,6 @@
 // allowed, anything can be done with a UID after unpacking, as long as it isn't repacked
 module a::m {
-    use one::object::UID;
+    use sui::object::UID;
 
     struct Foo has key {
         id: UID,
@@ -13,7 +13,7 @@ module a::m {
 
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

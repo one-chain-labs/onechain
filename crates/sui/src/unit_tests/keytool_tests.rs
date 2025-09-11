@@ -3,43 +3,45 @@
 
 use std::str::FromStr;
 
-use crate::{
-    key_identity::KeyIdentity,
-    keytool::{read_authority_keypair_from_file, read_keypair_from_file, CommandOutput},
-};
+use crate::keytool::read_authority_keypair_from_file;
+use crate::keytool::read_keypair_from_file;
+use crate::keytool::CommandOutput;
 
-use super::{write_keypair_to_file, KeyToolCommand};
+use super::write_keypair_to_file;
+use super::KeyToolCommand;
 use anyhow::Ok;
-use fastcrypto::{
-    ed25519::Ed25519KeyPair,
-    encoding::{Base64, Encoding, Hex},
-    traits::ToFromBytes,
-};
-use rand::{rngs::StdRng, SeedableRng};
-use shared_crypto::intent::{Intent, IntentScope};
+use fastcrypto::ed25519::Ed25519KeyPair;
+use fastcrypto::encoding::Base64;
+use fastcrypto::encoding::Encoding;
+use fastcrypto::encoding::Hex;
+use fastcrypto::traits::ToFromBytes;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use shared_crypto::intent::Intent;
+use shared_crypto::intent::IntentScope;
+use sui_keys::key_identity::KeyIdentity;
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, InMemKeystore, Keystore};
-use sui_types::{
-    base_types::{ObjectDigest, ObjectID, SequenceNumber, SuiAddress},
-    crypto::{
-        get_key_pair,
-        get_key_pair_from_rng,
-        AuthorityKeyPair,
-        Ed25519SuiSignature,
-        EncodeDecodeBase64,
-        Secp256k1SuiSignature,
-        Secp256r1SuiSignature,
-        Signature,
-        SignatureScheme,
-        SuiKeyPair,
-        SuiSignatureInner,
-    },
-    transaction::{TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
-};
+use sui_types::base_types::ObjectDigest;
+use sui_types::base_types::ObjectID;
+use sui_types::base_types::SequenceNumber;
+use sui_types::base_types::SuiAddress;
+use sui_types::crypto::get_key_pair;
+use sui_types::crypto::get_key_pair_from_rng;
+use sui_types::crypto::AuthorityKeyPair;
+use sui_types::crypto::Ed25519SuiSignature;
+use sui_types::crypto::EncodeDecodeBase64;
+use sui_types::crypto::Secp256k1SuiSignature;
+use sui_types::crypto::Secp256r1SuiSignature;
+use sui_types::crypto::Signature;
+use sui_types::crypto::SignatureScheme;
+use sui_types::crypto::SuiKeyPair;
+use sui_types::crypto::SuiSignatureInner;
+use sui_types::transaction::TransactionData;
+use sui_types::transaction::TEST_ONLY_GAS_UNIT_FOR_TRANSFER;
 use tempfile::TempDir;
 use tokio::test;
 
-const TEST_MNEMONIC: &str =
-    "result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss";
+const TEST_MNEMONIC: &str = "result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss";
 
 #[test]
 async fn test_addresses_command() -> Result<(), anyhow::Error> {
@@ -48,11 +50,16 @@ async fn test_addresses_command() -> Result<(), anyhow::Error> {
 
     // Add another 3 Secp256k1 KeyPairs
     for _ in 0..3 {
-        keystore.add_key(None, SuiKeyPair::Secp256k1(get_key_pair().1))?;
+        keystore.import(None, SuiKeyPair::Secp256k1(get_key_pair().1))?;
     }
 
     // List all addresses with flag
-    KeyToolCommand::List { sort_by_alias: true }.execute(&mut keystore).await.unwrap();
+    KeyToolCommand::List {
+        sort_by_alias: true,
+    }
+    .execute(&mut keystore)
+    .await
+    .unwrap();
     Ok(())
 }
 
@@ -60,25 +67,34 @@ async fn test_addresses_command() -> Result<(), anyhow::Error> {
 async fn test_flag_in_signature_and_keypair() -> Result<(), anyhow::Error> {
     let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(0));
 
-    keystore.add_key(None, SuiKeyPair::Secp256k1(get_key_pair().1))?;
-    keystore.add_key(None, SuiKeyPair::Ed25519(get_key_pair().1))?;
+    keystore.import(None, SuiKeyPair::Secp256k1(get_key_pair().1))?;
+    keystore.import(None, SuiKeyPair::Ed25519(get_key_pair().1))?;
 
-    for pk in keystore.keys() {
+    for pk in keystore.entries() {
         let pk1 = pk.clone();
         let sig = keystore.sign_secure(&(&pk).into(), b"hello", Intent::sui_transaction())?;
         match sig {
             Signature::Ed25519SuiSignature(_) => {
                 // signature contains corresponding flag
-                assert_eq!(*sig.as_ref().first().unwrap(), Ed25519SuiSignature::SCHEME.flag());
+                assert_eq!(
+                    *sig.as_ref().first().unwrap(),
+                    Ed25519SuiSignature::SCHEME.flag()
+                );
                 // keystore stores pubkey with corresponding flag
                 assert!(pk1.flag() == Ed25519SuiSignature::SCHEME.flag())
             }
             Signature::Secp256k1SuiSignature(_) => {
-                assert_eq!(*sig.as_ref().first().unwrap(), Secp256k1SuiSignature::SCHEME.flag());
+                assert_eq!(
+                    *sig.as_ref().first().unwrap(),
+                    Secp256k1SuiSignature::SCHEME.flag()
+                );
                 assert!(pk1.flag() == Secp256k1SuiSignature::SCHEME.flag())
             }
             Signature::Secp256r1SuiSignature(_) => {
-                assert_eq!(*sig.as_ref().first().unwrap(), Secp256r1SuiSignature::SCHEME.flag());
+                assert_eq!(
+                    *sig.as_ref().first().unwrap(),
+                    Secp256r1SuiSignature::SCHEME.flag()
+                );
                 assert!(pk1.flag() == Secp256r1SuiSignature::SCHEME.flag())
             }
         }
@@ -105,7 +121,10 @@ async fn test_read_write_keystore_with_flag() {
     assert!(kp_secp_read.is_ok());
 
     // KeyPair wrote into file is the same as read
-    assert_eq!(kp_secp_read.unwrap().public().as_ref(), kp_secp.public().as_ref());
+    assert_eq!(
+        kp_secp_read.unwrap().public().as_ref(),
+        kp_secp.public().as_ref()
+    );
 
     // read as AuthorityKeyPair fails
     let kp_secp_read = read_authority_keypair_from_file(fp_secp_2);
@@ -126,7 +145,10 @@ async fn test_read_write_keystore_with_flag() {
     assert!(kp_ed_read.is_ok());
 
     // KeyPair wrote into file is the same as read
-    assert_eq!(kp_ed_read.unwrap().public().as_ref(), kp_ed.public().as_ref());
+    assert_eq!(
+        kp_ed_read.unwrap().public().as_ref(),
+        kp_ed.public().as_ref()
+    );
 
     // read from file as AuthorityKeyPair success
     let kp_ed_read = read_authority_keypair_from_file(fp_ed_2);
@@ -138,7 +160,7 @@ async fn test_sui_operations_config() {
     let temp_dir = TempDir::new().unwrap();
     let path = temp_dir.path().join("one.keystore");
     let path1 = path.clone();
-    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/sui.keystore
+    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/one.keystore
     // If this test fails, address hardcoded in sui-operations is likely needed be updated.
     let kp = SuiKeyPair::decode_base64("ANRj4Rx5FZRehqwrctiLgZDPrY/3tI5+uJLCdaXPCj6C").unwrap();
     let contents = vec![kp.encode_base64()];
@@ -147,11 +169,12 @@ async fn test_sui_operations_config() {
     let read = FileBasedKeystore::new(&path1);
     assert!(read.is_ok());
     assert_eq!(
-        SuiAddress::from_str("7d20dcdb2bca4f508ea9613994683eb4e76e9c4ed371169677c1be02aaf0b58e").unwrap(),
+        SuiAddress::from_str("7d20dcdb2bca4f508ea9613994683eb4e76e9c4ed371169677c1be02aaf0b58e")
+            .unwrap(),
         read.unwrap().addresses()[0]
     );
 
-    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/sui-benchmark.keystore
+    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/one-benchmark.keystore
     // If this test fails, address hardcoded in sui-operations is likely needed be updated.
     let path2 = temp_dir.path().join("one-benchmark.keystore");
     let path3 = path2.clone();
@@ -161,7 +184,8 @@ async fn test_sui_operations_config() {
     assert!(res.is_ok());
     let read = FileBasedKeystore::new(&path3);
     assert_eq!(
-        SuiAddress::from_str("160ef6ce4f395208a12119c5011bf8d8ceb760e3159307c819bd0197d154d384").unwrap(),
+        SuiAddress::from_str("160ef6ce4f395208a12119c5011bf8d8ceb760e3159307c819bd0197d154d384")
+            .unwrap(),
         read.unwrap().addresses()[0]
     );
 }
@@ -184,7 +208,7 @@ async fn test_load_keystore_err() {
 
 #[test]
 async fn test_private_keys_import_export() -> Result<(), anyhow::Error> {
-    // private key in Bech32, private key in Hex, private key in Base64, derived OneChain address in Hex
+    // private key in Bech32, private key in Hex, private key in Base64, derived Sui address in Hex
     const TEST_CASES: &[(&str, &str, &str, &str)] = &[
         (
             "suiprivkey1qzwant3kaegmjy4qxex93s0jzvemekkjmyv3r2sjwgnv2y479pgsywhveae",
@@ -217,8 +241,9 @@ async fn test_private_keys_import_export() -> Result<(), anyhow::Error> {
         .execute(&mut keystore)
         .await?;
         let kp = SuiKeyPair::decode(private_key).unwrap();
-        let kp_from_hex =
-            SuiKeyPair::Ed25519(Ed25519KeyPair::from_bytes(&Hex::decode(private_key_hex).unwrap()).unwrap());
+        let kp_from_hex = SuiKeyPair::Ed25519(
+            Ed25519KeyPair::from_bytes(&Hex::decode(private_key_hex).unwrap()).unwrap(),
+        );
         assert_eq!(kp, kp_from_hex);
 
         let kp_from_base64 = SuiKeyPair::decode_base64(private_key_base64).unwrap();
@@ -229,7 +254,11 @@ async fn test_private_keys_import_export() -> Result<(), anyhow::Error> {
         assert!(keystore.addresses().contains(&addr));
 
         // Export output shows the private key in Bech32
-        let output = KeyToolCommand::Export { key_identity: KeyIdentity::Address(addr) }.execute(&mut keystore).await?;
+        let output = KeyToolCommand::Export {
+            key_identity: KeyIdentity::Address(addr),
+        }
+        .execute(&mut keystore)
+        .await?;
         match output {
             CommandOutput::Export(exported) => {
                 assert_eq!(exported.exported_private_key, private_key.to_string());
@@ -471,9 +500,13 @@ async fn test_valid_derivation_path() -> Result<(), anyhow::Error> {
 #[test]
 async fn test_keytool_bls12381() -> Result<(), anyhow::Error> {
     let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(0));
-    KeyToolCommand::Generate { key_scheme: SignatureScheme::BLS12381, derivation_path: None, word_length: None }
-        .execute(&mut keystore)
-        .await?;
+    KeyToolCommand::Generate {
+        key_scheme: SignatureScheme::BLS12381,
+        derivation_path: None,
+        word_length: None,
+    }
+    .execute(&mut keystore)
+    .await?;
     Ok(())
 }
 
@@ -483,10 +516,14 @@ async fn test_sign_command() -> Result<(), anyhow::Error> {
     let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(1));
     let binding = keystore.addresses();
     let sender = binding.first().unwrap();
-    let alias = keystore.get_alias_by_address(sender).unwrap();
+    let alias = keystore.get_alias(sender).unwrap();
 
     // Create a dummy TransactionData
-    let gas = (ObjectID::random(), SequenceNumber::new(), ObjectDigest::random());
+    let gas = (
+        ObjectID::random(),
+        SequenceNumber::new(),
+        ObjectDigest::random(),
+    );
     let gas_price = 1;
     let tx_data = TransactionData::new_pay_oct(
         *sender,

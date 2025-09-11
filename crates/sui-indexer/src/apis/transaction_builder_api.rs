@@ -8,10 +8,8 @@ use move_core_types::language_storage::StructTag;
 use sui_json_rpc::transaction_builder_api::TransactionBuilderApi as SuiTransactionBuilderApi;
 use sui_json_rpc_types::{SuiObjectDataFilter, SuiObjectDataOptions, SuiObjectResponse};
 use sui_transaction_builder::DataReader;
-use sui_types::{
-    base_types::{ObjectID, ObjectInfo, SuiAddress},
-    object::Object,
-};
+use sui_types::base_types::{ObjectID, ObjectInfo, SuiAddress};
+use sui_types::object::Object;
 
 pub(crate) struct TransactionBuilderApi {
     inner: IndexerReader,
@@ -62,7 +60,11 @@ impl DataReader for TransactionBuilderApi {
     }
 
     async fn get_reference_gas_price(&self) -> Result<u64, anyhow::Error> {
-        let epoch_info = GovernanceReadApi::new(self.inner.clone()).get_epoch_info(None).await?;
-        Ok(epoch_info.reference_gas_price.ok_or_else(|| anyhow::anyhow!("missing latest reference_gas_price"))?)
+        let epoch_info = GovernanceReadApi::new(self.inner.clone())
+            .get_epoch_info(None)
+            .await?;
+        Ok(epoch_info
+            .reference_gas_price
+            .ok_or_else(|| anyhow::anyhow!("missing latest reference_gas_price"))?)
     }
 }

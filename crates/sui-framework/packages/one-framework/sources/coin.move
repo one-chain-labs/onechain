@@ -4,26 +4,26 @@
 /// Defines the `Coin` type - platform wide representation of fungible
 /// tokens and coins. `Coin` can be described as a secure wrapper around
 /// `Balance` type.
-module one::coin;
+module oct::coin;
 
 use std::ascii;
 use std::string;
 use std::type_name;
-use one::balance::{Self, Balance, Supply};
-use one::deny_list::DenyList;
-use one::url::{Self, Url};
+use sui::balance::{Self, Balance, Supply};
+use sui::deny_list::DenyList;
+use sui::url::{Self, Url};
 
 // Allows calling `.split_vec(amounts, ctx)` on `coin`
-public use fun one::pay::split_vec as Coin.split_vec;
+public use fun sui::pay::split_vec as Coin.split_vec;
 
 // Allows calling `.join_vec(coins)` on `coin`
-public use fun one::pay::join_vec as Coin.join_vec;
+public use fun sui::pay::join_vec as Coin.join_vec;
 
 // Allows calling `.split_and_transfer(amount, recipient, ctx)` on `coin`
-public use fun one::pay::split_and_transfer as Coin.split_and_transfer;
+public use fun sui::pay::split_and_transfer as Coin.split_and_transfer;
 
 // Allows calling `.divide_and_keep(n, ctx)` on `coin`
-public use fun one::pay::divide_and_keep as Coin.divide_and_keep;
+public use fun sui::pay::divide_and_keep as Coin.divide_and_keep;
 
 /// A type passed to create_supply is not a one-time witness.
 const EBadWitness: u64 = 0;
@@ -160,6 +160,7 @@ public fun put<T>(balance: &mut Balance<T>, coin: Coin<T>) {
 
 // === Base Coin functionality ===
 
+#[allow(lint(public_entry))]
 /// Consume the coin `c` and add its value to `self`.
 /// Aborts if `c.value + self.value > U64_MAX`
 public entry fun join<T>(self: &mut Coin<T>, c: Coin<T>) {
@@ -178,16 +179,10 @@ public fun split<T>(self: &mut Coin<T>, split_amount: u64, ctx: &mut TxContext):
 /// `self`. Return newly created coins.
 public fun divide_into_n<T>(self: &mut Coin<T>, n: u64, ctx: &mut TxContext): vector<Coin<T>> {
     assert!(n > 0, EInvalidArg);
-    assert!(n <= value(self), ENotEnough);
+    assert!(n <= self.value(), ENotEnough);
 
-    let mut vec = vector[];
-    let mut i = 0;
-    let split_amount = value(self) / n;
-    while (i < n - 1) {
-        vec.push_back(self.split(split_amount, ctx));
-        i = i + 1;
-    };
-    vec
+    let split_amount = self.value() / n;
+    vector::tabulate!(n - 1, |_| self.split(split_amount, ctx))
 }
 
 /// Make any Coin with a zero value. Useful for placeholding
@@ -218,7 +213,7 @@ public fun create_currency<T: drop>(
     ctx: &mut TxContext,
 ): (TreasuryCap<T>, CoinMetadata<T>) {
     // Make sure there's only one instance of the type T
-    assert!(one::types::is_one_time_witness(&witness), EBadWitness);
+    assert!(sui::types::is_one_time_witness(&witness), EBadWitness);
 
     (
         TreasuryCap {
@@ -228,9 +223,9 @@ public fun create_currency<T: drop>(
         CoinMetadata {
             id: object::new(ctx),
             decimals,
-            name: string::utf8(name),
-            symbol: ascii::string(symbol),
-            description: string::utf8(description),
+            name: name.to_string(),
+            symbol: symbol.to_ascii_string(),
+            description: description.to_string(),
             icon_url,
         },
     )
@@ -241,7 +236,7 @@ public fun create_currency<T: drop>(
 /// deny list, it is immediately unable to interact with the currency's coin as input objects.
 /// Additionally at the start of the next epoch, they will be unable to receive the currency's
 /// coin.
-/// The `allow_global_pause` flag enables an additional API that will cause all addresses to be
+/// The `allow_global_pause` flag enables an additional API that will cause all addresses to
 /// be denied. Note however, that this doesn't affect per-address entries of the deny list and
 /// will not change the result of the "contains" APIs.
 public fun create_regulated_currency_v2<T: drop>(
@@ -285,7 +280,7 @@ public fun migrate_regulated_currency_to_v2<T>(
     ctx: &mut TxContext,
 ): DenyCapV2<T> {
     let DenyCap { id } = cap;
-    object::delete(id);
+    id.delete();
     let ty = type_name::get_with_original_ids<T>().into_string().into_bytes();
     deny_list.migrate_v1_to_v2(DENY_LIST_COIN_INDEX, ty, ctx);
     DenyCapV2 {
@@ -310,6 +305,7 @@ public fun mint_balance<T>(cap: &mut TreasuryCap<T>, value: u64): Balance<T> {
     cap.total_supply.increase_supply(value)
 }
 
+#[allow(lint(public_entry))]
 /// Destroy the coin `c` and decrease the total supply in `cap`
 /// accordingly.
 public entry fun burn<T>(cap: &mut TreasuryCap<T>, c: Coin<T>): u64 {
@@ -408,6 +404,7 @@ public fun deny_list_v2_is_global_pause_enabled_next_epoch<T>(deny_list: &DenyLi
 
 // === Entrypoints ===
 
+#[allow(lint(public_entry))]
 /// Mint `amount` of `Coin` and send it to `recipient`. Invokes `mint()`.
 public entry fun mint_and_transfer<T>(
     c: &mut TreasuryCap<T>,
@@ -415,11 +412,12 @@ public entry fun mint_and_transfer<T>(
     recipient: address,
     ctx: &mut TxContext,
 ) {
-    transfer::public_transfer(mint(c, amount, ctx), recipient)
+    transfer::public_transfer(c.mint(amount, ctx), recipient)
 }
 
 // === Update coin metadata ===
 
+#[allow(lint(public_entry))]
 /// Update name of the coin in `CoinMetadata`
 public entry fun update_name<T>(
     _treasury: &TreasuryCap<T>,
@@ -429,6 +427,7 @@ public entry fun update_name<T>(
     metadata.name = name;
 }
 
+#[allow(lint(public_entry))]
 /// Update the symbol of the coin in `CoinMetadata`
 public entry fun update_symbol<T>(
     _treasury: &TreasuryCap<T>,
@@ -438,6 +437,7 @@ public entry fun update_symbol<T>(
     metadata.symbol = symbol;
 }
 
+#[allow(lint(public_entry))]
 /// Update the description of the coin in `CoinMetadata`
 public entry fun update_description<T>(
     _treasury: &TreasuryCap<T>,
@@ -447,6 +447,7 @@ public entry fun update_description<T>(
     metadata.description = description;
 }
 
+#[allow(lint(public_entry))]
 /// Update the url of the coin in `CoinMetadata`
 public entry fun update_icon_url<T>(
     _treasury: &TreasuryCap<T>,
@@ -559,7 +560,7 @@ public fun create_regulated_currency<T: drop>(
     (treasury_cap, deny_cap, metadata)
 }
 
-/// The index into the deny list vector for the `one::coin::Coin` type.
+/// The index into the deny list vector for the `sui::coin::Coin` type.
 const DENY_LIST_COIN_INDEX: u64 = 0; // TODO public(package) const
 
 /// Adds the given address to the deny list, preventing it

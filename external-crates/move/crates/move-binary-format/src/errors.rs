@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    file_format::{CodeOffset, FunctionDefinitionIndex, TableIndex},
     IndexKind,
+    file_format::{CodeOffset, FunctionDefinitionIndex, TableIndex},
 };
 use move_core_types::{
     language_storage::ModuleId,
@@ -91,6 +91,7 @@ impl VMError {
         self.0.major_status.status_type()
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn all_data(
         self,
     ) -> (
@@ -102,13 +103,44 @@ impl VMError {
         Vec<(IndexKind, TableIndex)>,
         Vec<(FunctionDefinitionIndex, CodeOffset)>,
     ) {
-        let VMError_ { major_status, sub_status, message, exec_state, location, indices, offsets } = *self.0;
-        (major_status, sub_status, message, exec_state, location, indices, offsets)
+        let VMError_ {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            location,
+            indices,
+            offsets,
+        } = *self.0;
+        (
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            location,
+            indices,
+            offsets,
+        )
     }
 
     pub fn to_partial(self) -> PartialVMError {
-        let VMError_ { major_status, sub_status, message, exec_state, indices, offsets, .. } = *self.0;
-        PartialVMError(Box::new(PartialVMError_ { major_status, sub_status, message, exec_state, indices, offsets }))
+        let VMError_ {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            indices,
+            offsets,
+            ..
+        } = *self.0;
+        PartialVMError(Box::new(PartialVMError_ {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            indices,
+            offsets,
+        }))
     }
 }
 
@@ -120,7 +152,15 @@ impl fmt::Debug for VMError {
 
 impl fmt::Debug for VMError_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { major_status, sub_status, message, exec_state, location, indices, offsets } = self;
+        let Self {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            location,
+            indices,
+            offsets,
+        } = self;
         f.debug_struct("VMError")
             .field("major_status", major_status)
             .field("sub_status", sub_status)
@@ -149,6 +189,7 @@ struct PartialVMError_ {
 }
 
 impl PartialVMError {
+    #[allow(clippy::type_complexity)]
     pub fn all_data(
         self,
     ) -> (
@@ -159,13 +200,42 @@ impl PartialVMError {
         Vec<(IndexKind, TableIndex)>,
         Vec<(FunctionDefinitionIndex, CodeOffset)>,
     ) {
-        let PartialVMError_ { major_status, sub_status, message, exec_state, indices, offsets } = *self.0;
-        (major_status, sub_status, message, exec_state, indices, offsets)
+        let PartialVMError_ {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            indices,
+            offsets,
+        } = *self.0;
+        (
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            indices,
+            offsets,
+        )
     }
 
     pub fn finish(self, location: Location) -> VMError {
-        let PartialVMError_ { major_status, sub_status, message, exec_state, indices, offsets } = *self.0;
-        VMError(Box::new(VMError_ { major_status, sub_status, message, exec_state, location, indices, offsets }))
+        let PartialVMError_ {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            indices,
+            offsets,
+        } = *self.0;
+        VMError(Box::new(VMError_ {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            location,
+            indices,
+            offsets,
+        }))
     }
 
     pub fn new(major_status: StatusCode) -> Self {
@@ -216,14 +286,21 @@ impl PartialVMError {
         self
     }
 
-    pub fn at_code_offsets(mut self, additional_offsets: Vec<(FunctionDefinitionIndex, CodeOffset)>) -> Self {
+    pub fn at_code_offsets(
+        mut self,
+        additional_offsets: Vec<(FunctionDefinitionIndex, CodeOffset)>,
+    ) -> Self {
         self.0.offsets.extend(additional_offsets);
         self
     }
 
-    /// Append the message `message` to the message field of the VM status, and insert a seperator
+    /// Append the message `message` to the message field of the VM status, and insert a separator
     /// if the original message is non-empty.
-    pub fn append_message_with_separator(mut self, separator: char, additional_message: String) -> Self {
+    pub fn append_message_with_separator(
+        mut self,
+        separator: char,
+        additional_message: String,
+    ) -> Self {
         match self.0.message.as_mut() {
             Some(msg) => {
                 if !msg.is_empty() {
@@ -262,7 +339,10 @@ impl fmt::Display for PartialVMError {
             status = format!("{} at index {} for {}", status, index, kind);
         }
         for (fdef, code_offset) in &self.0.offsets {
-            status = format!("{} at code offset {} in function definition {}", status, code_offset, fdef);
+            status = format!(
+                "{} at code offset {} in function definition {}",
+                status, code_offset, fdef
+            );
         }
 
         write!(f, "{}", status)
@@ -287,7 +367,10 @@ impl fmt::Display for VMError {
             status = format!("{} at index {} for {}", status, index, kind);
         }
         for (fdef, code_offset) in &self.0.offsets {
-            status = format!("{} at code offset {} in function definition {}", status, code_offset, fdef);
+            status = format!(
+                "{} at code offset {} in function definition {}",
+                status, code_offset, fdef
+            );
         }
 
         write!(f, "{}", status)
@@ -295,7 +378,7 @@ impl fmt::Display for VMError {
 }
 
 ////////////////////////////////////////////////////////////////////////////
-/// Conversion functions from internal VM statuses into external VM statuses
+// Conversion functions from internal VM statuses into external VM statuses
 ////////////////////////////////////////////////////////////////////////////
 
 pub fn offset_out_of_bounds(
@@ -310,12 +393,24 @@ pub fn offset_out_of_bounds(
         "Index {} out of bounds for {} at bytecode offset {} in function {} while indexing {}",
         target_offset, target_pool_len, cur_bytecode_offset, cur_function, kind
     );
-    PartialVMError::new(status).with_message(msg).at_code_offset(cur_function, cur_bytecode_offset)
+    PartialVMError::new(status)
+        .with_message(msg)
+        .at_code_offset(cur_function, cur_bytecode_offset)
 }
 
-pub fn bounds_error(status: StatusCode, kind: IndexKind, idx: TableIndex, len: usize) -> PartialVMError {
-    let msg = format!("Index {} out of bounds for {} while indexing {}", idx, len, kind);
-    PartialVMError::new(status).at_index(kind, idx).with_message(msg)
+pub fn bounds_error(
+    status: StatusCode,
+    kind: IndexKind,
+    idx: TableIndex,
+    len: usize,
+) -> PartialVMError {
+    let msg = format!(
+        "Index {} out of bounds for {} while indexing {}",
+        idx, len, kind
+    );
+    PartialVMError::new(status)
+        .at_index(kind, idx)
+        .with_message(msg)
 }
 
 pub fn verification_error(status: StatusCode, kind: IndexKind, idx: TableIndex) -> PartialVMError {
@@ -330,7 +425,14 @@ impl fmt::Debug for PartialVMError {
 
 impl fmt::Debug for PartialVMError_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { major_status, sub_status, message, exec_state, indices, offsets } = self;
+        let Self {
+            major_status,
+            sub_status,
+            message,
+            exec_state,
+            indices,
+            offsets,
+        } = self;
         f.debug_struct("PartialVMError")
             .field("major_status", major_status)
             .field("sub_status", sub_status)

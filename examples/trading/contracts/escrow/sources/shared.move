@@ -29,11 +29,12 @@
 module escrow::shared;
 
 use escrow::lock::{Locked, Key};
-use one::{dynamic_object_field as dof, event};
+use sui::dynamic_object_field as dof;
+use sui::event;
 
 /// The `name` of the DOF that holds the Escrowed object.
 /// Allows easy discoverability for the escrowed object.
-public struct EscrowedObjectKey has copy, store, drop {}
+public struct EscrowedObjectKey has copy, drop, store {}
 
 /// An object held in escrow
 ///
@@ -164,11 +165,11 @@ public struct EscrowCancelled has copy, drop {
 
 // === Tests ===
 #[test_only]
-use one::coin::{Self, Coin};
+use sui::coin::{Self, Coin};
 #[test_only]
-use one::oct::OCT;
+use sui::oct::OCT;
 #[test_only]
-use one::test_scenario::{Self as ts, Scenario};
+use sui::test_scenario::{Self as ts, Scenario};
 
 #[test_only]
 use escrow::lock;
@@ -182,7 +183,7 @@ const DIANE: address = @0xD;
 
 #[test_only]
 fun test_coin(ts: &mut Scenario): Coin<OCT> {
-    coin::mint_for_testing<OCT>(42, ts.ctx())
+    coin::mint_for_testing<SUI>(42, ts.ctx())
 }
 
 //docs::#test

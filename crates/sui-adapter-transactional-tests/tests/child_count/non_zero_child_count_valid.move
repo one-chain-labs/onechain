@@ -9,33 +9,33 @@
 //# publish
 
 module test::m {
-    use one::dynamic_object_field as ofield;
+    use sui::dynamic_object_field as ofield;
 
     public struct S has key, store {
-        id: one::object::UID,
+        id: sui::object::UID,
     }
 
     public struct R has key, store {
-        id: one::object::UID,
+        id: sui::object::UID,
         s: S,
     }
 
     public entry fun mint(ctx: &mut TxContext) {
-        let mut id = one::object::new(ctx);
-        let child = S { id: one::object::new(ctx) };
+        let mut id = sui::object::new(ctx);
+        let child = S { id: sui::object::new(ctx) };
         ofield::add(&mut id, 0, child);
-        one::transfer::public_transfer(S { id }, tx_context::sender(ctx))
+        sui::transfer::public_transfer(S { id }, tx_context::sender(ctx))
     }
 
     public entry fun mint_and_share(ctx: &mut TxContext) {
-        let mut id = one::object::new(ctx);
-        let child = S { id: one::object::new(ctx) };
+        let mut id = sui::object::new(ctx);
+        let child = S { id: sui::object::new(ctx) };
         ofield::add(&mut id, 0, child);
-        one::transfer::public_share_object(S { id })
+        sui::transfer::public_share_object(S { id })
     }
 
     public entry fun transfer(s: S, recipient: address) {
-        one::transfer::public_transfer(s, recipient)
+        sui::transfer::public_transfer(s, recipient)
     }
 
 }

@@ -4,15 +4,15 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use fastcrypto::{
-    encoding::{Encoding, Hex},
-    secp256k1::Secp256k1KeyPair,
-    traits::EncodeDecodeBase64,
-};
+use fastcrypto::encoding::{Encoding, Hex};
+use fastcrypto::{secp256k1::Secp256k1KeyPair, traits::EncodeDecodeBase64};
 use sui_types::crypto::{AuthorityKeyPair, NetworkKeyPair, SuiKeyPair, ToFromBytes};
 
 /// Write Base64 encoded `flag || privkey` to file.
-pub fn write_keypair_to_file<P: AsRef<std::path::Path>>(keypair: &SuiKeyPair, path: P) -> anyhow::Result<()> {
+pub fn write_keypair_to_file<P: AsRef<std::path::Path>>(
+    keypair: &SuiKeyPair,
+    path: P,
+) -> anyhow::Result<()> {
     let contents = keypair.encode_base64();
     std::fs::write(path, contents)?;
     Ok(())
@@ -29,7 +29,9 @@ pub fn write_authority_keypair_to_file<P: AsRef<std::path::Path>>(
 }
 
 /// Read from file as Base64 encoded `privkey` and return a AuthorityKeyPair.
-pub fn read_authority_keypair_from_file<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<AuthorityKeyPair> {
+pub fn read_authority_keypair_from_file<P: AsRef<std::path::Path>>(
+    path: P,
+) -> anyhow::Result<AuthorityKeyPair> {
     let contents = std::fs::read_to_string(path)?;
     AuthorityKeyPair::decode_base64(contents.as_str().trim()).map_err(|e| anyhow!(e))
 }
@@ -41,7 +43,9 @@ pub fn read_keypair_from_file<P: AsRef<std::path::Path>>(path: P) -> anyhow::Res
 }
 
 /// Read from file as Base64 encoded `flag || privkey` and return a NetworkKeyPair.
-pub fn read_network_keypair_from_file<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<NetworkKeyPair> {
+pub fn read_network_keypair_from_file<P: AsRef<std::path::Path>>(
+    path: P,
+) -> anyhow::Result<NetworkKeyPair> {
     let kp = read_keypair_from_file(path)?;
     if let SuiKeyPair::Ed25519(kp) = kp {
         Ok(kp)

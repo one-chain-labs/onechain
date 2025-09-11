@@ -5,41 +5,17 @@
 use crate::{
     diagnostics::warning_filters::{WarningFilters, WarningFiltersTable},
     expansion::ast::{
-        ability_constraints_ast_debug,
+        AbilitySet, Attributes, DottedUsage, Fields, Friend, ImplicitUseFunCandidate, ModuleIdent,
+        Mutability, Value, Value_, Visibility, ability_constraints_ast_debug,
         ability_modifiers_ast_debug,
-        AbilitySet,
-        Attributes,
-        DottedUsage,
-        Fields,
-        Friend,
-        ImplicitUseFunCandidate,
-        ModuleIdent,
-        Mutability,
-        TargetKind,
-        Value,
-        Value_,
-        Visibility,
     },
     parser::ast::{
-        self as P,
-        Ability_,
-        BinOp,
-        ConstantName,
-        DatatypeName,
-        Field,
-        FunctionName,
-        UnaryOp,
-        VariantName,
-        ENTRY_MODIFIER,
-        MACRO_MODIFIER,
-        NATIVE_MODIFIER,
+        self as P, Ability_, BinOp, ConstantName, DatatypeName, DocComment, ENTRY_MODIFIER, Field,
+        FunctionName, MACRO_MODIFIER, NATIVE_MODIFIER, TargetKind, UnaryOp, VariantName,
     },
     shared::{
-        ast_debug::*,
-        known_attributes::SyntaxAttribute,
-        program_info::NamingProgramInfo,
-        unique_map::UniqueMap,
-        *,
+        ast_debug::*, known_attributes::SyntaxAttribute, program_info::NamingProgramInfo,
+        unique_map::UniqueMap, *,
     },
 };
 use move_ir_types::location::*;
@@ -90,6 +66,7 @@ pub enum UseFunKind {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UseFun {
+    pub doc: DocComment,
     pub loc: Loc,
     pub attributes: Attributes,
     pub is_public: Option<Loc>,
@@ -163,10 +140,13 @@ pub type SyntaxMethods = BTreeMap<TypeName, SyntaxMethodEntry>;
 
 #[derive(Debug, Clone)]
 pub struct ModuleDefinition {
+    pub doc: DocComment,
     pub loc: Loc,
     pub warning_filter: WarningFilters,
     // package name metadata from compiler arguments, not used for any language rules
     pub package_name: Option<Symbol>,
+    /// The named address map used by this module during `expansion`.
+    pub named_address_map: Arc<NamedAddressMap>,
     pub attributes: Attributes,
     pub target_kind: TargetKind,
     pub use_funs: UseFuns,
@@ -190,6 +170,7 @@ pub struct DatatypeTypeParameter {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StructDefinition {
+    pub doc: DocComment,
     pub warning_filter: WarningFilters,
     // index in the original order as defined in the source file
     pub index: usize,
@@ -202,12 +183,13 @@ pub struct StructDefinition {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StructFields {
-    Defined(/* positional */ bool, Fields<Type>),
+    Defined(/* positional */ bool, Fields<(DocComment, Type)>),
     Native(Loc),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumDefinition {
+    pub doc: DocComment,
     pub warning_filter: WarningFilters,
     // index in the original order as defined in the source file
     pub index: usize,
@@ -220,6 +202,7 @@ pub struct EnumDefinition {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VariantDefinition {
+    pub doc: DocComment,
     // index in the original order as defined in the source file
     pub index: usize,
     pub loc: Loc,
@@ -228,7 +211,7 @@ pub struct VariantDefinition {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum VariantFields {
-    Defined(/* positional */ bool, Fields<Type>),
+    Defined(/* positional */ bool, Fields<(DocComment, Type)>),
     Empty,
 }
 
@@ -252,11 +235,12 @@ pub type FunctionBody = Spanned<FunctionBody_>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function {
+    pub doc: DocComment,
+    pub loc: Loc,
     pub warning_filter: WarningFilters,
     // index in the original order as defined in the source file
     pub index: usize,
     pub attributes: Attributes,
-    pub loc: Loc,
     pub visibility: Visibility,
     pub entry: Option<Loc>,
     pub macro_: Option<Loc>,
@@ -270,6 +254,7 @@ pub struct Function {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Constant {
+    pub doc: DocComment,
     pub warning_filter: WarningFilters,
     // index in the original order as defined in the source file
     pub index: usize,
@@ -308,7 +293,7 @@ pub enum BuiltinTypeName_ {
 }
 pub type BuiltinTypeName = Spanned<BuiltinTypeName_>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 pub enum TypeName_ {
     // exp-list/tuple type
@@ -341,6 +326,7 @@ pub enum Type_ {
     Fun(Vec<Type>, Box<Type>),
     Var(TVar),
     Anything,
+    Void,
     UnresolvedError,
 }
 pub type Type = Spanned<Type_>;
@@ -367,7 +353,11 @@ pub struct BlockLabel {
 #[allow(clippy::large_enum_variant)]
 pub enum LValue_ {
     Ignore,
-    Var { mut_: Option<Mutability>, var: Var, unused_binding: bool },
+    Var {
+        mut_: Option<Mutability>,
+        var: Var,
+        unused_binding: bool,
+    },
     Unpack(ModuleIdent, DatatypeName, Option<Vec<Type>>, Fields<LValue>),
     Error,
 }
@@ -409,6 +399,12 @@ pub struct Lambda {
     pub return_label: BlockLabel,
     pub use_fun_color: Color,
     pub body: Box<Exp>,
+    // Collected during macro expansion. These additional annotations can come from `Annotate` or
+    // more subtly by passing a lambda from one macro to another.
+    // Conceptually we could handle this by eta-expanding the lambda
+    // invocation, so that `$f` becomes `|...|$f(...)`, but due to the limited nature here, just
+    // collecting the annotations is easier
+    pub extra_annotations: Vec<Spanned<(Vec<Type>, Type)>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -431,7 +427,13 @@ pub enum Exp_ {
     Var(Var),
     Constant(ModuleIdent, ConstantName),
 
-    ModuleCall(ModuleIdent, FunctionName, /* is_macro */ Option<Loc>, Option<Vec<Type>>, Spanned<Vec<Exp>>),
+    ModuleCall(
+        ModuleIdent,
+        FunctionName,
+        /* is_macro */ Option<Loc>,
+        Option<Vec<Type>>,
+        Spanned<Vec<Exp>>,
+    ),
     MethodCall(
         ExpDotted,
         Loc, // location of the dot
@@ -465,7 +467,13 @@ pub enum Exp_ {
     BinopExp(Box<Exp>, BinOp, Box<Exp>),
 
     Pack(ModuleIdent, DatatypeName, Option<Vec<Type>>, Fields<Exp>),
-    PackVariant(ModuleIdent, DatatypeName, VariantName, Option<Vec<Type>>, Fields<Exp>),
+    PackVariant(
+        ModuleIdent,
+        DatatypeName,
+        VariantName,
+        Option<Vec<Type>>,
+        Fields<Exp>,
+    ),
     ExpList(Vec<Exp>),
     Unit {
         trailing: bool,
@@ -507,8 +515,19 @@ pub type MatchArm = Spanned<MatchArm_>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MatchPattern_ {
-    Variant(ModuleIdent, DatatypeName, VariantName, Option<Vec<Type>>, Fields<MatchPattern>),
-    Struct(ModuleIdent, DatatypeName, Option<Vec<Type>>, Fields<MatchPattern>),
+    Variant(
+        ModuleIdent,
+        DatatypeName,
+        VariantName,
+        Option<Vec<Type>>,
+        Fields<MatchPattern>,
+    ),
+    Struct(
+        ModuleIdent,
+        DatatypeName,
+        Option<Vec<Type>>,
+        Fields<MatchPattern>,
+    ),
     Constant(ModuleIdent, ConstantName),
     Binder(Mutability, Var, /* unused binding */ bool),
     Literal(Value),
@@ -526,6 +545,7 @@ pub type MatchPattern = Spanned<MatchPattern_>;
 
 impl TName for Var {
     type Key = Var_;
+
     type Loc = Loc;
 
     fn drop_loc(self) -> (Self::Loc, Self::Key) {
@@ -549,7 +569,11 @@ impl TName for Var {
 
 impl UseFuns {
     pub fn new(color: Color) -> Self {
-        Self { color, resolved: BTreeMap::new(), implicit_candidates: UniqueMap::new() }
+        Self {
+            color,
+            resolved: BTreeMap::new(),
+            implicit_candidates: UniqueMap::new(),
+        }
     }
 }
 
@@ -560,7 +584,9 @@ impl IndexSyntaxMethods {
         if let Some(index) = &self.index {
             Some(index.target_function)
         } else {
-            self.index_mut.as_ref().map(|index_mut| index_mut.target_function)
+            self.index_mut
+                .as_ref()
+                .map(|index_mut| index_mut.target_function)
         }
     }
 }
@@ -578,7 +604,10 @@ impl SyntaxMethodEntry {
 
     fn index_entry(&mut self) -> &mut IndexSyntaxMethods {
         if self.index.is_none() {
-            let new_index_syntax_method = IndexSyntaxMethods { index: None, index_mut: None };
+            let new_index_syntax_method = IndexSyntaxMethods {
+                index: None,
+                index_mut: None,
+            };
             self.index = Some(Box::new(new_index_syntax_method));
         }
         self.index.as_mut().unwrap()
@@ -616,20 +645,22 @@ static BUILTIN_TYPE_NUMERIC: Lazy<BTreeSet<BuiltinTypeName_>> = Lazy::new(|| {
     .collect()
 });
 
-static BUILTIN_TYPE_BITS: Lazy<BTreeSet<BuiltinTypeName_>> = Lazy::new(|| BUILTIN_TYPE_NUMERIC.clone());
+static BUILTIN_TYPE_BITS: Lazy<BTreeSet<BuiltinTypeName_>> =
+    Lazy::new(|| BUILTIN_TYPE_NUMERIC.clone());
 
-static BUILTIN_TYPE_ORDERED: Lazy<BTreeSet<BuiltinTypeName_>> = Lazy::new(|| BUILTIN_TYPE_BITS.clone());
+static BUILTIN_TYPE_ORDERED: Lazy<BTreeSet<BuiltinTypeName_>> =
+    Lazy::new(|| BUILTIN_TYPE_BITS.clone());
 
 impl BuiltinTypeName_ {
     pub const ADDRESS: &'static str = "address";
-    pub const BOOL: &'static str = "bool";
     pub const SIGNER: &'static str = "signer";
-    pub const U_128: &'static str = "u128";
+    pub const U_8: &'static str = "u8";
     pub const U_16: &'static str = "u16";
-    pub const U_256: &'static str = "u256";
     pub const U_32: &'static str = "u32";
     pub const U_64: &'static str = "u64";
-    pub const U_8: &'static str = "u8";
+    pub const U_128: &'static str = "u128";
+    pub const U_256: &'static str = "u256";
+    pub const BOOL: &'static str = "bool";
     pub const VECTOR: &'static str = "vector";
 
     pub fn all_names() -> &'static BTreeSet<Symbol> {
@@ -673,7 +704,9 @@ impl BuiltinTypeName_ {
         use BuiltinTypeName_ as B;
         // Match here to make sure this function is fixed when collections are added
         match self {
-            B::Address | B::U8 | B::U16 | B::U32 | B::U64 | B::U128 | B::U256 | B::Bool => AbilitySet::primitives(loc),
+            B::Address | B::U8 | B::U16 | B::U32 | B::U64 | B::U128 | B::U256 | B::Bool => {
+                AbilitySet::primitives(loc)
+            }
             B::Signer => AbilitySet::signer(loc),
             B::Vector => AbilitySet::collection(loc),
         }
@@ -683,7 +716,15 @@ impl BuiltinTypeName_ {
         use BuiltinTypeName_ as B;
         // Match here to make sure this function is fixed when collections are added
         match self {
-            B::Address | B::Signer | B::U8 | B::U16 | B::U32 | B::U64 | B::U128 | B::U256 | B::Bool => vec![],
+            B::Address
+            | B::Signer
+            | B::U8
+            | B::U16
+            | B::U32
+            | B::U64
+            | B::U128
+            | B::U256
+            | B::Bool => vec![],
             B::Vector => vec![AbilitySet::empty()],
         }
     }
@@ -695,12 +736,16 @@ impl TParamID {
     }
 }
 
-static BUILTIN_FUNCTION_ALL_NAMES: Lazy<BTreeSet<Symbol>> =
-    Lazy::new(|| [BuiltinFunction_::FREEZE, BuiltinFunction_::ASSERT_MACRO].into_iter().map(Symbol::from).collect());
+static BUILTIN_FUNCTION_ALL_NAMES: Lazy<BTreeSet<Symbol>> = Lazy::new(|| {
+    [BuiltinFunction_::FREEZE, BuiltinFunction_::ASSERT_MACRO]
+        .into_iter()
+        .map(Symbol::from)
+        .collect()
+});
 
 impl BuiltinFunction_ {
-    pub const ASSERT_MACRO: &'static str = "assert";
     pub const FREEZE: &'static str = "freeze";
+    pub const ASSERT_MACRO: &'static str = "assert";
 
     pub fn all_names() -> &'static BTreeSet<Symbol> {
         &BUILTIN_FUNCTION_ALL_NAMES
@@ -730,14 +775,16 @@ impl TypeName_ {
     {
         match self {
             TypeName_::Builtin(_) | TypeName_::Multiple(_) => false,
-            TypeName_::ModuleType(mident, n) => mident.value.is(address, module) && n == name.as_ref(),
+            TypeName_::ModuleType(mident, n) => {
+                mident.value.is(address, module) && n == name.as_ref()
+            }
         }
     }
 
     pub fn single_type(&self) -> Option<TypeName_> {
         match self {
             TypeName_::Multiple(_) => None,
-            TypeName_::Builtin(_) | TypeName_::ModuleType(_, _) => Some(self.clone()),
+            TypeName_::Builtin(_) | TypeName_::ModuleType(_, _) => Some(*self),
         }
     }
 
@@ -861,30 +908,33 @@ impl Type_ {
     where
         NumericalAddress: PartialEq<Addr>,
     {
-        self.type_name().is_some_and(|tn| tn.value.is(address, module, name))
+        self.type_name()
+            .is_some_and(|tn| tn.value.is(address, module, name))
     }
 
     pub fn abilities(&self, loc: Loc) -> Option<AbilitySet> {
+        use Type_ as T;
         match self {
-            Type_::Apply(abilities, _, _) => abilities.clone(),
-            Type_::Param(tp) => Some(tp.abilities.clone()),
-            Type_::Unit => Some(AbilitySet::collection(loc)),
-            Type_::Ref(_, _) => Some(AbilitySet::references(loc)),
-            Type_::Anything | Type_::UnresolvedError => Some(AbilitySet::all(loc)),
-            Type_::Fun(_, _) => Some(AbilitySet::functions(loc)),
-            Type_::Var(_) => None,
+            T::Apply(abilities, _, _) => abilities.clone(),
+            T::Param(tp) => Some(tp.abilities.clone()),
+            T::Unit => Some(AbilitySet::collection(loc)),
+            T::Ref(_, _) => Some(AbilitySet::references(loc)),
+            T::Anything | T::Void | T::UnresolvedError => Some(AbilitySet::all(loc)),
+            T::Fun(_, _) => Some(AbilitySet::functions(loc)),
+            T::Var(_) => None,
         }
     }
 
     pub fn has_ability_(&self, ability: Ability_) -> Option<bool> {
+        use Type_ as T;
         match self {
-            Type_::Apply(abilities, _, _) => abilities.as_ref().map(|s| s.has_ability_(ability)),
-            Type_::Param(tp) => Some(tp.abilities.has_ability_(ability)),
-            Type_::Unit => Some(AbilitySet::COLLECTION.contains(&ability)),
-            Type_::Ref(_, _) => Some(AbilitySet::REFERENCES.contains(&ability)),
-            Type_::Anything | Type_::UnresolvedError => Some(true),
-            Type_::Fun(_, _) => Some(AbilitySet::FUNCTIONS.contains(&ability)),
-            Type_::Var(_) => None,
+            T::Apply(abilities, _, _) => abilities.as_ref().map(|s| s.has_ability_(ability)),
+            T::Param(tp) => Some(tp.abilities.has_ability_(ability)),
+            T::Unit => Some(AbilitySet::COLLECTION.contains(&ability)),
+            T::Ref(_, _) => Some(AbilitySet::REFERENCES.contains(&ability)),
+            T::Anything | T::Void | T::UnresolvedError => Some(true),
+            T::Fun(_, _) => Some(AbilitySet::FUNCTIONS.contains(&ability)),
+            T::Var(_) => None,
         }
     }
 
@@ -900,6 +950,7 @@ impl Type_ {
             | Type_::Fun(_, _)
             | Type_::Var(_)
             | Type_::Anything
+            | Type_::Void
             | Type_::UnresolvedError => None,
         }
     }
@@ -914,6 +965,7 @@ impl Type_ {
             | Type_::Fun(_, _)
             | Type_::Var(_)
             | Type_::Anything
+            | Type_::Void
             | Type_::UnresolvedError => self.clone(),
         }
     }
@@ -964,18 +1016,22 @@ impl Value_ {
 impl fmt::Display for BuiltinTypeName_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         use BuiltinTypeName_ as BT;
-        write!(f, "{}", match self {
-            BT::Address => BT::ADDRESS,
-            BT::Signer => BT::SIGNER,
-            BT::U8 => BT::U_8,
-            BT::U16 => BT::U_16,
-            BT::U32 => BT::U_32,
-            BT::U64 => BT::U_64,
-            BT::U128 => BT::U_128,
-            BT::U256 => BT::U_256,
-            BT::Bool => BT::BOOL,
-            BT::Vector => BT::VECTOR,
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                BT::Address => BT::ADDRESS,
+                BT::Signer => BT::SIGNER,
+                BT::U8 => BT::U_8,
+                BT::U16 => BT::U_16,
+                BT::U32 => BT::U_32,
+                BT::U64 => BT::U_64,
+                BT::U128 => BT::U_128,
+                BT::U256 => BT::U_256,
+                BT::Bool => BT::BOOL,
+                BT::Vector => BT::VECTOR,
+            }
+        )
     }
 }
 
@@ -992,11 +1048,15 @@ impl fmt::Display for TypeName_ {
 
 impl std::fmt::Display for NominalBlockUsage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            NominalBlockUsage::Return => "return",
-            NominalBlockUsage::Break => "break",
-            NominalBlockUsage::Continue => "continue",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                NominalBlockUsage::Return => "return",
+                NominalBlockUsage::Break => "break",
+                NominalBlockUsage::Continue => "continue",
+            }
+        )
     }
 }
 
@@ -1041,7 +1101,17 @@ impl AstDebug for Neighbor_ {
 
 impl AstDebug for UseFun {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let UseFun { loc: _, attributes, is_public, tname: _, target_function: (target_m, target_f), kind, used } = self;
+        let UseFun {
+            doc,
+            loc: _,
+            attributes,
+            is_public,
+            tname: _,
+            target_function: (target_m, target_f),
+            kind,
+            used,
+        } = self;
+        doc.ast_debug(w);
         attributes.ast_debug(w);
         w.new_line();
         if is_public.is_some() {
@@ -1079,7 +1149,11 @@ impl AstDebug for ResolvedUseFuns {
 
 impl AstDebug for UseFuns {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let Self { color, resolved, implicit_candidates } = self;
+        let Self {
+            color,
+            resolved,
+            implicit_candidates,
+        } = self;
         w.write(format!("use_funs#{} ", color));
         resolved.ast_debug(w);
         if !implicit_candidates.is_empty() {
@@ -1096,9 +1170,17 @@ impl AstDebug for UseFuns {
 
 impl AstDebug for SyntaxMethod {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let SyntaxMethod { loc: _, tname, target_function: (target_m, target_f), visibility: _, kind } = self;
+        let SyntaxMethod {
+            loc: _,
+            tname,
+            target_function: (target_m, target_f),
+            visibility: _,
+            kind,
+        } = self;
         let kind_str = format!("{:?}", kind.value);
-        w.write(format!("syntax({kind_str}) for {tname} -> {target_m}::{target_f}\n"));
+        w.write(format!(
+            "syntax({kind_str}) for {tname} -> {target_m}::{target_f}\n"
+        ));
     }
 }
 
@@ -1129,9 +1211,11 @@ impl AstDebug for SyntaxMethods {
 impl AstDebug for ModuleDefinition {
     fn ast_debug(&self, w: &mut AstWriter) {
         let ModuleDefinition {
+            doc,
             loc: _,
             warning_filter,
             package_name,
+            named_address_map: _,
             attributes,
             target_kind,
             use_funs,
@@ -1142,16 +1226,13 @@ impl AstDebug for ModuleDefinition {
             constants,
             functions,
         } = self;
+        doc.ast_debug(w);
         warning_filter.ast_debug(w);
         if let Some(n) = package_name {
             w.writeln(format!("{}", n))
         }
         attributes.ast_debug(w);
-        w.writeln(match target_kind {
-            TargetKind::Source { is_root_package: true } => "root module",
-            TargetKind::Source { is_root_package: false } => "dependency module",
-            TargetKind::External => "external module",
-        });
+        target_kind.ast_debug(w);
         use_funs.ast_debug(w);
         syntax_methods.ast_debug(w);
         for (mident, _loc) in friends.key_cloned_iter() {
@@ -1179,8 +1260,20 @@ impl AstDebug for ModuleDefinition {
 
 impl AstDebug for (DatatypeName, &StructDefinition) {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let (name, StructDefinition { warning_filter, index, loc: _, attributes, abilities, type_parameters, fields }) =
-            self;
+        let (
+            name,
+            StructDefinition {
+                doc,
+                warning_filter,
+                index,
+                loc: _,
+                attributes,
+                abilities,
+                type_parameters,
+                fields,
+            },
+        ) = self;
+        doc.ast_debug(w);
         warning_filter.ast_debug(w);
         attributes.ast_debug(w);
         if let StructFields::Native(_) = fields {
@@ -1195,7 +1288,8 @@ impl AstDebug for (DatatypeName, &StructDefinition) {
             }
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
-                    let (idx, st) = idx_st;
+                    let (idx, (doc, st)) = idx_st;
+                    doc.ast_debug(w);
                     w.write(format!("{}#{}: ", idx, f));
                     st.ast_debug(w);
                     true
@@ -1207,8 +1301,20 @@ impl AstDebug for (DatatypeName, &StructDefinition) {
 
 impl AstDebug for (DatatypeName, &EnumDefinition) {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let (name, EnumDefinition { index, loc: _, attributes, abilities, type_parameters, variants, warning_filter }) =
-            self;
+        let (
+            name,
+            EnumDefinition {
+                doc,
+                index,
+                loc: _,
+                attributes,
+                abilities,
+                type_parameters,
+                variants,
+                warning_filter,
+            },
+        ) = self;
+        doc.ast_debug(w);
         warning_filter.ast_debug(w);
         attributes.ast_debug(w);
 
@@ -1225,8 +1331,17 @@ impl AstDebug for (DatatypeName, &EnumDefinition) {
 
 impl AstDebug for (VariantName, &VariantDefinition) {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let (name, VariantDefinition { index, fields, loc: _ }) = self;
+        let (
+            name,
+            VariantDefinition {
+                doc,
+                index,
+                fields,
+                loc: _,
+            },
+        ) = self;
 
+        doc.ast_debug(w);
         w.write(format!("variant#{index} {name}"));
         match fields {
             VariantFields::Defined(is_positional, fields) => {
@@ -1235,7 +1350,8 @@ impl AstDebug for (VariantName, &VariantDefinition) {
                 }
                 w.block(|w| {
                     w.list(fields, ",", |w, (_, f, idx_st)| {
-                        let (idx, st) = idx_st;
+                        let (idx, (doc, st)) = idx_st;
+                        doc.ast_debug(w);
                         w.write(format!("{}#{}: ", idx, f));
                         st.ast_debug(w);
                         true
@@ -1249,8 +1365,22 @@ impl AstDebug for (VariantName, &VariantDefinition) {
 
 impl AstDebug for (FunctionName, &Function) {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let (name, Function { warning_filter, index, attributes, loc: _, visibility, macro_, entry, signature, body }) =
-            self;
+        let (
+            name,
+            Function {
+                doc,
+                loc: _,
+                warning_filter,
+                index,
+                attributes,
+                visibility,
+                macro_,
+                entry,
+                signature,
+                body,
+            },
+        ) = self;
+        doc.ast_debug(w);
         warning_filter.ast_debug(w);
         attributes.ast_debug(w);
         visibility.ast_debug(w);
@@ -1274,7 +1404,11 @@ impl AstDebug for (FunctionName, &Function) {
 
 impl AstDebug for FunctionSignature {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let FunctionSignature { type_parameters, parameters, return_type } = self;
+        let FunctionSignature {
+            type_parameters,
+            parameters,
+            return_type,
+        } = self;
         type_parameters.ast_debug(w);
         w.write("(");
         w.comma(parameters, |w, (mut_, v, st)| {
@@ -1305,7 +1439,10 @@ impl AstDebug for Var_ {
 
 impl AstDebug for BlockLabel {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let BlockLabel { is_implicit: _, label: sp!(_, Var_ { name, id, color }) } = self;
+        let BlockLabel {
+            is_implicit: _,
+            label: sp!(_, Var_ { name, id, color }),
+        } = self;
         w.write(format!("'{name}"));
         if *id != 0 {
             w.write(format!("#{id}"));
@@ -1338,7 +1475,19 @@ impl AstDebug for Vec<DatatypeTypeParameter> {
 
 impl AstDebug for (ConstantName, &Constant) {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let (name, Constant { warning_filter, index, attributes, loc: _loc, signature, value }) = self;
+        let (
+            name,
+            Constant {
+                doc,
+                warning_filter,
+                index,
+                attributes,
+                loc: _loc,
+                signature,
+                value,
+            },
+        ) = self;
+        doc.ast_debug(w);
         warning_filter.ast_debug(w);
         attributes.ast_debug(w);
         w.write(format!("const#{index} {name}:"));
@@ -1367,7 +1516,11 @@ impl AstDebug for TypeName_ {
 
 impl AstDebug for TParam {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let TParam { id, user_specified_name, abilities } = self;
+        let TParam {
+            id,
+            user_specified_name,
+            abilities,
+        } = self;
         w.write(format!("{}#{}", user_specified_name, id.0));
         ability_constraints_ast_debug(w, abilities);
     }
@@ -1438,6 +1591,7 @@ impl AstDebug for Type_ {
             }
             Type_::Var(tv) => w.write(format!("#{}", tv.0)),
             Type_::Anything => w.write("_"),
+            Type_::Void => w.write("_"),
             Type_::UnresolvedError => w.write("_|_"),
         }
     }
@@ -1486,7 +1640,9 @@ impl AstDebug for Exp_ {
         use Exp_ as E;
         match self {
             E::Unit { trailing } if !trailing => w.write("()"),
-            E::Unit { trailing: _trailing } => w.write("/*()*/"),
+            E::Unit {
+                trailing: _trailing,
+            } => w.write("/*()*/"),
             E::Value(v) => v.ast_debug(w),
             E::Var(v) => v.ast_debug(w),
             E::Constant(m, c) => w.write(format!("{}::{}", m, c)),
@@ -1699,22 +1855,50 @@ impl AstDebug for Exp_ {
 
 impl AstDebug for Lambda {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let Lambda { parameters: sp!(_, bs), return_type, return_label, use_fun_color, body: e } = self;
+        struct LambdaAnnot<'a>(&'a (Vec<Type>, Type));
+        impl AstDebug for LambdaAnnot<'_> {
+            fn ast_debug(&self, w: &mut AstWriter) {
+                let (args, result) = &self.0;
+                w.write("|");
+                w.comma(args, |w, ty| ty.ast_debug(w));
+                w.write("|");
+                result.ast_debug(w);
+            }
+        }
+
+        let Lambda {
+            parameters: sp!(_, bs),
+            return_type,
+            return_label,
+            use_fun_color,
+            body: e,
+            extra_annotations,
+        } = self;
         return_label.ast_debug(w);
         w.write(": ");
-        bs.ast_debug(w);
-        if let Some(ty) = return_type {
-            w.write(" -> ");
-            ty.ast_debug(w);
+        let mut display: Box<dyn FnOnce(&mut AstWriter)> = Box::new(|w: &mut AstWriter| {
+            bs.ast_debug(w);
+            if let Some(ty) = return_type {
+                w.write(" -> ");
+                ty.ast_debug(w);
+            }
+            w.write(format!("use_funs#{}", use_fun_color));
+            e.ast_debug(w);
+        });
+        for sp!(_, annot) in extra_annotations {
+            display = Box::new(|w: &mut AstWriter| w.annotate(display, &LambdaAnnot(annot)));
         }
-        w.write(format!("use_funs#{}", use_fun_color));
-        e.ast_debug(w);
+        display(w)
     }
 }
 
 impl AstDebug for Block {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let Block { name, from_macro_argument, seq } = self;
+        let Block {
+            name,
+            from_macro_argument,
+            seq,
+        } = self;
         if let Some(name) = name {
             name.ast_debug(w);
             w.write(": ");
@@ -1767,7 +1951,14 @@ impl AstDebug for ExpDotted_ {
 
 impl AstDebug for MatchArm_ {
     fn ast_debug(&self, w: &mut AstWriter) {
-        let MatchArm_ { pattern, binders: _, guard, guard_binders: _, rhs_binders: _, rhs } = self;
+        let MatchArm_ {
+            pattern,
+            binders: _,
+            guard,
+            guard_binders: _,
+            rhs_binders: _,
+            rhs,
+        } = self;
         pattern.ast_debug(w);
         if let Some(exp) = guard.as_ref() {
             w.write(" if (");
@@ -1857,7 +2048,11 @@ impl AstDebug for LValue_ {
         match self {
             L::Ignore => w.write("_"),
             L::Error => w.write("<_error>"),
-            L::Var { mut_, var, unused_binding } => {
+            L::Var {
+                mut_,
+                var,
+                unused_binding,
+            } => {
                 if let Some(mut_) = mut_ {
                     mut_.ast_debug(w);
                 }

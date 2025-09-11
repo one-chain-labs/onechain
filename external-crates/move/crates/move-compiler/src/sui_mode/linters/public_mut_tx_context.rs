@@ -5,10 +5,10 @@
 //! Detects and reports instances where a non-mutable reference to `TxContext` is used in public function signatures.
 //! Promotes best practices for future-proofing smart contract code by allowing mutation of the transaction context.
 
-use super::{LinterDiagnosticCategory, LinterDiagnosticCode, LINT_WARNING_PREFIX};
+use super::{LINT_WARNING_PREFIX, LinterDiagnosticCategory, LinterDiagnosticCode};
 use crate::{
     diag,
-    diagnostics::codes::{custom, DiagnosticInfo, Severity},
+    diagnostics::codes::{DiagnosticInfo, Severity, custom},
     expansion::ast::{ModuleIdent, Visibility},
     naming::ast::Type_,
     parser::ast::FunctionName,
@@ -31,7 +31,12 @@ simple_visitor!(
         // skip if in 'sui::tx_context'
         ident.value.is(&SUI_ADDR_VALUE, TX_CONTEXT_MODULE_NAME)
     },
-    fn visit_function_custom(&mut self, _module: ModuleIdent, _function_name: FunctionName, fdef: &T::Function) -> bool {
+    fn visit_function_custom(
+        &mut self,
+        _module: ModuleIdent,
+        _function_name: FunctionName,
+        fdef: &T::Function,
+    ) -> bool {
         if !matches!(&fdef.visibility, Visibility::Public(_)) {
             return false;
         }

@@ -19,13 +19,17 @@ use sui_sdk::SuiClientBuilder;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // Sui testnet -- https://fullnode.testnet.sui.io:443
+    // Sui testnet -- https://rpc-testnet.onelabs.cc:443
     let sui_testnet = SuiClientBuilder::default().build_testnet().await?;
     println!("Sui testnet version: {}", sui_testnet.api_version());
 
-     // Sui devnet -- https://fullnode.devnet.sui.io:443
+     // Sui devnet -- https://rpc-devnet.onelabs.cc:443
     let sui_devnet = SuiClientBuilder::default().build_devnet().await?;
     println!("Sui devnet version: {}", sui_devnet.api_version());
+
+    // Sui mainnet -- https://rpc-mainnet.onelabs.cc:443
+    let sui_mainnet = SuiClientBuilder::default().build_mainnet().await?;
+    println!("Sui mainnet version: {}", sui_mainnet.api_version());
 
     Ok(())
 }
@@ -54,7 +58,7 @@ There are serveral files ending in `_api.rs` which provide code examples of the 
 
 ### Prerequisites
 
-Unless otherwise specified, most of these examples assume `Rust` and `cargo` are installed, and that there is an available internet connection. The examples connect to the Sui testnet (`https://fullnode.testnet.sui.io:443`) and execute different APIs using the active address from the local wallet. If there is no local wallet, it will create one, generate two addresses, set one of them to be active, and it will request 1 SUI from the testnet faucet for the active address.
+Unless otherwise specified, most of these examples assume `Rust` and `cargo` are installed, and that there is an available internet connection. The examples connect to the Sui testnet (`https://rpc-testnet.onelabs.cc:443`) and execute different APIs using the active address from the local wallet. If there is no local wallet, it will create one, generate two addresses, set one of them to be active, and it will request 1 SUI from the testnet faucet for the active address.
 
 ### Running the existing examples
 
@@ -74,9 +78,9 @@ In the root folder of the `sui` repository (or in the `sui-sdk` crate folder), y
 The `SuiClientBuilder` struct provides a connection to the JSON-RPC server that you use for all read-only operations. The default URLs to connect to the Sui network are:
 
 - Local: http://127.0.0.1:9000
-- Devnet: https://fullnode.devnet.sui.io:443
-- Testnet: https://fullnode.testnet.sui.io:443
-- Mainnet: https://fullnode.mainnet.sui.io:443
+- Devnet: https://rpc-devnet.onelabs.cc:443
+- Testnet: https://rpc-testnet.onelabs.cc:443
+- Mainnet: https://rpc-mainnet.onelabs.cc:443
 
 For all available servers, see [here](https://sui.io/networkinfo).
 
@@ -97,11 +101,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let sui_local = SuiClientBuilder::default().build_localnet().await?;
     println!("Sui local network version: {}", sui_local.api_version());
 
-    // Sui devnet -- https://fullnode.devnet.sui.io:443
+    // Sui devnet -- https://rpc-devnet.onelabs.cc:443
     let sui_devnet = SuiClientBuilder::default().build_devnet().await?;
     println!("Sui devnet version: {}", sui_devnet.api_version());
 
-    // Sui testnet -- https://fullnode.testnet.sui.io:443
+    // Sui testnet -- https://rpc-testnet.onelabs.cc:443
     let sui_testnet = SuiClientBuilder::default().build_testnet().await?;
     println!("Sui testnet version: {}", sui_testnet.api_version());
 
@@ -126,7 +130,7 @@ async fn main() -> Result<(), anyhow::Error> {
       .coin_read_api()
       .get_all_balances(active_address)
       .await?;
-   println!("The balances for all coins owned by address: {active_address} are {}", total_balance);
+   println!("The balances for all coins owned by address: {active_address} are {:#?}", total_balance);
    Ok(())
 }
 ```

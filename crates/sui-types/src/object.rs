@@ -1,45 +1,42 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::BTreeMap,
-    convert::TryFrom,
-    fmt::{Debug, Display, Formatter},
-    sync::Arc,
-};
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
+use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
 
 use move_binary_format::CompiledModule;
-use move_bytecode_utils::{layout::TypeLayoutBuilder, module_cache::GetModule};
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
-    language_storage::{StructTag, TypeTag},
-};
+use move_bytecode_utils::layout::TypeLayoutBuilder;
+use move_bytecode_utils::module_cache::GetModule;
+use move_core_types::annotated_value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue};
+use move_core_types::language_storage::StructTag;
+use move_core_types::language_storage::TypeTag;
+use mysten_common::debug_fatal;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, Bytes};
+use serde_with::serde_as;
+use serde_with::Bytes;
 
+use crate::base_types::{FullObjectID, FullObjectRef, MoveObjectType, ObjectIDParseError};
+use crate::coin::{Coin, CoinMetadata, TreasuryCap};
+use crate::crypto::{default_hash, deterministic_random_account_key};
+use crate::error::{ExecutionError, ExecutionErrorKind, UserInputError, UserInputResult};
+use crate::error::{SuiError, SuiResult};
+use crate::gas_coin::GAS;
+use crate::is_system_package;
+use crate::layout_resolver::LayoutResolver;
+use crate::move_package::MovePackage;
 use crate::{
     base_types::{
-        MoveObjectType,
-        ObjectDigest,
-        ObjectID,
-        ObjectIDParseError,
-        ObjectRef,
-        SequenceNumber,
-        SuiAddress,
-        TransactionDigest,
+        ObjectDigest, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest,
     },
-    coin::{Coin, CoinMetadata, TreasuryCap},
-    crypto::{default_hash, deterministic_random_account_key},
-    error::{ExecutionError, ExecutionErrorKind, SuiError, SuiResult, UserInputError, UserInputResult},
-    gas_coin::{GasCoin, GAS},
-    is_system_package,
-    layout_resolver::LayoutResolver,
-    move_package::MovePackage,
+    gas_coin::GasCoin,
 };
 use sui_protocol_config::ProtocolConfig;
 
-use self::{balance_traversal::BalanceTraversal, bounded_visitor::BoundedVisitor};
+use self::balance_traversal::BalanceTraversal;
+use self::bounded_visitor::BoundedVisitor;
 
 mod balance_traversal;
 pub mod bounded_visitor;
@@ -83,14 +80,23 @@ impl MoveObject {
         version: SequenceNumber,
         contents: Vec<u8>,
         protocol_config: &ProtocolConfig,
+        system_mutation: bool,
     ) -> Result<Self, ExecutionError> {
-        Self::new_from_execution_with_limit(
-            type_,
-            has_public_transfer,
-            version,
-            contents,
-            protocol_config.max_move_object_size(),
-        )
+        let bound = if protocol_config.allow_unbounded_system_objects() && system_mutation {
+            if contents.len() as u64 > protocol_config.max_move_object_size() {
+                debug_fatal!(
+                    "System created object (ID = {:?}) of type {:?} and size {} exceeds normal max size {}",
+                    MoveObject::id_opt(&contents).ok(),
+                    type_,
+                    contents.len(),
+                    protocol_config.max_move_object_size()
+                );
+            }
+            u64::MAX
+        } else {
+            protocol_config.max_move_object_size()
+        };
+        Self::new_from_execution_with_limit(type_, has_public_transfer, version, contents, bound)
     }
 
     /// # Safety
@@ -107,12 +113,19 @@ impl MoveObject {
         // TODO: think this can be generalized to is_coin
         debug_assert!(!type_.is_gas_coin() || has_public_transfer);
         if contents.len() as u64 > max_move_object_size {
-            return Err(ExecutionError::from_kind(ExecutionErrorKind::MoveObjectTooBig {
-                object_size: contents.len() as u64,
-                max_object_size: max_move_object_size,
-            }));
+            return Err(ExecutionError::from_kind(
+                ExecutionErrorKind::MoveObjectTooBig {
+                    object_size: contents.len() as u64,
+                    max_object_size: max_move_object_size,
+                },
+            ));
         }
-        Ok(Self { type_, has_public_transfer, version, contents })
+        Ok(Self {
+            type_,
+            has_public_transfer,
+            version,
+            contents,
+        })
     }
 
     pub fn new_gas_coin(version: SequenceNumber, id: ObjectID, value: u64) -> Self {
@@ -129,11 +142,17 @@ impl MoveObject {
         }
     }
 
-    pub fn new_coin(coin_type: MoveObjectType, version: SequenceNumber, id: ObjectID, value: u64) -> Self {
+    pub fn new_coin(coin_type: TypeTag, version: SequenceNumber, id: ObjectID, value: u64) -> Self {
         // unwrap safe because coins are always smaller than the max object size
         unsafe {
-            Self::new_from_execution_with_limit(coin_type, true, version, GasCoin::new(id, value).to_bcs_bytes(), 256)
-                .unwrap()
+            Self::new_from_execution_with_limit(
+                MoveObjectType::coin(coin_type),
+                true,
+                version,
+                Coin::new(id, value).to_bcs_bytes(),
+                256,
+            )
+            .unwrap()
         }
     }
 
@@ -193,7 +212,8 @@ impl MoveObject {
         // 32 bytes for object ID, 8 for timestamp
         assert!(self.contents.len() == 40);
 
-        self.contents.splice(ID_END_INDEX.., timestamp_ms.to_le_bytes());
+        self.contents
+            .splice(ID_END_INDEX.., timestamp_ms.to_le_bytes());
     }
 
     pub fn is_coin(&self) -> bool {
@@ -221,24 +241,28 @@ impl MoveObject {
     }
 
     /// Update the contents of this object but does not increment its version
-    pub fn update_contents(
+    /// This should only be used for safe mode epoch advancement.
+    pub(crate) fn update_contents_advance_epoch_safe_mode(
         &mut self,
         new_contents: Vec<u8>,
         protocol_config: &ProtocolConfig,
     ) -> Result<(), ExecutionError> {
-        self.update_contents_with_limit(new_contents, protocol_config.max_move_object_size())
-    }
-
-    fn update_contents_with_limit(
-        &mut self,
-        new_contents: Vec<u8>,
-        max_move_object_size: u64,
-    ) -> Result<(), ExecutionError> {
-        if new_contents.len() as u64 > max_move_object_size {
-            return Err(ExecutionError::from_kind(ExecutionErrorKind::MoveObjectTooBig {
-                object_size: new_contents.len() as u64,
-                max_object_size: max_move_object_size,
-            }));
+        if new_contents.len() as u64 > protocol_config.max_move_object_size() {
+            if protocol_config.allow_unbounded_system_objects() {
+                debug_fatal!(
+                    "Safe mode object update (ID = {}) of size {} exceeds normal max size {}",
+                    self.id(),
+                    new_contents.len(),
+                    protocol_config.max_move_object_size()
+                )
+            } else {
+                return Err(ExecutionError::from_kind(
+                    ExecutionErrorKind::MoveObjectTooBig {
+                        object_size: new_contents.len() as u64,
+                        max_object_size: protocol_config.max_move_object_size(),
+                    },
+                ));
+            }
         }
 
         #[cfg(debug_assertions)]
@@ -290,22 +314,33 @@ impl MoveObject {
         resolver: &impl GetModule,
     ) -> Result<MoveStructLayout, SuiError> {
         let type_ = TypeTag::Struct(Box::new(struct_tag));
-        let layout = TypeLayoutBuilder::build_with_types(&type_, resolver)
-            .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
+        let layout = TypeLayoutBuilder::build_with_types(&type_, resolver).map_err(|e| {
+            SuiError::ObjectSerializationError {
+                error: e.to_string(),
+            }
+        })?;
         match layout {
             MoveTypeLayout::Struct(l) => Ok(*l),
-            _ => unreachable!("We called build_with_types on Struct type, should get a struct layout"),
+            _ => unreachable!(
+                "We called build_with_types on Struct type, should get a struct layout"
+            ),
         }
     }
 
     /// Convert `self` to the JSON representation dictated by `layout`.
     pub fn to_move_struct(&self, layout: &MoveStructLayout) -> Result<MoveStruct, SuiError> {
-        BoundedVisitor::deserialize_struct(&self.contents, layout)
-            .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })
+        BoundedVisitor::deserialize_struct(&self.contents, layout).map_err(|e| {
+            SuiError::ObjectSerializationError {
+                error: e.to_string(),
+            }
+        })
     }
 
     /// Convert `self` to the JSON representation dictated by `layout`.
-    pub fn to_move_struct_with_resolver(&self, resolver: &impl GetModule) -> Result<MoveStruct, SuiError> {
+    pub fn to_move_struct_with_resolver(
+        &self,
+        resolver: &impl GetModule,
+    ) -> Result<MoveStruct, SuiError> {
         self.to_move_struct(&self.get_layout(resolver)?)
     }
 
@@ -318,13 +353,14 @@ impl MoveObject {
     /// This should not be very expensive since the type tag is usually simple, and
     /// we only do this once per object being mutated.
     pub fn object_size_for_gas_metering(&self) -> usize {
-        let serialized_type_tag_size = bcs::serialized_size(&self.type_).expect("Serializing type tag should not fail");
+        let serialized_type_tag_size =
+            bcs::serialized_size(&self.type_).expect("Serializing type tag should not fail");
         // + 1 for 'has_public_transfer'
         // + 8 for `version`
         self.contents.len() + serialized_type_tag_size + 1 + 8
     }
 
-    /// Get the total amount of OCT embedded in `self`. Intended for testing purposes
+    /// Get the total amount of SUI embedded in `self`. Intended for testing purposes
     pub fn get_total_oct(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
         let balances = self.get_coin_balances(layout_resolver)?;
         Ok(balances.get(&GAS::type_tag()).copied().unwrap_or(0))
@@ -341,13 +377,19 @@ impl MoveObject {
         // Fast path without deserialization.
         if let Some(type_tag) = self.type_.coin_type_maybe() {
             let balance = self.get_coin_value_unsafe();
-            Ok(if balance > 0 { BTreeMap::from([(type_tag.clone(), balance)]) } else { BTreeMap::default() })
+            Ok(if balance > 0 {
+                BTreeMap::from([(type_tag.clone(), balance)])
+            } else {
+                BTreeMap::default()
+            })
         } else {
             let layout = layout_resolver.get_annotated_layout(&self.type_().clone().into())?;
 
             let mut traversal = BalanceTraversal::default();
             MoveValue::visit_deserialize(&self.contents, &layout.into_layout(), &mut traversal)
-                .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
+                .map_err(|e| SuiError::ObjectSerializationError {
+                    error: e.to_string(),
+                })?;
 
             Ok(traversal.finish())
         }
@@ -429,7 +471,9 @@ impl Data {
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Clone, Deserialize, Serialize, Hash, JsonSchema, Ord, PartialOrd)]
+#[derive(
+    Eq, PartialEq, Debug, Clone, Deserialize, Serialize, Hash, JsonSchema, Ord, PartialOrd,
+)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub enum Owner {
     /// Object is exclusively owned by a single address, and is mutable.
@@ -444,36 +488,15 @@ pub enum Owner {
     },
     /// Object is immutable, and hence ownership doesn't matter.
     Immutable,
-    /// Object is sequenced via consensus. Ownership is managed by the configured authenticator.
-    ///
-    /// Note: wondering what happened to `V1`? `Shared` above was the V1 of consensus objects.
-    ConsensusV2 {
+    /// Object is exclusively owned by a single address and sequenced via consensus.
+    ConsensusAddressOwner {
         /// The version at which the object most recently became a consensus object.
         /// This serves the same function as `initial_shared_version`, except it may change
         /// if the object's Owner type changes.
         start_version: SequenceNumber,
-        /// The authentication mode of the object
-        authenticator: Box<Authenticator>,
+        // The owner of the object.
+        owner: SuiAddress,
     },
-}
-
-#[derive(Eq, PartialEq, Debug, Clone, Copy, Deserialize, Serialize, Hash, JsonSchema, Ord, PartialOrd)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
-pub enum Authenticator {
-    /// The contained SuiAddress exclusively has all permissions: read, write, delete, transfer
-    SingleOwner(SuiAddress),
-}
-
-impl Authenticator {
-    pub fn as_single_owner(&self) -> &SuiAddress {
-        // NOTE: Existing callers are written assuming that only singly-owned
-        // ConsensusV2 objects exist. If additional Authenticator variants are
-        // added, do not simply panic here. Instead, change the return type of
-        // this function and update callers accordingly.
-        match self {
-            Self::SingleOwner(address) => address,
-        }
-    }
 }
 
 impl Owner {
@@ -482,18 +505,34 @@ impl Owner {
     pub fn get_address_owner_address(&self) -> SuiResult<SuiAddress> {
         match self {
             Self::AddressOwner(address) => Ok(*address),
-            Self::Shared { .. } | Self::Immutable | Self::ObjectOwner(_) | Self::ConsensusV2 { .. } => {
-                Err(SuiError::UnexpectedOwnerType)
-            }
+            Self::Shared { .. }
+            | Self::Immutable
+            | Self::ObjectOwner(_)
+            | Self::ConsensusAddressOwner { .. } => Err(SuiError::UnexpectedOwnerType),
         }
     }
 
-    // NOTE: this function will return address of both AddressOwner and ObjectOwner,
-    // address of ObjectOwner is converted from object id, even though the type is SuiAddress.
+    // NOTE: this function will return address of AddressOwner, ConsensusAddressOwner, and
+    // ObjectOwner. The address of ObjectOwner is converted from object ID, even though the
+    // type is SuiAddress.
     pub fn get_owner_address(&self) -> SuiResult<SuiAddress> {
         match self {
-            Self::AddressOwner(address) | Self::ObjectOwner(address) => Ok(*address),
-            Self::Shared { .. } | Self::Immutable | Self::ConsensusV2 { .. } => Err(SuiError::UnexpectedOwnerType),
+            Self::AddressOwner(address)
+            | Self::ObjectOwner(address)
+            | Self::ConsensusAddressOwner { owner: address, .. } => Ok(*address),
+            Self::Shared { .. } | Self::Immutable => Err(SuiError::UnexpectedOwnerType),
+        }
+    }
+
+    // Returns initial_shared_version for Shared objects, and start_version
+    // for ConsensusAddressOwner objects.
+    pub fn start_version(&self) -> Option<SequenceNumber> {
+        match self {
+            Self::Shared {
+                initial_shared_version,
+            } => Some(*initial_shared_version),
+            Self::ConsensusAddressOwner { start_version, .. } => Some(*start_version),
+            Self::Immutable | Self::AddressOwner(_) | Self::ObjectOwner(_) => None,
         }
     }
 
@@ -512,6 +551,13 @@ impl Owner {
     pub fn is_shared(&self) -> bool {
         matches!(self, Owner::Shared { .. })
     }
+
+    pub fn is_consensus(&self) -> bool {
+        matches!(
+            self,
+            Owner::Shared { .. } | Owner::ConsensusAddressOwner { .. }
+        )
+    }
 }
 
 impl PartialEq<ObjectID> for Owner {
@@ -519,7 +565,10 @@ impl PartialEq<ObjectID> for Owner {
         let other_id: SuiAddress = (*other).into();
         match self {
             Self::ObjectOwner(id) => id == &other_id,
-            Self::AddressOwner(_) | Self::Shared { .. } | Self::Immutable | Self::ConsensusV2 { .. } => false,
+            Self::AddressOwner(_)
+            | Self::Shared { .. }
+            | Self::Immutable
+            | Self::ConsensusAddressOwner { .. } => false,
         }
     }
 }
@@ -536,21 +585,21 @@ impl Display for Owner {
             Self::Immutable => {
                 write!(f, "Immutable")
             }
-            Self::Shared { initial_shared_version } => {
+            Self::Shared {
+                initial_shared_version,
+            } => {
                 write!(f, "Shared( {} )", initial_shared_version.value())
             }
-            Self::ConsensusV2 { start_version, authenticator } => {
-                write!(f, "ConsensusV2( {}, {} )", start_version.value(), authenticator)
-            }
-        }
-    }
-}
-
-impl Display for Authenticator {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SingleOwner(address) => {
-                write!(f, "SingleOwner({})", address)
+            Self::ConsensusAddressOwner {
+                start_version,
+                owner,
+            } => {
+                write!(
+                    f,
+                    "ConsensusAddressOwner( {}, {} )",
+                    start_version.value(),
+                    owner
+                )
             }
         }
     }
@@ -565,7 +614,7 @@ pub struct ObjectInner {
     pub owner: Owner,
     /// The digest of the transaction that created or last mutated this object
     pub previous_transaction: TransactionDigest,
-    /// The amount of OCT we would rebate if this object gets deleted.
+    /// The amount of SUI we would rebate if this object gets deleted.
     /// This number is re-calculated each time the object is mutated based on
     /// the present storage gas price.
     pub storage_rebate: u64,
@@ -597,17 +646,39 @@ impl Object {
         &self.0.owner
     }
 
-    pub fn new_from_genesis(data: Data, owner: Owner, previous_transaction: TransactionDigest) -> Self {
-        ObjectInner { data, owner, previous_transaction, storage_rebate: 0 }.into()
+    pub fn new_from_genesis(
+        data: Data,
+        owner: Owner,
+        previous_transaction: TransactionDigest,
+    ) -> Self {
+        ObjectInner {
+            data,
+            owner,
+            previous_transaction,
+            storage_rebate: 0,
+        }
+        .into()
     }
 
     /// Create a new Move object
     pub fn new_move(o: MoveObject, owner: Owner, previous_transaction: TransactionDigest) -> Self {
-        ObjectInner { data: Data::Move(o), owner, previous_transaction, storage_rebate: 0 }.into()
+        ObjectInner {
+            data: Data::Move(o),
+            owner,
+            previous_transaction,
+            storage_rebate: 0,
+        }
+        .into()
     }
 
     pub fn new_package_from_data(data: Data, previous_transaction: TransactionDigest) -> Self {
-        ObjectInner { data, owner: Owner::Immutable, previous_transaction, storage_rebate: 0 }.into()
+        ObjectInner {
+            data,
+            owner: Owner::Immutable,
+            previous_transaction,
+            storage_rebate: 0,
+        }
+        .into()
     }
 
     // Note: this will panic if `modules` is empty
@@ -618,15 +689,13 @@ impl Object {
     pub fn new_package<'p>(
         modules: &[CompiledModule],
         previous_transaction: TransactionDigest,
-        max_move_package_size: u64,
-        move_binary_format_version: u32,
+        protocol_config: &ProtocolConfig,
         dependencies: impl IntoIterator<Item = &'p MovePackage>,
     ) -> Result<Self, ExecutionError> {
         Ok(Self::new_package_from_data(
             Data::Package(MovePackage::new_initial(
                 modules,
-                max_move_package_size,
-                move_binary_format_version,
+                protocol_config,
                 dependencies,
             )?),
             previous_transaction,
@@ -642,7 +711,12 @@ impl Object {
         dependencies: impl IntoIterator<Item = &'p MovePackage>,
     ) -> Result<Self, ExecutionError> {
         Ok(Self::new_package_from_data(
-            Data::Package(previous_package.new_upgraded(new_package_id, modules, protocol_config, dependencies)?),
+            Data::Package(previous_package.new_upgraded(
+                new_package_id,
+                modules,
+                protocol_config,
+                dependencies,
+            )?),
             previous_transaction,
         ))
     }
@@ -654,13 +728,7 @@ impl Object {
     ) -> Result<Self, ExecutionError> {
         let dependencies: Vec<_> = dependencies.into_iter().collect();
         let config = ProtocolConfig::get_for_max_version_UNSAFE();
-        Self::new_package(
-            modules,
-            previous_transaction,
-            config.max_move_package_size(),
-            config.move_binary_format_version(),
-            &dependencies,
-        )
+        Self::new_package(modules, previous_transaction, &config, &dependencies)
     }
 
     /// Create a system package which is not subject to size limits. Panics if the object ID is not
@@ -685,7 +753,6 @@ impl Object {
 
 impl std::ops::Deref for Object {
     type Target = ObjectInner;
-
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -719,6 +786,10 @@ impl ObjectInner {
         self.owner.is_shared()
     }
 
+    pub fn is_consensus(&self) -> bool {
+        self.owner.is_consensus()
+    }
+
     pub fn get_single_owner(&self) -> Option<SuiAddress> {
         self.owner.get_owner_address().ok()
     }
@@ -738,6 +809,10 @@ impl ObjectInner {
         (self.id(), self.version(), self.digest())
     }
 
+    pub fn compute_full_object_reference(&self) -> FullObjectRef {
+        FullObjectRef(self.full_id(), self.version(), self.digest())
+    }
+
     pub fn digest(&self) -> ObjectDigest {
         ObjectDigest::new(default_hash(self))
     }
@@ -748,6 +823,15 @@ impl ObjectInner {
         match &self.data {
             Move(v) => v.id(),
             Package(m) => m.id(),
+        }
+    }
+
+    pub fn full_id(&self) -> FullObjectID {
+        let id = self.id();
+        if let Some(start_version) = self.owner.start_version() {
+            FullObjectID::Consensus((id, start_version))
+        } else {
+            FullObjectID::Fastpath(id)
         }
     }
 
@@ -788,8 +872,12 @@ impl ObjectInner {
     // context: https://github.com/MystenLabs/sui/pull/10679#discussion_r1165877816
     pub fn as_coin_maybe(&self) -> Option<Coin> {
         if let Some(move_object) = self.data.try_as_move() {
-            let coin: Coin = bcs::from_bytes(move_object.contents()).ok()?;
-            Some(coin)
+            if move_object.type_().is_coin() {
+                let coin: Coin = bcs::from_bytes(move_object.contents()).ok()?;
+                Some(coin)
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -820,18 +908,7 @@ impl ObjectInner {
         const TRANSACTION_DIGEST_SIZE: usize = 32;
         const STORAGE_REBATE_SIZE: usize = 8;
 
-        let owner_size = match &self.owner {
-            Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Shared { .. } | Owner::Immutable => {
-                DEFAULT_OWNER_SIZE
-            }
-            Owner::ConsensusV2 { authenticator, .. } => {
-                DEFAULT_OWNER_SIZE
-                    + match authenticator.as_ref() {
-                        Authenticator::SingleOwner(_) => 8, // marginal cost to store both SuiAddress and SequenceNumber
-                    }
-            }
-        };
-        let meta_data_size = owner_size + TRANSACTION_DIGEST_SIZE + STORAGE_REBATE_SIZE;
+        let meta_data_size = DEFAULT_OWNER_SIZE + TRANSACTION_DIGEST_SIZE + STORAGE_REBATE_SIZE;
         let data_size = match &self.data {
             Data::Move(m) => m.object_size_for_gas_metering(),
             Data::Package(p) => p.object_size_for_gas_metering(),
@@ -847,7 +924,10 @@ impl ObjectInner {
     /// Get a `MoveStructLayout` for `self`.
     /// The `resolver` value must contain the module that declares `self.type_` and the (transitive)
     /// dependencies of `self.type_` in order for this to succeed. Failure will result in an `ObjectSerializationError`
-    pub fn get_layout(&self, resolver: &impl GetModule) -> Result<Option<MoveStructLayout>, SuiError> {
+    pub fn get_layout(
+        &self,
+        resolver: &impl GetModule,
+    ) -> Result<Option<MoveStructLayout>, SuiError> {
         match &self.data {
             Data::Move(m) => Ok(Some(m.get_layout(resolver)?)),
             Data::Package(_) => Ok(None),
@@ -858,13 +938,15 @@ impl ObjectInner {
     /// like this: `S<T>`.
     /// Returns the inner parameter type `T`.
     pub fn get_move_template_type(&self) -> SuiResult<TypeTag> {
-        let move_struct = self
-            .data
-            .struct_tag()
-            .ok_or_else(|| SuiError::TypeError { error: "Object must be a Move object".to_owned() })?;
-        fp_ensure!(move_struct.type_params.len() == 1, SuiError::TypeError {
-            error: "Move object struct must have one type parameter".to_owned()
-        });
+        let move_struct = self.data.struct_tag().ok_or_else(|| SuiError::TypeError {
+            error: "Object must be a Move object".to_owned(),
+        })?;
+        fp_ensure!(
+            move_struct.type_params.len() == 1,
+            SuiError::TypeError {
+                error: "Move object struct must have one type parameter".to_owned()
+            }
+        );
         // Index access safe due to checks above.
         let type_tag = move_struct.type_params[0].clone();
         Ok(type_tag)
@@ -877,7 +959,7 @@ impl ObjectInner {
 
 // Testing-related APIs.
 impl Object {
-    /// Get the total amount of OCT embedded in `self`, including both Move objects and the storage rebate
+    /// Get the total amount of SUI embedded in `self`, including both Move objects and the storage rebate
     pub fn get_total_oct(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
         Ok(self.storage_rebate
             + match &self.data {
@@ -914,7 +996,9 @@ impl Object {
     pub fn shared_for_testing() -> Object {
         let id = ObjectID::random();
         let obj = MoveObject::new_gas_coin(OBJECT_START_VERSION, id, 10);
-        let owner = Owner::Shared { initial_shared_version: obj.version() };
+        let owner = Owner::Shared {
+            initial_shared_version: obj.version(),
+        };
         Object::new_move(obj, owner, TransactionDigest::genesis_marker())
     }
 
@@ -987,7 +1071,11 @@ impl Object {
         Self::with_id_owner_gas_for_testing(id, owner, GAS_VALUE_FOR_TESTING)
     }
 
-    pub fn with_id_owner_version_for_testing(id: ObjectID, version: SequenceNumber, owner: SuiAddress) -> Self {
+    pub fn with_id_owner_version_for_testing(
+        id: ObjectID,
+        version: SequenceNumber,
+        owner: Owner,
+    ) -> Self {
         let data = Data::Move(MoveObject {
             type_: GasCoin::type_().into(),
             has_public_transfer: true,
@@ -995,7 +1083,7 @@ impl Object {
             contents: GasCoin::new(id, GAS_VALUE_FOR_TESTING).to_bcs_bytes(),
         });
         ObjectInner {
-            owner: Owner::AddressOwner(owner),
+            owner,
             data,
             previous_transaction: TransactionDigest::genesis_marker(),
             storage_rebate: 0,
@@ -1011,7 +1099,11 @@ impl Object {
     /// For testing purposes only
     pub fn new_gas_with_balance_and_owner_for_testing(value: u64, owner: SuiAddress) -> Self {
         let obj = MoveObject::new_gas_coin(OBJECT_START_VERSION, ObjectID::random(), value);
-        Object::new_move(obj, Owner::AddressOwner(owner), TransactionDigest::genesis_marker())
+        Object::new_move(
+            obj,
+            Owner::AddressOwner(owner),
+            TransactionDigest::genesis_marker(),
+        )
     }
 
     /// Generate a new gas coin object with default balance and random owner.
@@ -1052,7 +1144,10 @@ impl ObjectRead {
     pub fn into_object(self) -> UserInputResult<Object> {
         match self {
             Self::Deleted(oref) => Err(UserInputError::ObjectDeleted { object_ref: oref }),
-            Self::NotExists(id) => Err(UserInputError::ObjectNotFound { object_id: id, version: None }),
+            Self::NotExists(id) => Err(UserInputError::ObjectNotFound {
+                object_id: id,
+                version: None,
+            }),
             Self::Exists(_, o, _) => Ok(o),
         }
     }
@@ -1060,7 +1155,10 @@ impl ObjectRead {
     pub fn object(&self) -> UserInputResult<&Object> {
         match self {
             Self::Deleted(oref) => Err(UserInputError::ObjectDeleted { object_ref: *oref }),
-            Self::NotExists(id) => Err(UserInputError::ObjectNotFound { object_id: *id, version: None }),
+            Self::NotExists(id) => Err(UserInputError::ObjectNotFound {
+                object_id: *id,
+                version: None,
+            }),
             Self::Exists(_, o, _) => Ok(o),
         }
     }
@@ -1103,7 +1201,11 @@ pub enum PastObjectRead {
     /// The object exists but not found with this version
     VersionNotFound(ObjectID, SequenceNumber),
     /// The asked object version is higher than the latest
-    VersionTooHigh { object_id: ObjectID, asked_version: SequenceNumber, latest_version: SequenceNumber },
+    VersionTooHigh {
+        object_id: ObjectID,
+        asked_version: SequenceNumber,
+        latest_version: SequenceNumber,
+    },
 }
 
 impl PastObjectRead {
@@ -1111,14 +1213,24 @@ impl PastObjectRead {
     pub fn into_object(self) -> UserInputResult<Object> {
         match self {
             Self::ObjectDeleted(oref) => Err(UserInputError::ObjectDeleted { object_ref: oref }),
-            Self::ObjectNotExists(id) => Err(UserInputError::ObjectNotFound { object_id: id, version: None }),
+            Self::ObjectNotExists(id) => Err(UserInputError::ObjectNotFound {
+                object_id: id,
+                version: None,
+            }),
             Self::VersionFound(_, o, _) => Ok(o),
-            Self::VersionNotFound(object_id, version) => {
-                Err(UserInputError::ObjectNotFound { object_id, version: Some(version) })
-            }
-            Self::VersionTooHigh { object_id, asked_version, latest_version } => {
-                Err(UserInputError::ObjectSequenceNumberTooHigh { object_id, asked_version, latest_version })
-            }
+            Self::VersionNotFound(object_id, version) => Err(UserInputError::ObjectNotFound {
+                object_id,
+                version: Some(version),
+            }),
+            Self::VersionTooHigh {
+                object_id,
+                asked_version,
+                latest_version,
+            } => Err(UserInputError::ObjectSequenceNumberTooHigh {
+                object_id,
+                asked_version,
+                latest_version,
+            }),
         }
     }
 }
@@ -1136,14 +1248,18 @@ impl Display for PastObjectRead {
                 write!(f, "PastObjectRead::VersionFound ({:?})", oref)
             }
             Self::VersionNotFound(object_id, version) => {
-                write!(f, "PastObjectRead::VersionNotFound ({:?}, asked sequence number {:?})", object_id, version)
-            }
-            Self::VersionTooHigh { object_id, asked_version, latest_version } => {
                 write!(
                     f,
-                    "PastObjectRead::VersionTooHigh ({:?}, asked sequence number {:?}, latest sequence number {:?})",
-                    object_id, asked_version, latest_version
+                    "PastObjectRead::VersionNotFound ({:?}, asked sequence number {:?})",
+                    object_id, version
                 )
+            }
+            Self::VersionTooHigh {
+                object_id,
+                asked_version,
+                latest_version,
+            } => {
+                write!(f, "PastObjectRead::VersionTooHigh ({:?}, asked sequence number {:?}, latest sequence number {:?})", object_id, asked_version, latest_version)
             }
         }
     }
@@ -1151,25 +1267,34 @@ impl Display for PastObjectRead {
 
 #[cfg(test)]
 mod tests {
+    use crate::object::{Object, Owner, OBJECT_START_VERSION};
     use crate::{
         base_types::{ObjectID, SuiAddress, TransactionDigest},
         gas_coin::GasCoin,
-        object::{Object, Owner, OBJECT_START_VERSION},
     };
 
     // Ensure that object digest computation and bcs serialized format are not inadvertently changed.
     #[test]
     fn test_object_digest_and_serialized_format() {
-        let g = GasCoin::new_for_testing_with_id(ObjectID::ZERO, 123).to_object(OBJECT_START_VERSION);
-        let o = Object::new_move(g, Owner::AddressOwner(SuiAddress::ZERO), TransactionDigest::ZERO);
+        let g =
+            GasCoin::new_for_testing_with_id(ObjectID::ZERO, 123).to_object(OBJECT_START_VERSION);
+        let o = Object::new_move(
+            g,
+            Owner::AddressOwner(SuiAddress::ZERO),
+            TransactionDigest::ZERO,
+        );
         let bytes = bcs::to_bytes(&o).unwrap();
 
-        assert_eq!(bytes, [
-            0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-        ]);
+        assert_eq!(
+            bytes,
+            [
+                0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
 
         let objref = format!("{:?}", o.compute_object_reference());
         assert_eq!(objref, "(0x0000000000000000000000000000000000000000000000000000000000000000, SequenceNumber(1), o#59tZq65HVqZjUyNtD7BCGLTD87N5cpayYwEFrtwR4aMz)");

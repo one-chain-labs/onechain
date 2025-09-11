@@ -7,30 +7,30 @@ use metrics::OracleMetrics;
 use mysten_metrics::monitored_scope;
 use once_cell::sync::OnceCell;
 use prometheus::Registry;
-use std::{
-    collections::HashMap,
-    ops::Add,
-    str::FromStr,
-    sync::Arc,
-    time::{Duration, Instant, SystemTime},
-};
+use std::ops::Add;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use std::{collections::HashMap, time::Instant};
+use sui_json_rpc_types::SuiTransactionBlockResponse;
 use sui_json_rpc_types::{
-    SuiObjectDataOptions,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
+    SuiObjectDataOptions, SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI,
     SuiTransactionBlockResponseOptions,
 };
-use sui_sdk::{apis::ReadApi, rpc_types::SuiObjectResponse, SuiClient};
+use sui_sdk::apis::ReadApi;
+use sui_sdk::rpc_types::SuiObjectResponse;
+use sui_sdk::SuiClient;
+use sui_types::error::UserInputError;
+use sui_types::object::{Object, Owner};
+use sui_types::parse_sui_type_tag;
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::quorum_driver_types::NON_RECOVERABLE_ERROR_MSG;
+use sui_types::transaction::{Argument, Transaction};
+use sui_types::transaction::{Command, ObjectArg};
+use sui_types::Identifier;
 use sui_types::{
     base_types::SuiAddress,
-    error::UserInputError,
-    object::{Object, Owner},
-    parse_sui_type_tag,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    quorum_driver_types::NON_RECOVERABLE_ERROR_MSG,
-    transaction::{Argument, CallArg, Command, ObjectArg, Transaction, TransactionData},
-    Identifier,
+    transaction::{CallArg, TransactionData},
 };
 use tap::tap::TapFallible;
 
@@ -62,7 +62,13 @@ impl OracleNode {
         wallet_ctx: WalletContext,
         registry: Registry,
     ) -> Self {
-        Self { upload_feeds, gas_obj_id, download_feeds, wallet_ctx, metrics: Arc::new(OracleMetrics::new(&registry)) }
+        Self {
+            upload_feeds,
+            gas_obj_id,
+            download_feeds,
+            wallet_ctx,
+            metrics: Arc::new(OracleMetrics::new(&registry)),
+        }
     }
 
     pub async fn run(mut self) -> anyhow::Result<()> {
@@ -98,7 +104,12 @@ impl OracleNode {
         }
 
         while let Some((read_feed, object_id, value)) = receiver.recv().await {
-            info!(read_feed, ?object_id, ?value, "Received data from on chain reader.");
+            info!(
+                read_feed,
+                ?object_id,
+                ?value,
+                "Received data from on chain reader."
+            );
         }
 
         Ok(())
@@ -125,8 +136,10 @@ impl DataProviderRunner {
         let (sender, receiver) = tokio::sync::mpsc::channel(10000);
         for (feed_name, upload_feed) in upload_feeds {
             for (source_name, data_feed) in upload_feed {
-                staleness_tolerance
-                    .insert(make_onchain_feed_name(&feed_name, &source_name), data_feed.submission_interval);
+                staleness_tolerance.insert(
+                    make_onchain_feed_name(&feed_name, &source_name),
+                    data_feed.submission_interval,
+                );
                 let oracle_obj_id = data_feed.upload_parameters.write_data_provider_object_id;
                 let data_provider = DataProvider {
                     feed_name: feed_name.clone(),
@@ -136,8 +149,14 @@ impl DataProviderRunner {
                     metrics: metrics.clone(),
                 };
                 providers.push(Arc::new(data_provider));
-                if let std::collections::hash_map::Entry::Vacant(e) = oracle_object_args.entry(oracle_obj_id) {
-                    e.insert(get_object_arg(client.read_api(), oracle_obj_id, true).await.unwrap());
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    oracle_object_args.entry(oracle_obj_id)
+                {
+                    e.insert(
+                        get_object_arg(client.read_api(), oracle_obj_id, true)
+                            .await
+                            .unwrap(),
+                    );
                 }
             }
         }
@@ -156,7 +175,10 @@ impl DataProviderRunner {
             oracle_object_args,
             metrics: metrics.clone(),
         };
-        Self { providers, uploader }
+        Self {
+            providers,
+            uploader,
+        }
     }
 
     pub fn spawn(mut self) {
@@ -171,7 +193,11 @@ impl DataProviderRunner {
     }
 }
 
-async fn get_gas_obj_ref(read_api: &ReadApi, gas_obj_id: ObjectID, owner_address: SuiAddress) -> ObjectRef {
+async fn get_gas_obj_ref(
+    read_api: &ReadApi,
+    gas_obj_id: ObjectID,
+    owner_address: SuiAddress,
+) -> ObjectRef {
     loop {
         match read_api
             .get_object_with_options(gas_obj_id, SuiObjectDataOptions::default().with_owner())
@@ -206,7 +232,11 @@ struct DataProvider {
 
 impl DataProvider {
     pub async fn run(&self) {
-        info!(feed_name = self.feed_name, source_name = self.source_name, "Starting DataProvider");
+        info!(
+            feed_name = self.feed_name,
+            source_name = self.source_name,
+            "Starting DataProvider"
+        );
         let mut interval = tokio::time::interval(self.upload_feed.submission_interval);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -217,7 +247,11 @@ impl DataProvider {
     }
 
     async fn run_once(&self) {
-        debug!(feed_name = self.feed_name, source_name = self.source_name, "Running data provider once.");
+        debug!(
+            feed_name = self.feed_name,
+            source_name = self.source_name,
+            "Running data provider once."
+        );
         let value = self.retrieve_from_data_source().await;
         if value.is_err() {
             error!(
@@ -226,11 +260,17 @@ impl DataProvider {
                 "Failed to retrieve data from data source: {:?}",
                 value
             );
-            self.metrics.data_source_errors.with_label_values(&[&self.feed_name, &self.source_name]).inc();
+            self.metrics
+                .data_source_errors
+                .with_label_values(&[&self.feed_name, &self.source_name])
+                .inc();
             return;
         }
 
-        self.metrics.data_source_successes.with_label_values(&[&self.feed_name, &self.source_name]).inc();
+        self.metrics
+            .data_source_successes
+            .with_label_values(&[&self.feed_name, &self.source_name])
+            .inc();
 
         // TODO: allow more flexible multiplers and data types
         let value = (value.unwrap() * METRICS_MULTIPLIER) as u64;
@@ -251,15 +291,27 @@ impl DataProvider {
         let data = jsonpath_lib::select(&json_blob, json_path)?;
 
         if data.is_empty() {
-            anyhow::bail!("Failed to find data from json blob: {:?} with json path: {:?}", json_blob, json_path);
+            anyhow::bail!(
+                "Failed to find data from json blob: {:?} with json path: {:?}",
+                json_blob,
+                json_path
+            );
         }
         // Assume there is one single value per request
         match data[0].as_str() {
             Some(value_str) => match value_str.parse::<f64>() {
                 Ok(value) => Ok(value),
-                Err(_) => anyhow::bail!("Failed to parse data {:?} as f64 from json blob: {:?}", data[0], json_blob),
+                Err(_) => anyhow::bail!(
+                    "Failed to parse data {:?} as f64 from json blob: {:?}",
+                    data[0],
+                    json_blob
+                ),
             },
-            None => anyhow::bail!("Failed to parse data {:?} as string from json blob: {:?}", data[0], json_blob),
+            None => anyhow::bail!(
+                "Failed to parse data {:?} as string from json blob: {:?}",
+                data[0],
+                json_blob
+            ),
         }
     }
 
@@ -279,7 +331,11 @@ impl DataProvider {
 }
 
 fn make_onchain_feed_name(feed_name: &str, source_name: &str) -> String {
-    format!("{}-{}", feed_name.to_ascii_lowercase(), source_name.to_ascii_lowercase())
+    format!(
+        "{}-{}",
+        feed_name.to_ascii_lowercase(),
+        source_name.to_ascii_lowercase()
+    )
 }
 
 struct OnChainDataUploader {
@@ -306,8 +362,12 @@ impl OnChainDataUploader {
                 if let Err(err) = self.upload(data_points).await {
                     error!("Upload failure: {err}. About to resting for {UPLOAD_FAILURE_RECOVER_SEC} sec.");
                     tokio::time::sleep(Duration::from_secs(UPLOAD_FAILURE_RECOVER_SEC)).await;
-                    self.gas_obj_ref =
-                        get_gas_obj_ref(self.client.read_api(), self.gas_obj_ref.0, self.signer_address).await;
+                    self.gas_obj_ref = get_gas_obj_ref(
+                        self.client.read_api(),
+                        self.gas_obj_ref.0,
+                        self.signer_address,
+                    )
+                    .await;
                     error!("Updated gas object reference: {:?}", self.gas_obj_ref);
                 }
             }
@@ -317,14 +377,20 @@ impl OnChainDataUploader {
     async fn collect(&mut self) -> Vec<DataPoint> {
         let start = Instant::now();
         let mut data_points = vec![];
-        while let Ok(Some(data_point)) = tokio::time::timeout(Duration::from_millis(100), self.receiver.recv()).await {
+        while let Ok(Some(data_point)) =
+            tokio::time::timeout(Duration::from_millis(100), self.receiver.recv()).await
+        {
             let feed_name = &data_point.feed_name;
-            debug!(feed_name = data_point.feed_name, value = data_point.value, "Received data from data provider.");
+            debug!(
+                feed_name = data_point.feed_name,
+                value = data_point.value,
+                "Received data from data provider."
+            );
             // TODO: for each source, at most take one value in each submission
-            let staleness_tolerance = self
-                .staleness_tolerance
-                .get(feed_name)
-                .unwrap_or_else(|| panic!("Bug, missing staleness tolerance for feed: {}", feed_name));
+            let staleness_tolerance =
+                self.staleness_tolerance.get(feed_name).unwrap_or_else(|| {
+                    panic!("Bug, missing staleness tolerance for feed: {}", feed_name)
+                });
             let duration_since = data_point.retrieval_instant.elapsed();
             if duration_since > staleness_tolerance.add(Duration::from_secs(1)) {
                 warn!(
@@ -334,7 +400,10 @@ impl OnChainDataUploader {
                     ?staleness_tolerance,
                     "Data is too stale, skipping."
                 );
-                self.metrics.data_staleness.with_label_values(&[feed_name]).inc();
+                self.metrics
+                    .data_staleness
+                    .with_label_values(&[feed_name])
+                    .inc();
             } else {
                 data_points.push(data_point);
             }
@@ -349,7 +418,10 @@ impl OnChainDataUploader {
         data_points
     }
 
-    async fn upload(&mut self, data_points: Vec<DataPoint>) -> anyhow::Result<SuiTransactionBlockEffects> {
+    async fn upload(
+        &mut self,
+        data_points: Vec<DataPoint>,
+    ) -> anyhow::Result<SuiTransactionBlockEffects> {
         let _scope = monitored_scope("Oracle::OnChainDataUploader::upload");
         // TODO add more error handling & polling perhaps
         let mut builder = ProgrammableTransactionBuilder::new();
@@ -360,21 +432,33 @@ impl OnChainDataUploader {
             let oracle_obj_arg = *self
                 .oracle_object_args
                 .get(&data_point.upload_parameters.write_data_provider_object_id)
-                .unwrap_or_else(|| panic!("Bug, missing oracle object arg for feed: {}", feed_name));
+                .unwrap_or_else(|| {
+                    panic!("Bug, missing oracle object arg for feed: {}", feed_name)
+                });
             let duration_since_start = data_point.retrieval_instant.elapsed();
-            let data_point_ts: DateTime<Utc> = DateTime::from(data_point.retrieval_timestamp + duration_since_start);
+            let data_point_ts: DateTime<Utc> =
+                DateTime::from(data_point.retrieval_timestamp + duration_since_start);
 
             let mut arguments = if is_first {
-                vec![builder.input(CallArg::Object(oracle_obj_arg)).unwrap(), builder.input(CallArg::CLOCK_IMM).unwrap()]
+                vec![
+                    builder.input(CallArg::Object(oracle_obj_arg)).unwrap(),
+                    builder.input(CallArg::CLOCK_IMM).unwrap(),
+                ]
             } else {
                 vec![Argument::Input(0), Argument::Input(1)]
             };
 
-            let decimal = builder.input(CallArg::Pure(bcs::to_bytes(&DECIMAL).unwrap())).unwrap();
-            let value = builder.input(CallArg::Pure(bcs::to_bytes(&data_point.value).unwrap())).unwrap();
+            let decimal = builder
+                .input(CallArg::Pure(bcs::to_bytes(&DECIMAL).unwrap()))
+                .unwrap();
+            let value = builder
+                .input(CallArg::Pure(bcs::to_bytes(&data_point.value).unwrap()))
+                .unwrap();
 
             arguments.extend_from_slice(&[
-                builder.input(CallArg::Pure(bcs::to_bytes(&feed_name)?)).unwrap(),
+                builder
+                    .input(CallArg::Pure(bcs::to_bytes(&feed_name)?))
+                    .unwrap(),
                 builder.programmable_move_call(
                     package_id,
                     Identifier::from_str("decimal_value").unwrap(),
@@ -382,7 +466,9 @@ impl OnChainDataUploader {
                     vec![],
                     vec![value, decimal],
                 ),
-                builder.input(CallArg::Pure(bcs::to_bytes(&format!("{}", data_point_ts))?)).unwrap(),
+                builder
+                    .input(CallArg::Pure(bcs::to_bytes(&format!("{}", data_point_ts))?))
+                    .unwrap(),
             ]);
 
             builder.command(Command::move_call(
@@ -390,13 +476,20 @@ impl OnChainDataUploader {
                 Identifier::new(data_point.upload_parameters.write_module_name.clone()).unwrap(),
                 Identifier::new(data_point.upload_parameters.write_function_name.clone()).unwrap(),
                 // TODO: allow more generic data types
-                vec![parse_sui_type_tag(&format!("{package_id}::decimal_value::DecimalValue")).unwrap()],
+                vec![
+                    parse_sui_type_tag(&format!("{package_id}::decimal_value::DecimalValue"))
+                        .unwrap(),
+                ],
                 arguments,
             ));
             is_first = false;
         }
         let pt = builder.finish();
-        let rgp = self.client.governance_api().get_reference_gas_price().await?;
+        let rgp = self
+            .client
+            .governance_api()
+            .get_reference_gas_price()
+            .await?;
         let tx = TransactionData::new_programmable(
             self.signer_address,
             vec![self.gas_obj_ref],
@@ -425,13 +518,19 @@ impl OnChainDataUploader {
         // Update metrics
         for data_point in &data_points {
             if success {
-                self.metrics.upload_successes.with_label_values(&[&data_point.feed_name]).inc();
+                self.metrics
+                    .upload_successes
+                    .with_label_values(&[&data_point.feed_name])
+                    .inc();
                 self.metrics
                     .uploaded_values
                     .with_label_values(&[&data_point.feed_name])
                     .observe(data_point.value as f64);
             } else {
-                self.metrics.upload_data_errors.with_label_values(&[&data_point.feed_name]).inc();
+                self.metrics
+                    .upload_data_errors
+                    .with_label_values(&[&data_point.feed_name])
+                    .inc();
             }
         }
 
@@ -439,13 +538,23 @@ impl OnChainDataUploader {
         let storage_rebate = effects.gas_cost_summary().storage_rebate;
         let computation_cost = effects.gas_cost_summary().computation_cost;
         let net_gas_usage = effects.gas_cost_summary().net_gas_usage();
-        self.metrics.computation_gas_used.observe(computation_cost as f64);
+        self.metrics
+            .computation_gas_used
+            .observe(computation_cost as f64);
         self.metrics.total_gas_cost.inc_by(gas_usage);
         self.metrics.total_gas_rebate.inc_by(storage_rebate);
 
         if success {
-            self.metrics.total_data_points_uploaded.inc_by(data_points.len() as u64);
-            info!(?tx_digest, net_gas_usage, time_spend_sec, "Upload succeeded with {} data points", data_points.len(),);
+            self.metrics
+                .total_data_points_uploaded
+                .inc_by(data_points.len() as u64);
+            info!(
+                ?tx_digest,
+                net_gas_usage,
+                time_spend_sec,
+                "Upload succeeded with {} data points",
+                data_points.len(),
+            );
             Ok(effects)
         } else {
             error!(
@@ -473,44 +582,28 @@ impl OnChainDataUploader {
                     // Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForEffectsCert),
                     Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution),
                 )
-                .await
-            {
+                .await {
                 Ok(response) => return Ok(response),
                 Err(sui_sdk::error::Error::RpcError(err)) => {
-                    // jsonrpsee translate every SuiError into jsonrpsee::core::Error, so we need to further distinguish
+                    // jsonrpsee translate every SuiError into jsonrpsee::core::Error, so we need to further distinguish 
                     if err.to_string().contains(NON_RECOVERABLE_ERROR_MSG) {
-                        let stale_obj_error = STALE_OBJ_ERROR.get_or_init(|| {
-                            String::from(
-                                UserInputError::ObjectVersionUnavailableForConsumption {
-                                    provided_obj_ref: random_object_ref(),
-                                    current_version: 0.into(),
-                                }
-                                .as_ref(),
-                            )
-                        });
+                        let stale_obj_error = STALE_OBJ_ERROR
+                            .get_or_init(||
+                                String::from(UserInputError::ObjectVersionUnavailableForConsumption { provided_obj_ref: random_object_ref(), current_version: 0.into() }.as_ref())
+                            );
                         if err.to_string().contains(stale_obj_error) {
                             error!(?tx_digest, "Failed to submit tx, it looks like gas object is stale : {:?}", err);
-                            let new_ref =
-                                get_gas_obj_ref(self.client.read_api(), self.gas_obj_ref.0, self.signer_address).await;
+                            let new_ref = get_gas_obj_ref(self.client.read_api(), self.gas_obj_ref.0, self.signer_address).await;
                             self.gas_obj_ref = new_ref;
                             info!("Gas object updated: {:?}", new_ref);
-                            anyhow::bail!(
-                                "Gas object is stale, now updated to {:?}. tx_digest={:?}",
-                                new_ref,
-                                tx_digest
-                            );
+                            anyhow::bail!("Gas object is stale, now updated to {:?}. tx_digest={:?}", new_ref, tx_digest);
                         } else {
                             error!(?tx_digest, "Failed to submit tx, with non recoverable error: {:?}", err);
                             anyhow::bail!("Non-retryable error {:?}. tx_digest={:?}", err, tx_digest);
                         }
                     }
                     // Likely retryable error?
-                    error!(
-                        ?tx_digest,
-                        "Failed to submit tx, with (likely) recoverable error: {:?}. Remaining retry times: {}",
-                        err,
-                        retry_attempts
-                    );
+                    error!(?tx_digest, "Failed to submit tx, with (likely) recoverable error: {:?}. Remaining retry times: {}", err, retry_attempts);
                     retry_attempts -= 1;
                     if retry_attempts <= 0 {
                         anyhow::bail!("Too many RPC errors: {}. tx_digest={:?}", err, tx_digest);
@@ -554,8 +647,15 @@ impl OnChainDataReader {
         loop {
             read_interval.tick().await;
             for (feed_name, object_id) in &self.read_configs {
-                match self.client.read_api().get_object_with_options(*object_id, SuiObjectDataOptions::default()).await {
-                    Ok(SuiObjectResponse { data: Some(_data), .. }) => {
+                match self
+                    .client
+                    .read_api()
+                    .get_object_with_options(*object_id, SuiObjectDataOptions::default())
+                    .await
+                {
+                    Ok(SuiObjectResponse {
+                        data: Some(_data), ..
+                    }) => {
                         // TODO parse value based on returned BCS
                         let value = 5_f64;
                         let _ = sender.send((feed_name.clone(), *object_id, value)).await;
@@ -563,11 +663,22 @@ impl OnChainDataReader {
                             .downloaded_values
                             .with_label_values(&[feed_name])
                             .observe(value * METRICS_MULTIPLIER);
-                        self.metrics.download_successes.with_label_values(&[feed_name, &object_id.to_string()]).inc();
+                        self.metrics
+                            .download_successes
+                            .with_label_values(&[feed_name, &object_id.to_string()])
+                            .inc();
                     }
                     other => {
-                        error!(read_feed = feed_name, ?object_id, "Failed to read data from on-chain: {:?}", other);
-                        self.metrics.download_data_errors.with_label_values(&[feed_name, &object_id.to_string()]).inc();
+                        error!(
+                            read_feed = feed_name,
+                            ?object_id,
+                            "Failed to read data from on-chain: {:?}",
+                            other
+                        );
+                        self.metrics
+                            .download_data_errors
+                            .with_label_values(&[feed_name, &object_id.to_string()])
+                            .inc();
                     }
                 }
             }
@@ -575,17 +686,32 @@ impl OnChainDataReader {
     }
 }
 
-async fn get_object_arg(read_api: &ReadApi, id: ObjectID, is_mutable_ref: bool) -> anyhow::Result<ObjectArg> {
-    let response = read_api.get_object_with_options(id, SuiObjectDataOptions::bcs_lossless()).await?;
+async fn get_object_arg(
+    read_api: &ReadApi,
+    id: ObjectID,
+    is_mutable_ref: bool,
+) -> anyhow::Result<ObjectArg> {
+    let response = read_api
+        .get_object_with_options(id, SuiObjectDataOptions::bcs_lossless())
+        .await?;
 
     let obj: Object = response.into_object()?.try_into()?;
     let obj_ref = obj.compute_object_reference();
     let owner = obj.owner.clone();
     Ok(match owner {
-        Owner::Shared { initial_shared_version }
-        | Owner::ConsensusV2 { start_version: initial_shared_version, authenticator: _ } => {
-            ObjectArg::SharedObject { id, initial_shared_version, mutable: is_mutable_ref }
+        Owner::Shared {
+            initial_shared_version,
         }
-        Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => ObjectArg::ImmOrOwnedObject(obj_ref),
+        | Owner::ConsensusAddressOwner {
+            start_version: initial_shared_version,
+            ..
+        } => ObjectArg::SharedObject {
+            id,
+            initial_shared_version,
+            mutable: is_mutable_ref,
+        },
+        Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => {
+            ObjectArg::ImmOrOwnedObject(obj_ref)
+        }
     })
 }

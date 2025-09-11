@@ -1,24 +1,25 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    error::{ExecutionError, ExecutionErrorKind},
-    sui_serde::{BigInt, Readable},
-    SUI_FRAMEWORK_ADDRESS,
-};
-use move_core_types::{
-    annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
-    ident_str,
-    identifier::IdentStr,
-    language_storage::{StructTag, TypeTag},
-};
+use crate::error::{ExecutionError, ExecutionErrorKind};
+use crate::sui_serde::BigInt;
+use crate::sui_serde::Readable;
+use crate::SUI_FRAMEWORK_ADDRESS;
+use move_core_types::annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout};
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
+use move_core_types::language_storage::{StructTag, TypeTag};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use serde_with::serde_as;
+pub const SUI_MODULE_NAME: &IdentStr = ident_str!("oct");
 pub const BALANCE_MODULE_NAME: &IdentStr = ident_str!("balance");
 pub const BALANCE_STRUCT_NAME: &IdentStr = ident_str!("Balance");
 pub const BALANCE_CREATE_REWARDS_FUNCTION_NAME: &IdentStr = ident_str!("create_staking_rewards");
 pub const BALANCE_DESTROY_REBATES_FUNCTION_NAME: &IdentStr = ident_str!("destroy_storage_rebates");
+pub const SEND_TO_ACCOUNT_FUNCTION_NAME: &IdentStr = ident_str!("send_to_account");
+pub const WITHDRAW_FROM_ACCOUNT_FUNCTION_NAME: &IdentStr = ident_str!("withdraw_from_account");
 
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, JsonSchema)]
@@ -47,10 +48,22 @@ impl Balance {
         }
     }
 
+    pub fn type_tag(type_param: TypeTag) -> TypeTag {
+        TypeTag::Struct(Box::new(Self::type_(type_param)))
+    }
+
     pub fn is_balance(s: &StructTag) -> bool {
         s.address == SUI_FRAMEWORK_ADDRESS
             && s.module.as_ident_str() == BALANCE_MODULE_NAME
             && s.name.as_ident_str() == BALANCE_STRUCT_NAME
+    }
+
+    pub fn is_balance_type(type_param: &TypeTag) -> bool {
+        if let TypeTag::Struct(struct_tag) = type_param {
+            Self::is_balance(struct_tag)
+        } else {
+            false
+        }
     }
 
     pub fn withdraw(&mut self, amount: u64) -> Result<(), ExecutionError> {
@@ -80,7 +93,10 @@ impl Balance {
     pub fn layout(type_param: TypeTag) -> MoveStructLayout {
         MoveStructLayout {
             type_: Self::type_(type_param),
-            fields: Box::new(vec![MoveFieldLayout::new(ident_str!("value").to_owned(), MoveTypeLayout::U64)]),
+            fields: vec![MoveFieldLayout::new(
+                ident_str!("value").to_owned(),
+                MoveTypeLayout::U64,
+            )],
         }
     }
 }

@@ -1,40 +1,38 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    connection::ScanConnection,
-    consistency::{build_objects_query, View},
-    data::{Db, QueryExecutor},
-    error::Error,
-    filter,
-    raw_query::RawQuery,
-};
+use crate::connection::ScanConnection;
+use crate::consistency::{build_objects_query, View};
+use crate::data::{Db, QueryExecutor};
+use crate::error::Error;
+use crate::filter;
+use crate::raw_query::RawQuery;
 
-use super::{
-    available_range::AvailableRange,
-    balance::{self, Balance},
-    base64::Base64,
-    big_int::BigInt,
-    cursor::{Page, Target},
-    display::DisplayEntry,
-    dynamic_field::{DynamicField, DynamicFieldName},
-    move_object::{MoveObject, MoveObjectImpl},
-    move_value::MoveValue,
-    object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
-    owner::OwnerImpl,
-    stake::StakedOct,
-    sui_address::SuiAddress,
-    suins_registration::{DomainFormat, SuinsRegistration},
-    transaction_block::{self, TransactionBlock, TransactionBlockFilter},
-    type_filter::ExactTypeFilter,
-    uint53::UInt53,
-};
+use super::available_range::AvailableRange;
+use super::balance::{self, Balance};
+use super::base64::Base64;
+use super::big_int::BigInt;
+use super::cursor::{Page, Target};
+use super::display::DisplayEntry;
+use super::dynamic_field::{DynamicField, DynamicFieldName};
+use super::move_object::{MoveObject, MoveObjectImpl};
+use super::move_value::MoveValue;
+use super::object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus};
+use super::owner::OwnerImpl;
+use super::stake::StakedOct;
+use super::sui_address::SuiAddress;
+use super::suins_registration::{DomainFormat, SuinsRegistration};
+use super::transaction_block::{self, TransactionBlock, TransactionBlockFilter};
+use super::type_filter::ExactTypeFilter;
+use super::uint53::UInt53;
 use async_graphql::*;
 
 use async_graphql::connection::{Connection, CursorType, Edge};
 use diesel_async::scoped_futures::ScopedFutureExt;
-use sui_indexer::{models::objects::StoredHistoryObject, types::OwnerType};
-use sui_types::{coin::Coin as NativeCoin, TypeTag};
+use sui_indexer::models::objects::StoredHistoryObject;
+use sui_indexer::types::OwnerType;
+use sui_types::coin::Coin as NativeCoin;
+use sui_types::TypeTag;
 
 #[derive(Clone)]
 pub(crate) struct Coin {
@@ -67,13 +65,21 @@ impl Coin {
         before: Option<object::Cursor>,
         filter: Option<ObjectFilter>,
     ) -> Result<Connection<String, MoveObject>> {
-        OwnerImpl::from(&self.super_.super_).objects(ctx, first, after, last, before, filter).await
+        OwnerImpl::from(&self.super_.super_)
+            .objects(ctx, first, after, last, before, filter)
+            .await
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
     /// it defaults to `0x2::oct::OCT`.
-    pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
-        OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
+    pub(crate) async fn balance(
+        &self,
+        ctx: &Context<'_>,
+        type_: Option<ExactTypeFilter>,
+    ) -> Result<Option<Balance>> {
+        OwnerImpl::from(&self.super_.super_)
+            .balance(ctx, type_)
+            .await
     }
 
     /// The balances of all coin types owned by this object.
@@ -85,7 +91,9 @@ impl Coin {
         last: Option<u64>,
         before: Option<balance::Cursor>,
     ) -> Result<Connection<String, Balance>> {
-        OwnerImpl::from(&self.super_.super_).balances(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .balances(ctx, first, after, last, before)
+            .await
     }
 
     /// The coin objects for this object.
@@ -100,7 +108,9 @@ impl Coin {
         before: Option<object::Cursor>,
         type_: Option<ExactTypeFilter>,
     ) -> Result<Connection<String, Coin>> {
-        OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
+        OwnerImpl::from(&self.super_.super_)
+            .coins(ctx, first, after, last, before, type_)
+            .await
     }
 
     /// The `0x3::staking_pool::StakedOct` objects owned by this object.
@@ -112,7 +122,9 @@ impl Coin {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .staked_octs(ctx, first, after, last, before)
+            .await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -121,7 +133,9 @@ impl Coin {
         ctx: &Context<'_>,
         format: Option<DomainFormat>,
     ) -> Result<Option<String>> {
-        OwnerImpl::from(&self.super_.super_).default_suins_name(ctx, format).await
+        OwnerImpl::from(&self.super_.super_)
+            .default_suins_name(ctx, format)
+            .await
     }
 
     /// The SuinsRegistration NFTs owned by this object. These grant the owner the capability to
@@ -134,7 +148,9 @@ impl Coin {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, SuinsRegistration>> {
-        OwnerImpl::from(&self.super_.super_).suins_registrations(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .suins_registrations(ctx, first, after, last, before)
+            .await
     }
 
     pub(crate) async fn version(&self) -> UInt53 {
@@ -163,8 +179,13 @@ impl Coin {
     }
 
     /// The transaction block that created this version of the object.
-    pub(crate) async fn previous_transaction_block(&self, ctx: &Context<'_>) -> Result<Option<TransactionBlock>> {
-        ObjectImpl(&self.super_.super_).previous_transaction_block(ctx).await
+    pub(crate) async fn previous_transaction_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<TransactionBlock>> {
+        ObjectImpl(&self.super_.super_)
+            .previous_transaction_block(ctx)
+            .await
     }
 
     /// The amount of SUI we would rebate if this object gets deleted or mutated. This number is
@@ -240,8 +261,14 @@ impl Coin {
     ///
     /// Dynamic fields on wrapped objects can be accessed by using the same API under the Owner
     /// type.
-    pub(crate) async fn dynamic_field(&self, ctx: &Context<'_>, name: DynamicFieldName) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_).dynamic_field(ctx, name, Some(self.super_.root_version())).await
+    pub(crate) async fn dynamic_field(
+        &self,
+        ctx: &Context<'_>,
+        name: DynamicFieldName,
+    ) -> Result<Option<DynamicField>> {
+        OwnerImpl::from(&self.super_.super_)
+            .dynamic_field(ctx, name, Some(self.super_.root_version()))
+            .await
     }
 
     /// Access a dynamic object field on an object using its name. Names are arbitrary Move values
@@ -256,7 +283,9 @@ impl Coin {
         ctx: &Context<'_>,
         name: DynamicFieldName,
     ) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_).dynamic_object_field(ctx, name, Some(self.super_.root_version())).await
+        OwnerImpl::from(&self.super_.super_)
+            .dynamic_object_field(ctx, name, Some(self.super_.root_version()))
+            .await
     }
 
     /// The dynamic fields and dynamic object fields on an object.
@@ -272,7 +301,14 @@ impl Coin {
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, DynamicField>> {
         OwnerImpl::from(&self.super_.super_)
-            .dynamic_fields(ctx, first, after, last, before, Some(self.super_.root_version()))
+            .dynamic_fields(
+                ctx,
+                first,
+                after,
+                last,
+                before,
+                Some(self.super_.root_version()),
+            )
             .await
     }
 
@@ -301,7 +337,8 @@ impl Coin {
         let Some((prev, next, results)) = db
             .execute_repeatable(move |conn| {
                 async move {
-                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await? else {
+                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await?
+                    else {
                         return Ok::<_, diesel::result::Error>(None);
                     };
 
@@ -318,7 +355,9 @@ impl Coin {
             })
             .await?
         else {
-            return Err(Error::Client("Requested data is outside the available range".to_string()));
+            return Err(Error::Client(
+                "Requested data is outside the available range".to_string(),
+            ));
         };
 
         let mut conn: Connection<String, Coin> = Connection::new(prev, next);
@@ -327,13 +366,19 @@ impl Coin {
             // To maintain consistency, the returned cursor should have the same upper-bound as the
             // checkpoint found on the cursor.
             let cursor = stored.cursor(checkpoint_viewed_at).encode_cursor();
-            let object = Object::try_from_stored_history_object(stored, checkpoint_viewed_at, None)?;
+            let object =
+                Object::try_from_stored_history_object(stored, checkpoint_viewed_at, None)?;
 
-            let move_ = MoveObject::try_from(&object)
-                .map_err(|_| Error::Internal(format!("Failed to deserialize as Move object: {}", object.address)))?;
+            let move_ = MoveObject::try_from(&object).map_err(|_| {
+                Error::Internal(format!(
+                    "Failed to deserialize as Move object: {}",
+                    object.address
+                ))
+            })?;
 
-            let coin = Coin::try_from(&move_)
-                .map_err(|_| Error::Internal(format!("Faild to deserialize as Coin: {}", object.address)))?;
+            let coin = Coin::try_from(&move_).map_err(|_| {
+                Error::Internal(format!("Faild to deserialize as Coin: {}", object.address))
+            })?;
 
             conn.edges.push(Edge::new(cursor, coin));
         }
@@ -352,7 +397,8 @@ impl TryFrom<&MoveObject> for Coin {
 
         Ok(Self {
             super_: move_object.clone(),
-            native: bcs::from_bytes(move_object.native.contents()).map_err(CoinDowncastError::Bcs)?,
+            native: bcs::from_bytes(move_object.native.contents())
+                .map_err(CoinDowncastError::Bcs)?,
         })
     }
 }

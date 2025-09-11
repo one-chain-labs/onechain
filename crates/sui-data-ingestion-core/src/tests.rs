@@ -1,35 +1,26 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    progress_store::ExecutorProgress,
-    DataIngestionMetrics,
-    FileProgressStore,
-    IndexerExecutor,
-    ReaderOptions,
-    Worker,
-    WorkerPool,
-};
+use crate::progress_store::ExecutorProgress;
+use crate::{DataIngestionMetrics, FileProgressStore, IndexerExecutor, WorkerPool};
+use crate::{ReaderOptions, Worker};
 use anyhow::Result;
 use async_trait::async_trait;
 use prometheus::Registry;
-use rand::{prelude::StdRng, SeedableRng};
-use std::{path::PathBuf, time::Duration};
+use rand::prelude::StdRng;
+use rand::SeedableRng;
+use std::path::PathBuf;
+use std::time::Duration;
 use sui_protocol_config::ProtocolConfig;
 use sui_storage::blob::{Blob, BlobEncoding};
-use sui_types::{
-    crypto::KeypairTraits,
-    full_checkpoint_content::CheckpointData,
-    gas::GasCostSummary,
-    messages_checkpoint::{
-        CertifiedCheckpointSummary,
-        CheckpointContents,
-        CheckpointSequenceNumber,
-        CheckpointSummary,
-        SignedCheckpointSummary,
-    },
-    utils::make_committee_key,
+use sui_types::crypto::KeypairTraits;
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::gas::GasCostSummary;
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber, CheckpointSummary,
+    SignedCheckpointSummary,
 };
+use sui_types::utils::make_committee_key;
 use tempfile::NamedTempFile;
 use tokio::sync::oneshot;
 
@@ -48,13 +39,23 @@ async fn run(
     path: Option<PathBuf>,
     duration: Option<Duration>,
 ) -> Result<ExecutorProgress> {
-    let options = ReaderOptions { tick_internal_ms: 10, batch_size: 1, ..Default::default() };
+    let options = ReaderOptions {
+        tick_internal_ms: 10,
+        batch_size: 1,
+        ..Default::default()
+    };
     let (sender, recv) = oneshot::channel();
     match duration {
-        None => indexer.run(path.unwrap_or_else(temp_dir), None, vec![], options, recv).await,
+        None => {
+            indexer
+                .run(path.unwrap_or_else(temp_dir), None, vec![], options, recv)
+                .await
+        }
         Some(duration) => {
             let handle = tokio::task::spawn(async move {
-                indexer.run(path.unwrap_or_else(temp_dir), None, vec![], options, recv).await
+                indexer
+                    .run(path.unwrap_or_else(temp_dir), None, vec![], options, recv)
+                    .await
             });
             tokio::time::sleep(duration).await;
             drop(sender);
@@ -74,7 +75,6 @@ struct TestWorker;
 #[async_trait]
 impl Worker for TestWorker {
     type Result = ();
-
     async fn process_checkpoint(&self, _checkpoint: &CheckpointData) -> Result<()> {
         Ok(())
     }
@@ -93,7 +93,9 @@ async fn empty_pools() {
 #[tokio::test]
 async fn basic_flow() {
     let mut bundle = create_executor_bundle();
-    add_worker_pool(&mut bundle.executor, TestWorker, 5).await.unwrap();
+    add_worker_pool(&mut bundle.executor, TestWorker, 5)
+        .await
+        .unwrap();
     let path = temp_dir();
     for checkpoint_number in 0..20 {
         let bytes = mock_checkpoint_data_bytes(checkpoint_number);
@@ -105,7 +107,9 @@ async fn basic_flow() {
 }
 
 fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").keep()
+    tempfile::tempdir()
+        .expect("Failed to open temporary directory")
+        .keep()
 }
 
 fn create_executor_bundle() -> ExecutorBundle {
@@ -113,13 +117,20 @@ fn create_executor_bundle() -> ExecutorBundle {
     let path = progress_file.path().to_path_buf();
     std::fs::write(path.clone(), "{}").unwrap();
     let progress_store = FileProgressStore::new(path);
-    let executor = IndexerExecutor::new(progress_store, 1, DataIngestionMetrics::new(&Registry::new()));
-    ExecutorBundle { executor, _progress_file: progress_file }
+    let executor = IndexerExecutor::new(
+        progress_store,
+        1,
+        DataIngestionMetrics::new(&Registry::new()),
+    );
+    ExecutorBundle {
+        executor,
+        _progress_file: progress_file,
+    }
 }
 
 const RNG_SEED: [u8; 32] = [
-    21, 23, 199, 200, 234, 250, 252, 178, 94, 15, 202, 178, 62, 186, 88, 137, 233, 192, 130, 157, 179, 179, 65, 9, 31,
-    249, 221, 123, 225, 112, 199, 247,
+    21, 23, 199, 200, 234, 250, 252, 178, 94, 15, 202, 178, 62, 186, 88, 137, 233, 192, 130, 157,
+    179, 179, 65, 9, 31, 249, 221, 123, 225, 112, 199, 247,
 ];
 
 fn mock_checkpoint_data_bytes(seq_number: CheckpointSequenceNumber) -> Vec<u8> {
@@ -148,9 +159,12 @@ fn mock_checkpoint_data_bytes(seq_number: CheckpointSequenceNumber) -> Vec<u8> {
         .collect();
 
     let checkpoint_data = CheckpointData {
-        checkpoint_summary: CertifiedCheckpointSummary::new(summary, sign_infos, &committee).unwrap(),
+        checkpoint_summary: CertifiedCheckpointSummary::new(summary, sign_infos, &committee)
+            .unwrap(),
         checkpoint_contents: contents,
         transactions: vec![],
     };
-    Blob::encode(&checkpoint_data, BlobEncoding::Bcs).unwrap().to_bytes()
+    Blob::encode(&checkpoint_data, BlobEncoding::Bcs)
+        .unwrap()
+        .to_bytes()
 }

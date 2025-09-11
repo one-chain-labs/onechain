@@ -2,26 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use invalid_mutations::{
-    bounds::{ApplyCodeUnitBoundsContext, ApplyOutOfBoundsContext, CodeUnitBoundsMutation, OutOfBoundsMutation},
+    bounds::{
+        ApplyCodeUnitBoundsContext, ApplyOutOfBoundsContext, CodeUnitBoundsMutation,
+        OutOfBoundsMutation,
+    },
     signature::{FieldRefMutation, SignatureRefMutation},
 };
 use move_binary_format::{
-    check_bounds::BoundsChecker,
-    file_format::CompiledModule,
+    check_bounds::BoundsChecker, file_format::CompiledModule,
     proptest_types::CompiledModuleStrategyGen,
 };
 use move_bytecode_verifier::{
-    ability_cache::AbilityCache,
-    ability_field_requirements,
-    constants,
+    DuplicationChecker, InstructionConsistency, RecursiveDataDefChecker, SignatureChecker,
+    ability_cache::AbilityCache, ability_field_requirements, constants,
     instantiation_loops::InstantiationLoopChecker,
-    DuplicationChecker,
-    InstructionConsistency,
-    RecursiveDataDefChecker,
-    SignatureChecker,
 };
 use move_bytecode_verifier_meter::dummy::DummyMeter;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+};
 use proptest::{collection::vec, prelude::*, sample::Index as PropIndex};
 
 proptest! {
@@ -166,9 +165,9 @@ proptest! {
 /// There are some potentially tricky edge cases around ranges that are captured here.
 #[test]
 fn valid_bounds_no_members() {
-    let mut gen = CompiledModuleStrategyGen::new(20);
-    gen.zeros_all();
-    proptest!(|(_module in gen.generate())| {
+    let mut rng = CompiledModuleStrategyGen::new(20);
+    rng.zeros_all();
+    proptest!(|(_module in rng.generate())| {
         // gen.generate() will panic if there are any bounds check issues.
     });
 }

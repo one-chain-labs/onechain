@@ -4,26 +4,25 @@
 use axum::{extract::Extension, http::StatusCode, routing::get, Router};
 use mysten_metrics::RegistryService;
 use prometheus::{
-    register_histogram_with_registry,
-    register_int_counter_with_registry,
-    register_int_gauge_with_registry,
-    Histogram,
-    IntCounter,
-    IntGauge,
-    Registry,
-    TextEncoder,
+    register_histogram_with_registry, register_int_counter_with_registry,
+    register_int_gauge_with_registry, Histogram, IntCounter, IntGauge,
 };
+use prometheus::{Registry, TextEncoder};
 use std::net::SocketAddr;
 use tracing::info;
 
 const METRICS_ROUTE: &str = "/metrics";
 
-pub fn start_prometheus_server(addr: SocketAddr) -> Result<(RegistryService, Registry), anyhow::Error> {
+pub fn start_prometheus_server(
+    addr: SocketAddr,
+) -> Result<(RegistryService, Registry), anyhow::Error> {
     info!(address =% addr, "Starting prometheus server");
     let registry = Registry::new_custom(Some("indexer".to_string()), None)?;
     let registry_service = RegistryService::new(registry.clone());
 
-    let app = Router::new().route(METRICS_ROUTE, get(metrics)).layer(Extension(registry_service.clone()));
+    let app = Router::new()
+        .route(METRICS_ROUTE, get(metrics))
+        .layer(Extension(registry_service.clone()));
 
     tokio::spawn(async move {
         let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
@@ -36,22 +35,29 @@ async fn metrics(Extension(registry_service): Extension<RegistryService>) -> (St
     let metrics_families = registry_service.gather_all();
     match TextEncoder.encode_to_string(&metrics_families) {
         Ok(metrics) => (StatusCode::OK, metrics),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, format!("unable to encode metrics: {error}")),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("unable to encode metrics: {error}"),
+        ),
     }
 }
 
 /// NOTE: for various data ingestion steps, which are expected to be within [0.001, 100] seconds,
 /// and high double digits usually means something is broken.
-const DATA_INGESTION_LATENCY_SEC_BUCKETS: &[f64] =
-    &[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0];
+const DATA_INGESTION_LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0,
+];
 /// NOTE: for objects_snapshot update and advance_epoch, which are expected to be within [0.1, 100] seconds,
 /// and can go up to high hundreds of seconds when things go wrong.
-const DB_UPDATE_QUERY_LATENCY_SEC_BUCKETS: &[f64] =
-    &[0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0];
+const DB_UPDATE_QUERY_LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0,
+    10000.0,
+];
 /// NOTE: for json_rpc calls, which are expected to be within [0.01, 100] seconds,
 /// high hundreds of seconds usually means something is broken.
-const JSON_RPC_LATENCY_SEC_BUCKETS: &[f64] =
-    &[0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0];
+const JSON_RPC_LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0,
+];
 
 #[derive(Clone)]
 pub struct IndexerMetrics {
@@ -237,68 +243,57 @@ impl IndexerMetrics {
                 "latest_object_snapshot_sequence_number",
                 "Latest object snapshot sequence number from the Indexer",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             max_downloaded_checkpoint_sequence_number: register_int_gauge_with_registry!(
                 "max_downloaded_checkpoint_sequence_number",
                 "Max downloaded checkpoint sequence number",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             max_indexed_checkpoint_sequence_number: register_int_gauge_with_registry!(
                 "max_indexed_checkpoint_sequence_number",
                 "Max indexed checkpoint sequence number",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             max_committed_checkpoint_sequence_number: register_int_gauge_with_registry!(
                 "max_committed_checkpoint_sequence_number",
                 "Max committed checkpoint sequence number",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             downloaded_checkpoint_timestamp_ms: register_int_gauge_with_registry!(
                 "downloaded_checkpoint_timestamp_ms",
                 "Timestamp of the downloaded checkpoint",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             indexed_checkpoint_timestamp_ms: register_int_gauge_with_registry!(
                 "indexed_checkpoint_timestamp_ms",
                 "Timestamp of the indexed checkpoint",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             committed_checkpoint_timestamp_ms: register_int_gauge_with_registry!(
                 "committed_checkpoint_timestamp_ms",
                 "Timestamp of the committed checkpoint",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             download_lag_ms: register_int_gauge_with_registry!(
                 "download_lag_ms",
                 "Lag of the latest checkpoint in milliseconds",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             index_lag_ms: register_int_gauge_with_registry!(
                 "index_lag_ms",
                 "Lag of the latest checkpoint in milliseconds",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             db_commit_lag_ms: register_int_gauge_with_registry!(
                 "db_commit_lag_ms",
                 "Lag of the latest checkpoint in milliseconds",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             checkpoint_download_bytes_size: register_int_gauge_with_registry!(
                 "checkpoint_download_bytes_size",
                 "Size of the downloaded checkpoint in bytes",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             fullnode_checkpoint_data_download_latency: register_histogram_with_registry!(
                 "fullnode_checkpoint_data_download_latency",
                 "Time spent in downloading checkpoint and transaction for a new checkpoint from the Full Node",
@@ -339,8 +334,7 @@ impl IndexerMetrics {
                 "indexing_batch_size",
                 "Size of the indexing batch",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             indexing_tx_object_changes_latency: register_histogram_with_registry!(
                 "indexing_tx_object_changes_latency",
                 "Time spent in indexing object changes for a transaction",
@@ -448,22 +442,19 @@ impl IndexerMetrics {
                 "Time spent committing objects version",
                 DATA_INGESTION_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             checkpoint_db_commit_latency_objects_history: register_histogram_with_registry!(
                 "checkpoint_db_commit_latency_objects_history",
                 "Time spent committing objects history",
                 DATA_INGESTION_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             checkpoint_db_commit_latency_full_objects_history: register_histogram_with_registry!(
                 "checkpoint_db_commit_latency_full_objects_history",
                 "Time spent committing full objects history",
                 DATA_INGESTION_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             checkpoint_db_commit_latency_objects_chunks: register_histogram_with_registry!(
                 "checkpoint_db_commit_latency_objects_chunks",
                 "Time spent committing objects chunks",
@@ -483,15 +474,13 @@ impl IndexerMetrics {
                 "Time spent committing objects version chunks",
                 DATA_INGESTION_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             checkpoint_db_commit_latency_objects_history_chunks: register_histogram_with_registry!(
                 "checkpoint_db_commit_latency_objects_history_chunks",
                 "Time spent committing objects history chunks",
                 DATA_INGESTION_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             checkpoint_db_commit_latency_full_objects_history_chunks: register_histogram_with_registry!(
                 "checkpoint_db_commit_latency_full_objects_history_chunks",
                 "Time spent committing full objects history chunks",
@@ -574,8 +563,7 @@ impl IndexerMetrics {
                 "Time spent to wait for tokio blocking task pool",
                 DATA_INGESTION_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             thousand_transaction_avg_db_commit_latency: register_histogram_with_registry!(
                 "transaction_db_commit_latency",
                 "Average time spent committing 1000 transactions to the db",
@@ -616,8 +604,7 @@ impl IndexerMetrics {
                 "Time spent in advancing epoch",
                 DB_UPDATE_QUERY_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             subscription_process_latency: register_histogram_with_registry!(
                 "subscription_process_latency",
                 "Time spent in process Websocket subscription",
@@ -762,14 +749,12 @@ impl IndexerMetrics {
                 "db_conn_pool_size",
                 "Size of the database connection pool",
                 registry
-            )
-            .unwrap(),
+            ).unwrap(),
             idle_db_conn: register_int_gauge_with_registry!(
                 "idle_db_conn",
                 "Number of idle database connections",
                 registry
-            )
-            .unwrap(),
+            ).unwrap(),
             address_processor_failure: register_int_counter_with_registry!(
                 "address_processor_failure",
                 "Total number of address processor failure",
@@ -798,15 +783,13 @@ impl IndexerMetrics {
                 "last_pruned_transaction",
                 "Last pruned transaction sequence number",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             epoch_pruning_latency: register_histogram_with_registry!(
                 "epoch_pruning_latency",
                 "Time spent in pruning one epoch",
                 DB_UPDATE_QUERY_LATENCY_SEC_BUCKETS.to_vec(),
                 registry
-            )
-            .unwrap(),
+            ).unwrap(),
         }
     }
 }

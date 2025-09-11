@@ -7,7 +7,7 @@ use crate::{
     cfgir::visitor::CFGIRVisitor,
     command_line::compiler::Visitor,
     diagnostics::{
-        codes::{custom, DiagnosticInfo, Severity},
+        codes::{DiagnosticInfo, Severity, custom},
         warning_filters::WarningFilter,
     },
     typing::visitor::TypingVisitor,
@@ -104,25 +104,60 @@ macro_rules! lints {
 }
 
 lints!(
-    (ConstantNaming, LinterDiagnosticCategory::Style, "constant_naming", "constant should follow naming convention"),
-    (WhileTrueToLoop, LinterDiagnosticCategory::Style, "while_true", "unnecessary 'while (true)', replace with 'loop'"),
-    (MeaninglessMath, LinterDiagnosticCategory::Complexity, "unnecessary_math", "math operator can be simplified"),
-    (UnneededReturn, LinterDiagnosticCategory::Style, "unneeded_return", "unneeded return"),
+    (
+        ConstantNaming,
+        LinterDiagnosticCategory::Style,
+        "constant_naming",
+        "constant should follow naming convention"
+    ),
+    (
+        WhileTrueToLoop,
+        LinterDiagnosticCategory::Style,
+        "while_true",
+        "unnecessary 'while (true)', replace with 'loop'"
+    ),
+    (
+        MeaninglessMath,
+        LinterDiagnosticCategory::Complexity,
+        "unnecessary_math",
+        "math operator can be simplified"
+    ),
+    (
+        UnneededReturn,
+        LinterDiagnosticCategory::Style,
+        "unneeded_return",
+        "unneeded return"
+    ),
     (
         AbortWithoutConstant,
         LinterDiagnosticCategory::Style,
         "abort_without_constant",
         "'abort' or 'assert' without named constant"
     ),
-    (LoopWithoutExit, LinterDiagnosticCategory::Suspicious, "loop_without_exit", "'loop' without 'break' or 'return'"),
+    (
+        LoopWithoutExit,
+        LinterDiagnosticCategory::Suspicious,
+        "loop_without_exit",
+        "'loop' without 'break' or 'return'"
+    ),
     (
         UnnecessaryConditional,
         LinterDiagnosticCategory::Complexity,
         "unnecessary_conditional",
         "'if' expression can be removed"
     ),
-    (SelfAssignment, LinterDiagnosticCategory::Suspicious, "self_assignment", "assignment preserves the same value"),
-    (RedundantRefDeref, LinterDiagnosticCategory::Complexity, "redundant_ref_deref", "redundant reference/dereference"),
+    (
+        SelfAssignment,
+        LinterDiagnosticCategory::Suspicious,
+        "self_assignment",
+        "assignment preserves the same value"
+    ),
+    (
+        RedundantRefDeref,
+        LinterDiagnosticCategory::Complexity,
+        "redundant_ref_deref",
+        "redundant reference/dereference"
+    ),
     (
         UnnecessaryUnit,
         LinterDiagnosticCategory::Style,
@@ -140,7 +175,7 @@ lints!(
         LinterDiagnosticCategory::Complexity,
         "combinable_comparisons",
         "comparison operations condition can be simplified"
-    )
+    ),
 );
 
 pub const ALLOW_ATTR_CATEGORY: &str = "lint";
@@ -152,7 +187,12 @@ pub fn known_filters() -> (Option<Symbol>, Vec<WarningFilter>) {
         STYLE_WARNING_FILTERS
             .iter()
             .map(|(category, code, filter_name)| {
-                WarningFilter::code(Some(LINT_WARNING_PREFIX), *category, *code, Some(filter_name))
+                WarningFilter::code(
+                    Some(LINT_WARNING_PREFIX),
+                    *category,
+                    *code,
+                    Some(filter_name),
+                )
             })
             .collect(),
     )

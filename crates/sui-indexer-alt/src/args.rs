@@ -7,13 +7,12 @@ use std::path::PathBuf;
 use crate::benchmark::BenchmarkArgs;
 use crate::IndexerArgs;
 use clap::Subcommand;
-use sui_indexer_alt_framework::{db::DbArgs, ingestion::ClientArgs};
+use sui_indexer_alt_framework::{ingestion::ClientArgs, postgres::DbArgs};
+use sui_indexer_alt_metrics::MetricsArgs;
+use url::Url;
 
 #[derive(clap::Parser, Debug, Clone)]
 pub struct Args {
-    #[command(flatten)]
-    pub db_args: DbArgs,
-
     #[command(subcommand)]
     pub command: Command,
 }
@@ -23,11 +22,24 @@ pub struct Args {
 pub enum Command {
     /// Run the indexer.
     Indexer {
+        /// The URL of the database to connect to.
+        #[clap(
+            long,
+            default_value = "postgres://postgres:postgrespw@localhost:5432/sui_indexer_alt"
+        )]
+        database_url: Url,
+
+        #[command(flatten)]
+        db_args: DbArgs,
+
         #[command(flatten)]
         client_args: ClientArgs,
 
         #[command(flatten)]
         indexer_args: IndexerArgs,
+
+        #[command(flatten)]
+        metrics_args: MetricsArgs,
 
         /// Path to the indexer's configuration TOML file.
         #[arg(long)]
@@ -47,6 +59,16 @@ pub enum Command {
 
     /// Wipe the database of its contents
     ResetDatabase {
+        /// The URL of the database to connect to.
+        #[clap(
+            long,
+            default_value = "postgres://postgres:postgrespw@localhost:5432/sui_indexer_alt"
+        )]
+        database_url: Url,
+
+        #[command(flatten)]
+        db_args: DbArgs,
+
         /// If true, only drop all tables but do not run the migrations.
         /// That is, no tables will exist in the DB after the reset.
         #[clap(long, default_value_t = false)]
@@ -59,6 +81,16 @@ pub enum Command {
     /// skip any pipelines that rely on genesis data.
     #[cfg(feature = "benchmark")]
     Benchmark {
+        /// The URL of the database to connect to.
+        #[clap(
+            long,
+            default_value = "postgres://postgres:postgrespw@localhost:5432/sui_indexer_alt"
+        )]
+        database_url: Url,
+
+        #[command(flatten)]
+        db_args: DbArgs,
+
         #[command(flatten)]
         benchmark_args: BenchmarkArgs,
 

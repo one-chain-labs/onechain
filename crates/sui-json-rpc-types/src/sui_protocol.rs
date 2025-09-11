@@ -5,9 +5,11 @@ use std::collections::BTreeMap;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::serde_as;
+use serde_with::DisplayFromStr;
 use sui_protocol_config::{ProtocolConfig, ProtocolConfigValue, ProtocolVersion};
-use sui_types::sui_serde::{AsProtocolVersion, BigInt, Readable};
+use sui_types::sui_serde::Readable;
+use sui_types::sui_serde::{AsProtocolVersion, BigInt};
 
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq)]
@@ -72,7 +74,11 @@ impl From<ProtocolConfig> for ProtocolConfigResponse {
     fn from(config: ProtocolConfig) -> Self {
         ProtocolConfigResponse {
             protocol_version: config.version,
-            attributes: config.attr_map().into_iter().map(|(k, v)| (k, v.map(SuiProtocolConfigValue::from))).collect(),
+            attributes: config
+                .attr_map()
+                .into_iter()
+                .map(|(k, v)| (k, v.map(SuiProtocolConfigValue::from)))
+                .collect(),
             min_supported_protocol_version: ProtocolVersion::MIN,
             max_supported_protocol_version: ProtocolVersion::MAX,
             feature_flags: config.feature_map(),

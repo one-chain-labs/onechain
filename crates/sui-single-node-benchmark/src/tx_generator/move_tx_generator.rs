@@ -1,15 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{mock_account::Account, tx_generator::TxGenerator};
+use crate::mock_account::Account;
+use crate::tx_generator::TxGenerator;
 use move_core_types::identifier::Identifier;
 use std::collections::HashMap;
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{CallArg, ObjectArg, Transaction, DEFAULT_VALIDATOR_GAS_PRICE},
-};
+use sui_types::base_types::{FullObjectRef, ObjectID, ObjectRef, SequenceNumber, SuiAddress};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{CallArg, ObjectArg, Transaction, DEFAULT_VALIDATOR_GAS_PRICE};
 
 pub struct MoveTxGenerator {
     move_package: ObjectID,
@@ -58,7 +57,9 @@ impl TxGenerator for MoveTxGenerator {
             for i in 1..=self.num_transfers {
                 let object = account.gas_objects[i as usize];
                 if self.use_native_transfer {
-                    builder.transfer_object(account.sender, object).unwrap();
+                    builder
+                        .transfer_object(account.sender, FullObjectRef::from_fastpath_ref(object))
+                        .unwrap();
                 } else {
                     builder
                         .move_call(
@@ -90,7 +91,9 @@ impl TxGenerator for MoveTxGenerator {
             if !self.root_objects.is_empty() {
                 // Step 2: Read all dynamic fields from the root object.
                 let root_object = self.root_objects.get(&account.sender).unwrap();
-                let root_object_arg = builder.obj(ObjectArg::ImmOrOwnedObject(*root_object)).unwrap();
+                let root_object_arg = builder
+                    .obj(ObjectArg::ImmOrOwnedObject(*root_object))
+                    .unwrap();
                 builder.programmable_move_call(
                     self.move_package,
                     Identifier::new("benchmark").unwrap(),
@@ -124,7 +127,10 @@ impl TxGenerator for MoveTxGenerator {
                     for _ in 0..self.num_mints {
                         recipients.push(account.sender)
                     }
-                    let args = vec![builder.pure(recipients).unwrap(), builder.pure(contents).unwrap()];
+                    let args = vec![
+                        builder.pure(recipients).unwrap(),
+                        builder.pure(contents).unwrap(),
+                    ];
                     builder.programmable_move_call(
                         self.move_package,
                         Identifier::new("benchmark").unwrap(),
@@ -135,7 +141,10 @@ impl TxGenerator for MoveTxGenerator {
                 } else {
                     // create PTB with a command that transfers each
                     for _ in 0..self.num_mints {
-                        let args = vec![builder.pure(account.sender).unwrap(), builder.pure(contents.clone()).unwrap()];
+                        let args = vec![
+                            builder.pure(account.sender).unwrap(),
+                            builder.pure(contents.clone()).unwrap(),
+                        ];
                         builder.programmable_move_call(
                             self.move_package,
                             Identifier::new("benchmark").unwrap(),
@@ -148,9 +157,13 @@ impl TxGenerator for MoveTxGenerator {
             }
             builder.finish()
         };
-        TestTransactionBuilder::new(account.sender, account.gas_objects[0], DEFAULT_VALIDATOR_GAS_PRICE)
-            .programmable(pt)
-            .build_and_sign(account.keypair.as_ref())
+        TestTransactionBuilder::new(
+            account.sender,
+            account.gas_objects[0],
+            DEFAULT_VALIDATOR_GAS_PRICE,
+        )
+        .programmable(pt)
+        .build_and_sign(account.keypair.as_ref())
     }
 
     fn name(&self) -> &'static str {

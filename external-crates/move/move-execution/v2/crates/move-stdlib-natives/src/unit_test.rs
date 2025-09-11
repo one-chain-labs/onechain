@@ -12,7 +12,9 @@ use move_vm_runtime::{
     native_charge_gas_early_exit,
     native_functions::{NativeContext, NativeFunction},
 };
-use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+};
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
 
@@ -45,8 +47,9 @@ fn native_create_signers_for_testing(
     debug_assert!(args.len() == 1);
 
     let num_signers = pop_arg!(args, u64);
-    let signers =
-        Value::vector_for_testing_only((0..num_signers).map(|i| Value::signer(AccountAddress::new(to_le_bytes(i)))));
+    let signers = Value::vector_for_testing_only(
+        (0..num_signers).map(|i| Value::signer(AccountAddress::new(to_le_bytes(i)))),
+    );
 
     let cost = gas_params.base_cost + gas_params.unit_cost * NumArgs::new(num_signers);
     native_charge_gas_early_exit!(context, cost);
@@ -54,10 +57,14 @@ fn native_create_signers_for_testing(
     Ok(NativeResult::ok(context.gas_used(), smallvec![signers]))
 }
 
-pub fn make_native_create_signers_for_testing(gas_params: CreateSignersForTestingGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_create_signers_for_testing(&gas_params, context, ty_args, args)
-    })
+pub fn make_native_create_signers_for_testing(
+    gas_params: CreateSignersForTestingGasParameters,
+) -> NativeFunction {
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_create_signers_for_testing(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -79,9 +86,11 @@ fn native_poison(
 }
 
 pub fn make_native_poison(gas_params: PoisonGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_poison(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_poison(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -95,7 +104,10 @@ pub struct GasParameters {
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("create_signers_for_testing", make_native_create_signers_for_testing(gas_params.create_signers_for_testing)),
+        (
+            "create_signers_for_testing",
+            make_native_create_signers_for_testing(gas_params.create_signers_for_testing),
+        ),
         ("poison", make_native_poison(gas_params.poison)),
     ];
 

@@ -8,7 +8,9 @@ use crate::{
     annotated_extractor::{Element as E, Extractor},
     annotated_value::{MoveTypeLayout, MoveValue},
     language_storage::TypeTag,
-    unit_tests::visitor_test::{enum_layout_, serialize, struct_layout_, struct_value_, variant_value_, PrintVisitor},
+    unit_tests::visitor_test::{
+        PrintVisitor, enum_layout_, serialize, struct_layout_, struct_value_, variant_value_,
+    },
 };
 
 #[test]
@@ -589,7 +591,10 @@ fn enum_() {
 [1] 11: u8
     "#;
 
-    for path in enumerate_paths(vec![C::Opt(E::Type(&type_("0x0::foo::Qux"))), C::Opt(E::Variant("n"))]) {
+    for path in enumerate_paths(vec![
+        C::Opt(E::Type(&type_("0x0::foo::Qux"))),
+        C::Opt(E::Variant("n")),
+    ]) {
         assert_path(test_enum(), path, expect);
     }
 }
@@ -661,7 +666,11 @@ fn type_mismatch() {
         // Wrong nested struct
         vec![E::Field("k"), E::Type(&type_("0x0::foo::Bar"))],
         // Wrong type with further nesting
-        vec![E::Field("k"), E::Type(&type_("0x0::foo::Bar")), E::Field("l")],
+        vec![
+            E::Field("k"),
+            E::Type(&type_("0x0::foo::Bar")),
+            E::Field("l"),
+        ],
         // Wrong primitive vector
         vec![E::Field("j"), E::Type(&type_("vector<u16>"))],
         vec![E::Field("j"), E::Type(&type_("u8"))],
@@ -727,11 +736,17 @@ fn assert_path((value, layout): (MoveValue, MoveTypeLayout), path: Vec<E<'_>>, e
     let mut printer = PrintVisitor::default();
 
     assert!(
-        Extractor::deserialize_value(&bytes, &layout, &mut printer, path.clone()).unwrap().is_some(),
+        Extractor::deserialize_value(&bytes, &layout, &mut printer, path.clone())
+            .unwrap()
+            .is_some(),
         "Failed to extract value {path:?}",
     );
 
-    assert_eq!(printer.output.trim(), expect.trim(), "Failed to match value at {path:?}");
+    assert_eq!(
+        printer.output.trim(),
+        expect.trim(),
+        "Failed to match value at {path:?}"
+    );
 }
 
 fn assert_no_path((value, layout): (MoveValue, MoveTypeLayout), path: Vec<E<'_>>) {
@@ -739,11 +754,16 @@ fn assert_no_path((value, layout): (MoveValue, MoveTypeLayout), path: Vec<E<'_>>
     let mut printer = PrintVisitor::default();
 
     assert!(
-        Extractor::deserialize_value(&bytes, &layout, &mut printer, path.clone()).unwrap().is_none(),
+        Extractor::deserialize_value(&bytes, &layout, &mut printer, path.clone())
+            .unwrap()
+            .is_none(),
         "Expected not to find something at {path:?}",
     );
 
-    assert!(printer.output.is_empty(), "Expected not to delegate to the inner visitor for {path:?}");
+    assert!(
+        printer.output.is_empty(),
+        "Expected not to delegate to the inner visitor for {path:?}"
+    );
 }
 
 fn type_(t: &str) -> TypeTag {
@@ -757,37 +777,43 @@ fn test_struct() -> (MoveValue, MoveTypeLayout) {
     let (vector, vector_layout) = test_vector();
     let (variant, enum_layout) = test_enum();
 
-    let value = struct_value_("0x0::foo::Bar", vec![
-        ("a", V::U8(1)),
-        ("b", V::U16(2)),
-        ("c", V::U32(3)),
-        ("d", V::U64(4)),
-        ("e", V::U128(5)),
-        ("f", V::U256(6u32.into())),
-        ("g", V::Bool(true)),
-        ("h", V::Address(AccountAddress::ZERO)),
-        ("i", V::Signer(AccountAddress::ZERO)),
-        ("j", V::Vector(vec![V::U8(7), V::U8(8), V::U8(9)])),
-        ("k", struct_value_("0x0::foo::Baz", vec![("l", V::U8(10))])),
-        ("m", variant),
-        ("p", vector),
-    ]);
+    let value = struct_value_(
+        "0x0::foo::Bar",
+        vec![
+            ("a", V::U8(1)),
+            ("b", V::U16(2)),
+            ("c", V::U32(3)),
+            ("d", V::U64(4)),
+            ("e", V::U128(5)),
+            ("f", V::U256(6u32.into())),
+            ("g", V::Bool(true)),
+            ("h", V::Address(AccountAddress::ZERO)),
+            ("i", V::Signer(AccountAddress::ZERO)),
+            ("j", V::Vector(vec![V::U8(7), V::U8(8), V::U8(9)])),
+            ("k", struct_value_("0x0::foo::Baz", vec![("l", V::U8(10))])),
+            ("m", variant),
+            ("p", vector),
+        ],
+    );
 
-    let layout = struct_layout_("0x0::foo::Bar", vec![
-        ("a", T::U8),
-        ("b", T::U16),
-        ("c", T::U32),
-        ("d", T::U64),
-        ("e", T::U128),
-        ("f", T::U256),
-        ("g", T::Bool),
-        ("h", T::Address),
-        ("i", T::Signer),
-        ("j", T::Vector(Box::new(T::U8))),
-        ("k", struct_layout_("0x0::foo::Baz", vec![("l", T::U8)])),
-        ("m", enum_layout),
-        ("p", vector_layout),
-    ]);
+    let layout = struct_layout_(
+        "0x0::foo::Bar",
+        vec![
+            ("a", T::U8),
+            ("b", T::U16),
+            ("c", T::U32),
+            ("d", T::U64),
+            ("e", T::U128),
+            ("f", T::U256),
+            ("g", T::Bool),
+            ("h", T::Address),
+            ("i", T::Signer),
+            ("j", T::Vector(Box::new(T::U8))),
+            ("k", struct_layout_("0x0::foo::Baz", vec![("l", T::U8)])),
+            ("m", enum_layout),
+            ("p", vector_layout),
+        ],
+    );
 
     (value, layout)
 }
@@ -807,11 +833,20 @@ fn test_vector() -> (MoveValue, MoveTypeLayout) {
     use MoveValue as V;
 
     let value = V::Vector(vec![
-        struct_value_("0x0::foo::Quy", vec![("q", V::U8(12)), ("r", V::Bool(true))]),
-        struct_value_("0x0::foo::Quy", vec![("q", V::U8(13)), ("r", V::Bool(false))]),
+        struct_value_(
+            "0x0::foo::Quy",
+            vec![("q", V::U8(12)), ("r", V::Bool(true))],
+        ),
+        struct_value_(
+            "0x0::foo::Quy",
+            vec![("q", V::U8(13)), ("r", V::Bool(false))],
+        ),
     ]);
 
-    let layout = T::Vector(Box::new(struct_layout_("0x0::foo::Quy", vec![("q", T::U8), ("r", T::Bool)])));
+    let layout = T::Vector(Box::new(struct_layout_(
+        "0x0::foo::Quy",
+        vec![("q", T::U8), ("r", T::Bool)],
+    )));
 
     (value, layout)
 }

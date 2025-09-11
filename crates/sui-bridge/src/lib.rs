@@ -93,7 +93,9 @@ mod tests {
         // no retry is needed, should return immediately. We give it a very small
         // max_elapsed_time and it should still finish in time.
         let max_elapsed_time = Duration::from_millis(20);
-        retry_with_max_elapsed_time!(example_func_ok(), max_elapsed_time).unwrap().unwrap();
+        retry_with_max_elapsed_time!(example_func_ok(), max_elapsed_time)
+            .unwrap()
+            .unwrap();
 
         // now call a function that always errors and expect it to return before max_elapsed_time runs out
         let max_elapsed_time = Duration::from_secs(10);

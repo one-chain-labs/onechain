@@ -76,8 +76,21 @@ function activate(context) {
  * - Prettier extension settings
  */
 async function findMatchingConfig(documentUri) {
-	const root = vscode.workspace.getWorkspaceFolder(documentUri).uri.path;
-	let lookup = documentUri.path;
+	const workspaceFolder = vscode.workspace.getWorkspaceFolder(documentUri);
+	if (!workspaceFolder) {
+		const formatterConfig = vscode.workspace.getConfiguration(EXTENSION_NAME);
+		return {
+			tabWidth: formatterConfig.get('tabWidth'),
+			printWidth: formatterConfig.get('printWidth'),
+			wrapComments: formatterConfig.get('wrapComments'),
+			useModuleLabel: formatterConfig.get('useModuleLabel'),
+			autoGroupImports: formatterConfig.get('autoGroupImports'),
+			enableErrorDebug: formatterConfig.get('errorDebugMode'),
+		};
+	}
+
+	const root = workspaceFolder.uri.fsPath;
+	let lookup = documentUri.fsPath;
 	let search = {};
 
 	// go back in the directory until the root is found; or until we find the

@@ -23,7 +23,11 @@ impl TransactionKindMutator for DropRandomCommands {
             if p.commands.is_empty() {
                 return None;
             }
-            p.commands = p.commands.choose_multiple(&mut self.rng, p.commands.len() - 1).cloned().collect();
+            p.commands = p
+                .commands
+                .choose_multiple(&mut self.rng, p.commands.len() - 1)
+                .cloned()
+                .collect();
             info!("Mutation: Dropping random commands");
             Some(TransactionKind::ProgrammableTransaction(p))
         } else {

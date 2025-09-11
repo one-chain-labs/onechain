@@ -34,7 +34,10 @@ pub struct LiveVarInfoAtCodeOffset {
 pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
-    pub fn get_live_var_info_at(&self, code_offset: CodeOffset) -> Option<&LiveVarInfoAtCodeOffset> {
+    pub fn get_live_var_info_at(
+        &self,
+        code_offset: CodeOffset,
+    ) -> Option<&LiveVarInfoAtCodeOffset> {
         self.0.get(&code_offset)
     }
 }
@@ -73,7 +76,8 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
         let func_target = FunctionTarget::new(func_env, &data);
 
         // Call 1st time
-        let (code, _) = Self::analyze_and_transform(&func_target, next_free_label, next_free_attr, code);
+        let (code, _) =
+            Self::analyze_and_transform(&func_target, next_free_label, next_free_attr, code);
 
         // Eliminate unused locals after dead code elimination.
         let (code, local_types, remap) = Self::eliminate_unused_vars(&func_target, code);
@@ -93,7 +97,8 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
             let offset_to_live_refs = LiveVarAnnotation(Self::analyze(&func_target, &data.code));
             // Annotate function target with computed life variable data.
             // TODO(mengxu): verify that recursion does not affect how live-var analysis is done
-            data.annotations.set::<LiveVarAnnotation>(offset_to_live_refs, true);
+            data.annotations
+                .set::<LiveVarAnnotation>(offset_to_live_refs, true);
         }
         data
     }
@@ -116,15 +121,26 @@ impl LiveVarAnalysisProcessor {
         (new_bytecode, annotations)
     }
 
-    fn analyze(func_target: &FunctionTarget, code: &[Bytecode]) -> BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset> {
+    fn analyze(
+        func_target: &FunctionTarget,
+        code: &[Bytecode],
+    ) -> BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset> {
         // Perform backward analysis from all blocks just in case some block
         // cannot reach an exit block
         let cfg = StacklessControlFlowGraph::new_backward(code, true);
         let analyzer = LiveVarAnalysis::new(func_target, 0, 0);
-        let state_map = analyzer.analyze_function(LiveVarState { livevars: BTreeSet::new() }, code, &cfg);
-        analyzer.state_per_instruction(state_map, code, &cfg, |before, after| LiveVarInfoAtCodeOffset {
-            before: before.livevars.clone(),
-            after: after.livevars.clone(),
+        let state_map = analyzer.analyze_function(
+            LiveVarState {
+                livevars: BTreeSet::new(),
+            },
+            code,
+            &cfg,
+        );
+        analyzer.state_per_instruction(state_map, code, &cfg, |before, after| {
+            LiveVarInfoAtCodeOffset {
+                before: before.livevars.clone(),
+                after: after.livevars.clone(),
+            }
         })
     }
 
@@ -190,7 +206,11 @@ impl LiveVarState {
 
 impl<'a> LiveVarAnalysis<'a> {
     fn new(func_target: &'a FunctionTarget, next_label_id: usize, next_attr_id: usize) -> Self {
-        Self { func_target, next_label_id, next_attr_id }
+        Self {
+            func_target,
+            next_label_id,
+            next_attr_id,
+        }
     }
 
     fn transform_code(
@@ -207,7 +227,12 @@ impl<'a> LiveVarAnalysis<'a> {
         if let Some(info) = annotations.get(&0) {
             for index in &info.before {
                 // only mark the mutable references conditionally defined in function body as uninit
-                if *index >= num_args && self.func_target.get_local_type(*index).is_mutable_reference() {
+                if *index >= num_args
+                    && self
+                        .func_target
+                        .get_local_type(*index)
+                        .is_mutable_reference()
+                {
                     transformed_code.push(Bytecode::Call(
                         self.new_attr_id(),
                         vec![],
@@ -250,7 +275,9 @@ impl<'a> LiveVarAnalysis<'a> {
                     new_bytecodes.append(&mut bytecodes);
                     transformed_code.push(Bytecode::Branch(attr_id, then_label, else_label, src));
                 }
-                Bytecode::Load(_, dest, _) | Bytecode::Assign(_, dest, _, _) if !annotation_at.after.contains(&dest) => {
+                Bytecode::Load(_, dest, _) | Bytecode::Assign(_, dest, _, _)
+                    if !annotation_at.after.contains(&dest) =>
+                {
                     // Drop this load/assign as it is not used.
                 }
                 Bytecode::Call(attr_id, dests, oper, srcs, aa)
@@ -276,7 +303,13 @@ impl<'a> LiveVarAnalysis<'a> {
                     if let Bytecode::Assign(_, dest, src, _) = &code[next_code_offset] {
                         let annotation_at = &annotations[&(next_code_offset as CodeOffset)];
                         if src == &dests[0] && !annotation_at.after.contains(src) {
-                            transformed_code.push(Bytecode::Call(attr_id, vec![*dest], oper, srcs, aa));
+                            transformed_code.push(Bytecode::Call(
+                                attr_id,
+                                vec![*dest],
+                                oper,
+                                srcs,
+                                aa,
+                            ));
                             skip_next = true;
                         } else {
                             transformed_code.push(Bytecode::Call(attr_id, dests, oper, srcs, aa));
@@ -306,14 +339,24 @@ impl<'a> LiveVarAnalysis<'a> {
         attr_id
     }
 
-    fn create_block_to_destroy_refs(&mut self, jump_label: Label, refs: Vec<TempIndex>) -> (Label, Vec<Bytecode>) {
+    fn create_block_to_destroy_refs(
+        &mut self,
+        jump_label: Label,
+        refs: Vec<TempIndex>,
+    ) -> (Label, Vec<Bytecode>) {
         let mut start_label = jump_label;
         let mut new_bytecodes = vec![];
         if !refs.is_empty() {
             start_label = self.new_label();
             new_bytecodes.push(Bytecode::Label(self.new_attr_id(), start_label));
             for idx in refs {
-                new_bytecodes.push(Bytecode::Call(self.new_attr_id(), vec![], Operation::Destroy, vec![idx], None));
+                new_bytecodes.push(Bytecode::Call(
+                    self.new_attr_id(),
+                    vec![],
+                    Operation::Destroy,
+                    vec![idx],
+                    None,
+                ));
             }
             new_bytecodes.push(Bytecode::Jump(self.new_attr_id(), jump_label));
         }
@@ -330,16 +373,16 @@ impl<'a> LiveVarAnalysis<'a> {
             .after
             .iter()
             .filter(|x| {
-                self.func_target.get_local_type(**x).is_reference() && !annotations[&dest_code_offset].before.contains(x)
+                self.func_target.get_local_type(**x).is_reference()
+                    && !annotations[&dest_code_offset].before.contains(x)
             })
             .copied()
             .collect()
     }
 }
 
-impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
+impl TransferFunctions for LiveVarAnalysis<'_> {
     type State = LiveVarState;
-
     const BACKWARD: bool = true;
 
     fn execute(&self, state: &mut LiveVarState, instr: &Bytecode, _idx: CodeOffset) {
@@ -371,7 +414,7 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
     }
 }
 
-impl<'a> DataflowAnalysis for LiveVarAnalysis<'a> {}
+impl DataflowAnalysis for LiveVarAnalysis<'_> {}
 
 impl AbstractDomain for LiveVarState {
     fn join(&mut self, other: &Self) -> JoinResult {
@@ -390,7 +433,10 @@ impl AbstractDomain for LiveVarState {
 // Formatting
 
 /// Format a live variable annotation.
-pub fn format_livevar_annotation(target: &FunctionTarget<'_>, code_offset: CodeOffset) -> Option<String> {
+pub fn format_livevar_annotation(
+    target: &FunctionTarget<'_>,
+    code_offset: CodeOffset,
+) -> Option<String> {
     if let Some(LiveVarAnnotation(map)) = target.get_annotations().get::<LiveVarAnnotation>() {
         if let Some(map_at) = map.get(&code_offset) {
             let mut res = map_at

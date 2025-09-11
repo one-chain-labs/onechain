@@ -2,7 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::Interpreter, loader::Resolver, native_extensions::NativeContextExtensions};
+use crate::{
+    interpreter::Interpreter, loader::Resolver, native_extensions::NativeContextExtensions,
+};
 use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -14,7 +16,9 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_config::runtime::VMRuntimeLimitsConfig;
-use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+};
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
@@ -22,14 +26,19 @@ use std::{
     sync::Arc,
 };
 
-pub type UnboxedNativeFunction =
-    dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult> + Send + Sync + 'static;
+pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
+    + Send
+    + Sync
+    + 'static;
 
 pub type NativeFunction = Arc<UnboxedNativeFunction>;
 
 pub type NativeFunctionTable = Vec<(AccountAddress, Identifier, Identifier, NativeFunction)>;
 
-pub fn make_table(addr: AccountAddress, elems: &[(&str, &str, NativeFunction)]) -> NativeFunctionTable {
+pub fn make_table(
+    addr: AccountAddress,
+    elems: &[(&str, &str, NativeFunction)],
+) -> NativeFunctionTable {
     make_table_from_iter(addr, elems.iter().cloned())
 }
 
@@ -40,15 +49,27 @@ pub fn make_table_from_iter<S: Into<Box<str>>>(
     elems
         .into_iter()
         .map(|(module_name, func_name, func)| {
-            (addr, Identifier::new(module_name).unwrap(), Identifier::new(func_name).unwrap(), func)
+            (
+                addr,
+                Identifier::new(module_name).unwrap(),
+                Identifier::new(func_name).unwrap(),
+                func,
+            )
         })
         .collect()
 }
 
-pub(crate) struct NativeFunctions(HashMap<AccountAddress, HashMap<String, HashMap<String, NativeFunction>>>);
+pub(crate) struct NativeFunctions(
+    HashMap<AccountAddress, HashMap<String, HashMap<String, NativeFunction>>>,
+);
 
 impl NativeFunctions {
-    pub fn resolve(&self, addr: &AccountAddress, module_name: &str, func_name: &str) -> Option<NativeFunction> {
+    pub fn resolve(
+        &self,
+        addr: &AccountAddress,
+        module_name: &str,
+        func_name: &str,
+    ) -> Option<NativeFunction> {
         self.0.get(addr)?.get(module_name)?.get(func_name).cloned()
     }
 
@@ -59,7 +80,9 @@ impl NativeFunctions {
         let mut map = HashMap::new();
         for (addr, module_name, func_name, func) in natives.into_iter() {
             let modules = map.entry(addr).or_insert_with(HashMap::new);
-            let funcs = modules.entry(module_name.into_string()).or_insert_with(HashMap::new);
+            let funcs = modules
+                .entry(module_name.into_string())
+                .or_insert_with(HashMap::new);
 
             if funcs.insert(func_name.into_string(), func).is_some() {
                 return Err(PartialVMError::new(StatusCode::DUPLICATE_NATIVE_FUNCTION));
@@ -84,7 +107,13 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_budget: InternalGas,
     ) -> Self {
-        Self { interpreter, resolver, extensions, gas_left: RefCell::new(gas_budget), gas_budget }
+        Self {
+            interpreter,
+            resolver,
+            extensions,
+            gas_left: RefCell::new(gas_budget),
+            gas_budget,
+        }
     }
 
     /// Limits imposed at runtime
@@ -93,9 +122,10 @@ impl<'a, 'b> NativeContext<'a, 'b> {
     }
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'b> NativeContext<'_, 'b> {
     pub fn print_stack_trace<B: Write>(&self, buf: &mut B) -> PartialVMResult<()> {
-        self.interpreter.debug_print_stack_trace(buf, self.resolver.loader())
+        self.interpreter
+            .debug_print_stack_trace(buf, self.resolver.loader())
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
@@ -114,7 +144,10 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         }
     }
 
-    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<Option<A::MoveTypeLayout>> {
+    pub fn type_to_fully_annotated_layout(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<Option<A::MoveTypeLayout>> {
         match self.resolver.type_to_fully_annotated_layout(ty) {
             Ok(ty_layout) => Ok(Some(ty_layout)),
             Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
@@ -164,7 +197,10 @@ macro_rules! native_charge_gas_early_exit {
         use move_core_types::vm_status::sub_status::NFE_OUT_OF_GAS;
         if !$native_context.charge_gas($cost) {
             // Exhausted all in budget. terminate early
-            return Ok(NativeResult::err($native_context.gas_budget(), NFE_OUT_OF_GAS));
+            return Ok(NativeResult::err(
+                $native_context.gas_budget(),
+                NFE_OUT_OF_GAS,
+            ));
         }
     }};
 }

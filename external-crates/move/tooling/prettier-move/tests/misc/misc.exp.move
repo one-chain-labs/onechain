@@ -3,17 +3,10 @@
 // autoGroupImports: package
 // useModuleLabel: true
 
-/*
- * @title Timelock
- *
- * @notice Locks any object with the store ability for a specific amount of time.
- *
- * @dev We do not provide a function to read the data inside the {Timelock<T>} to prevent capabilities from being used.
- */
-module suitears::timelock;
+module prettier::misc;
 
 use std::{string::String, type_name::{Self, TypeName}};
-use one::{
+use sui::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,
@@ -23,6 +16,7 @@ use one::{
 
 fun calculate_pending_rewards<StakeCoin, RewardCoin>(
     acc: &Account<StakeCoin, RewardCoin>,
+    an_acc: &mut Account<StakeCoin, RewardCoin>,
     stake_factor: u64,
     accrued_rewards_per_share: u256,
 ): u64 {
@@ -45,8 +39,9 @@ fun compute_reward_adjustments(
     u64, // sum of storage fund reward adjustments
     VecMap<u64, u64>, // mapping of individual validator's storage fund reward adjustment from index -> amount
 ) {
-    let unadjusted_storage_fund_reward_amount =
-        unadjusted_storage_fund_reward_amounts[i];
+    let unadjusted_storage_fund_reward_amount = unadjusted_storage_fund_reward_amounts[
+        i,
+    ];
     let adjusted_storage_fund_reward_amount = // If the validator is one of the slashed ones, then subtract the adjustment.
     if (individual_storage_fund_reward_adjustments.contains(&i)) {
         let adjustment = individual_storage_fund_reward_adjustments[&i];
@@ -119,31 +114,10 @@ public fun propose<DaoWitness: drop>(
 
 public fun inline_fun(): u128 { 1000 }
 
-// === Public View Function ===
-
-/*
-     * @notice Returns the unlock time in milliseconds.
-     *
-     * @param self A {Timelock<T>}
-     * @return u64. The `self.unlock_time`.
-     */
 public fun unlock_time<T: store>(self: &Timelock<T>): u64 {
     self.unlock_time
 }
 
-// === Public Mutative Function ===
-
-/*
-     * @notice Locks the `data` for `unlock_time` milliseconds.
-     *
-     * @param data An object with the store ability.
-     * @param c The shared `one::clock::Clock` object.
-     * @patam unlock_time The lock period in milliseconds.
-     * @return {Timelock<T>}.
-     *
-     * aborts-if
-     * - `unlock_time` is in the past.
-     */
 public fun lock<T: store>(
     data: T,
     c: &Clock,
@@ -156,16 +130,6 @@ public fun lock<T: store>(
     Timelock { id: object::new(ctx), data, unlock_time }
 }
 
-/*
-     * @notice Unlocks a {Timelock<T>} and returns the locked resource `T`.
-     *
-     * @param self A {Timelock<T>}
-     * @param c The shared `one::clock::Clock` object.
-     * @return `T`. An object with the store ability.
-     *
-     * aborts-if
-     * - `unlock_time` has not passed.
-     */
 public fun unlock<T: store>(self: Timelock<T>, c: &Clock): T {
     let Timelock { id, data, unlock_time } = self;
 
@@ -227,4 +191,38 @@ fun content() {
         },
         shape::ellipse(30, 30, 10, 5),
     ]);
+}
+
+public fun withdraw<T>(
+    vault: &mut Vault<T>,
+    key: key::Key,
+    ctx: &mut TxContext,
+): coin::Coin<T> {
+    assert_valid_key_code(vault, &key);
+    key.delete();
+
+    let new_coin = coin::from_balance(
+        balance::split(
+            &mut vault.balance,
+            vault.withdrawal_amount,
+        ),
+        ctx,
+    );
+    new_coin
+}
+
+fun staking() {
+    let unadjusted_staking_reward_amount = unadjusted_staking_reward_amounts[i];
+    let adjusted_staking_reward_amount // If the validator is one of the slashed ones, then subtract the adjustment.
+     = if (individual_staking_reward_adjustments.contains(&i)) {
+        let adjustment = individual_staking_reward_adjustments[&i];
+        unadjusted_staking_reward_amount - adjustment
+    } else {
+        // Otherwise the slashed rewards should be distributed among the unslashed
+        // validators so add the corresponding adjustment.
+        let adjustment =
+            total_staking_reward_adjustment as u128 * voting_power / (total_unslashed_validator_voting_power as u128);
+        unadjusted_staking_reward_amount + (adjustment as u64)
+    };
+    adjusted_staking_reward_amounts.push_back(adjusted_staking_reward_amount);
 }

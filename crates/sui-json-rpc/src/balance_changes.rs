@@ -1,27 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    ops::Neg,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::Neg;
 
 use async_trait::async_trait;
 use move_core_types::language_storage::TypeTag;
 use tokio::sync::RwLock;
 
 use sui_json_rpc_types::BalanceChange;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber},
-    coin::Coin,
-    digests::ObjectDigest,
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    execution_status::ExecutionStatus,
-    gas_coin::GAS,
-    object::{Object, Owner},
-    storage::WriteKind,
-    transaction::InputObjectKind,
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SequenceNumber};
+use sui_types::coin::Coin;
+use sui_types::digests::ObjectDigest;
+use sui_types::effects::{TransactionEffects, TransactionEffectsAPI};
+use sui_types::execution_status::ExecutionStatus;
+use sui_types::gas_coin::GAS;
+use sui_types::object::{Object, Owner};
+use sui_types::storage::WriteKind;
+use sui_types::transaction::InputObjectKind;
 use tracing::instrument;
 
 #[instrument(skip_all, fields(transaction_digest = %effects.transaction_digest()))]
@@ -60,7 +56,11 @@ pub async fn get_balance_changes_from_effect<P: ObjectProvider<Error = E>, E>(
             InputObjectKind::MovePackage(_) | InputObjectKind::SharedMoveObject { .. } => None,
         })
         .collect::<HashMap<ObjectID, ObjectDigest>>();
-    let unwrapped_then_deleted = effects.unwrapped_then_deleted().iter().map(|e| e.0).collect::<HashSet<_>>();
+    let unwrapped_then_deleted = effects
+        .unwrapped_then_deleted()
+        .iter()
+        .map(|e| e.0)
+        .collect::<HashSet<_>>();
     get_balance_changes(
         object_provider,
         &effects
@@ -89,21 +89,24 @@ pub async fn get_balance_changes<P: ObjectProvider<Error = E>, E>(
     all_mutated: &[(ObjectID, SequenceNumber, Option<ObjectDigest>)],
 ) -> Result<Vec<BalanceChange>, E> {
     // 1. subtract all input coins
-    let balances = fetch_coins(object_provider, modified_at_version).await?.into_iter().fold(
-        BTreeMap::<_, i128>::new(),
-        |mut acc, (owner, type_, amount)| {
-            *acc.entry((owner, type_)).or_default() -= amount as i128;
-            acc
-        },
-    );
+    let balances = fetch_coins(object_provider, modified_at_version)
+        .await?
+        .into_iter()
+        .fold(
+            BTreeMap::<_, i128>::new(),
+            |mut acc, (owner, type_, amount)| {
+                *acc.entry((owner, type_)).or_default() -= amount as i128;
+                acc
+            },
+        );
     // 2. add all mutated coins
-    let balances = fetch_coins(object_provider, all_mutated).await?.into_iter().fold(
-        balances,
-        |mut acc, (owner, type_, amount)| {
+    let balances = fetch_coins(object_provider, all_mutated)
+        .await?
+        .into_iter()
+        .fold(balances, |mut acc, (owner, type_, amount)| {
             *acc.entry((owner, type_)).or_default() += amount as i128;
             acc
-        },
-    );
+        });
 
     Ok(balances
         .into_iter()
@@ -111,7 +114,11 @@ pub async fn get_balance_changes<P: ObjectProvider<Error = E>, E>(
             if amount == 0 {
                 return None;
             }
-            Some(BalanceChange { owner, coin_type, amount })
+            Some(BalanceChange {
+                owner,
+                coin_type,
+                amount,
+            })
         })
         .collect())
 }
@@ -129,9 +136,14 @@ async fn fetch_coins<P: ObjectProvider<Error = E>, E>(
             if type_.is_coin() {
                 if let Some(digest) = digest_opt {
                     // TODO: can we return Err here instead?
-                    assert_eq!(*digest, o.digest(), "Object digest mismatch--got bad data from object_provider?")
+                    assert_eq!(
+                        *digest,
+                        o.digest(),
+                        "Object digest mismatch--got bad data from object_provider?"
+                    )
                 }
-                let [coin_type]: [TypeTag; 1] = type_.clone().into_type_params().try_into().unwrap();
+                let [coin_type]: [TypeTag; 1] =
+                    type_.clone().into_type_params().try_into().unwrap();
                 all_mutated_coins.push((
                     o.owner.clone(),
                     coin_type,
@@ -147,7 +159,11 @@ async fn fetch_coins<P: ObjectProvider<Error = E>, E>(
 #[async_trait]
 pub trait ObjectProvider {
     type Error;
-    async fn get_object(&self, id: &ObjectID, version: &SequenceNumber) -> Result<Object, Self::Error>;
+    async fn get_object(
+        &self,
+        id: &ObjectID,
+        version: &SequenceNumber,
+    ) -> Result<Object, Self::Error>;
     async fn find_object_lt_or_eq_version(
         &self,
         id: &ObjectID,
@@ -163,7 +179,11 @@ pub struct ObjectProviderCache<P> {
 
 impl<P> ObjectProviderCache<P> {
     pub fn new(provider: P) -> Self {
-        Self { object_cache: Default::default(), last_version_cache: Default::default(), provider }
+        Self {
+            object_cache: Default::default(),
+            last_version_cache: Default::default(),
+            provider,
+        }
     }
 
     pub fn insert_objects_into_cache(&mut self, objects: Vec<Object>) {
@@ -190,7 +210,10 @@ impl<P> ObjectProviderCache<P> {
         }
     }
 
-    pub fn new_with_cache(provider: P, written_objects: BTreeMap<ObjectID, (ObjectRef, Object, WriteKind)>) -> Self {
+    pub fn new_with_cache(
+        provider: P,
+        written_objects: BTreeMap<ObjectID, (ObjectRef, Object, WriteKind)>,
+    ) -> Self {
         let mut object_cache = BTreeMap::new();
         let mut last_version_cache = BTreeMap::new();
 
@@ -210,7 +233,11 @@ impl<P> ObjectProviderCache<P> {
             }
         }
 
-        Self { object_cache: RwLock::new(object_cache), last_version_cache: RwLock::new(last_version_cache), provider }
+        Self {
+            object_cache: RwLock::new(object_cache),
+            last_version_cache: RwLock::new(last_version_cache),
+            provider,
+        }
     }
 }
 
@@ -222,12 +249,19 @@ where
 {
     type Error = P::Error;
 
-    async fn get_object(&self, id: &ObjectID, version: &SequenceNumber) -> Result<Object, Self::Error> {
+    async fn get_object(
+        &self,
+        id: &ObjectID,
+        version: &SequenceNumber,
+    ) -> Result<Object, Self::Error> {
         if let Some(o) = self.object_cache.read().await.get(&(*id, *version)) {
             return Ok(o.clone());
         }
         let o = self.provider.get_object(id, version).await?;
-        self.object_cache.write().await.insert((*id, *version), o.clone());
+        self.object_cache
+            .write()
+            .await
+            .insert((*id, *version), o.clone());
         Ok(o)
     }
 
@@ -239,9 +273,19 @@ where
         if let Some(version) = self.last_version_cache.read().await.get(&(*id, *version)) {
             return Ok(self.get_object(id, version).await.ok());
         }
-        if let Some(o) = self.provider.find_object_lt_or_eq_version(id, version).await? {
-            self.object_cache.write().await.insert((*id, o.version()), o.clone());
-            self.last_version_cache.write().await.insert((*id, *version), o.version());
+        if let Some(o) = self
+            .provider
+            .find_object_lt_or_eq_version(id, version)
+            .await?
+        {
+            self.object_cache
+                .write()
+                .await
+                .insert((*id, o.version()), o.clone());
+            self.last_version_cache
+                .write()
+                .await
+                .insert((*id, *version), o.version());
             Ok(Some(o))
         } else {
             Ok(None)

@@ -4,14 +4,8 @@
 
 use move_binary_format::{
     file_format::{
-        empty_module,
-        Bytecode,
-        CodeUnit,
-        FunctionDefinition,
-        FunctionHandle,
-        IdentifierIndex,
-        ModuleHandleIndex,
-        SignatureIndex,
+        empty_module, Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, IdentifierIndex,
+        ModuleHandleIndex, SignatureIndex,
     },
     CompiledModule,
 };
@@ -19,8 +13,14 @@ use move_binary_format::{
 /// Create a dummy module to wrap the bytecode program in local@code
 pub fn dummy_procedure_module(code: Vec<Bytecode>) -> CompiledModule {
     let mut module = empty_module();
-    let code_unit = CodeUnit { code, ..Default::default() };
-    let fun_def = FunctionDefinition { code: Some(code_unit), ..Default::default() };
+    let code_unit = CodeUnit {
+        code,
+        ..Default::default()
+    };
+    let fun_def = FunctionDefinition {
+        code: Some(code_unit),
+        ..Default::default()
+    };
 
     let fun_handle = FunctionHandle {
         module: ModuleHandleIndex(0),

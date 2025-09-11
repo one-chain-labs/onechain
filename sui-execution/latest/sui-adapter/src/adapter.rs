@@ -6,7 +6,10 @@ pub use checked::*;
 mod checked {
     #[cfg(feature = "tracing")]
     use move_vm_config::runtime::VMProfilerConfig;
-    use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+    use std::rc::Rc;
+    use std::{collections::BTreeMap, sync::Arc};
 
     use anyhow::Result;
     use move_binary_format::file_format::CompiledModule;
@@ -18,20 +21,20 @@ mod checked {
         verifier::VerifierConfig,
     };
     use move_vm_runtime::{
-        move_vm::MoveVM,
-        native_extensions::NativeContextExtensions,
+        move_vm::MoveVM, native_extensions::NativeContextExtensions,
         native_functions::NativeFunctionTable,
     };
-    use sui_move_natives::object_runtime;
+    use sui_move_natives::{object_runtime, transaction_context::TransactionContext};
     use sui_types::metrics::BytecodeVerifierMetrics;
     use sui_verifier::check_for_verifier_timeout;
     use tracing::instrument;
 
-    use sui_move_natives::{object_runtime::ObjectRuntime, NativesCostTable};
+    use sui_move_natives::{NativesCostTable, object_runtime::ObjectRuntime};
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::*,
-        error::{ExecutionError, ExecutionErrorKind, SuiError},
+        error::ExecutionError,
+        error::{ExecutionErrorKind, SuiError},
         execution_config_utils::to_binary_config,
         metrics::LimitsMetrics,
         storage::ChildObjectResolver,
@@ -51,24 +54,30 @@ mod checked {
             track_bytecode_instructions: false,
             use_long_function_name: false,
         });
-        MoveVM::new_with_config(natives, VMConfig {
-            verifier: protocol_config.verifier_config(/* signing_limits */ None),
-            max_binary_format_version: protocol_config.move_binary_format_version(),
-            runtime_limits_config: VMRuntimeLimitsConfig {
-                vector_len_max: protocol_config.max_move_vector_len(),
-                max_value_nest_depth: protocol_config.max_move_value_depth_as_option(),
-                hardened_otw_check: protocol_config.hardened_otw_check(),
+        MoveVM::new_with_config(
+            natives,
+            VMConfig {
+                verifier: protocol_config.verifier_config(/* signing_limits */ None),
+                max_binary_format_version: protocol_config.move_binary_format_version(),
+                runtime_limits_config: VMRuntimeLimitsConfig {
+                    vector_len_max: protocol_config.max_move_vector_len(),
+                    max_value_nest_depth: protocol_config.max_move_value_depth_as_option(),
+                    hardened_otw_check: protocol_config.hardened_otw_check(),
+                },
+                enable_invariant_violation_check_in_swap_loc: !protocol_config
+                    .disable_invariant_violation_check_in_swap_loc(),
+                check_no_extraneous_bytes_during_deserialization: protocol_config
+                    .no_extraneous_module_bytes(),
+                profiler_config: vm_profiler_config,
+                // Don't augment errors with execution state on-chain
+                error_execution_state: false,
+                binary_config: to_binary_config(protocol_config),
+                rethrow_serialization_type_layout_errors: protocol_config
+                    .rethrow_serialization_type_layout_errors(),
+                max_type_to_layout_nodes: protocol_config.max_type_to_layout_nodes_as_option(),
+                variant_nodes: protocol_config.variant_nodes(),
             },
-            enable_invariant_violation_check_in_swap_loc: !protocol_config
-                .disable_invariant_violation_check_in_swap_loc(),
-            check_no_extraneous_bytes_during_deserialization: protocol_config.no_extraneous_module_bytes(),
-            profiler_config: vm_profiler_config,
-            // Don't augment errors with execution state on-chain
-            error_execution_state: false,
-            binary_config: to_binary_config(protocol_config),
-            rethrow_serialization_type_layout_errors: protocol_config.rethrow_serialization_type_layout_errors(),
-            max_type_to_layout_nodes: protocol_config.max_type_to_layout_nodes_as_option(),
-        })
+        )
         .map_err(|_| SuiError::ExecutionInvariantViolation)
     }
 
@@ -78,8 +87,9 @@ mod checked {
         is_metered: bool,
         protocol_config: &'r ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
-        current_epoch_id: EpochId,
+        tx_context: Rc<RefCell<TxContext>>,
     ) -> NativeContextExtensions<'r> {
+        let current_epoch_id: EpochId = tx_context.borrow().epoch();
         let mut extensions = NativeContextExtensions::default();
         extensions.add(ObjectRuntime::new(
             child_resolver,
@@ -90,12 +100,16 @@ mod checked {
             current_epoch_id,
         ));
         extensions.add(NativesCostTable::from_protocol_config(protocol_config));
+        extensions.add(TransactionContext::new(tx_context));
         extensions
     }
 
     /// Given a list of `modules` and an `object_id`, mutate each module's self ID (which must be
     /// 0x0) to be `object_id`.
-    pub fn substitute_package_id(modules: &mut [CompiledModule], object_id: ObjectID) -> Result<(), ExecutionError> {
+    pub fn substitute_package_id(
+        modules: &mut [CompiledModule],
+        object_id: ObjectID,
+    ) -> Result<(), ExecutionError> {
         let new_address = AccountAddress::from(object_id);
 
         for module in modules.iter_mut() {
@@ -126,7 +140,10 @@ mod checked {
     }
 
     pub fn missing_unwrapped_msg(id: &ObjectID) -> String {
-        format!("Unable to unwrap object {}. Was unable to retrieve last known version in the parent sync", id)
+        format!(
+            "Unable to unwrap object {}. Was unable to retrieve last known version in the parent sync",
+            id
+        )
     }
 
     /// Run the bytecode verifier with a meter limit
@@ -143,7 +160,9 @@ mod checked {
     ) -> Result<(), SuiError> {
         // run the Move verifier
         for module in modules.iter() {
-            let per_module_meter_verifier_timer = metrics.verifier_runtime_per_module_success_latency.start_timer();
+            let per_module_meter_verifier_timer = metrics
+                .verifier_runtime_per_module_success_latency
+                .start_timer();
 
             if let Err(e) = verify_module_timeout_only(module, verifier_config, meter) {
                 // We only checked that the failure was due to timeout
@@ -153,7 +172,10 @@ mod checked {
                     .observe(per_module_meter_verifier_timer.stop_and_discard());
                 metrics
                     .verifier_timeout_metrics
-                    .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::TIMEOUT_TAG])
+                    .with_label_values(&[
+                        BytecodeVerifierMetrics::OVERALL_TAG,
+                        BytecodeVerifierMetrics::TIMEOUT_TAG,
+                    ])
                     .inc();
 
                 return Err(e);
@@ -163,7 +185,10 @@ mod checked {
             per_module_meter_verifier_timer.stop_and_record();
             metrics
                 .verifier_timeout_metrics
-                .with_label_values(&[BytecodeVerifierMetrics::OVERALL_TAG, BytecodeVerifierMetrics::SUCCESS_TAG])
+                .with_label_values(&[
+                    BytecodeVerifierMetrics::OVERALL_TAG,
+                    BytecodeVerifierMetrics::SUCCESS_TAG,
+                ])
                 .inc();
         }
 
@@ -183,16 +208,23 @@ mod checked {
         if let Err(e) = verify_module_with_config_metered(verifier_config, module, meter) {
             // Check that the status indicates metering timeout.
             if check_for_verifier_timeout(&e.major_status()) {
-                return Err(SuiError::ModuleVerificationFailure { error: format!("Verification timed out: {}", e) });
+                return Err(SuiError::ModuleVerificationFailure {
+                    error: format!("Verification timed out: {}", e),
+                });
             }
-        } else if let Err(err) =
-            sui_verify_module_metered_check_timeout_only(module, &BTreeMap::new(), meter, verifier_config)
-        {
+        } else if let Err(err) = sui_verify_module_metered_check_timeout_only(
+            module,
+            &BTreeMap::new(),
+            meter,
+            verifier_config,
+        ) {
             return Err(err.into());
         }
 
         if meter.transfer(Scope::Module, Scope::Package, 1.0).is_err() {
-            return Err(SuiError::ModuleVerificationFailure { error: "Verification timed out".to_string() });
+            return Err(SuiError::ModuleVerificationFailure {
+                error: "Verification timed out".to_string(),
+            });
         }
 
         Ok(())

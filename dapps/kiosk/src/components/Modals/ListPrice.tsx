@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { MIST_PER_OCT } from '@mysten/sui/utils';
+import { MIST_PER_SUI } from '@mysten/sui/utils';
 import { useState } from 'react';
 
 import { usePlaceAndListMutation } from '../../mutations/kiosk';
@@ -49,7 +49,7 @@ export function ListPrice({ item, onSuccess, closeModal, listAndPlace, kioskId }
 						onClick={() =>
 							placeAndListToKioskMutation.mutate({
 								item,
-								price: (Number(price) * Number(MIST_PER_OCT)).toString(),
+								price: (Number(price) * Number(MIST_PER_SUI)).toString(),
 								shouldPlace: listAndPlace,
 								kioskId,
 							})

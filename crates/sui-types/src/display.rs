@@ -1,13 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    collection_types::VecMap,
-    event::Event,
-    id::{ID, UID},
-    SUI_FRAMEWORK_ADDRESS,
-};
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use crate::collection_types::VecMap;
+use crate::event::Event;
+use crate::id::{ID, UID};
+use crate::SUI_FRAMEWORK_ADDRESS;
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
+use move_core_types::language_storage::StructTag;
 use serde::Deserialize;
 
 pub const DISPLAY_MODULE_NAME: &IdentStr = ident_str!("display");
@@ -67,7 +67,9 @@ impl DisplayVersionUpdatedEvent {
     pub fn try_from_event(event: &Event) -> Option<(&StructTag, Self)> {
         let inner_type = Self::inner_type(&event.type_)?;
 
-        bcs::from_bytes(&event.contents).ok().map(|event| (inner_type, event))
+        bcs::from_bytes(&event.contents)
+            .ok()
+            .map(|event| (inner_type, event))
     }
 }
 

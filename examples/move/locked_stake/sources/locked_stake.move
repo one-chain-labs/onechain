@@ -4,8 +4,12 @@
 module locked_stake::locked_stake;
 
 use locked_stake::epoch_time_lock::{Self, EpochTimeLock};
-use one::{balance::{Self, Balance}, coin, oct::OCT, vec_map::{Self, VecMap}};
-use one_system::{staking_pool::StakedOct, one_system::{Self, SuiSystemState}};
+use one::balance::{Self, Balance};
+use one::coin;
+use one::oct::OCT;
+use one::vec_map::{Self, VecMap};
+use one_system::staking_pool::StakedOct;
+use one_system::one_system::{Self, SuiSystemState};
 
 const EInsufficientBalance: u64 = 0;
 const EStakeObjectNonExistent: u64 = 1;
@@ -54,7 +58,7 @@ public fun deposit_sui(ls: &mut LockedStake, sui: Balance<OCT>) {
 }
 
 /// Take `amount` of SUI from the sui balance, stakes it, and puts the stake object
-/// back into the staked oct vec map.
+/// back into the staked sui vec map.
 public fun stake(
     ls: &mut LockedStake,
     sui_system: &mut SuiSystemState,

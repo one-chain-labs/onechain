@@ -13,7 +13,7 @@
 
 //# publish
 module Test::M1 {
-    use one::event;
+    use sui::event;
 
     public struct EventA has copy, drop {
         new_value: u64
@@ -47,7 +47,7 @@ module Test::M1 {
 }
 
 module Test::M2 {
-    use one::event;
+    use sui::event;
 
     public struct EventA has copy, drop {
         new_value: u64

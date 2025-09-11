@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use futures::{FutureExt, StreamExt};
 
 use serde::{Deserialize, Serialize};
-use sui_rpc_api::CheckpointData;
+use sui_types::full_checkpoint_content::CheckpointData;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -18,15 +18,8 @@ use crate::{
         obj_indices::StoredObjectVersion,
     },
     types::{
-        EventIndex,
-        IndexedCheckpoint,
-        IndexedDeletedObject,
-        IndexedEvent,
-        IndexedObject,
-        IndexedPackage,
-        IndexedTransaction,
-        IndexerResult,
-        TxIndex,
+        EventIndex, IndexedCheckpoint, IndexedDeletedObject, IndexedEvent, IndexedObject,
+        IndexedPackage, IndexedTransaction, IndexerResult, TxIndex,
     },
 };
 
@@ -76,7 +69,9 @@ impl EpochToCommit {
     }
 
     pub fn last_epoch_total_transactions(&self) -> Option<u64> {
-        self.last_epoch.as_ref().map(|e| e.epoch_total_transactions as u64)
+        self.last_epoch
+            .as_ref()
+            .map(|e| e.epoch_total_transactions as u64)
     }
 
     pub fn new_epoch_first_tx_sequence_number(&self) -> u64 {
@@ -104,8 +99,8 @@ impl<T> CommonHandler<T> {
             .unwrap_or(CHECKPOINT_COMMIT_BATCH_SIZE.to_string())
             .parse::<usize>()
             .unwrap();
-        let mut stream =
-            mysten_metrics::metered_channel::ReceiverStream::new(cp_receiver).ready_chunks(checkpoint_commit_batch_size);
+        let mut stream = mysten_metrics::metered_channel::ReceiverStream::new(cp_receiver)
+            .ready_chunks(checkpoint_commit_batch_size);
 
         // Mapping of ordered checkpoint data to ensure that we process them in order. The key is
         // just the checkpoint sequence number, and the tuple is (CommitterWatermark, T).
@@ -142,7 +137,10 @@ impl<T> CommonHandler<T> {
 
             // Process unprocessed checkpoints, even no new checkpoints from stream
             let checkpoint_lag_limiter = self.handler.get_max_committable_checkpoint().await?;
-            let max_commitable_cp = std::cmp::min(checkpoint_lag_limiter, end_checkpoint_opt.unwrap_or(u64::MAX));
+            let max_commitable_cp = std::cmp::min(
+                checkpoint_lag_limiter,
+                end_checkpoint_opt.unwrap_or(u64::MAX),
+            );
             // Stop pushing to tuple_batch if we've reached the end checkpoint.
             while next_cp_to_process <= max_commitable_cp {
                 if let Some(data_tuple) = unprocessed.remove(&next_cp_to_process) {
@@ -169,7 +167,10 @@ impl<T> CommonHandler<T> {
 
             if let Some(end_checkpoint) = end_checkpoint_opt {
                 if next_cp_to_process > end_checkpoint {
-                    tracing::info!("Reached end checkpoint, stopping handler {}...", self.handler.name());
+                    tracing::info!(
+                        "Reached end checkpoint, stopping handler {}...",
+                        self.handler.name()
+                    );
                     return Ok(());
                 }
             }

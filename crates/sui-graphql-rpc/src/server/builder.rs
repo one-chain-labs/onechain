@@ -1,80 +1,67 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    exchange_rates_task::TriggerExchangeRatesTask,
-    system_package_task::SystemPackageTask,
-    watermark_task::{ChainIdentifierLock, Watermark, WatermarkLock, WatermarkTask},
+use super::exchange_rates_task::TriggerExchangeRatesTask;
+use super::system_package_task::SystemPackageTask;
+use super::watermark_task::{ChainIdentifierLock, Watermark, WatermarkLock, WatermarkTask};
+use crate::config::{
+    ConnectionConfig, ServiceConfig, Version, MAX_CONCURRENT_REQUESTS,
+    RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD,
 };
+use crate::data::move_registry_data_loader::MoveRegistryDataLoader;
+use crate::data::package_resolver::{DbPackageStore, PackageResolver};
+use crate::data::{DataLoader, Db};
+use crate::extensions::directive_checker::DirectiveChecker;
+use crate::metrics::Metrics;
+use crate::mutation::Mutation;
+use crate::types::datatype::IMoveDatatype;
+use crate::types::move_object::IMoveObject;
+use crate::types::object::IObject;
+use crate::types::owner::IOwner;
 use crate::{
-    config::{
-        ConnectionConfig,
-        ServerConfig,
-        ServiceConfig,
-        Version,
-        MAX_CONCURRENT_REQUESTS,
-        RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD,
-    },
+    config::ServerConfig,
     context_data::db_data_provider::PgManager,
-    data::{
-        move_registry_data_loader::MoveRegistryDataLoader,
-        package_resolver::{DbPackageStore, PackageResolver},
-        DataLoader,
-        Db,
-    },
     error::Error,
     extensions::{
-        directive_checker::DirectiveChecker,
         feature_gate::FeatureGate,
         logger::Logger,
         query_limits_checker::{PayloadSize, QueryLimitsChecker, ShowUsage},
         timeout::Timeout,
     },
-    metrics::Metrics,
-    mutation::Mutation,
     server::version::set_version_middleware,
-    types::{
-        datatype::IMoveDatatype,
-        move_object::IMoveObject,
-        object::IObject,
-        owner::IOwner,
-        query::{Query, SuiGraphQLSchema},
-    },
+    types::query::{Query, SuiGraphQLSchema},
 };
-use async_graphql::{
-    extensions::{ApolloTracing, ExtensionFactory, Tracing},
-    EmptySubscription,
-    Schema,
-    SchemaBuilder,
-};
+use async_graphql::extensions::ApolloTracing;
+use async_graphql::extensions::Tracing;
+use async_graphql::EmptySubscription;
+use async_graphql::{extensions::ExtensionFactory, Schema, SchemaBuilder};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::{
-    body::Body,
-    extract::{ConnectInfo, FromRef, Query as AxumQuery, State},
-    http::{HeaderMap, StatusCode},
-    middleware::{self},
-    response::IntoResponse,
-    routing::{get, post, MethodRouter, Route},
-    Extension,
-    Router,
-};
-use axum_extra::{headers::ContentLength, TypedHeader};
+use axum::body::Body;
+use axum::extract::FromRef;
+use axum::extract::{ConnectInfo, Query as AxumQuery, State};
+use axum::http::{HeaderMap, StatusCode};
+use axum::middleware::{self};
+use axum::response::IntoResponse;
+use axum::routing::{get, post, MethodRouter, Route};
+use axum::Extension;
+use axum::Router;
+use axum_extra::headers::ContentLength;
+use axum_extra::TypedHeader;
 use chrono::Utc;
 use http::{HeaderValue, Method, Request};
 use mysten_metrics::spawn_monitored_task;
 use mysten_network::callback::{CallbackLayer, MakeCallbackHandler, ResponseHandler};
-use std::{
-    any::Any,
-    convert::Infallible,
-    net::{SocketAddr, TcpStream},
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::convert::Infallible;
+use std::net::TcpStream;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{any::Any, net::SocketAddr, time::Instant};
 use sui_graphql_rpc_headers::LIMITS_HEADER;
 use sui_indexer::db::check_db_migration_consistency;
 use sui_package_resolver::{PackageStoreWithLruCache, Resolver};
 use sui_sdk::SuiClientBuilder;
-use tokio::{join, sync::OnceCell};
+use tokio::join;
+use tokio::sync::OnceCell;
 use tokio_util::sync::CancellationToken;
 use tower::{Layer, Service};
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -129,19 +116,28 @@ impl Server {
             let cancellation_token = self.state.cancellation_token.clone();
             spawn_monitored_task!(async move {
                 let listener = tokio::net::TcpListener::bind(&self.address).await.unwrap();
-                axum::serve(listener, self.router.into_make_service_with_connect_info::<SocketAddr>())
-                    .with_graceful_shutdown(async move {
-                        cancellation_token.cancelled().await;
-                        info!("Shutdown signal received, terminating graphql service");
-                    })
-                    .await
-                    .map_err(|e| Error::Internal(format!("Server run failed: {}", e)))
+                axum::serve(
+                    listener,
+                    self.router
+                        .into_make_service_with_connect_info::<SocketAddr>(),
+                )
+                .with_graceful_shutdown(async move {
+                    cancellation_token.cancelled().await;
+                    info!("Shutdown signal received, terminating graphql service");
+                })
+                .await
+                .map_err(|e| Error::Internal(format!("Server run failed: {}", e)))
             })
         };
 
         // Wait for all tasks to complete. This ensures that the service doesn't fully shut down
         // until all tasks and the server have completed their shutdown processes.
-        let _ = join!(watermark_task, system_package_task, trigger_exchange_rates_task, server_task);
+        let _ = join!(
+            watermark_task,
+            system_package_task,
+            trigger_exchange_rates_task,
+            server_task
+        );
 
         Ok(())
     }
@@ -172,7 +168,13 @@ impl AppState {
         cancellation_token: CancellationToken,
         version: Version,
     ) -> Self {
-        Self { connection, service, metrics, cancellation_token, version }
+        Self {
+            connection,
+            service,
+            metrics,
+            cancellation_token,
+            version,
+        }
     }
 }
 
@@ -190,11 +192,20 @@ impl FromRef<AppState> for Metrics {
 
 impl ServerBuilder {
     pub fn new(state: AppState) -> Self {
-        Self { state, schema: schema_builder(), router: None, db_reader: None, resolver: None }
+        Self {
+            state,
+            schema: schema_builder(),
+            router: None,
+            db_reader: None,
+            resolver: None,
+        }
     }
 
     pub fn address(&self) -> String {
-        format!("{}:{}", self.state.connection.host, self.state.connection.port)
+        format!(
+            "{}:{}",
+            self.state.connection.host, self.state.connection.port
+        )
     }
 
     pub fn context_data(mut self, context_data: impl Any + Send + Sync) -> Self {
@@ -214,9 +225,23 @@ impl ServerBuilder {
 
     /// Prepares the components of the server to be run. Finalizes the graphql schema, and expects
     /// the `Db` and `Router` to have been initialized.
-    fn build_components(self) -> (String, Schema<Query, Mutation, EmptySubscription>, Db, PackageResolver, Router) {
+    fn build_components(
+        self,
+    ) -> (
+        String,
+        Schema<Query, Mutation, EmptySubscription>,
+        Db,
+        PackageResolver,
+        Router,
+    ) {
         let address = self.address();
-        let ServerBuilder { state: _, schema, db_reader, resolver, router } = self;
+        let ServerBuilder {
+            state: _,
+            schema,
+            db_reader,
+            resolver,
+            router,
+        } = self;
         (
             address,
             schema.finish(),
@@ -234,7 +259,9 @@ impl ServerBuilder {
                 .route("/health", get(health_check))
                 .route("/graphql/health", get(health_check))
                 .with_state(self.state.clone())
-                .route_layer(CallbackLayer::new(MetricsMakeCallbackHandler { metrics: self.state.metrics.clone() }));
+                .route_layer(CallbackLayer::new(MetricsMakeCallbackHandler {
+                    metrics: self.state.metrics.clone(),
+                }));
             self.router = Some(router);
         }
     }
@@ -265,7 +292,11 @@ impl ServerBuilder {
                     .split(',')
                     .map(HeaderValue::from_str)
                     .collect::<Result<Vec<_>, _>>()
-                    .map_err(|_| Error::Internal("Cannot resolve access control origin env variable".to_string()))?;
+                    .map_err(|_| {
+                        Error::Internal(
+                            "Cannot resolve access control origin env variable".to_string(),
+                        )
+                    })?;
                 AllowOrigin::list(allow_hosts)
             }
             _ => AllowOrigin::any(),
@@ -294,20 +325,36 @@ impl ServerBuilder {
             state.cancellation_token.clone(),
         );
 
-        let system_package_task =
-            SystemPackageTask::new(resolver, watermark_task.epoch_receiver(), state.cancellation_token.clone());
+        let system_package_task = SystemPackageTask::new(
+            resolver,
+            watermark_task.epoch_receiver(),
+            state.cancellation_token.clone(),
+        );
 
-        let trigger_exchange_rates_task =
-            TriggerExchangeRatesTask::new(db_reader, watermark_task.epoch_receiver(), state.cancellation_token.clone());
+        let trigger_exchange_rates_task = TriggerExchangeRatesTask::new(
+            db_reader,
+            watermark_task.epoch_receiver(),
+            state.cancellation_token.clone(),
+        );
 
         let router = router
-            .route_layer(middleware::from_fn_with_state(state.version, set_version_middleware))
+            .route_layer(middleware::from_fn_with_state(
+                state.version,
+                set_version_middleware,
+            ))
             .layer(axum::extract::Extension(schema))
             .layer(axum::extract::Extension(watermark_task.lock()))
             .layer(axum::extract::Extension(watermark_task.chain_id_lock()))
             .layer(Self::cors()?);
 
-        Ok(Server { router, address, watermark_task, system_package_task, trigger_exchange_rates_task, state })
+        Ok(Server {
+            router,
+            address,
+            watermark_task,
+            system_package_task,
+            trigger_exchange_rates_task,
+            state,
+        })
     }
 
     /// Instantiate a `ServerBuilder` from a `ServerConfig`, typically called when building the
@@ -318,18 +365,28 @@ impl ServerBuilder {
         cancellation_token: CancellationToken,
     ) -> Result<Self, Error> {
         // PROMETHEUS
-        let prom_addr: SocketAddr =
-            format!("{}:{}", config.connection.prom_host, config.connection.prom_port).parse().map_err(|_| {
-                Error::Internal(format!(
-                    "Failed to parse url {}, port {} into socket address",
-                    config.connection.prom_host, config.connection.prom_port
-                ))
-            })?;
+        let prom_addr: SocketAddr = format!(
+            "{}:{}",
+            config.connection.prom_host, config.connection.prom_port
+        )
+        .parse()
+        .map_err(|_| {
+            Error::Internal(format!(
+                "Failed to parse url {}, port {} into socket address",
+                config.connection.prom_host, config.connection.prom_port
+            ))
+        })?;
 
         let registry_service = mysten_metrics::start_prometheus_server(prom_addr);
         info!("Starting Prometheus HTTP endpoint at {}", prom_addr);
         let registry = registry_service.default_registry();
-        registry.register(mysten_metrics::uptime_metric("graphql", version.full, "unknown")).unwrap();
+        registry
+            .register(mysten_metrics::uptime_metric(
+                "graphql",
+                version.full,
+                "unknown",
+            ))
+            .unwrap();
 
         // METRICS
         let metrics = Metrics::new(&registry);
@@ -357,12 +414,22 @@ impl ServerBuilder {
         .map_err(|e| Error::Internal(format!("Failed to create pg connection pool: {}", e)))?;
 
         if !config.connection.skip_migration_consistency_check {
-            check_db_migration_consistency(&mut reader.pool().get().await.map_err(|e| Error::Internal(e.to_string()))?)
-                .await?;
+            check_db_migration_consistency(
+                &mut reader
+                    .pool()
+                    .get()
+                    .await
+                    .map_err(|e| Error::Internal(e.to_string()))?,
+            )
+            .await?;
         }
 
         // DB
-        let db = Db::new(reader.clone(), config.service.limits.clone(), metrics.clone());
+        let db = Db::new(
+            reader.clone(),
+            config.service.limits.clone(),
+            metrics.clone(),
+        );
         let loader = DataLoader::new(db.clone());
         let pg_conn_pool = PgManager::new(reader.clone());
         let package_store = DbPackageStore::new(loader.clone());
@@ -386,9 +453,7 @@ impl ServerBuilder {
                     .map_err(|e| Error::Internal(format!("Failed to create SuiClient: {}", e)))?,
             )
         } else {
-            warn!(
-                "No fullnode url found in config. `dryRunTransactionBlock` and `executeTransactionBlock` will not work"
-            );
+            warn!("No fullnode url found in config. `dryRunTransactionBlock` and `executeTransactionBlock` will not work");
             None
         };
 
@@ -404,7 +469,10 @@ impl ServerBuilder {
             .context_data(metrics.clone())
             .context_data(config.clone())
             .context_data(move_registry_config.clone())
-            .context_data(MoveRegistryDataLoader::new(move_registry_config, metrics.clone()));
+            .context_data(MoveRegistryDataLoader::new(
+                move_registry_config,
+                metrics.clone(),
+            ));
 
         if config.internal_features.feature_gate {
             builder = builder.extension(FeatureGate);
@@ -515,13 +583,13 @@ struct MetricsCallbackHandler {
 }
 
 impl ResponseHandler for MetricsCallbackHandler {
-    fn on_response(self, response: &http::response::Parts) {
+    fn on_response(&mut self, response: &http::response::Parts) {
         if let Some(errors) = response.extensions.get::<GraphqlErrors>() {
             self.metrics.inc_errors(&errors.0);
         }
     }
 
-    fn on_error<E>(self, _error: &E) {
+    fn on_error<E>(&mut self, _error: &E) {
         // Do nothing if the whole service errored
         //
         // in Axum this isn't possible since all services are required to have an error type of
@@ -549,7 +617,11 @@ async fn db_health_check(State(connection): State<ConnectionConfig>) -> StatusCo
         return StatusCode::INTERNAL_SERVER_ERROR;
     };
 
-    let tcp_url = if let Some(port) = url.port() { format!("{host}:{port}") } else { host.to_string() };
+    let tcp_url = if let Some(port) = url.port() {
+        format!("{host}:{port}")
+    } else {
+        host.to_string()
+    };
 
     if TcpStream::connect(tcp_url).is_err() {
         StatusCode::INTERNAL_SERVER_ERROR
@@ -577,10 +649,13 @@ async fn health_check(
         return db_health_check;
     }
 
-    let max_checkpoint_lag_ms =
-        query_params.max_checkpoint_lag_ms.map(Duration::from_millis).unwrap_or_else(|| DEFAULT_MAX_CHECKPOINT_LAG);
+    let max_checkpoint_lag_ms = query_params
+        .max_checkpoint_lag_ms
+        .map(Duration::from_millis)
+        .unwrap_or_else(|| DEFAULT_MAX_CHECKPOINT_LAG);
 
-    let checkpoint_timestamp = Duration::from_millis(watermark_lock.read().await.hi_cp_timestamp_ms);
+    let checkpoint_timestamp =
+        Duration::from_millis(watermark_lock.read().await.hi_cp_timestamp_ms);
 
     let now_millis = Utc::now().timestamp_millis();
 
@@ -606,24 +681,24 @@ async fn get_or_init_server_start_time() -> &'static Instant {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::test_infra::cluster::{prep_executor_cluster, start_cluster};
+    use crate::types::chain_identifier::ChainIdentifier;
     use crate::{
         config::{ConnectionConfig, Limits, ServiceConfig, Version},
         context_data::db_data_provider::PgManager,
         extensions::{query_limits_checker::QueryLimitsChecker, timeout::Timeout},
-        test_infra::cluster::{prep_executor_cluster, start_cluster},
-        types::chain_identifier::ChainIdentifier,
     };
     use async_graphql::{
         extensions::{Extension, ExtensionContext, NextExecute},
-        Request,
-        Response,
-        Variables,
+        Request, Response, Variables,
     };
     use serde_json::json;
-    use std::{sync::Arc, time::Duration};
-    use sui_pg_temp_db::get_available_port;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use sui_pg_db::temp::get_available_port;
     use sui_sdk::SuiClient;
-    use sui_types::{digests::get_mainnet_chain_identifier, transaction::TransactionData};
+    use sui_types::digests::get_mainnet_chain_identifier;
+    use sui_types::transaction::TransactionData;
     use uuid::Uuid;
 
     /// Prepares a schema for tests dealing with extensions. Returns a `ServerBuilder` that can be
@@ -650,11 +725,22 @@ pub mod tests {
 
         let version = Version::for_testing();
         let metrics = metrics();
-        let db = Db::new(reader.clone(), service_config.limits.clone(), metrics.clone());
+        let db = Db::new(
+            reader.clone(),
+            service_config.limits.clone(),
+            metrics.clone(),
+        );
         let loader = DataLoader::new(db.clone());
         let pg_conn_pool = PgManager::new(reader);
         let cancellation_token = CancellationToken::new();
-        let watermark = Watermark { hi_cp: 1, hi_cp_timestamp_ms: 1, epoch: 0, lo_cp: 0, lo_tx: 0 };
+        let watermark = Watermark {
+            hi_cp: 1,
+            hi_cp_timestamp_ms: 1,
+            hi_tx: 1,
+            epoch: 0,
+            lo_cp: 0,
+            lo_tx: 0,
+        };
         let state = AppState::new(
             connection_config.clone(),
             service_config.clone(),
@@ -675,7 +761,9 @@ pub mod tests {
     }
 
     fn metrics() -> Metrics {
-        let binding_address: SocketAddr = format!("127.0.0.1:{}", get_available_port()).parse().unwrap();
+        let binding_address: SocketAddr = format!("127.0.0.1:{}", get_available_port())
+            .parse()
+            .unwrap();
         let registry = mysten_metrics::start_prometheus_server(binding_address).default_registry();
         Metrics::new(&registry)
     }
@@ -693,7 +781,9 @@ pub mod tests {
     async fn test_timeout() {
         telemetry_subscribers::init_for_testing();
         let cluster = start_cluster(ServiceConfig::test_defaults()).await;
-        cluster.wait_for_checkpoint_catchup(1, Duration::from_secs(30)).await;
+        cluster
+            .wait_for_checkpoint_catchup(1, Duration::from_secs(30))
+            .await;
         // timeout test includes mutation timeout, which requires a [SuiClient] to be able to run
         // the test, and a transaction. [WalletContext] gives access to everything that's needed.
         let wallet = &cluster.network.validator_fullnode_handle.wallet;
@@ -705,7 +795,9 @@ pub mod tests {
 
         impl ExtensionFactory for TimedExecuteExt {
             fn create(&self) -> Arc<dyn Extension> {
-                Arc::new(TimedExecuteExt { min_req_delay: self.min_req_delay })
+                Arc::new(TimedExecuteExt {
+                    min_req_delay: self.min_req_delay,
+                })
             }
         }
 
@@ -737,7 +829,9 @@ pub mod tests {
                 .await
                 .context_data(Some(sui_client.clone()))
                 .extension(Timeout)
-                .extension(TimedExecuteExt { min_req_delay: delay })
+                .extension(TimedExecuteExt {
+                    min_req_delay: delay,
+                })
                 .build_schema();
 
             schema.execute(query).await
@@ -768,7 +862,10 @@ pub mod tests {
         // Create a transaction and sign it, and use the tx_bytes + signatures for the GraphQL
         // executeTransactionBlock mutation call.
         let addresses = wallet.get_addresses();
-        let gas = wallet.get_one_gas_object_owned_by_address(addresses[0]).await.unwrap();
+        let gas = wallet
+            .get_one_gas_object_owned_by_address(addresses[0])
+            .await
+            .unwrap();
         let tx_data = TransactionData::new_transfer_oct(
             addresses[1],
             addresses[0],
@@ -801,7 +898,10 @@ pub mod tests {
             .into_iter()
             .map(|e| e.message)
             .collect();
-        let exp = format!("Mutation request timed out. Limit: {}s", delay.as_secs_f32());
+        let exp = format!(
+            "Mutation request timed out. Limit: {}s",
+            delay.as_secs_f32()
+        );
         assert_eq!(errs, vec![exp]);
     }
 
@@ -811,8 +911,13 @@ pub mod tests {
         let db_url = cluster.graphql_connection_config.db_url.clone();
 
         async fn exec_query_depth_limit(db_url: String, depth: u32, query: &str) -> Response {
-            let service_config =
-                ServiceConfig { limits: Limits { max_query_depth: depth, ..Default::default() }, ..Default::default() };
+            let service_config = ServiceConfig {
+                limits: Limits {
+                    max_query_depth: depth,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
 
             let schema = prep_schema(db_url, Some(service_config))
                 .await
@@ -827,10 +932,14 @@ pub mod tests {
             .into_result()
             .expect("Should complete successfully");
 
-        exec_query_depth_limit(db_url.clone(), 5, "{ chainIdentifier protocolConfig { configs { value key }} }")
-            .await
-            .into_result()
-            .expect("Should complete successfully");
+        exec_query_depth_limit(
+            db_url.clone(),
+            5,
+            "{ chainIdentifier protocolConfig { configs { value key }} }",
+        )
+        .await
+        .into_result()
+        .expect("Should complete successfully");
 
         // Should fail
         let errs: Vec<_> = exec_query_depth_limit(db_url.clone(), 0, "{ chainIdentifier }")
@@ -842,14 +951,17 @@ pub mod tests {
             .collect();
 
         assert_eq!(errs, vec!["Query nesting is over 0".to_string()]);
-        let errs: Vec<_> =
-            exec_query_depth_limit(db_url.clone(), 2, "{ chainIdentifier protocolConfig { configs { value key }} }")
-                .await
-                .into_result()
-                .unwrap_err()
-                .into_iter()
-                .map(|e| e.message)
-                .collect();
+        let errs: Vec<_> = exec_query_depth_limit(
+            db_url.clone(),
+            2,
+            "{ chainIdentifier protocolConfig { configs { value key }} }",
+        )
+        .await
+        .into_result()
+        .unwrap_err()
+        .into_iter()
+        .map(|e| e.message)
+        .collect();
         assert_eq!(errs, vec!["Query nesting is over 2".to_string()]);
     }
 
@@ -858,8 +970,13 @@ pub mod tests {
         let cluster = prep_executor_cluster().await;
         let db_url = cluster.graphql_connection_config.db_url.clone();
         async fn exec_query_node_limit(db_url: String, nodes: u32, query: &str) -> Response {
-            let service_config =
-                ServiceConfig { limits: Limits { max_query_nodes: nodes, ..Default::default() }, ..Default::default() };
+            let service_config = ServiceConfig {
+                limits: Limits {
+                    max_query_nodes: nodes,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
 
             let schema = prep_schema(db_url, Some(service_config))
                 .await
@@ -874,10 +991,14 @@ pub mod tests {
             .into_result()
             .expect("Should complete successfully");
 
-        exec_query_node_limit(db_url.clone(), 5, "{ chainIdentifier protocolConfig { configs { value key }} }")
-            .await
-            .into_result()
-            .expect("Should complete successfully");
+        exec_query_node_limit(
+            db_url.clone(),
+            5,
+            "{ chainIdentifier protocolConfig { configs { value key }} }",
+        )
+        .await
+        .into_result()
+        .expect("Should complete successfully");
 
         // Should fail
         let err: Vec<_> = exec_query_node_limit(db_url.clone(), 0, "{ chainIdentifier }")
@@ -889,14 +1010,17 @@ pub mod tests {
             .collect();
         assert_eq!(err, vec!["Query has over 0 nodes".to_string()]);
 
-        let err: Vec<_> =
-            exec_query_node_limit(db_url.clone(), 4, "{ chainIdentifier protocolConfig { configs { value key }} }")
-                .await
-                .into_result()
-                .unwrap_err()
-                .into_iter()
-                .map(|e| e.message)
-                .collect();
+        let err: Vec<_> = exec_query_node_limit(
+            db_url.clone(),
+            4,
+            "{ chainIdentifier protocolConfig { configs { value key }} }",
+        )
+        .await
+        .into_result()
+        .unwrap_err()
+        .into_iter()
+        .map(|e| e.message)
+        .collect();
         assert_eq!(err, vec!["Query has over 4 nodes".to_string()]);
     }
 
@@ -905,19 +1029,50 @@ pub mod tests {
         let cluster = prep_executor_cluster().await;
         let db_url = cluster.graphql_connection_config.db_url.clone();
 
-        let service_config =
-            ServiceConfig { limits: Limits { default_page_size: 1, ..Default::default() }, ..Default::default() };
-        let schema = prep_schema(db_url, Some(service_config)).await.build_schema();
+        let service_config = ServiceConfig {
+            limits: Limits {
+                default_page_size: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let schema = prep_schema(db_url, Some(service_config))
+            .await
+            .build_schema();
 
-        let resp = schema.execute("{ checkpoints { nodes { sequenceNumber } } }").await;
+        let resp = schema
+            .execute("{ checkpoints { nodes { sequenceNumber } } }")
+            .await;
         let data = resp.data.clone().into_json().unwrap();
-        let checkpoints = data.get("checkpoints").unwrap().get("nodes").unwrap().as_array().unwrap();
-        assert_eq!(checkpoints.len(), 1, "Checkpoints should have exactly one element");
+        let checkpoints = data
+            .get("checkpoints")
+            .unwrap()
+            .get("nodes")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(
+            checkpoints.len(),
+            1,
+            "Checkpoints should have exactly one element"
+        );
 
-        let resp = schema.execute("{ checkpoints(first: 2) { nodes { sequenceNumber } } }").await;
+        let resp = schema
+            .execute("{ checkpoints(first: 2) { nodes { sequenceNumber } } }")
+            .await;
         let data = resp.data.clone().into_json().unwrap();
-        let checkpoints = data.get("checkpoints").unwrap().get("nodes").unwrap().as_array().unwrap();
-        assert_eq!(checkpoints.len(), 2, "Checkpoints should return two elements");
+        let checkpoints = data
+            .get("checkpoints")
+            .unwrap()
+            .get("nodes")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(
+            checkpoints.len(),
+            2,
+            "Checkpoints should return two elements"
+        );
     }
 
     #[tokio::test]
@@ -942,7 +1097,10 @@ pub mod tests {
             .into_iter()
             .map(|e| e.message)
             .collect();
-        assert_eq!(err, vec!["Connection's page size of 51 exceeds max of 50".to_string()]);
+        assert_eq!(
+            err,
+            vec!["Connection's page size of 51 exceeds max of 50".to_string()]
+        );
     }
 
     #[tokio::test]
@@ -950,13 +1108,19 @@ pub mod tests {
         telemetry_subscribers::init_for_testing();
         let cluster = prep_executor_cluster().await;
         let db_url = cluster.graphql_connection_config.db_url.clone();
-        let server_builder = prep_schema(db_url, None).await.context_data(PayloadSize(100));
+        let server_builder = prep_schema(db_url, None)
+            .await
+            .context_data(PayloadSize(100));
         let metrics = server_builder.state.metrics.clone();
         let schema = server_builder
             .extension(QueryLimitsChecker) // QueryLimitsChecker is where we actually set the metrics
             .build_schema();
 
-        schema.execute("{ chainIdentifier }").await.into_result().expect("Should complete successfully");
+        schema
+            .execute("{ chainIdentifier }")
+            .await
+            .into_result()
+            .expect("Should complete successfully");
 
         let req_metrics = metrics.request_metrics;
         assert_eq!(req_metrics.input_nodes.get_sample_count(), 1);
@@ -984,6 +1148,10 @@ pub mod tests {
     pub async fn test_health_check() {
         let cluster = prep_executor_cluster().await;
 
+        cluster
+            .wait_for_checkpoint_catchup(6, Duration::from_secs(60))
+            .await;
+
         let url = format!(
             "http://{}:{}/health",
             cluster.graphql_connection_config.host, cluster.graphql_connection_config.port
@@ -1000,7 +1168,10 @@ pub mod tests {
     /// Execute a GraphQL request with `limits` in place, expecting an error to be returned.
     /// Returns the list of errors returned.
     async fn execute_for_error(db_url: &str, limits: Limits, request: Request) -> String {
-        let service_config = ServiceConfig { limits, ..Default::default() };
+        let service_config = ServiceConfig {
+            limits,
+            ..Default::default()
+        };
 
         let schema = prep_schema(db_url.to_owned(), Some(service_config))
             .await
@@ -1014,8 +1185,14 @@ pub mod tests {
             .extension(QueryLimitsChecker)
             .build_schema();
 
-        let errs: Vec<_> =
-            schema.execute(request).await.into_result().unwrap_err().into_iter().map(|e| e.message).collect();
+        let errs: Vec<_> = schema
+            .execute(request)
+            .await
+            .into_result()
+            .unwrap_err()
+            .into_iter()
+            .map(|e| e.message)
+            .collect();
 
         errs.join("\n")
     }
@@ -1027,7 +1204,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 400, max_query_payload_size: 10, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 400,
+                    max_query_payload_size: 10,
+                    ..Default::default()
+                },
                 r#"
                     mutation {
                         executeTransactionBlock(txBytes: "AAA", signatures: ["BBB"]) {
@@ -1041,8 +1222,8 @@ pub mod tests {
             )
             .await,
             "Query part too large: 354 bytes. Requests are limited to 400 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 10 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 10 \
              bytes or fewer."
         );
     }
@@ -1054,7 +1235,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 400, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 400,
+                    ..Default::default()
+                },
                 r#"
                     mutation {
                         executeTransactionBlock(txBytes: "AAABBBCCC", signatures: ["BBB"]) {
@@ -1068,8 +1253,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 400 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 400 \
              bytes or fewer."
         );
     }
@@ -1081,7 +1266,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 400, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 400,
+                    ..Default::default()
+                },
                 r#"
                     query {
                         dryRunTransactionBlock(txBytes: "AAABBBCCC") {
@@ -1096,9 +1285,44 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 400 bytes \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 400 bytes \
              or fewer."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_payload_zklogin_exceeded() {
+        let cluster = prep_executor_cluster().await;
+        let db_url = cluster.graphql_connection_config.db_url.clone();
+        assert_eq!(
+            execute_for_error(
+                &db_url,
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 600,
+                    ..Default::default()
+                },
+                r#"
+                    query {
+                        verifyZkloginSignature(
+                            bytes: "AAABBBCCC",
+                            signature: "DDD",
+                            intentScope: TRANSACTION_DATA,
+                            author: "0xeee",
+                        ) {
+                            success
+                            errors
+                        }
+                    }
+                "#
+                .into(),
+            )
+            .await,
+            "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 600 \
+             bytes or fewer."
         );
     }
 
@@ -1109,7 +1333,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 10, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 10,
+                    ..Default::default()
+                },
                 r#"
                     query {
                         dryRunTransactionBlock(txByte: "AAABBB") {
@@ -1124,8 +1352,9 @@ pub mod tests {
             )
             .await,
             "Overall request too large: 380 bytes. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or dryRunTransactionBlock) \
-             and the rest of the request (the query part) must be 10 bytes or fewer."
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 10 \
+             bytes or fewer."
         );
     }
 
@@ -1136,7 +1365,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 500, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 500,
+                    ..Default::default()
+                },
                 Request::new(
                     r#"
                     mutation ($tx: String!, $sigs: [String!]!) {
@@ -1155,8 +1388,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 500 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 500 \
              bytes or fewer."
         );
     }
@@ -1168,7 +1401,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 500, max_query_payload_size: 10, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 500,
+                    max_query_payload_size: 10,
+                    ..Default::default()
+                },
                 Request::new(
                     r#"
                     mutation ($tx: String!, $sigs: [String!]!) {
@@ -1187,9 +1424,9 @@ pub mod tests {
             )
             .await,
             "Query part too large: 409 bytes. Requests are limited to 500 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 10 bytes \
-             or fewer."
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 10 \
+             bytes or fewer."
         );
     }
 
@@ -1200,7 +1437,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 400, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 400,
+                    ..Default::default()
+                },
                 Request::new(
                     r#"
                     query ($tx: String!) {
@@ -1219,8 +1460,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 400 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 400 \
              bytes or fewer."
         );
     }
@@ -1232,7 +1473,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 400, max_query_payload_size: 10, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 400,
+                    max_query_payload_size: 10,
+                    ..Default::default()
+                },
                 Request::new(
                     r#"
                     query ($tx: String!) {
@@ -1251,9 +1496,9 @@ pub mod tests {
             )
             .await,
             "Query part too large: 398 bytes. Requests are limited to 400 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 10 bytes \
-             or fewer."
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 10 \
+             bytes or fewer."
         );
     }
 
@@ -1265,7 +1510,11 @@ pub mod tests {
         // checking that we hit the read limit).
         let err = execute_for_error(
             &db_url,
-            Limits { max_tx_payload_size: 30, max_query_payload_size: 320, ..Default::default() },
+            Limits {
+                max_tx_payload_size: 30,
+                max_query_payload_size: 320,
+                ..Default::default()
+            },
             r#"
                 mutation {
                     executeTransactionBlock(txBytes: "AAABBBCCC", signatures: ["DDD"]) {
@@ -1283,7 +1532,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 30, max_query_payload_size: 800, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 30,
+                    max_query_payload_size: 800,
+                    ..Default::default()
+                },
                 r#"
                     mutation {
                         e0: executeTransactionBlock(txBytes: "AAABBBCCC", signatures: ["DDD"]) {
@@ -1302,8 +1555,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 30 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 800 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 800 \
              bytes or fewer."
         );
     }
@@ -1316,7 +1569,11 @@ pub mod tests {
         // checking that we hit the read limit).
         let err = execute_for_error(
             &db_url,
-            Limits { max_tx_payload_size: 20, max_query_payload_size: 330, ..Default::default() },
+            Limits {
+                max_tx_payload_size: 20,
+                max_query_payload_size: 330,
+                ..Default::default()
+            },
             r#"
                 query {
                     dryRunTransactionBlock(txBytes: "AAABBBCCC") {
@@ -1335,7 +1592,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 20, max_query_payload_size: 800, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 20,
+                    max_query_payload_size: 800,
+                    ..Default::default()
+                },
                 r#"
                     query {
                         d0: dryRunTransactionBlock(txBytes: "AAABBBCCC") {
@@ -1356,8 +1617,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 20 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 800 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 800 \
              bytes or fewer."
         );
     }
@@ -1370,7 +1631,11 @@ pub mod tests {
         // (by checking that we hite the read limit).
         let err = execute_for_error(
             &db_url,
-            Limits { max_tx_payload_size: 30, max_query_payload_size: 320, ..Default::default() },
+            Limits {
+                max_tx_payload_size: 30,
+                max_query_payload_size: 320,
+                ..Default::default()
+            },
             r#"
                 mutation {
                     executeTransactionBlock(txBytes: "AAA", signatures: ["BBB"]) {
@@ -1389,7 +1654,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 30, max_query_payload_size: 500, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 30,
+                    max_query_payload_size: 500,
+                    ..Default::default()
+                },
                 r#"
                     mutation {
                         executeTransactionBlock(
@@ -1406,8 +1675,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 30 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 500 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 500 \
              bytes or fewer.",
         )
     }
@@ -1421,7 +1690,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 500, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 500,
+                    ..Default::default()
+                },
                 Request::new(
                     r#"
                     mutation ($tx: String!, $sig: String!) {
@@ -1440,8 +1713,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 500 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 500 \
              bytes or fewer."
         );
     }
@@ -1449,7 +1722,8 @@ pub mod tests {
     /// Check if the error indicates that the request passed the overall size check and the
     /// transaction payload check.
     fn passed_tx_checks(err: &str) -> bool {
-        !err.starts_with("Overall request too large") && !err.starts_with("Transaction payload too large")
+        !err.starts_with("Overall request too large")
+            && !err.starts_with("Transaction payload too large")
     }
 
     #[tokio::test]
@@ -1464,7 +1738,11 @@ pub mod tests {
         assert!(!passed_tx_checks(
             &execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 1, max_query_payload_size: 1, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 1,
+                    max_query_payload_size: 1,
+                    ..Default::default()
+                },
                 r#"
                     mutation {
                         executeTransactionBlock(txBytes: "AAA", signatures: ["BBB"]) {
@@ -1479,7 +1757,11 @@ pub mod tests {
             .await
         ));
 
-        let limits = Limits { max_tx_payload_size: 20, max_query_payload_size: 1000, ..Default::default() };
+        let limits = Limits {
+            max_tx_payload_size: 20,
+            max_query_payload_size: 1000,
+            ..Default::default()
+        };
 
         // Then check that a request that uses the variable once passes the transaction limit
         // check.
@@ -1560,7 +1842,11 @@ pub mod tests {
         let db_url = cluster.graphql_connection_config.db_url.clone();
         // Like `test_payload_reusing_vars_execution` but the variable is used in a dry-run.
 
-        let limits = Limits { max_tx_payload_size: 20, max_query_payload_size: 1000, ..Default::default() };
+        let limits = Limits {
+            max_tx_payload_size: 20,
+            max_query_payload_size: 1000,
+            ..Default::default()
+        };
 
         // A single dry-run is under the limit.
         assert!(passed_tx_checks(
@@ -1656,7 +1942,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 500, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 500,
+                    ..Default::default()
+                },
                 r#"
                     mutation {
                         ...Tx
@@ -1674,8 +1964,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 500 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 500 \
              bytes or fewer."
         );
     }
@@ -1687,7 +1977,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 500, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 500,
+                    ..Default::default()
+                },
                 r#"
                     mutation {
                         ... on Mutation {
@@ -1703,8 +1997,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 500 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 500 \
              bytes or fewer."
         );
     }
@@ -1716,7 +2010,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 500, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 500,
+                    ..Default::default()
+                },
                 r#"
                     query {
                         ...DryRun
@@ -1735,8 +2033,8 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 500 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 500 \
              bytes or fewer."
         );
     }
@@ -1748,7 +2046,11 @@ pub mod tests {
         assert_eq!(
             execute_for_error(
                 &db_url,
-                Limits { max_tx_payload_size: 10, max_query_payload_size: 500, ..Default::default() },
+                Limits {
+                    max_tx_payload_size: 10,
+                    max_query_payload_size: 500,
+                    ..Default::default()
+                },
                 r#"
                     query {
                         ... on Query {
@@ -1765,9 +2067,128 @@ pub mod tests {
             )
             .await,
             "Transaction payload too large. Requests are limited to 10 bytes or fewer on \
-             transaction payloads (all inputs to executeTransactionBlock or \
-             dryRunTransactionBlock) and the rest of the request (the query part) must be 500 \
+             transaction payloads (all inputs to executeTransactionBlock, dryRunTransactionBlock, \
+             or verifyZkloginSignature) and the rest of the request (the query part) must be 500 \
              bytes or fewer."
         );
+    }
+
+    #[tokio::test]
+    async fn test_multi_get_objects_query_limits_exceeded() {
+        let cluster = prep_executor_cluster().await;
+        let db_url = cluster.graphql_connection_config.db_url.clone();
+        assert_eq!(
+            execute_for_error(
+                &db_url,
+                Limits {
+                    max_output_nodes: 5,
+                    ..Default::default()
+                }, // the query will have 6 output nodes: 2 keys * 3 fields, thus exceeding the
+                   // limit
+                r#"
+                    query {
+                          multiGetObjects(
+                            keys: [
+                              {objectId: "0x01dcb4674affb04e68d8088895e951f4ea335ef1695e9e50c166618f6789d808", version: 2},
+                              {objectId: "0x23e340e97fb41249278c85b1f067dc88576f750670c6dc56572e90971f857c8c", version: 2},
+                            ]
+                          ) {
+                                address
+                                status
+                                version
+                            }
+                    }
+                "#
+                .into(),
+            )
+            .await,
+            "Estimated output nodes exceeds 5"
+        );
+        assert_eq!(
+            execute_for_error(
+                &db_url,
+                Limits {
+                    max_output_nodes: 4,
+                    ..Default::default()
+                }, // the query will have 5 output nodes: 5keys * 1 field, thus exceeding the limit
+                r#"
+                    query {
+                          multiGetObjects(
+                            keys: [
+                              {objectId: "0x01dcb4674affb04e68d8088895e951f4ea335ef1695e9e50c166618f6789d808", version: 2},
+                              {objectId: "0x23e340e97fb41249278c85b1f067dc88576f750670c6dc56572e90971f857c8c", version: 2},
+                              {objectId: "0x23e340e97fb41249278c85b1f067dc88576f750670c6dc56572e90971f857c8c", version: 2},
+                              {objectId: "0x33032e0706337632361f2607b79df8c9d1079e8069259b27b1fa5c0394e79893", version: 2},
+                              {objectId: "0x388295e3ecad53986ebf9a7a1e5854b7df94c3f1f0bba934c5396a2a9eb4550b", version: 2},
+                            ]
+                          ) {
+                                address
+                            }
+                    }
+                "#
+                .into(),
+            )
+            .await,
+            "Estimated output nodes exceeds 4"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_multi_get_objects_query_limits_pass() {
+        let cluster = prep_executor_cluster().await;
+        let db_url = cluster.graphql_connection_config.db_url.clone();
+        let service_config = ServiceConfig {
+            limits: Limits {
+                max_output_nodes: 5,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let schema = prep_schema(db_url, Some(service_config))
+            .await
+            .build_schema();
+
+        let resp = schema
+            .execute(
+                // query will have 5 output nodes: 5 keys * 1 field, thus not exceeding the limit
+                r#"
+                    query {
+                          multiGetObjects(
+                            keys: [
+                              {objectId: "0x01dcb4674affb04e68d8088895e951f4ea335ef1695e9e50c166618f6789d808", version: 2},
+                              {objectId: "0x23e340e97fb41249278c85b1f067dc88576f750670c6dc56572e90971f857c8c", version: 2},
+                              {objectId: "0x23e340e97fb41249278c85b1f067dc88576f750670c6dc56572e90971f857c8c", version: 2},
+                              {objectId: "0x33032e0706337632361f2607b79df8c9d1079e8069259b27b1fa5c0394e79893", version: 2},
+                              {objectId: "0x388295e3ecad53986ebf9a7a1e5854b7df94c3f1f0bba934c5396a2a9eb4550b", version: 2},
+                            ]
+                          ) {
+                                address
+                            }
+                    }
+                "#)
+            .await;
+        assert!(resp.is_ok());
+        assert!(resp.errors.is_empty());
+
+        let resp = schema
+            .execute(
+                // query will have 4 output nodes: 2 keys * 2 fields, thus not exceeding the limit
+                r#"
+                    query {
+                          multiGetObjects(
+                            keys: [
+                              {objectId: "0x01dcb4674affb04e68d8088895e951f4ea335ef1695e9e50c166618f6789d808", version: 2},
+                              {objectId: "0x23e340e97fb41249278c85b1f067dc88576f750670c6dc56572e90971f857c8c", version: 2},
+                            ]
+                          ) {
+                                address
+                                status
+                            }
+                    }
+                "#)
+            .await;
+        assert!(resp.is_ok());
+        assert!(resp.errors.is_empty());
     }
 }

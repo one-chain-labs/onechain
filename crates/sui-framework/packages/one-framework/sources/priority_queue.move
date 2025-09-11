@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Priority queue implemented using a max heap.
-module one::priority_queue;
+module oct::priority_queue;
 
 /// For when heap is empty and there's no data to pop.
 const EPopFromEmptyHeap: u64 = 0;
@@ -12,11 +12,11 @@ const EPopFromEmptyHeap: u64 = 0;
 /// left child and right child of the root, etc. More generally, the children of
 /// entries[i] are at i * 2 + 1 and i * 2 + 2. The max heap should have the invariant
 /// that the parent node's priority is always higher than its child nodes' priorities.
-public struct PriorityQueue<T: drop> has store, drop {
+public struct PriorityQueue<T: drop> has drop, store {
     entries: vector<Entry<T>>,
 }
 
-public struct Entry<T: drop> has store, drop {
+public struct Entry<T: drop> has drop, store {
     priority: u64, // higher value means higher priority and will be popped first
     value: T,
 }

@@ -9,7 +9,6 @@ use std::{
     rc::Rc,
 };
 
-use codespan::ByteIndex;
 use codespan_reporting::diagnostic::{Diagnostic, Label, LabelStyle};
 use itertools::Itertools;
 #[allow(unused_imports)]
@@ -18,25 +17,16 @@ use num::{BigUint, Num};
 
 use builder::module_builder::ModuleBuilder;
 use move_binary_format::file_format::{
-    CompiledModule,
-    EnumDefinitionIndex,
-    FunctionDefinitionIndex,
-    StructDefinitionIndex,
+    CompiledModule, EnumDefinitionIndex, FunctionDefinitionIndex, StructDefinitionIndex,
 };
 use move_compiler::{
-    self,
+    self, Compiler, Flags, PASS_COMPILATION, PASS_EXPANSION, PASS_PARSER, PASS_TYPING,
     compiled_unit::{self, AnnotatedCompiledUnit},
-    diagnostics::{warning_filters::WarningFiltersBuilder, Diagnostics},
-    expansion::ast::{self as E, ModuleIdent, ModuleIdent_, TargetKind},
-    parser::ast as P,
-    shared::{parse_named_address, unique_map::UniqueMap, NumericalAddress, PackagePaths},
+    diagnostics::{Diagnostics, warning_filters::WarningFiltersBuilder},
+    expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
+    parser::ast::{self as P, TargetKind},
+    shared::{NumericalAddress, PackagePaths, parse_named_address, unique_map::UniqueMap},
     typing::ast as T,
-    Compiler,
-    Flags,
-    PASS_COMPILATION,
-    PASS_EXPANSION,
-    PASS_PARSER,
-    PASS_TYPING,
 };
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol as MoveSymbol;
@@ -64,24 +54,41 @@ pub mod well_known;
 
 /// Build the move model with default compilation flags and default options and no named addresses.
 /// This collects transitive dependencies for move sources from the provided directory list.
-pub fn run_model_builder<Paths: Into<MoveSymbol> + Clone, NamedAddress: Into<MoveSymbol> + Clone>(
+pub fn run_model_builder<
+    Paths: Into<MoveSymbol> + Clone,
+    NamedAddress: Into<MoveSymbol> + Clone,
+>(
     move_sources: Vec<PackagePaths<Paths, NamedAddress>>,
     deps: Vec<PackagePaths<Paths, NamedAddress>>,
     warning_filter: Option<WarningFiltersBuilder>,
 ) -> anyhow::Result<GlobalEnv> {
-    run_model_builder_with_options(move_sources, deps, ModelBuilderOptions::default(), warning_filter)
+    run_model_builder_with_options(
+        move_sources,
+        deps,
+        ModelBuilderOptions::default(),
+        warning_filter,
+    )
 }
 
 /// Build the move model with default compilation flags and custom options and a set of provided
 /// named addreses.
 /// This collects transitive dependencies for move sources from the provided directory list.
-pub fn run_model_builder_with_options<Paths: Into<MoveSymbol> + Clone, NamedAddress: Into<MoveSymbol> + Clone>(
+pub fn run_model_builder_with_options<
+    Paths: Into<MoveSymbol> + Clone,
+    NamedAddress: Into<MoveSymbol> + Clone,
+>(
     move_sources: Vec<PackagePaths<Paths, NamedAddress>>,
     deps: Vec<PackagePaths<Paths, NamedAddress>>,
     options: ModelBuilderOptions,
     warning_filter: Option<WarningFiltersBuilder>,
 ) -> anyhow::Result<GlobalEnv> {
-    run_model_builder_with_options_and_compilation_flags(move_sources, deps, options, Flags::empty(), warning_filter)
+    run_model_builder_with_options_and_compilation_flags(
+        move_sources,
+        deps,
+        options,
+        Flags::empty(),
+        warning_filter,
+    )
 }
 
 /// Build the move model with custom compilation flags and custom options
@@ -100,16 +107,23 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     env.set_extension(options);
 
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
-    let (files, comments_and_compiler_res) = Compiler::from_package_paths(None, move_sources, deps)?
-        .set_flags(flags)
-        .set_warning_filter(warning_filter)
-        .run::<PASS_PARSER>()?;
-    let (comment_map, compiler) = match comments_and_compiler_res {
+    let (files, comments_and_compiler_res) =
+        Compiler::from_package_paths(None, move_sources, deps)?
+            .set_flags(flags)
+            .set_warning_filter(warning_filter)
+            .run::<PASS_PARSER>()?;
+    let compiler = match comments_and_compiler_res {
         Err((_pass, diags)) => {
             // Add source files so that the env knows how to translate locations of parse errors
             let empty_alias = Rc::new(BTreeMap::new());
             for (fhash, (fname, fsrc)) in &files {
-                env.add_source(*fhash, empty_alias.clone(), fname.as_str(), fsrc, /* is_dep */ false);
+                env.add_source(
+                    *fhash,
+                    empty_alias.clone(),
+                    fname.as_str(),
+                    fsrc,
+                    /* is_dep */ false,
+                );
             }
             add_move_lang_diagnostics(&mut env, diags);
             return Ok(env);
@@ -119,9 +133,17 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let (compiler, parsed_prog) = compiler.into_ast();
 
     // Add source files for targets and dependencies
-    let dep_files: BTreeSet<_> = parsed_prog.lib_definitions.iter().map(|p| p.def.file_hash()).collect();
+    let dep_files: BTreeSet<_> = parsed_prog
+        .lib_definitions
+        .iter()
+        .map(|p| p.def.file_hash())
+        .collect();
 
-    for member in parsed_prog.source_definitions.iter().chain(parsed_prog.lib_definitions.iter()) {
+    for member in parsed_prog
+        .source_definitions
+        .iter()
+        .chain(parsed_prog.lib_definitions.iter())
+    {
         let fhash = member.def.file_hash();
         let (fname, fsrc) = files.get(&fhash).unwrap();
         let is_dep = dep_files.contains(&fhash);
@@ -139,21 +161,29 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         if env.get_file_id(*fhash).is_none() {
             let (fname, fsrc) = files.get(fhash).unwrap();
             let is_dep = dep_files.contains(fhash);
-            env.add_source(*fhash, Rc::new(BTreeMap::new()), fname.as_str(), &fsrc, is_dep);
+            env.add_source(
+                *fhash,
+                Rc::new(BTreeMap::new()),
+                fname.as_str(),
+                &fsrc,
+                is_dep,
+            );
         }
-    }
-
-    // Add any documentation comments found by the Move compiler to the env.
-    for (fhash, documentation) in comment_map {
-        let file_id = env.get_file_id(fhash).expect("file name defined");
-        env.add_documentation(file_id, documentation.into_iter().map(|(idx, s)| (ByteIndex(idx), s)).collect())
     }
 
     // Step 2: run the compiler up to expansion
     let parsed_prog = {
-        let P::Program { named_address_maps, mut source_definitions, lib_definitions } = parsed_prog;
+        let P::Program {
+            named_address_maps,
+            mut source_definitions,
+            lib_definitions,
+        } = parsed_prog;
         source_definitions.extend(lib_definitions);
-        P::Program { named_address_maps, source_definitions, lib_definitions: vec![] }
+        P::Program {
+            named_address_maps,
+            source_definitions,
+            lib_definitions: vec![],
+        }
     };
     let (compiler, expansion_ast) = match compiler.at_parser(parsed_prog).run::<PASS_EXPANSION>() {
         Err((_pass, diags)) => {
@@ -162,7 +192,10 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         }
         Ok(compiler) => compiler.into_ast(),
     };
-    let (compiler, typing_ast) = match compiler.at_expansion(expansion_ast.clone()).run::<PASS_TYPING>() {
+    let (compiler, typing_ast) = match compiler
+        .at_expansion(expansion_ast.clone())
+        .run::<PASS_TYPING>()
+    {
         Err((_pass, diags)) => {
             add_move_lang_diagnostics(&mut env, diags);
             return Ok(env);
@@ -181,24 +214,42 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 
     // Step 3: selective compilation.
     let expansion_ast = {
-        let E::Program { warning_filters_table, modules } = expansion_ast;
+        let E::Program {
+            warning_filters_table,
+            modules,
+        } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
             visited_modules.contains(&mident.value).then(|| {
-                mdef.target_kind = TargetKind::Source { is_root_package: true };
+                mdef.target_kind = TargetKind::Source {
+                    is_root_package: true,
+                };
                 mdef
             })
         });
-        E::Program { warning_filters_table, modules }
+        E::Program {
+            warning_filters_table,
+            modules,
+        }
     };
     let typing_ast = {
-        let T::Program { info, warning_filters_table, modules } = typing_ast;
+        let T::Program {
+            info,
+            warning_filters_table,
+            modules,
+        } = typing_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
             visited_modules.contains(&mident.value).then(|| {
-                mdef.target_kind = TargetKind::Source { is_root_package: true };
+                mdef.target_kind = TargetKind::Source {
+                    is_root_package: true,
+                };
                 mdef
             })
         });
-        T::Program { info, warning_filters_table, modules }
+        T::Program {
+            info,
+            warning_filters_table,
+            modules,
+        }
     };
 
     // Run the compiler fully to the compiled units
@@ -278,7 +329,8 @@ pub fn run_bytecode_model_builder<'a>(
             let name = m.identifier_at(m.datatype_handle_at(def.struct_handle).name);
             let symbol = env.symbol_pool().make(name.as_str());
             let struct_id = DatatypeId::new(symbol);
-            let data = env.create_move_struct_data(m, def_idx, symbol, Loc::default(), Vec::default());
+            let data =
+                env.create_move_struct_data(m, def_idx, symbol, Loc::default(), Vec::default());
             module_data.struct_data.insert(struct_id, data);
             module_data.struct_idx_to_id.insert(def_idx, struct_id);
         }
@@ -289,7 +341,8 @@ pub fn run_bytecode_model_builder<'a>(
             let name = m.identifier_at(m.datatype_handle_at(def.enum_handle).name);
             let symbol = env.symbol_pool().make(name.as_str());
             let enum_id = DatatypeId::new(symbol);
-            let data = env.create_move_enum_data(m, def_idx, symbol, Loc::default(), None, Vec::default());
+            let data =
+                env.create_move_enum_data(m, def_idx, symbol, Loc::default(), None, Vec::default());
             module_data.enum_data.insert(enum_id, data);
             module_data.enum_idx_to_id.insert(def_idx, enum_id);
         }
@@ -301,7 +354,11 @@ pub fn run_bytecode_model_builder<'a>(
 
 fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
     let mk_label = |is_primary: bool, (loc, msg): (move_ir_types::location::Loc, String)| {
-        let style = if is_primary { LabelStyle::Primary } else { LabelStyle::Secondary };
+        let style = if is_primary {
+            LabelStyle::Primary
+        } else {
+            LabelStyle::Secondary
+        };
         let loc = env.to_loc(&loc);
         Label::new(style, loc.file_id(), loc.span()).with_message(msg)
     };
@@ -309,7 +366,12 @@ fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
         let diag = Diagnostic::new(severity)
             .with_labels(vec![mk_label(true, primary_label)])
             .with_message(msg.to_string())
-            .with_labels(secondary_labels.into_iter().map(|e| mk_label(false, e)).collect())
+            .with_labels(
+                secondary_labels
+                    .into_iter()
+                    .map(|e| mk_label(false, e))
+                    .collect(),
+            )
             .with_notes(notes);
         env.add_diag(diag);
     }
@@ -327,11 +389,19 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
             let expanded_module = match eprog.modules.remove(&module_ident) {
                 Some(m) => m,
                 None => {
-                    warn!("[internal] cannot associate bytecode module `{}` with AST", module_ident);
+                    warn!(
+                        "[internal] cannot associate bytecode module `{}` with AST",
+                        module_ident
+                    );
                     return None;
                 }
             };
-            Some((module_ident, expanded_module, unit.named_module.module, unit.named_module.source_map))
+            Some((
+                module_ident,
+                expanded_module,
+                unit.named_module.module,
+                unit.named_module.source_map,
+            ))
         })
         .enumerate();
     for (module_count, (module_id, expanded_module, compiled_module, source_map)) in modules {
@@ -339,7 +409,10 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
         let addr_bytes = builder.resolve_address(&loc, &module_id.value.address);
         let module_name = ModuleName::from_address_bytes_and_name(
             addr_bytes,
-            builder.env.symbol_pool().make(&module_id.value.module.0.value),
+            builder
+                .env
+                .symbol_pool()
+                .make(&module_id.value.module.0.value),
         );
         let module_id = ModuleId::new(module_count);
         let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
@@ -365,7 +438,10 @@ pub fn big_uint_to_addr(i: &BigUint) -> AccountAddress {
 pub fn parse_addresses_from_options(
     named_addr_strings: Vec<String>,
 ) -> anyhow::Result<BTreeMap<String, NumericalAddress>> {
-    named_addr_strings.iter().map(|x| parse_named_address(x)).collect()
+    named_addr_strings
+        .iter()
+        .map(|x| parse_named_address(x))
+        .collect()
 }
 
 // =================================================================================================

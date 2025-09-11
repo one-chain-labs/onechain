@@ -2,13 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use prometheus::{
-    register_int_counter_vec_with_registry,
-    register_int_counter_with_registry,
-    register_int_gauge_with_registry,
-    IntCounter,
-    IntCounterVec,
-    IntGauge,
-    Registry,
+    register_int_counter_vec_with_registry, register_int_counter_with_registry,
+    register_int_gauge_with_registry, IntCounter, IntCounterVec, IntGauge, Registry,
 };
 
 #[derive(Clone)]
@@ -29,12 +24,18 @@ pub struct TrafficControllerMetrics {
     pub highest_proxied_spam_rate: IntGauge,
     pub highest_direct_error_rate: IntGauge,
     pub highest_proxied_error_rate: IntGauge,
+    pub spam_client_threshold: IntGauge,
+    pub error_client_threshold: IntGauge,
+    pub spam_proxied_client_threshold: IntGauge,
+    pub error_proxied_client_threshold: IntGauge,
+    pub dry_run_enabled: IntGauge,
 }
 
 impl TrafficControllerMetrics {
     pub fn new(registry: &Registry) -> Self {
         Self {
-            tallies: register_int_counter_with_registry!("tallies", "Number of tallies", registry).unwrap(),
+            tallies: register_int_counter_with_registry!("tallies", "Number of tallies", registry)
+                .unwrap(),
             connection_ip_blocklist_len: register_int_gauge_with_registry!(
                 "connection_ip_blocklist_len",
                 // make the below a multiline string
@@ -130,6 +131,36 @@ impl TrafficControllerMetrics {
             highest_proxied_error_rate: register_int_gauge_with_registry!(
                 "highest_proxied_error_rate",
                 "Highest proxied error rate seen recently",
+                registry
+            )
+            .unwrap(),
+            spam_client_threshold: register_int_gauge_with_registry!(
+                "spam_client_threshold",
+                "Spam client threshold",
+                registry
+            )
+            .unwrap(),
+            error_client_threshold: register_int_gauge_with_registry!(
+                "error_client_threshold",
+                "Error client threshold",
+                registry
+            )
+            .unwrap(),
+            spam_proxied_client_threshold: register_int_gauge_with_registry!(
+                "spam_proxied_client_threshold",
+                "Spam proxied client threshold",
+                registry
+            )
+            .unwrap(),
+            error_proxied_client_threshold: register_int_gauge_with_registry!(
+                "error_proxied_client_threshold",
+                "Error proxied client threshold",
+                registry
+            )
+            .unwrap(),
+            dry_run_enabled: register_int_gauge_with_registry!(
+                "dry_run_enabled",
+                "If 1, dry run mode is enabled and traffic will not be blocked",
                 registry
             )
             .unwrap(),

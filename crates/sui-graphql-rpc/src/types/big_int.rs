@@ -19,7 +19,8 @@ pub(crate) struct NotANumber;
 impl ScalarType for BigInt {
     fn parse(value: Value) -> InputValueResult<Self> {
         match value {
-            Value::String(s) => BigInt::from_str(&s).map_err(|_| InputValueError::custom("Not a number".to_string())),
+            Value::String(s) => BigInt::from_str(&s)
+                .map_err(|_| InputValueError::custom("Not a number".to_string())),
             _ => Err(InputValueError::expected_type(value)),
         }
     }
@@ -77,8 +78,14 @@ mod tests {
     #[test]
     fn from_value() {
         assert_eq!(BigInt::from_str("123").unwrap(), BigInt("123".to_string()));
-        assert_eq!(BigInt::from_str("-123").unwrap(), BigInt("-123".to_string()));
-        assert_eq!(BigInt::from_str("00233").unwrap(), BigInt("233".to_string()));
+        assert_eq!(
+            BigInt::from_str("-123").unwrap(),
+            BigInt("-123".to_string())
+        );
+        assert_eq!(
+            BigInt::from_str("00233").unwrap(),
+            BigInt("233".to_string())
+        );
         assert_eq!(BigInt::from_str("0").unwrap(), BigInt("0".to_string()));
         assert_eq!(BigInt::from_str("-0").unwrap(), BigInt("0".to_string()));
         assert_eq!(BigInt::from_str("000").unwrap(), BigInt("0".to_string()));
@@ -98,13 +105,25 @@ mod tests {
 
         assert_eq!(BigInt::from(123_456u32), BigInt("123456".to_string()));
 
-        assert_eq!(BigInt::from(-12_345_678_901i64), BigInt("-12345678901".to_string()),);
+        assert_eq!(
+            BigInt::from(-12_345_678_901i64),
+            BigInt("-12345678901".to_string()),
+        );
 
-        assert_eq!(BigInt::from(12_345_678_901u64), BigInt("12345678901".to_string()),);
+        assert_eq!(
+            BigInt::from(12_345_678_901u64),
+            BigInt("12345678901".to_string()),
+        );
 
-        assert_eq!(BigInt::from(-123_456_789_012_345_678_901i128), BigInt("-123456789012345678901".to_string()),);
+        assert_eq!(
+            BigInt::from(-123_456_789_012_345_678_901i128),
+            BigInt("-123456789012345678901".to_string()),
+        );
 
-        assert_eq!(BigInt::from(123_456_789_012_345_678_901u128), BigInt("123456789012345678901".to_string()),);
+        assert_eq!(
+            BigInt::from(123_456_789_012_345_678_901u128),
+            BigInt("123456789012345678901".to_string()),
+        );
 
         assert_eq!(
             BigInt::from(U256::from_str("12345678901234567890123456789012345678901").unwrap()),

@@ -1,19 +1,25 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::{arbitrary::*, test_runner::TestCaseError};
-use sui_types::{
-    base_types::dbg_addr,
-    crypto::KeypairTraits,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{TransactionData, TransactionKind},
-    utils::to_sender_signed_transaction,
-};
+use proptest::arbitrary::*;
+use proptest::test_runner::TestCaseError;
+use sui_types::base_types::dbg_addr;
+use sui_types::crypto::KeypairTraits;
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::TransactionData;
+use sui_types::transaction::TransactionKind;
+use sui_types::utils::to_sender_signed_transaction;
 use tracing::debug;
-use transaction_fuzzer::{executor::Executor, run_proptest, GasDataGenConfig, GasDataWithObjects};
+use transaction_fuzzer::executor::Executor;
+use transaction_fuzzer::run_proptest;
+use transaction_fuzzer::GasDataGenConfig;
+use transaction_fuzzer::GasDataWithObjects;
 
 /// Send transfer sui txn with provided random gas data and gas objects to an authority.
-fn test_with_random_gas_data(gas_data_test: GasDataWithObjects, executor: &mut Executor) -> Result<(), TestCaseError> {
+fn test_with_random_gas_data(
+    gas_data_test: GasDataWithObjects,
+    executor: &mut Executor,
+) -> Result<(), TestCaseError> {
     let gas_data = gas_data_test.gas_data;
     let objects = gas_data_test.objects;
     let sender = gas_data_test.sender_key.public().into();
@@ -39,12 +45,16 @@ fn test_with_random_gas_data(gas_data_test: GasDataWithObjects, executor: &mut E
 #[cfg_attr(msim, ignore)]
 fn test_gas_data_owned_or_immut() {
     let strategy = any_with::<GasDataWithObjects>(GasDataGenConfig::owned_by_sender_or_immut());
-    run_proptest(1000, strategy, |gas_data_test, mut executor| test_with_random_gas_data(gas_data_test, &mut executor));
+    run_proptest(1000, strategy, |gas_data_test, mut executor| {
+        test_with_random_gas_data(gas_data_test, &mut executor)
+    });
 }
 
 #[test]
 #[cfg_attr(msim, ignore)]
 fn test_gas_data_any_owner() {
     let strategy = any_with::<GasDataWithObjects>(GasDataGenConfig::any_owner());
-    run_proptest(1000, strategy, |gas_data_test, mut executor| test_with_random_gas_data(gas_data_test, &mut executor));
+    run_proptest(1000, strategy, |gas_data_test, mut executor| {
+        test_with_random_gas_data(gas_data_test, &mut executor)
+    });
 }

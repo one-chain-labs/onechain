@@ -1,20 +1,26 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::base_types::ObjectID;
+use crate::base_types::SequenceNumber;
+use crate::collection_types::LinkedTableNode;
+use crate::dynamic_field::{get_dynamic_field_from_store, Field};
+use crate::error::SuiResult;
+use crate::object::Owner;
+use crate::storage::ObjectStore;
+use crate::sui_serde::BigInt;
+use crate::sui_serde::Readable;
+use crate::versioned::Versioned;
+use crate::SUI_BRIDGE_OBJECT_ID;
 use crate::{
-    base_types::{ObjectID, SequenceNumber, SuiAddress},
-    collection_types::{Bag, LinkedTable, LinkedTableNode, VecMap},
-    dynamic_field::{get_dynamic_field_from_store, Field},
-    error::{SuiError, SuiResult},
+    base_types::SuiAddress,
+    collection_types::{Bag, LinkedTable, VecMap},
+    error::SuiError,
     id::UID,
-    object::Owner,
-    storage::ObjectStore,
-    sui_serde::{BigInt, Readable},
-    versioned::Versioned,
-    SUI_BRIDGE_OBJECT_ID,
 };
 use enum_dispatch::enum_dispatch;
-use move_core_types::{ident_str, identifier::IdentStr};
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
 use num_enum::TryFromPrimitive;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -22,8 +28,10 @@ use serde_with::serde_as;
 use strum_macros::Display;
 
 pub type BridgeInnerDynamicField = Field<u64, BridgeInnerV1>;
-pub type BridgeRecordDyanmicField =
-    Field<MoveTypeBridgeMessageKey, LinkedTableNode<MoveTypeBridgeMessageKey, MoveTypeBridgeRecord>>;
+pub type BridgeRecordDyanmicField = Field<
+    MoveTypeBridgeMessageKey,
+    LinkedTableNode<MoveTypeBridgeMessageKey, MoveTypeBridgeRecord>,
+>;
 
 pub const BRIDGE_MODULE_NAME: &IdentStr = ident_str!("bridge");
 pub const BRIDGE_TREASURY_MODULE_NAME: &IdentStr = ident_str!("treasury");
@@ -32,10 +40,12 @@ pub const BRIDGE_COMMITTEE_MODULE_NAME: &IdentStr = ident_str!("committee");
 pub const BRIDGE_MESSAGE_MODULE_NAME: &IdentStr = ident_str!("message");
 pub const BRIDGE_CREATE_FUNCTION_NAME: &IdentStr = ident_str!("create");
 pub const BRIDGE_INIT_COMMITTEE_FUNCTION_NAME: &IdentStr = ident_str!("init_bridge_committee");
-pub const BRIDGE_REGISTER_FOREIGN_TOKEN_FUNCTION_NAME: &IdentStr = ident_str!("register_foreign_token");
+pub const BRIDGE_REGISTER_FOREIGN_TOKEN_FUNCTION_NAME: &IdentStr =
+    ident_str!("register_foreign_token");
 pub const BRIDGE_CREATE_ADD_TOKEN_ON_SUI_MESSAGE_FUNCTION_NAME: &IdentStr =
     ident_str!("create_add_tokens_on_sui_message");
-pub const BRIDGE_EXECUTE_SYSTEM_MESSAGE_FUNCTION_NAME: &IdentStr = ident_str!("execute_system_message");
+pub const BRIDGE_EXECUTE_SYSTEM_MESSAGE_FUNCTION_NAME: &IdentStr =
+    ident_str!("execute_system_message");
 
 pub const BRIDGE_SUPPORTED_ASSET: &[&str] = &["btc", "eth", "usdc", "usdt"];
 
@@ -60,7 +70,19 @@ pub const TOKEN_ID_ETH: u8 = 2;
 pub const TOKEN_ID_USDC: u8 = 3;
 pub const TOKEN_ID_USDT: u8 = 4;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, TryFromPrimitive, JsonSchema, Hash, Display)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    TryFromPrimitive,
+    JsonSchema,
+    Hash,
+    Display,
+)]
 #[repr(u8)]
 pub enum BridgeChainId {
     SuiMainnet = 0,
@@ -74,15 +96,24 @@ pub enum BridgeChainId {
 
 impl BridgeChainId {
     pub fn is_sui_chain(&self) -> bool {
-        matches!(self, BridgeChainId::SuiMainnet | BridgeChainId::SuiTestnet | BridgeChainId::SuiCustom)
+        matches!(
+            self,
+            BridgeChainId::SuiMainnet | BridgeChainId::SuiTestnet | BridgeChainId::SuiCustom
+        )
     }
 }
 
-pub fn get_bridge_obj_initial_shared_version(object_store: &dyn ObjectStore) -> SuiResult<Option<SequenceNumber>> {
-    Ok(object_store.get_object(&SUI_BRIDGE_OBJECT_ID).map(|obj| match obj.owner {
-        Owner::Shared { initial_shared_version } => initial_shared_version,
-        _ => unreachable!("Bridge object must be shared"),
-    }))
+pub fn get_bridge_obj_initial_shared_version(
+    object_store: &dyn ObjectStore,
+) -> SuiResult<Option<SequenceNumber>> {
+    Ok(object_store
+        .get_object(&SUI_BRIDGE_OBJECT_ID)
+        .map(|obj| match obj.owner {
+            Owner::Shared {
+                initial_shared_version,
+            } => initial_shared_version,
+            _ => unreachable!("Bridge object must be shared"),
+        }))
 }
 
 /// Bridge provides an abstraction over multiple versions of the inner BridgeInner object.
@@ -169,10 +200,9 @@ pub fn get_bridge_wrapper(object_store: &dyn ObjectStore) -> Result<BridgeWrappe
         .get_object(&SUI_BRIDGE_OBJECT_ID)
         // Don't panic here on None because object_store is a generic store.
         .ok_or_else(|| SuiError::SuiBridgeReadError("BridgeWrapper object not found".to_owned()))?;
-    let move_object = wrapper
-        .data
-        .try_as_move()
-        .ok_or_else(|| SuiError::SuiBridgeReadError("BridgeWrapper object must be a Move object".to_owned()))?;
+    let move_object = wrapper.data.try_as_move().ok_or_else(|| {
+        SuiError::SuiBridgeReadError("BridgeWrapper object must be a Move object".to_owned())
+    })?;
     let result = bcs::from_bytes::<BridgeWrapper>(move_object.contents())
         .map_err(|err| SuiError::SuiBridgeReadError(err.to_string()))?;
     Ok(result)
@@ -184,15 +214,19 @@ pub fn get_bridge(object_store: &dyn ObjectStore) -> Result<Bridge, SuiError> {
     let version = wrapper.version.version;
     match version {
         1 => {
-            let result: BridgeInnerV1 = get_dynamic_field_from_store(object_store, id, &version).map_err(|err| {
-                SuiError::SuiBridgeReadError(format!(
-                    "Failed to load bridge inner object with ID {:?} and version {:?}: {:?}",
-                    id, version, err
-                ))
-            })?;
+            let result: BridgeInnerV1 = get_dynamic_field_from_store(object_store, id, &version)
+                .map_err(|err| {
+                    SuiError::SuiBridgeReadError(format!(
+                        "Failed to load bridge inner object with ID {:?} and version {:?}: {:?}",
+                        id, version, err
+                    ))
+                })?;
             Ok(Bridge::V1(result))
         }
-        _ => Err(SuiError::SuiBridgeReadError(format!("Unsupported SuiBridge version: {}", version))),
+        _ => Err(SuiError::SuiBridgeReadError(format!(
+            "Unsupported SuiBridge version: {}",
+            version
+        ))),
     }
 }
 
@@ -250,42 +284,74 @@ impl BridgeTrait for BridgeInnerV1 {
             .contents
             .into_iter()
             .map(|e| {
-                let source = BridgeChainId::try_from(e.key.source).map_err(|_e| SuiError::GenericBridgeError {
-                    error: format!("Unrecognized chain id: {}", e.key.source),
+                let source = BridgeChainId::try_from(e.key.source).map_err(|_e| {
+                    SuiError::GenericBridgeError {
+                        error: format!("Unrecognized chain id: {}", e.key.source),
+                    }
                 })?;
                 let destination = BridgeChainId::try_from(e.key.destination).map_err(|_e| {
-                    SuiError::GenericBridgeError { error: format!("Unrecognized chain id: {}", e.key.destination) }
+                    SuiError::GenericBridgeError {
+                        error: format!("Unrecognized chain id: {}", e.key.destination),
+                    }
                 })?;
                 Ok((source, destination, e.value))
             })
             .collect::<SuiResult<Vec<_>>>()?;
-        let supported_tokens =
-            self.treasury.supported_tokens.contents.into_iter().map(|e| (e.key, e.value)).collect::<Vec<_>>();
-        let id_token_type_map =
-            self.treasury.id_token_type_map.contents.into_iter().map(|e| (e.key, e.value)).collect::<Vec<_>>();
+        let supported_tokens = self
+            .treasury
+            .supported_tokens
+            .contents
+            .into_iter()
+            .map(|e| (e.key, e.value))
+            .collect::<Vec<_>>();
+        let id_token_type_map = self
+            .treasury
+            .id_token_type_map
+            .contents
+            .into_iter()
+            .map(|e| (e.key, e.value))
+            .collect::<Vec<_>>();
         let transfer_records = self
             .limiter
             .transfer_records
             .contents
             .into_iter()
             .map(|e| {
-                let source = BridgeChainId::try_from(e.key.source).map_err(|_e| SuiError::GenericBridgeError {
-                    error: format!("Unrecognized chain id: {}", e.key.source),
+                let source = BridgeChainId::try_from(e.key.source).map_err(|_e| {
+                    SuiError::GenericBridgeError {
+                        error: format!("Unrecognized chain id: {}", e.key.source),
+                    }
                 })?;
                 let destination = BridgeChainId::try_from(e.key.destination).map_err(|_e| {
-                    SuiError::GenericBridgeError { error: format!("Unrecognized chain id: {}", e.key.destination) }
+                    SuiError::GenericBridgeError {
+                        error: format!("Unrecognized chain id: {}", e.key.destination),
+                    }
                 })?;
                 Ok((source, destination, e.value))
             })
             .collect::<SuiResult<Vec<_>>>()?;
-        let limiter = BridgeLimiterSummary { transfer_limit, transfer_records };
+        let limiter = BridgeLimiterSummary {
+            transfer_limit,
+            transfer_records,
+        };
         Ok(BridgeSummary {
             bridge_version: self.bridge_version,
             message_version: self.message_version,
             chain_id: self.chain_id,
-            sequence_nums: self.sequence_nums.contents.into_iter().map(|e| (e.key, e.value)).collect(),
+            sequence_nums: self
+                .sequence_nums
+                .contents
+                .into_iter()
+                .map(|e| (e.key, e.value))
+                .collect(),
             committee: BridgeCommitteeSummary {
-                members: self.committee.members.contents.into_iter().map(|e| (e.key, e.value)).collect(),
+                members: self
+                    .committee
+                    .members
+                    .contents
+                    .into_iter()
+                    .map(|e| (e.key, e.value))
+                    .collect(),
                 member_registration: self
                     .committee
                     .member_registrations
@@ -297,7 +363,10 @@ impl BridgeTrait for BridgeInnerV1 {
             },
             bridge_records_id: self.bridge_records.id,
             limiter,
-            treasury: BridgeTreasurySummary { supported_tokens, id_token_type_map },
+            treasury: BridgeTreasurySummary {
+                supported_tokens,
+                id_token_type_map,
+            },
             is_frozen: self.frozen,
         })
     }

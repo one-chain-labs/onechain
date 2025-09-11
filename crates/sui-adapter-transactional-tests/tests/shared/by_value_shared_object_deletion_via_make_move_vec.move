@@ -6,15 +6,15 @@
 //# publish
 
 module t2::o2 {
-    use one::oct::OCT;
-    use one::coin::{Self, Coin};
+    use sui::oct::OCT;
+    use sui::coin::{Self, Coin};
 
     public struct Obj2 has key, store {
         id: UID,
     }
 
     public fun mint_shared_coin(ctx: &mut TxContext) {
-        transfer::public_share_object(coin::zero<OCT>(ctx))
+        transfer::public_share_object(coin::zero<SUI>(ctx))
     }
 
     public fun create(ctx: &mut TxContext) {

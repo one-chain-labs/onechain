@@ -6,17 +6,13 @@
 //! recursive. Since the module dependency graph is acylic by construction, applying this checker to
 //! each module in isolation guarantees that there is no structural recursion globally.
 use move_binary_format::{
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+    IndexKind,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult, verification_error},
     file_format::{
-        CompiledModule,
-        DatatypeHandleIndex,
-        EnumDefinitionIndex,
-        SignatureToken,
-        StructDefinitionIndex,
-        TableIndex,
+        CompiledModule, DatatypeHandleIndex, EnumDefinitionIndex, SignatureToken,
+        StructDefinitionIndex, TableIndex,
     },
     internals::ModuleIndex,
-    IndexKind,
 };
 use move_core_types::vm_status::StatusCode;
 use petgraph::{algo::toposort, graphmap::DiGraphMap};
@@ -40,12 +36,16 @@ impl<'a> RecursiveDataDefChecker<'a> {
         match toposort(&graph, None) {
             Ok(_) => Ok(()),
             Err(cycle) => match cycle.node_id() {
-                DataIndex::Struct(idx) => {
-                    Err(verification_error(StatusCode::RECURSIVE_DATATYPE_DEFINITION, IndexKind::StructDefinition, idx))
-                }
-                DataIndex::Enum(idx) => {
-                    Err(verification_error(StatusCode::RECURSIVE_DATATYPE_DEFINITION, IndexKind::EnumDefinition, idx))
-                }
+                DataIndex::Struct(idx) => Err(verification_error(
+                    StatusCode::RECURSIVE_DATATYPE_DEFINITION,
+                    IndexKind::StructDefinition,
+                    idx,
+                )),
+                DataIndex::Enum(idx) => Err(verification_error(
+                    StatusCode::RECURSIVE_DATATYPE_DEFINITION,
+                    IndexKind::EnumDefinition,
+                    idx,
+                )),
             },
         }
     }
@@ -72,25 +72,35 @@ impl<'a> DataDefGraphBuilder<'a> {
         // DuplicationChecker
         for (idx, struct_def) in module.struct_defs().iter().enumerate() {
             let sh_idx = struct_def.struct_handle;
-            if let Some(other) = handle_to_def.insert(sh_idx, DataIndex::Struct(idx as TableIndex)) {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!(
-                    "Duplicate struct handle index {} for struct definitions {:?} and {}",
-                    sh_idx, other, idx
-                )));
+            if let Some(other) = handle_to_def.insert(sh_idx, DataIndex::Struct(idx as TableIndex))
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Duplicate struct handle index {} for struct definitions {:?} and {}",
+                            sh_idx, other, idx
+                        )),
+                );
             }
         }
 
         for (idx, enum_def) in module.enum_defs().iter().enumerate() {
             let sh_idx = enum_def.enum_handle;
             if let Some(other) = handle_to_def.insert(sh_idx, DataIndex::Enum(idx as TableIndex)) {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!(
-                    "Duplicate enum handle index {} for enum definitions {:?} and {}",
-                    sh_idx, other, idx
-                )));
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Duplicate enum handle index {} for enum definitions {:?} and {}",
+                            sh_idx, other, idx
+                        )),
+                );
             }
         }
 
-        Ok(Self { module, handle_to_def })
+        Ok(Self {
+            module,
+            handle_to_def,
+        })
     }
 
     fn build(self) -> PartialVMResult<DiGraphMap<DataIndex, ()>> {
@@ -105,8 +115,9 @@ impl<'a> DataDefGraphBuilder<'a> {
             self.add_enum_defs(&mut neighbors, sd_idx)?
         }
 
-        let edges =
-            neighbors.into_iter().flat_map(|(parent, children)| children.into_iter().map(move |child| (parent, child)));
+        let edges = neighbors
+            .into_iter()
+            .flat_map(|(parent, children)| children.into_iter().map(move |child| (parent, child)));
         Ok(DiGraphMap::from_edges(edges))
     }
 
@@ -119,7 +130,11 @@ impl<'a> DataDefGraphBuilder<'a> {
         // The fields iterator is an option in the case of native structs. Flatten makes an empty
         // iterator for that case
         for field in struct_def.fields().into_iter().flatten() {
-            self.add_signature_token(neighbors, DataIndex::Struct(idx.into_index() as TableIndex), &field.signature.0)?
+            self.add_signature_token(
+                neighbors,
+                DataIndex::Struct(idx.into_index() as TableIndex),
+                &field.signature.0,
+            )?
         }
         Ok(())
     }
@@ -130,8 +145,16 @@ impl<'a> DataDefGraphBuilder<'a> {
         idx: EnumDefinitionIndex,
     ) -> PartialVMResult<()> {
         let enum_def = self.module.enum_def_at(idx);
-        for field in enum_def.variants.iter().flat_map(|variant| variant.fields.iter()) {
-            self.add_signature_token(neighbors, DataIndex::Enum(idx.into_index() as TableIndex), &field.signature.0)?
+        for field in enum_def
+            .variants
+            .iter()
+            .flat_map(|variant| variant.fields.iter())
+        {
+            self.add_signature_token(
+                neighbors,
+                DataIndex::Enum(idx.into_index() as TableIndex),
+                &field.signature.0,
+            )?
         }
         Ok(())
     }
@@ -155,8 +178,10 @@ impl<'a> DataDefGraphBuilder<'a> {
             | T::Signer
             | T::TypeParameter(_) => (),
             T::Reference(_) | T::MutableReference(_) => {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Reference field when checking recursive structs".to_owned()))
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Reference field when checking recursive structs".to_owned()),
+                );
             }
             T::Vector(inner) => self.add_signature_token(neighbors, cur_idx, inner)?,
             T::Datatype(sh_idx) => {

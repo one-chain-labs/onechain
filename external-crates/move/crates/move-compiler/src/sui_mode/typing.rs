@@ -8,16 +8,18 @@ use move_symbol_pool::Symbol;
 
 use crate::{
     diag,
-    diagnostics::{warning_filters::WarningFilters, Diagnostic, DiagnosticReporter, Diagnostics},
+    diagnostics::{Diagnostic, DiagnosticReporter, Diagnostics, warning_filters::WarningFilters},
     editions::Flavor,
-    expansion::ast::{AbilitySet, Fields, ModuleIdent, Mutability, TargetKind, Visibility},
-    naming::ast::{self as N, BuiltinTypeName_, FunctionSignature, StructFields, Type, TypeName_, Type_, Var},
-    parser::ast::{Ability_, DatatypeName, FunctionName},
-    shared::{program_info::TypingProgramInfo, CompilationEnv, Identifier},
+    expansion::ast::{AbilitySet, Fields, ModuleIdent, Mutability, Visibility},
+    naming::ast::{
+        self as N, BuiltinTypeName_, FunctionSignature, StructFields, Type, Type_, TypeName_, Var,
+    },
+    parser::ast::{Ability_, DatatypeName, DocComment, FunctionName, TargetKind},
+    shared::{CompilationEnv, Identifier, program_info::TypingProgramInfo},
     sui_mode::*,
     typing::{
         ast::{self as T, ModuleCall},
-        core::{ability_not_satisfied_tips, error_format, error_format_, Subst},
+        core::{Subst, ability_not_satisfied_tips, error_format, error_format_},
         visitor::{TypingVisitorConstructor, TypingVisitorContext},
     },
 };
@@ -30,7 +32,6 @@ pub struct SuiTypeChecks;
 
 impl TypingVisitorConstructor for SuiTypeChecks {
     type Context<'a> = Context<'a>;
-
     fn context<'a>(env: &'a CompilationEnv, program: &T::Program) -> Self::Context<'a> {
         Context::new(env, program.info.clone())
     }
@@ -83,7 +84,9 @@ impl<'a> Context<'a> {
 
     fn set_module(&mut self, current_module: ModuleIdent) {
         self.current_module = Some(current_module);
-        self.otw_name = Some(Symbol::from(current_module.value.module.0.value.as_str().to_uppercase()));
+        self.otw_name = Some(Symbol::from(
+            current_module.value.module.0.value.as_str().to_uppercase(),
+        ));
         self.one_time_witness = None;
     }
 
@@ -106,7 +109,7 @@ const OTW_NOTE: &str = "One-time witness types are structs with the following re
 // Entry
 //**************************************************************************************************
 
-impl<'a> TypingVisitorContext for Context<'a> {
+impl TypingVisitorContext for Context<'_> {
     fn push_warning_filter_scope(&mut self, filters: WarningFilters) {
         self.reporter.push_warning_filter_scope(filters)
     }
@@ -121,7 +124,12 @@ impl<'a> TypingVisitorContext for Context<'a> {
             // Skip if not sui
             return true;
         }
-        if !matches!(mdef.target_kind, TargetKind::Source { is_root_package: true }) {
+        if !matches!(
+            mdef.target_kind,
+            TargetKind::Source {
+                is_root_package: true
+            }
+        ) {
             // Skip non-source, dependency modules
             return true;
         }
@@ -157,7 +165,12 @@ impl<'a> TypingVisitorContext for Context<'a> {
         false
     }
 
-    fn visit_function_custom(&mut self, module: ModuleIdent, name: FunctionName, fdef: &T::Function) -> bool {
+    fn visit_function_custom(
+        &mut self,
+        module: ModuleIdent,
+        name: FunctionName,
+        fdef: &T::Function,
+    ) -> bool {
         debug_assert!(self.current_module.as_ref() == Some(&module));
         function(self, name, fdef);
         // skip since we have already visited the body
@@ -177,6 +190,7 @@ impl<'a> TypingVisitorContext for Context<'a> {
 
 fn struct_def(context: &mut Context, name: DatatypeName, sdef: &N::StructDefinition) {
     let N::StructDefinition {
+        doc: _,
         warning_filter: _,
         index: _,
         loc: _,
@@ -197,7 +211,10 @@ fn struct_def(context: &mut Context, name: DatatypeName, sdef: &N::StructDefinit
         // no fields
         Some(name.loc())
     } else {
-        fields.iter().find(|(_, name, (idx, _))| *idx == 0 && **name != ID_FIELD_NAME).map(|(loc, _, _)| loc)
+        fields
+            .iter()
+            .find(|(_, name, (idx, _))| *idx == 0 && **name != ID_FIELD_NAME)
+            .map(|(loc, _, _)| loc)
     };
     if let Some(loc) = invalid_first_field {
         // no fields or an invalid 'id' field
@@ -205,10 +222,16 @@ fn struct_def(context: &mut Context, name: DatatypeName, sdef: &N::StructDefinit
         return;
     };
 
-    let (_, id_field_type) = fields.get_(&ID_FIELD_NAME).unwrap();
+    let (_, (_, id_field_type)) = fields.get_(&ID_FIELD_NAME).unwrap();
     let id_field_loc = fields.get_loc_(&ID_FIELD_NAME).unwrap();
-    if !id_field_type.value.is(&SUI_ADDR_VALUE, OBJECT_MODULE_NAME, UID_TYPE_NAME) {
-        let actual = format!("But found type: {}", error_format(id_field_type, &Subst::empty()));
+    if !id_field_type
+        .value
+        .is(&SUI_ADDR_VALUE, OBJECT_MODULE_NAME, UID_TYPE_NAME)
+    {
+        let actual = format!(
+            "But found type: {}",
+            error_format(id_field_type, &Subst::empty())
+        );
         let mut diag = invalid_object_id_field_diag(key_loc, *id_field_loc, name);
         diag.add_secondary_label((id_field_type.loc, actual));
         context.add_diag(diag);
@@ -237,6 +260,7 @@ fn invalid_object_id_field_diag(key_loc: Loc, loc: Loc, name: DatatypeName) -> D
 
 fn enum_def(context: &mut Context, name: DatatypeName, edef: &N::EnumDefinition) {
     let N::EnumDefinition {
+        doc: _,
         warning_filter: _,
         index: _,
         loc: _loc,
@@ -259,6 +283,8 @@ fn enum_def(context: &mut Context, name: DatatypeName, edef: &N::EnumDefinition)
 
 fn function(context: &mut Context, name: FunctionName, fdef: &T::Function) {
     let T::Function {
+        doc: _,
+        loc: _,
         compiled_visibility: _,
         visibility,
         signature,
@@ -267,7 +293,6 @@ fn function(context: &mut Context, name: FunctionName, fdef: &T::Function) {
         index: _,
         macro_: _,
         attributes,
-        loc: _,
         entry,
     } = fdef;
     let prev_in_test = context.in_test;
@@ -290,13 +315,19 @@ fn function(context: &mut Context, name: FunctionName, fdef: &T::Function) {
 // init
 //**************************************************************************************************
 
-fn init_visibility(context: &mut Context, name: FunctionName, visibility: Visibility, entry: Option<Loc>) {
+fn init_visibility(
+    context: &mut Context,
+    name: FunctionName,
+    visibility: Visibility,
+    entry: Option<Loc>,
+) {
     match visibility {
-        Visibility::Public(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => context.add_diag(diag!(
-            INIT_FUN_DIAG,
-            (name.loc(), "Invalid 'init' function declaration"),
-            (loc, "'init' functions must be internal to their module"),
-        )),
+        Visibility::Public(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => context
+            .add_diag(diag!(
+                INIT_FUN_DIAG,
+                (name.loc(), "Invalid 'init' function declaration"),
+                (loc, "'init' functions must be internal to their module"),
+            )),
         Visibility::Internal => (),
     }
     if let Some(entry) = entry {
@@ -309,7 +340,11 @@ fn init_visibility(context: &mut Context, name: FunctionName, visibility: Visibi
 }
 
 fn init_signature(context: &mut Context, name: FunctionName, signature: &FunctionSignature) {
-    let FunctionSignature { type_parameters, parameters, return_type } = signature;
+    let FunctionSignature {
+        type_parameters,
+        parameters,
+        return_type,
+    } = signature;
     if !type_parameters.is_empty() {
         let tp_loc = type_parameters[0].user_specified_name.loc;
         context.add_diag(diag!(
@@ -319,17 +354,24 @@ fn init_signature(context: &mut Context, name: FunctionName, signature: &Functio
         ));
     }
     if !matches!(return_type, sp!(_, Type_::Unit)) {
-        let msg =
-            format!("'init' functions must have a return type of {}", error_format_(&Type_::Unit, &Subst::empty()));
+        let msg = format!(
+            "'init' functions must have a return type of {}",
+            error_format_(&Type_::Unit, &Subst::empty())
+        );
         context.add_diag(diag!(
             INIT_FUN_DIAG,
             (name.loc(), "Invalid 'init' function declaration"),
             (return_type.loc, msg),
         ))
     }
-    let last_loc = parameters.last().map(|(_, _, sp!(loc, _))| *loc).unwrap_or(name.loc());
-    let tx_ctx_kind =
-        parameters.last().map(|(_, _, last_param_ty)| tx_context_kind(last_param_ty)).unwrap_or(TxContextKind::None);
+    let last_loc = parameters
+        .last()
+        .map(|(_, _, sp!(loc, _))| *loc)
+        .unwrap_or(name.loc());
+    let tx_ctx_kind = parameters
+        .last()
+        .map(|(_, _, last_param_ty)| tx_context_kind(last_param_ty))
+        .unwrap_or(TxContextKind::None);
     if tx_ctx_kind == TxContextKind::None {
         let msg = format!(
             "'init' functions must have their last parameter as \
@@ -338,21 +380,34 @@ fn init_signature(context: &mut Context, name: FunctionName, signature: &Functio
             m = TX_CONTEXT_MODULE_NAME,
             t = TX_CONTEXT_TYPE_NAME,
         );
-        context.add_diag(diag!(INIT_FUN_DIAG, (name.loc(), "Invalid 'init' function declaration"), (last_loc, msg),))
+        context.add_diag(diag!(
+            INIT_FUN_DIAG,
+            (name.loc(), "Invalid 'init' function declaration"),
+            (last_loc, msg),
+        ))
     }
 
     let info = context.info.clone();
     let otw_name: Symbol = context.otw_name();
-    if parameters.len() == 1 && context.one_time_witness.is_some() && tx_ctx_kind != TxContextKind::None {
+    if parameters.len() == 1
+        && context.one_time_witness.is_some()
+        && tx_ctx_kind != TxContextKind::None
+    {
         // if there is 1 parameter, and a OTW, this is an error since the OTW must be used
         let msg = format!(
             "Invalid first parameter to 'init'. \
             Expected this module's one-time witness type '{}::{otw_name}'",
             context.current_module(),
         );
-        let otw_loc = context.info.struct_declared_loc_(context.current_module(), &otw_name);
+        let otw_loc = context
+            .info
+            .struct_declared_loc_(context.current_module(), &otw_name);
         let otw_msg = "One-time witness declared here";
-        let mut diag = diag!(INIT_FUN_DIAG, (parameters[0].2.loc, msg), (otw_loc, otw_msg),);
+        let mut diag = diag!(
+            INIT_FUN_DIAG,
+            (parameters[0].2.loc, msg),
+            (otw_loc, otw_msg),
+        );
         diag.add_note(OTW_NOTE);
         context.add_diag(diag)
     } else if parameters.len() > 1 {
@@ -372,12 +427,24 @@ fn init_signature(context: &mut Context, name: FunctionName, signature: &Functio
                 error_format(first_ty, &Subst::empty()),
                 context.current_module(),
             );
-            let mut diag =
-                diag!(INIT_FUN_DIAG, (name.loc(), "Invalid 'init' function declaration"), (first_ty.loc, msg));
+            let mut diag = diag!(
+                INIT_FUN_DIAG,
+                (name.loc(), "Invalid 'init' function declaration"),
+                (first_ty.loc, msg)
+            );
             diag.add_note(OTW_NOTE);
             context.add_diag(diag)
-        } else if let Some(sdef) = info.module(context.current_module()).structs.get_(&otw_name) {
-            let name = context.info.module(context.current_module()).structs.get_full_key_(&otw_name).unwrap();
+        } else if let Some(sdef) = info
+            .module(context.current_module())
+            .structs
+            .get_(&otw_name)
+        {
+            let name = context
+                .info
+                .module(context.current_module())
+                .structs
+                .get_full_key_(&otw_name)
+                .unwrap();
             check_otw_type(context, name, sdef, Some(first_ty.loc))
         }
     }
@@ -387,7 +454,10 @@ fn init_signature(context: &mut Context, name: FunctionName, signature: &Functio
         context.add_diag(diag!(
             INIT_FUN_DIAG,
             (name.loc(), "Invalid 'init' function declaration"),
-            (third_var.loc, "'init' functions can have at most two parameters"),
+            (
+                third_var.loc,
+                "'init' functions can have at most two parameters"
+            ),
         ));
     }
 }
@@ -395,7 +465,12 @@ fn init_signature(context: &mut Context, name: FunctionName, signature: &Functio
 // While theoretically we could call this just once for the upper cased module struct, we break it
 // out into a separate function to help programmers understand the rules for one-time witness types,
 // when trying to write an 'init' function.
-fn check_otw_type(context: &mut Context, name: DatatypeName, sdef: &N::StructDefinition, usage_loc: Option<Loc>) {
+fn check_otw_type(
+    context: &mut Context,
+    name: DatatypeName,
+    sdef: &N::StructDefinition,
+    usage_loc: Option<Loc>,
+) {
     const OTW_USAGE: &str = "Attempted usage as a one-time witness here";
     if context.one_time_witness.is_some() {
         return;
@@ -429,7 +504,9 @@ fn check_otw_type(context: &mut Context, name: DatatypeName, sdef: &N::StructDef
             );
             let (invalid_loc, invalid_msg) = match invalid_otw_opt {
                 InvalidOTW::FirstFieldNotBool(loc) => (loc, msg_base),
-                InvalidOTW::MoreThanOneField(loc) => (loc, format!("Found more than one field. {msg_base}")),
+                InvalidOTW::MoreThanOneField(loc) => {
+                    (loc, format!("Found more than one field. {msg_base}"))
+                }
             };
             context.add_diag(otw_diag(diag!(
                 OTW_DECL_DIAG,
@@ -440,18 +517,28 @@ fn check_otw_type(context: &mut Context, name: DatatypeName, sdef: &N::StructDef
         };
     }
 
-    let invalid_ability_loc = if !sdef.abilities.has_ability_(Ability_::Drop) || sdef.abilities.len() > 1 {
-        let loc = sdef
-            .abilities
-            .iter()
-            .find_map(|a| if a.value != Ability_::Drop { Some(a.loc) } else { None })
-            .unwrap_or(name.loc());
-        Some(loc)
-    } else {
-        None
-    };
+    let invalid_ability_loc =
+        if !sdef.abilities.has_ability_(Ability_::Drop) || sdef.abilities.len() > 1 {
+            let loc = sdef
+                .abilities
+                .iter()
+                .find_map(|a| {
+                    if a.value != Ability_::Drop {
+                        Some(a.loc)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(name.loc());
+            Some(loc)
+        } else {
+            None
+        };
     if let Some(loc) = invalid_ability_loc {
-        let msg = format!("One-time witness types can only have the have the '{}' ability", Ability_::Drop);
+        let msg = format!(
+            "One-time witness types can only have the have the '{}' ability",
+            Ability_::Drop
+        );
         context.add_diag(otw_diag(diag!(
             OTW_DECL_DIAG,
             (name.loc(), "Invalid one-time witness declaration"),
@@ -470,8 +557,8 @@ enum InvalidOTW {
 
 // Find the first invalid field in a one-time witness type, if any.
 // First looks for a non-boolean field, otherwise looks for any field after the first.
-fn invalid_otw_field_loc(fields: &Fields<Type>) -> Option<InvalidOTW> {
-    let invalid_first_field = fields.iter().find_map(|(loc, _, (idx, ty))| {
+fn invalid_otw_field_loc(fields: &Fields<(DocComment, Type)>) -> Option<InvalidOTW> {
+    let invalid_first_field = fields.iter().find_map(|(loc, _, (idx, (_, ty)))| {
         if *idx != 0 {
             return None;
         }
@@ -484,7 +571,10 @@ fn invalid_otw_field_loc(fields: &Fields<Type>) -> Option<InvalidOTW> {
         return Some(InvalidOTW::FirstFieldNotBool(loc));
     }
 
-    let more_than_one_field = fields.iter().find(|(_, _, (idx, _))| *idx > 0).map(|(loc, _, _)| loc);
+    let more_than_one_field = fields
+        .iter()
+        .find(|(_, _, (idx, _))| *idx > 0)
+        .map(|(loc, _, _)| loc);
     if let Some(loc) = more_than_one_field {
         return Some(InvalidOTW::MoreThanOneField(loc));
     }
@@ -496,8 +586,17 @@ fn invalid_otw_field_loc(fields: &Fields<Type>) -> Option<InvalidOTW> {
 // entry types
 //**************************************************************************************************
 
-fn entry_signature(context: &mut Context, entry_loc: Loc, name: FunctionName, signature: &FunctionSignature) {
-    let FunctionSignature { type_parameters: _, parameters, return_type } = signature;
+fn entry_signature(
+    context: &mut Context,
+    entry_loc: Loc,
+    name: FunctionName,
+    signature: &FunctionSignature,
+) {
+    let FunctionSignature {
+        type_parameters: _,
+        parameters,
+        return_type,
+    } = signature;
     let all_non_ctx_parameters = match parameters.last() {
         Some((_, _, last_param_ty)) if tx_context_kind(last_param_ty) != TxContextKind::None => {
             &parameters[0..parameters.len() - 1]
@@ -522,7 +621,11 @@ fn tx_context_kind(sp!(_, last_param_ty_): &Type) -> TxContextKind {
         // not a user defined type
         return TxContextKind::None;
     };
-    if inner_name.is(&SUI_ADDR_VALUE, TX_CONTEXT_MODULE_NAME, TX_CONTEXT_TYPE_NAME) {
+    if inner_name.is(
+        &SUI_ADDR_VALUE,
+        TX_CONTEXT_MODULE_NAME,
+        TX_CONTEXT_TYPE_NAME,
+    ) {
         if *is_mut {
             TxContextKind::Mutable
         } else {
@@ -544,7 +647,12 @@ pub enum TxContextKind {
     Immutable,
 }
 
-fn entry_param(context: &mut Context, entry_loc: Loc, name: FunctionName, parameters: &[(Mutability, Var, Type)]) {
+fn entry_param(
+    context: &mut Context,
+    entry_loc: Loc,
+    name: FunctionName,
+    parameters: &[(Mutability, Var, Type)],
+) {
     for (_, var, ty) in parameters {
         entry_param_ty(context, entry_loc, name, var, ty);
     }
@@ -557,7 +665,13 @@ fn entry_param(context: &mut Context, entry_loc: Loc, name: FunctionName, parame
 /// - An object
 /// - A reference to an object
 /// - A vector of objects
-fn entry_param_ty(context: &mut Context, entry_loc: Loc, name: FunctionName, param: &Var, param_ty: &Type) {
+fn entry_param_ty(
+    context: &mut Context,
+    entry_loc: Loc,
+    name: FunctionName,
+    param: &Var,
+    param_ty: &Type,
+) {
     let is_mut_clock = is_mut_clock(param_ty);
     let is_mut_random = is_mut_random(param_ty);
 
@@ -565,9 +679,14 @@ fn entry_param_ty(context: &mut Context, entry_loc: Loc, name: FunctionName, par
     // which should give a contextual error about `MyObject` having `key`, but the instantiation
     // `MyObject<InnerTypeWithoutStore>` not having `key` due to `InnerTypeWithoutStore` not having
     // `store`
-    let is_valid = is_entry_primitive_ty(param_ty) || is_entry_object_ty(param_ty) || is_entry_receiving_ty(param_ty);
+    let is_valid = is_entry_primitive_ty(param_ty)
+        || is_entry_object_ty(param_ty)
+        || is_entry_receiving_ty(param_ty);
     if is_mut_clock || is_mut_random || !is_valid {
-        let pmsg = format!("Invalid 'entry' parameter type for parameter '{}'", param.value.name);
+        let pmsg = format!(
+            "Invalid 'entry' parameter type for parameter '{}'",
+            param.value.name
+        );
         let tmsg = if is_mut_clock {
             format!(
                 "{a}::{m}::{n} must be passed by immutable reference, e.g. '&{a}::{m}::{n}'",
@@ -588,7 +707,12 @@ fn entry_param_ty(context: &mut Context, entry_loc: Loc, name: FunctionName, par
                 .to_owned()
         };
         let emsg = format!("'{name}' was declared 'entry' here");
-        context.add_diag(diag!(ENTRY_FUN_SIGNATURE_DIAG, (param.loc, pmsg), (param_ty.loc, tmsg), (entry_loc, emsg)));
+        context.add_diag(diag!(
+            ENTRY_FUN_SIGNATURE_DIAG,
+            (param.loc, pmsg),
+            (param_ty.loc, tmsg),
+            (entry_loc, emsg)
+        ));
     }
 }
 
@@ -596,10 +720,16 @@ fn is_mut_clock(param_ty: &Type) -> bool {
     match &param_ty.value {
         Type_::Ref(/* mut */ false, _) => false,
         Type_::Ref(/* mut */ true, t) => is_mut_clock(t),
-        Type_::Apply(_, sp!(_, n_), _) => n_.is(&SUI_ADDR_VALUE, CLOCK_MODULE_NAME, CLOCK_TYPE_NAME),
-        Type_::Unit | Type_::Param(_) | Type_::Var(_) | Type_::Anything | Type_::UnresolvedError | Type_::Fun(_, _) => {
-            false
+        Type_::Apply(_, sp!(_, n_), _) => {
+            n_.is(&SUI_ADDR_VALUE, CLOCK_MODULE_NAME, CLOCK_TYPE_NAME)
         }
+        Type_::Unit
+        | Type_::Param(_)
+        | Type_::Var(_)
+        | Type_::Anything
+        | Type_::Void
+        | Type_::UnresolvedError
+        | Type_::Fun(_, _) => false,
     }
 }
 
@@ -607,17 +737,27 @@ fn is_mut_random(param_ty: &Type) -> bool {
     match &param_ty.value {
         Type_::Ref(/* mut */ false, _) => false,
         Type_::Ref(/* mut */ true, t) => is_mut_random(t),
-        Type_::Apply(_, sp!(_, n_), _) => n_.is(&SUI_ADDR_VALUE, RANDOMNESS_MODULE_NAME, RANDOMNESS_STATE_TYPE_NAME),
-        Type_::Unit | Type_::Param(_) | Type_::Var(_) | Type_::Anything | Type_::UnresolvedError | Type_::Fun(_, _) => {
-            false
-        }
+        Type_::Apply(_, sp!(_, n_), _) => n_.is(
+            &SUI_ADDR_VALUE,
+            RANDOMNESS_MODULE_NAME,
+            RANDOMNESS_STATE_TYPE_NAME,
+        ),
+        Type_::Unit
+        | Type_::Param(_)
+        | Type_::Var(_)
+        | Type_::Anything
+        | Type_::Void
+        | Type_::UnresolvedError
+        | Type_::Fun(_, _) => false,
     }
 }
 
 fn is_entry_receiving_ty(param_ty: &Type) -> bool {
     match &param_ty.value {
         Type_::Ref(_, t) => is_entry_receiving_ty(t),
-        Type_::Apply(_, sp!(_, n), targs) if n.is(&SUI_ADDR_VALUE, TRANSFER_MODULE_NAME, RECEIVING_TYPE_NAME) => {
+        Type_::Apply(_, sp!(_, n), targs)
+            if n.is(&SUI_ADDR_VALUE, TRANSFER_MODULE_NAME, RECEIVING_TYPE_NAME) =>
+        {
             debug_assert!(targs.len() == 1);
             // Don't care about the type parameter, just that it's a receiving type -- since it has
             // a `key` requirement on the type parameter it must be an object or type checking will
@@ -653,7 +793,9 @@ fn is_entry_primitive_ty(param_ty: &Type) -> bool {
             debug_assert!(targs.is_empty());
             true
         }
-        Type_::Apply(_, sp!(_, n), targs) if n.is(&STD_ADDR_VALUE, OPTION_MODULE_NAME, OPTION_TYPE_NAME) => {
+        Type_::Apply(_, sp!(_, n), targs)
+            if n.is(&STD_ADDR_VALUE, OPTION_MODULE_NAME, OPTION_TYPE_NAME) =>
+        {
             debug_assert!(targs.len() == 1);
             is_entry_primitive_ty(&targs[0])
         }
@@ -669,7 +811,11 @@ fn is_entry_primitive_ty(param_ty: &Type) -> bool {
         Type_::Unit => false,
 
         // Error case nothing to do
-        Type_::UnresolvedError | Type_::Anything | Type_::Var(_) | Type_::Fun(_, _) => true,
+        Type_::UnresolvedError
+        | Type_::Anything
+        | Type_::Void
+        | Type_::Var(_)
+        | Type_::Fun(_, _) => true,
     }
 }
 
@@ -699,7 +845,12 @@ fn is_entry_object_ty_inner(param_ty: &Type) -> bool {
         Type_::Apply(Some(abilities), _, _) => abilities.has_ability_(Ability_::Key),
 
         // Error case nothing to do
-        Type_::UnresolvedError | Type_::Anything | Type_::Var(_) | Type_::Unit | Type_::Fun(_, _) => true,
+        Type_::UnresolvedError
+        | Type_::Anything
+        | Type_::Void
+        | Type_::Var(_)
+        | Type_::Unit
+        | Type_::Fun(_, _) => true,
         // Unreachable cases
         Type_::Apply(None, _, _) => unreachable!("ICE abilities should have been expanded"),
     }
@@ -717,7 +868,11 @@ fn entry_return(
         Type_::Ref(_, _) => {
             let fmsg = format!("Invalid return type for entry function '{}'", name);
             let tmsg = "Expected a non-reference type";
-            context.add_diag(diag!(ENTRY_FUN_SIGNATURE_DIAG, (entry_loc, fmsg), (*tloc, tmsg)))
+            context.add_diag(diag!(
+                ENTRY_FUN_SIGNATURE_DIAG,
+                (entry_loc, fmsg),
+                (*tloc, tmsg)
+            ))
         }
         Type_::Param(tp) => {
             if !tp.abilities.has_ability_(Ability_::Drop) {
@@ -756,14 +911,19 @@ fn entry_return(
             }
         }
         // Error case nothing to do
-        Type_::UnresolvedError | Type_::Anything | Type_::Var(_) | Type_::Fun(_, _) => (),
+        Type_::UnresolvedError
+        | Type_::Anything
+        | Type_::Void
+        | Type_::Var(_)
+        | Type_::Fun(_, _) => (),
         // Unreachable cases
         Type_::Apply(None, _, _) => unreachable!("ICE abilities should have been expanded"),
     }
 }
 
 fn get_abilities(sp!(loc, ty_): &Type) -> AbilitySet {
-    ty_.abilities(*loc).expect("ICE abilities should have been expanded")
+    ty_.abilities(*loc)
+        .expect("ICE abilities should have been expanded")
 }
 
 fn invalid_entry_return_ty<'a>(
@@ -812,7 +972,9 @@ fn exp(context: &mut Context, e: &T::Exp) {
                 );
                 context.add_diag(diag)
             }
-            if module.value.is(&SUI_ADDR_VALUE, EVENT_MODULE_NAME) && name.value() == EVENT_FUNCTION_NAME {
+            if module.value.is(&SUI_ADDR_VALUE, EVENT_MODULE_NAME)
+                && name.value() == EVENT_FUNCTION_NAME
+            {
                 check_event_emit(context, e.exp.loc, mcall)
             }
             let is_transfer_module = module.value.is(&SUI_ADDR_VALUE, TRANSFER_MODULE_NAME);
@@ -823,10 +985,10 @@ fn exp(context: &mut Context, e: &T::Exp) {
         T::UnannotatedExp_::Pack(m, s, _, _) => {
             if !context.in_test
                 && !otw_special_cases(context)
-                && context
-                    .one_time_witness
-                    .as_ref()
-                    .is_some_and(|otw| otw.as_ref().is_ok_and(|o| m == context.current_module() && o == s))
+                && context.one_time_witness.as_ref().is_some_and(|otw| {
+                    otw.as_ref()
+                        .is_ok_and(|o| m == context.current_module() && o == s)
+                })
             {
                 let msg = "Invalid one-time witness construction. One-time witness types \
                     cannot be created manually, but are passed as an argument 'init'";
@@ -840,35 +1002,58 @@ fn exp(context: &mut Context, e: &T::Exp) {
 }
 
 fn otw_special_cases(context: &Context) -> bool {
-    BRIDGE_SUPPORTED_ASSET.iter().any(|token| context.current_module().value.is(&BRIDGE_ADDR_VALUE, token))
-        || context.current_module().value.is(&SUI_ADDR_VALUE, SUI_MODULE_NAME)
+    BRIDGE_SUPPORTED_ASSET
+        .iter()
+        .any(|token| context.current_module().value.is(&BRIDGE_ADDR_VALUE, token))
+        || context
+            .current_module()
+            .value
+            .is(&SUI_ADDR_VALUE, SUI_MODULE_NAME)
 }
 
 fn check_event_emit(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
     let current_module = context.current_module();
-    let ModuleCall { module, name, type_arguments, .. } = mcall;
+    let ModuleCall {
+        module,
+        name,
+        type_arguments,
+        ..
+    } = mcall;
     let Some(first_ty) = type_arguments.first() else {
         // invalid arity
         debug_assert!(false, "ICE arity should have been expanded for errors");
         return;
     };
-    let is_defined_in_current_module =
-        matches!(first_ty.value.type_name(), Some(sp!(_, TypeName_::ModuleType(m, _))) if m == current_module);
+    let is_defined_in_current_module = matches!(first_ty.value.type_name(), Some(sp!(_, TypeName_::ModuleType(m, _))) if m == current_module);
     if !is_defined_in_current_module {
         let msg = format!(
             "Invalid event. The function '{}::{}' must be called with a type defined in the current module",
             module, name
         );
-        let ty_msg =
-            format!("The type {} is not declared in the current module", error_format(first_ty, &Subst::empty()),);
-        context.add_diag(diag!(EVENT_EMIT_CALL_DIAG, (loc, msg), (first_ty.loc, ty_msg)));
+        let ty_msg = format!(
+            "The type {} is not declared in the current module",
+            error_format(first_ty, &Subst::empty()),
+        );
+        context.add_diag(diag!(
+            EVENT_EMIT_CALL_DIAG,
+            (loc, msg),
+            (first_ty.loc, ty_msg)
+        ));
     }
 }
 
 fn check_private_transfer(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
-    let ModuleCall { module, name, type_arguments, .. } = mcall;
+    let ModuleCall {
+        module,
+        name,
+        type_arguments,
+        ..
+    } = mcall;
     let current_module = context.current_module();
-    if current_module.value.is(&SUI_ADDR_VALUE, TRANSFER_FUNCTION_NAME) {
+    if current_module
+        .value
+        .is(&SUI_ADDR_VALUE, TRANSFER_FUNCTION_NAME)
+    {
         // inside the transfer module, so no private transfer rules
         return;
     }
@@ -878,7 +1063,9 @@ fn check_private_transfer(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
         return;
     };
     let (in_current_module, first_ty_tn) = match first_ty.value.type_name() {
-        Some(sp!(_, TypeName_::Multiple(_))) | Some(sp!(_, TypeName_::Builtin(_))) | None => (false, None),
+        Some(sp!(_, TypeName_::Multiple(_))) | Some(sp!(_, TypeName_::Builtin(_))) | None => {
+            (false, None)
+        }
         Some(sp!(_, TypeName_::ModuleType(m, n))) => (m == current_module, Some((m, n))),
     };
     if !in_current_module {
@@ -890,12 +1077,24 @@ fn check_private_transfer(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
         if let Some((first_ty_module, _)) = &first_ty_tn {
             msg = format!("{}, '{}'", msg, first_ty_module);
         };
-        let ty_msg =
-            format!("The type {} is not declared in the current module", error_format(first_ty, &Subst::empty()),);
-        let mut diag = diag!(PRIVATE_TRANSFER_CALL_DIAG, (loc, msg), (first_ty.loc, ty_msg));
-        if first_ty.value.has_ability_(Ability_::Store).is_some_and(|b| b) {
+        let ty_msg = format!(
+            "The type {} is not declared in the current module",
+            error_format(first_ty, &Subst::empty()),
+        );
+        let mut diag = diag!(
+            PRIVATE_TRANSFER_CALL_DIAG,
+            (loc, msg),
+            (first_ty.loc, ty_msg)
+        );
+        if first_ty
+            .value
+            .has_ability_(Ability_::Store)
+            .is_some_and(|b| b)
+        {
             let store_loc = if let Some((first_ty_module, first_ty_name)) = &first_ty_tn {
-                let abilities = context.info.datatype_declared_abilities(first_ty_module, first_ty_name);
+                let abilities = context
+                    .info
+                    .datatype_declared_abilities(first_ty_module, first_ty_name);
                 abilities.ability_loc_(Ability_::Store).unwrap()
             } else {
                 first_ty
@@ -905,8 +1104,12 @@ fn check_private_transfer(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
                     .ability_loc_(Ability_::Store)
                     .unwrap()
             };
-            let store_msg =
-                format!("The object has '{}' so '{}::public_{}' can be called instead", Ability_::Store, module, name);
+            let store_msg = format!(
+                "The object has '{}' so '{}::public_{}' can be called instead",
+                Ability_::Store,
+                module,
+                name
+            );
             diag.add_secondary_label((store_loc, store_msg))
         }
         context.add_diag(diag)

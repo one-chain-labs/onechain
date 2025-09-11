@@ -1,9 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::parser::lexer::{Tok, TOK_COUNT};
-
-use move_symbol_pool::Symbol;
+use crate::parser::lexer::{TOK_COUNT, Tok};
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -13,7 +11,7 @@ use super::ast::{ENTRY_MODIFIER, MACRO_MODIFIER, NATIVE_MODIFIER};
 #[derive(Clone, Debug)]
 pub struct TokenSet {
     tokens: [u8; TOK_COUNT],
-    identifiers: HashMap<Symbol, u8>,
+    identifiers: HashMap<&'static str, u8>,
 }
 
 //**************************************************************************************************
@@ -22,8 +20,15 @@ pub struct TokenSet {
 
 const MOVE_2024_KEYWORDS: &[Tok] = &[Tok::Mut, Tok::Match, Tok::For, Tok::Enum, Tok::Type];
 
-const MODULE_MEMBER_TOKENS: &[Tok] =
-    &[Tok::Fun, Tok::Struct, Tok::Use, Tok::Const, Tok::Friend, Tok::Spec, Tok::Invariant];
+const MODULE_MEMBER_TOKENS: &[Tok] = &[
+    Tok::Fun,
+    Tok::Struct,
+    Tok::Use,
+    Tok::Const,
+    Tok::Friend,
+    Tok::Spec,
+    Tok::Invariant,
+];
 
 const MEMBER_VISIBILITY_TOKENS: &[Tok] = &[Tok::Public];
 
@@ -43,7 +48,13 @@ pub static MODULE_MEMBER_OR_MODULE_START_SET: Lazy<TokenSet> = Lazy::new(|| {
     token_set
 });
 
-const PARAM_STARTS: &[Tok] = &[Tok::Identifier, Tok::Mut, Tok::SyntaxIdentifier, Tok::LParen, Tok::RestrictedIdentifier];
+const PARAM_STARTS: &[Tok] = &[
+    Tok::Identifier,
+    Tok::Mut,
+    Tok::SyntaxIdentifier,
+    Tok::LParen,
+    Tok::RestrictedIdentifier,
+];
 
 pub static PARAM_START_SET: Lazy<TokenSet> = Lazy::new(|| TokenSet::from(PARAM_STARTS));
 
@@ -140,12 +151,24 @@ const ATTR_STARTS: &[Tok] = &[Tok::Identifier, Tok::For];
 
 pub static ATTR_START_SET: Lazy<TokenSet> = Lazy::new(|| TokenSet::from(ATTR_STARTS));
 
-const FIELD_BINDING_STARTS: &[Tok] = &[Tok::Mut, Tok::Identifier, Tok::RestrictedIdentifier, Tok::PeriodPeriod];
+const FIELD_BINDING_STARTS: &[Tok] = &[
+    Tok::Mut,
+    Tok::Identifier,
+    Tok::RestrictedIdentifier,
+    Tok::PeriodPeriod,
+];
 
-pub static FIELD_BINDING_START_SET: Lazy<TokenSet> = Lazy::new(|| TokenSet::from(FIELD_BINDING_STARTS));
+pub static FIELD_BINDING_START_SET: Lazy<TokenSet> =
+    Lazy::new(|| TokenSet::from(FIELD_BINDING_STARTS));
 
-const VALUE_STARTS: &[Tok] =
-    &[Tok::AtSign, Tok::True, Tok::False, Tok::NumValue, Tok::NumTypedValue, Tok::ByteStringValue];
+const VALUE_STARTS: &[Tok] = &[
+    Tok::AtSign,
+    Tok::True,
+    Tok::False,
+    Tok::NumValue,
+    Tok::NumTypedValue,
+    Tok::ByteStringValue,
+];
 
 pub static VALUE_START_SET: Lazy<TokenSet> = Lazy::new(|| TokenSet::from(VALUE_STARTS));
 
@@ -164,7 +187,10 @@ impl TokenSet {
     pub fn new() -> Self {
         let tokens = [0; TOK_COUNT];
         let identifiers = HashMap::new();
-        TokenSet { tokens, identifiers }
+        TokenSet {
+            tokens,
+            identifiers,
+        }
     }
 
     pub fn add(&mut self, tok: Tok) {
@@ -177,14 +203,14 @@ impl TokenSet {
         }
     }
 
-    pub fn add_identifier(&mut self, identifier: &str) {
-        *self.identifiers.entry(identifier.into()).or_default() += 1;
+    pub fn add_identifier(&mut self, identifier: &'static str) {
+        *self.identifiers.entry(identifier).or_default() += 1;
     }
 
     pub fn remove_identifier(&mut self, identifier: impl AsRef<str>) {
-        if let Some(entry) = self.identifiers.get_mut(&identifier.as_ref().into()) {
+        if let Some(entry) = self.identifiers.get_mut(identifier.as_ref()) {
             if *entry < 2 {
-                self.identifiers.remove(&identifier.as_ref().into());
+                self.identifiers.remove(identifier.as_ref());
             } else {
                 *entry -= 1;
             }
@@ -205,12 +231,15 @@ impl TokenSet {
 
     pub fn contains(&self, tok: Tok, tok_contents: impl AsRef<str>) -> bool {
         self.tokens[tok as usize] > 0
-            || (tok == Tok::Identifier || tok == Tok::RestrictedIdentifier || tok == Tok::SyntaxIdentifier)
-                && self.identifiers.contains_key(&tok_contents.as_ref().into())
+            || (tok == Tok::Identifier
+                || tok == Tok::RestrictedIdentifier
+                || tok == Tok::SyntaxIdentifier)
+                && self.identifiers.contains_key(tok_contents.as_ref())
     }
 
     pub fn contains_any(&self, toks: &[Tok], tok_contents: impl AsRef<str>) -> bool {
-        toks.iter().any(|tok| self.contains(*tok, tok_contents.as_ref()))
+        toks.iter()
+            .any(|tok| self.contains(*tok, tok_contents.as_ref()))
     }
 
     pub fn union(&mut self, other: &TokenSet) {

@@ -2,26 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::AbilitySet;
-use move_core_types::{identifier::IdentStr, resolver::ResourceResolver};
+use move_core_types::identifier::IdentStr;
 use move_vm_types::loaded_data::runtime_types::Type;
 use serde::Deserialize;
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, SuiAddress},
     coin::Coin,
-    error::{ExecutionError, ExecutionErrorKind, SuiError},
+    error::{ExecutionError, ExecutionErrorKind},
     execution_status::CommandArgumentError,
     object::Owner,
     storage::{BackingPackageStore, ChildObjectResolver, StorageView},
     transfer::Receiving,
 };
 
-pub trait SuiResolver: ResourceResolver<Error = SuiError> + BackingPackageStore {
+pub trait SuiResolver: BackingPackageStore {
     fn as_backing_package_store(&self) -> &dyn BackingPackageStore;
 }
 
 impl<T> SuiResolver for T
 where
-    T: ResourceResolver<Error = SuiError>,
     T: BackingPackageStore,
 {
     fn as_backing_package_store(&self) -> &dyn BackingPackageStore {
@@ -51,8 +50,16 @@ where
 
 #[derive(Clone, Debug)]
 pub enum InputObjectMetadata {
-    Receiving { id: ObjectID, version: SequenceNumber },
-    InputObject { id: ObjectID, is_mutable_input: bool, owner: Owner, version: SequenceNumber },
+    Receiving {
+        id: ObjectID,
+        version: SequenceNumber,
+    },
+    InputObject {
+        id: ObjectID,
+        is_mutable_input: bool,
+        owner: Owner,
+        version: SequenceNumber,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,7 +71,11 @@ pub enum UsageKind {
 
 #[derive(Clone, Copy)]
 pub enum CommandKind<'a> {
-    MoveCall { package: ObjectID, module: &'a IdentStr, function: &'a IdentStr },
+    MoveCall {
+        package: ObjectID,
+        module: &'a IdentStr,
+        function: &'a IdentStr,
+    },
     MakeMoveVec,
     TransferObjects,
     SplitCoins,
@@ -116,7 +127,11 @@ pub enum ObjectContents {
 #[derive(Debug, Clone)]
 pub enum RawValueType {
     Any,
-    Loaded { ty: Type, abilities: AbilitySet, used_in_non_entry_move_call: bool },
+    Loaded {
+        ty: Type,
+        abilities: AbilitySet,
+        used_in_non_entry_move_call: bool,
+    },
 }
 
 impl InputObjectMetadata {
@@ -137,11 +152,17 @@ impl InputObjectMetadata {
 
 impl InputValue {
     pub fn new_object(object_metadata: InputObjectMetadata, value: ObjectValue) -> Self {
-        InputValue { object_metadata: Some(object_metadata), inner: ResultValue::new(Value::Object(value)) }
+        InputValue {
+            object_metadata: Some(object_metadata),
+            inner: ResultValue::new(Value::Object(value)),
+        }
     }
 
     pub fn new_raw(ty: RawValueType, value: Vec<u8>) -> Self {
-        InputValue { object_metadata: None, inner: ResultValue::new(Value::Raw(ty, value)) }
+        InputValue {
+            object_metadata: None,
+            inner: ResultValue::new(Value::Raw(ty, value)),
+        }
     }
 
     pub fn new_receiving_object(id: ObjectID, version: SequenceNumber) -> Self {
@@ -154,7 +175,10 @@ impl InputValue {
 
 impl ResultValue {
     pub fn new(value: Value) -> Self {
-        Self { last_usage_kind: None, value: Some(value) }
+        Self {
+            last_usage_kind: None,
+            value: Some(value),
+        }
     }
 }
 
@@ -172,7 +196,9 @@ impl Value {
         match self {
             Value::Object(obj_value) => obj_value.write_bcs_bytes(buf),
             Value::Raw(_, bytes) => buf.extend(bytes),
-            Value::Receiving(id, version, _) => buf.extend(Receiving::new(*id, *version).to_bcs_bytes()),
+            Value::Receiving(id, version, _) => {
+                buf.extend(Receiving::new(*id, *version).to_bcs_bytes())
+            }
         }
     }
 
@@ -182,7 +208,13 @@ impl Value {
             // Any is only used for Pure inputs, and if it was used by &mut it would have switched
             // to Loaded
             Value::Raw(RawValueType::Any, _) => false,
-            Value::Raw(RawValueType::Loaded { used_in_non_entry_move_call, .. }, _) => *used_in_non_entry_move_call,
+            Value::Raw(
+                RawValueType::Loaded {
+                    used_in_non_entry_move_call,
+                    ..
+                },
+                _,
+            ) => *used_in_non_entry_move_call,
             // Only thing you can do with a `Receiving<T>` is consume it, so once it's used it
             // can't be used again.
             Value::Receiving(_, _, _) => false,
@@ -250,7 +282,10 @@ impl TryFromValue for u64 {
     }
 }
 
-fn try_from_value_prim<'a, T: Deserialize<'a>>(value: &'a Value, expected_ty: Type) -> Result<T, CommandArgumentError> {
+fn try_from_value_prim<'a, T: Deserialize<'a>>(
+    value: &'a Value,
+    expected_ty: Type,
+) -> Result<T, CommandArgumentError> {
     match value {
         Value::Object(_) => Err(CommandArgumentError::TypeMismatch),
         Value::Receiving(_, _, _) => Err(CommandArgumentError::TypeMismatch),

@@ -3,79 +3,42 @@
 
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
-use diesel::{dsl::now, ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper, TextExpressionMethods};
-use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
+use diesel::dsl::now;
+use diesel::{ExpressionMethods, TextExpressionMethods};
+use diesel::{OptionalExtension, QueryDsl, SelectableHelper};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::AsyncConnection;
+use diesel_async::RunQueryDsl;
 use sui_indexer_builder::progress::ProgressSavingPolicy;
-use sui_types::{
-    base_types::ObjectID,
-    transaction::{Command, TransactionDataAPI},
-};
+use sui_types::base_types::ObjectID;
+use sui_types::transaction::{Command, TransactionDataAPI};
 use tracing::info;
 
-use sui_indexer_builder::{
-    indexer_builder::{DataMapper, IndexerProgressStore, Persistent},
-    sui_datasource::CheckpointTxnData,
-    Task,
-    Tasks,
-    LIVE_TASK_TARGET_CHECKPOINT,
-};
-use sui_types::{
-    effects::TransactionEffectsAPI,
-    event::Event,
-    execution_status::ExecutionStatus,
-    full_checkpoint_content::CheckpointTransaction,
-};
+use sui_indexer_builder::indexer_builder::{DataMapper, IndexerProgressStore, Persistent};
+use sui_indexer_builder::sui_datasource::CheckpointTxnData;
+use sui_indexer_builder::{Task, Tasks, LIVE_TASK_TARGET_CHECKPOINT};
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::event::Event;
+use sui_types::execution_status::ExecutionStatus;
+use sui_types::full_checkpoint_content::CheckpointTransaction;
 
-use crate::{
-    events::{
-        MoveBalanceEvent,
-        MoveFlashLoanBorrowedEvent,
-        MoveOrderCanceledEvent,
-        MoveOrderExpiredEvent,
-        MoveOrderFilledEvent,
-        MoveOrderModifiedEvent,
-        MoveOrderPlacedEvent,
-        MovePriceAddedEvent,
-        MoveProposalEvent,
-        MoveRebateEvent,
-        MoveStakeEvent,
-        MoveTradeParamsUpdateEvent,
-        MoveVoteEvent,
-    },
-    metrics::DeepBookIndexerMetrics,
-    models,
-    postgres_manager::PgPool,
-    schema,
-    schema::{
-        balances,
-        flashloans,
-        order_fills,
-        order_updates,
-        pool_prices,
-        progress_store::{columns, dsl},
-        proposals,
-        rebates,
-        stakes,
-        sui_error_transactions,
-        trade_params_update,
-        votes,
-    },
-    types::{
-        Balances,
-        Flashloan,
-        OrderFill,
-        OrderUpdate,
-        OrderUpdateStatus,
-        PoolPrice,
-        ProcessedTxnData,
-        Proposals,
-        Rebates,
-        Stakes,
-        SuiTxnError,
-        TradeParamsUpdate,
-        Votes,
-    },
+use crate::events::{
+    MoveBalanceEvent, MoveFlashLoanBorrowedEvent, MoveOrderCanceledEvent, MoveOrderExpiredEvent,
+    MoveOrderFilledEvent, MoveOrderModifiedEvent, MoveOrderPlacedEvent, MovePriceAddedEvent,
+    MoveProposalEvent, MoveRebateEvent, MoveStakeEvent, MoveTradeParamsUpdateEvent, MoveVoteEvent,
 };
+use crate::metrics::DeepBookIndexerMetrics;
+use crate::postgres_manager::PgPool;
+use crate::schema::progress_store::{columns, dsl};
+use crate::schema::{
+    balances, flashloans, order_fills, order_updates, pool_prices, proposals, rebates, stakes,
+    sui_error_transactions, trade_params_update, votes,
+};
+use crate::types::{
+    Balances, Flashloan, OrderFill, OrderUpdate, OrderUpdateStatus, PoolPrice, ProcessedTxnData,
+    Proposals, Rebates, Stakes, SuiTxnError, TradeParamsUpdate, Votes,
+};
+use crate::{models, schema};
 
 /// Persistent layer impl
 #[derive(Clone)]
@@ -86,10 +49,16 @@ pub struct PgDeepbookPersistent {
 
 impl PgDeepbookPersistent {
     pub fn new(pool: PgPool, save_progress_policy: ProgressSavingPolicy) -> Self {
-        Self { pool, save_progress_policy }
+        Self {
+            pool,
+            save_progress_policy,
+        }
     }
 
-    async fn get_largest_backfill_task_target_checkpoint(&self, prefix: &str) -> Result<Option<u64>, Error> {
+    async fn get_largest_backfill_task_target_checkpoint(
+        &self,
+        prefix: &str,
+    ) -> Result<Option<u64>, Error> {
         let mut conn = self.pool.get().await?;
         let cp = dsl::progress_store
             .select(columns::target_checkpoint)
@@ -259,15 +228,24 @@ impl IndexerProgressStore for PgDeepbookPersistent {
             .first(&mut conn)
             .await
             .optional()?;
-        Ok(cp.ok_or(anyhow!("Cannot found progress for task {task_name}"))?.checkpoint as u64)
+        Ok(cp
+            .ok_or(anyhow!("Cannot found progress for task {task_name}"))?
+            .checkpoint as u64)
     }
 
-    async fn save_progress(&mut self, task: &Task, checkpoint_numbers: &[u64]) -> anyhow::Result<Option<u64>> {
+    async fn save_progress(
+        &mut self,
+        task: &Task,
+        checkpoint_numbers: &[u64],
+    ) -> anyhow::Result<Option<u64>> {
         if checkpoint_numbers.is_empty() {
             return Ok(None);
         }
         let task_name = task.task_name.clone();
-        if let Some(checkpoint_to_save) = self.save_progress_policy.cache_progress(task, checkpoint_numbers) {
+        if let Some(checkpoint_to_save) = self
+            .save_progress_policy
+            .cache_progress(task, checkpoint_numbers)
+        {
             let mut conn = self.pool.get().await?;
             diesel::insert_into(schema::progress_store::table)
                 .values(&models::ProgressStore {
@@ -280,7 +258,10 @@ impl IndexerProgressStore for PgDeepbookPersistent {
                 })
                 .on_conflict(dsl::task_name)
                 .do_update()
-                .set((columns::checkpoint.eq(checkpoint_to_save as i64), columns::timestamp.eq(now)))
+                .set((
+                    columns::checkpoint.eq(checkpoint_to_save as i64),
+                    columns::timestamp.eq(now),
+                ))
                 .execute(&mut conn)
                 .await?;
             // TODO: add metrics here
@@ -318,7 +299,8 @@ impl IndexerProgressStore for PgDeepbookPersistent {
             Ok(Some(cp as u64))
         } else {
             // Use the largest backfill target checkpoint as a fallback
-            self.get_largest_backfill_task_target_checkpoint(prefix).await
+            self.get_largest_backfill_task_target_checkpoint(prefix)
+                .await
         }
     }
 
@@ -343,7 +325,11 @@ impl IndexerProgressStore for PgDeepbookPersistent {
     }
 
     /// Register a live task to progress store with a start checkpoint.
-    async fn register_live_task(&mut self, task_name: String, start_checkpoint: u64) -> Result<(), anyhow::Error> {
+    async fn register_live_task(
+        &mut self,
+        task_name: String,
+        start_checkpoint: u64,
+    ) -> Result<(), anyhow::Error> {
         let mut conn = self.pool.get().await?;
         diesel::insert_into(schema::progress_store::table)
             .values(models::ProgressStore {
@@ -380,12 +366,16 @@ pub struct SuiDeepBookDataMapper {
 }
 
 impl DataMapper<CheckpointTxnData, ProcessedTxnData> for SuiDeepBookDataMapper {
-    fn map(&self, (data, checkpoint_num, timestamp_ms): CheckpointTxnData) -> Result<Vec<ProcessedTxnData>, Error> {
-        if !data
-            .input_objects
-            .iter()
-            .any(|obj| obj.data.type_().map(|t| t.address() == self.package_id.into()).unwrap_or_default())
-        {
+    fn map(
+        &self,
+        (data, checkpoint_num, timestamp_ms): CheckpointTxnData,
+    ) -> Result<Vec<ProcessedTxnData>, Error> {
+        if !data.input_objects.iter().any(|obj| {
+            obj.data
+                .type_()
+                .map(|t| t.address() == self.package_id.into())
+                .unwrap_or_default()
+        }) {
             return Ok(vec![]);
         }
 
@@ -393,12 +383,24 @@ impl DataMapper<CheckpointTxnData, ProcessedTxnData> for SuiDeepBookDataMapper {
 
         match &data.events {
             Some(events) => {
-                let processed_sui_events = events.data.iter().enumerate().try_fold(vec![], |mut result, (i, ev)| {
-                    if let Some(data) = process_sui_event(ev, i, &data, checkpoint_num, timestamp_ms, self.package_id)? {
-                        result.push(data);
-                    }
-                    Ok::<_, anyhow::Error>(result)
-                })?;
+                let processed_sui_events =
+                    events
+                        .data
+                        .iter()
+                        .enumerate()
+                        .try_fold(vec![], |mut result, (i, ev)| {
+                            if let Some(data) = process_sui_event(
+                                ev,
+                                i,
+                                &data,
+                                checkpoint_num,
+                                timestamp_ms,
+                                self.package_id,
+                            )? {
+                                result.push(data);
+                            }
+                            Ok::<_, anyhow::Error>(result)
+                        })?;
                 if !processed_sui_events.is_empty() {
                     info!(
                         "SUI: Extracted {} deepbook data entries for tx {}.",
@@ -540,7 +542,8 @@ fn process_sui_event(
                     onchain_timestamp: move_event.timestamp,
                     original_quantity: move_event.original_quantity,
                     quantity: move_event.base_asset_quantity_canceled,
-                    filled_quantity: move_event.original_quantity - move_event.base_asset_quantity_canceled,
+                    filled_quantity: move_event.original_quantity
+                        - move_event.base_asset_quantity_canceled,
                     trader: move_event.trader.to_string(),
                     balance_manager_id: move_event.balance_manager_id.to_string(),
                 }));
@@ -575,7 +578,8 @@ fn process_sui_event(
                     onchain_timestamp: move_event.timestamp,
                     original_quantity: move_event.original_quantity,
                     quantity: move_event.base_asset_quantity_canceled,
-                    filled_quantity: move_event.original_quantity - move_event.base_asset_quantity_canceled,
+                    filled_quantity: move_event.original_quantity
+                        - move_event.base_asset_quantity_canceled,
                     trader: move_event.trader.to_string(),
                     balance_manager_id: move_event.balance_manager_id.to_string(),
                 }));
@@ -801,7 +805,9 @@ fn process_sui_event(
                 let mut pool_id = "0x0".to_string();
                 for obj in shared_objects.iter() {
                     if let Some(obj_type) = obj.data.type_() {
-                        if obj_type.module().to_string().eq("pool") && obj_type.address() == *package_id {
+                        if obj_type.module().to_string().eq("pool")
+                            && obj_type.address() == *package_id
+                        {
                             pool_id = obj_type.address().to_string();
                             break;
                         }
@@ -853,7 +859,7 @@ fn process_sui_event(
                 txn_data
             }
             _ => {
-                // todo: metrics.total_sui_bridge_txn_other.inc();
+                // todo: metrics.total_oct_bridge_txn_other.inc();
                 None
             }
         }

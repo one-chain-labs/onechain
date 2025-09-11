@@ -1,16 +1,25 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::object_store::{ObjectStoreDeleteExt, ObjectStoreGetExt, ObjectStoreListExt, ObjectStorePutExt};
+use crate::object_store::{
+    ObjectStoreDeleteExt, ObjectStoreGetExt, ObjectStoreListExt, ObjectStorePutExt,
+};
 use anyhow::{anyhow, Context, Result};
 use backoff::future::retry;
 use bytes::Bytes;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
+use futures::TryStreamExt;
 use indicatif::ProgressBar;
 use itertools::Itertools;
-use object_store::{path::Path, DynObjectStore, Error, ObjectStore};
+use object_store::path::Path;
+use object_store::{DynObjectStore, Error, ObjectStore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, num::NonZeroUsize, ops::Range, path::PathBuf, sync::Arc, time::Duration};
+use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
+use std::ops::Range;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::time::Instant;
 use tracing::{error, warn};
 use url::Url;
@@ -48,14 +57,23 @@ impl PerEpochManifest {
     }
 
     pub fn deserialize_from_newline_delimited(s: &str) -> PerEpochManifest {
-        PerEpochManifest { lines: s.lines().map(String::from).collect() }
+        PerEpochManifest {
+            lines: s.lines().map(String::from).collect(),
+        }
     }
 
     // Method to filter lines by a given prefix
     pub fn filter_by_prefix(&self, prefix: &str) -> PerEpochManifest {
-        let filtered_lines = self.lines.iter().filter(|line| line.starts_with(prefix)).cloned().collect();
+        let filtered_lines = self
+            .lines
+            .iter()
+            .filter(|line| line.starts_with(prefix))
+            .cloned()
+            .collect();
 
-        PerEpochManifest { lines: filtered_lines }
+        PerEpochManifest {
+            lines: filtered_lines,
+        }
     }
 }
 
@@ -151,7 +169,15 @@ pub async fn copy_recursively<S: ObjectStoreGetExt + ObjectStoreListExt, D: Obje
             return Err(res.err().unwrap().into());
         }
     }
-    copy_files(&input_paths, &output_paths, src_store, dest_store, concurrency, None).await
+    copy_files(
+        &input_paths,
+        &output_paths,
+        src_store,
+        dest_store,
+        concurrency,
+        None,
+    )
+    .await
 }
 
 pub async fn delete_files<S: ObjectStoreDeleteExt>(
@@ -195,12 +221,15 @@ pub async fn delete_recursively<S: ObjectStoreDeleteExt + ObjectStoreListExt>(
 pub fn path_to_filesystem(local_dir_path: PathBuf, location: &Path) -> anyhow::Result<PathBuf> {
     // Convert an `object_store::path::Path` to `std::path::PathBuf`
     let path = std::fs::canonicalize(local_dir_path)?;
-    let mut url = Url::from_file_path(&path).map_err(|_| anyhow!("Failed to parse input path: {}", path.display()))?;
+    let mut url = Url::from_file_path(&path)
+        .map_err(|_| anyhow!("Failed to parse input path: {}", path.display()))?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("Failed to get path segments: {}", path.display()))?
         .pop_if_empty()
         .extend(location.parts());
-    let new_path = url.to_file_path().map_err(|_| anyhow!("Failed to convert url to path: {}", url.as_str()))?;
+    let new_path = url
+        .to_file_path()
+        .map_err(|_| anyhow!("Failed to convert url to path: {}", url.as_str()))?;
     Ok(new_path)
 }
 
@@ -288,7 +317,10 @@ pub async fn find_all_files_with_epoch_prefix(
             .0
             .split_once('_')
             .context("Failed to split dir name")
-            .map(|(start, end)| Range { start: start.parse::<u64>().unwrap(), end: end.parse::<u64>().unwrap() })?;
+            .map(|(start, end)| Range {
+                start: start.parse::<u64>().unwrap(),
+                end: end.parse::<u64>().unwrap(),
+            })?;
 
         ranges.push(checkpoint_seq_range);
     }
@@ -300,7 +332,10 @@ pub async fn find_all_files_with_epoch_prefix(
 /// store will have all epoch directories from `epoch_0` to `epoch_N`. Additionally, any epoch directory
 /// should have the passed in marker file present or else that epoch number is already considered as
 /// missing
-pub async fn find_missing_epochs_dirs(store: &Arc<DynObjectStore>, success_marker: &str) -> anyhow::Result<Vec<u64>> {
+pub async fn find_missing_epochs_dirs(
+    store: &Arc<DynObjectStore>,
+    success_marker: &str,
+) -> anyhow::Result<Vec<u64>> {
     let remote_checkpoints_by_epoch = find_all_dirs_with_epoch_prefix(store, None).await?;
     let mut dirs: Vec<_> = remote_checkpoints_by_epoch.iter().collect();
     dirs.sort_by_key(|(epoch_num, _path)| *epoch_num);
@@ -364,16 +399,24 @@ pub async fn write_snapshot_manifest<S: ObjectStoreListExt + ObjectStorePutExt>(
 
     let epoch_manifest = PerEpochManifest::new(file_names);
     let bytes = Bytes::from(epoch_manifest.serialize_as_newline_delimited());
-    put(store, &Path::from(format!("{}/{}", dir, MANIFEST_FILENAME)), bytes).await?;
+    put(
+        store,
+        &Path::from(format!("{}/{}", dir, MANIFEST_FILENAME)),
+        bytes,
+    )
+    .await?;
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::object_store::util::{copy_recursively, delete_recursively, write_snapshot_manifest, MANIFEST_FILENAME};
+    use crate::object_store::util::{
+        copy_recursively, delete_recursively, write_snapshot_manifest, MANIFEST_FILENAME,
+    };
     use object_store::path::Path;
-    use std::{fs, num::NonZeroUsize};
+    use std::fs;
+    use std::num::NonZeroUsize;
     use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
     use tempfile::TempDir;
 
@@ -407,15 +450,26 @@ mod tests {
         }
         .make()?;
 
-        copy_recursively(&Path::from("child"), &input_store, &output_store, NonZeroUsize::new(1).unwrap()).await?;
+        copy_recursively(
+            &Path::from("child"),
+            &input_store,
+            &output_store,
+            NonZeroUsize::new(1).unwrap(),
+        )
+        .await?;
 
         assert!(output_path.join("child").exists());
         assert!(output_path.join("child").join("file1").exists());
         assert!(output_path.join("child").join("grand_child").exists());
-        assert!(output_path.join("child").join("grand_child").join("file2").exists());
+        assert!(output_path
+            .join("child")
+            .join("grand_child")
+            .join("file2")
+            .exists());
         let content = fs::read_to_string(output_path.join("child").join("file1"))?;
         assert_eq!(content, "Lorem ipsum");
-        let content = fs::read_to_string(output_path.join("child").join("grand_child").join("file2"))?;
+        let content =
+            fs::read_to_string(output_path.join("child").join("grand_child").join("file2"))?;
         assert_eq!(content, "Lorem ipsum");
         Ok(())
     }
@@ -442,7 +496,12 @@ mod tests {
         }
         .make()?;
 
-        write_snapshot_manifest(&Path::from("epoch_0"), &input_store, String::from("epoch_0/")).await?;
+        write_snapshot_manifest(
+            &Path::from("epoch_0"),
+            &input_store,
+            String::from("epoch_0/"),
+        )
+        .await?;
 
         assert!(input_path.join("epoch_0").join(MANIFEST_FILENAME).exists());
         let content = fs::read_to_string(input_path.join("epoch_0").join(MANIFEST_FILENAME))?;
@@ -472,10 +531,19 @@ mod tests {
         }
         .make()?;
 
-        delete_recursively(&Path::from("child"), &input_store, NonZeroUsize::new(1).unwrap()).await?;
+        delete_recursively(
+            &Path::from("child"),
+            &input_store,
+            NonZeroUsize::new(1).unwrap(),
+        )
+        .await?;
 
         assert!(!input_path.join("child").join("file1").exists());
-        assert!(!input_path.join("child").join("grand_child").join("file2").exists());
+        assert!(!input_path
+            .join("child")
+            .join("grand_child")
+            .join("file2")
+            .exists());
         Ok(())
     }
 }

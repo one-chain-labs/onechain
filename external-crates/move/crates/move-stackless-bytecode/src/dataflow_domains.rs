@@ -4,7 +4,7 @@
 
 //! This module defines traits and representations of domains used in dataflow analysis.
 
-use im::{ordmap, ordset, OrdMap, OrdSet};
+use im::{OrdMap, OrdSet, ordmap, ordset};
 use itertools::Itertools;
 use std::{
     borrow::Borrow,
@@ -85,7 +85,6 @@ impl<E: Ord + Clone> Borrow<OrdSet<E>> for SetDomain<E> {
 
 impl<E: Ord + Clone> Deref for SetDomain<E> {
     type Target = OrdSet<E>;
-
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -114,8 +113,8 @@ impl<E: Ord + Clone> std::iter::FromIterator<E> for SetDomain<E> {
 }
 
 impl<E: Ord + Clone> std::iter::IntoIterator for SetDomain<E> {
-    type IntoIter = im::ordset::ConsumingIter<E>;
     type Item = E;
+    type IntoIter = im::ordset::ConsumingIter<E>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -188,7 +187,6 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone> Borrow<OrdMap<K, V>> for MapDoma
 
 impl<K: Ord + Clone, V: AbstractDomain + Clone> Deref for MapDomain<K, V> {
     type Target = OrdMap<K, V>;
-
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -206,7 +204,9 @@ impl<K: Ord + Clone + Debug, V: AbstractDomain + Clone + Debug> Debug for MapDom
     }
 }
 
-impl<K: Ord + Clone, V: AbstractDomain + Clone> std::iter::FromIterator<(K, V)> for MapDomain<K, V> {
+impl<K: Ord + Clone, V: AbstractDomain + Clone> std::iter::FromIterator<(K, V)>
+    for MapDomain<K, V>
+{
     fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
         let mut s = MapDomain::default();
         for (k, v) in iter {
@@ -217,9 +217,8 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone> std::iter::FromIterator<(K, V)> 
 }
 
 impl<K: Ord + Clone, V: AbstractDomain + Clone> std::iter::IntoIterator for MapDomain<K, V> {
-    type IntoIter = im::ordmap::ConsumingIter<(K, V)>;
     type Item = (K, V);
-
+    type IntoIter = im::ordmap::ConsumingIter<(K, V)>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }

@@ -219,7 +219,9 @@ async fn main() -> Result<()> {
 
 async fn run<C: ServerProviderClient>(settings: Settings, client: C, opts: Opts) -> Result<()> {
     // Create a new testbed.
-    let mut testbed = Testbed::new(settings.clone(), client).await.wrap_err("Failed to create testbed")?;
+    let mut testbed = Testbed::new(settings.clone(), client)
+        .await
+        .wrap_err("Failed to create testbed")?;
 
     match opts.operation {
         Operation::Testbed { action } => match action {
@@ -227,18 +229,25 @@ async fn run<C: ServerProviderClient>(settings: Settings, client: C, opts: Opts)
             TestbedAction::Status => testbed.status(),
 
             // Deploy the specified number of instances on the testbed.
-            TestbedAction::Deploy { instances, region } => {
-                testbed.deploy(instances, region).await.wrap_err("Failed to deploy testbed")?
-            }
+            TestbedAction::Deploy { instances, region } => testbed
+                .deploy(instances, region)
+                .await
+                .wrap_err("Failed to deploy testbed")?,
 
             // Start the specified number of instances on an existing testbed.
-            TestbedAction::Start { instances } => testbed.start(instances).await.wrap_err("Failed to start testbed")?,
+            TestbedAction::Start { instances } => testbed
+                .start(instances)
+                .await
+                .wrap_err("Failed to start testbed")?,
 
             // Stop an existing testbed.
             TestbedAction::Stop => testbed.stop().await.wrap_err("Failed to stop testbed")?,
 
             // Destroy the testbed and terminal all instances.
-            TestbedAction::Destroy => testbed.destroy().await.wrap_err("Failed to destroy testbed")?,
+            TestbedAction::Destroy => testbed
+                .destroy()
+                .await
+                .wrap_err("Failed to destroy testbed")?,
         },
 
         // Run benchmarks.
@@ -262,12 +271,16 @@ async fn run<C: ServerProviderClient>(settings: Settings, client: C, opts: Opts)
             // Create a new orchestrator to instruct the testbed.
             let username = testbed.username();
             let private_key_file = settings.ssh_private_key_file.clone();
-            let ssh_manager =
-                SshConnectionManager::new(username.into(), private_key_file).with_timeout(timeout).with_retries(retries);
+            let ssh_manager = SshConnectionManager::new(username.into(), private_key_file)
+                .with_timeout(timeout)
+                .with_retries(retries);
 
             let instances = testbed.instances();
 
-            let setup_commands = testbed.setup_commands().await.wrap_err("Failed to load testbed setup commands")?;
+            let setup_commands = testbed
+                .setup_commands()
+                .await
+                .wrap_err("Failed to load testbed setup commands")?;
 
             let protocol_commands = Protocol::new(&settings);
             let benchmark_type = BenchmarkType::from_str(&benchmark_type)?;
@@ -277,13 +290,22 @@ async fn run<C: ServerProviderClient>(settings: Settings, client: C, opts: Opts)
                     let loads = if loads.is_empty() { vec![200] } else { loads };
                     LoadType::Fixed(loads)
                 }
-                Load::Search { starting_load, max_iterations } => LoadType::Search { starting_load, max_iterations },
+                Load::Search {
+                    starting_load,
+                    max_iterations,
+                } => LoadType::Search {
+                    starting_load,
+                    max_iterations,
+                },
             };
 
             let fault_type = if !crash_recovery || faults == 0 {
                 FaultsType::Permanent { faults }
             } else {
-                FaultsType::CrashRecovery { max_faults: faults, interval: crash_interval }
+                FaultsType::CrashRecovery {
+                    max_faults: faults,
+                    interval: crash_interval,
+                }
             };
 
             let generator = BenchmarkParametersGenerator::new(committee, load)
@@ -291,21 +313,29 @@ async fn run<C: ServerProviderClient>(settings: Settings, client: C, opts: Opts)
                 .with_custom_duration(duration)
                 .with_faults(fault_type);
 
-            Orchestrator::new(settings, instances, setup_commands, protocol_commands, ssh_manager)
-                .with_scrape_interval(scrape_interval)
-                .with_crash_interval(crash_interval)
-                .skip_testbed_updates(skip_testbed_update)
-                .skip_testbed_configuration(skip_testbed_configuration)
-                .with_log_processing(log_processing)
-                .with_dedicated_clients(dedicated_clients)
-                .skip_monitoring(skip_monitoring)
-                .run_benchmarks(generator)
-                .await
-                .wrap_err("Failed to run benchmarks")?;
+            Orchestrator::new(
+                settings,
+                instances,
+                setup_commands,
+                protocol_commands,
+                ssh_manager,
+            )
+            .with_scrape_interval(scrape_interval)
+            .with_crash_interval(crash_interval)
+            .skip_testbed_updates(skip_testbed_update)
+            .skip_testbed_configuration(skip_testbed_configuration)
+            .with_log_processing(log_processing)
+            .with_dedicated_clients(dedicated_clients)
+            .skip_monitoring(skip_monitoring)
+            .run_benchmarks(generator)
+            .await
+            .wrap_err("Failed to run benchmarks")?;
         }
 
         // Print a summary of the specified measurements collection.
-        Operation::Summarize { path } => MeasurementsCollection::<BenchmarkType>::load(path)?.display_summary(),
+        Operation::Summarize { path } => {
+            MeasurementsCollection::<BenchmarkType>::load(path)?.display_summary()
+        }
     }
     Ok(())
 }

@@ -1,6 +1,6 @@
 {
     "release_binaries": [
-        "sui",
+        "oct",
         "sui-node",
         "sui-tool",
         "sui-faucet",
@@ -16,7 +16,6 @@
         "sui-proxy",
         "sui-metric-checker",
         "sui-analytics-indexer",
-        "sui-security-watchdog",
-		"suiop"
+        "sui-security-watchdog"
 	]
 }

@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use crate::metrics::{DefaultMetricsCallbackProvider, MetricsCallbackProvider};
 use crate::{
     client::{connect_lazy_with_config, connect_with_config},
-    metrics::{DefaultMetricsCallbackProvider, MetricsCallbackProvider},
     server::ServerBuilder,
     Multiaddr,
 };
@@ -12,9 +12,9 @@ use std::time::Duration;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::transport::Channel;
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Config {
-    /// Set the concurrency limit applied to on requests inbound per connection.
+    /// Set the concurrency limit applied to inbound requests per connection.
     pub concurrency_limit_per_connection: Option<usize>,
 
     /// Set a timeout for all request handlers.
@@ -91,11 +91,22 @@ impl Config {
         ServerBuilder::from_config(self, metrics_provider)
     }
 
-    pub async fn connect(&self, addr: &Multiaddr, tls_config: Option<ClientConfig>) -> Result<Channel> {
+    pub async fn connect(&self, addr: &Multiaddr, tls_config: ClientConfig) -> Result<Channel> {
         connect_with_config(addr, tls_config, self).await
     }
 
-    pub fn connect_lazy(&self, addr: &Multiaddr, tls_config: Option<ClientConfig>) -> Result<Channel> {
+    pub fn connect_lazy(&self, addr: &Multiaddr, tls_config: ClientConfig) -> Result<Channel> {
         connect_lazy_with_config(addr, tls_config, self)
+    }
+
+    pub(crate) fn http_config(&self) -> sui_http::Config {
+        sui_http::Config::default()
+            .initial_stream_window_size(self.http2_initial_stream_window_size)
+            .initial_connection_window_size(self.http2_initial_connection_window_size)
+            .max_concurrent_streams(self.http2_max_concurrent_streams)
+            .http2_keepalive_timeout(self.http2_keepalive_timeout)
+            .http2_keepalive_interval(self.http2_keepalive_interval)
+            .tcp_keepalive(self.tcp_keepalive)
+            .tcp_nodelay(self.tcp_nodelay.unwrap_or_default())
     }
 }

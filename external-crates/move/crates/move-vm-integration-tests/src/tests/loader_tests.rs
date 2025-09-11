@@ -7,8 +7,10 @@
 
 use crate::compiler::{compile_modules_in_file, expect_modules, serialize_module_at_max_version};
 use move_binary_format::{
-    file_format::{empty_module, AddressIdentifierIndex, IdentifierIndex, ModuleHandle, TableIndex},
     CompiledModule,
+    file_format::{
+        AddressIdentifierIndex, IdentifierIndex, ModuleHandle, TableIndex, empty_module,
+    },
 };
 use move_compiler::Compiler;
 use move_core_types::{
@@ -17,7 +19,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    resolver::{LinkageResolver, ModuleResolver, ResourceResolver},
+    resolver::{LinkageResolver, ModuleResolver},
     runtime_value::MoveValue,
 };
 use move_vm_config::{runtime::VMConfig, verifier::VerifierConfig};
@@ -63,14 +65,32 @@ struct RelinkingStore {
 impl Adapter {
     fn new(store: InMemoryStorage) -> Self {
         let functions = vec![
-            (ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("A").unwrap()), Identifier::new("entry_a").unwrap()),
-            (ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("D").unwrap()), Identifier::new("entry_d").unwrap()),
-            (ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("E").unwrap()), Identifier::new("entry_e").unwrap()),
-            (ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("F").unwrap()), Identifier::new("entry_f").unwrap()),
-            (ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("C").unwrap()), Identifier::new("just_c").unwrap()),
+            (
+                ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("A").unwrap()),
+                Identifier::new("entry_a").unwrap(),
+            ),
+            (
+                ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("D").unwrap()),
+                Identifier::new("entry_d").unwrap(),
+            ),
+            (
+                ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("E").unwrap()),
+                Identifier::new("entry_e").unwrap(),
+            ),
+            (
+                ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("F").unwrap()),
+                Identifier::new("entry_f").unwrap(),
+            ),
+            (
+                ModuleId::new(DEFAULT_ACCOUNT, Identifier::new("C").unwrap()),
+                Identifier::new("just_c").unwrap(),
+            ),
         ];
         let config = VMConfig {
-            verifier: VerifierConfig { max_dependency_depth: Some(100), ..Default::default() },
+            verifier: VerifierConfig {
+                max_dependency_depth: Some(100),
+                ..Default::default()
+            },
             ..Default::default()
         };
         Self {
@@ -82,7 +102,10 @@ impl Adapter {
 
     fn fresh(self) -> Self {
         let config = VMConfig {
-            verifier: VerifierConfig { max_dependency_depth: Some(100), ..Default::default() },
+            verifier: VerifierConfig {
+                max_dependency_depth: Some(100),
+                ..Default::default()
+            },
             ..Default::default()
         };
         Self {
@@ -98,7 +121,11 @@ impl Adapter {
         linkage: BTreeMap<ModuleId, ModuleId>,
         type_origin: BTreeMap<(ModuleId, Identifier), ModuleId>,
     ) -> Self {
-        Self { store: self.store.relink(context, linkage, type_origin), vm: self.vm, functions: self.functions }
+        Self {
+            store: self.store.relink(context, linkage, type_origin),
+            vm: self.vm,
+            functions: self.functions,
+        }
     }
 
     fn publish_modules(&mut self, modules: Vec<CompiledModule>) {
@@ -106,14 +133,17 @@ impl Adapter {
 
         for module in modules {
             let mut binary = vec![];
-            serialize_module_at_max_version(&module, &mut binary)
-                .unwrap_or_else(|e| panic!("failure in module serialization: {e:?}\n{:#?}", module));
+            serialize_module_at_max_version(&module, &mut binary).unwrap_or_else(|e| {
+                panic!("failure in module serialization: {e:?}\n{:#?}", module)
+            });
             session
                 .publish_module(binary, DEFAULT_ACCOUNT, &mut UnmeteredGasMeter)
                 .unwrap_or_else(|e| panic!("failure publishing module: {e:?}\n{:#?}", module));
         }
         let changeset = session.finish().0.expect("failure getting write set");
-        self.store.apply(changeset).expect("failure applying write set");
+        self.store
+            .apply(changeset)
+            .expect("failure applying write set");
     }
 
     fn publish_modules_with_error(&mut self, modules: Vec<CompiledModule>) {
@@ -121,9 +151,12 @@ impl Adapter {
 
         for module in modules {
             let mut binary = vec![];
-            serialize_module_at_max_version(&module, &mut binary)
-                .unwrap_or_else(|e| panic!("failure in module serialization: {e:?}\n{:#?}", module));
-            session.publish_module(binary, DEFAULT_ACCOUNT, &mut UnmeteredGasMeter).expect_err("publishing must fail");
+            serialize_module_at_max_version(&module, &mut binary).unwrap_or_else(|e| {
+                panic!("failure in module serialization: {e:?}\n{:#?}", module)
+            });
+            session
+                .publish_module(binary, DEFAULT_ACCOUNT, &mut UnmeteredGasMeter)
+                .expect_err("publishing must fail");
         }
     }
 
@@ -133,8 +166,9 @@ impl Adapter {
             .into_iter()
             .map(|module| {
                 let mut binary = vec![];
-                serialize_module_at_max_version(&module, &mut binary)
-                    .unwrap_or_else(|e| panic!("failure in module serialization: {e:?}\n{:#?}", module));
+                serialize_module_at_max_version(&module, &mut binary).unwrap_or_else(|e| {
+                    panic!("failure in module serialization: {e:?}\n{:#?}", module)
+                });
                 binary
             })
             .collect();
@@ -144,7 +178,9 @@ impl Adapter {
             .unwrap_or_else(|e| panic!("failure publishing module bundle: {e:?}"));
 
         let changeset = session.finish().0.expect("failure getting write set");
-        self.store.apply(changeset).expect("failure applying write set");
+        self.store
+            .apply(changeset)
+            .expect("failure applying write set");
     }
 
     fn publish_module_bundle_with_error(&mut self, modules: Vec<CompiledModule>) {
@@ -153,8 +189,9 @@ impl Adapter {
             .into_iter()
             .map(|module| {
                 let mut binary = vec![];
-                serialize_module_at_max_version(&module, &mut binary)
-                    .unwrap_or_else(|e| panic!("failure in module serialization: {e:?}\n{:#?}", module));
+                serialize_module_at_max_version(&module, &mut binary).unwrap_or_else(|e| {
+                    panic!("failure in module serialization: {e:?}\n{:#?}", module)
+                });
                 binary
             })
             .collect();
@@ -166,17 +203,24 @@ impl Adapter {
 
     fn load_type(&self, type_tag: &TypeTag) -> Type {
         let session = self.vm.new_session(&self.store);
-        session.load_type(type_tag).expect("Loading type should succeed")
+        session
+            .load_type(type_tag)
+            .expect("Loading type should succeed")
     }
 
     fn load_datatype(&self, module_id: &ModuleId, struct_name: &IdentStr) -> Arc<CachedDatatype> {
         let session = self.vm.new_session(&self.store);
-        session.load_datatype(module_id, struct_name).expect("Loading struct should succeed").1
+        session
+            .load_datatype(module_id, struct_name)
+            .expect("Loading struct should succeed")
+            .1
     }
 
     fn get_type_tag(&self, ty: &Type) -> TypeTag {
         let session = self.vm.new_session(&self.store);
-        session.get_type_tag(ty).expect("Converting to type tag should succeed")
+        session
+            .get_type_tag(ty)
+            .expect("Converting to type tag should succeed")
     }
 
     fn call_functions(&self) {
@@ -200,8 +244,11 @@ impl Adapter {
                             vec![],
                             Vec::<Vec<u8>>::new(),
                             &mut UnmeteredGasMeter,
+                            None,
                         )
-                        .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module_id, name));
+                        .unwrap_or_else(|_| {
+                            panic!("Failure executing {:?}::{:?}", module_id, name)
+                        });
                 }));
             }
         }
@@ -214,28 +261,50 @@ impl Adapter {
         self.call_function(module, name)
             .return_values
             .into_iter()
-            .map(|(bytes, ty)| MoveValue::simple_deserialize(&bytes[..], &ty).expect("Can't deserialize return value"))
+            .map(|(bytes, ty)| {
+                MoveValue::simple_deserialize(&bytes[..], &ty)
+                    .expect("Can't deserialize return value")
+            })
             .collect()
     }
 
     fn call_function_with_error(&self, module: &ModuleId, name: &IdentStr) {
         let mut session = self.vm.new_session(&self.store);
         session
-            .execute_function_bypass_visibility(module, name, vec![], Vec::<Vec<u8>>::new(), &mut UnmeteredGasMeter)
+            .execute_function_bypass_visibility(
+                module,
+                name,
+                vec![],
+                Vec::<Vec<u8>>::new(),
+                &mut UnmeteredGasMeter,
+                None,
+            )
             .expect_err("calling function must fail");
     }
 
     fn call_function(&self, module: &ModuleId, name: &IdentStr) -> SerializedReturnValues {
         let mut session = self.vm.new_session(&self.store);
         session
-            .execute_function_bypass_visibility(module, name, vec![], Vec::<Vec<u8>>::new(), &mut UnmeteredGasMeter)
+            .execute_function_bypass_visibility(
+                module,
+                name,
+                vec![],
+                Vec::<Vec<u8>>::new(),
+                &mut UnmeteredGasMeter,
+                None,
+            )
             .unwrap_or_else(|e| panic!("Failure executing {module:?}::{name:?}: {e:#?}"))
     }
 }
 
 impl RelinkingStore {
     fn new(store: InMemoryStorage) -> Self {
-        Self { store, context: AccountAddress::ZERO, linkage: BTreeMap::new(), type_origin: BTreeMap::new() }
+        Self {
+            store,
+            context: AccountAddress::ZERO,
+            linkage: BTreeMap::new(),
+            type_origin: BTreeMap::new(),
+        }
     }
 
     fn relink(
@@ -245,7 +314,12 @@ impl RelinkingStore {
         type_origin: BTreeMap<(ModuleId, Identifier), ModuleId>,
     ) -> Self {
         let Self { store, .. } = self;
-        Self { store, context, linkage, type_origin }
+        Self {
+            store,
+            context,
+            linkage,
+            type_origin,
+        }
     }
 
     fn apply(&mut self, changeset: ChangeSet) -> anyhow::Result<()> {
@@ -267,8 +341,16 @@ impl LinkageResolver for RelinkingStore {
         Ok(self.linkage.get(module_id).unwrap_or(module_id).clone())
     }
 
-    fn defining_module(&self, module_id: &ModuleId, struct_: &IdentStr) -> Result<ModuleId, Self::Error> {
-        Ok(self.type_origin.get(&(module_id.clone(), struct_.to_owned())).unwrap_or(module_id).clone())
+    fn defining_module(
+        &self,
+        module_id: &ModuleId,
+        struct_: &IdentStr,
+    ) -> Result<ModuleId, Self::Error> {
+        Ok(self
+            .type_origin
+            .get(&(module_id.clone(), struct_.to_owned()))
+            .unwrap_or(module_id)
+            .clone())
     }
 }
 
@@ -278,19 +360,6 @@ impl ModuleResolver for RelinkingStore {
 
     fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         self.store.get_module(id)
-    }
-}
-
-/// Implement by forwarding to the underlying in memory storage
-impl ResourceResolver for RelinkingStore {
-    type Error = ();
-
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        typ: &move_core_types::language_storage::StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.store.get_resource(address, typ)
     }
 }
 
@@ -313,7 +382,10 @@ fn get_relinker_tests_modules_with_deps<'s>(
     deps: impl IntoIterator<Item = &'s str>,
 ) -> anyhow::Result<Vec<CompiledModule>> {
     fn fixture_string_path(module: &str) -> String {
-        get_fixture(&format!("relinking_tests_{module}.move")).to_str().unwrap().to_string()
+        get_fixture(&format!("relinking_tests_{module}.move"))
+            .to_str()
+            .unwrap()
+            .to_string()
     }
 
     let (_, units) = Compiler::from_files(
@@ -343,36 +415,200 @@ fn test_depth() {
     let mut adapter = Adapter::new(data_store);
     let modules = get_depth_tests_modules();
     let structs = vec![
-        ("A", "Box", Some(DepthFormula { terms: vec![(0, 1)], constant: None })),
-        ("A", "Box3", Some(DepthFormula { terms: vec![(0, 3)], constant: None })),
-        ("A", "Box7", Some(DepthFormula { terms: vec![(0, 7)], constant: None })),
-        ("A", "Box15", Some(DepthFormula { terms: vec![(0, 15)], constant: None })),
-        ("A", "Box31", Some(DepthFormula { terms: vec![(0, 31)], constant: None })),
-        ("A", "Box63", Some(DepthFormula { terms: vec![(0, 63)], constant: None })),
-        ("A", "Box127", Some(DepthFormula { terms: vec![(0, 127)], constant: None })),
-        ("A", "S", Some(DepthFormula { terms: vec![], constant: Some(3) })),
-        ("B", "S", Some(DepthFormula { terms: vec![], constant: Some(2) })),
-        ("C", "S", Some(DepthFormula { terms: vec![], constant: Some(2) })),
-        ("D", "S", Some(DepthFormula { terms: vec![], constant: Some(3) })),
-        ("E", "S", Some(DepthFormula { terms: vec![(0, 2)], constant: Some(3) })),
-        ("F", "S", Some(DepthFormula { terms: vec![(0, 1)], constant: Some(2) })),
-        ("G", "S", Some(DepthFormula { terms: vec![(0, 5), (1, 3)], constant: Some(6) })),
-        ("H", "S", Some(DepthFormula { terms: vec![(0, 2), (1, 4)], constant: Some(5) })),
-        ("I", "L", Some(DepthFormula { terms: vec![(0, 2)], constant: Some(4) })),
-        ("I", "G", Some(DepthFormula { terms: vec![], constant: Some(3) })),
-        ("I", "H", Some(DepthFormula { terms: vec![(0, 1)], constant: Some(2) })),
-        ("I", "E", Some(DepthFormula { terms: vec![(0, 2)], constant: Some(3) })),
-        ("I", "F", Some(DepthFormula { terms: vec![(0, 1)], constant: Some(2) })),
-        ("I", "S", Some(DepthFormula { terms: vec![(0, 2), (1, 7)], constant: Some(9) })),
-        ("I", "LL", Some(DepthFormula { terms: vec![(1, 2)], constant: Some(4) })),
-        ("I", "N", Some(DepthFormula { terms: vec![], constant: Some(2) })),
+        (
+            "A",
+            "Box",
+            Some(DepthFormula {
+                terms: vec![(0, 1)],
+                constant: None,
+            }),
+        ),
+        (
+            "A",
+            "Box3",
+            Some(DepthFormula {
+                terms: vec![(0, 3)],
+                constant: None,
+            }),
+        ),
+        (
+            "A",
+            "Box7",
+            Some(DepthFormula {
+                terms: vec![(0, 7)],
+                constant: None,
+            }),
+        ),
+        (
+            "A",
+            "Box15",
+            Some(DepthFormula {
+                terms: vec![(0, 15)],
+                constant: None,
+            }),
+        ),
+        (
+            "A",
+            "Box31",
+            Some(DepthFormula {
+                terms: vec![(0, 31)],
+                constant: None,
+            }),
+        ),
+        (
+            "A",
+            "Box63",
+            Some(DepthFormula {
+                terms: vec![(0, 63)],
+                constant: None,
+            }),
+        ),
+        (
+            "A",
+            "Box127",
+            Some(DepthFormula {
+                terms: vec![(0, 127)],
+                constant: None,
+            }),
+        ),
+        (
+            "A",
+            "S",
+            Some(DepthFormula {
+                terms: vec![],
+                constant: Some(3),
+            }),
+        ),
+        (
+            "B",
+            "S",
+            Some(DepthFormula {
+                terms: vec![],
+                constant: Some(2),
+            }),
+        ),
+        (
+            "C",
+            "S",
+            Some(DepthFormula {
+                terms: vec![],
+                constant: Some(2),
+            }),
+        ),
+        (
+            "D",
+            "S",
+            Some(DepthFormula {
+                terms: vec![],
+                constant: Some(3),
+            }),
+        ),
+        (
+            "E",
+            "S",
+            Some(DepthFormula {
+                terms: vec![(0, 2)],
+                constant: Some(3),
+            }),
+        ),
+        (
+            "F",
+            "S",
+            Some(DepthFormula {
+                terms: vec![(0, 1)],
+                constant: Some(2),
+            }),
+        ),
+        (
+            "G",
+            "S",
+            Some(DepthFormula {
+                terms: vec![(0, 5), (1, 3)],
+                constant: Some(6),
+            }),
+        ),
+        (
+            "H",
+            "S",
+            Some(DepthFormula {
+                terms: vec![(0, 2), (1, 4)],
+                constant: Some(5),
+            }),
+        ),
+        (
+            "I",
+            "L",
+            Some(DepthFormula {
+                terms: vec![(0, 2)],
+                constant: Some(4),
+            }),
+        ),
+        (
+            "I",
+            "G",
+            Some(DepthFormula {
+                terms: vec![],
+                constant: Some(3),
+            }),
+        ),
+        (
+            "I",
+            "H",
+            Some(DepthFormula {
+                terms: vec![(0, 1)],
+                constant: Some(2),
+            }),
+        ),
+        (
+            "I",
+            "E",
+            Some(DepthFormula {
+                terms: vec![(0, 2)],
+                constant: Some(3),
+            }),
+        ),
+        (
+            "I",
+            "F",
+            Some(DepthFormula {
+                terms: vec![(0, 1)],
+                constant: Some(2),
+            }),
+        ),
+        (
+            "I",
+            "S",
+            Some(DepthFormula {
+                terms: vec![(0, 2), (1, 7)],
+                constant: Some(9),
+            }),
+        ),
+        (
+            "I",
+            "LL",
+            Some(DepthFormula {
+                terms: vec![(1, 2)],
+                constant: Some(4),
+            }),
+        ),
+        (
+            "I",
+            "N",
+            Some(DepthFormula {
+                terms: vec![],
+                constant: Some(2),
+            }),
+        ),
     ];
     adapter.publish_modules(modules);
     // loads all structs sequentially
     for (module_name, type_name, expected_depth) in structs.iter() {
         let computed_depth = &adapter
             .load_datatype(
-                &ModuleId::new(DEFAULT_ACCOUNT, Identifier::new(module_name.to_string()).unwrap()),
+                &ModuleId::new(
+                    DEFAULT_ACCOUNT,
+                    Identifier::new(module_name.to_string()).unwrap(),
+                ),
                 ident_str!(type_name),
             )
             .depth;
@@ -419,7 +655,10 @@ fn relink() {
     adapter.publish_modules(c0_modules);
     adapter.publish_modules(b0_modules);
 
-    assert_eq!(vec![MoveValue::U64(42 + 1)], adapter.call_function_with_return(&b0, ident_str!("b")),);
+    assert_eq!(
+        vec![MoveValue::U64(42 + 1)],
+        adapter.call_function_with_return(&b0, ident_str!("b")),
+    );
 
     let mut adapter = adapter.relink(
         UPGRADE_ACCOUNT,
@@ -436,7 +675,10 @@ fn relink() {
     adapter.publish_modules(c1_modules);
     adapter.publish_modules(a0_modules);
 
-    assert_eq!(vec![MoveValue::U64(44 + 43 + 1)], adapter.call_function_with_return(&a0, ident_str!("a")),);
+    assert_eq!(
+        vec![MoveValue::U64(44 + 43 + 1)],
+        adapter.call_function_with_return(&a0, ident_str!("a")),
+    );
 }
 
 #[test]
@@ -472,7 +714,10 @@ fn relink_load_err() {
     adapter.publish_modules(c0_modules);
     adapter.publish_modules(b0_modules);
 
-    assert_eq!(vec![MoveValue::U64(42 + 1)], adapter.call_function_with_return(&b0, ident_str!("b")),);
+    assert_eq!(
+        vec![MoveValue::U64(42 + 1)],
+        adapter.call_function_with_return(&b0, ident_str!("b")),
+    );
 
     let mut adapter = adapter.relink(
         UPGRADE_ACCOUNT,
@@ -489,7 +734,10 @@ fn relink_load_err() {
     adapter.publish_modules(c1_modules);
     adapter.publish_modules(b1_modules);
 
-    assert_eq!(vec![MoveValue::U64(44 * 43)], adapter.call_function_with_return(&b0, ident_str!("b")),);
+    assert_eq!(
+        vec![MoveValue::U64(44 * 43)],
+        adapter.call_function_with_return(&b0, ident_str!("b")),
+    );
 
     let adapter = adapter.relink(
         UPGRADE_ACCOUNT,
@@ -592,18 +840,24 @@ fn relink_defining_module_successive() {
     let c2_q = adapter.load_type(&TypeTag::from_str("0x7::c::Q").unwrap());
 
     for s in &[c0_s, c1_s, c2_s] {
-        let TypeTag::Struct(st) = adapter.get_type_tag(s) else { panic!("Not a struct: {s:?}") };
+        let TypeTag::Struct(st) = adapter.get_type_tag(s) else {
+            panic!("Not a struct: {s:?}")
+        };
 
         assert_eq!(st.module_id(), c0);
     }
 
     for r in &[c1_r, c2_r] {
-        let TypeTag::Struct(st) = adapter.get_type_tag(r) else { panic!("Not a struct: {r:?}") };
+        let TypeTag::Struct(st) = adapter.get_type_tag(r) else {
+            panic!("Not a struct: {r:?}")
+        };
 
         assert_eq!(st.module_id(), c1);
     }
 
-    let TypeTag::Struct(st) = adapter.get_type_tag(&c2_q) else { panic!("Not a struct: {c2_q:?}") };
+    let TypeTag::Struct(st) = adapter.get_type_tag(&c2_q) else {
+        panic!("Not a struct: {c2_q:?}")
+    };
 
     assert_eq!(st.module_id(), c2);
 }
@@ -639,11 +893,17 @@ fn relink_defining_module_oneshot() {
     let r = adapter.load_type(&TypeTag::from_str("0x7::c::R").unwrap());
     let q = adapter.load_type(&TypeTag::from_str("0x7::c::Q").unwrap());
 
-    let TypeTag::Struct(s) = adapter.get_type_tag(&s) else { panic!("Not a struct: {s:?}") };
+    let TypeTag::Struct(s) = adapter.get_type_tag(&s) else {
+        panic!("Not a struct: {s:?}")
+    };
 
-    let TypeTag::Struct(r) = adapter.get_type_tag(&r) else { panic!("Not a struct: {r:?}") };
+    let TypeTag::Struct(r) = adapter.get_type_tag(&r) else {
+        panic!("Not a struct: {r:?}")
+    };
 
-    let TypeTag::Struct(q) = adapter.get_type_tag(&q) else { panic!("Not a struct: {q:?}") };
+    let TypeTag::Struct(q) = adapter.get_type_tag(&q) else {
+        panic!("Not a struct: {q:?}")
+    };
 
     assert_eq!(s.module_id(), c0);
     assert_eq!(r.module_id(), c1);
@@ -707,7 +967,10 @@ fn publish_bundle_and_load() {
     // Publish all the modules together
     adapter.publish_module_bundle(modules);
 
-    assert_eq!(vec![MoveValue::U64(44 + 43 + 1)], adapter.call_function_with_return(&a0, ident_str!("a")),);
+    assert_eq!(
+        vec![MoveValue::U64(44 + 43 + 1)],
+        adapter.call_function_with_return(&a0, ident_str!("a")),
+    );
 }
 
 #[test]
@@ -738,7 +1001,10 @@ fn publish_bundle_with_err_retry() {
     // will not leave behind modules in the loader).
     adapter.publish_module_bundle(modules);
 
-    assert_eq!(vec![MoveValue::U64(44 + 43 + 1)], adapter.call_function_with_return(&a0, ident_str!("a")),);
+    assert_eq!(
+        vec![MoveValue::U64(44 + 43 + 1)],
+        adapter.call_function_with_return(&a0, ident_str!("a")),
+    );
 }
 
 #[test]

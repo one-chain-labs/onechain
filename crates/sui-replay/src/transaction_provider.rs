@@ -5,11 +5,8 @@ use crate::{
     data_fetcher::{DataFetcher, RemoteFetcher},
     types::{ReplayEngineError, MAX_CONCURRENT_REQUESTS, RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD},
 };
-use std::{
-    collections::VecDeque,
-    fmt::{Debug, Formatter},
-    str::FromStr,
-};
+use std::{collections::VecDeque, fmt::Formatter};
+use std::{fmt::Debug, str::FromStr};
 use sui_sdk::SuiClientBuilder;
 use sui_types::digests::TransactionDigest;
 use tracing::info;
@@ -25,7 +22,10 @@ pub enum TransactionSource {
     /// Use the latest transaction from the network
     TailLatest { start: Option<FuzzStartPoint> },
     /// Use a random transaction from an inclusive range of checkpoint IDs
-    FromInclusiveCheckpointRange { checkpoint_start: u64, checkpoint_end: u64 },
+    FromInclusiveCheckpointRange {
+        checkpoint_start: u64,
+        checkpoint_end: u64,
+    },
 }
 
 #[derive(Clone)]
@@ -51,10 +51,7 @@ impl FromStr for FuzzStartPoint {
             Err(u64_err) => match TransactionDigest::from_str(s) {
                 Ok(d) => Ok(FuzzStartPoint::TxDigest(d)),
                 Err(tx_err) => {
-                    info!(
-                        "{} is not a valid checkpoint (err: {:?}) or transaction digest (err: {:?})",
-                        s, u64_err, tx_err
-                    );
+                    info!("{} is not a valid checkpoint (err: {:?}) or transaction digest (err: {:?})", s, u64_err, tx_err);
                     Err(tx_err)
                 }
             },
@@ -97,7 +94,10 @@ impl TransactionProvider {
                 Some(tx)
             }
             TransactionSource::FromCheckpoint(checkpoint_id) => {
-                let tx = self.fetcher.fetch_random_transaction(Some(checkpoint_id), Some(checkpoint_id)).await?;
+                let tx = self
+                    .fetcher
+                    .fetch_random_transaction(Some(checkpoint_id), Some(checkpoint_id))
+                    .await?;
                 Some(tx)
             }
             TransactionSource::TailLatest { start } => {
@@ -122,8 +122,9 @@ impl TransactionProvider {
                                     .checkpoint
                                     .expect("Transaction must have a checkpoint");
                                 // For the next round
-                                self.source =
-                                    TransactionSource::TailLatest { start: Some(FuzzStartPoint::Checkpoint(ch + 1)) };
+                                self.source = TransactionSource::TailLatest {
+                                    start: Some(FuzzStartPoint::Checkpoint(ch + 1)),
+                                };
                                 Some(ch)
                             }
                         },
@@ -132,13 +133,23 @@ impl TransactionProvider {
                     }
                     .unwrap_or(VALID_CHECKPOINT_START);
 
-                    self.transactions_left = self.fetcher.get_checkpoint_txs(next_checkpoint).await?.into();
+                    self.transactions_left = self
+                        .fetcher
+                        .get_checkpoint_txs(next_checkpoint)
+                        .await?
+                        .into();
                     self.last_checkpoint = Some(next_checkpoint);
                     self.transactions_left.pop_front()
                 }
             }
-            TransactionSource::FromInclusiveCheckpointRange { checkpoint_start, checkpoint_end } => {
-                let tx = self.fetcher.fetch_random_transaction(Some(checkpoint_start), Some(checkpoint_end)).await?;
+            TransactionSource::FromInclusiveCheckpointRange {
+                checkpoint_start,
+                checkpoint_end,
+            } => {
+                let tx = self
+                    .fetcher
+                    .fetch_random_transaction(Some(checkpoint_start), Some(checkpoint_end))
+                    .await?;
                 Some(tx)
             }
         };

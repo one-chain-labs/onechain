@@ -5,29 +5,19 @@ use async_trait::async_trait;
 use rand::seq::IteratorRandom;
 use tracing::error;
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
-use crate::{
-    drivers::Interval,
-    system_state_observer::SystemStateObserver,
-    workloads::{
-        payload::Payload,
-        workload::{
-            ExpectedFailureType,
-            Workload,
-            WorkloadBuilder,
-            ESTIMATED_COMPUTATION_COST,
-            MAX_GAS_FOR_TESTING,
-            STORAGE_COST_PER_COIN,
-        },
-        Gas,
-        GasCoinConfig,
-        WorkloadBuilderInfo,
-        WorkloadParams,
-    },
-    ExecutionEffects,
-    ValidatorProxy,
+use crate::drivers::Interval;
+use crate::system_state_observer::SystemStateObserver;
+use crate::workloads::payload::Payload;
+use crate::workloads::workload::WorkloadBuilder;
+use crate::workloads::workload::{
+    ExpectedFailureType, Workload, ESTIMATED_COMPUTATION_COST, MAX_GAS_FOR_TESTING,
+    STORAGE_COST_PER_COIN,
 };
+use crate::workloads::{Gas, GasCoinConfig, WorkloadBuilderInfo, WorkloadParams};
+use crate::{ExecutionEffects, ValidatorProxy};
 use sui_core::test_utils::make_transfer_object_transaction;
 use sui_types::{
     base_types::{ObjectRef, SuiAddress},
@@ -77,7 +67,6 @@ impl Payload for TransferObjectTestPayload {
         self.transfer_to = recipient;
         self.gas = updated_gas;
     }
-
     fn make_transaction(&mut self) -> Transaction {
         let (gas_obj, _, keypair) = self.gas.iter().find(|x| x.1 == self.transfer_from).unwrap();
         make_transfer_object_transaction(
@@ -86,10 +75,12 @@ impl Payload for TransferObjectTestPayload {
             self.transfer_from,
             keypair,
             self.transfer_to,
-            self.system_state_observer.state.borrow().reference_gas_price,
+            self.system_state_observer
+                .state
+                .borrow()
+                .reference_gas_price,
         )
     }
-
     fn get_failure_type(&self) -> Option<ExpectedFailureType> {
         None
     }
@@ -117,19 +108,29 @@ impl TransferObjectWorkloadBuilder {
         duration: Interval,
         group: u32,
     ) -> Option<WorkloadBuilderInfo> {
-        let target_qps = (workload_weight * target_qps as f32) as u64;
+        let target_qps = (workload_weight * target_qps as f32).ceil() as u64;
         let num_workers = (workload_weight * num_workers as f32).ceil() as u64;
         let max_ops = target_qps * in_flight_ratio;
         if max_ops == 0 || num_workers == 0 {
             None
         } else {
-            let workload_params = WorkloadParams { target_qps, num_workers, max_ops, duration, group };
-            let workload_builder =
-                Box::<dyn WorkloadBuilder<dyn Payload>>::from(Box::new(TransferObjectWorkloadBuilder {
+            let workload_params = WorkloadParams {
+                target_qps,
+                num_workers,
+                max_ops,
+                duration,
+                group,
+            };
+            let workload_builder = Box::<dyn WorkloadBuilder<dyn Payload>>::from(Box::new(
+                TransferObjectWorkloadBuilder {
                     num_transfer_accounts,
                     num_payloads: max_ops,
-                }));
-            let builder_info = WorkloadBuilderInfo { workload_params, workload_builder };
+                },
+            ));
+            let builder_info = WorkloadBuilderInfo {
+                workload_params,
+                workload_builder,
+            };
             Some(builder_info)
         }
     }
@@ -140,13 +141,13 @@ impl WorkloadBuilder<dyn Payload> for TransferObjectWorkloadBuilder {
     async fn generate_coin_config_for_init(&self) -> Vec<GasCoinConfig> {
         vec![]
     }
-
     async fn generate_coin_config_for_payloads(&self) -> Vec<GasCoinConfig> {
         let mut address_map = HashMap::new();
         // Have to include not just the coins that are going to be created and sent
         // but the coin being used as gas as well.
-        let amount =
-            MAX_GAS_FOR_TESTING + ESTIMATED_COMPUTATION_COST + STORAGE_COST_PER_COIN * (self.num_transfer_accounts + 1);
+        let amount = MAX_GAS_FOR_TESTING
+            + ESTIMATED_COMPUTATION_COST
+            + STORAGE_COST_PER_COIN * (self.num_transfer_accounts + 1);
         // gas for payloads
         let mut payload_configs = vec![];
         for _i in 0..self.num_transfer_accounts {
@@ -154,7 +155,11 @@ impl WorkloadBuilder<dyn Payload> for TransferObjectWorkloadBuilder {
             let cloned_keypair: Arc<AccountKeyPair> = Arc::new(keypair);
             address_map.insert(address, cloned_keypair.clone());
             for _j in 0..self.num_payloads {
-                payload_configs.push(GasCoinConfig { amount, address, keypair: cloned_keypair.clone() });
+                payload_configs.push(GasCoinConfig {
+                    amount,
+                    address,
+                    keypair: cloned_keypair.clone(),
+                });
             }
         }
 
@@ -164,14 +169,21 @@ impl WorkloadBuilder<dyn Payload> for TransferObjectWorkloadBuilder {
         let mut gas_configs = vec![];
         for _i in 0..self.num_payloads {
             let (address, keypair) = (owner, address_map.get(&owner).unwrap().clone());
-            gas_configs.push(GasCoinConfig { amount, address, keypair: keypair.clone() });
+            gas_configs.push(GasCoinConfig {
+                amount,
+                address,
+                keypair: keypair.clone(),
+            });
         }
 
         gas_configs.extend(payload_configs);
         gas_configs
     }
-
-    async fn build(&self, _init_gas: Vec<Gas>, payload_gas: Vec<Gas>) -> Box<dyn Workload<dyn Payload>> {
+    async fn build(
+        &self,
+        _init_gas: Vec<Gas>,
+        payload_gas: Vec<Gas>,
+    ) -> Box<dyn Workload<dyn Payload>> {
         Box::<dyn Workload<dyn Payload>>::from(Box::new(TransferObjectWorkload {
             num_tokens: self.num_payloads,
             payload_gas,
@@ -194,7 +206,6 @@ impl Workload<dyn Payload> for TransferObjectWorkload {
     ) {
         return;
     }
-
     async fn make_test_payloads(
         &self,
         _proxy: Arc<dyn ValidatorProxy + Sync + Send>,
@@ -203,7 +214,10 @@ impl Workload<dyn Payload> for TransferObjectWorkload {
         let (transfer_tokens, payload_gas) = self.payload_gas.split_at(self.num_tokens as usize);
         let mut gas_by_address: HashMap<SuiAddress, Vec<Gas>> = HashMap::new();
         for gas in payload_gas.iter() {
-            gas_by_address.entry(gas.1).or_insert_with(|| Vec::with_capacity(1)).push(gas.clone());
+            gas_by_address
+                .entry(gas.1)
+                .or_insert_with(|| Vec::with_capacity(1))
+                .push(gas.clone());
         }
 
         let addresses: Vec<SuiAddress> = gas_by_address.keys().cloned().collect();
@@ -215,8 +229,11 @@ impl Workload<dyn Payload> for TransferObjectWorkload {
             }
             transfer_gas.push(account_transfer_gas);
         }
-        let refs: Vec<(Vec<Gas>, Gas)> =
-            transfer_gas.into_iter().zip(transfer_tokens.iter()).map(|(g, t)| (g, t.clone())).collect();
+        let refs: Vec<(Vec<Gas>, Gas)> = transfer_gas
+            .into_iter()
+            .zip(transfer_tokens.iter())
+            .map(|(g, t)| (g, t.clone()))
+            .collect();
         refs.iter()
             .map(|(g, t)| {
                 let from = t.1;
@@ -231,5 +248,9 @@ impl Workload<dyn Payload> for TransferObjectWorkload {
             })
             .map(|b| Box::<dyn Payload>::from(b))
             .collect()
+    }
+
+    fn name(&self) -> &str {
+        "TransferObject"
     }
 }

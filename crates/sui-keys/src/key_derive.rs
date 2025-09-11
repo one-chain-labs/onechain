@@ -5,10 +5,11 @@ use anyhow::anyhow;
 use bip32::{ChildNumber, DerivationPath, XPrv};
 
 use bip39::{Language, Mnemonic, MnemonicType, Seed};
+use fastcrypto::ed25519::Ed25519KeyPair;
+use fastcrypto::secp256r1::{Secp256r1KeyPair, Secp256r1PrivateKey};
 use fastcrypto::{
-    ed25519::{Ed25519KeyPair, Ed25519PrivateKey},
+    ed25519::Ed25519PrivateKey,
     secp256k1::{Secp256k1KeyPair, Secp256k1PrivateKey},
-    secp256r1::{Secp256r1KeyPair, Secp256r1PrivateKey},
     traits::{KeyPair, ToFromBytes},
 };
 use slip10_ed25519::derive_ed25519_private_key;
@@ -37,14 +38,14 @@ pub fn derive_key_pair_from_path(
         SignatureScheme::ED25519 => {
             let indexes = path.into_iter().map(|i| i.into()).collect::<Vec<_>>();
             let derived = derive_ed25519_private_key(seed, &indexes);
-            let sk =
-                Ed25519PrivateKey::from_bytes(&derived).map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?;
+            let sk = Ed25519PrivateKey::from_bytes(&derived)
+                .map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?;
             let kp: Ed25519KeyPair = sk.into();
             Ok((kp.public().into(), SuiKeyPair::Ed25519(kp)))
         }
         SignatureScheme::Secp256k1 => {
-            let child_xprv =
-                XPrv::derive_from_path(seed, &path).map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?;
+            let child_xprv = XPrv::derive_from_path(seed, &path)
+                .map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?;
             let kp = Secp256k1KeyPair::from(
                 Secp256k1PrivateKey::from_bytes(child_xprv.private_key().to_bytes().as_slice())
                     .map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?,
@@ -52,8 +53,8 @@ pub fn derive_key_pair_from_path(
             Ok((kp.public().into(), SuiKeyPair::Secp256k1(kp)))
         }
         SignatureScheme::Secp256r1 => {
-            let child_xprv =
-                XPrv::derive_from_path(seed, &path).map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?;
+            let child_xprv = XPrv::derive_from_path(seed, &path)
+                .map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?;
             let kp = Secp256r1KeyPair::from(
                 Secp256r1PrivateKey::from_bytes(child_xprv.private_key().to_bytes().as_slice())
                     .map_err(|e| SuiError::SignatureKeyGenError(e.to_string()))?,
@@ -63,21 +64,26 @@ pub fn derive_key_pair_from_path(
         SignatureScheme::BLS12381
         | SignatureScheme::MultiSig
         | SignatureScheme::ZkLoginAuthenticator
-        | SignatureScheme::PasskeyAuthenticator => {
-            Err(SuiError::UnsupportedFeatureError { error: format!("key derivation not supported {:?}", key_scheme) })
-        }
+        | SignatureScheme::PasskeyAuthenticator => Err(SuiError::UnsupportedFeatureError {
+            error: format!("key derivation not supported {:?}", key_scheme),
+        }),
     }
 }
 
-pub fn validate_path(key_scheme: &SignatureScheme, path: Option<DerivationPath>) -> Result<DerivationPath, SuiError> {
+pub fn validate_path(
+    key_scheme: &SignatureScheme,
+    path: Option<DerivationPath>,
+) -> Result<DerivationPath, SuiError> {
     match key_scheme {
         SignatureScheme::ED25519 => {
             match path {
                 Some(p) => {
                     // The derivation path must be hardened at all levels with purpose = 44, coin_type = 784
                     if let &[purpose, coin_type, account, change, address] = p.as_ref() {
-                        if Some(purpose) == ChildNumber::new(DERVIATION_PATH_PURPOSE_ED25519, true).ok()
-                            && Some(coin_type) == ChildNumber::new(DERIVATION_PATH_COIN_TYPE, true).ok()
+                        if Some(purpose)
+                            == ChildNumber::new(DERVIATION_PATH_PURPOSE_ED25519, true).ok()
+                            && Some(coin_type)
+                                == ChildNumber::new(DERIVATION_PATH_COIN_TYPE, true).ok()
                             && account.is_hardened()
                             && change.is_hardened()
                             && address.is_hardened()
@@ -90,9 +96,11 @@ pub fn validate_path(key_scheme: &SignatureScheme, path: Option<DerivationPath>)
                         Err(SuiError::SignatureKeyGenError("Invalid path".to_string()))
                     }
                 }
-                None => Ok(format!("m/{DERVIATION_PATH_PURPOSE_ED25519}'/{DERIVATION_PATH_COIN_TYPE}'/0'/0'/0'")
-                    .parse()
-                    .map_err(|_| SuiError::SignatureKeyGenError("Cannot parse path".to_string()))?),
+                None => Ok(format!(
+                    "m/{DERVIATION_PATH_PURPOSE_ED25519}'/{DERIVATION_PATH_COIN_TYPE}'/0'/0'/0'"
+                )
+                .parse()
+                .map_err(|_| SuiError::SignatureKeyGenError("Cannot parse path".to_string()))?),
             }
         }
         SignatureScheme::Secp256k1 => {
@@ -100,8 +108,10 @@ pub fn validate_path(key_scheme: &SignatureScheme, path: Option<DerivationPath>)
                 Some(p) => {
                     // The derivation path must be hardened at first 3 levels with purpose = 54, coin_type = 784
                     if let &[purpose, coin_type, account, change, address] = p.as_ref() {
-                        if Some(purpose) == ChildNumber::new(DERVIATION_PATH_PURPOSE_SECP256K1, true).ok()
-                            && Some(coin_type) == ChildNumber::new(DERIVATION_PATH_COIN_TYPE, true).ok()
+                        if Some(purpose)
+                            == ChildNumber::new(DERVIATION_PATH_PURPOSE_SECP256K1, true).ok()
+                            && Some(coin_type)
+                                == ChildNumber::new(DERIVATION_PATH_COIN_TYPE, true).ok()
                             && account.is_hardened()
                             && !change.is_hardened()
                             && !address.is_hardened()
@@ -114,9 +124,11 @@ pub fn validate_path(key_scheme: &SignatureScheme, path: Option<DerivationPath>)
                         Err(SuiError::SignatureKeyGenError("Invalid path".to_string()))
                     }
                 }
-                None => Ok(format!("m/{DERVIATION_PATH_PURPOSE_SECP256K1}'/{DERIVATION_PATH_COIN_TYPE}'/0'/0/0")
-                    .parse()
-                    .map_err(|_| SuiError::SignatureKeyGenError("Cannot parse path".to_string()))?),
+                None => Ok(format!(
+                    "m/{DERVIATION_PATH_PURPOSE_SECP256K1}'/{DERIVATION_PATH_COIN_TYPE}'/0'/0/0"
+                )
+                .parse()
+                .map_err(|_| SuiError::SignatureKeyGenError("Cannot parse path".to_string()))?),
             }
         }
         SignatureScheme::Secp256r1 => {
@@ -124,8 +136,10 @@ pub fn validate_path(key_scheme: &SignatureScheme, path: Option<DerivationPath>)
                 Some(p) => {
                     // The derivation path must be hardened at first 3 levels with purpose = 74, coin_type = 784
                     if let &[purpose, coin_type, account, change, address] = p.as_ref() {
-                        if Some(purpose) == ChildNumber::new(DERVIATION_PATH_PURPOSE_SECP256R1, true).ok()
-                            && Some(coin_type) == ChildNumber::new(DERIVATION_PATH_COIN_TYPE, true).ok()
+                        if Some(purpose)
+                            == ChildNumber::new(DERVIATION_PATH_PURPOSE_SECP256R1, true).ok()
+                            && Some(coin_type)
+                                == ChildNumber::new(DERIVATION_PATH_COIN_TYPE, true).ok()
                             && account.is_hardened()
                             && !change.is_hardened()
                             && !address.is_hardened()
@@ -138,17 +152,19 @@ pub fn validate_path(key_scheme: &SignatureScheme, path: Option<DerivationPath>)
                         Err(SuiError::SignatureKeyGenError("Invalid path".to_string()))
                     }
                 }
-                None => Ok(format!("m/{DERVIATION_PATH_PURPOSE_SECP256R1}'/{DERIVATION_PATH_COIN_TYPE}'/0'/0/0")
-                    .parse()
-                    .map_err(|_| SuiError::SignatureKeyGenError("Cannot parse path".to_string()))?),
+                None => Ok(format!(
+                    "m/{DERVIATION_PATH_PURPOSE_SECP256R1}'/{DERIVATION_PATH_COIN_TYPE}'/0'/0/0"
+                )
+                .parse()
+                .map_err(|_| SuiError::SignatureKeyGenError("Cannot parse path".to_string()))?),
             }
         }
         SignatureScheme::BLS12381
         | SignatureScheme::MultiSig
         | SignatureScheme::ZkLoginAuthenticator
-        | SignatureScheme::PasskeyAuthenticator => {
-            Err(SuiError::UnsupportedFeatureError { error: format!("key derivation not supported {:?}", key_scheme) })
-        }
+        | SignatureScheme::PasskeyAuthenticator => Err(SuiError::UnsupportedFeatureError {
+            error: format!("key derivation not supported {:?}", key_scheme),
+        }),
     }
 }
 

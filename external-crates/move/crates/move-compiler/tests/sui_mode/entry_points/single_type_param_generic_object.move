@@ -1,6 +1,6 @@
 module a::m {
-    use one::object;
-    use one::tx_context;
+    use sui::object;
+    use sui::tx_context;
     struct Obj<T> has key {
         id: object::UID,
         value: T,
@@ -11,12 +11,12 @@ module a::m {
 
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

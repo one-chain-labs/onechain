@@ -10,10 +10,8 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::move_vm::MoveVM;
-use sui_types::{
-    error::{ExecutionError, SuiError},
-    execution_status::{ExecutionFailureStatus, MoveLocation, MoveLocationOpt},
-};
+use sui_types::error::{ExecutionError, SuiError};
+use sui_types::execution_status::{ExecutionFailureStatus, MoveLocation, MoveLocationOpt};
 
 pub(crate) fn convert_vm_error<S: MoveResolver<Err = SuiError>>(
     error: VMError,
@@ -41,7 +39,12 @@ pub(crate) fn convert_vm_error<S: MoveResolver<Err = SuiError>>(
                 module.identifier_at(fhandle.name).to_string()
             });
             ExecutionFailureStatus::MoveAbort(
-                MoveLocation { module: id.clone(), function, instruction, function_name },
+                MoveLocation {
+                    module: id.clone(),
+                    function,
+                    instruction,
+                    function_name,
+                },
                 code,
             )
         }
@@ -62,15 +65,21 @@ pub(crate) fn convert_vm_error<S: MoveResolver<Err = SuiError>>(
                             let fhandle = module.function_handle_at(fdef.function);
                             module.identifier_at(fhandle.name).to_string()
                         });
-                        Some(MoveLocation { module: id.clone(), function, instruction, function_name })
+                        Some(MoveLocation {
+                            module: id.clone(),
+                            function,
+                            instruction,
+                            function_name,
+                        })
                     }
                     _ => None,
                 };
                 ExecutionFailureStatus::MovePrimitiveRuntimeError(MoveLocationOpt(location))
             }
-            StatusType::Validation | StatusType::Verification | StatusType::Deserialization | StatusType::Unknown => {
-                ExecutionFailureStatus::VMVerificationOrDeserializationError
-            }
+            StatusType::Validation
+            | StatusType::Verification
+            | StatusType::Deserialization
+            | StatusType::Unknown => ExecutionFailureStatus::VMVerificationOrDeserializationError,
             StatusType::InvariantViolation => ExecutionFailureStatus::VMInvariantViolation,
         },
     };

@@ -1,25 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{iter, mem, ops::Not, sync::Arc, thread};
+use std::sync::Arc;
+use std::{iter, mem, thread};
 
-use crate::{
-    authority::{
-        authority_per_epoch_store::AuthorityPerEpochStore,
-        authority_store_pruner::{AuthorityStorePruner, AuthorityStorePruningMetrics, EPOCH_DURATION_MS_FOR_TESTING},
-        authority_store_types::{
-            get_store_object_pair,
-            ObjectContentDigest,
-            StoreObject,
-            StoreObjectPair,
-            StoreObjectWrapper,
-        },
-        epoch_start_configuration::{EpochFlag, EpochStartConfiguration},
-    },
-    rpc_index::RpcIndexStore,
-    state_accumulator::AccumulatorStore,
-    transaction_outputs::TransactionOutputs,
+use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
+use crate::authority::authority_store_pruner::{
+    AuthorityStorePruner, AuthorityStorePruningMetrics, EPOCH_DURATION_MS_FOR_TESTING,
 };
+use crate::authority::authority_store_types::{get_store_object, StoreObject, StoreObjectWrapper};
+use crate::authority::epoch_start_configuration::{EpochFlag, EpochStartConfiguration};
+use crate::global_state_hasher::GlobalStateHashStore;
+use crate::rpc_index::RpcIndexStore;
+use crate::transaction_outputs::TransactionOutputs;
 use either::Either;
 use fastcrypto::hash::{HashFunction, MultisetHash, Sha3_256};
 use futures::stream::FuturesUnordered;
@@ -28,40 +21,30 @@ use move_core_types::resolver::ModuleResolver;
 use serde::{Deserialize, Serialize};
 use sui_config::node::AuthorityStorePruningConfig;
 use sui_macros::fail_point_arg;
-use sui_storage::mutex_table::{MutexGuard, MutexTable, RwLockGuard, RwLockTable};
-use sui_types::{
-    accumulator::Accumulator,
-    base_types::SequenceNumber,
-    digests::TransactionEventsDigest,
-    error::UserInputError,
-    execution::TypeLayoutStore,
-    fp_bail,
-    fp_ensure,
-    message_envelope::Message,
-    storage::{get_module, BackingPackageStore, MarkerValue, ObjectKey, ObjectOrTombstone, ObjectStore},
-    sui_system_state::get_sui_system_state,
+use sui_storage::mutex_table::{MutexGuard, MutexTable};
+use sui_types::error::UserInputError;
+use sui_types::execution::TypeLayoutStore;
+use sui_types::global_state_hash::GlobalStateHash;
+use sui_types::message_envelope::Message;
+use sui_types::storage::{
+    get_module, BackingPackageStore, FullObjectKey, MarkerValue, ObjectKey, ObjectOrTombstone,
+    ObjectStore,
 };
-use tokio::{
-    sync::{RwLockReadGuard, RwLockWriteGuard},
-    time::Instant,
-};
+use sui_types::sui_system_state::get_sui_system_state;
+use sui_types::{base_types::SequenceNumber, fp_bail, fp_ensure};
+use tokio::time::Instant;
 use tracing::{debug, info, trace};
+use typed_store::traits::Map;
 use typed_store::{
     rocks::{DBBatch, DBMap},
-    traits::Map,
     TypedStoreError,
 };
 
-use super::{
-    authority_store_tables::{AuthorityPerpetualTables, LiveObject},
-    *,
-};
+use super::authority_store_tables::LiveObject;
+use super::{authority_store_tables::AuthorityPerpetualTables, *};
 use mysten_common::sync::notify_read::NotifyRead;
-use sui_types::{
-    effects::{TransactionEffects, TransactionEvents},
-    gas_coin::TOTAL_SUPPLY_MIST,
-};
-use typed_store::rocks::util::is_ref_count_value;
+use sui_types::effects::{TransactionEffects, TransactionEvents};
+use sui_types::gas_coin::TOTAL_SUPPLY_MIST;
 
 const NUM_SHARDS: usize = 4096;
 
@@ -82,45 +65,38 @@ impl AuthorityStoreMetrics {
                 "sui_conservation_check_latency",
                 "Number of seconds took to scan all live objects in the store for OCT conservation check",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             sui_conservation_live_object_count: register_int_gauge_with_registry!(
                 "sui_conservation_live_object_count",
                 "Number of live objects in the store",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             sui_conservation_live_object_size: register_int_gauge_with_registry!(
                 "sui_conservation_live_object_size",
                 "Size in bytes of live objects in the store",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             sui_conservation_imbalance: register_int_gauge_with_registry!(
                 "sui_conservation_imbalance",
                 "Total amount of OCT in the network - 10B * 10^9. This delta shows the amount of imbalance",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             sui_conservation_storage_fund: register_int_gauge_with_registry!(
                 "sui_conservation_storage_fund",
                 "Storage Fund pool balance (only includes the storage fund proper that represents object storage)",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             sui_conservation_storage_fund_imbalance: register_int_gauge_with_registry!(
                 "sui_conservation_storage_fund_imbalance",
                 "Imbalance of storage fund, computed with storage_fund_balance - total_object_storage_rebates",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             epoch_flags: register_int_gauge_vec_with_registry!(
                 "epoch_flags",
                 "Local flags of the currently running epoch",
                 &["flag"],
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
         }
     }
 }
@@ -137,12 +113,8 @@ pub struct AuthorityStore {
 
     pub(crate) perpetual_tables: Arc<AuthorityPerpetualTables>,
 
-    pub(crate) root_state_notify_read: NotifyRead<EpochId, (CheckpointSequenceNumber, Accumulator)>,
-
-    /// Guards reference count updates to `indirect_move_objects` table
-    pub(crate) objects_lock_table: Arc<RwLockTable<ObjectContentDigest>>,
-
-    indirect_objects_threshold: usize,
+    pub(crate) root_state_notify_read:
+        NotifyRead<EpochId, (CheckpointSequenceNumber, GlobalStateHash)>,
 
     /// Whether to enable expensive OCT conservation check at epoch boundaries.
     enable_epoch_sui_conservation_check: bool,
@@ -150,8 +122,8 @@ pub struct AuthorityStore {
     metrics: AuthorityStoreMetrics,
 }
 
-pub type ExecutionLockReadGuard<'a> = RwLockReadGuard<'a, EpochId>;
-pub type ExecutionLockWriteGuard<'a> = RwLockWriteGuard<'a, EpochId>;
+pub type ExecutionLockReadGuard<'a> = tokio::sync::RwLockReadGuard<'a, EpochId>;
+pub type ExecutionLockWriteGuard<'a> = tokio::sync::RwLockWriteGuard<'a, EpochId>;
 
 impl AuthorityStore {
     /// Open an authority store by directory path.
@@ -162,9 +134,9 @@ impl AuthorityStore {
         config: &NodeConfig,
         registry: &Registry,
     ) -> SuiResult<Arc<Self>> {
-        let indirect_objects_threshold = config.indirect_objects_threshold;
-        let enable_epoch_sui_conservation_check =
-            config.expensive_safety_check_config.enable_epoch_sui_conservation_check();
+        let enable_epoch_sui_conservation_check = config
+            .expensive_safety_check_config
+            .enable_epoch_sui_conservation_check();
 
         let epoch_start_configuration = if perpetual_tables.database_is_empty()? {
             info!("Creating new epoch start config from genesis");
@@ -197,7 +169,6 @@ impl AuthorityStore {
         let this = Self::open_inner(
             genesis,
             perpetual_tables,
-            indirect_objects_threshold,
             enable_epoch_sui_conservation_check,
             registry,
         )
@@ -208,66 +179,97 @@ impl AuthorityStore {
 
     pub fn update_epoch_flags_metrics(&self, old: &[EpochFlag], new: &[EpochFlag]) {
         for flag in old {
-            self.metrics.epoch_flags.with_label_values(&[&flag.to_string()]).set(0);
+            self.metrics
+                .epoch_flags
+                .with_label_values(&[&flag.to_string()])
+                .set(0);
         }
         for flag in new {
-            self.metrics.epoch_flags.with_label_values(&[&flag.to_string()]).set(1);
+            self.metrics
+                .epoch_flags
+                .with_label_values(&[&flag.to_string()])
+                .set(1);
         }
     }
 
     // NB: This must only be called at time of reconfiguration. We take the execution lock write
     // guard as an argument to ensure that this is the case.
-    pub fn clear_object_per_epoch_marker_table(&self, _execution_guard: &ExecutionLockWriteGuard<'_>) -> SuiResult<()> {
+    pub fn clear_object_per_epoch_marker_table(
+        &self,
+        _execution_guard: &ExecutionLockWriteGuard<'_>,
+    ) -> SuiResult<()> {
         // We can safely delete all entries in the per epoch marker table since this is only called
         // at epoch boundaries (during reconfiguration). Therefore any entries that currently
         // exist can be removed. Because of this we can use the `schedule_delete_all` method.
-        Ok(self.perpetual_tables.object_per_epoch_marker_table.schedule_delete_all()?)
+        self.perpetual_tables
+            .object_per_epoch_marker_table
+            .schedule_delete_all()?;
+        Ok(self
+            .perpetual_tables
+            .object_per_epoch_marker_table_v2
+            .schedule_delete_all()?)
     }
 
     pub async fn open_with_committee_for_testing(
         perpetual_tables: Arc<AuthorityPerpetualTables>,
         committee: &Committee,
         genesis: &Genesis,
-        indirect_objects_threshold: usize,
     ) -> SuiResult<Arc<Self>> {
         // TODO: Since we always start at genesis, the committee should be technically the same
         // as the genesis committee.
         assert_eq!(committee.epoch, 0);
-        Self::open_inner(genesis, perpetual_tables, indirect_objects_threshold, true, &Registry::new()).await
+        Self::open_inner(genesis, perpetual_tables, true, &Registry::new()).await
     }
 
     async fn open_inner(
         genesis: &Genesis,
         perpetual_tables: Arc<AuthorityPerpetualTables>,
-        indirect_objects_threshold: usize,
         enable_epoch_sui_conservation_check: bool,
         registry: &Registry,
     ) -> SuiResult<Arc<Self>> {
         let store = Arc::new(Self {
             mutex_table: MutexTable::new(NUM_SHARDS),
             perpetual_tables,
-            root_state_notify_read: NotifyRead::<EpochId, (CheckpointSequenceNumber, Accumulator)>::new(),
-            objects_lock_table: Arc::new(RwLockTable::new(NUM_SHARDS)),
-            indirect_objects_threshold,
+            root_state_notify_read: NotifyRead::<
+                EpochId,
+                (CheckpointSequenceNumber, GlobalStateHash),
+            >::new(),
             enable_epoch_sui_conservation_check,
             metrics: AuthorityStoreMetrics::new(registry),
         });
         // Only initialize an empty database.
-        if store.database_is_empty().expect("Database read should not fail at init.") {
-            store.bulk_insert_genesis_objects(genesis.objects()).expect("Cannot bulk insert genesis objects");
+        if store
+            .database_is_empty()
+            .expect("Database read should not fail at init.")
+        {
+            store
+                .bulk_insert_genesis_objects(genesis.objects())
+                .expect("Cannot bulk insert genesis objects");
 
             // insert txn and effects of genesis
             let transaction = VerifiedTransaction::new_unchecked(genesis.transaction().clone());
 
-            store.perpetual_tables.transactions.insert(transaction.digest(), transaction.serializable_ref()).unwrap();
+            store
+                .perpetual_tables
+                .transactions
+                .insert(transaction.digest(), transaction.serializable_ref())
+                .unwrap();
 
-            store.perpetual_tables.effects.insert(&genesis.effects().digest(), genesis.effects()).unwrap();
+            store
+                .perpetual_tables
+                .effects
+                .insert(&genesis.effects().digest(), genesis.effects())
+                .unwrap();
             // We don't insert the effects to executed_effects yet because the genesis tx hasn't but will be executed.
             // This is important for fullnodes to be able to generate indexing data right now.
 
-            let event_digests = genesis.events().digest();
-            let events = genesis.events().data.iter().enumerate().map(|(i, e)| ((event_digests, i), e));
-            store.perpetual_tables.events.multi_insert(events).unwrap();
+            if genesis.effects().events_digest().is_some() {
+                store
+                    .perpetual_tables
+                    .events_2
+                    .insert(transaction.digest(), genesis.events())
+                    .unwrap();
+            }
         }
 
         Ok(store)
@@ -278,16 +280,16 @@ impl AuthorityStore {
     /// or inserting genesis objects.
     pub fn open_no_genesis(
         perpetual_tables: Arc<AuthorityPerpetualTables>,
-        indirect_objects_threshold: usize,
         enable_epoch_sui_conservation_check: bool,
         registry: &Registry,
     ) -> SuiResult<Arc<Self>> {
         let store = Arc::new(Self {
             mutex_table: MutexTable::new(NUM_SHARDS),
             perpetual_tables,
-            root_state_notify_read: NotifyRead::<EpochId, (CheckpointSequenceNumber, Accumulator)>::new(),
-            objects_lock_table: Arc::new(RwLockTable::new(NUM_SHARDS)),
-            indirect_objects_threshold,
+            root_state_notify_read: NotifyRead::<
+                EpochId,
+                (CheckpointSequenceNumber, GlobalStateHash),
+            >::new(),
             enable_epoch_sui_conservation_check,
             metrics: AuthorityStoreMetrics::new(registry),
         });
@@ -298,43 +300,49 @@ impl AuthorityStore {
         self.perpetual_tables.get_recovery_epoch_at_restart()
     }
 
-    pub fn get_effects(&self, effects_digest: &TransactionEffectsDigest) -> SuiResult<Option<TransactionEffects>> {
+    pub fn get_effects(
+        &self,
+        effects_digest: &TransactionEffectsDigest,
+    ) -> SuiResult<Option<TransactionEffects>> {
         Ok(self.perpetual_tables.effects.get(effects_digest)?)
     }
 
     /// Returns true if we have an effects structure for this transaction digest
     pub fn effects_exists(&self, effects_digest: &TransactionEffectsDigest) -> SuiResult<bool> {
-        self.perpetual_tables.effects.contains_key(effects_digest).map_err(|e| e.into())
+        self.perpetual_tables
+            .effects
+            .contains_key(effects_digest)
+            .map_err(|e| e.into())
     }
 
     pub fn get_events(
         &self,
-        event_digest: &TransactionEventsDigest,
+        digest: &TransactionDigest,
     ) -> Result<Option<TransactionEvents>, TypedStoreError> {
-        let data = self
-            .perpetual_tables
-            .events
-            .safe_range_iter((*event_digest, 0)..=(*event_digest, usize::MAX))
-            .map_ok(|(_, event)| event)
-            .collect::<Result<Vec<_>, TypedStoreError>>()?;
-        Ok(data.is_empty().not().then_some(TransactionEvents { data }))
+        self.perpetual_tables.events_2.get(digest)
     }
 
     pub fn multi_get_events(
         &self,
-        event_digests: &[TransactionEventsDigest],
+        event_digests: &[TransactionDigest],
     ) -> SuiResult<Vec<Option<TransactionEvents>>> {
-        Ok(event_digests.iter().map(|digest| self.get_events(digest)).collect::<Result<Vec<_>, _>>()?)
+        Ok(event_digests
+            .iter()
+            .map(|digest| self.get_events(digest))
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub fn multi_get_effects<'a>(
         &self,
         effects_digests: impl Iterator<Item = &'a TransactionEffectsDigest>,
-    ) -> SuiResult<Vec<Option<TransactionEffects>>> {
-        Ok(self.perpetual_tables.effects.multi_get(effects_digests)?)
+    ) -> Result<Vec<Option<TransactionEffects>>, TypedStoreError> {
+        self.perpetual_tables.effects.multi_get(effects_digests)
     }
 
-    pub fn get_executed_effects(&self, tx_digest: &TransactionDigest) -> SuiResult<Option<TransactionEffects>> {
+    pub fn get_executed_effects(
+        &self,
+        tx_digest: &TransactionDigest,
+    ) -> Result<Option<TransactionEffects>, TypedStoreError> {
         let effects_digest = self.perpetual_tables.executed_effects.get(tx_digest)?;
         match effects_digest {
             Some(digest) => Ok(self.perpetual_tables.effects.get(&digest)?),
@@ -347,8 +355,8 @@ impl AuthorityStore {
     pub fn multi_get_executed_effects_digests(
         &self,
         digests: &[TransactionDigest],
-    ) -> SuiResult<Vec<Option<TransactionEffectsDigest>>> {
-        Ok(self.perpetual_tables.executed_effects.multi_get(digests)?)
+    ) -> Result<Vec<Option<TransactionEffectsDigest>>, TypedStoreError> {
+        self.perpetual_tables.executed_effects.multi_get(digests)
     }
 
     /// Given a list of transaction digests, returns a list of the corresponding effects only if they have been
@@ -356,7 +364,7 @@ impl AuthorityStore {
     pub fn multi_get_executed_effects(
         &self,
         digests: &[TransactionDigest],
-    ) -> SuiResult<Vec<Option<TransactionEffects>>> {
+    ) -> Result<Vec<Option<TransactionEffects>>, TypedStoreError> {
         let executed_effects_digests = self.perpetual_tables.executed_effects.multi_get(digests)?;
         let effects = self.multi_get_effects(executed_effects_digests.iter().flatten())?;
         let mut tx_to_effects_map = effects
@@ -364,43 +372,49 @@ impl AuthorityStore {
             .flatten()
             .map(|effects| (*effects.transaction_digest(), effects))
             .collect::<HashMap<_, _>>();
-        Ok(digests.iter().map(|digest| tx_to_effects_map.remove(digest)).collect())
+        Ok(digests
+            .iter()
+            .map(|digest| tx_to_effects_map.remove(digest))
+            .collect())
     }
 
     pub fn is_tx_already_executed(&self, digest: &TransactionDigest) -> SuiResult<bool> {
-        Ok(self.perpetual_tables.executed_effects.contains_key(digest)?)
+        Ok(self
+            .perpetual_tables
+            .executed_effects
+            .contains_key(digest)?)
     }
 
     pub fn get_marker_value(
         &self,
-        object_id: &ObjectID,
-        version: &SequenceNumber,
+        object_key: FullObjectKey,
         epoch_id: EpochId,
     ) -> SuiResult<Option<MarkerValue>> {
-        let object_key = (epoch_id, ObjectKey(*object_id, *version));
-        Ok(self.perpetual_tables.object_per_epoch_marker_table.get(&object_key)?)
+        Ok(self
+            .perpetual_tables
+            .object_per_epoch_marker_table_v2
+            .get(&(epoch_id, object_key))?)
     }
 
     pub fn get_latest_marker(
         &self,
-        object_id: &ObjectID,
+        object_id: FullObjectID,
         epoch_id: EpochId,
     ) -> SuiResult<Option<(SequenceNumber, MarkerValue)>> {
-        let min_key = (epoch_id, ObjectKey::min_for_id(object_id));
-        let max_key = (epoch_id, ObjectKey::max_for_id(object_id));
+        let min_key = (epoch_id, FullObjectKey::min_for_id(&object_id));
+        let max_key = (epoch_id, FullObjectKey::max_for_id(&object_id));
 
         let marker_entry = self
             .perpetual_tables
-            .object_per_epoch_marker_table
-            .safe_iter_with_bounds(Some(min_key), Some(max_key))
-            .skip_prior_to(&max_key)?
+            .object_per_epoch_marker_table_v2
+            .reversed_safe_iter_with_bounds(Some(min_key), Some(max_key))?
             .next();
         match marker_entry {
             Some(Ok(((epoch, key), marker))) => {
                 // because of the iterator bounds these cannot fail
                 assert_eq!(epoch, epoch_id);
-                assert_eq!(key.0, *object_id);
-                Ok(Some((key.1, marker)))
+                assert_eq!(key.id(), object_id);
+                Ok(Some((key.version(), marker)))
             }
             Some(Err(e)) => Err(e.into()),
             None => Ok(None),
@@ -412,7 +426,7 @@ impl AuthorityStore {
     pub async fn notify_read_root_state_hash(
         &self,
         epoch: EpochId,
-    ) -> SuiResult<(CheckpointSequenceNumber, Accumulator)> {
+    ) -> SuiResult<(CheckpointSequenceNumber, GlobalStateHash)> {
         // We need to register waiters _before_ reading from the database to avoid race conditions
         let registration = self.root_state_notify_read.register_one(&epoch);
         let hash = self.perpetual_tables.root_state_hash_by_epoch.get(&epoch)?;
@@ -434,7 +448,10 @@ impl AuthorityStore {
         epoch: EpochId,
         sequence: CheckpointSequenceNumber,
     ) -> SuiResult {
-        let mut batch = self.perpetual_tables.executed_transactions_to_checkpoint.batch();
+        let mut batch = self
+            .perpetual_tables
+            .executed_transactions_to_checkpoint
+            .batch();
         batch.insert_batch(
             &self.perpetual_tables.executed_transactions_to_checkpoint,
             digests.iter().map(|d| (*d, (epoch, sequence))),
@@ -449,7 +466,10 @@ impl AuthorityStore {
         &self,
         digest: &TransactionDigest,
     ) -> SuiResult<Option<(EpochId, CheckpointSequenceNumber)>> {
-        Ok(self.perpetual_tables.executed_transactions_to_checkpoint.get(digest)?)
+        Ok(self
+            .perpetual_tables
+            .executed_transactions_to_checkpoint
+            .get(digest)?)
     }
 
     // DEPRECATED -- use function of same name in AuthorityPerEpochStore
@@ -457,7 +477,12 @@ impl AuthorityStore {
         &self,
         digests: &[TransactionDigest],
     ) -> SuiResult<Vec<Option<(EpochId, CheckpointSequenceNumber)>>> {
-        Ok(self.perpetual_tables.executed_transactions_to_checkpoint.multi_get(digests)?.into_iter().collect())
+        Ok(self
+            .perpetual_tables
+            .executed_transactions_to_checkpoint
+            .multi_get(digests)?
+            .into_iter()
+            .collect())
     }
 
     /// Returns true if there are no objects in the database
@@ -466,16 +491,29 @@ impl AuthorityStore {
     }
 
     /// A function that acquires all locks associated with the objects (in order to avoid deadlocks).
-    async fn acquire_locks(&self, input_objects: &[ObjectRef]) -> Vec<MutexGuard> {
-        self.mutex_table.acquire_locks(input_objects.iter().map(|(_, _, digest)| *digest)).await
+    fn acquire_locks(&self, input_objects: &[ObjectRef]) -> Vec<MutexGuard> {
+        self.mutex_table
+            .acquire_locks(input_objects.iter().map(|(_, _, digest)| *digest))
     }
 
-    pub fn object_exists_by_key(&self, object_id: &ObjectID, version: VersionNumber) -> SuiResult<bool> {
-        Ok(self.perpetual_tables.objects.contains_key(&ObjectKey(*object_id, version))?)
+    pub fn object_exists_by_key(
+        &self,
+        object_id: &ObjectID,
+        version: VersionNumber,
+    ) -> SuiResult<bool> {
+        Ok(self
+            .perpetual_tables
+            .objects
+            .contains_key(&ObjectKey(*object_id, version))?)
     }
 
     pub fn multi_object_exists_by_key(&self, object_keys: &[ObjectKey]) -> SuiResult<Vec<bool>> {
-        Ok(self.perpetual_tables.objects.multi_contains_keys(object_keys.to_vec())?.into_iter().collect())
+        Ok(self
+            .perpetual_tables
+            .objects
+            .multi_contains_keys(object_keys.to_vec())?
+            .into_iter()
+            .collect())
     }
 
     fn get_object_ref_prior_to_key(
@@ -486,23 +524,40 @@ impl AuthorityStore {
         let Some(prior_version) = version.one_before() else {
             return Ok(None);
         };
-        let mut iterator =
-            self.perpetual_tables.objects.unbounded_iter().skip_prior_to(&ObjectKey(*object_id, prior_version))?;
+        let mut iterator = self
+            .perpetual_tables
+            .objects
+            .reversed_safe_iter_with_bounds(
+                Some(ObjectKey::min_for_id(object_id)),
+                Some(ObjectKey(*object_id, prior_version)),
+            )?;
 
-        if let Some((object_key, value)) = iterator.next() {
+        if let Some((object_key, value)) = iterator.next().transpose()? {
             if object_key.0 == *object_id {
-                return Ok(Some(self.perpetual_tables.object_reference(&object_key, value)?));
+                return Ok(Some(
+                    self.perpetual_tables.object_reference(&object_key, value)?,
+                ));
             }
         }
         Ok(None)
     }
 
-    pub fn multi_get_objects_by_key(&self, object_keys: &[ObjectKey]) -> Result<Vec<Option<Object>>, SuiError> {
-        let wrappers = self.perpetual_tables.objects.multi_get(object_keys.to_vec())?;
+    pub fn multi_get_objects_by_key(
+        &self,
+        object_keys: &[ObjectKey],
+    ) -> Result<Vec<Option<Object>>, SuiError> {
+        let wrappers = self
+            .perpetual_tables
+            .objects
+            .multi_get(object_keys.to_vec())?;
         let mut ret = vec![];
 
         for (idx, w) in wrappers.into_iter().enumerate() {
-            ret.push(w.map(|object| self.perpetual_tables.object(&object_keys[idx], object)).transpose()?.flatten());
+            ret.push(
+                w.map(|object| self.perpetual_tables.object(&object_keys[idx], object))
+                    .transpose()?
+                    .flatten(),
+            );
         }
         Ok(ret)
     }
@@ -514,33 +569,6 @@ impl AuthorityStore {
             result.push(self.get_object(id));
         }
         Ok(result)
-    }
-
-    pub fn have_deleted_owned_object_at_version_or_after(
-        &self,
-        object_id: &ObjectID,
-        version: VersionNumber,
-        epoch_id: EpochId,
-    ) -> Result<bool, SuiError> {
-        let object_key = ObjectKey::max_for_id(object_id);
-        let marker_key = (epoch_id, object_key);
-
-        // Find the most recent version of the object that was deleted or wrapped.
-        // Return true if the version is >= `version`. Otherwise return false.
-        let marker_entry =
-            self.perpetual_tables.object_per_epoch_marker_table.unbounded_iter().skip_prior_to(&marker_key)?.next();
-        match marker_entry {
-            Some(((epoch, key), marker)) => {
-                // Make sure object id matches and version is >= `version`
-                let object_data_ok = key.0 == *object_id && key.1 >= version;
-                // Make sure we don't have a stale epoch for some reason (e.g., a revert)
-                let epoch_data_ok = epoch == epoch_id;
-                // Make sure the object was deleted or wrapped.
-                let mark_data_ok = marker == MarkerValue::OwnedDeleted;
-                Ok(object_data_ok && epoch_data_ok && mark_data_ok)
-            }
-            None => Ok(false),
-        }
     }
 
     // Methods to mutate the store
@@ -561,18 +589,11 @@ impl AuthorityStore {
         let mut write_batch = self.perpetual_tables.objects.batch();
 
         // Insert object
-        let StoreObjectPair(store_object, indirect_object) =
-            get_store_object_pair(object.clone(), self.indirect_objects_threshold);
+        let store_object = get_store_object(object.clone());
         write_batch.insert_batch(
             &self.perpetual_tables.objects,
             std::iter::once((ObjectKey::from(object_ref), store_object)),
         )?;
-        if let Some(indirect_obj) = indirect_object {
-            write_batch.insert_batch(
-                &self.perpetual_tables.indirect_move_objects,
-                std::iter::once((indirect_obj.inner().digest(), indirect_obj)),
-            )?;
-        }
 
         // Update the index
         if object.get_single_owner().is_some() {
@@ -591,26 +612,23 @@ impl AuthorityStore {
     #[instrument(level = "debug", skip_all)]
     pub(crate) fn bulk_insert_genesis_objects(&self, objects: &[Object]) -> SuiResult<()> {
         let mut batch = self.perpetual_tables.objects.batch();
-        let ref_and_objects: Vec<_> = objects.iter().map(|o| (o.compute_object_reference(), o)).collect();
+        let ref_and_objects: Vec<_> = objects
+            .iter()
+            .map(|o| (o.compute_object_reference(), o))
+            .collect();
 
-        batch
-            .insert_batch(
-                &self.perpetual_tables.objects,
-                ref_and_objects.iter().map(|(oref, o)| {
-                    (ObjectKey::from(oref), get_store_object_pair((*o).clone(), self.indirect_objects_threshold).0)
-                }),
-            )?
-            .insert_batch(
-                &self.perpetual_tables.indirect_move_objects,
-                ref_and_objects.iter().filter_map(|(_, o)| {
-                    let StoreObjectPair(_, indirect_object) =
-                        get_store_object_pair((*o).clone(), self.indirect_objects_threshold);
-                    indirect_object.map(|obj| (obj.inner().digest(), obj))
-                }),
-            )?;
+        batch.insert_batch(
+            &self.perpetual_tables.objects,
+            ref_and_objects
+                .iter()
+                .map(|(oref, o)| (ObjectKey::from(oref), get_store_object((*o).clone()))),
+        )?;
 
-        let non_child_object_refs: Vec<_> =
-            ref_and_objects.iter().filter(|(_, object)| !object.is_child_object()).map(|(oref, _)| *oref).collect();
+        let non_child_object_refs: Vec<_> = ref_and_objects
+            .iter()
+            .filter(|(_, object)| !object.is_child_object())
+            .map(|(oref, _)| *oref)
+            .collect();
 
         self.initialize_live_object_markers_impl(
             &mut batch,
@@ -626,7 +644,6 @@ impl AuthorityStore {
     pub fn bulk_insert_live_objects(
         perpetual_db: &AuthorityPerpetualTables,
         live_objects: impl Iterator<Item = LiveObject>,
-        indirect_objects_threshold: usize,
         expected_sha3_digest: &[u8; 32],
     ) -> SuiResult<()> {
         let mut hasher = Sha3_256::default();
@@ -635,18 +652,14 @@ impl AuthorityStore {
             hasher.update(object.object_reference().2.inner());
             match object {
                 LiveObject::Normal(object) => {
-                    let StoreObjectPair(store_object_wrapper, indirect_object) =
-                        get_store_object_pair(object.clone(), indirect_objects_threshold);
+                    let store_object_wrapper = get_store_object(object.clone());
                     batch.insert_batch(
                         &perpetual_db.objects,
-                        std::iter::once((ObjectKey::from(object.compute_object_reference()), store_object_wrapper)),
+                        std::iter::once((
+                            ObjectKey::from(object.compute_object_reference()),
+                            store_object_wrapper,
+                        )),
                     )?;
-                    if let Some(indirect_object) = indirect_object {
-                        batch.merge_batch(
-                            &perpetual_db.indirect_move_objects,
-                            iter::once((indirect_object.inner().digest(), indirect_object)),
-                        )?;
-                    }
                     if !object.is_child_object() {
                         Self::initialize_live_object_markers(
                             &perpetual_db.live_owned_object_markers,
@@ -659,22 +672,32 @@ impl AuthorityStore {
                 LiveObject::Wrapped(object_key) => {
                     batch.insert_batch(
                         &perpetual_db.objects,
-                        std::iter::once::<(ObjectKey, StoreObjectWrapper)>((object_key, StoreObject::Wrapped.into())),
+                        std::iter::once::<(ObjectKey, StoreObjectWrapper)>((
+                            object_key,
+                            StoreObject::Wrapped.into(),
+                        )),
                     )?;
                 }
             }
         }
         let sha3_digest = hasher.finalize().digest;
         if *expected_sha3_digest != sha3_digest {
-            error!("Sha does not match! expected: {:?}, actual: {:?}", expected_sha3_digest, sha3_digest);
+            error!(
+                "Sha does not match! expected: {:?}, actual: {:?}",
+                expected_sha3_digest, sha3_digest
+            );
             return Err(SuiError::from("Sha does not match"));
         }
         batch.write()?;
         Ok(())
     }
 
-    pub fn set_epoch_start_configuration(&self, epoch_start_configuration: &EpochStartConfiguration) -> SuiResult {
-        self.perpetual_tables.set_epoch_start_configuration(epoch_start_configuration)?;
+    pub fn set_epoch_start_configuration(
+        &self,
+        epoch_start_configuration: &EpochStartConfiguration,
+    ) -> SuiResult {
+        self.perpetual_tables
+            .set_epoch_start_configuration(epoch_start_configuration)?;
         Ok(())
     }
 
@@ -682,59 +705,40 @@ impl AuthorityStore {
         Ok(self.perpetual_tables.epoch_start_configuration.get(&())?)
     }
 
-    /// Acquires read locks for affected indirect objects
-    #[instrument(level = "trace", skip_all)]
-    async fn acquire_read_locks_for_indirect_objects(&self, written: &[Object]) -> Vec<RwLockGuard> {
-        // locking is required to avoid potential race conditions with the pruner
-        // potential race:
-        //   - transaction execution branches to reference count increment
-        //   - pruner decrements ref count to 0
-        //   - compaction job compresses existing merge values to an empty vector
-        //   - tx executor commits ref count increment instead of the full value making object inaccessible
-        // read locks are sufficient because ref count increments are safe,
-        // concurrent transaction executions produce independent ref count increments and don't corrupt the state
-        let digests = written
-            .iter()
-            .filter_map(|object| {
-                let StoreObjectPair(_, indirect_object) =
-                    get_store_object_pair(object.clone(), self.indirect_objects_threshold);
-                indirect_object.map(|obj| obj.inner().digest())
-            })
-            .collect();
-        self.objects_lock_table.acquire_read_locks(digests).await
-    }
-
     /// Updates the state resulting from the execution of a certificate.
     ///
     /// Internally it checks that all locks for active inputs are at the correct
     /// version, and then writes objects, certificates, parents and clean up locks atomically.
     #[instrument(level = "debug", skip_all)]
-    pub async fn write_transaction_outputs(
+    pub fn build_db_batch(
         &self,
         epoch_id: EpochId,
         tx_outputs: &[Arc<TransactionOutputs>],
-    ) -> SuiResult {
+    ) -> SuiResult<DBBatch> {
         let mut written = Vec::with_capacity(tx_outputs.len());
         for outputs in tx_outputs {
             written.extend(outputs.written.values().cloned());
         }
-
-        let _locks = self.acquire_read_locks_for_indirect_objects(&written).await;
 
         let mut write_batch = self.perpetual_tables.transactions.batch();
         for outputs in tx_outputs {
             self.write_one_transaction_outputs(&mut write_batch, epoch_id, outputs)?;
         }
         // test crashing before writing the batch
-        fail_point_async!("crash");
+        fail_point!("crash");
 
-        write_batch.write()?;
-        trace!("committed transactions: {:?}", tx_outputs.iter().map(|tx| tx.transaction.digest()).collect::<Vec<_>>());
+        trace!(
+            "built batch for committed transactions: {:?}",
+            tx_outputs
+                .iter()
+                .map(|tx| tx.transaction.digest())
+                .collect::<Vec<_>>()
+        );
 
         // test crashing before notifying
-        fail_point_async!("crash");
+        fail_point!("crash");
 
-        Ok(())
+        Ok(write_batch)
     }
 
     fn write_one_transaction_outputs(
@@ -764,13 +768,12 @@ impl AuthorityStore {
         )?;
 
         // Add batched writes for objects and locks.
-        let effects_digest = effects.digest();
-
         write_batch.insert_batch(
-            &self.perpetual_tables.object_per_epoch_marker_table,
-            markers.iter().map(|(key, marker_value)| ((epoch_id, *key), *marker_value)),
+            &self.perpetual_tables.object_per_epoch_marker_table_v2,
+            markers
+                .iter()
+                .map(|(key, marker_value)| ((epoch_id, *key), *marker_value)),
         )?;
-
         write_batch.insert_batch(
             &self.perpetual_tables.objects,
             deleted
@@ -781,47 +784,22 @@ impl AuthorityStore {
         )?;
 
         // Insert each output object into the stores
-        let (new_objects, new_indirect_move_objects): (Vec<_>, Vec<_>) = written
-            .iter()
-            .map(|(id, new_object)| {
-                let version = new_object.version();
-                trace!(?id, ?version, "writing object");
-                let StoreObjectPair(store_object, indirect_object) =
-                    get_store_object_pair(new_object.clone(), self.indirect_objects_threshold);
-                ((ObjectKey(*id, version), store_object), indirect_object.map(|obj| (obj.inner().digest(), obj)))
-            })
-            .unzip();
+        let new_objects = written.iter().map(|(id, new_object)| {
+            let version = new_object.version();
+            trace!(?id, ?version, "writing object");
+            let store_object = get_store_object(new_object.clone());
+            (ObjectKey(*id, version), store_object)
+        });
 
-        let indirect_objects: Vec<_> = new_indirect_move_objects.into_iter().flatten().collect();
-        let existing_digests = self
-            .perpetual_tables
-            .indirect_move_objects
-            .multi_get_raw_bytes(indirect_objects.iter().map(|(digest, _)| digest))?;
-        // split updates to existing and new indirect objects
-        // for new objects full merge needs to be triggered. For existing ref count increment is sufficient
-        let (existing_indirect_objects, new_indirect_objects): (Vec<_>, Vec<_>) = indirect_objects
-            .into_iter()
-            .enumerate()
-            .partition(|(idx, _)| matches!(&existing_digests[*idx], Some(value) if !is_ref_count_value(value)));
+        write_batch.insert_batch(&self.perpetual_tables.objects, new_objects)?;
 
-        write_batch.insert_batch(&self.perpetual_tables.objects, new_objects.into_iter())?;
-        if !new_indirect_objects.is_empty() {
-            write_batch.merge_batch(
-                &self.perpetual_tables.indirect_move_objects,
-                new_indirect_objects.into_iter().map(|(_, pair)| pair),
+        // Write events into the new table keyed off of transaction_digest
+        if effects.events_digest().is_some() {
+            write_batch.insert_batch(
+                &self.perpetual_tables.events_2,
+                [(transaction_digest, events)],
             )?;
         }
-        if !existing_indirect_objects.is_empty() {
-            write_batch.partial_merge_batch(
-                &self.perpetual_tables.indirect_move_objects,
-                existing_indirect_objects.into_iter().map(|(_, (digest, _))| (digest, 1_u64.to_le_bytes())),
-            )?;
-        }
-
-        let event_digest = events.digest();
-        let events = events.data.iter().enumerate().map(|(i, e)| ((event_digest, i), e));
-
-        write_batch.insert_batch(&self.perpetual_tables.events, events)?;
 
         self.initialize_live_object_markers_impl(write_batch, new_locks_to_init, false)?;
 
@@ -829,28 +807,35 @@ impl AuthorityStore {
         // `Receiving` arguments which were not received)
         self.delete_live_object_markers(write_batch, locks_to_delete)?;
 
+        let effects_digest = effects.digest();
         write_batch
-            .insert_batch(&self.perpetual_tables.effects, [(effects_digest, effects.clone())])?
-            .insert_batch(&self.perpetual_tables.executed_effects, [(transaction_digest, effects_digest)])?;
+            .insert_batch(
+                &self.perpetual_tables.effects,
+                [(effects_digest, effects.clone())],
+            )?
+            .insert_batch(
+                &self.perpetual_tables.executed_effects,
+                [(transaction_digest, effects_digest)],
+            )?;
 
         debug!(effects_digest = ?effects.digest(), "commit_certificate finished");
 
         Ok(())
     }
 
-    /// Commits transactions only to the db. Called by checkpoint builder. See
-    /// ExecutionCache::commit_transactions for more info
-    pub(crate) fn commit_transactions(&self, transactions: &[(TransactionDigest, VerifiedTransaction)]) -> SuiResult {
+    /// Commits transactions only (not effects or other transaction outputs) to the db.
+    /// See ExecutionCache::persist_transaction for more info
+    pub(crate) fn persist_transaction(&self, tx: &VerifiedExecutableTransaction) -> SuiResult {
         let mut batch = self.perpetual_tables.transactions.batch();
         batch.insert_batch(
             &self.perpetual_tables.transactions,
-            transactions.iter().map(|(digest, tx)| (*digest, tx.serializable_ref())),
+            [(tx.digest(), tx.clone().into_unsigned().serializable_ref())],
         )?;
         batch.write()?;
         Ok(())
     }
 
-    pub async fn acquire_transaction_locks(
+    pub fn acquire_transaction_locks(
         &self,
         epoch_store: &AuthorityPerEpochStore,
         owned_input_objects: &[ObjectRef],
@@ -861,12 +846,15 @@ impl AuthorityStore {
         // Other writers may be attempting to acquire locks on the same objects, so a mutex is
         // required.
         // TODO: replace with optimistic db_transactions (i.e. set lock to tx if none)
-        let _mutexes = self.acquire_locks(owned_input_objects).await;
+        let _mutexes = self.acquire_locks(owned_input_objects);
 
         trace!(?owned_input_objects, "acquire_locks");
         let mut locks_to_write = Vec::new();
 
-        let live_object_markers = self.perpetual_tables.live_owned_object_markers.multi_get(owned_input_objects)?;
+        let live_object_markers = self
+            .perpetual_tables
+            .live_owned_object_markers
+            .multi_get(owned_input_objects)?;
 
         let epoch_tables = epoch_store.tables()?;
 
@@ -874,9 +862,11 @@ impl AuthorityStore {
 
         assert_eq!(locks.len(), live_object_markers.len());
 
-        for (live_marker, lock, obj_ref) in
-            izip!(live_object_markers.into_iter(), locks.into_iter(), owned_input_objects)
-        {
+        for (live_marker, lock, obj_ref) in izip!(
+            live_object_markers.into_iter(),
+            locks.into_iter(),
+            owned_input_objects
+        ) {
             let Some(live_marker) = live_marker else {
                 let latest_lock = self.get_latest_live_version_for_object_id(obj_ref.0)?;
                 fp_bail!(UserInputError::ObjectVersionUnavailableForConsumption {
@@ -888,10 +878,18 @@ impl AuthorityStore {
 
             let live_marker = live_marker.map(|l| l.migrate().into_inner());
 
-            if let Some(LockDetailsDeprecated { epoch: previous_epoch, .. }) = &live_marker {
+            if let Some(LockDetailsDeprecated {
+                epoch: previous_epoch,
+                ..
+            }) = &live_marker
+            {
                 // this must be from a prior epoch, because we no longer write LockDetails to
                 // owned_object_transaction_locks
-                assert!(previous_epoch < &epoch, "lock for {:?} should be from a prior epoch", obj_ref);
+                assert!(
+                    previous_epoch < &epoch,
+                    "lock for {:?} should be from a prior epoch",
+                    obj_ref
+                );
             }
 
             if let Some(previous_tx_digest) = &lock {
@@ -923,8 +921,17 @@ impl AuthorityStore {
 
     /// Gets ObjectLockInfo that represents state of lock on an object.
     /// Returns UserInputError::ObjectNotFound if cannot find lock record for this object
-    pub(crate) fn get_lock(&self, obj_ref: ObjectRef, epoch_store: &AuthorityPerEpochStore) -> SuiLockResult {
-        if self.perpetual_tables.live_owned_object_markers.get(&obj_ref)?.is_none() {
+    pub(crate) fn get_lock(
+        &self,
+        obj_ref: ObjectRef,
+        epoch_store: &AuthorityPerEpochStore,
+    ) -> SuiLockResult {
+        if self
+            .perpetual_tables
+            .live_owned_object_markers
+            .get(&obj_ref)?
+            .is_none()
+        {
             return Ok(ObjectLockStatus::LockedAtDifferentVersion {
                 locked_ref: self.get_latest_live_version_for_object_id(obj_ref.0)?,
             });
@@ -934,24 +941,45 @@ impl AuthorityStore {
         let epoch_id = epoch_store.epoch();
 
         if let Some(tx_digest) = tables.get_locked_transaction(&obj_ref)? {
-            Ok(ObjectLockStatus::LockedToTx { locked_by_tx: LockDetailsDeprecated { epoch: epoch_id, tx_digest } })
+            Ok(ObjectLockStatus::LockedToTx {
+                locked_by_tx: LockDetailsDeprecated {
+                    epoch: epoch_id,
+                    tx_digest,
+                },
+            })
         } else {
             Ok(ObjectLockStatus::Initialized)
         }
     }
 
     /// Returns UserInputError::ObjectNotFound if no lock records found for this object.
-    pub(crate) fn get_latest_live_version_for_object_id(&self, object_id: ObjectID) -> SuiResult<ObjectRef> {
+    pub(crate) fn get_latest_live_version_for_object_id(
+        &self,
+        object_id: ObjectID,
+    ) -> SuiResult<ObjectRef> {
         let mut iterator = self
             .perpetual_tables
             .live_owned_object_markers
-            .unbounded_iter()
-            // Make the max possible entry for this object ID.
-            .skip_prior_to(&(object_id, SequenceNumber::MAX, ObjectDigest::MAX))?;
+            .reversed_safe_iter_with_bounds(
+                None,
+                Some((object_id, SequenceNumber::MAX, ObjectDigest::MAX)),
+            )?;
         Ok(iterator
             .next()
-            .and_then(|value| if value.0 .0 == object_id { Some(value) } else { None })
-            .ok_or_else(|| SuiError::from(UserInputError::ObjectNotFound { object_id, version: None }))?
+            .transpose()?
+            .and_then(|value| {
+                if value.0 .0 == object_id {
+                    Some(value)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| {
+                SuiError::from(UserInputError::ObjectNotFound {
+                    object_id,
+                    version: None,
+                })
+            })?
             .0)
     }
 
@@ -960,7 +988,10 @@ impl AuthorityStore {
     /// Returns UserInputError::ObjectVersionUnavailableForConsumption if at least one object lock is not initialized
     ///     at the given version.
     pub fn check_owned_objects_are_live(&self, objects: &[ObjectRef]) -> SuiResult {
-        let locks = self.perpetual_tables.live_owned_object_markers.multi_get(objects)?;
+        let locks = self
+            .perpetual_tables
+            .live_owned_object_markers
+            .multi_get(objects)?;
         for (lock, obj_ref) in locks.into_iter().zip(objects) {
             if lock.is_none() {
                 let latest_lock = self.get_latest_live_version_for_object_id(obj_ref.0)?;
@@ -1007,22 +1038,39 @@ impl AuthorityStore {
             let existing_live_object_markers: Vec<ObjectRef> = live_object_markers
                 .iter()
                 .zip(objects)
-                .filter_map(|(lock_opt, objref)| lock_opt.clone().flatten().map(|_tx_digest| *objref))
+                .filter_map(|(lock_opt, objref)| {
+                    lock_opt.clone().flatten().map(|_tx_digest| *objref)
+                })
                 .collect();
             if !existing_live_object_markers.is_empty() {
-                info!(?existing_live_object_markers, "Cannot initialize live_object_markers because some exist already");
-                return Err(SuiError::ObjectLockAlreadyInitialized { refs: existing_live_object_markers });
+                info!(
+                    ?existing_live_object_markers,
+                    "Cannot initialize live_object_markers because some exist already"
+                );
+                return Err(SuiError::ObjectLockAlreadyInitialized {
+                    refs: existing_live_object_markers,
+                });
             }
         }
 
-        write_batch.insert_batch(live_object_marker_table, objects.iter().map(|obj_ref| (obj_ref, None)))?;
+        write_batch.insert_batch(
+            live_object_marker_table,
+            objects.iter().map(|obj_ref| (obj_ref, None)),
+        )?;
         Ok(())
     }
 
     /// Removes locks for a given list of ObjectRefs.
-    fn delete_live_object_markers(&self, write_batch: &mut DBBatch, objects: &[ObjectRef]) -> SuiResult {
+    fn delete_live_object_markers(
+        &self,
+        write_batch: &mut DBBatch,
+        objects: &[ObjectRef],
+    ) -> SuiResult {
         trace!(?objects, "delete_locks");
-        write_batch.delete_batch(&self.perpetual_tables.live_owned_object_markers, objects.iter())?;
+        write_batch.delete_batch(
+            &self.perpetual_tables.live_owned_object_markers,
+            objects.iter(),
+        )?;
         Ok(())
     }
 
@@ -1039,11 +1087,17 @@ impl AuthorityStore {
         }
 
         let mut batch = self.perpetual_tables.live_owned_object_markers.batch();
-        batch.delete_batch(&self.perpetual_tables.live_owned_object_markers, objects.iter()).unwrap();
+        batch
+            .delete_batch(
+                &self.perpetual_tables.live_owned_object_markers,
+                objects.iter(),
+            )
+            .unwrap();
         batch.write().unwrap();
 
         let mut batch = self.perpetual_tables.live_owned_object_markers.batch();
-        self.initialize_live_object_markers_impl(&mut batch, objects, false).unwrap();
+        self.initialize_live_object_markers_impl(&mut batch, objects, false)
+            .unwrap();
         batch.write().unwrap();
     }
 
@@ -1072,32 +1126,47 @@ impl AuthorityStore {
         assert!(effects.input_shared_objects().is_empty());
 
         let mut write_batch = self.perpetual_tables.transactions.batch();
-        write_batch.delete_batch(&self.perpetual_tables.executed_effects, iter::once(tx_digest))?;
-        if let Some(events_digest) = effects.events_digest() {
-            write_batch.schedule_delete_range(
-                &self.perpetual_tables.events,
-                &(*events_digest, usize::MIN),
-                &(*events_digest, usize::MAX),
-            )?;
+        write_batch.delete_batch(
+            &self.perpetual_tables.executed_effects,
+            iter::once(tx_digest),
+        )?;
+        if effects.events_digest().is_some() {
+            write_batch.delete_batch(&self.perpetual_tables.events_2, [tx_digest])?;
         }
 
-        let tombstones = effects.all_tombstones().into_iter().map(|(id, version)| ObjectKey(id, version));
+        let tombstones = effects
+            .all_tombstones()
+            .into_iter()
+            .map(|(id, version)| ObjectKey(id, version));
         write_batch.delete_batch(&self.perpetual_tables.objects, tombstones)?;
 
-        let all_new_object_keys =
-            effects.all_changed_objects().into_iter().map(|((id, version, _), _, _)| ObjectKey(id, version));
+        let all_new_object_keys = effects
+            .all_changed_objects()
+            .into_iter()
+            .map(|((id, version, _), _, _)| ObjectKey(id, version));
         write_batch.delete_batch(&self.perpetual_tables.objects, all_new_object_keys.clone())?;
 
-        let modified_object_keys =
-            effects.modified_at_versions().into_iter().map(|(id, version)| ObjectKey(id, version));
+        let modified_object_keys = effects
+            .modified_at_versions()
+            .into_iter()
+            .map(|(id, version)| ObjectKey(id, version));
 
         macro_rules! get_objects_and_locks {
             ($object_keys: expr) => {
-                self.perpetual_tables.objects.multi_get($object_keys.clone())?.into_iter().zip($object_keys).filter_map(
-                    |(obj_opt, key)| {
+                self.perpetual_tables
+                    .objects
+                    .multi_get($object_keys.clone())?
+                    .into_iter()
+                    .zip($object_keys)
+                    .filter_map(|(obj_opt, key)| {
                         let obj = self
                             .perpetual_tables
-                            .object(&key, obj_opt.unwrap_or_else(|| panic!("Older object version not found: {:?}", key)))
+                            .object(
+                                &key,
+                                obj_opt.unwrap_or_else(|| {
+                                    panic!("Older object version not found: {:?}", key)
+                                }),
+                            )
                             .expect("Matching indirect object not found")?;
 
                         if obj.is_immutable() {
@@ -1106,8 +1175,7 @@ impl AuthorityStore {
 
                         let obj_ref = obj.compute_object_reference();
                         Some(obj.is_address_owned().then_some(obj_ref))
-                    },
-                )
+                    })
             };
         }
 
@@ -1120,7 +1188,10 @@ impl AuthorityStore {
         self.initialize_live_object_markers_impl(&mut write_batch, &old_locks, true)?;
 
         // Delete new locks
-        write_batch.delete_batch(&self.perpetual_tables.live_owned_object_markers, new_locks.flatten())?;
+        write_batch.delete_batch(
+            &self.perpetual_tables.live_owned_object_markers,
+            new_locks.flatten(),
+        )?;
 
         write_batch.write()?;
 
@@ -1136,7 +1207,8 @@ impl AuthorityStore {
         object_id: ObjectID,
         version: SequenceNumber,
     ) -> SuiResult<Option<Object>> {
-        self.perpetual_tables.find_object_lt_or_eq_version(object_id, version)
+        self.perpetual_tables
+            .find_object_lt_or_eq_version(object_id, version)
     }
 
     /// Returns the latest object reference we have for this object_id in the objects table.
@@ -1148,13 +1220,20 @@ impl AuthorityStore {
     /// being wrapped in another object.
     ///
     /// If no entry for the object_id is found, return None.
-    pub fn get_latest_object_ref_or_tombstone(&self, object_id: ObjectID) -> Result<Option<ObjectRef>, SuiError> {
-        self.perpetual_tables.get_latest_object_ref_or_tombstone(object_id)
+    pub fn get_latest_object_ref_or_tombstone(
+        &self,
+        object_id: ObjectID,
+    ) -> Result<Option<ObjectRef>, SuiError> {
+        self.perpetual_tables
+            .get_latest_object_ref_or_tombstone(object_id)
     }
 
     /// Returns the latest object reference if and only if the object is still live (i.e. it does
     /// not return tombstones)
-    pub fn get_latest_object_ref_if_alive(&self, object_id: ObjectID) -> Result<Option<ObjectRef>, SuiError> {
+    pub fn get_latest_object_ref_if_alive(
+        &self,
+        object_id: ObjectID,
+    ) -> Result<Option<ObjectRef>, SuiError> {
         match self.get_latest_object_ref_or_tombstone(object_id)? {
             Some(objref) if objref.2.is_alive() => Ok(Some(objref)),
             _ => Ok(None),
@@ -1168,11 +1247,17 @@ impl AuthorityStore {
         &self,
         object_id: ObjectID,
     ) -> Result<Option<(ObjectKey, ObjectOrTombstone)>, SuiError> {
-        let Some((object_key, store_object)) = self.perpetual_tables.get_latest_object_or_tombstone(object_id)? else {
+        let Some((object_key, store_object)) = self
+            .perpetual_tables
+            .get_latest_object_or_tombstone(object_id)?
+        else {
             return Ok(None);
         };
 
-        if let Some(object_ref) = self.perpetual_tables.tombstone_reference(&object_key, &store_object)? {
+        if let Some(object_ref) = self
+            .perpetual_tables
+            .tombstone_reference(&object_key, &store_object)?
+        {
             return Ok(Some((object_key, ObjectOrTombstone::Tombstone(object_ref))));
         }
 
@@ -1191,8 +1276,14 @@ impl AuthorityStore {
     ) -> Result<(), TypedStoreError> {
         let mut write_batch = self.perpetual_tables.transactions.batch();
         write_batch
-            .insert_batch(&self.perpetual_tables.transactions, [(transaction.digest(), transaction.serializable_ref())])?
-            .insert_batch(&self.perpetual_tables.effects, [(transaction_effects.digest(), transaction_effects)])?;
+            .insert_batch(
+                &self.perpetual_tables.transactions,
+                [(transaction.digest(), transaction.serializable_ref())],
+            )?
+            .insert_batch(
+                &self.perpetual_tables.effects,
+                [(transaction_effects.digest(), transaction_effects)],
+            )?;
 
         write_batch.write()?;
         Ok(())
@@ -1205,11 +1296,14 @@ impl AuthorityStore {
         let mut write_batch = self.perpetual_tables.transactions.batch();
         for tx in transactions {
             write_batch
-                .insert_batch(&self.perpetual_tables.transactions, [(
-                    tx.transaction.digest(),
-                    tx.transaction.serializable_ref(),
-                )])?
-                .insert_batch(&self.perpetual_tables.effects, [(tx.effects.digest(), &tx.effects)])?;
+                .insert_batch(
+                    &self.perpetual_tables.transactions,
+                    [(tx.transaction.digest(), tx.transaction.serializable_ref())],
+                )?
+                .insert_batch(
+                    &self.perpetual_tables.effects,
+                    [(tx.effects.digest(), &tx.effects)],
+                )?;
         }
 
         write_batch.write()?;
@@ -1219,19 +1313,21 @@ impl AuthorityStore {
     pub fn multi_get_transaction_blocks(
         &self,
         tx_digests: &[TransactionDigest],
-    ) -> SuiResult<Vec<Option<VerifiedTransaction>>> {
-        Ok(self
-            .perpetual_tables
+    ) -> Result<Vec<Option<VerifiedTransaction>>, TypedStoreError> {
+        self.perpetual_tables
             .transactions
             .multi_get(tx_digests)
-            .map(|v| v.into_iter().map(|v| v.map(|v| v.into())).collect())?)
+            .map(|v| v.into_iter().map(|v| v.map(|v| v.into())).collect())
     }
 
     pub fn get_transaction_block(
         &self,
         tx_digest: &TransactionDigest,
     ) -> Result<Option<VerifiedTransaction>, TypedStoreError> {
-        self.perpetual_tables.transactions.get(tx_digest).map(|v| v.map(|v| v.into()))
+        self.perpetual_tables
+            .transactions
+            .get(tx_digest)
+            .map(|v| v.map(|v| v.into()))
     }
 
     /// This function reads the DB directly to get the system state object.
@@ -1274,7 +1370,8 @@ impl AuthorityStore {
                             let mut task_objects = vec![];
                             mem::swap(&mut pending_objects, &mut task_objects);
                             pending_tasks.push(s.spawn(move || {
-                                let mut layout_resolver = executor.type_layout_resolver(Box::new(type_layout_store));
+                                let mut layout_resolver =
+                                    executor.type_layout_resolver(Box::new(type_layout_store));
                                 let mut total_storage_rebate = 0;
                                 let mut total_oct = 0;
                                 for object in task_objects {
@@ -1282,7 +1379,8 @@ impl AuthorityStore {
                                     // get_total_oct includes storage rebate, however all storage rebate is
                                     // also stored in the storage fund, so we need to subtract it here.
                                     total_oct +=
-                                        object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+                                        object.get_total_oct(layout_resolver.as_mut()).unwrap()
+                                            - object.storage_rebate;
                                 }
                                 if count % 50_000_000 == 0 {
                                     info!("Processed {} objects", count);
@@ -1304,17 +1402,28 @@ impl AuthorityStore {
         let mut layout_resolver = executor.type_layout_resolver(Box::new(type_layout_store));
         for object in pending_objects {
             total_storage_rebate += object.storage_rebate;
-            total_oct += object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            total_oct +=
+                object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
         }
-        info!("Scanned {} live objects, took {:?}", count, cur_time.elapsed());
-        self.metrics.sui_conservation_live_object_count.set(count as i64);
-        self.metrics.sui_conservation_live_object_size.set(size as i64);
-        self.metrics.sui_conservation_check_latency.set(cur_time.elapsed().as_secs() as i64);
+        info!(
+            "Scanned {} live objects, took {:?}",
+            count,
+            cur_time.elapsed()
+        );
+        self.metrics
+            .sui_conservation_live_object_count
+            .set(count as i64);
+        self.metrics
+            .sui_conservation_live_object_size
+            .set(size as i64);
+        self.metrics
+            .sui_conservation_check_latency
+            .set(cur_time.elapsed().as_secs() as i64);
 
         // It is safe to call this function because we are in the middle of reconfiguration.
         let system_state = self
             .get_sui_system_state_object_unsafe()
-            .expect("Reading oct system state object cannot fail")
+            .expect("Reading sui system state object cannot fail")
             .into_sui_system_state_summary();
         let storage_fund_balance = system_state.storage_fund_total_object_storage_rebates;
         info!(
@@ -1323,12 +1432,21 @@ impl AuthorityStore {
         );
 
         let imbalance = (storage_fund_balance as i64) - (total_storage_rebate as i64);
-        self.metrics.sui_conservation_storage_fund.set(storage_fund_balance as i64);
-        self.metrics.sui_conservation_storage_fund_imbalance.set(imbalance);
-        self.metrics.sui_conservation_imbalance.set((total_oct as i128 - TOTAL_SUPPLY_MIST as i128) as i64);
+        self.metrics
+            .sui_conservation_storage_fund
+            .set(storage_fund_balance as i64);
+        self.metrics
+            .sui_conservation_storage_fund_imbalance
+            .set(imbalance);
+        self.metrics
+            .sui_conservation_imbalance
+            .set((total_oct as i128 - TOTAL_SUPPLY_MIST as i128) as i64);
 
-        if let Some(expected_imbalance) =
-            self.perpetual_tables.expected_storage_fund_imbalance.get(&()).expect("DB read cannot fail")
+        if let Some(expected_imbalance) = self
+            .perpetual_tables
+            .expected_storage_fund_imbalance
+            .get(&())
+            .expect("DB read cannot fail")
         {
             fp_ensure!(
                 imbalance == expected_imbalance,
@@ -1340,24 +1458,33 @@ impl AuthorityStore {
                 )
             );
         } else {
-            self.perpetual_tables.expected_storage_fund_imbalance.insert(&(), &imbalance).expect("DB write cannot fail");
+            self.perpetual_tables
+                .expected_storage_fund_imbalance
+                .insert(&(), &imbalance)
+                .expect("DB write cannot fail");
         }
 
-        if let Some(expected_oct) =
-            self.perpetual_tables.expected_network_sui_amount.get(&()).expect("DB read cannot fail")
+        if let Some(expected_oct) = self
+            .perpetual_tables
+            .expected_network_sui_amount
+            .get(&())
+            .expect("DB read cannot fail")
         {
             fp_ensure!(
                 total_oct == expected_oct,
                 SuiError::from(
                     format!(
-                        "Inconsistent state detected at epoch {}: total oct: {}, expecting {}",
+                        "Inconsistent state detected at epoch {}: total sui: {}, expecting {}",
                         system_state.epoch, total_oct, expected_oct
                     )
                     .as_str()
                 )
             );
         } else {
-            self.perpetual_tables.expected_network_sui_amount.insert(&(), &total_oct).expect("DB write cannot fail");
+            self.perpetual_tables
+                .expected_network_sui_amount
+                .insert(&(), &total_oct)
+                .expect("DB write cannot fail");
         }
 
         Ok(())
@@ -1371,13 +1498,16 @@ impl AuthorityStore {
         cur_epoch_store: &AuthorityPerEpochStore,
         new_protocol_version: ProtocolVersion,
     ) {
-        let old_simplified_unwrap_then_delete = cur_epoch_store.protocol_config().simplified_unwrap_then_delete();
+        let old_simplified_unwrap_then_delete = cur_epoch_store
+            .protocol_config()
+            .simplified_unwrap_then_delete();
         let new_simplified_unwrap_then_delete =
-            ProtocolConfig::get_for_version(new_protocol_version, cur_epoch_store.get_chain_identifier().chain())
+            ProtocolConfig::get_for_version(new_protocol_version, cur_epoch_store.get_chain())
                 .simplified_unwrap_then_delete();
         // If in the new epoch the simplified_unwrap_then_delete is enabled for the first time,
         // we re-accumulate state root.
-        let should_reaccumulate = !old_simplified_unwrap_then_delete && new_simplified_unwrap_then_delete;
+        let should_reaccumulate =
+            !old_simplified_unwrap_then_delete && new_simplified_unwrap_then_delete;
         if !should_reaccumulate {
             return;
         }
@@ -1406,24 +1536,33 @@ impl AuthorityStore {
                     }
                     let end_id = ObjectID::new(id_bytes);
 
-                    info!("[Re-accumulate] Scanning object ID range {:?}..{:?}", start_id, end_id);
-                    let mut prev =
-                        (ObjectKey::min_for_id(&ObjectID::ZERO), StoreObjectWrapper::V1(StoreObject::Deleted));
+                    info!(
+                        "[Re-accumulate] Scanning object ID range {:?}..{:?}",
+                        start_id, end_id
+                    );
+                    let mut prev = (
+                        ObjectKey::min_for_id(&ObjectID::ZERO),
+                        StoreObjectWrapper::V1(StoreObject::Deleted),
+                    );
                     let mut object_scanned: u64 = 0;
                     let mut wrapped_objects_to_remove = vec![];
-                    for db_result in self
-                        .perpetual_tables
-                        .objects
-                        .safe_range_iter(ObjectKey::min_for_id(&start_id)..=ObjectKey::max_for_id(&end_id))
-                    {
+                    for db_result in self.perpetual_tables.objects.safe_range_iter(
+                        ObjectKey::min_for_id(&start_id)..=ObjectKey::max_for_id(&end_id),
+                    ) {
                         match db_result {
                             Ok((object_key, object)) => {
                                 object_scanned += 1;
                                 if object_scanned % 100000 == 0 {
-                                    info!("[Re-accumulate] Task {}: object scanned: {}", index, object_scanned,);
+                                    info!(
+                                        "[Re-accumulate] Task {}: object scanned: {}",
+                                        index, object_scanned,
+                                    );
                                 }
-                                if matches!(prev.1.inner(), StoreObject::Wrapped) && object_key.0 != prev.0 .0 {
-                                    wrapped_objects_to_remove.push(WrappedObject::new(prev.0 .0, prev.0 .1));
+                                if matches!(prev.1.inner(), StoreObject::Wrapped)
+                                    && object_key.0 != prev.0 .0
+                                {
+                                    wrapped_objects_to_remove
+                                        .push(WrappedObject::new(prev.0 .0, prev.0 .1));
                                 }
 
                                 prev = (object_key, object);
@@ -1447,35 +1586,47 @@ impl AuthorityStore {
                 }));
             }
             let (last_checkpoint_of_epoch, cur_accumulator) = self
-                .get_root_state_accumulator_for_epoch(cur_epoch_store.epoch())
+                .get_root_state_hash_for_epoch(cur_epoch_store.epoch())
                 .expect("read cannot fail")
                 .expect("accumulator must exist");
-            let (accumulator, total_objects_scanned, total_wrapped_objects) = pending_tasks.into_iter().fold(
-                (cur_accumulator, 0u64, 0usize),
-                |(mut accumulator, total_objects_scanned, total_wrapped_objects), task| {
-                    let (wrapped_objects_to_remove, object_scanned) = task.join().unwrap().unwrap();
-                    accumulator.remove_all(
-                        wrapped_objects_to_remove
-                            .iter()
-                            .map(|wrapped| bcs::to_bytes(wrapped).unwrap().to_vec())
-                            .collect::<Vec<Vec<u8>>>(),
-                    );
-                    (
-                        accumulator,
-                        total_objects_scanned + object_scanned,
-                        total_wrapped_objects + wrapped_objects_to_remove.len(),
-                    )
-                },
-            );
+            let (accumulator, total_objects_scanned, total_wrapped_objects) =
+                pending_tasks.into_iter().fold(
+                    (cur_accumulator, 0u64, 0usize),
+                    |(mut accumulator, total_objects_scanned, total_wrapped_objects), task| {
+                        let (wrapped_objects_to_remove, object_scanned) =
+                            task.join().unwrap().unwrap();
+                        accumulator.remove_all(
+                            wrapped_objects_to_remove
+                                .iter()
+                                .map(|wrapped| bcs::to_bytes(wrapped).unwrap().to_vec())
+                                .collect::<Vec<Vec<u8>>>(),
+                        );
+                        (
+                            accumulator,
+                            total_objects_scanned + object_scanned,
+                            total_wrapped_objects + wrapped_objects_to_remove.len(),
+                        )
+                    },
+                );
             info!(
                 "[Re-accumulate] Total objects scanned: {}, total wrapped objects: {}",
                 total_objects_scanned, total_wrapped_objects,
             );
-            info!("[Re-accumulate] New accumulator value: {:?}", accumulator.digest());
-            self.insert_state_accumulator_for_epoch(cur_epoch_store.epoch(), &last_checkpoint_of_epoch, &accumulator)
-                .unwrap();
+            info!(
+                "[Re-accumulate] New accumulator value: {:?}",
+                accumulator.digest()
+            );
+            self.insert_state_hash_for_epoch(
+                cur_epoch_store.epoch(),
+                &last_checkpoint_of_epoch,
+                &accumulator,
+            )
+            .unwrap();
         });
-        info!("[Re-accumulate] Re-accumulating took {}seconds", cur_time.elapsed().as_secs());
+        info!(
+            "[Re-accumulate] Re-accumulating took {}seconds",
+            cur_time.elapsed().as_secs()
+        );
     }
 
     pub async fn prune_objects_and_compact_for_testing(
@@ -1483,15 +1634,17 @@ impl AuthorityStore {
         checkpoint_store: &Arc<CheckpointStore>,
         rpc_index: Option<&RpcIndexStore>,
     ) {
-        let pruning_config = AuthorityStorePruningConfig { num_epochs_to_retain: 0, ..Default::default() };
+        let pruning_config = AuthorityStorePruningConfig {
+            num_epochs_to_retain: 0,
+            ..Default::default()
+        };
         let _ = AuthorityStorePruner::prune_objects_for_eligible_epochs(
             &self.perpetual_tables,
             checkpoint_store,
             rpc_index,
-            &self.objects_lock_table,
+            None,
             pruning_config,
             AuthorityStorePruningMetrics::new_for_test(),
-            usize::MAX,
             EPOCH_DURATION_MS_FOR_TESTING,
         )
         .await;
@@ -1513,21 +1666,12 @@ impl AuthorityStore {
             }
         }
 
-        wb.delete_batch(&self.perpetual_tables.objects, object_keys_to_prune.into_iter())?;
+        wb.delete_batch(
+            &self.perpetual_tables.objects,
+            object_keys_to_prune.into_iter(),
+        )?;
         wb.write()?;
         Ok(())
-    }
-
-    #[cfg(msim)]
-    pub fn remove_all_versions_of_object(&self, object_id: ObjectID) {
-        let entries: Vec<_> = self
-            .perpetual_tables
-            .objects
-            .unbounded_iter()
-            .filter_map(|(key, _)| if key.0 == object_id { Some(key) } else { None })
-            .collect();
-        info!("Removing all versions of object: {:?}", entries);
-        self.perpetual_tables.objects.multi_remove(entries).unwrap();
     }
 
     // Counts the number of versions exist in object store for `object_id`. This includes tombstone.
@@ -1545,7 +1689,7 @@ impl AuthorityStore {
     }
 }
 
-impl AccumulatorStore for AuthorityStore {
+impl GlobalStateHashStore for AuthorityStore {
     fn get_object_ref_prior_to_key_deprecated(
         &self,
         object_id: &ObjectID,
@@ -1554,33 +1698,50 @@ impl AccumulatorStore for AuthorityStore {
         self.get_object_ref_prior_to_key(object_id, version)
     }
 
-    fn get_root_state_accumulator_for_epoch(
+    fn get_root_state_hash_for_epoch(
         &self,
         epoch: EpochId,
-    ) -> SuiResult<Option<(CheckpointSequenceNumber, Accumulator)>> {
-        self.perpetual_tables.root_state_hash_by_epoch.get(&epoch).map_err(Into::into)
+    ) -> SuiResult<Option<(CheckpointSequenceNumber, GlobalStateHash)>> {
+        self.perpetual_tables
+            .root_state_hash_by_epoch
+            .get(&epoch)
+            .map_err(Into::into)
     }
 
-    fn get_root_state_accumulator_for_highest_epoch(
+    fn get_root_state_hash_for_highest_epoch(
         &self,
-    ) -> SuiResult<Option<(EpochId, (CheckpointSequenceNumber, Accumulator))>> {
-        Ok(self.perpetual_tables.root_state_hash_by_epoch.safe_iter().skip_to_last().next().transpose()?)
+    ) -> SuiResult<Option<(EpochId, (CheckpointSequenceNumber, GlobalStateHash))>> {
+        Ok(self
+            .perpetual_tables
+            .root_state_hash_by_epoch
+            .reversed_safe_iter_with_bounds(None, None)?
+            .next()
+            .transpose()?)
     }
 
-    fn insert_state_accumulator_for_epoch(
+    fn insert_state_hash_for_epoch(
         &self,
         epoch: EpochId,
         last_checkpoint_of_epoch: &CheckpointSequenceNumber,
-        acc: &Accumulator,
+        acc: &GlobalStateHash,
     ) -> SuiResult {
-        self.perpetual_tables.root_state_hash_by_epoch.insert(&epoch, &(*last_checkpoint_of_epoch, acc.clone()))?;
-        self.root_state_notify_read.notify(&epoch, &(*last_checkpoint_of_epoch, acc.clone()));
+        self.perpetual_tables
+            .root_state_hash_by_epoch
+            .insert(&epoch, &(*last_checkpoint_of_epoch, acc.clone()))?;
+        self.root_state_notify_read
+            .notify(&epoch, &(*last_checkpoint_of_epoch, acc.clone()));
 
         Ok(())
     }
 
-    fn iter_live_object_set(&self, include_wrapped_object: bool) -> Box<dyn Iterator<Item = LiveObject> + '_> {
-        Box::new(self.perpetual_tables.iter_live_object_set(include_wrapped_object))
+    fn iter_live_object_set(
+        &self,
+        include_wrapped_object: bool,
+    ) -> Box<dyn Iterator<Item = LiveObject> + '_> {
+        Box::new(
+            self.perpetual_tables
+                .iter_live_object_set(include_wrapped_object),
+        )
     }
 }
 
@@ -1602,7 +1763,10 @@ pub struct ResolverWrapper {
 }
 
 impl ResolverWrapper {
-    pub fn new(resolver: Arc<dyn BackingPackageStore + Send + Sync>, metrics: Arc<ResolverMetrics>) -> Self {
+    pub fn new(
+        resolver: Arc<dyn BackingPackageStore + Send + Sync>,
+        metrics: Arc<ResolverMetrics>,
+    ) -> Self {
         metrics.module_cache_size.set(0);
         ResolverWrapper { resolver, metrics }
     }
@@ -1616,7 +1780,6 @@ impl ResolverWrapper {
 
 impl ModuleResolver for ResolverWrapper {
     type Error = SuiError;
-
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         self.inc_cache_size_gauge();
         get_module(&*self.resolver, module_id)
@@ -1660,7 +1823,6 @@ impl LockDetailsWrapperDeprecated {
             _ => panic!("lock details should have been migrated to latest version at read time"),
         }
     }
-
     pub fn into_inner(self) -> LockDetailsDeprecated {
         match self {
             Self::V1(v1) => v1,

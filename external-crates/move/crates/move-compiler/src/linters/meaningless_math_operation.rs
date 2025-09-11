@@ -79,7 +79,9 @@ fn is_zero(exp: &H::Exp) -> Option<Loc> {
         return None;
     };
     match value_ {
-        Value_::U8(0) | Value_::U16(0) | Value_::U32(0) | Value_::U64(0) | Value_::U128(0) => Some(*loc),
+        Value_::U8(0) | Value_::U16(0) | Value_::U32(0) | Value_::U64(0) | Value_::U128(0) => {
+            Some(*loc)
+        }
         Value_::U256(u) if u == &U256::zero() => Some(*loc),
         Value_::U8(_)
         | Value_::U16(_)
@@ -98,7 +100,9 @@ fn is_one(exp: &H::Exp) -> Option<Loc> {
         return None;
     };
     match value_ {
-        Value_::U8(1) | Value_::U16(1) | Value_::U32(1) | Value_::U64(1) | Value_::U128(1) => Some(*loc),
+        Value_::U8(1) | Value_::U16(1) | Value_::U32(1) | Value_::U64(1) | Value_::U128(1) => {
+            Some(*loc)
+        }
         Value_::U256(u) if u == &U256::one() => Some(*loc),
         Value_::U8(_)
         | Value_::U16(_)

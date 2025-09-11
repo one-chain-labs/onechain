@@ -4,7 +4,7 @@
 use crate::{
     diag,
     diagnostics::{Diagnostic, DiagnosticReporter},
-    parser::ast::{self as P, ModuleName, Var, MACRO_MODIFIER},
+    parser::ast::{self as P, MACRO_MODIFIER, ModuleName, Var},
     shared::*,
 };
 use move_ir_types::location::*;
@@ -15,18 +15,29 @@ use std::collections::BTreeSet;
 // use std::vector;
 // use std::option::{Self, Option};
 pub const IMPLICIT_STD_MODULES: &[Symbol] = &[symbol!("option"), symbol!("vector")];
-pub const IMPLICIT_STD_MEMBERS: &[(Symbol, Symbol, ModuleMemberKind)] =
-    &[(symbol!("option"), symbol!("Option"), ModuleMemberKind::Struct)];
+pub const IMPLICIT_STD_MEMBERS: &[(Symbol, Symbol, ModuleMemberKind)] = &[(
+    symbol!("option"),
+    symbol!("Option"),
+    ModuleMemberKind::Struct,
+)];
 
 // Implicit aliases for Sui mode:
 // use sui::object::{Self, ID, UID};
 // use sui::transfer;
 // use sui::tx_context::{Self, TxContext};
-pub const IMPLICIT_SUI_MODULES: &[Symbol] = &[symbol!("object"), symbol!("transfer"), symbol!("tx_context")];
+pub const IMPLICIT_SUI_MODULES: &[Symbol] = &[
+    symbol!("object"),
+    symbol!("transfer"),
+    symbol!("tx_context"),
+];
 pub const IMPLICIT_SUI_MEMBERS: &[(Symbol, Symbol, ModuleMemberKind)] = &[
     (symbol!("object"), symbol!("ID"), ModuleMemberKind::Struct),
     (symbol!("object"), symbol!("UID"), ModuleMemberKind::Struct),
-    (symbol!("tx_context"), symbol!("TxContext"), ModuleMemberKind::Struct),
+    (
+        symbol!("tx_context"),
+        symbol!("TxContext"),
+        ModuleMemberKind::Struct,
+    ),
 ];
 
 #[derive(Copy, Clone, Debug)]
@@ -91,11 +102,16 @@ impl NameCase {
 //**************************************************************************************************
 
 #[allow(clippy::result_unit_err)]
-pub fn check_valid_address_name(reporter: &DiagnosticReporter, sp!(_, ln_): &P::LeadingNameAccess) -> Result<(), ()> {
+pub fn check_valid_address_name(
+    reporter: &DiagnosticReporter,
+    sp!(_, ln_): &P::LeadingNameAccess,
+) -> Result<(), ()> {
     use P::LeadingNameAccess_ as LN;
     match ln_ {
         LN::AnonymousAddress(_) => Ok(()),
-        LN::GlobalAddress(n) | LN::Name(n) => check_restricted_name_all_cases(reporter, NameCase::Address, n),
+        LN::GlobalAddress(n) | LN::Name(n) => {
+            check_restricted_name_all_cases(reporter, NameCase::Address, n)
+        }
     }
 }
 
@@ -104,9 +120,12 @@ pub fn valid_local_variable_name(s: Symbol) -> bool {
 }
 
 #[allow(clippy::result_unit_err)]
-pub fn check_valid_function_parameter_name(reporter: &DiagnosticReporter, is_macro: Option<Loc>, v: &Var) {
-    const SYNTAX_IDENTIFIER_NOTE: &str =
-        "'macro' parameters start with '$' to indicate that their arguments are not evaluated \
+pub fn check_valid_function_parameter_name(
+    reporter: &DiagnosticReporter,
+    is_macro: Option<Loc>,
+    v: &Var,
+) {
+    const SYNTAX_IDENTIFIER_NOTE: &str = "'macro' parameters start with '$' to indicate that their arguments are not evaluated \
         before the macro is expanded, meaning the entire expression is substituted. \
         This is different from regular function parameters that are evaluated before the \
         function is called.";
@@ -118,13 +137,19 @@ pub fn check_valid_function_parameter_name(reporter: &DiagnosticReporter, is_mac
                 v, MACRO_MODIFIER,
             );
             let macro_msg = format!("Declared '{}' here", MACRO_MODIFIER);
-            let mut diag = diag!(Declarations::InvalidName, (v.loc(), msg), (macro_loc, macro_msg),);
+            let mut diag = diag!(
+                Declarations::InvalidName,
+                (v.loc(), msg),
+                (macro_loc, macro_msg),
+            );
             diag.add_note(SYNTAX_IDENTIFIER_NOTE);
             reporter.add_diag(diag);
         }
     } else if is_syntax_identifier {
-        let msg =
-            format!("Invalid parameter name '{}'. Non-'{}' parameter names cannot start with '$'", v, MACRO_MODIFIER,);
+        let msg = format!(
+            "Invalid parameter name '{}'. Non-'{}' parameter names cannot start with '$'",
+            v, MACRO_MODIFIER,
+        );
         let mut diag = diag!(Declarations::InvalidName, (v.loc(), msg));
         diag.add_note(SYNTAX_IDENTIFIER_NOTE);
         reporter.add_diag(diag);
@@ -171,7 +196,12 @@ pub fn check_valid_module_member_alias(
     member: ModuleMemberKind,
     alias: Name,
 ) -> Option<Name> {
-    match check_valid_module_member_name_impl(reporter, member, &alias, NameCase::ModuleMemberAlias(member)) {
+    match check_valid_module_member_name_impl(
+        reporter,
+        member,
+        &alias,
+        NameCase::ModuleMemberAlias(member),
+    ) {
         Err(()) => None,
         Ok(()) => Some(alias),
     }
@@ -219,8 +249,18 @@ fn check_valid_module_member_name_impl(
     }
 
     // TODO move these names to a more central place?
-    check_restricted_names(reporter, case, n, crate::naming::ast::BuiltinFunction_::all_names())?;
-    check_restricted_names(reporter, case, n, crate::naming::ast::BuiltinTypeName_::all_names())?;
+    check_restricted_names(
+        reporter,
+        case,
+        n,
+        crate::naming::ast::BuiltinFunction_::all_names(),
+    )?;
+    check_restricted_names(
+        reporter,
+        case,
+        n,
+        crate::naming::ast::BuiltinTypeName_::all_names(),
+    )?;
 
     // Restricting Self for now in the case where we ever have impls
     // Otherwise, we could allow it
@@ -255,7 +295,11 @@ pub fn check_valid_type_parameter_name(
                 MACRO_MODIFIER
             );
             let macro_msg = format!("Declared '{}' here", MACRO_MODIFIER);
-            let mut diag = diag!(Declarations::InvalidName, (n.loc, msg), (macro_loc, macro_msg),);
+            let mut diag = diag!(
+                Declarations::InvalidName,
+                (n.loc, msg),
+                (macro_loc, macro_msg),
+            );
             diag.add_note(SYNTAX_IDENTIFIER_NOTE);
             reporter.add_diag(diag);
         } else {
@@ -284,8 +328,18 @@ pub fn check_valid_type_parameter_name(
     }
 
     // TODO move these names to a more central place?
-    check_restricted_names(reporter, NameCase::TypeParameter, n, crate::naming::ast::BuiltinFunction_::all_names())?;
-    check_restricted_names(reporter, NameCase::TypeParameter, n, crate::naming::ast::BuiltinTypeName_::all_names())?;
+    check_restricted_names(
+        reporter,
+        NameCase::TypeParameter,
+        n,
+        crate::naming::ast::BuiltinFunction_::all_names(),
+    )?;
+    check_restricted_names(
+        reporter,
+        NameCase::TypeParameter,
+        n,
+        crate::naming::ast::BuiltinTypeName_::all_names(),
+    )?;
 
     check_restricted_name_all_cases(reporter, NameCase::TypeParameter, n)
 }
@@ -297,7 +351,11 @@ pub fn is_valid_datatype_or_constant_name(s: &str) -> bool {
 #[allow(clippy::result_unit_err)]
 // Checks for a restricted name in any decl case
 // Self and vector are not allowed
-pub fn check_restricted_name_all_cases(reporter: &DiagnosticReporter, case: NameCase, n: &Name) -> Result<(), ()> {
+pub fn check_restricted_name_all_cases(
+    reporter: &DiagnosticReporter,
+    case: NameCase,
+    n: &Name,
+) -> Result<(), ()> {
     match case {
         NameCase::Constant
         | NameCase::Function
@@ -323,7 +381,9 @@ pub fn check_restricted_name_all_cases(reporter: &DiagnosticReporter, case: Name
 
     let n_str = n.value.as_str();
     let can_be_vector = matches!(case, NameCase::Module | NameCase::ModuleAlias);
-    if n_str == ModuleName::SELF_NAME || (!can_be_vector && n_str == crate::naming::ast::BuiltinTypeName_::VECTOR) {
+    if n_str == ModuleName::SELF_NAME
+        || (!can_be_vector && n_str == crate::naming::ast::BuiltinTypeName_::VECTOR)
+    {
         reporter.add_diag(restricted_name_error(case, n.loc, n_str));
         Err(())
     } else {

@@ -1,40 +1,28 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    num::NonZeroUsize,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::path::PathBuf;
+use std::time::Duration;
+use std::{num::NonZeroUsize, path::Path, sync::Arc};
 
 use rand::rngs::OsRng;
-use sui_config::{
-    genesis::{TokenAllocation, TokenDistributionSchedule, TokenDistributionScheduleBuilder},
-    node::AuthorityOverloadConfig,
-    ExecutionCacheConfig,
-};
-use sui_macros::nondeterministic;
-use sui_types::{
-    base_types::{AuthorityName, SuiAddress},
-    committee::{Committee, ProtocolVersion},
-    crypto::{get_key_pair_from_rng, AccountKeyPair, KeypairTraits, PublicKey},
-    object::Object,
-    supported_protocol_versions::SupportedProtocolVersions,
-    traffic_control::{PolicyConfig, RemoteFirewallConfig},
-};
+use sui_config::genesis::{TokenAllocation, TokenDistributionScheduleBuilder,TokenDistributionSchedule};
+use sui_config::node::AuthorityOverloadConfig;
+#[cfg(msim)]
+use sui_config::node::ExecutionTimeObserverConfig;
+use sui_config::ExecutionCacheConfig;
+use sui_protocol_config::Chain;
+use sui_types::base_types::{AuthorityName, SuiAddress};
+use sui_types::committee::{Committee, ProtocolVersion};
+use sui_types::crypto::{get_key_pair_from_rng, AccountKeyPair, KeypairTraits, PublicKey};
+use sui_types::object::Object;
+use sui_types::supported_protocol_versions::SupportedProtocolVersions;
+use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
 
-use crate::{
-    genesis_config::{
-        AccountConfig,
-        GenesisConfig,
-        ValidatorGenesisConfig,
-        ValidatorGenesisConfigBuilder,
-        DEFAULT_GAS_AMOUNT,
-    },
-    network_config::NetworkConfig,
-    node_config_builder::ValidatorConfigBuilder,
-};
+use crate::genesis_config::{AccountConfig, ValidatorGenesisConfigBuilder, DEFAULT_GAS_AMOUNT};
+use crate::genesis_config::{GenesisConfig, ValidatorGenesisConfig};
+use crate::network_config::NetworkConfig;
+use crate::node_config_builder::ValidatorConfigBuilder;
 
 pub enum CommitteeConfig {
     Size(NonZeroUsize),
@@ -66,18 +54,19 @@ pub enum ProtocolVersionsConfig {
     PerValidator(SupportedProtocolVersionsCallback),
 }
 
-pub type StateAccumulatorV2EnabledCallback = Arc<dyn Fn(usize) -> bool + Send + Sync + 'static>;
+pub type GlobalStateHashV2EnabledCallback = Arc<dyn Fn(usize) -> bool + Send + Sync + 'static>;
 
 #[derive(Clone)]
-pub enum StateAccumulatorV2EnabledConfig {
+pub enum GlobalStateHashV2EnabledConfig {
     Global(bool),
-    PerValidator(StateAccumulatorV2EnabledCallback),
+    PerValidator(GlobalStateHashV2EnabledCallback),
 }
 
 pub struct ConfigBuilder<R = OsRng> {
     rng: Option<R>,
     config_directory: PathBuf,
     supported_protocol_versions_config: Option<ProtocolVersionsConfig>,
+    chain_override: Option<Chain>,
     committee: CommitteeConfig,
     genesis_config: Option<GenesisConfig>,
     reference_gas_price: Option<u64>,
@@ -91,8 +80,10 @@ pub struct ConfigBuilder<R = OsRng> {
     firewall_config: Option<RemoteFirewallConfig>,
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
-    state_accumulator_v2_enabled_config: Option<StateAccumulatorV2EnabledConfig>,
+    global_state_hash_v2_enabled_config: Option<GlobalStateHashV2EnabledConfig>,
     custom_distribution_schedule: Option<TokenDistributionSchedule>,
+    #[cfg(msim)]
+    execution_time_observer_config: Option<ExecutionTimeObserverConfig>,
 }
 
 impl ConfigBuilder {
@@ -101,6 +92,7 @@ impl ConfigBuilder {
             rng: Some(OsRng),
             config_directory: config_directory.as_ref().into(),
             supported_protocol_versions_config: None,
+            chain_override: None,
             // FIXME: A network with only 1 validator does not have liveness.
             // We need to change this. There are some tests that depend on it though.
             committee: CommitteeConfig::Size(NonZeroUsize::new(1).unwrap()),
@@ -116,13 +108,15 @@ impl ConfigBuilder {
             firewall_config: None,
             max_submit_position: None,
             submit_delay_step_override_millis: None,
-            state_accumulator_v2_enabled_config: None,
+            global_state_hash_v2_enabled_config: None,
             custom_distribution_schedule: None,
+            #[cfg(msim)]
+            execution_time_observer_config: None,
         }
     }
 
     pub fn new_with_temp_dir() -> Self {
-        Self::new(nondeterministic!(tempfile::tempdir().unwrap()).keep())
+        Self::new(mysten_common::tempdir().unwrap().keep())
     }
 }
 
@@ -166,6 +160,12 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
+    pub fn with_chain_override(mut self, chain: Chain) -> Self {
+        assert!(self.chain_override.is_none(), "Chain override already set");
+        self.chain_override = Some(chain);
+        self
+    }
+
     pub fn with_num_unpruned_validators(mut self, n: usize) -> Self {
         self.num_unpruned_validators = Some(n);
         self
@@ -192,7 +192,9 @@ impl<R> ConfigBuilder<R> {
     }
 
     pub fn with_chain_start_timestamp_ms(mut self, chain_start_timestamp_ms: u64) -> Self {
-        self.get_or_init_genesis_config().parameters.chain_start_timestamp_ms = chain_start_timestamp_ms;
+        self.get_or_init_genesis_config()
+            .parameters
+            .chain_start_timestamp_ms = chain_start_timestamp_ms;
         self
     }
 
@@ -202,12 +204,16 @@ impl<R> ConfigBuilder<R> {
     }
 
     pub fn with_epoch_duration(mut self, epoch_duration_ms: u64) -> Self {
-        self.get_or_init_genesis_config().parameters.epoch_duration_ms = epoch_duration_ms;
+        self.get_or_init_genesis_config()
+            .parameters
+            .epoch_duration_ms = epoch_duration_ms;
         self
     }
 
     pub fn with_protocol_version(mut self, protocol_version: ProtocolVersion) -> Self {
-        self.get_or_init_genesis_config().parameters.protocol_version = protocol_version;
+        self.get_or_init_genesis_config()
+            .parameters
+            .protocol_version = protocol_version;
         self
     }
 
@@ -216,7 +222,10 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
-    pub fn with_supported_protocol_version_callback(mut self, func: SupportedProtocolVersionsCallback) -> Self {
+    pub fn with_supported_protocol_version_callback(
+        mut self,
+        func: SupportedProtocolVersionsCallback,
+    ) -> Self {
         self.supported_protocol_versions_config = Some(ProtocolVersionsConfig::PerValidator(func));
         self
     }
@@ -226,18 +235,32 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled(mut self, enabled: bool) -> Self {
-        self.state_accumulator_v2_enabled_config = Some(StateAccumulatorV2EnabledConfig::Global(enabled));
+    pub fn with_global_state_hash_v2_enabled(mut self, enabled: bool) -> Self {
+        self.global_state_hash_v2_enabled_config =
+            Some(GlobalStateHashV2EnabledConfig::Global(enabled));
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled_callback(mut self, func: StateAccumulatorV2EnabledCallback) -> Self {
-        self.state_accumulator_v2_enabled_config = Some(StateAccumulatorV2EnabledConfig::PerValidator(func));
+    pub fn with_global_state_hash_v2_enabled_callback(
+        mut self,
+        func: GlobalStateHashV2EnabledCallback,
+    ) -> Self {
+        self.global_state_hash_v2_enabled_config =
+            Some(GlobalStateHashV2EnabledConfig::PerValidator(func));
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled_config(mut self, c: StateAccumulatorV2EnabledConfig) -> Self {
-        self.state_accumulator_v2_enabled_config = Some(c);
+    pub fn with_global_state_hash_v2_enabled_config(
+        mut self,
+        c: GlobalStateHashV2EnabledConfig,
+    ) -> Self {
+        self.global_state_hash_v2_enabled_config = Some(c);
+        self
+    }
+
+    #[cfg(msim)]
+    pub fn with_execution_time_observer_config(mut self, c: ExecutionTimeObserverConfig) -> Self {
+        self.execution_time_observer_config = Some(c);
         self
     }
 
@@ -266,7 +289,10 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
-    pub fn with_submit_delay_step_override_millis(mut self, submit_delay_step_override_millis: u64) -> Self {
+    pub fn with_submit_delay_step_override_millis(
+        mut self,
+        submit_delay_step_override_millis: u64,
+    ) -> Self {
         self.submit_delay_step_override_millis = Some(submit_delay_step_override_millis);
         self
     }
@@ -283,6 +309,7 @@ impl<R> ConfigBuilder<R> {
             supported_protocol_versions_config: self.supported_protocol_versions_config,
             committee: self.committee,
             genesis_config: self.genesis_config,
+            chain_override: self.chain_override,
             reference_gas_price: self.reference_gas_price,
             additional_objects: self.additional_objects,
             num_unpruned_validators: self.num_unpruned_validators,
@@ -294,8 +321,11 @@ impl<R> ConfigBuilder<R> {
             firewall_config: self.firewall_config,
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
-            state_accumulator_v2_enabled_config: self.state_accumulator_v2_enabled_config,
+            global_state_hash_v2_enabled_config: self.global_state_hash_v2_enabled_config,
             custom_distribution_schedule: self.custom_distribution_schedule,
+
+            #[cfg(msim)]
+            execution_time_observer_config: self.execution_time_observer_config,
         }
     }
 
@@ -323,7 +353,8 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
 
                 keys.into_iter()
                     .map(|authority_key| {
-                        let mut builder = ValidatorGenesisConfigBuilder::new().with_protocol_key_pair(authority_key);
+                        let mut builder = ValidatorGenesisConfigBuilder::new()
+                            .with_protocol_key_pair(authority_key);
                         if let Some(rgp) = self.reference_gas_price {
                             builder = builder.with_gas_price(rgp);
                         }
@@ -352,7 +383,11 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
             }
             CommitteeConfig::Deterministic((size, keys)) => {
                 // If no keys are provided, generate them.
-                let keys = keys.unwrap_or((0..size.get()).map(|_| get_key_pair_from_rng(&mut rng).1).collect());
+                let keys = keys.unwrap_or(
+                    (0..size.get())
+                        .map(|_| get_key_pair_from_rng(&mut rng).1)
+                        .collect(),
+                );
 
                 let mut configs = vec![];
                 for (i, key) in keys.into_iter().enumerate() {
@@ -370,7 +405,9 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
             }
         };
 
-        let genesis_config = self.genesis_config.unwrap_or_else(GenesisConfig::for_local_testing);
+        let genesis_config = self
+            .genesis_config
+            .unwrap_or_else(GenesisConfig::for_local_testing);
 
         let (account_keys, allocations) = genesis_config.generate_accounts(&mut rng).unwrap();
 
@@ -408,9 +445,13 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                 .add_objects(self.additional_objects);
 
             for (i, validator) in validators.iter().enumerate() {
-                let name = validator.name.clone().unwrap_or(format!("validator-{i}").to_string());
+                let name = validator
+                    .name
+                    .clone()
+                    .unwrap_or(format!("validator-{i}").to_string());
                 let validator_info = validator.to_validator_info(name);
-                builder = builder.add_validator(validator_info.info, validator_info.proof_of_possession);
+                builder =
+                    builder.add_validator(validator_info.info, validator_info.proof_of_possession);
             }
 
             builder = builder.with_token_distribution_schedule(token_distribution_schedule);
@@ -431,12 +472,19 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     .with_policy_config(self.policy_config.clone())
                     .with_firewall_config(self.firewall_config.clone());
 
+                if let Some(chain) = self.chain_override {
+                    builder = builder.with_chain_override(chain);
+                }
+
                 if let Some(max_submit_position) = self.max_submit_position {
                     builder = builder.with_max_submit_position(max_submit_position);
                 }
 
-                if let Some(submit_delay_step_override_millis) = self.submit_delay_step_override_millis {
-                    builder = builder.with_submit_delay_step_override_millis(submit_delay_step_override_millis);
+                if let Some(submit_delay_step_override_millis) =
+                    self.submit_delay_step_override_millis
+                {
+                    builder = builder
+                        .with_submit_delay_step_override_millis(submit_delay_step_override_millis);
                 }
 
                 if let Some(jwk_fetch_interval) = self.jwk_fetch_interval {
@@ -444,7 +492,8 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                 }
 
                 if let Some(authority_overload_config) = &self.authority_overload_config {
-                    builder = builder.with_authority_overload_config(authority_overload_config.clone());
+                    builder =
+                        builder.with_authority_overload_config(authority_overload_config.clone());
                 }
 
                 if let Some(execution_cache_config) = &self.execution_cache_config {
@@ -455,9 +504,18 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     builder = builder.with_data_ingestion_dir(path.clone());
                 }
 
+                #[cfg(msim)]
+                if let Some(execution_time_observer_config) = &self.execution_time_observer_config {
+                    builder = builder.with_execution_time_observer_config(
+                        execution_time_observer_config.clone(),
+                    );
+                }
+
                 if let Some(spvc) = &self.supported_protocol_versions_config {
                     let supported_versions = match spvc {
-                        ProtocolVersionsConfig::Default => SupportedProtocolVersions::SYSTEM_DEFAULT,
+                        ProtocolVersionsConfig::Default => {
+                            SupportedProtocolVersions::SYSTEM_DEFAULT
+                        }
                         ProtocolVersionsConfig::Global(v) => *v,
                         ProtocolVersionsConfig::PerValidator(func) => {
                             func(idx, Some(validator.key_pair.public().into()))
@@ -465,12 +523,13 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     };
                     builder = builder.with_supported_protocol_versions(supported_versions);
                 }
-                if let Some(acc_v2_config) = &self.state_accumulator_v2_enabled_config {
-                    let state_accumulator_v2_enabled: bool = match acc_v2_config {
-                        StateAccumulatorV2EnabledConfig::Global(enabled) => *enabled,
-                        StateAccumulatorV2EnabledConfig::PerValidator(func) => func(idx),
+                if let Some(acc_v2_config) = &self.global_state_hash_v2_enabled_config {
+                    let global_state_hash_v2_enabled: bool = match acc_v2_config {
+                        GlobalStateHashV2EnabledConfig::Global(enabled) => *enabled,
+                        GlobalStateHashV2EnabledConfig::PerValidator(func) => func(idx),
                     };
-                    builder = builder.with_state_accumulator_v2_enabled(state_accumulator_v2_enabled);
+                    builder =
+                        builder.with_global_state_hash_v2_enabled(global_state_hash_v2_enabled);
                 }
                 if let Some(num_unpruned_validators) = self.num_unpruned_validators {
                     if idx < num_unpruned_validators {
@@ -480,7 +539,11 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                 builder.build(validator, genesis.clone())
             })
             .collect();
-        NetworkConfig { validator_configs, genesis, account_keys }
+        NetworkConfig {
+            validator_configs,
+            genesis,
+            account_keys,
+        }
     }
 }
 
@@ -498,13 +561,21 @@ mod tests {
 
         let mut s = serde_yaml::to_string(&g).unwrap();
         let loaded_genesis: Genesis = serde_yaml::from_str(&s).unwrap();
-        loaded_genesis.genesis().unwrap().checkpoint_contents().digest(); // cache digest before comparing.
+        loaded_genesis
+            .genesis()
+            .unwrap()
+            .checkpoint_contents()
+            .digest(); // cache digest before comparing.
         assert_eq!(g, loaded_genesis);
 
         // If both in-place and file location are provided, prefer the in-place variant
         s.push_str("\ngenesis-file-location: path/to/file");
         let loaded_genesis: Genesis = serde_yaml::from_str(&s).unwrap();
-        loaded_genesis.genesis().unwrap().checkpoint_contents().digest(); // cache digest before comparing.
+        loaded_genesis
+            .genesis()
+            .unwrap()
+            .checkpoint_contents()
+            .digest(); // cache digest before comparing.
         assert_eq!(g, loaded_genesis);
     }
 
@@ -526,17 +597,16 @@ mod tests {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, sync::Arc};
+    use std::sync::Arc;
     use sui_config::genesis::Genesis;
     use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
-    use sui_types::{
-        epoch_data::EpochData,
-        gas::SuiGasStatus,
-        in_memory_storage::InMemoryStorage,
-        metrics::LimitsMetrics,
-        sui_system_state::SuiSystemStateTrait,
-        transaction::CheckedInputObjects,
-    };
+    use sui_types::epoch_data::EpochData;
+    use sui_types::execution_params::ExecutionOrEarlyError;
+    use sui_types::gas::SuiGasStatus;
+    use sui_types::in_memory_storage::InMemoryStorage;
+    use sui_types::metrics::LimitsMetrics;
+    use sui_types::sui_system_state::SuiSystemStateTrait;
+    use sui_types::transaction::CheckedInputObjects;
 
     #[test]
     fn roundtrip() {
@@ -564,34 +634,36 @@ mod test {
         let genesis_digest = *genesis_transaction.digest();
 
         let silent = true;
-        let executor =
-            sui_execution::executor(&protocol_config, silent, None).expect("Creating an executor should not fail here");
+        let executor = sui_execution::executor(&protocol_config, silent, None)
+            .expect("Creating an executor should not fail here");
 
         // Use a throwaway metrics registry for genesis transaction execution.
         let registry = prometheus::Registry::new();
         let metrics = Arc::new(LimitsMetrics::new(&registry));
         let expensive_checks = false;
-        let certificate_deny_set = HashSet::new();
         let epoch = EpochData::new_test();
         let transaction_data = &genesis_transaction.data().intent_message().value;
-        let (kind, signer, _) = transaction_data.execution_parts();
+        let (kind, signer, mut gas_data) = transaction_data.execution_parts();
+        gas_data.payment = vec![];
         let input_objects = CheckedInputObjects::new_for_genesis(vec![]);
 
-        let (_inner_temp_store, _, effects, _execution_error) = executor.execute_transaction_to_effects(
-            &InMemoryStorage::new(Vec::new()),
-            &protocol_config,
-            metrics,
-            expensive_checks,
-            &certificate_deny_set,
-            &epoch.epoch_id(),
-            epoch.epoch_start_timestamp(),
-            input_objects,
-            vec![],
-            SuiGasStatus::new_unmetered(),
-            kind,
-            signer,
-            genesis_digest,
-        );
+        let (_inner_temp_store, _, effects, _timings, _execution_error) = executor
+            .execute_transaction_to_effects(
+                &InMemoryStorage::new(Vec::new()),
+                &protocol_config,
+                metrics,
+                expensive_checks,
+                ExecutionOrEarlyError::Ok(()),
+                &epoch.epoch_id(),
+                epoch.epoch_start_timestamp(),
+                input_objects,
+                gas_data,
+                SuiGasStatus::new_unmetered(),
+                kind,
+                signer,
+                genesis_digest,
+                &mut None,
+            );
 
         assert_eq!(&effects, genesis.effects());
     }

@@ -19,12 +19,10 @@ impl AutoTraceLevel {
         use AutoTraceLevel::*;
         matches!(self, VerifiedFunction | AllFunctions)
     }
-
     pub fn functions(self) -> bool {
         use AutoTraceLevel::*;
         matches!(self, AllFunctions)
     }
-
     pub fn invariants(self) -> bool {
         use AutoTraceLevel::*;
         matches!(self, VerifiedFunction | AllFunctions)

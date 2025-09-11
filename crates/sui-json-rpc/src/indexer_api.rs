@@ -1,15 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use anyhow::bail;
 use async_trait::async_trait;
-use futures::{future, Stream};
+use futures::{future, Stream, StreamExt};
 use jsonrpsee::{
-    core::{error::SubscriptionClosed, RpcResult},
-    types::SubscriptionResult,
-    RpcModule,
-    SubscriptionSink,
+    core::{RpcResult, SubscriptionResult},
+    PendingSubscriptionSink, RpcModule,
 };
 use move_bytecode_utils::layout::TypeLayoutBuilder;
 use move_core_types::language_storage::TypeTag;
@@ -18,28 +17,15 @@ use serde::Serialize;
 use sui_core::authority::AuthorityState;
 use sui_json::SuiJsonValue;
 use sui_json_rpc_api::{
-    cap_page_limit,
-    validate_limit,
-    IndexerApiOpenRpc,
-    IndexerApiServer,
-    JsonRpcMetrics,
-    ReadApiServer,
-    QUERY_MAX_RESULT_LIMIT,
+    cap_page_limit, validate_limit, IndexerApiOpenRpc, IndexerApiServer, JsonRpcMetrics,
+    ReadApiServer, QUERY_MAX_RESULT_LIMIT,
 };
 use sui_json_rpc_types::{
-    DynamicFieldPage,
-    EventFilter,
-    EventPage,
-    ObjectsPage,
-    Page,
-    SuiObjectDataOptions,
-    SuiObjectResponse,
-    SuiObjectResponseQuery,
-    SuiTransactionBlockResponse,
-    SuiTransactionBlockResponseQuery,
-    TransactionBlocksPage,
-    TransactionFilter,
+    DynamicFieldPage, EventFilter, EventPage, ObjectsPage, Page, SuiObjectDataOptions,
+    SuiObjectResponse, SuiObjectResponseQuery, SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseQuery, TransactionBlocksPage, TransactionFilter,
 };
+use sui_name_service::{Domain, NameRecord, NameServiceConfig, NameServiceError};
 use sui_open_rpc::Module;
 use sui_storage::key_value_store::TransactionKeyValueStore;
 use sui_types::{
@@ -50,37 +36,51 @@ use sui_types::{
     event::EventID,
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tracing::{debug, instrument, warn};
+use tracing::{instrument, warn};
 
 use crate::{
     authority_state::{StateRead, StateReadResult},
     error::{Error, SuiRpcInputError},
-    name_service::{Domain, NameRecord, NameServiceConfig, NameServiceError},
-    with_tracing,
-    SuiRpcModule,
+    with_tracing, SuiRpcModule,
 };
 
-pub fn spawn_subscription<S, T>(mut sink: SubscriptionSink, rx: S, permit: Option<OwnedSemaphorePermit>)
-where
+pub fn spawn_subscription<S, T>(
+    sink: PendingSubscriptionSink,
+    mut rx: S,
+    permit: Option<OwnedSemaphorePermit>,
+) where
     S: Stream<Item = T> + Unpin + Send + 'static,
-    T: Serialize,
+    T: Serialize + Send,
 {
     spawn_monitored_task!(async move {
-        let _permit = permit;
-        match sink.pipe_from_stream(rx).await {
-            SubscriptionClosed::Success => {
-                debug!("Subscription completed.");
-                sink.close(SubscriptionClosed::Success);
-            }
-            SubscriptionClosed::RemotePeerAborted => {
-                debug!("Subscription aborted by remote peer.");
-                sink.close(SubscriptionClosed::RemotePeerAborted);
-            }
-            SubscriptionClosed::Failed(err) => {
-                debug!("Subscription failed: {err:?}");
-                sink.close(err);
-            }
+        let Ok(sink) = sink.accept().await else {
+            return;
         };
+        let _permit = permit;
+
+        while let Some(item) = rx.next().await {
+            let Ok(message) = jsonrpsee::server::SubscriptionMessage::from_json(&item) else {
+                break;
+            };
+            let Ok(()) = sink.send(message).await else {
+                break;
+            };
+        }
+
+        //         match sink.pipe_from_stream(rx).await {
+        //             SubscriptionClosed::Success => {
+        //                 debug!("Subscription completed.");
+        //                 sink.close(SubscriptionClosed::Success);
+        //             }
+        //             SubscriptionClosed::RemotePeerAborted => {
+        //                 debug!("Subscription aborted by remote peer.");
+        //                 sink.close(SubscriptionClosed::RemotePeerAborted);
+        //             }
+        //             SubscriptionClosed::Failed(err) => {
+        //                 debug!("Subscription failed: {err:?}");
+        //                 sink.close(err);
+        //             }
+        //         };
     });
 }
 const DEFAULT_MAX_SUBSCRIPTIONS: usize = 100;
@@ -118,7 +118,10 @@ impl<R: ReadApiServer> IndexerApi<R> {
         &self,
         name: DynamicFieldName,
     ) -> Result<(TypeTag, Vec<u8>), SuiRpcInputError> {
-        let DynamicFieldName { type_: name_type, value } = name;
+        let DynamicFieldName {
+            type_: name_type,
+            value,
+        } = name;
         let epoch_store = self.state.load_epoch_store_one_call_per_task();
         let layout = TypeLayoutBuilder::build_with_types(&name_type, epoch_store.module_cache())?;
         let sui_json_value = SuiJsonValue::new(value)?;
@@ -136,7 +139,9 @@ impl<R: ReadApiServer> IndexerApi<R> {
     fn get_latest_checkpoint_timestamp_ms(&self) -> StateReadResult<u64> {
         let latest_checkpoint = self.state.get_latest_checkpoint_sequence_number()?;
 
-        let checkpoint = self.state.get_verified_checkpoint_by_sequence_number(latest_checkpoint)?;
+        let checkpoint = self
+            .state
+            .get_verified_checkpoint_by_sequence_number(latest_checkpoint)?;
 
         Ok(checkpoint.timestamp_ms)
     }
@@ -153,22 +158,30 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
         limit: Option<usize>,
     ) -> RpcResult<ObjectsPage> {
         with_tracing!(async move {
-            let limit = validate_limit(limit, *QUERY_MAX_RESULT_LIMIT).map_err(SuiRpcInputError::from)?;
+            let limit =
+                validate_limit(limit, *QUERY_MAX_RESULT_LIMIT).map_err(SuiRpcInputError::from)?;
             self.metrics.get_owned_objects_limit.observe(limit as f64);
             let SuiObjectResponseQuery { filter, options } = query.unwrap_or_default();
             let options = options.unwrap_or_default();
-            let mut objects =
-                self.state.get_owner_objects_with_limit(address, cursor, limit + 1, filter).map_err(Error::from)?;
+            let mut objects = self
+                .state
+                .get_owner_objects_with_limit(address, cursor, limit + 1, filter)
+                .map_err(Error::from)?;
 
             // objects here are of size (limit + 1), where the last one is the cursor for the next page
             let has_next_page = objects.len() > limit;
             objects.truncate(limit);
-            let next_cursor = objects.last().cloned().map_or(cursor, |o_info| Some(o_info.object_id));
+            let next_cursor = objects
+                .last()
+                .cloned()
+                .map_or(cursor, |o_info| Some(o_info.object_id));
 
             let data = match options.is_not_in_object_info() {
                 true => {
                     let object_ids = objects.iter().map(|obj| obj.object_id).collect();
-                    self.read_api.multi_get_objects(object_ids, Some(options)).await?
+                    self.read_api
+                        .multi_get_objects(object_ids, Some(options))
+                        .await?
                 }
                 false => objects
                     .into_iter()
@@ -176,9 +189,17 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
                     .collect::<Result<Vec<SuiObjectResponse>, _>>()?,
             };
 
-            self.metrics.get_owned_objects_result_size.observe(data.len() as f64);
-            self.metrics.get_owned_objects_result_size_total.inc_by(data.len() as u64);
-            Ok(Page { data, next_cursor, has_next_page })
+            self.metrics
+                .get_owned_objects_result_size
+                .observe(data.len() as f64);
+            self.metrics
+                .get_owned_objects_result_size_total
+                .inc_by(data.len() as u64);
+            Ok(Page {
+                data,
+                next_cursor,
+                has_next_page,
+            })
         })
     }
 
@@ -200,7 +221,13 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
             // Retrieve 1 extra item for next cursor
             let mut digests = self
                 .state
-                .get_transactions(&self.transaction_kv_store, query.filter, cursor, Some(limit + 1), descending)
+                .get_transactions(
+                    &self.transaction_kv_store,
+                    query.filter,
+                    cursor,
+                    Some(limit + 1),
+                    descending,
+                )
                 .await
                 .map_err(Error::from)?;
             // De-dup digests, duplicate digests are possible, for example,
@@ -214,17 +241,29 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
             let next_cursor = digests.last().cloned().map_or(cursor, Some);
 
             let data: Vec<SuiTransactionBlockResponse> = if opts.only_digest() {
-                digests.into_iter().map(SuiTransactionBlockResponse::new).collect()
+                digests
+                    .into_iter()
+                    .map(SuiTransactionBlockResponse::new)
+                    .collect()
             } else {
-                self.read_api.multi_get_transaction_blocks(digests, Some(opts)).await?
+                self.read_api
+                    .multi_get_transaction_blocks(digests, Some(opts))
+                    .await?
             };
 
-            self.metrics.query_tx_blocks_result_size.observe(data.len() as f64);
-            self.metrics.query_tx_blocks_result_size_total.inc_by(data.len() as u64);
-            Ok(Page { data, next_cursor, has_next_page })
+            self.metrics
+                .query_tx_blocks_result_size
+                .observe(data.len() as f64);
+            self.metrics
+                .query_tx_blocks_result_size_total
+                .inc_by(data.len() as u64);
+            Ok(Page {
+                data,
+                next_cursor,
+                has_next_page,
+            })
         })
     }
-
     #[instrument(skip(self))]
     async fn query_events(
         &self,
@@ -241,28 +280,62 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
             // Retrieve 1 extra item for next cursor
             let mut data = self
                 .state
-                .query_events(&self.transaction_kv_store, query, cursor, limit + 1, descending)
+                .query_events(
+                    &self.transaction_kv_store,
+                    query,
+                    cursor,
+                    limit + 1,
+                    descending,
+                )
                 .await
                 .map_err(Error::from)?;
             let has_next_page = data.len() > limit;
             data.truncate(limit);
             let next_cursor = data.last().map_or(cursor, |e| Some(e.id));
-            self.metrics.query_events_result_size.observe(data.len() as f64);
-            self.metrics.query_events_result_size_total.inc_by(data.len() as u64);
-            Ok(EventPage { data, next_cursor, has_next_page })
+            self.metrics
+                .query_events_result_size
+                .observe(data.len() as f64);
+            self.metrics
+                .query_events_result_size_total
+                .inc_by(data.len() as u64);
+            Ok(EventPage {
+                data,
+                next_cursor,
+                has_next_page,
+            })
         })
     }
 
     #[instrument(skip(self))]
-    fn subscribe_event(&self, sink: SubscriptionSink, filter: EventFilter) -> SubscriptionResult {
+    fn subscribe_event(
+        &self,
+        sink: PendingSubscriptionSink,
+        filter: EventFilter,
+    ) -> SubscriptionResult {
         let permit = self.acquire_subscribe_permit()?;
-        spawn_subscription(sink, self.state.get_subscription_handler().subscribe_events(filter), Some(permit));
+        spawn_subscription(
+            sink,
+            self.state
+                .get_subscription_handler()
+                .subscribe_events(filter),
+            Some(permit),
+        );
         Ok(())
     }
 
-    fn subscribe_transaction(&self, sink: SubscriptionSink, filter: TransactionFilter) -> SubscriptionResult {
+    fn subscribe_transaction(
+        &self,
+        sink: PendingSubscriptionSink,
+        filter: TransactionFilter,
+    ) -> SubscriptionResult {
         let permit = self.acquire_subscribe_permit()?;
-        spawn_subscription(sink, self.state.get_subscription_handler().subscribe_transactions(filter), Some(permit));
+        spawn_subscription(
+            sink,
+            self.state
+                .get_subscription_handler()
+                .subscribe_transactions(filter),
+            Some(permit),
+        );
         Ok(())
     }
 
@@ -277,13 +350,24 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
         with_tracing!(async move {
             let limit = cap_page_limit(limit);
             self.metrics.get_dynamic_fields_limit.observe(limit as f64);
-            let mut data = self.state.get_dynamic_fields(parent_object_id, cursor, limit + 1).map_err(Error::from)?;
+            let mut data = self
+                .state
+                .get_dynamic_fields(parent_object_id, cursor, limit + 1)
+                .map_err(Error::from)?;
             let has_next_page = data.len() > limit;
             data.truncate(limit);
             let next_cursor = data.last().cloned().map_or(cursor, |c| Some(c.0));
-            self.metrics.get_dynamic_fields_result_size.observe(data.len() as f64);
-            self.metrics.get_dynamic_fields_result_size_total.inc_by(data.len() as u64);
-            Ok(DynamicFieldPage { data: data.into_iter().map(|(_, w)| w.into()).collect(), next_cursor, has_next_page })
+            self.metrics
+                .get_dynamic_fields_result_size
+                .observe(data.len() as f64);
+            self.metrics
+                .get_dynamic_fields_result_size_total
+                .inc_by(data.len() as u64);
+            Ok(DynamicFieldPage {
+                data: data.into_iter().map(|(_, w)| w.into()).collect(),
+                next_cursor,
+                has_next_page,
+            })
         })
     }
 
@@ -302,9 +386,14 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
                 .map_err(Error::from)?;
             // TODO(chris): add options to `get_dynamic_field_object` API as well
             if let Some(id) = id {
-                self.read_api.get_object(id, Some(SuiObjectDataOptions::full_content())).await.map_err(Error::from)
+                self.read_api
+                    .get_object(id, Some(SuiObjectDataOptions::full_content()))
+                    .await
+                    .map_err(Error::from)
             } else {
-                Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::DynamicFieldNotFound { parent_object_id }))
+                Ok(SuiObjectResponse::new_with_error(
+                    SuiObjectResponseError::DynamicFieldNotFound { parent_object_id },
+                ))
             }
         })
     }
@@ -384,22 +473,34 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
         _limit: Option<usize>,
     ) -> RpcResult<Page<String, ObjectID>> {
         with_tracing!(async move {
-            let reverse_record_id = self.name_service_config.reverse_record_field_id(address.as_ref());
+            let reverse_record_id = self
+                .name_service_config
+                .reverse_record_field_id(address.as_ref());
 
-            let mut result = Page { data: vec![], next_cursor: None, has_next_page: false };
+            let mut result = Page {
+                data: vec![],
+                next_cursor: None,
+                has_next_page: false,
+            };
 
-            let Some(field_reverse_record_object) = self.state.get_object(&reverse_record_id).await? else {
+            let Some(field_reverse_record_object) =
+                self.state.get_object(&reverse_record_id).await?
+            else {
                 return Ok(result);
             };
 
             let domain = field_reverse_record_object
                 .to_rust::<Field<SuiAddress, Domain>>()
-                .ok_or_else(|| Error::UnexpectedError(format!("Malformed Object {reverse_record_id}")))?
+                .ok_or_else(|| {
+                    Error::UnexpectedError(format!("Malformed Object {reverse_record_id}"))
+                })?
                 .value;
 
             let domain_name = domain.to_string();
 
-            let resolved_address = self.resolve_name_service_address(domain_name.clone()).await?;
+            let resolved_address = self
+                .resolve_name_service_address(domain_name.clone())
+                .await?;
 
             // If looking up the domain returns an empty result, we return an empty result.
             if resolved_address.is_none() {

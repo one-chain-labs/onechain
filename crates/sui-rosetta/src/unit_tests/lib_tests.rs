@@ -3,31 +3,24 @@
 
 use crate::CoinMetadataCache;
 use anyhow::anyhow;
-use rand::{prelude::IteratorRandom, rngs::OsRng};
+use rand::prelude::IteratorRandom;
+use rand::rngs::OsRng;
 use shared_crypto::intent::Intent;
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::num::NonZeroUsize;
+use std::path::PathBuf;
 use sui_json_rpc_types::{
-    ObjectChange,
-    SuiObjectDataOptions,
-    SuiObjectResponseQuery,
-    SuiTransactionBlockResponseOptions,
+    ObjectChange, SuiObjectDataOptions, SuiObjectResponseQuery, SuiTransactionBlockResponseOptions,
 };
 use sui_keys::keystore::AccountKeystore;
 use sui_move_build::BuildConfig;
 use sui_sdk::SuiClient;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    gas_coin::GAS,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    quorum_driver_types::ExecuteTransactionRequestType,
-    transaction::{
-        InputObjectKind,
-        Transaction,
-        TransactionData,
-        TransactionDataAPI,
-        TransactionKind,
-        TEST_ONLY_GAS_UNIT_FOR_HEAVY_COMPUTATION_STORAGE,
-    },
+use sui_types::base_types::{ObjectID, ObjectRef, SuiAddress};
+use sui_types::gas_coin::GAS;
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::transaction::{
+    InputObjectKind, Transaction, TransactionData, TransactionDataAPI, TransactionKind,
+    TEST_ONLY_GAS_UNIT_FOR_HEAVY_COMPUTATION_STORAGE,
 };
 use test_cluster::TestClusterBuilder;
 
@@ -44,7 +37,8 @@ async fn test_cache() {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.extend(["..", "..", "examples", "move", "coin"]);
     let compiled_package = BuildConfig::new_for_testing().build(&path).unwrap();
-    let compiled_modules_bytes = compiled_package.get_package_bytes(/* with_unpublished_deps */ false);
+    let compiled_modules_bytes =
+        compiled_package.get_package_bytes(/* with_unpublished_deps */ false);
     let dependencies = compiled_package.get_dependency_storage_package_ids();
 
     let pt = {
@@ -56,7 +50,13 @@ async fn test_cache() {
         .input_objects()
         .unwrap_or_default()
         .iter()
-        .flat_map(|obj| if let InputObjectKind::ImmOrOwnedMoveObject((id, ..)) = obj { Some(*id) } else { None })
+        .flat_map(|obj| {
+            if let InputObjectKind::ImmOrOwnedMoveObject((id, ..)) = obj {
+                Some(*id)
+            } else {
+                None
+            }
+        })
         .collect::<Vec<_>>();
     let gas = vec![get_random_sui(&client, sender, input_objects).await];
     let data = TransactionData::new_with_gas_coins(
@@ -67,7 +67,9 @@ async fn test_cache() {
         rgp,
     );
 
-    let signature = keystore.sign_secure(&data.sender(), &data, Intent::sui_transaction()).unwrap();
+    let signature = keystore
+        .sign_secure(&data.sender(), &data, Intent::sui_transaction())
+        .unwrap();
     let response = client
         .quorum_driver_api()
         .execute_transaction_block(
@@ -109,13 +111,20 @@ async fn test_cache() {
     assert!(!coin_cache.metadata.lock().await.contains(&GAS::type_tag()));
 }
 
-async fn get_random_sui(client: &SuiClient, sender: SuiAddress, except: Vec<ObjectID>) -> ObjectRef {
+async fn get_random_sui(
+    client: &SuiClient,
+    sender: SuiAddress,
+    except: Vec<ObjectID>,
+) -> ObjectRef {
     let coins = client
         .read_api()
         .get_owned_objects(
             sender,
             Some(SuiObjectResponseQuery::new_with_options(
-                SuiObjectDataOptions::new().with_type().with_owner().with_previous_transaction(),
+                SuiObjectDataOptions::new()
+                    .with_type()
+                    .with_owner()
+                    .with_previous_transaction(),
             )),
             /* cursor */ None,
             /* limit */ None,

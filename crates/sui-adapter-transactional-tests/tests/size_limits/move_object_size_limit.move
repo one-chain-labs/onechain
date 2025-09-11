@@ -8,7 +8,7 @@
 //# publish
 
 module Test::M1 {
-    use one::bcs;
+    use sui::bcs;
 
     public struct S has key, store {
         id: UID,

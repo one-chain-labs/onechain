@@ -8,14 +8,10 @@ use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl
 use dotenvy::dotenv;
 use mysten_service::metrics::start_basic_prometheus_server;
 use prometheus::Registry;
-use std::{env, path::PathBuf};
+use std::env;
+use std::path::PathBuf;
 use sui_data_ingestion_core::{
-    DataIngestionMetrics,
-    FileProgressStore,
-    IndexerExecutor,
-    ReaderOptions,
-    Worker,
-    WorkerPool,
+    DataIngestionMetrics, FileProgressStore, IndexerExecutor, ReaderOptions, Worker, WorkerPool,
 };
 use sui_types::full_checkpoint_content::CheckpointData;
 use tokio::sync::oneshot;
@@ -69,7 +65,8 @@ impl SuinsIndexerWorker {
                                 domains::expiration_timestamp_ms
                                     .eq(sql(&format_update_field_query("expiration_timestamp_ms"))),
                                 domains::nft_id.eq(sql(&format_update_field_query("nft_id"))),
-                                domains::target_address.eq(sql(&format_update_field_query("target_address"))),
+                                domains::target_address
+                                    .eq(sql(&format_update_field_query("target_address"))),
                                 domains::data.eq(sql(&format_update_field_query("data"))),
                                 domains::last_checkpoint_updated
                                     .eq(sql(&format_update_field_query("last_checkpoint_updated"))),
@@ -78,7 +75,8 @@ impl SuinsIndexerWorker {
                                 // That prevents a scenario where we first process a later checkpoint that did an update to the name record (e..g change target address),
                                 // without first executing the checkpoint that created the subdomain wrapper.
                                 // Since wrapper re-assignment can only happen every 2 days, we can't write invalid data here.
-                                domains::subdomain_wrapper_id.eq(sql(&format_update_subdomain_wrapper_query())),
+                                domains::subdomain_wrapper_id
+                                    .eq(sql(&format_update_subdomain_wrapper_query())),
                             ))
                             .execute(conn)
                             .await
@@ -89,14 +87,14 @@ impl SuinsIndexerWorker {
                         // We want to remove from the database all name records that were removed in the checkpoint
                         // but only if the checkpoint is newer than the last time the name record was updated.
                         diesel::delete(domains::table)
-                            .filter(
-                                domains::field_id
-                                    .eq_any(removals)
-                                    .and(domains::last_checkpoint_updated.le(checkpoint_seq_num as i64)),
-                            )
+                            .filter(domains::field_id.eq_any(removals).and(
+                                domains::last_checkpoint_updated.le(checkpoint_seq_num as i64),
+                            ))
                             .execute(conn)
                             .await
-                            .unwrap_or_else(|_| panic!("Failed to process deletions: {:?}", removals));
+                            .unwrap_or_else(|_| {
+                                panic!("Failed to process deletions: {:?}", removals)
+                            });
                     }
 
                     Ok(())
@@ -110,7 +108,6 @@ impl SuinsIndexerWorker {
 #[async_trait]
 impl Worker for SuinsIndexerWorker {
     type Result = ();
-
     async fn process_checkpoint(&self, checkpoint: &CheckpointData) -> Result<()> {
         let checkpoint_seq_number = checkpoint.checkpoint_summary.sequence_number;
         let (updates, removals) = self.indexer.process_checkpoint(checkpoint);
@@ -120,13 +117,15 @@ impl Worker for SuinsIndexerWorker {
         if checkpoint_seq_number % 1000 == 0 {
             info!("Checkpoint sequence number: {}", checkpoint_seq_number);
         }
-        self.commit_to_db(&updates, &removals, checkpoint_seq_number).await?;
+        self.commit_to_db(&updates, &removals, checkpoint_seq_number)
+            .await?;
         Ok(())
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _guard = mysten_service::logging::init();
     dotenv().ok();
     let (remote_storage, registry_id, subdomain_wrapper_type, name_record_type) = (
         env::var("REMOTE_STORAGE").ok(),
@@ -148,16 +147,20 @@ async fn main() -> Result<()> {
     let metrics = DataIngestionMetrics::new(&registry);
     let mut executor = IndexerExecutor::new(progress_store, 1, metrics);
 
-    let indexer_setup = if let (Some(registry_id), Some(subdomain_wrapper_type), Some(name_record_type)) =
-        (registry_id, subdomain_wrapper_type, name_record_type)
-    {
-        SuinsIndexer::new(registry_id, subdomain_wrapper_type, name_record_type)
-    } else {
-        SuinsIndexer::default()
-    };
+    let indexer_setup =
+        if let (Some(registry_id), Some(subdomain_wrapper_type), Some(name_record_type)) =
+            (registry_id, subdomain_wrapper_type, name_record_type)
+        {
+            SuinsIndexer::new(registry_id, subdomain_wrapper_type, name_record_type)
+        } else {
+            SuinsIndexer::default()
+        };
 
     let worker_pool = WorkerPool::new(
-        SuinsIndexerWorker { pg_pool: get_connection_pool().await, indexer: indexer_setup },
+        SuinsIndexerWorker {
+            pg_pool: get_connection_pool().await,
+            indexer: indexer_setup,
+        },
         "suins_indexing".to_string(), /* task name used as a key in the progress store */
         100,                          /* concurrency */
     );
@@ -172,5 +175,6 @@ async fn main() -> Result<()> {
             exit_receiver,
         )
         .await?;
+    drop(_guard);
     Ok(())
 }

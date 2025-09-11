@@ -1,8 +1,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_abstract_interpreter::control_flow_graph::{BlockId, ControlFlowGraph, VMControlFlowGraph};
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use crate::absint::VMControlFlowGraph;
+use move_abstract_interpreter::control_flow_graph::ControlFlowGraph;
+use move_binary_format::file_format::CodeOffset;
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+
+type BlockId = CodeOffset;
 
 /// Dense index into nodes in the same `LoopSummary`
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -60,11 +64,18 @@ impl LoopSummary {
         }
 
         enum Frontier {
-            Visit { from_node: NodeId, to_block: BlockId },
-            Finish { block: BlockId, node_id: NodeId, parent: NodeId },
+            Visit {
+                from_node: NodeId,
+                to_block: BlockId,
+            },
+            Finish {
+                block: BlockId,
+                node_id: NodeId,
+                parent: NodeId,
+            },
         }
 
-        let num_blocks = cfg.num_blocks() as usize;
+        let num_blocks = cfg.num_blocks();
 
         // Fields in LoopSummary that are filled via a depth-first traversal of `cfg`.
         let mut blocks = vec![0; num_blocks];
@@ -81,17 +92,29 @@ impl LoopSummary {
         blocks[usize::from(root_node)] = root_block;
         exploration.insert(root_block, InProgress(root_node));
 
-        let mut stack: Vec<Frontier> =
-            cfg.successors(root_block).iter().map(|succ| Visit { from_node: root_node, to_block: *succ }).collect();
+        let mut stack: Vec<Frontier> = cfg
+            .successors(root_block)
+            .map(|succ| Visit {
+                from_node: root_node,
+                to_block: succ,
+            })
+            .collect();
 
         while let Some(action) = stack.pop() {
             match action {
-                Finish { block, node_id, parent } => {
+                Finish {
+                    block,
+                    node_id,
+                    parent,
+                } => {
                     descs[usize::from(parent)] += 1 + descs[usize::from(node_id)];
                     *exploration.get_mut(&block).unwrap() = Done(node_id);
                 }
 
-                Visit { from_node, to_block } => match exploration.entry(to_block) {
+                Visit {
+                    from_node,
+                    to_block,
+                } => match exploration.entry(to_block) {
                     Entry::Occupied(entry) => match entry.get() {
                         // Cyclic back edge detected by re-visiting `to` while still processing its
                         // children.
@@ -110,17 +133,27 @@ impl LoopSummary {
                         blocks[usize::from(to_node)] = to_block;
                         preds[usize::from(to_node)].push(from_node);
 
-                        stack.push(Finish { block: to_block, node_id: to_node, parent: from_node });
+                        stack.push(Finish {
+                            block: to_block,
+                            node_id: to_node,
+                            parent: from_node,
+                        });
 
-                        stack.extend(
-                            cfg.successors(to_block).iter().map(|succ| Visit { from_node: to_node, to_block: *succ }),
-                        );
+                        stack.extend(cfg.successors(to_block).map(|succ| Visit {
+                            from_node: to_node,
+                            to_block: succ,
+                        }));
                     }
                 },
             }
         }
 
-        LoopSummary { blocks, descs, backs, preds }
+        LoopSummary {
+            blocks,
+            descs,
+            backs,
+            preds,
+        }
     }
 
     /// Decides whether `descendant` is a descendant of `ancestor` in the depth-first spanning
@@ -157,7 +190,10 @@ impl LoopSummary {
 impl LoopPartition {
     pub fn new(summary: &LoopSummary) -> Self {
         let num_blocks = summary.blocks.len();
-        LoopPartition { parents: (0..num_blocks).map(|id| NodeId(id as u16)).collect(), depths: vec![0; num_blocks] }
+        LoopPartition {
+            parents: (0..num_blocks).map(|id| NodeId(id as u16)).collect(),
+            depths: vec![0; num_blocks],
+        }
     }
 
     /// Find the head of the collapsed node containing loop `id`, use path-compression to speed up

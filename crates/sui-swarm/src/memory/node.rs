@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
-use one_node::SuiNodeHandle;
-use std::sync::{Mutex, MutexGuard};
+use anyhow::anyhow;
+use anyhow::Result;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
 use sui_config::NodeConfig;
-use sui_types::{
-    base_types::{AuthorityName, ConciseableName},
-    crypto::KeypairTraits,
-};
+use one_node::SuiNodeHandle;
+use sui_types::base_types::AuthorityName;
+use sui_types::base_types::ConciseableName;
+use sui_types::crypto::KeypairTraits;
 use tap::TapFallible;
 use tracing::{error, info};
 
@@ -35,7 +36,11 @@ impl Node {
     ///
     /// [`NodeConfig`]: sui_config::NodeConfig
     pub fn new(config: NodeConfig) -> Self {
-        Self { container: Default::default(), config: config.into(), runtime_type: RuntimeType::SingleThreaded }
+        Self {
+            container: Default::default(),
+            config: config.into(),
+            runtime_type: RuntimeType::SingleThreaded,
+        }
     }
 
     /// Return the `name` of this Node
@@ -73,11 +78,19 @@ impl Node {
 
     /// If this Node is currently running
     pub fn is_running(&self) -> bool {
-        self.container.lock().unwrap().as_ref().map_or(false, |c| c.is_alive())
+        self.container
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|c| c.is_alive())
     }
 
     pub fn get_node_handle(&self) -> Option<SuiNodeHandle> {
-        self.container.lock().unwrap().as_ref().and_then(|c| c.get_node_handle())
+        self.container
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|c| c.get_node_handle())
     }
 
     /// Perform a health check on this Node by:
@@ -93,13 +106,17 @@ impl Node {
         }
 
         if is_validator {
-            let network_address = self.config().network_address().clone();
+            let network_address = self
+                .config()
+                .network_address()
+                .clone()
+                .rewrite_http_to_https();
             let tls_config = sui_tls::create_rustls_client_config(
                 self.config().network_key_pair().public().to_owned(),
                 sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
                 None,
             );
-            let channel = mysten_network::client::connect(&network_address, Some(tls_config))
+            let channel = mysten_network::client::connect(&network_address, tls_config)
                 .await
                 .map_err(|err| anyhow!(err.to_string()))
                 .map_err(HealthCheckError::Failure)
@@ -110,7 +127,12 @@ impl Node {
                 .check(tonic_health::pb::HealthCheckRequest::default())
                 .await
                 .map_err(|e| HealthCheckError::Failure(e.into()))
-                .tap_err(|e| error!("error performing health check on {}: {e}", self.name().concise()))?;
+                .tap_err(|e| {
+                    error!(
+                        "error performing health check on {}: {e}",
+                        self.name().concise()
+                    )
+                })?;
         }
 
         Ok(())

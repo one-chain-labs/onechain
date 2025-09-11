@@ -1,54 +1,120 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{BTreeMap, BTreeSet};
-
+use crate::package_store::PackageCache;
+use crate::tables::{InputObjectKind, ObjectStatus, OwnerType};
+use crate::FileType;
+use crate::TRANSACTION_CONCURRENCY_LIMIT;
 use anyhow::{anyhow, Result};
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveTypeLayout, MoveValue},
-    language_storage::{StructTag, TypeTag},
-};
-use sui_data_ingestion_core::Worker;
-
+use async_trait::async_trait;
+use futures::stream::{self, StreamExt};
+use move_core_types::annotated_value::{MoveStruct, MoveTypeLayout, MoveValue};
+use move_core_types::language_storage::{StructTag, TypeTag};
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use sui_package_resolver::{PackageStore, Resolver};
-use sui_types::{
-    base_types::ObjectID,
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    object::{bounded_visitor::BoundedVisitor, Object, Owner},
-    transaction::{TransactionData, TransactionDataAPI},
-};
-
-use crate::{
-    tables::{InputObjectKind, ObjectStatus, OwnerType},
-    FileType,
-};
+use sui_types::base_types::ObjectID;
+use sui_types::effects::TransactionEffects;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::object::bounded_visitor::BoundedVisitor;
+use sui_types::object::{Object, Owner};
+use sui_types::transaction::TransactionData;
+use sui_types::transaction::TransactionDataAPI;
 
 pub mod checkpoint_handler;
 pub mod df_handler;
 pub mod event_handler;
 pub mod move_call_handler;
 pub mod object_handler;
+pub mod package_bcs_handler;
 pub mod package_handler;
+pub mod transaction_bcs_handler;
 pub mod transaction_handler;
 pub mod transaction_objects_handler;
 pub mod wrapped_object_handler;
-const WRAPPED_INDEXING_DISALLOW_LIST: [&str; 4] =
-    ["0x1::string::String", "0x1::ascii::String", "0x2::url::Url", "0x2::object::ID"];
+const WRAPPED_INDEXING_DISALLOW_LIST: [&str; 4] = [
+    "0x1::string::String",
+    "0x1::ascii::String",
+    "0x2::url::Url",
+    "0x2::object::ID",
+];
 
 #[async_trait::async_trait]
-pub trait AnalyticsHandler<S>: Worker<Result = ()> {
-    /// Read back rows which are ready to be persisted. This function
-    /// will be invoked by the analytics processor after every call to
-    /// process_checkpoint
-    async fn read(&self) -> Result<Vec<S>>;
+pub trait AnalyticsHandler<S>: Send + Sync {
+    /// Process a checkpoint and return a boxed iterator over the rows.
+    /// This function is invoked by the analytics processor for each checkpoint.
+    async fn process_checkpoint(
+        &self,
+        checkpoint_data: &Arc<CheckpointData>,
+    ) -> Result<Box<dyn Iterator<Item = S> + Send + Sync>>
+    where
+        S: Send + Sync;
     /// Type of data being written by this processor i.e. checkpoint, object, etc
     fn file_type(&self) -> Result<FileType>;
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
+}
+
+/// Trait for processing transactions in parallel across all transactions in a checkpoint.
+/// Implementations will extract and transform transaction data into structured rows for analytics.
+#[async_trait]
+pub trait TransactionProcessor<Row>: Send + Sync + 'static {
+    /// Process a single transaction at the given index and return a boxed iterator over the rows.
+    /// The implementation should handle extracting the transaction from the checkpoint.
+    async fn process_transaction(
+        &self,
+        tx_idx: usize,
+        checkpoint: &CheckpointData,
+    ) -> Result<Box<dyn Iterator<Item = Row> + Send + Sync>>;
+}
+
+/// Run transaction processing in parallel across all transactions in a checkpoint.
+pub async fn process_transactions<Row, P>(
+    checkpoint: Arc<CheckpointData>,
+    processor: Arc<P>,
+) -> Result<Box<dyn Iterator<Item = Row> + Send + Sync>>
+where
+    Row: Send + Sync + 'static,
+    P: TransactionProcessor<Row>,
+{
+    // Process transactions in parallel using buffered stream for ordered execution
+    let txn_len = checkpoint.transactions.len();
+    let mut entries_vec = Vec::with_capacity(txn_len);
+
+    let mut stream = stream::iter(0..txn_len)
+        .map(|idx| {
+            let checkpoint = checkpoint.clone();
+            let processor = processor.clone();
+            tokio::spawn(async move { processor.process_transaction(idx, &checkpoint).await })
+        })
+        .buffered(*TRANSACTION_CONCURRENCY_LIMIT);
+
+    while let Some(join_res) = stream.next().await {
+        match join_res {
+            Ok(Ok(tx_entries)) => {
+                // Store the iterator for later flattening
+                entries_vec.push(tx_entries);
+            }
+            Ok(Err(e)) => {
+                // Task executed but application logic returned an error
+                return Err(e);
+            }
+            Err(e) => {
+                // Task panicked or was cancelled
+                return Err(anyhow::anyhow!("Task join error: {}", e));
+            }
+        }
+    }
+
+    let flattened_iter = entries_vec.into_iter().flatten();
+    Ok(Box::new(flattened_iter))
 }
 
 fn initial_shared_version(object: &Object) -> Option<u64> {
     match object.owner {
-        Owner::Shared { initial_shared_version } => Some(initial_shared_version.value()),
+        Owner::Shared {
+            initial_shared_version,
+        } => Some(initial_shared_version.value()),
         _ => None,
     }
 }
@@ -59,8 +125,7 @@ fn get_owner_type(object: &Object) -> OwnerType {
         Owner::ObjectOwner(_) => OwnerType::ObjectOwner,
         Owner::Shared { .. } => OwnerType::Shared,
         Owner::Immutable => OwnerType::Immutable,
-        // TODO: Implement support for ConsensusV2 objects.
-        Owner::ConsensusV2 { .. } => todo!(),
+        Owner::ConsensusAddressOwner { .. } => OwnerType::AddressOwner,
     }
 }
 
@@ -70,8 +135,17 @@ fn get_owner_address(object: &Object) -> Option<String> {
         Owner::ObjectOwner(address) => Some(address.to_string()),
         Owner::Shared { .. } => None,
         Owner::Immutable => None,
-        // TODO: Implement support for ConsensusV2 objects.
-        Owner::ConsensusV2 { .. } => todo!(),
+        Owner::ConsensusAddressOwner { owner, .. } => Some(owner.to_string()),
+    }
+}
+
+fn get_is_consensus(object: &Object) -> bool {
+    match object.owner {
+        Owner::AddressOwner(_) => false,
+        Owner::ObjectOwner(_) => false,
+        Owner::Shared { .. } => true,
+        Owner::Immutable => false,
+        Owner::ConsensusAddressOwner { .. } => true,
     }
 }
 
@@ -87,8 +161,11 @@ struct InputObjectTracker {
 
 impl InputObjectTracker {
     fn new(txn_data: &TransactionData) -> Self {
-        let shared: BTreeSet<ObjectID> =
-            txn_data.shared_input_objects().iter().map(|shared_io| shared_io.id()).collect();
+        let shared: BTreeSet<ObjectID> = txn_data
+            .shared_input_objects()
+            .iter()
+            .map(|shared_io| shared_io.id())
+            .collect();
         let coins: BTreeSet<ObjectID> = txn_data.gas().iter().map(|obj_ref| obj_ref.0).collect();
         let input: BTreeSet<ObjectID> = txn_data
             .input_objects()
@@ -96,7 +173,11 @@ impl InputObjectTracker {
             .iter()
             .map(|io_kind| io_kind.object_id())
             .collect();
-        Self { shared, coins, input }
+        Self {
+            shared,
+            coins,
+            input,
+        }
     }
 
     fn get_input_object_kind(&self, object_id: &ObjectID) -> Option<InputObjectKind> {
@@ -123,11 +204,27 @@ struct ObjectStatusTracker {
 
 impl ObjectStatusTracker {
     fn new(effects: &TransactionEffects) -> Self {
-        let created: BTreeSet<ObjectID> = effects.created().iter().map(|(obj_ref, _)| obj_ref.0).collect();
-        let mutated: BTreeSet<ObjectID> =
-            effects.mutated().iter().chain(effects.unwrapped().iter()).map(|(obj_ref, _)| obj_ref.0).collect();
-        let deleted: BTreeSet<ObjectID> = effects.all_tombstones().into_iter().map(|(id, _)| id).collect();
-        Self { created, mutated, deleted }
+        let created: BTreeSet<ObjectID> = effects
+            .created()
+            .iter()
+            .map(|(obj_ref, _)| obj_ref.0)
+            .collect();
+        let mutated: BTreeSet<ObjectID> = effects
+            .mutated()
+            .iter()
+            .chain(effects.unwrapped().iter())
+            .map(|(obj_ref, _)| obj_ref.0)
+            .collect();
+        let deleted: BTreeSet<ObjectID> = effects
+            .all_tombstones()
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        Self {
+            created,
+            mutated,
+            deleted,
+        }
     }
 
     fn get_object_status(&self, object_id: &ObjectID) -> Option<ObjectStatus> {
@@ -148,8 +245,13 @@ async fn get_move_struct<T: PackageStore>(
     contents: &[u8],
     resolver: &Resolver<T>,
 ) -> Result<MoveStruct> {
-    let move_struct = match resolver.type_layout(TypeTag::Struct(Box::new(struct_tag.clone()))).await? {
-        MoveTypeLayout::Struct(move_struct_layout) => BoundedVisitor::deserialize_struct(contents, &move_struct_layout),
+    let move_struct = match resolver
+        .type_layout(TypeTag::Struct(Box::new(struct_tag.clone())))
+        .await?
+    {
+        MoveTypeLayout::Struct(move_struct_layout) => {
+            BoundedVisitor::deserialize_struct(contents, &move_struct_layout)
+        }
         _ => Err(anyhow!("Object is not a move struct")),
     }?;
     Ok(move_struct)
@@ -161,10 +263,22 @@ pub struct WrappedStruct {
     struct_tag: Option<StructTag>,
 }
 
-fn parse_struct(path: &str, move_struct: MoveStruct, all_structs: &mut BTreeMap<String, WrappedStruct>) {
-    let mut wrapped_struct = WrappedStruct { struct_tag: Some(move_struct.type_), ..Default::default() };
+fn parse_struct(
+    path: &str,
+    move_struct: MoveStruct,
+    all_structs: &mut BTreeMap<String, WrappedStruct>,
+) {
+    let mut wrapped_struct = WrappedStruct {
+        struct_tag: Some(move_struct.type_),
+        ..Default::default()
+    };
     for (k, v) in move_struct.fields {
-        parse_struct_field(&format!("{}.{}", path, &k), v, &mut wrapped_struct, all_structs);
+        parse_struct_field(
+            &format!("{}.{}", path, &k),
+            v,
+            &mut wrapped_struct,
+            all_structs,
+        );
     }
     all_structs.insert(path.to_string(), wrapped_struct);
 }
@@ -177,8 +291,11 @@ fn parse_struct_field(
 ) {
     match move_value {
         MoveValue::Struct(move_struct) => {
-            let values =
-                move_struct.fields.iter().map(|(id, value)| (id.to_string(), value)).collect::<BTreeMap<_, _>>();
+            let values = move_struct
+                .fields
+                .iter()
+                .map(|(id, value)| (id.to_string(), value))
+                .collect::<BTreeMap<_, _>>();
             let struct_name = format!(
                 "0x{}::{}::{}",
                 move_struct.type_.address.short_str_lossless(),
@@ -187,8 +304,11 @@ fn parse_struct_field(
             );
             if "0x2::object::UID" == struct_name {
                 if let Some(MoveValue::Struct(id_struct)) = values.get("id").cloned() {
-                    let id_values =
-                        id_struct.fields.iter().map(|(id, value)| (id.to_string(), value)).collect::<BTreeMap<_, _>>();
+                    let id_values = id_struct
+                        .fields
+                        .iter()
+                        .map(|(id, value)| (id.to_string(), value))
+                        .collect::<BTreeMap<_, _>>();
                     if let Some(MoveValue::Address(address) | MoveValue::Signer(address)) =
                         id_values.get("bytes").cloned()
                     {
@@ -199,7 +319,12 @@ fn parse_struct_field(
                 // Option in sui move is implemented as vector of size 1
                 if let Some(MoveValue::Vector(vec_values)) = values.get("vec").cloned() {
                     if let Some(first_value) = vec_values.first() {
-                        parse_struct_field(&format!("{}[0]", path), first_value.clone(), curr_struct, all_structs);
+                        parse_struct_field(
+                            &format!("{}[0]", path),
+                            first_value.clone(),
+                            curr_struct,
+                            all_structs,
+                        );
                     }
                 }
             } else if !WRAPPED_INDEXING_DISALLOW_LIST.contains(&&*struct_name) {
@@ -209,28 +334,42 @@ fn parse_struct_field(
         }
         MoveValue::Variant(v) => {
             for (k, field) in v.fields.iter() {
-                parse_struct_field(&format!("{}.{}", path, k), field.clone(), curr_struct, all_structs);
+                parse_struct_field(
+                    &format!("{}.{}", path, k),
+                    field.clone(),
+                    curr_struct,
+                    all_structs,
+                );
             }
         }
         MoveValue::Vector(fields) => {
             for (index, field) in fields.iter().enumerate() {
-                parse_struct_field(&format!("{}[{}]", path, &index), field.clone(), curr_struct, all_structs);
+                parse_struct_field(
+                    &format!("{}[{}]", path, &index),
+                    field.clone(),
+                    curr_struct,
+                    all_structs,
+                );
             }
         }
         _ => {}
     }
 }
 
+pub async fn wait_for_cache(checkpoint_data: &CheckpointData, package_cache: &PackageCache) {
+    let sequence_number = *checkpoint_data.checkpoint_summary.sequence_number();
+    package_cache.coordinator.wait(sequence_number).await;
+}
+
 #[cfg(test)]
 mod tests {
     use crate::handlers::parse_struct;
-    use move_core_types::{
-        account_address::AccountAddress,
-        annotated_value::{MoveStruct, MoveValue, MoveVariant},
-        identifier::Identifier,
-        language_storage::StructTag,
-    };
-    use std::{collections::BTreeMap, str::FromStr};
+    use move_core_types::account_address::AccountAddress;
+    use move_core_types::annotated_value::{MoveStruct, MoveValue, MoveVariant};
+    use move_core_types::identifier::Identifier;
+    use move_core_types::language_storage::StructTag;
+    use std::collections::BTreeMap;
+    use std::str::FromStr;
     use sui_types::base_types::ObjectID;
 
     #[tokio::test]
@@ -254,11 +393,17 @@ mod tests {
         });
         let move_struct = MoveStruct {
             type_: StructTag::from_str("0x2::test::Test")?,
-            fields: vec![(Identifier::from_str("id")?, uid_field), (Identifier::from_str("principal")?, balance_field)],
+            fields: vec![
+                (Identifier::from_str("id")?, uid_field),
+                (Identifier::from_str("principal")?, balance_field),
+            ],
         };
         let mut all_structs = BTreeMap::new();
         parse_struct("$", move_struct, &mut all_structs);
-        assert_eq!(all_structs.get("$").unwrap().object_id, Some(ObjectID::from_hex_literal("0x300")?));
+        assert_eq!(
+            all_structs.get("$").unwrap().object_id,
+            Some(ObjectID::from_hex_literal("0x300")?)
+        );
         assert_eq!(
             all_structs.get("$.principal").unwrap().struct_tag,
             Some(StructTag::from_str("0x2::balance::Balance")?)
@@ -298,14 +443,23 @@ mod tests {
             type_: StructTag::from_str("0x2::test::Test")?,
             fields: vec![
                 (Identifier::from_str("id")?, uid_field),
-                (Identifier::from_str("enum_field")?, MoveValue::Variant(move_enum)),
+                (
+                    Identifier::from_str("enum_field")?,
+                    MoveValue::Variant(move_enum),
+                ),
             ],
         };
         let mut all_structs = BTreeMap::new();
         parse_struct("$", move_struct, &mut all_structs);
-        assert_eq!(all_structs.get("$").unwrap().object_id, Some(ObjectID::from_hex_literal("0x300")?));
         assert_eq!(
-            all_structs.get("$.enum_field.principal").unwrap().struct_tag,
+            all_structs.get("$").unwrap().object_id,
+            Some(ObjectID::from_hex_literal("0x300")?)
+        );
+        assert_eq!(
+            all_structs
+                .get("$.enum_field.principal")
+                .unwrap()
+                .struct_tag,
             Some(StructTag::from_str("0x2::balance::Balance")?)
         );
         Ok(())

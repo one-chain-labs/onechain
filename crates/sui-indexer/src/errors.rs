@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use fastcrypto::error::FastCryptoError;
-use jsonrpsee::{core::Error as RpcError, types::error::CallError};
-use sui_json_rpc::name_service::NameServiceError;
+use jsonrpsee::types::ErrorObjectOwned as RpcError;
+use sui_name_service::NameServiceError;
 use thiserror::Error;
 
-use sui_types::{
-    base_types::ObjectIDParseError,
-    error::{SuiError, SuiObjectResponseError, UserInputError},
-};
+use sui_types::base_types::ObjectIDParseError;
+use sui_types::error::{SuiError, SuiObjectResponseError, UserInputError};
 
 #[derive(Debug, Error)]
 pub struct DataDownloadError {
@@ -19,7 +17,11 @@ pub struct DataDownloadError {
 
 impl std::fmt::Display for DataDownloadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "next_checkpoint_seq: {}, error: {}", self.next_checkpoint_sequence_number, self.error)
+        write!(
+            f,
+            "next_checkpoint_seq: {}, error: {}",
+            self.next_checkpoint_sequence_number, self.error
+        )
     }
 }
 
@@ -152,7 +154,11 @@ impl<T> Context<T> for Result<T, IndexerError> {
 
 impl From<IndexerError> for RpcError {
     fn from(e: IndexerError) -> Self {
-        RpcError::Call(CallError::Failed(e.into()))
+        RpcError::owned(
+            jsonrpsee::types::error::CALL_EXECUTION_FAILED_CODE,
+            e.to_string(),
+            None::<()>,
+        )
     }
 }
 
@@ -165,5 +171,18 @@ impl From<tokio::task::JoinError> for IndexerError {
 impl From<diesel_async::pooled_connection::bb8::RunError> for IndexerError {
     fn from(value: diesel_async::pooled_connection::bb8::RunError) -> Self {
         Self::PgPoolConnectionError(value.to_string())
+    }
+}
+
+pub(crate) fn client_error_to_error_object(
+    e: jsonrpsee::core::ClientError,
+) -> jsonrpsee::types::ErrorObjectOwned {
+    match e {
+        jsonrpsee::core::ClientError::Call(e) => e,
+        _ => jsonrpsee::types::ErrorObjectOwned::owned(
+            jsonrpsee::types::error::UNKNOWN_ERROR_CODE,
+            e.to_string(),
+            None::<()>,
+        ),
     }
 }

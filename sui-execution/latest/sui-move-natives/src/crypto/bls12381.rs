@@ -47,8 +47,11 @@ pub fn bls12381_min_sig_verify(
     debug_assert!(args.len() == 3);
 
     // Load the cost parameters from the protocol config
-    let bls12381_bls12381_min_sig_verify_cost_params =
-        &context.extensions().get::<NativesCostTable>().bls12381_bls12381_min_sig_verify_cost_params.clone();
+    let bls12381_bls12381_min_sig_verify_cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .bls12381_bls12381_min_sig_verify_cost_params
+        .clone();
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(
         context,
@@ -66,27 +69,35 @@ pub fn bls12381_min_sig_verify(
     // Charge the arg size dependent costs
     native_charge_gas_early_exit!(
         context,
-        bls12381_bls12381_min_sig_verify_cost_params.bls12381_bls12381_min_sig_verify_msg_cost_per_byte
+        bls12381_bls12381_min_sig_verify_cost_params
+            .bls12381_bls12381_min_sig_verify_msg_cost_per_byte
             * (msg_ref.len() as u64).into()
-            + bls12381_bls12381_min_sig_verify_cost_params.bls12381_bls12381_min_sig_verify_msg_cost_per_block
-                * (((msg_ref.len() + BLS12381_BLOCK_SIZE - 1) / BLS12381_BLOCK_SIZE) as u64).into()
+            + bls12381_bls12381_min_sig_verify_cost_params
+                .bls12381_bls12381_min_sig_verify_msg_cost_per_block
+                * (msg_ref.len().div_ceil(BLS12381_BLOCK_SIZE) as u64).into()
     );
 
     let cost = context.gas_used();
 
-    let Ok(signature) = <min_sig::BLS12381Signature as ToFromBytes>::from_bytes(&signature_bytes_ref) else {
+    let Ok(signature) =
+        <min_sig::BLS12381Signature as ToFromBytes>::from_bytes(&signature_bytes_ref)
+    else {
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
     };
 
-    let public_key = match <min_sig::BLS12381PublicKey as ToFromBytes>::from_bytes(&public_key_bytes_ref) {
-        Ok(public_key) => match public_key.validate() {
-            Ok(_) => public_key,
+    let public_key =
+        match <min_sig::BLS12381PublicKey as ToFromBytes>::from_bytes(&public_key_bytes_ref) {
+            Ok(public_key) => match public_key.validate() {
+                Ok(_) => public_key,
+                Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
+            },
             Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
-        },
-        Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
-    };
+        };
 
-    Ok(NativeResult::ok(cost, smallvec![Value::bool(public_key.verify(&msg_ref, &signature).is_ok())]))
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::bool(public_key.verify(&msg_ref, &signature).is_ok())],
+    ))
 }
 
 #[derive(Clone)]
@@ -116,8 +127,11 @@ pub fn bls12381_min_pk_verify(
     debug_assert!(args.len() == 3);
 
     // Load the cost parameters from the protocol config
-    let bls12381_bls12381_min_pk_verify_cost_params =
-        &context.extensions().get::<NativesCostTable>().bls12381_bls12381_min_pk_verify_cost_params.clone();
+    let bls12381_bls12381_min_pk_verify_cost_params = &context
+        .extensions()
+        .get::<NativesCostTable>()?
+        .bls12381_bls12381_min_pk_verify_cost_params
+        .clone();
 
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(
@@ -136,26 +150,33 @@ pub fn bls12381_min_pk_verify(
     // Charge the arg size dependent costs
     native_charge_gas_early_exit!(
         context,
-        bls12381_bls12381_min_pk_verify_cost_params.bls12381_bls12381_min_pk_verify_msg_cost_per_byte
+        bls12381_bls12381_min_pk_verify_cost_params
+            .bls12381_bls12381_min_pk_verify_msg_cost_per_byte
             * (msg_ref.len() as u64).into()
-            + bls12381_bls12381_min_pk_verify_cost_params.bls12381_bls12381_min_pk_verify_msg_cost_per_block
-                * (((msg_ref.len() + BLS12381_BLOCK_SIZE - 1) / BLS12381_BLOCK_SIZE) as u64).into()
+            + bls12381_bls12381_min_pk_verify_cost_params
+                .bls12381_bls12381_min_pk_verify_msg_cost_per_block
+                * (msg_ref.len().div_ceil(BLS12381_BLOCK_SIZE) as u64).into()
     );
 
     let cost = context.gas_used();
 
-    let signature = match <min_pk::BLS12381Signature as ToFromBytes>::from_bytes(&signature_bytes_ref) {
-        Ok(signature) => signature,
-        Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
-    };
-
-    let public_key = match <min_pk::BLS12381PublicKey as ToFromBytes>::from_bytes(&public_key_bytes_ref) {
-        Ok(public_key) => match public_key.validate() {
-            Ok(_) => public_key,
+    let signature =
+        match <min_pk::BLS12381Signature as ToFromBytes>::from_bytes(&signature_bytes_ref) {
+            Ok(signature) => signature,
             Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
-        },
-        Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
-    };
+        };
 
-    Ok(NativeResult::ok(cost, smallvec![Value::bool(public_key.verify(&msg_ref, &signature).is_ok())]))
+    let public_key =
+        match <min_pk::BLS12381PublicKey as ToFromBytes>::from_bytes(&public_key_bytes_ref) {
+            Ok(public_key) => match public_key.validate() {
+                Ok(_) => public_key,
+                Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
+            },
+            Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
+        };
+
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::bool(public_key.verify(&msg_ref, &signature).is_ok())],
+    ))
 }

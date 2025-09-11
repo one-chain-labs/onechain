@@ -1,40 +1,38 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::base_types::{ObjectDigest, SuiAddress};
+use crate::crypto::DefaultHash;
+use crate::error::{SuiError, SuiResult};
+use crate::id::UID;
+use crate::object::Object;
+use crate::storage::ObjectStore;
+use crate::sui_serde::Readable;
+use crate::sui_serde::SuiTypeTag;
 use crate::{
-    base_types::{ObjectDigest, SuiAddress},
-    crypto::DefaultHash,
-    error::{SuiError, SuiResult},
-    id::UID,
-    object::Object,
-    storage::ObjectStore,
-    sui_serde::{Readable, SuiTypeTag},
-    MoveTypeTagTrait,
-    ObjectID,
-    SequenceNumber,
-    SUI_FRAMEWORK_ADDRESS,
+    MoveTypeTagTrait, MoveTypeTagTraitGeneric, ObjectID, SequenceNumber, SUI_FRAMEWORK_ADDRESS,
 };
-use fastcrypto::{encoding::Base64, hash::HashFunction};
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveValue},
-    ident_str,
-    identifier::IdentStr,
-    language_storage::{StructTag, TypeTag},
-};
+use fastcrypto::encoding::Base64;
+use fastcrypto::hash::HashFunction;
+use move_core_types::annotated_value::{MoveStruct, MoveValue};
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
+use move_core_types::language_storage::{StructTag, TypeTag};
 use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::serde_as;
+use serde_with::DisplayFromStr;
 use shared_crypto::intent::HashingIntentScope;
-use std::{
-    fmt,
-    fmt::{Display, Formatter},
-};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 pub mod visitor;
 
-const DYNAMIC_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_field");
-const DYNAMIC_FIELD_FIELD_STRUCT_NAME: &IdentStr = ident_str!("Field");
+pub const DYNAMIC_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_field");
+pub const DYNAMIC_FIELD_FIELD_STRUCT_NAME: &IdentStr = ident_str!("Field");
 
 const DYNAMIC_OBJECT_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_object_field");
 const DYNAMIC_OBJECT_FIELD_WRAPPER_STRUCT_NAME: &IdentStr = ident_str!("Wrapper");
@@ -58,7 +56,9 @@ where
     N: MoveTypeTagTrait,
 {
     fn get_type_tag() -> TypeTag {
-        TypeTag::Struct(Box::new(DynamicFieldInfo::dynamic_object_field_wrapper(N::get_type_tag())))
+        TypeTag::Struct(Box::new(DynamicFieldInfo::dynamic_object_field_wrapper(
+            N::get_type_tag(),
+        )))
     }
 }
 
@@ -96,7 +96,9 @@ impl Display for DynamicFieldName {
     }
 }
 
-#[derive(Copy, Clone, Serialize, Deserialize, JsonSchema, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(
+    Copy, Clone, Serialize, Deserialize, JsonSchema, Ord, PartialOrd, Eq, PartialEq, Debug,
+)]
 pub enum DynamicFieldType {
     #[serde(rename_all = "camelCase")]
     DynamicField,
@@ -168,11 +170,14 @@ impl DynamicFieldInfo {
         }
     }
 
-    pub fn parse_move_object(move_struct: &MoveStruct) -> SuiResult<(MoveValue, DynamicFieldType, ObjectID)> {
-        let name =
-            extract_field_from_move_struct(move_struct, "name").ok_or_else(|| SuiError::ObjectDeserializationError {
+    pub fn parse_move_object(
+        move_struct: &MoveStruct,
+    ) -> SuiResult<(MoveValue, DynamicFieldType, ObjectID)> {
+        let name = extract_field_from_move_struct(move_struct, "name").ok_or_else(|| {
+            SuiError::ObjectDeserializationError {
                 error: "Cannot extract [name] field from sui::dynamic_field::Field".to_string(),
-            })?;
+            }
+        })?;
 
         let value = extract_field_from_move_struct(move_struct, "value").ok_or_else(|| {
             SuiError::ObjectDeserializationError {
@@ -182,35 +187,50 @@ impl DynamicFieldInfo {
 
         Ok(if is_dynamic_object(move_struct) {
             let name = match name {
-                MoveValue::Struct(name_struct) => extract_field_from_move_struct(name_struct, "name"),
+                MoveValue::Struct(name_struct) => {
+                    extract_field_from_move_struct(name_struct, "name")
+                }
                 _ => None,
             }
             .ok_or_else(|| SuiError::ObjectDeserializationError {
-                error: "Cannot extract [name] field from sui::dynamic_object_field::Wrapper.".to_string(),
+                error: "Cannot extract [name] field from sui::dynamic_object_field::Wrapper."
+                    .to_string(),
             })?;
             // ID extracted from the wrapper object
-            let object_id = extract_id_value(value).ok_or_else(|| SuiError::ObjectDeserializationError {
-                error: format!(
-                    "Cannot extract dynamic object's object id from \
+            let object_id =
+                extract_id_value(value).ok_or_else(|| SuiError::ObjectDeserializationError {
+                    error: format!(
+                        "Cannot extract dynamic object's object id from \
                         sui::dynamic_field::Field, {value:?}"
-                ),
-            })?;
+                    ),
+                })?;
             (name.clone(), DynamicFieldType::DynamicObject, object_id)
         } else {
             // ID of the Field object
-            let object_id = extract_object_id(move_struct).ok_or_else(|| SuiError::ObjectDeserializationError {
-                error: format!(
-                    "Cannot extract dynamic object's object id from \
+            let object_id = extract_object_id(move_struct).ok_or_else(|| {
+                SuiError::ObjectDeserializationError {
+                    error: format!(
+                        "Cannot extract dynamic object's object id from \
                         sui::dynamic_field::Field, {move_struct:?}",
-                ),
+                    ),
+                }
             })?;
             (name.clone(), DynamicFieldType::DynamicField, object_id)
         })
     }
 }
 
-pub fn extract_field_from_move_struct<'a>(move_struct: &'a MoveStruct, field_name: &str) -> Option<&'a MoveValue> {
-    move_struct.fields.iter().find_map(|(id, value)| if id.to_string() == field_name { Some(value) } else { None })
+pub fn extract_field_from_move_struct<'a>(
+    move_struct: &'a MoveStruct,
+    field_name: &str,
+) -> Option<&'a MoveValue> {
+    move_struct.fields.iter().find_map(|(id, value)| {
+        if id.to_string() == field_name {
+            Some(value)
+        } else {
+            None
+        }
+    })
 }
 
 fn extract_object_id(value: &MoveStruct) -> Option<ObjectID> {
@@ -245,7 +265,11 @@ pub fn is_dynamic_object(move_struct: &MoveStruct) -> bool {
     )
 }
 
-pub fn derive_dynamic_field_id<T>(parent: T, key_type_tag: &TypeTag, key_bytes: &[u8]) -> Result<ObjectID, bcs::Error>
+pub fn derive_dynamic_field_id<T>(
+    parent: T,
+    key_type_tag: &TypeTag,
+    key_bytes: &[u8],
+) -> Result<ObjectID, bcs::Error>
 where
     T: Into<SuiAddress>,
 {
@@ -274,6 +298,49 @@ where
     Ok(id)
 }
 
+fn get_dynamic_field_object_from_store_impl<K>(
+    object_store: &dyn ObjectStore,
+    parent_id: ObjectID,
+    key: &K,
+    key_type_tag: &TypeTag,
+) -> Result<Object, SuiError>
+where
+    K: Serialize + DeserializeOwned + fmt::Debug,
+{
+    let id = derive_dynamic_field_id(parent_id, key_type_tag, &bcs::to_bytes(key).unwrap())
+        .map_err(|err| SuiError::DynamicFieldReadError(err.to_string()))?;
+    let object = object_store.get_object(&id).ok_or_else(|| {
+        SuiError::DynamicFieldReadError(format!(
+            "Dynamic field with key={:?} and ID={:?} not found on parent {:?}",
+            key, id, parent_id
+        ))
+    })?;
+    Ok(object)
+}
+
+pub fn get_dynamic_field_from_store_impl<K, V>(
+    object_store: &dyn ObjectStore,
+    parent_id: ObjectID,
+    key: &K,
+    key_type_tag: &TypeTag,
+) -> Result<V, SuiError>
+where
+    K: Serialize + DeserializeOwned + fmt::Debug,
+    V: Serialize + DeserializeOwned,
+{
+    let object =
+        get_dynamic_field_object_from_store_impl(object_store, parent_id, key, key_type_tag)?;
+    let move_object = object.data.try_as_move().ok_or_else(|| {
+        SuiError::DynamicFieldReadError(format!(
+            "Dynamic field {:?} is not a Move object",
+            object.id()
+        ))
+    })?;
+    Ok(bcs::from_bytes::<Field<K, V>>(move_object.contents())
+        .map_err(|err| SuiError::DynamicFieldReadError(err.to_string()))?
+        .value)
+}
+
 /// Given a parent object ID (e.g. a table), and a `key`, retrieve the corresponding dynamic field object
 /// from the `object_store`. The key type `K` must implement `MoveTypeTagTrait` which has an associated
 /// function that returns the Move type tag.
@@ -286,15 +353,8 @@ pub fn get_dynamic_field_object_from_store<K>(
 where
     K: MoveTypeTagTrait + Serialize + DeserializeOwned + fmt::Debug,
 {
-    let id = derive_dynamic_field_id(parent_id, &K::get_type_tag(), &bcs::to_bytes(key).unwrap())
-        .map_err(|err| SuiError::DynamicFieldReadError(err.to_string()))?;
-    let object = object_store.get_object(&id).ok_or_else(|| {
-        SuiError::DynamicFieldReadError(format!(
-            "Dynamic field with key={:?} and ID={:?} not found on parent {:?}",
-            key, id, parent_id
-        ))
-    })?;
-    Ok(object)
+    let key_type_tag = K::get_type_tag();
+    get_dynamic_field_object_from_store_impl(object_store, parent_id, key, &key_type_tag)
 }
 
 /// Similar to `get_dynamic_field_object_from_store`, but returns the value in the field instead of
@@ -308,11 +368,39 @@ where
     K: MoveTypeTagTrait + Serialize + DeserializeOwned + fmt::Debug,
     V: Serialize + DeserializeOwned,
 {
-    let object = get_dynamic_field_object_from_store(object_store, parent_id, key)?;
-    let move_object = object.data.try_as_move().ok_or_else(|| {
-        SuiError::DynamicFieldReadError(format!("Dynamic field {:?} is not a Move object", object.id()))
-    })?;
-    Ok(bcs::from_bytes::<Field<K, V>>(move_object.contents())
-        .map_err(|err| SuiError::DynamicFieldReadError(err.to_string()))?
-        .value)
+    let key_type_tag = K::get_type_tag();
+    get_dynamic_field_from_store_impl(object_store, parent_id, key, &key_type_tag)
+}
+
+/// Get a dynamic field object from the store with a generic key type. The key type may
+/// only have phantom type parameters, because it must have a fixed serialization
+/// format.
+pub fn get_dynamic_field_object_from_store_generic<K>(
+    object_store: &dyn ObjectStore,
+    parent_id: ObjectID,
+    key: &K,
+    key_type_params: &[TypeTag],
+) -> Result<Object, SuiError>
+where
+    K: MoveTypeTagTraitGeneric + Serialize + DeserializeOwned + fmt::Debug,
+{
+    let key_type_tag = K::get_type_tag(key_type_params);
+    get_dynamic_field_object_from_store_impl(object_store, parent_id, key, &key_type_tag)
+}
+
+/// Get a dynamic field from the store with a generic key type. The key type may
+/// only have phantom type parameters, because it must have a fixed serialization
+/// format.
+pub fn get_dynamic_field_from_store_generic<K, V>(
+    object_store: &dyn ObjectStore,
+    parent_id: ObjectID,
+    key: &K,
+    key_type_params: &[TypeTag],
+) -> Result<V, SuiError>
+where
+    K: MoveTypeTagTraitGeneric + Serialize + DeserializeOwned + fmt::Debug,
+    V: Serialize + DeserializeOwned,
+{
+    let key_type_tag = K::get_type_tag(key_type_params);
+    get_dynamic_field_from_store_impl(object_store, parent_id, key, &key_type_tag)
 }

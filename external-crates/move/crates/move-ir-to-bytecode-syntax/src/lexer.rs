@@ -183,14 +183,22 @@ impl<'input> Lexer<'input> {
         Ok(())
     }
 
-    pub fn replace_token(&mut self, token: Tok, len: usize) -> Result<(), ParseError<Loc, anyhow::Error>> {
+    pub fn replace_token(
+        &mut self,
+        token: Tok,
+        len: usize,
+    ) -> Result<(), ParseError<Loc, anyhow::Error>> {
         self.token = token;
         self.cur_end = self.cur_start.wrapping_add(len); // memory will run out long before this wraps
         Ok(())
     }
 
     // Find the next token and its length without changing the state of the lexer.
-    fn find_token(&self, text: &str, start_offset: usize) -> Result<(Tok, usize), ParseError<Loc, anyhow::Error>> {
+    fn find_token(
+        &self,
+        text: &str,
+        start_offset: usize,
+    ) -> Result<(Tok, usize), ParseError<Loc, anyhow::Error>> {
         let c: char = match text.chars().next() {
             Some(next_char) => next_char,
             None => {
@@ -359,11 +367,16 @@ fn get_name_len(text: &str) -> usize {
     if first_char.is_ascii_digit() {
         return 0;
     }
-    text.chars().position(|c| !matches!(c, 'a'..='z' | 'A'..='Z' | '$' | '_' | '0'..='9')).unwrap_or(text.len())
+    text.chars()
+        .position(|c| !matches!(c, 'a'..='z' | 'A'..='Z' | '$' | '_' | '0'..='9'))
+        .unwrap_or(text.len())
 }
 
 fn get_decimal_number(text: &str) -> (Tok, usize) {
-    let len = text.chars().position(|c| !matches!(c, '0'..='9' | '_')).unwrap_or(text.len());
+    let len = text
+        .chars()
+        .position(|c| !matches!(c, '0'..='9' | '_'))
+        .unwrap_or(text.len());
     let rest = &text[len..];
     if rest.starts_with("u8") {
         (Tok::U8Value, len + 2)
@@ -384,7 +397,9 @@ fn get_decimal_number(text: &str) -> (Tok, usize) {
 
 // Return the length of the substring containing characters in [0-9a-fA-F].
 fn get_hex_digits_len(text: &str) -> usize {
-    text.chars().position(|c| !matches!(c, 'a'..='f' | 'A'..='F' | '0'..='9' | '_')).unwrap_or(text.len())
+    text.chars()
+        .position(|c| !matches!(c, 'a'..='f' | 'A'..='F' | '0'..='9' | '_'))
+        .unwrap_or(text.len())
 }
 
 // Check for an optional sequence of hex digits following by a double quote, and return

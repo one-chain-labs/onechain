@@ -13,7 +13,10 @@ pub fn decode(loc: Loc, s: &str) -> Result<Vec<u8>, Box<Diagnostic>> {
             let start_offset = loc.start() as usize;
             let offset = start_offset + 2 + index;
             let loc = make_loc(filename, offset, offset);
-            Err(Box::new(diag!(Syntax::InvalidHexString, (loc, format!("Invalid hexadecimal character: '{}'", c)),)))
+            Err(Box::new(diag!(
+                Syntax::InvalidHexString,
+                (loc, format!("Invalid hexadecimal character: '{}'", c)),
+            )))
         }
         Err(hex::FromHexError::OddLength) => Err(Box::new(diag!(
             Syntax::InvalidHexString,

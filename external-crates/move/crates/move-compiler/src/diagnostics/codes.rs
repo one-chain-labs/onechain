@@ -15,7 +15,7 @@ pub enum Severity {
     Bug = 4,
 }
 
-/// A an optional prefix to distinguish between different types of warnings (internal vs. possibly
+/// An optional prefix to distinguish between different types of warnings (internal vs. possibly
 /// multiple externally provided ones).
 pub type ExternalPrefix = Option<&'static str>;
 /// The ID for a diagnostic, consisting of an optional prefix, a category, and a code.
@@ -41,7 +41,13 @@ pub(crate) trait DiagnosticCode: Copy {
         let severity = self.severity();
         let category = Self::CATEGORY as u8;
         let (code, message) = self.code_and_message();
-        DiagnosticInfo { severity, category, code, external_prefix: None, message }
+        DiagnosticInfo {
+            severity,
+            category,
+            code,
+            external_prefix: None,
+            message,
+        }
     }
 }
 
@@ -61,7 +67,13 @@ pub const fn custom(
     message: &'static str,
 ) -> DiagnosticInfo {
     assert!(category <= 99);
-    DiagnosticInfo { severity, category, code, external_prefix: Some(external_prefix), message }
+    DiagnosticInfo {
+        severity,
+        category,
+        code,
+        external_prefix: Some(external_prefix),
+        message,
+    }
 }
 
 macro_rules! codes {
@@ -357,7 +369,13 @@ codes!(
 
 impl DiagnosticInfo {
     pub fn render(self) -> (/* code */ String, /* message */ &'static str) {
-        let Self { severity, category, code, external_prefix, message } = self;
+        let Self {
+            severity,
+            category,
+            code,
+            external_prefix,
+            message,
+        } = self;
         let sev_prefix = match severity {
             Severity::BlockingError | Severity::NonblockingError => "E",
             Severity::Warning => "W",
@@ -408,8 +426,8 @@ impl DiagnosticInfo {
 }
 
 impl Severity {
-    pub const MAX: Self = Self::Bug;
     pub const MIN: Self = Self::Warning;
+    pub const MAX: Self = Self::Bug;
 
     pub fn into_codespan_severity(self) -> codespan_reporting::diagnostic::Severity {
         use codespan_reporting::diagnostic::Severity as CSRSeverity;

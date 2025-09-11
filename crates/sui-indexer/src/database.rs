@@ -4,20 +4,18 @@
 use std::sync::Arc;
 
 use diesel::prelude::ConnectionError;
-use diesel_async::{
-    pooled_connection::{
-        bb8::{Pool, PooledConnection, RunError},
-        AsyncDieselConnectionManager,
-        PoolError,
-    },
-    AsyncConnection,
-    AsyncPgConnection,
-    RunQueryDsl,
-};
+use diesel_async::pooled_connection::bb8::Pool;
+use diesel_async::pooled_connection::bb8::PooledConnection;
+use diesel_async::pooled_connection::bb8::RunError;
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::pooled_connection::PoolError;
+use diesel_async::RunQueryDsl;
+use diesel_async::{AsyncConnection, AsyncPgConnection};
 use futures::FutureExt;
 use url::Url;
 
-use crate::db::{ConnectionConfig, ConnectionPoolConfig};
+use crate::db::ConnectionConfig;
+use crate::db::ConnectionPoolConfig;
 
 #[derive(Clone, Debug)]
 pub struct ConnectionPool {
@@ -30,8 +28,10 @@ impl ConnectionPool {
         let database_url = Arc::new(database_url);
         let connection_config = config.connection_config();
         let mut manager_config = diesel_async::pooled_connection::ManagerConfig::default();
-        manager_config.custom_setup = Box::new(move |url| establish_connection(url, connection_config).boxed());
-        let manager = AsyncDieselConnectionManager::new_with_config(database_url.as_str(), manager_config);
+        manager_config.custom_setup =
+            Box::new(move |url| establish_connection(url, connection_config).boxed());
+        let manager =
+            AsyncDieselConnectionManager::new_with_config(database_url.as_str(), manager_config);
 
         Pool::builder()
             .max_size(config.pool_size)
@@ -53,7 +53,10 @@ impl ConnectionPool {
     /// This method allows reusing the manager's configuration but otherwise
     /// bypassing the pool
     pub async fn dedicated_connection(&self) -> Result<Connection<'static>, PoolError> {
-        self.pool.dedicated_connection().await.map(Connection::Dedicated)
+        self.pool
+            .dedicated_connection()
+            .await
+            .map(Connection::Dedicated)
     }
 
     /// Returns information about the current state of the pool.
@@ -74,7 +77,9 @@ pub enum Connection<'a> {
 
 impl Connection<'static> {
     pub async fn dedicated(database_url: &Url) -> Result<Self, ConnectionError> {
-        AsyncPgConnection::establish(database_url.as_str()).await.map(Connection::Dedicated)
+        AsyncPgConnection::establish(database_url.as_str())
+            .await
+            .map(Connection::Dedicated)
     }
 
     /// Run the provided Migrations
@@ -88,7 +93,8 @@ impl Connection<'static> {
         use diesel::migration::MigrationVersion;
         use diesel_migrations::MigrationHarness;
 
-        let mut connection = diesel_async::async_connection_wrapper::AsyncConnectionWrapper::<Self>::from(self);
+        let mut connection =
+            diesel_async::async_connection_wrapper::AsyncConnectionWrapper::<Self>::from(self);
 
         tokio::task::spawn_blocking(move || {
             connection
@@ -100,7 +106,7 @@ impl Connection<'static> {
     }
 }
 
-impl<'a> std::ops::Deref for Connection<'a> {
+impl std::ops::Deref for Connection<'_> {
     type Target = AsyncPgConnection;
 
     fn deref(&self) -> &Self::Target {
@@ -111,7 +117,7 @@ impl<'a> std::ops::Deref for Connection<'a> {
     }
 }
 
-impl<'a> std::ops::DerefMut for Connection<'a> {
+impl std::ops::DerefMut for Connection<'_> {
     fn deref_mut(&mut self) -> &mut AsyncPgConnection {
         match self {
             Connection::PooledConnection(pooled) => pooled.deref_mut(),
@@ -122,12 +128,17 @@ impl<'a> std::ops::DerefMut for Connection<'a> {
 
 impl ConnectionConfig {
     async fn apply(&self, connection: &mut AsyncPgConnection) -> Result<(), diesel::result::Error> {
-        diesel::sql_query(format!("SET statement_timeout = {}", self.statement_timeout.as_millis(),))
-            .execute(connection)
-            .await?;
+        diesel::sql_query(format!(
+            "SET statement_timeout = {}",
+            self.statement_timeout.as_millis(),
+        ))
+        .execute(connection)
+        .await?;
 
         if self.read_only {
-            diesel::sql_query("SET default_transaction_read_only = 'on'").execute(connection).await?;
+            diesel::sql_query("SET default_transaction_read_only = 'on'")
+                .execute(connection)
+                .await?;
         }
 
         Ok(())
@@ -135,10 +146,16 @@ impl ConnectionConfig {
 }
 
 /// Function used by the Connection Pool Manager to establish and setup new connections
-async fn establish_connection(url: &str, config: ConnectionConfig) -> Result<AsyncPgConnection, ConnectionError> {
+async fn establish_connection(
+    url: &str,
+    config: ConnectionConfig,
+) -> Result<AsyncPgConnection, ConnectionError> {
     let mut connection = AsyncPgConnection::establish(url).await?;
 
-    config.apply(&mut connection).await.map_err(ConnectionError::CouldntSetupConfiguration)?;
+    config
+        .apply(&mut connection)
+        .await
+        .map_err(ConnectionError::CouldntSetupConfiguration)?;
 
     Ok(connection)
 }

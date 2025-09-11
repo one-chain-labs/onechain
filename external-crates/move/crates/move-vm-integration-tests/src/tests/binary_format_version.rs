@@ -14,7 +14,8 @@ fn test_publish_module_with_custom_max_binary_format_version() {
     let mut b_new = vec![];
     let mut b_old = vec![];
     m.serialize_with_version(VERSION_MAX, &mut b_new).unwrap();
-    m.serialize_with_version(VERSION_MAX.checked_sub(1).unwrap(), &mut b_old).unwrap();
+    m.serialize_with_version(VERSION_MAX.checked_sub(1).unwrap(), &mut b_old)
+        .unwrap();
 
     // Should accept both modules with the default settings
     {
@@ -27,9 +28,19 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         .unwrap();
         let mut sess = vm.new_session(&storage);
 
-        sess.publish_module(b_new.clone(), *m.self_id().address(), &mut UnmeteredGasMeter).unwrap();
+        sess.publish_module(
+            b_new.clone(),
+            *m.self_id().address(),
+            &mut UnmeteredGasMeter,
+        )
+        .unwrap();
 
-        sess.publish_module(b_old.clone(), *m.self_id().address(), &mut UnmeteredGasMeter).unwrap();
+        sess.publish_module(
+            b_old.clone(),
+            *m.self_id().address(),
+            &mut UnmeteredGasMeter,
+        )
+        .unwrap();
     }
 
     // Should reject the module with newer version with max binary format version being set to VERSION_MAX - 1
@@ -53,12 +64,21 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         let mut sess = vm.new_session(&storage);
 
         assert_eq!(
-            sess.publish_module(b_new.clone(), *m.self_id().address(), &mut UnmeteredGasMeter,)
-                .unwrap_err()
-                .major_status(),
+            sess.publish_module(
+                b_new.clone(),
+                *m.self_id().address(),
+                &mut UnmeteredGasMeter,
+            )
+            .unwrap_err()
+            .major_status(),
             StatusCode::UNKNOWN_VERSION
         );
 
-        sess.publish_module(b_old.clone(), *m.self_id().address(), &mut UnmeteredGasMeter).unwrap();
+        sess.publish_module(
+            b_old.clone(),
+            *m.self_id().address(),
+            &mut UnmeteredGasMeter,
+        )
+        .unwrap();
     }
 }

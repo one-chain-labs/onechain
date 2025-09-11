@@ -1,19 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::sui_system_state_inner {
-    use one::balance::{Self, Balance};
-    use one::oct::OCT;
-    use one::tx_context::TxContext;
-    use one::bag::{Self, Bag};
-    use one::table::{Self, Table};
-    use one::object::ID;
+module oct_system::sui_system_state_inner {
+    use sui::balance::{Self, Balance};
+    use sui::oct::OCT;
+    use sui::tx_context::TxContext;
+    use sui::bag::{Self, Bag};
+    use sui::table::{Self, Table};
+    use sui::object::ID;
 
     use one_system::validator::Validator;
     use one_system::validator_wrapper::ValidatorWrapper;
 
     const SYSTEM_STATE_VERSION_V1: u64 = 18446744073709551605;  // u64::MAX - 10
     const SYSTEM_STATE_VERSION_V2: u64 = 18446744073709551606;  // u64::MAX - 9
+
+    const EXTRA_FIELD_EXECUTION_TIME_ESTIMATES_KEY: u64 = 0;
 
     public struct SystemParameters has store {
         epoch_duration_ms: u64,
@@ -142,5 +144,12 @@ module one_system::sui_system_state_inner {
             epoch_start_timestamp_ms,
             extra_fields,
         }
+    }
+    
+    public(package) fun store_execution_time_estimates(self: &mut SuiSystemStateInnerV2, estimates: vector<u8>) {
+        if (bag::contains(&self.extra_fields, EXTRA_FIELD_EXECUTION_TIME_ESTIMATES_KEY)) {
+            let _: vector<u8> = bag::remove(&mut self.extra_fields, EXTRA_FIELD_EXECUTION_TIME_ESTIMATES_KEY);
+        };
+        bag::add(&mut self.extra_fields, EXTRA_FIELD_EXECUTION_TIME_ESTIMATES_KEY, estimates);
     }
 }

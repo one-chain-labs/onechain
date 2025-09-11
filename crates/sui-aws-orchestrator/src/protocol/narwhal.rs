@@ -12,13 +12,15 @@ use crate::{
     client::Instance,
     settings::Settings,
 };
-use narwhal_config::PrometheusMetricsParameters;
 use serde::{Deserialize, Serialize};
 
 use super::{ProtocolCommands, ProtocolMetrics};
 
 const NUM_WORKERS: usize = 1;
 const BASE_PORT: usize = 5000;
+
+// Narwhal default metrics port.
+const DEFAULT_PORT: usize = 9184;
 
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NarwhalBenchmarkType {
@@ -42,7 +44,9 @@ impl FromStr for NarwhalBenchmarkType {
     type Err = std::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self { size: s.parse::<usize>()?.min(1000000) })
+        Ok(Self {
+            size: s.parse::<usize>()?.min(1000000),
+        })
     }
 }
 
@@ -63,7 +67,9 @@ impl ProtocolCommands<NarwhalBenchmarkType> for NarwhalProtocol {
     }
 
     fn db_directories(&self) -> Vec<PathBuf> {
-        let consensus_db = [&self.working_dir, &"db-*".to_string().into()].iter().collect();
+        let consensus_db = [&self.working_dir, &"db-*".to_string().into()]
+            .iter()
+            .collect();
 
         let narwhal_config = [&self.working_dir].iter().collect();
         vec![consensus_db, narwhal_config]
@@ -74,7 +80,10 @@ impl ProtocolCommands<NarwhalBenchmarkType> for NarwhalProtocol {
         I: Iterator<Item = &'a Instance>,
     {
         let working_dir = self.working_dir.display();
-        let ips = instances.map(|x| x.main_ip.to_string()).collect::<Vec<_>>().join(" ");
+        let ips = instances
+            .map(|x| x.main_ip.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
 
         let genesis = [
             "cargo run --release --bin narwhal-node benchmark-genesis",
@@ -84,7 +93,12 @@ impl ProtocolCommands<NarwhalBenchmarkType> for NarwhalProtocol {
         ]
         .join(" ");
 
-        [&format!("mkdir -p {working_dir}"), "source $HOME/.cargo/env", &genesis].join(" && ")
+        [
+            &format!("mkdir -p {working_dir}"),
+            "source $HOME/.cargo/env",
+            &genesis,
+        ]
+        .join(" && ")
     }
 
     fn monitor_command<I>(&self, _instances: I) -> Vec<(Instance, String)>
@@ -110,7 +124,8 @@ impl ProtocolCommands<NarwhalBenchmarkType> for NarwhalProtocol {
         let transaction_addresses: Vec<_> = hosts
             .iter()
             .map(|instance| {
-                let transaction_address = format!("http://{}:{}", instance.main_ip, worker_base_port);
+                let transaction_address =
+                    format!("http://{}:{}", instance.main_ip, worker_base_port);
                 worker_base_port += 2;
                 transaction_address
             })
@@ -120,15 +135,29 @@ impl ProtocolCommands<NarwhalBenchmarkType> for NarwhalProtocol {
             .into_iter()
             .enumerate()
             .map(|(i, instance)| {
-                let primary_keys: PathBuf = [&working_dir, &format!("primary-{i}-key.json").into()].iter().collect();
-                let primary_network_keys: PathBuf =
-                    [&working_dir, &format!("primary-{i}-network-key.json").into()].iter().collect();
+                let primary_keys: PathBuf = [&working_dir, &format!("primary-{i}-key.json").into()]
+                    .iter()
+                    .collect();
+                let primary_network_keys: PathBuf = [
+                    &working_dir,
+                    &format!("primary-{i}-network-key.json").into(),
+                ]
+                .iter()
+                .collect();
                 // todo: add logic for multiple workers
-                let worker_keys: PathBuf = [&working_dir, &format!("worker-{i}-key.json").into()].iter().collect();
-                let committee: PathBuf = [&working_dir, &"committee.json".to_string().into()].iter().collect();
-                let workers: PathBuf = [&working_dir, &"workers.json".to_string().into()].iter().collect();
+                let worker_keys: PathBuf = [&working_dir, &format!("worker-{i}-key.json").into()]
+                    .iter()
+                    .collect();
+                let committee: PathBuf = [&working_dir, &"committee.json".to_string().into()]
+                    .iter()
+                    .collect();
+                let workers: PathBuf = [&working_dir, &"workers.json".to_string().into()]
+                    .iter()
+                    .collect();
                 let store: PathBuf = [&working_dir, &format!("db-{i}").into()].iter().collect();
-                let nw_parameters: PathBuf = [&working_dir, &"parameters.json".to_string().into()].iter().collect();
+                let nw_parameters: PathBuf = [&working_dir, &"parameters.json".to_string().into()]
+                    .iter()
+                    .collect();
 
                 let run = [
                     "sudo sysctl -w net.core.wmem_max=104857600 && ",
@@ -146,7 +175,11 @@ impl ProtocolCommands<NarwhalBenchmarkType> for NarwhalProtocol {
                         committee.display(),
                         workers.display()
                     ),
-                    &format!("--store {} --parameters {} benchmark ", store.display(), nw_parameters.display()),
+                    &format!(
+                        "--store {} --parameters {} benchmark ",
+                        store.display(),
+                        nw_parameters.display()
+                    ),
                     &format!(
                         "--worker-id 0 --addr {} --size {} --rate {} --nodes {}",
                         transaction_addresses[i],
@@ -180,23 +213,27 @@ impl ProtocolCommands<NarwhalBenchmarkType> for NarwhalProtocol {
 impl NarwhalProtocol {
     /// Make a new instance of the Narwhal protocol commands generator.
     pub fn new(settings: &Settings) -> Self {
-        Self { working_dir: [&settings.working_dir, &"narwhal_config".into()].iter().collect() }
+        Self {
+            working_dir: [&settings.working_dir, &"narwhal_config".into()]
+                .iter()
+                .collect(),
+        }
     }
 }
 
 impl ProtocolMetrics for NarwhalProtocol {
     const BENCHMARK_DURATION: &'static str = "narwhal_benchmark_duration";
-    // Does not include the time taken for the tx to be included in the batch, only
-    // from batch creation to when the batch is fetched for execution
-    const LATENCY_BUCKETS: &'static str = "batch_execution_latency";
-    // Measuring client submit latency but this only factors in submission and
-    // not time to commit
-    const LATENCY_SQUARED_SUM: &'static str = "narwhal_client_latency_squared_s";
-    const LATENCY_SUM: &'static str = "batch_execution_latency_sum";
     // TODO: Improve metrics used for benchmark summary.
     // Currently the only route should be `SubmitTransaction` so this should be a
     // good proxy for total tx
     const TOTAL_TRANSACTIONS: &'static str = "worker_req_latency_by_route_count";
+    // Does not include the time taken for the tx to be included in the batch, only
+    // from batch creation to when the batch is fetched for execution
+    const LATENCY_BUCKETS: &'static str = "batch_execution_latency";
+    const LATENCY_SUM: &'static str = "batch_execution_latency_sum";
+    // Measuring client submit latency but this only factors in submission and
+    // not time to commit
+    const LATENCY_SQUARED_SUM: &'static str = "narwhal_client_latency_squared_s";
 
     fn nodes_metrics_path<I>(&self, instances: I) -> Vec<(Instance, String)>
     where
@@ -208,7 +245,7 @@ impl ProtocolMetrics for NarwhalProtocol {
                 let path = format!(
                     "{}:{}{}",
                     instance.main_ip,
-                    PrometheusMetricsParameters::DEFAULT_PORT,
+                    DEFAULT_PORT,
                     mysten_metrics::METRICS_ROUTE
                 );
                 (instance, path)

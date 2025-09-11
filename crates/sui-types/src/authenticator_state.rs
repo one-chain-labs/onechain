@@ -5,24 +5,24 @@ use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    base_types::SequenceNumber,
-    dynamic_field::get_dynamic_field_from_store,
-    error::{SuiError, SuiResult},
-    id::UID,
-    object::Owner,
-    storage::ObjectStore,
-    SUI_AUTHENTICATOR_STATE_OBJECT_ID,
-    SUI_FRAMEWORK_ADDRESS,
-};
+use crate::base_types::SequenceNumber;
+use crate::dynamic_field::get_dynamic_field_from_store;
+use crate::error::{SuiError, SuiResult};
+use crate::object::Owner;
+use crate::storage::ObjectStore;
+use crate::{id::UID, SUI_AUTHENTICATOR_STATE_OBJECT_ID, SUI_FRAMEWORK_ADDRESS};
 
 pub const AUTHENTICATOR_STATE_MODULE_NAME: &IdentStr = ident_str!("authenticator_state");
 pub const AUTHENTICATOR_STATE_STRUCT_NAME: &IdentStr = ident_str!("AuthenticatorState");
-pub const AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME: &IdentStr = ident_str!("update_authenticator_state");
+pub const AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME: &IdentStr =
+    ident_str!("update_authenticator_state");
 pub const AUTHENTICATOR_STATE_CREATE_FUNCTION_NAME: &IdentStr = ident_str!("create");
 pub const AUTHENTICATOR_STATE_EXPIRE_JWKS_FUNCTION_NAME: &IdentStr = ident_str!("expire_jwks");
-pub const RESOLVED_SUI_AUTHENTICATOR_STATE: (&AccountAddress, &IdentStr, &IdentStr) =
-    (&SUI_FRAMEWORK_ADDRESS, AUTHENTICATOR_STATE_MODULE_NAME, AUTHENTICATOR_STATE_STRUCT_NAME);
+pub const RESOLVED_SUI_AUTHENTICATOR_STATE: (&AccountAddress, &IdentStr, &IdentStr) = (
+    &SUI_FRAMEWORK_ADDRESS,
+    AUTHENTICATOR_STATE_MODULE_NAME,
+    AUTHENTICATOR_STATE_STRUCT_NAME,
+);
 
 /// Current latest version of the authenticator state object.
 pub const AUTHENTICATOR_STATE_VERSION: u64 = 1;
@@ -105,13 +105,17 @@ impl std::cmp::Ord for ActiveJwk {
     }
 }
 
-pub fn get_authenticator_state(object_store: impl ObjectStore) -> SuiResult<Option<AuthenticatorStateInner>> {
+pub fn get_authenticator_state(
+    object_store: impl ObjectStore,
+) -> SuiResult<Option<AuthenticatorStateInner>> {
     let outer = object_store.get_object(&SUI_AUTHENTICATOR_STATE_OBJECT_ID);
     let Some(outer) = outer else {
         return Ok(None);
     };
     let move_object = outer.data.try_as_move().ok_or_else(|| {
-        SuiError::SuiSystemStateReadError("AuthenticatorState object must be a Move object".to_owned())
+        SuiError::SuiSystemStateReadError(
+            "AuthenticatorState object must be a Move object".to_owned(),
+        )
     })?;
     let outer = bcs::from_bytes::<AuthenticatorState>(move_object.contents())
         .map_err(|err| SuiError::SuiSystemStateReadError(err.to_string()))?;
@@ -134,8 +138,12 @@ pub fn get_authenticator_state(object_store: impl ObjectStore) -> SuiResult<Opti
 pub fn get_authenticator_state_obj_initial_shared_version(
     object_store: &dyn ObjectStore,
 ) -> SuiResult<Option<SequenceNumber>> {
-    Ok(object_store.get_object(&SUI_AUTHENTICATOR_STATE_OBJECT_ID).map(|obj| match obj.owner {
-        Owner::Shared { initial_shared_version } => initial_shared_version,
-        _ => unreachable!("Authenticator state object must be shared"),
-    }))
+    Ok(object_store
+        .get_object(&SUI_AUTHENTICATOR_STATE_OBJECT_ID)
+        .map(|obj| match obj.owner {
+            Owner::Shared {
+                initial_shared_version,
+            } => initial_shared_version,
+            _ => unreachable!("Authenticator state object must be shared"),
+        }))
 }

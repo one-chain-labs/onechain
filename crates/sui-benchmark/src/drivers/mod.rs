@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use duration_str::parse;
-use std::{fmt::Formatter, str::FromStr, time::Duration};
+use std::fmt::Formatter;
+use std::{str::FromStr, time::Duration};
 
 pub mod bench_driver;
 pub mod driver;
@@ -61,7 +62,9 @@ pub struct HistogramWrapper {
 
 impl Default for HistogramWrapper {
     fn default() -> Self {
-        Self { histogram: Histogram::new(0).unwrap() }
+        Self {
+            histogram: Histogram::new(0).unwrap(),
+        }
     }
 }
 
@@ -93,7 +96,10 @@ pub struct StressStats {
 
 impl StressStats {
     pub fn update(&mut self, sample_stat: &StressStats) {
-        self.cpu_usage.histogram.add(&sample_stat.cpu_usage.histogram).unwrap();
+        self.cpu_usage
+            .histogram
+            .add(&sample_stat.cpu_usage.histogram)
+            .unwrap();
     }
 
     pub fn to_table(&self) -> Table {
@@ -137,37 +143,48 @@ impl BenchmarkStats {
         self.num_success_txes += sample_stat.num_success_txes;
         self.num_success_cmds += sample_stat.num_success_cmds;
         self.total_gas_used += sample_stat.total_gas_used;
-        self.latency_ms.histogram.add(&sample_stat.latency_ms.histogram).unwrap();
+        self.latency_ms
+            .histogram
+            .add(&sample_stat.latency_ms.histogram)
+            .unwrap();
     }
-
     pub fn to_table(&self) -> Table {
         let mut table = Table::new();
-        table.set_content_arrangement(ContentArrangement::Dynamic).set_width(200).set_header(vec![
-            "duration(s)",
-            "tps",
-            "cps",
-            "error%",
-            "expected error%",
-            "latency (min)",
-            "latency (p50)",
-            "latency (p99)",
-            "gas used (MIST total)",
-            "gas used/hr (MIST approx.)",
-        ]);
+        table
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_width(200)
+            .set_header(vec![
+                "duration(s)",
+                "tps",
+                "cps",
+                "error%",
+                "expected error%",
+                "latency (min)",
+                "latency (p50)",
+                "latency (p99)",
+                "gas used (MIST total)",
+                "gas used/hr (MIST approx.)",
+            ]);
         let mut row = Row::new();
         row.add_cell(Cell::new(self.duration.as_secs()));
         row.add_cell(Cell::new(self.num_success_txes / self.duration.as_secs()));
         row.add_cell(Cell::new(self.num_success_cmds / self.duration.as_secs()));
         row.add_cell(Cell::new(
-            (100 * self.num_error_txes) as f32 / (self.num_error_txes + self.num_success_txes) as f32,
+            (100 * self.num_error_txes) as f32
+                / (self.num_error_txes + self.num_success_txes) as f32,
         ));
         row.add_cell(Cell::new(
-            (100 * self.num_expected_error_txes) as f32 / (self.num_expected_error_txes + self.num_success_txes) as f32,
+            (100 * self.num_expected_error_txes) as f32
+                / (self.num_expected_error_txes + self.num_success_txes) as f32,
         ));
         row.add_cell(Cell::new(self.latency_ms.histogram.min()));
         row.add_cell(Cell::new(self.latency_ms.histogram.value_at_quantile(0.5)));
         row.add_cell(Cell::new(self.latency_ms.histogram.value_at_quantile(0.99)));
-        row.add_cell(Cell::new(format_num_with_separators(self.total_gas_used, 3, ",")));
+        row.add_cell(Cell::new(format_num_with_separators(
+            self.total_gas_used,
+            3,
+            ",",
+        )));
         row.add_cell(Cell::new(format_num_with_separators(
             self.total_gas_used * 60 * 60 / self.duration.as_secs(),
             3,
@@ -224,7 +241,6 @@ impl BenchmarkCmp<'_> {
         }
         table
     }
-
     pub fn all_cmps(&self) -> Vec<Comparison> {
         vec![
             self.cmp_tps(),
@@ -239,7 +255,6 @@ impl BenchmarkCmp<'_> {
             self.cmp_max_latency(),
         ]
     }
-
     pub fn cmp_tps(&self) -> Comparison {
         let old_tps = self.old.num_success_txes / self.old.duration.as_secs();
         let new_tps = self.new.num_success_txes / self.new.duration.as_secs();
@@ -255,10 +270,11 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_error_rate(&self) -> Comparison {
-        let old_error_rate = self.old.num_error_txes / (self.old.num_error_txes + self.old.num_success_txes);
-        let new_error_rate = self.new.num_error_txes / (self.new.num_error_txes + self.new.num_success_txes);
+        let old_error_rate =
+            self.old.num_error_txes / (self.old.num_error_txes + self.old.num_success_txes);
+        let new_error_rate =
+            self.new.num_error_txes / (self.new.num_error_txes + self.new.num_success_txes);
         let diff = new_error_rate as i64 - old_error_rate as i64;
         let diff_ratio = diff as f64 / old_error_rate as f64;
         let speedup = 1.0 / (1.0 + diff_ratio);
@@ -271,7 +287,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_min_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.min() as i64;
         let new = self.new.latency_ms.histogram.min() as i64;
@@ -287,7 +302,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_p25_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.value_at_quantile(0.25) as i64;
         let new = self.new.latency_ms.histogram.value_at_quantile(0.25) as i64;
@@ -303,7 +317,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_p50_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.value_at_quantile(0.5) as i64;
         let new = self.new.latency_ms.histogram.value_at_quantile(0.5) as i64;
@@ -319,7 +332,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_p75_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.value_at_quantile(0.75) as i64;
         let new = self.new.latency_ms.histogram.value_at_quantile(0.75) as i64;
@@ -335,7 +347,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_p90_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.value_at_quantile(0.9) as i64;
         let new = self.new.latency_ms.histogram.value_at_quantile(0.9) as i64;
@@ -351,7 +362,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_p99_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.value_at_quantile(0.99) as i64;
         let new = self.new.latency_ms.histogram.value_at_quantile(0.99) as i64;
@@ -367,7 +377,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_p999_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.value_at_quantile(0.999) as i64;
         let new = self.new.latency_ms.histogram.value_at_quantile(0.999) as i64;
@@ -383,7 +392,6 @@ impl BenchmarkCmp<'_> {
             speedup,
         }
     }
-
     pub fn cmp_max_latency(&self) -> Comparison {
         let old = self.old.latency_ms.histogram.max() as i64;
         let new = self.new.latency_ms.histogram.max() as i64;
@@ -403,7 +411,11 @@ impl BenchmarkCmp<'_> {
 
 /// Convert an unsigned number into a string separated by `delim` every `step_size` digits
 /// For example used to make 100000 more readable as 100,000
-fn format_num_with_separators<T: Into<u128> + std::fmt::Display>(x: T, step_size: u8, delim: &'static str) -> String {
+fn format_num_with_separators<T: Into<u128> + std::fmt::Display>(
+    x: T,
+    step_size: u8,
+    delim: &'static str,
+) -> String {
     x.to_string()
         .as_bytes()
         .rchunks(step_size as usize)

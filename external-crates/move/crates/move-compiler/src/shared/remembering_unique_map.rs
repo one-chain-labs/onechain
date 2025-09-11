@@ -19,7 +19,10 @@ pub struct RememberingUniqueMap<K: TName + Ord, V> {
 #[allow(clippy::new_without_default)]
 impl<K: TName, V> RememberingUniqueMap<K, V> {
     pub fn new() -> Self {
-        RememberingUniqueMap { map: UniqueMap::new(), gotten_keys: BTreeSet::new() }
+        RememberingUniqueMap {
+            map: UniqueMap::new(),
+            gotten_keys: BTreeSet::new(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -70,14 +73,20 @@ impl<K: TName, V> RememberingUniqueMap<K, V> {
     where
         F: FnMut(K, V) -> V2,
     {
-        RememberingUniqueMap { map: self.map.map(f), gotten_keys: self.gotten_keys }
+        RememberingUniqueMap {
+            map: self.map.map(f),
+            gotten_keys: self.gotten_keys,
+        }
     }
 
     pub fn ref_map<V2, F>(&self, f: F) -> RememberingUniqueMap<K, V2>
     where
         F: FnMut(K, &V) -> V2,
     {
-        RememberingUniqueMap { map: self.map.ref_map(f), gotten_keys: self.gotten_keys.clone() }
+        RememberingUniqueMap {
+            map: self.map.ref_map(f),
+            gotten_keys: self.gotten_keys.clone(),
+        }
     }
 
     pub fn union_with<F>(&self, other: &Self, f: F) -> Self
@@ -87,7 +96,11 @@ impl<K: TName, V> RememberingUniqueMap<K, V> {
     {
         RememberingUniqueMap {
             map: self.map.union_with(&other.map, f),
-            gotten_keys: self.gotten_keys.union(&other.gotten_keys).cloned().collect(),
+            gotten_keys: self
+                .gotten_keys
+                .union(&other.gotten_keys)
+                .cloned()
+                .collect(),
         }
     }
 
@@ -103,14 +116,20 @@ impl<K: TName, V> RememberingUniqueMap<K, V> {
         iter: impl Iterator<Item = Option<(K, V)>>,
     ) -> Option<Result<RememberingUniqueMap<K, V>, (K::Key, K::Loc, K::Loc)>> {
         let map_res = UniqueMap::maybe_from_opt_iter(iter)?;
-        Some(map_res.map(|map| RememberingUniqueMap { map, gotten_keys: BTreeSet::new() }))
+        Some(map_res.map(|map| RememberingUniqueMap {
+            map,
+            gotten_keys: BTreeSet::new(),
+        }))
     }
 
     pub fn maybe_from_iter(
         iter: impl Iterator<Item = (K, V)>,
     ) -> Result<RememberingUniqueMap<K, V>, (K::Key, K::Loc, K::Loc)> {
         let map = UniqueMap::maybe_from_iter(iter)?;
-        Ok(RememberingUniqueMap { map, gotten_keys: BTreeSet::new() })
+        Ok(RememberingUniqueMap {
+            map,
+            gotten_keys: BTreeSet::new(),
+        })
     }
 
     pub fn into_inner(self) -> UniqueMap<K, V> {
@@ -139,7 +158,11 @@ where
     K::Loc: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RememberingUniqueMap {{ map: {:#?}, gotten_keys: {:#?} }}", self.map, self.gotten_keys)
+        write!(
+            f,
+            "RememberingUniqueMap {{ map: {:#?}, gotten_keys: {:#?} }}",
+            self.map, self.gotten_keys
+        )
     }
 }
 
@@ -162,8 +185,8 @@ impl<K: TName, V> Iterator for IntoIter<K, V> {
 }
 
 impl<K: TName, V> IntoIterator for RememberingUniqueMap<K, V> {
-    type IntoIter = IntoIter<K, V>;
     type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.map.into_iter())
@@ -189,8 +212,8 @@ impl<'a, K: TName, V> Iterator for Iter<'a, K, V> {
 }
 
 impl<'a, K: TName, V> IntoIterator for &'a RememberingUniqueMap<K, V> {
-    type IntoIter = Iter<'a, K, V>;
     type Item = (K::Loc, &'a K::Key, &'a V);
+    type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         let m = &self.map;
@@ -217,8 +240,8 @@ impl<'a, K: TName, V> Iterator for IterMut<'a, K, V> {
 }
 
 impl<'a, K: TName, V> IntoIterator for &'a mut RememberingUniqueMap<K, V> {
-    type IntoIter = IterMut<'a, K, V>;
     type Item = (K::Loc, &'a K::Key, &'a mut V);
+    type IntoIter = IterMut<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         let m = &mut self.map;

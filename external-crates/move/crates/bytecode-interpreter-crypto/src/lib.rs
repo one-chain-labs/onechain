@@ -12,12 +12,10 @@
 //! diem-framework) and be passed into the VM for execution. In this way we no
 //! longer need to worry about depending on diem-crypto.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use ed25519_dalek::{
-    PublicKey as Ed25519PublicKey,
-    Signature as Ed25519Signature,
-    PUBLIC_KEY_LENGTH as ED25519_PUBLIC_KEY_LENGTH,
-    SIGNATURE_LENGTH as ED25519_SIGNATURE_LENGTH,
+    PUBLIC_KEY_LENGTH as ED25519_PUBLIC_KEY_LENGTH, PublicKey as Ed25519PublicKey,
+    SIGNATURE_LENGTH as ED25519_SIGNATURE_LENGTH, Signature as Ed25519Signature,
 };
 use sha2::{Digest, Sha256};
 use sha3::Sha3_256;
@@ -25,8 +23,8 @@ use std::cmp::Ordering;
 
 /// The order of ed25519 as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).
 const L: [u8; 32] = [
-    0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+    0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
 ];
 
 // Hash functions
@@ -89,7 +87,11 @@ pub fn ed25519_deserialize_signature(bytes: &[u8]) -> Result<Ed25519Signature> {
     Ok(Ed25519Signature::from_bytes(bytes)?)
 }
 
-pub fn ed25519_verify_signature(key: &Ed25519PublicKey, sig: &Ed25519Signature, msg: &[u8]) -> Result<()> {
+pub fn ed25519_verify_signature(
+    key: &Ed25519PublicKey,
+    sig: &Ed25519Signature,
+    msg: &[u8],
+) -> Result<()> {
     if !validate_public_key(&key.to_bytes()) {
         bail!("Malleable public key");
     }

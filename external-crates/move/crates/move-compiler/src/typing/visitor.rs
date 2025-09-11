@@ -109,7 +109,12 @@ pub trait TypingVisitorContext {
         false
     }
 
-    fn visit_struct(&mut self, module: ModuleIdent, struct_name: DatatypeName, sdef: &N::StructDefinition) {
+    fn visit_struct(
+        &mut self,
+        module: ModuleIdent,
+        struct_name: DatatypeName,
+        sdef: &N::StructDefinition,
+    ) {
         self.push_warning_filter_scope(sdef.warning_filter);
         if self.visit_struct_custom(module, struct_name, sdef) {
             self.pop_warning_filter_scope();
@@ -118,7 +123,7 @@ pub trait TypingVisitorContext {
         if Self::VISIT_TYPES {
             match &sdef.fields {
                 N::StructFields::Defined(_, fields) => {
-                    for (_, _, (_, ty)) in fields {
+                    for (_, _, (_, (_, ty))) in fields {
                         self.visit_type(None, ty)
                     }
                 }
@@ -128,11 +133,21 @@ pub trait TypingVisitorContext {
         self.pop_warning_filter_scope();
     }
 
-    fn visit_enum_custom(&mut self, _module: ModuleIdent, _enum_name: DatatypeName, _edef: &N::EnumDefinition) -> bool {
+    fn visit_enum_custom(
+        &mut self,
+        _module: ModuleIdent,
+        _enum_name: DatatypeName,
+        _edef: &N::EnumDefinition,
+    ) -> bool {
         false
     }
 
-    fn visit_enum(&mut self, module: ModuleIdent, enum_name: DatatypeName, edef: &N::EnumDefinition) {
+    fn visit_enum(
+        &mut self,
+        module: ModuleIdent,
+        enum_name: DatatypeName,
+        edef: &N::EnumDefinition,
+    ) {
         self.push_warning_filter_scope(edef.warning_filter);
         if self.visit_enum_custom(module, enum_name, edef) {
             self.pop_warning_filter_scope();
@@ -167,7 +182,7 @@ pub trait TypingVisitorContext {
         if Self::VISIT_TYPES {
             match &vdef.fields {
                 N::VariantFields::Defined(_, fields) => {
-                    for (_, _, (_, ty)) in fields {
+                    for (_, _, (_, (_, ty))) in fields {
                         self.visit_type(None, ty)
                     }
                 }
@@ -187,7 +202,12 @@ pub trait TypingVisitorContext {
         false
     }
 
-    fn visit_constant(&mut self, module: ModuleIdent, constant_name: ConstantName, cdef: &T::Constant) {
+    fn visit_constant(
+        &mut self,
+        module: ModuleIdent,
+        constant_name: ConstantName,
+        cdef: &T::Constant,
+    ) {
         self.push_warning_filter_scope(cdef.warning_filter);
         if self.visit_constant_custom(module, constant_name, cdef) {
             self.pop_warning_filter_scope();
@@ -206,14 +226,23 @@ pub trait TypingVisitorContext {
         false
     }
 
-    fn visit_function(&mut self, module: ModuleIdent, function_name: FunctionName, fdef: &T::Function) {
+    fn visit_function(
+        &mut self,
+        module: ModuleIdent,
+        function_name: FunctionName,
+        fdef: &T::Function,
+    ) {
         self.push_warning_filter_scope(fdef.warning_filter);
         if self.visit_function_custom(module, function_name, fdef) {
             self.pop_warning_filter_scope();
             return;
         }
         if Self::VISIT_TYPES {
-            fdef.signature.parameters.iter().map(|(_, _, ty)| ty).for_each(|ty| self.visit_type(None, ty));
+            fdef.signature
+                .parameters
+                .iter()
+                .map(|(_, _, ty)| ty)
+                .for_each(|ty| self.visit_type(None, ty));
             self.visit_type(None, &fdef.signature.return_type);
         }
         if let T::FunctionBody_::Defined(seq) = &fdef.body.value {
@@ -246,6 +275,7 @@ pub trait TypingVisitorContext {
             }
             N::Type_::Var(_) => (),
             N::Type_::Anything => (),
+            N::Type_::Void => (),
             N::Type_::UnresolvedError => (),
         }
     }
@@ -304,7 +334,10 @@ pub trait TypingVisitorContext {
                     self.visit_lvalue_list(&LValueKind::Bind, lvalues);
                 }
                 if Self::VISIT_TYPES {
-                    ty_ann.iter().flatten().for_each(|ty| self.visit_type(Some(ty.loc), ty));
+                    ty_ann
+                        .iter()
+                        .flatten()
+                        .for_each(|ty| self.visit_type(Some(ty.loc), ty));
                 }
             }
         }
@@ -332,7 +365,12 @@ pub trait TypingVisitorContext {
         }
         match &lvalue.value {
             T::LValue_::Ignore => (),
-            T::LValue_::Var { mut_: _, var: _, ty, unused_binding: _ } => {
+            T::LValue_::Var {
+                mut_: _,
+                var: _,
+                ty,
+                unused_binding: _,
+            } => {
                 if Self::VISIT_TYPES {
                     self.visit_type(Some(lvalue.loc), ty);
                 }
@@ -342,7 +380,9 @@ pub trait TypingVisitorContext {
             | T::LValue_::Unpack(_, _, tyargs, fields)
             | T::LValue_::BorrowUnpack(_, _, _, tyargs, fields) => {
                 if Self::VISIT_TYPES {
-                    tyargs.iter().for_each(|ty| self.visit_type(Some(lvalue.loc), ty));
+                    tyargs
+                        .iter()
+                        .for_each(|ty| self.visit_type(Some(lvalue.loc), ty));
                 }
                 for (_, _, (_, (ty, lvalue))) in fields.iter() {
                     if Self::VISIT_TYPES {
@@ -373,8 +413,12 @@ pub trait TypingVisitorContext {
         match uexp {
             E::ModuleCall(c) => {
                 if Self::VISIT_TYPES {
-                    c.type_arguments.iter().for_each(|ty| self.visit_type(Some(exp_loc), ty));
-                    c.parameter_types.iter().for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    c.type_arguments
+                        .iter()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    c.parameter_types
+                        .iter()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
                 }
                 self.visit_exp(&c.arguments)
             }
@@ -435,7 +479,10 @@ pub trait TypingVisitorContext {
                     }
                 }
                 if Self::VISIT_TYPES {
-                    ty_ann.iter().flatten().for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    ty_ann
+                        .iter()
+                        .flatten()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
                 }
             }
             E::Mutate(e1, e2) => {
@@ -456,7 +503,9 @@ pub trait TypingVisitorContext {
             }
             E::Pack(_, _, tyargs, fields) | E::PackVariant(_, _, _, tyargs, fields) => {
                 if Self::VISIT_TYPES {
-                    tyargs.iter().for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    tyargs
+                        .iter()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
                 }
                 fields.iter().for_each(|(_, _, (_, (ty, e)))| {
                     if Self::VISIT_TYPES {
@@ -624,7 +673,11 @@ pub trait TypingMutVisitorContext {
 
     // -- MODULE DEFINITIONS --
 
-    fn visit_module_custom(&mut self, _ident: ModuleIdent, _mdef: &mut T::ModuleDefinition) -> bool {
+    fn visit_module_custom(
+        &mut self,
+        _ident: ModuleIdent,
+        _mdef: &mut T::ModuleDefinition,
+    ) -> bool {
         false
     }
 
@@ -664,7 +717,12 @@ pub trait TypingMutVisitorContext {
         false
     }
 
-    fn visit_struct(&mut self, module: ModuleIdent, struct_name: DatatypeName, sdef: &mut N::StructDefinition) {
+    fn visit_struct(
+        &mut self,
+        module: ModuleIdent,
+        struct_name: DatatypeName,
+        sdef: &mut N::StructDefinition,
+    ) {
         self.push_warning_filter_scope(sdef.warning_filter);
         if self.visit_struct_custom(module, struct_name, sdef) {
             self.pop_warning_filter_scope();
@@ -673,7 +731,7 @@ pub trait TypingMutVisitorContext {
         if Self::VISIT_TYPES {
             match &mut sdef.fields {
                 N::StructFields::Defined(_, fields) => {
-                    for (_, _, (_, ty)) in fields {
+                    for (_, _, (_, (_, ty))) in fields {
                         self.visit_type(None, ty)
                     }
                 }
@@ -692,7 +750,12 @@ pub trait TypingMutVisitorContext {
         false
     }
 
-    fn visit_enum(&mut self, module: ModuleIdent, enum_name: DatatypeName, edef: &mut N::EnumDefinition) {
+    fn visit_enum(
+        &mut self,
+        module: ModuleIdent,
+        enum_name: DatatypeName,
+        edef: &mut N::EnumDefinition,
+    ) {
         self.push_warning_filter_scope(edef.warning_filter);
         if self.visit_enum_custom(module, enum_name, edef) {
             self.pop_warning_filter_scope();
@@ -727,7 +790,7 @@ pub trait TypingMutVisitorContext {
         if Self::VISIT_TYPES {
             match &mut vdef.fields {
                 N::VariantFields::Defined(_, fields) => {
-                    for (_, _, (_, ty)) in fields {
+                    for (_, _, (_, (_, ty))) in fields {
                         self.visit_type(None, ty)
                     }
                 }
@@ -745,7 +808,12 @@ pub trait TypingMutVisitorContext {
         false
     }
 
-    fn visit_constant(&mut self, module: ModuleIdent, constant_name: ConstantName, cdef: &mut T::Constant) {
+    fn visit_constant(
+        &mut self,
+        module: ModuleIdent,
+        constant_name: ConstantName,
+        cdef: &mut T::Constant,
+    ) {
         self.push_warning_filter_scope(cdef.warning_filter);
         if self.visit_constant_custom(module, constant_name, cdef) {
             self.pop_warning_filter_scope();
@@ -764,14 +832,23 @@ pub trait TypingMutVisitorContext {
         false
     }
 
-    fn visit_function(&mut self, module: ModuleIdent, function_name: FunctionName, fdef: &mut T::Function) {
+    fn visit_function(
+        &mut self,
+        module: ModuleIdent,
+        function_name: FunctionName,
+        fdef: &mut T::Function,
+    ) {
         self.push_warning_filter_scope(fdef.warning_filter);
         if self.visit_function_custom(module, function_name, fdef) {
             self.pop_warning_filter_scope();
             return;
         }
         if Self::VISIT_TYPES {
-            fdef.signature.parameters.iter_mut().map(|(_, _, ty)| ty).for_each(|ty| self.visit_type(None, ty));
+            fdef.signature
+                .parameters
+                .iter_mut()
+                .map(|(_, _, ty)| ty)
+                .for_each(|ty| self.visit_type(None, ty));
             self.visit_type(None, &mut fdef.signature.return_type);
         }
         if let T::FunctionBody_::Defined(seq) = &mut fdef.body.value {
@@ -797,13 +874,16 @@ pub trait TypingMutVisitorContext {
             N::Type_::Unit => (),
             N::Type_::Ref(_, inner) => self.visit_type(exp_loc, inner),
             N::Type_::Param(_) => (),
-            N::Type_::Apply(_, _, args) => args.iter_mut().for_each(|ty| self.visit_type(exp_loc, ty)),
+            N::Type_::Apply(_, _, args) => {
+                args.iter_mut().for_each(|ty| self.visit_type(exp_loc, ty))
+            }
             N::Type_::Fun(args, ret) => {
                 args.iter_mut().for_each(|ty| self.visit_type(exp_loc, ty));
                 self.visit_type(exp_loc, ret);
             }
             N::Type_::Var(_) => (),
             N::Type_::Anything => (),
+            N::Type_::Void => (),
             N::Type_::UnresolvedError => (),
         }
     }
@@ -854,7 +934,10 @@ pub trait TypingMutVisitorContext {
                     self.visit_lvalue_list(&LValueKind::Bind, lvalues);
                 }
                 if Self::VISIT_TYPES {
-                    ty_ann.iter_mut().flatten().for_each(|ty| self.visit_type(Some(ty.loc), ty));
+                    ty_ann
+                        .iter_mut()
+                        .flatten()
+                        .for_each(|ty| self.visit_type(Some(ty.loc), ty));
                 }
             }
         }
@@ -882,7 +965,12 @@ pub trait TypingMutVisitorContext {
         }
         match &mut lvalue.value {
             T::LValue_::Ignore => (),
-            T::LValue_::Var { mut_: _, var: _, ty, unused_binding: _ } => {
+            T::LValue_::Var {
+                mut_: _,
+                var: _,
+                ty,
+                unused_binding: _,
+            } => {
                 if Self::VISIT_TYPES {
                     self.visit_type(Some(lvalue.loc), ty);
                 }
@@ -892,7 +980,9 @@ pub trait TypingMutVisitorContext {
             | T::LValue_::Unpack(_, _, tyargs, fields)
             | T::LValue_::BorrowUnpack(_, _, _, tyargs, fields) => {
                 if Self::VISIT_TYPES {
-                    tyargs.iter_mut().for_each(|ty| self.visit_type(Some(lvalue.loc), ty));
+                    tyargs
+                        .iter_mut()
+                        .for_each(|ty| self.visit_type(Some(lvalue.loc), ty));
                 }
                 for (_, _, (_, (ty, lvalue))) in fields.iter_mut() {
                     if Self::VISIT_TYPES {
@@ -923,8 +1013,12 @@ pub trait TypingMutVisitorContext {
         match uexp {
             E::ModuleCall(c) => {
                 if Self::VISIT_TYPES {
-                    c.type_arguments.iter_mut().for_each(|ty| self.visit_type(Some(exp_loc), ty));
-                    c.parameter_types.iter_mut().for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    c.type_arguments
+                        .iter_mut()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    c.parameter_types
+                        .iter_mut()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
                 }
                 self.visit_exp(&mut c.arguments)
             }
@@ -985,7 +1079,10 @@ pub trait TypingMutVisitorContext {
                     }
                 }
                 if Self::VISIT_TYPES {
-                    ty_ann.iter_mut().flatten().for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    ty_ann
+                        .iter_mut()
+                        .flatten()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
                 }
             }
             E::Mutate(e1, e2) => {
@@ -1006,7 +1103,9 @@ pub trait TypingMutVisitorContext {
             }
             E::Pack(_, _, tyargs, fields) | E::PackVariant(_, _, _, tyargs, fields) => {
                 if Self::VISIT_TYPES {
-                    tyargs.iter_mut().for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                    tyargs
+                        .iter_mut()
+                        .for_each(|ty| self.visit_type(Some(exp_loc), ty));
                 }
                 fields.iter_mut().for_each(|(_, _, (_, (ty, e)))| {
                     if Self::VISIT_TYPES {
@@ -1027,7 +1126,8 @@ pub trait TypingMutVisitorContext {
                         T::ExpListItem::Splat(_, e, tys) => {
                             self.visit_exp(e);
                             if Self::VISIT_TYPES {
-                                tys.iter_mut().for_each(|ty| self.visit_type(Some(exp_loc), ty));
+                                tys.iter_mut()
+                                    .for_each(|ty| self.visit_type(Some(exp_loc), ty));
                             }
                         }
                     }
@@ -1129,11 +1229,17 @@ where
             exp_satisfies_(e1, p) || exp_satisfies_(e2, p)
         }
         E::IfElse(e1, e2, e3_opt) => {
-            exp_satisfies_(e1, p) || exp_satisfies_(e2, p) || e3_opt.iter().any(|e3| exp_satisfies_(e3, p))
+            exp_satisfies_(e1, p)
+                || exp_satisfies_(e2, p)
+                || e3_opt.iter().any(|e3| exp_satisfies_(e3, p))
         }
         E::ModuleCall(c) => exp_satisfies_(&c.arguments, p),
         E::Match(esubject, arms) => {
-            exp_satisfies_(esubject, p) || arms.value.iter().any(|sp!(_, arm)| exp_satisfies_(&arm.rhs, p))
+            exp_satisfies_(esubject, p)
+                || arms
+                    .value
+                    .iter()
+                    .any(|sp!(_, arm)| exp_satisfies_(&arm.rhs, p))
         }
         E::VariantMatch(esubject, _, arms) => {
             exp_satisfies_(esubject, p) || arms.iter().any(|(_, arm)| exp_satisfies_(arm, p))
@@ -1141,9 +1247,9 @@ where
 
         E::NamedBlock(_, seq) | E::Block(seq) => seq_satisfies_(seq, p),
 
-        E::Pack(_, _, _, fields) | E::PackVariant(_, _, _, _, fields) => {
-            fields.iter().any(|(_, _, (_, (_, e)))| exp_satisfies_(e, p))
-        }
+        E::Pack(_, _, _, fields) | E::PackVariant(_, _, _, _, fields) => fields
+            .iter()
+            .any(|(_, _, (_, (_, e)))| exp_satisfies_(e, p)),
         E::ExpList(list) => exp_list_satisfies_(list, p),
     }
 }
@@ -1229,14 +1335,20 @@ pub fn same_value_exp_(e1: &T::UnannotatedExp_, e2: &T::UnannotatedExp_) -> bool
         (E::Value(v1), E::Value(v2)) => v1 == v2,
         (E::Unit { .. }, E::Unit { .. }) => true,
         (E::Constant(m1, c1), E::Constant(m2, c2)) => m1 == m2 && c1 == c2,
-        (E::Move { var, .. } | E::Copy { var, .. } | E::Use(var) | E::BorrowLocal(_, var), other)
-        | (other, E::Move { var, .. } | E::Copy { var, .. } | E::Use(var) | E::BorrowLocal(_, var)) => {
-            same_local_(var, other)
-        }
+        (
+            E::Move { var, .. } | E::Copy { var, .. } | E::Use(var) | E::BorrowLocal(_, var),
+            other,
+        )
+        | (
+            other,
+            E::Move { var, .. } | E::Copy { var, .. } | E::Use(var) | E::BorrowLocal(_, var),
+        ) => same_local_(var, other),
 
         (E::Vector(_, _, _, e1), E::Vector(_, _, _, e2)) => same_value_exp(e1, e2),
 
-        (E::Builtin(b, e), other) | (other, E::Builtin(b, e)) if matches!(&b.value, BuiltinFunction_::Freeze(_)) => {
+        (E::Builtin(b, e), other) | (other, E::Builtin(b, e))
+            if matches!(&b.value, BuiltinFunction_::Freeze(_)) =>
+        {
             same_value_exp_(&e.exp.value, other)
         }
 
@@ -1266,16 +1378,23 @@ pub fn same_value_exp_(e1: &T::UnannotatedExp_, e2: &T::UnannotatedExp_) -> bool
     }
 }
 
-fn same_value_fields(fields1: &Fields<(N::Type, T::Exp)>, fields2: &Fields<(N::Type, T::Exp)>) -> bool {
-    fields1
-        .key_cloned_iter()
-        .all(|(f1, (_, (_, e1)))| fields2.get(&f1).is_some_and(|(_, (_, e2))| same_value_exp(e1, e2)))
+fn same_value_fields(
+    fields1: &Fields<(N::Type, T::Exp)>,
+    fields2: &Fields<(N::Type, T::Exp)>,
+) -> bool {
+    fields1.key_cloned_iter().all(|(f1, (_, (_, e1)))| {
+        fields2
+            .get(&f1)
+            .is_some_and(|(_, (_, e2))| same_value_exp(e1, e2))
+    })
 }
 
 fn same_value_exp_list(l1: &[T::ExpListItem], l2: &[T::ExpListItem]) -> bool {
     l1.len() == l2.len()
         && l1.iter().zip(l2).all(|(i1, i2)| match (i1, i2) {
-            (T::ExpListItem::Single(e1, _), T::ExpListItem::Single(e2, _)) => same_value_exp(e1, e2),
+            (T::ExpListItem::Single(e1, _), T::ExpListItem::Single(e2, _)) => {
+                same_value_exp(e1, e2)
+            }
             // TODO handle splat
             _ => false,
         })

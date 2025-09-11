@@ -5,7 +5,9 @@ use crate::{object_runtime::ObjectRuntime, NativesCostTable};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{gas_algebra::InternalGas, language_storage::TypeTag, vm_status::StatusCode};
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
-use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+};
 use smallvec::smallvec;
 use std::collections::VecDeque;
 use sui_types::error::VMMemoryLimitExceededSubStatusCode;
@@ -34,7 +36,11 @@ pub fn emit(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    let event_emit_cost_params = context.extensions_mut().get::<NativesCostTable>().event_emit_cost_params.clone();
+    let event_emit_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .event_emit_cost_params
+        .clone();
 
     native_charge_gas_early_exit!(context, event_emit_cost_params.event_emit_cost_base);
 
@@ -46,14 +52,17 @@ pub fn emit(
     // Deriving event value size can be expensive due to recursion overhead
     native_charge_gas_early_exit!(
         context,
-        event_emit_cost_params.event_emit_value_size_derivation_cost_per_byte * u64::from(event_value_size).into()
+        event_emit_cost_params.event_emit_value_size_derivation_cost_per_byte
+            * u64::from(event_value_size).into()
     );
 
     let tag = match context.type_to_type_tag(&ty)? {
         TypeTag::Struct(s) => s,
         _ => {
-            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Sui verifier guarantees this is a struct".to_string()))
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Sui verifier guarantees this is a struct".to_string()),
+            )
         }
     };
     let tag_size = tag.abstract_size_for_gas_metering();
@@ -61,7 +70,8 @@ pub fn emit(
     // Converting type to typetag be expensive due to recursion overhead
     native_charge_gas_early_exit!(
         context,
-        event_emit_cost_params.event_emit_tag_size_derivation_cost_per_byte * u64::from(tag_size).into()
+        event_emit_cost_params.event_emit_tag_size_derivation_cost_per_byte
+            * u64::from(tag_size).into()
     );
 
     let obj_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
@@ -70,8 +80,12 @@ pub fn emit(
     // Check if the event size is within the limit
     if ev_size > max_event_emit_size {
         return Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED)
-            .with_message(format!("Emitting event of size {ev_size} bytes. Limit is {max_event_emit_size} bytes."))
-            .with_sub_status(VMMemoryLimitExceededSubStatusCode::EVENT_SIZE_LIMIT_EXCEEDED as u64));
+            .with_message(format!(
+                "Emitting event of size {ev_size} bytes. Limit is {max_event_emit_size} bytes."
+            ))
+            .with_sub_status(
+                VMMemoryLimitExceededSubStatusCode::EVENT_SIZE_LIMIT_EXCEEDED as u64,
+            ));
     }
 
     // Check that the size contribution of the event is within the total size limit
@@ -90,7 +104,10 @@ pub fn emit(
         obj_runtime.state.incr_total_events_size(ev_size);
     }
     // Emitting an event is cheap since its a vector push
-    native_charge_gas_early_exit!(context, event_emit_cost_params.event_emit_output_cost_per_byte * ev_size.into());
+    native_charge_gas_early_exit!(
+        context,
+        event_emit_cost_params.event_emit_output_cost_per_byte * ev_size.into()
+    );
 
     let obj_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
 

@@ -1,20 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::{random_object_ref, EpochId, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
-    digests::{ObjectDigest, TransactionEventsDigest},
-    effects::{InputSharedObject, TransactionEffectsAPI, UnchangedSharedKind},
-    execution_status::ExecutionStatus,
-    gas::GasCostSummary,
-    object::Owner,
+use crate::accumulator_event::AccumulatorEvent;
+use crate::base_types::{
+    random_object_ref, EpochId, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest,
 };
+use crate::digests::{ObjectDigest, TransactionEventsDigest};
+use crate::effects::{InputSharedObject, TransactionEffectsAPI, UnchangedSharedKind};
+use crate::execution_status::{ExecutionFailureStatus, ExecutionStatus, MoveLocation};
+use crate::gas::GasCostSummary;
+use crate::object::Owner;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashSet},
-    fmt::{Display, Formatter, Write},
-};
+use std::collections::{BTreeMap, HashSet};
+use std::fmt::{Display, Formatter, Write};
 
+use super::object_change::AccumulatorWriteV1;
 use super::{IDOperation, ObjectChange};
 
 /// The response from processing a transaction or a certified transaction
@@ -119,6 +119,10 @@ impl TransactionEffectsV1 {
     pub fn wrapped(&self) -> &[ObjectRef] {
         &self.wrapped
     }
+
+    pub fn shared_objects(&self) -> &[ObjectRef] {
+        &self.shared_objects
+    }
 }
 
 impl TransactionEffectsAPI for TransactionEffectsV1 {
@@ -150,6 +154,17 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             .collect()
     }
 
+    fn move_abort(&self) -> Option<(MoveLocation, u64)> {
+        let ExecutionStatus::Failure {
+            error: ExecutionFailureStatus::MoveAbort(move_location, code),
+            ..
+        } = self.status()
+        else {
+            return None;
+        };
+        Some((move_location.clone(), *code))
+    }
+
     fn lamport_version(&self) -> SequenceNumber {
         SequenceNumber::lamport_increment(self.modified_at_versions.iter().map(|(_, v)| *v))
     }
@@ -162,15 +177,13 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
         let modified: HashSet<_> = self.modified_at_versions.iter().map(|(r, _)| r).collect();
         self.shared_objects
             .iter()
-            .map(
-                |r| {
-                    if modified.contains(&r.0) {
-                        InputSharedObject::Mutate(*r)
-                    } else {
-                        InputSharedObject::ReadOnly(*r)
-                    }
-                },
-            )
+            .map(|r| {
+                if modified.contains(&r.0) {
+                    InputSharedObject::Mutate(*r)
+                } else {
+                    InputSharedObject::ReadOnly(*r)
+                }
+            })
             .collect()
     }
 
@@ -196,6 +209,21 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
 
     fn wrapped(&self) -> Vec<ObjectRef> {
         self.wrapped.clone()
+    }
+
+    fn transferred_from_consensus(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
+    }
+
+    fn transferred_to_consensus(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
+    }
+
+    fn consensus_owner_changed(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
     }
 
     fn object_changes(&self) -> Vec<ObjectChange> {
@@ -237,14 +265,17 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             id_operation: IDOperation::Deleted,
         });
 
-        let unwrapped_then_deleted = self.unwrapped_then_deleted.iter().map(|(id, _, _)| ObjectChange {
-            id: *id,
-            input_version: None,
-            input_digest: None,
-            output_version: None,
-            output_digest: None,
-            id_operation: IDOperation::Deleted,
-        });
+        let unwrapped_then_deleted =
+            self.unwrapped_then_deleted
+                .iter()
+                .map(|(id, _, _)| ObjectChange {
+                    id: *id,
+                    input_version: None,
+                    input_digest: None,
+                    output_version: None,
+                    output_digest: None,
+                    id_operation: IDOperation::Deleted,
+                });
 
         let wrapped = self.wrapped.iter().map(|(id, _, _)| ObjectChange {
             id: *id,
@@ -255,13 +286,23 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             id_operation: IDOperation::None,
         });
 
-        created.chain(mutated).chain(unwrapped).chain(deleted).chain(unwrapped_then_deleted).chain(wrapped).collect()
+        created
+            .chain(mutated)
+            .chain(unwrapped)
+            .chain(deleted)
+            .chain(unwrapped_then_deleted)
+            .chain(wrapped)
+            .collect()
+    }
+
+    fn accumulator_events(&self) -> Vec<AccumulatorEvent> {
+        // v1 did not have accumulator events
+        vec![]
     }
 
     fn gas_object(&self) -> (ObjectRef, Owner) {
         self.gas_object.clone()
     }
-
     fn events_digest(&self) -> Option<&TransactionEventsDigest> {
         self.events_digest.as_ref()
     }
@@ -283,10 +324,16 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             .iter()
             .filter_map(|o| match o {
                 // In effects v1, the only unchanged shared objects are read-only shared objects.
-                InputSharedObject::ReadOnly(oref) => Some((oref.0, UnchangedSharedKind::ReadOnlyRoot((oref.1, oref.2)))),
+                InputSharedObject::ReadOnly(oref) => {
+                    Some((oref.0, UnchangedSharedKind::ReadOnlyRoot((oref.1, oref.2))))
+                }
                 _ => None,
             })
             .collect()
+    }
+
+    fn accumulator_updates(&self) -> Vec<(ObjectID, AccumulatorWriteV1)> {
+        vec![]
     }
 
     fn status_mut_for_testing(&mut self) -> &mut ExecutionStatus {
@@ -314,8 +361,10 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             InputSharedObject::ReadOnly(obj_ref) => {
                 self.shared_objects.push(obj_ref);
             }
-            InputSharedObject::ReadDeleted(id, version) | InputSharedObject::MutateDeleted(id, version) => {
-                self.shared_objects.push((id, version, ObjectDigest::OBJECT_DIGEST_DELETED));
+            InputSharedObject::ReadConsensusStreamEnded(id, version)
+            | InputSharedObject::MutateConsensusStreamEnded(id, version) => {
+                self.shared_objects
+                    .push((id, version, ObjectDigest::OBJECT_DIGEST_DELETED));
             }
             InputSharedObject::Cancelled(..) => {
                 panic!("Transaction cancellation is not supported in effect v1");
@@ -390,7 +439,10 @@ impl Default for TransactionEffectsV1 {
             deleted: Vec::new(),
             unwrapped_then_deleted: Vec::new(),
             wrapped: Vec::new(),
-            gas_object: (random_object_ref(), Owner::AddressOwner(SuiAddress::default())),
+            gas_object: (
+                random_object_ref(),
+                Owner::AddressOwner(SuiAddress::default()),
+            ),
             events_digest: None,
             dependencies: Vec::new(),
         }

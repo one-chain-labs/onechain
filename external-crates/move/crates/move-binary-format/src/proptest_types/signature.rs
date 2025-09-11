@@ -3,19 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::file_format::{
-    Ability,
-    AbilitySet,
-    DatatypeHandle,
-    DatatypeHandleIndex,
-    Signature,
-    SignatureToken,
-    TableIndex,
-    TypeParameterIndex,
+    Ability, AbilitySet, DatatypeHandle, DatatypeHandleIndex, Signature, SignatureToken,
+    TableIndex, TypeParameterIndex,
 };
 use proptest::{
-    collection::{vec, SizeRange},
+    collection::{SizeRange, vec},
     prelude::*,
-    sample::{select, Index as PropIndex},
+    sample::{Index as PropIndex, select},
 };
 
 #[derive(Clone, Debug)]
@@ -34,8 +28,16 @@ impl AbilitySetGen {
     pub fn strategy() -> impl Strategy<Value = Self> {
         use AbilitySetGen as G;
 
-        static KINDS: &[AbilitySetGen] =
-            &[G::Empty, G::Copy, G::Drop, G::Store, G::CopyDrop, G::CopyStore, G::DropStore, G::CopyDropStore];
+        static KINDS: &[AbilitySetGen] = &[
+            G::Empty,
+            G::Copy,
+            G::Drop,
+            G::Store,
+            G::CopyDrop,
+            G::CopyStore,
+            G::DropStore,
+            G::CopyDropStore,
+        ];
 
         select(KINDS)
     }
@@ -68,7 +70,12 @@ impl SignatureGen {
     }
 
     pub fn materialize(self, datatype_handles: &[DatatypeHandle]) -> Signature {
-        Signature(self.signatures.into_iter().map(move |token| token.materialize(datatype_handles)).collect())
+        Signature(
+            self.signatures
+                .into_iter()
+                .map(move |token| token.materialize(datatype_handles))
+                .collect(),
+        )
     }
 }
 
@@ -120,7 +127,8 @@ impl SignatureTokenGen {
     pub fn owned_non_struct_strategy() -> impl Strategy<Value = Self> {
         use SignatureTokenGen::*;
 
-        static OWNED_NON_STRUCTS: &[SignatureTokenGen] = &[Bool, U8, U16, U32, U64, U128, U256, Address, Signer];
+        static OWNED_NON_STRUCTS: &[SignatureTokenGen] =
+            &[Bool, U8, U16, U32, U64, U128, U256, Address, Signer];
 
         select(OWNED_NON_STRUCTS)
     }
@@ -190,9 +198,15 @@ impl SignatureTokenGen {
                 }
             }
             Vector(token) => SignatureToken::Vector(Box::new(token.materialize(datatype_handles))),
-            Reference(token) => SignatureToken::Reference(Box::new(token.materialize(datatype_handles))),
-            MutableReference(token) => SignatureToken::MutableReference(Box::new(token.materialize(datatype_handles))),
-            TypeParameter(idx) => SignatureToken::TypeParameter(idx.index(datatype_handles.len()) as TypeParameterIndex),
+            Reference(token) => {
+                SignatureToken::Reference(Box::new(token.materialize(datatype_handles)))
+            }
+            MutableReference(token) => {
+                SignatureToken::MutableReference(Box::new(token.materialize(datatype_handles)))
+            }
+            TypeParameter(idx) => SignatureToken::TypeParameter(
+                idx.index(datatype_handles.len()) as TypeParameterIndex
+            ),
         }
     }
 }

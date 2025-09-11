@@ -8,6 +8,7 @@ use crate::{
     identifier::{IdentStr, Identifier},
     parsing::types::{ParsedModuleId, ParsedStructType, ParsedType},
 };
+use indexmap::IndexSet;
 use move_proc_macros::test_variant_order;
 use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -17,9 +18,6 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
-
-pub const CODE_TAG: u8 = 0;
-pub const RESOURCE_TAG: u8 = 1;
 
 /// Hex address: 0x1
 pub const CORE_CODE_ADDRESS: AccountAddress = AccountAddress::ONE;
@@ -106,7 +104,10 @@ impl TypeTag {
             }
         }
 
-        CanonicalDisplay { data: self, with_prefix }
+        CanonicalDisplay {
+            data: self,
+            with_prefix,
+        }
     }
 
     /// Return the abstract size we use for gas metering
@@ -127,6 +128,31 @@ impl TypeTag {
                 TypeTag::Vector(x) => x.abstract_size_for_gas_metering(),
                 TypeTag::Struct(y) => y.abstract_size_for_gas_metering(),
             }
+    }
+
+    /// Return all of the addresses used inside of the type.
+    pub fn all_addresses(&self) -> IndexSet<AccountAddress> {
+        let mut account_addresses = IndexSet::new();
+        self.find_addresses_internal(&mut account_addresses);
+        account_addresses
+    }
+
+    pub(crate) fn find_addresses_internal(&self, account_addresses: &mut IndexSet<AccountAddress>) {
+        match self {
+            TypeTag::Bool
+            | TypeTag::U8
+            | TypeTag::U64
+            | TypeTag::U128
+            | TypeTag::U16
+            | TypeTag::U32
+            | TypeTag::U256
+            | TypeTag::Address
+            | TypeTag::Signer => (),
+            TypeTag::Vector(inner) => inner.find_addresses_internal(account_addresses),
+            TypeTag::Struct(tag) => {
+                tag.all_addresses_internal(account_addresses);
+            }
+        }
     }
 }
 
@@ -149,22 +175,20 @@ pub struct StructTag {
 }
 
 impl StructTag {
-    pub fn access_vector(&self) -> Vec<u8> {
-        let mut key = vec![RESOURCE_TAG];
-        key.append(&mut bcs::to_bytes(self).unwrap());
-        key
-    }
-
     /// Returns true if this is a `StructTag` for an `std::ascii::String` struct defined in the
     /// standard library at address `move_std_addr`.
     pub fn is_ascii_string(&self, move_std_addr: &AccountAddress) -> bool {
-        self.address == *move_std_addr && self.module.as_str().eq("ascii") && self.name.as_str().eq("String")
+        self.address == *move_std_addr
+            && self.module.as_str().eq("ascii")
+            && self.name.as_str().eq("String")
     }
 
     /// Returns true if this is a `StructTag` for an `std::string::String` struct defined in the
     /// standard library at address `move_std_addr`.
     pub fn is_std_string(&self, move_std_addr: &AccountAddress) -> bool {
-        self.address == *move_std_addr && self.module.as_str().eq("string") && self.name.as_str().eq("String")
+        self.address == *move_std_addr
+            && self.module.as_str().eq("string")
+            && self.name.as_str().eq("String")
     }
 
     pub fn module_id(&self) -> ModuleId {
@@ -218,7 +242,10 @@ impl StructTag {
             }
         }
 
-        CanonicalDisplay { data: self, with_prefix }
+        CanonicalDisplay {
+            data: self,
+            with_prefix,
+        }
     }
 
     /// Return the abstract size we use for gas metering
@@ -232,7 +259,29 @@ impl StructTag {
             + self
                 .type_params
                 .iter()
-                .fold(AbstractMemorySize::new(0), |accum, val| accum + val.abstract_size_for_gas_metering())
+                .fold(AbstractMemorySize::new(0), |accum, val| {
+                    accum + val.abstract_size_for_gas_metering()
+                })
+    }
+
+    pub fn all_addresses(&self) -> IndexSet<AccountAddress> {
+        let mut account_addresses = IndexSet::new();
+        self.all_addresses_internal(&mut account_addresses);
+        account_addresses
+    }
+
+    pub fn all_addresses_internal(&self, addrs: &mut IndexSet<AccountAddress>) {
+        let StructTag {
+            address,
+            module: _,
+            name: _,
+            type_params,
+        } = self;
+        // Traverse in a pre-order manner. So the address is added first, then the type parameters.
+        addrs.insert(*address);
+        for tag in type_params {
+            tag.find_addresses_internal(addrs);
+        }
     }
 }
 
@@ -273,12 +322,6 @@ impl ModuleId {
         &self.address
     }
 
-    pub fn access_vector(&self) -> Vec<u8> {
-        let mut key = vec![CODE_TAG];
-        key.append(&mut bcs::to_bytes(self).unwrap());
-        key
-    }
-
     pub fn to_canonical_string(&self, with_prefix: bool) -> String {
         self.to_canonical_display(with_prefix).to_string()
     }
@@ -291,13 +334,21 @@ impl ModuleId {
             with_prefix: bool,
         }
 
-        impl<'a> Display for IdDisplay<'a> {
+        impl Display for IdDisplay<'_> {
             fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-                write!(f, "{}::{}", self.id.address.to_canonical_display(self.with_prefix), self.id.name,)
+                write!(
+                    f,
+                    "{}::{}",
+                    self.id.address.to_canonical_display(self.with_prefix),
+                    self.id.name,
+                )
             }
         }
 
-        IdDisplay { id: self, with_prefix }
+        IdDisplay {
+            id: self,
+            with_prefix,
+        }
     }
 }
 
@@ -309,7 +360,6 @@ impl Display for ModuleId {
 
 impl FromStr for ModuleId {
     type Err = anyhow::Error;
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         ParsedModuleId::parse(s)?.into_module_id(&|_| None)
     }
@@ -323,7 +373,13 @@ impl ModuleId {
 
 impl Display for StructTag {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "0x{}::{}::{}", self.address.short_str_lossless(), self.module, self.name)?;
+        write!(
+            f,
+            "0x{}::{}::{}",
+            self.address.short_str_lossless(),
+            self.module,
+            self.name
+        )?;
         if let Some(first_ty) = self.type_params.first() {
             write!(f, "<")?;
             write!(f, "{}", first_ty)?;
@@ -363,7 +419,10 @@ impl From<StructTag> for TypeTag {
 #[cfg(test)]
 mod tests {
     use super::{ModuleId, TypeTag};
-    use crate::{account_address::AccountAddress, ident_str, identifier::Identifier, language_storage::StructTag};
+    use crate::{
+        account_address::AccountAddress, ident_str, identifier::Identifier,
+        language_storage::StructTag,
+    };
     use std::mem;
 
     #[test]
@@ -384,7 +443,10 @@ mod tests {
     fn test_module_id_display() {
         let id = ModuleId::new(AccountAddress::ONE, ident_str!("foo").to_owned());
 
-        assert_eq!(format!("{id}"), "0000000000000000000000000000000000000000000000000000000000000001::foo",);
+        assert_eq!(
+            format!("{id}"),
+            "0000000000000000000000000000000000000000000000000000000000000001::foo",
+        );
 
         assert_eq!(
             format!("{}", id.to_canonical_display(/* with_prefix */ false)),

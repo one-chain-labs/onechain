@@ -2,74 +2,48 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use fastcrypto::encoding::Base64;
-use futures::{stream, StreamExt};
+use futures::stream;
+use futures::StreamExt;
 use futures_core::Stream;
 use jsonrpsee::core::client::Subscription;
-use std::{
-    collections::BTreeMap,
-    future,
-    sync::Arc,
-    time::{Duration, Instant},
-};
-use sui_json_rpc_types::{DevInspectArgs, SuiData};
+use std::collections::BTreeMap;
+use std::future;
+use std::sync::Arc;
+use std::time::Duration;
+use std::time::Instant;
+use sui_json_rpc_types::DevInspectArgs;
+use sui_json_rpc_types::SuiData;
+use sui_json_rpc_types::ZkLoginIntentScope;
+use sui_json_rpc_types::ZkLoginVerifyResult;
 
-use crate::{
-    error::{Error, SuiRpcResult},
-    RpcClient,
-};
+use crate::error::{Error, SuiRpcResult};
+use crate::RpcClient;
 use sui_json_rpc_api::{
-    CoinReadApiClient,
-    GovernanceReadApiClient,
-    IndexerApiClient,
-    MoveUtilsClient,
-    ReadApiClient,
+    CoinReadApiClient, GovernanceReadApiClient, IndexerApiClient, MoveUtilsClient, ReadApiClient,
     WriteApiClient,
 };
+use sui_json_rpc_types::CheckpointPage;
 use sui_json_rpc_types::{
-    Balance,
-    Checkpoint,
-    CheckpointId,
-    CheckpointPage,
-    Coin,
-    CoinPage,
-    DelegatedStake,
-    DevInspectResults,
-    DryRunTransactionBlockResponse,
-    DynamicFieldPage,
-    EventFilter,
-    EventPage,
-    ObjectsPage,
-    ProtocolConfigResponse,
-    SuiCoinMetadata,
-    SuiCommittee,
-    SuiEvent,
-    SuiGetPastObjectRequest,
-    SuiMoveNormalizedModule,
-    SuiObjectDataOptions,
-    SuiObjectResponse,
-    SuiObjectResponseQuery,
-    SuiPastObjectResponse,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockResponse,
-    SuiTransactionBlockResponseOptions,
-    SuiTransactionBlockResponseQuery,
-    TransactionBlocksPage,
+    Balance, Checkpoint, CheckpointId, Coin, CoinPage, DelegatedStake, DevInspectResults,
+    DryRunTransactionBlockResponse, DynamicFieldPage, EventFilter, EventPage, ObjectsPage,
+    ProtocolConfigResponse, SuiCoinMetadata, SuiCommittee, SuiEvent, SuiGetPastObjectRequest,
+    SuiMoveNormalizedModule, SuiObjectDataOptions, SuiObjectResponse, SuiObjectResponseQuery,
+    SuiPastObjectResponse, SuiTransactionBlockEffects, SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions, SuiTransactionBlockResponseQuery, TransactionBlocksPage,
     TransactionFilter,
 };
-use sui_types::{
-    balance::Supply,
-    base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest},
-    dynamic_field::DynamicFieldName,
-    event::EventID,
-    messages_checkpoint::CheckpointSequenceNumber,
-    quorum_driver_types::ExecuteTransactionRequestType,
-    sui_serde::BigInt,
-    sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
-    transaction::{Transaction, TransactionData, TransactionKind},
-};
+use sui_types::balance::Supply;
+use sui_types::base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest};
+use sui_types::dynamic_field::DynamicFieldName;
+use sui_types::event::EventID;
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::sui_serde::BigInt;
+use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary;
+use sui_types::transaction::{Transaction, TransactionData, TransactionKind};
 
-const WAIT_FOR_LOCAL_EXECUTION_TIMEOUT: Duration = Duration::from_secs(60);
 const WAIT_FOR_LOCAL_EXECUTION_DELAY: Duration = Duration::from_millis(200);
+
 const WAIT_FOR_LOCAL_EXECUTION_INTERVAL: Duration = Duration::from_secs(2);
 
 /// The main read API structure with functions for retrieving data about different objects and transactions
@@ -82,7 +56,6 @@ impl ReadApi {
     pub(crate) fn new(api: Arc<RpcClient>) -> Self {
         Self { api }
     }
-
     /// Return a paginated response with the objects owned by the given address, or an error upon failure.
     ///
     /// Note that if the address owns more than `QUERY_MAX_RESULT_LIMIT` objects (default is 50),
@@ -113,7 +86,11 @@ impl ReadApi {
         cursor: Option<ObjectID>,
         limit: Option<usize>,
     ) -> SuiRpcResult<ObjectsPage> {
-        Ok(self.api.http.get_owned_objects(address, query, cursor, limit).await?)
+        Ok(self
+            .api
+            .http
+            .get_owned_objects(address, query, cursor, limit)
+            .await?)
     }
 
     /// Return a paginated response with the dynamic fields owned by the given [ObjectID], or an error upon failure.
@@ -162,7 +139,11 @@ impl ReadApi {
         cursor: Option<ObjectID>,
         limit: Option<usize>,
     ) -> SuiRpcResult<DynamicFieldPage> {
-        Ok(self.api.http.get_dynamic_fields(object_id, cursor, limit).await?)
+        Ok(self
+            .api
+            .http
+            .get_dynamic_fields(object_id, cursor, limit)
+            .await?)
     }
 
     /// Return the dynamic field object information for a specified object.
@@ -171,7 +152,11 @@ impl ReadApi {
         parent_object_id: ObjectID,
         name: DynamicFieldName,
     ) -> SuiRpcResult<SuiObjectResponse> {
-        Ok(self.api.http.get_dynamic_field_object(parent_object_id, name).await?)
+        Ok(self
+            .api
+            .http
+            .get_dynamic_field_object(parent_object_id, name)
+            .await?)
     }
 
     /// Return a parsed past object for the provided [ObjectID] and version, or an error upon failure.
@@ -232,7 +217,11 @@ impl ReadApi {
         version: SequenceNumber,
         options: SuiObjectDataOptions,
     ) -> SuiRpcResult<SuiPastObjectResponse> {
-        Ok(self.api.http.try_get_past_object(object_id, version, Some(options)).await?)
+        Ok(self
+            .api
+            .http
+            .try_get_past_object(object_id, version, Some(options))
+            .await?)
     }
 
     /// Return a list of [SuiPastObjectResponse] objects, or an error upon failure.
@@ -309,7 +298,11 @@ impl ReadApi {
         past_objects: Vec<SuiGetPastObjectRequest>,
         options: SuiObjectDataOptions,
     ) -> SuiRpcResult<Vec<SuiPastObjectResponse>> {
-        Ok(self.api.http.try_multi_get_past_objects(past_objects, Some(options)).await?)
+        Ok(self
+            .api
+            .http
+            .try_multi_get_past_objects(past_objects, Some(options))
+            .await?)
     }
 
     /// Return a [SuiObjectResponse] based on the provided [ObjectID] and [SuiObjectDataOptions], or an error upon failure.
@@ -415,7 +408,11 @@ impl ReadApi {
         object_ids: Vec<ObjectID>,
         options: SuiObjectDataOptions,
     ) -> SuiRpcResult<Vec<SuiObjectResponse>> {
-        Ok(self.api.http.multi_get_objects(object_ids, Some(options)).await?)
+        Ok(self
+            .api
+            .http
+            .multi_get_objects(object_ids, Some(options))
+            .await?)
     }
 
     /// Return An object's bcs content [`Vec<u8>`] based on the provided [ObjectID], or an error upon failure.
@@ -424,12 +421,15 @@ impl ReadApi {
             .get_object_with_options(object_id, SuiObjectDataOptions::default().with_bcs())
             .await?
             .into_object()
-            .map_err(|e| Error::DataError(format!("Can't get bcs of object {:?}: {:?}", object_id, e)))?;
+            .map_err(|e| {
+                Error::DataError(format!("Can't get bcs of object {:?}: {:?}", object_id, e))
+            })?;
         // unwrap: requested bcs data
         let move_object = resp.bcs.unwrap();
-        let raw_move_obj = move_object
-            .try_into_move()
-            .ok_or(Error::DataError(format!("Object {:?} is not a MoveObject", object_id)))?;
+        let raw_move_obj = move_object.try_into_move().ok_or(Error::DataError(format!(
+            "Object {:?} is not a MoveObject",
+            object_id
+        )))?;
         Ok(raw_move_obj.bcs_bytes)
     }
 
@@ -461,9 +461,12 @@ impl ReadApi {
         digest: TransactionDigest,
         options: SuiTransactionBlockResponseOptions,
     ) -> SuiRpcResult<SuiTransactionBlockResponse> {
-        Ok(self.api.http.get_transaction_block(digest, Some(options)).await?)
+        Ok(self
+            .api
+            .http
+            .get_transaction_block(digest, Some(options))
+            .await?)
     }
-
     /// Return a list of [SuiTransactionBlockResponse] based on the given vector of [TransactionDigest], or an error upon failure.
     ///
     /// If only one transaction data is needed, use the
@@ -473,7 +476,11 @@ impl ReadApi {
         digests: Vec<TransactionDigest>,
         options: SuiTransactionBlockResponseOptions,
     ) -> SuiRpcResult<Vec<SuiTransactionBlockResponse>> {
-        Ok(self.api.http.multi_get_transaction_blocks(digests, Some(options)).await?)
+        Ok(self
+            .api
+            .http
+            .multi_get_transaction_blocks(digests, Some(options))
+            .await?)
     }
 
     /// Return the [SuiCommittee] information for the provided `epoch`, or an error upon failure.
@@ -497,7 +504,10 @@ impl ReadApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_committee_info(&self, epoch: Option<BigInt<u64>>) -> SuiRpcResult<SuiCommittee> {
+    pub async fn get_committee_info(
+        &self,
+        epoch: Option<BigInt<u64>>,
+    ) -> SuiRpcResult<SuiCommittee> {
         Ok(self.api.http.get_committee_info(epoch).await?)
     }
 
@@ -509,7 +519,11 @@ impl ReadApi {
         limit: Option<usize>,
         descending_order: bool,
     ) -> SuiRpcResult<TransactionBlocksPage> {
-        Ok(self.api.http.query_transaction_blocks(query, cursor, limit, Some(descending_order)).await?)
+        Ok(self
+            .api
+            .http
+            .query_transaction_blocks(query, cursor, limit, Some(descending_order))
+            .await?)
     }
 
     /// Return the first four bytes of the chain's genesis checkpoint digest, or an error upon failure.
@@ -532,12 +546,22 @@ impl ReadApi {
         limit: Option<usize>,
         descending_order: bool,
     ) -> SuiRpcResult<CheckpointPage> {
-        Ok(self.api.http.get_checkpoints(cursor, limit, descending_order).await?)
+        Ok(self
+            .api
+            .http
+            .get_checkpoints(cursor, limit, descending_order)
+            .await?)
     }
 
     /// Return the sequence number of the latest checkpoint that has been executed, or an error upon failure.
-    pub async fn get_latest_checkpoint_sequence_number(&self) -> SuiRpcResult<CheckpointSequenceNumber> {
-        Ok(*self.api.http.get_latest_checkpoint_sequence_number().await?)
+    pub async fn get_latest_checkpoint_sequence_number(
+        &self,
+    ) -> SuiRpcResult<CheckpointSequenceNumber> {
+        Ok(*self
+            .api
+            .http
+            .get_latest_checkpoint_sequence_number()
+            .await?)
     }
 
     /// Return a stream of [SuiTransactionBlockResponse], or an error upon failure.
@@ -547,19 +571,30 @@ impl ReadApi {
         cursor: Option<TransactionDigest>,
         descending_order: bool,
     ) -> impl Stream<Item = SuiTransactionBlockResponse> + '_ {
-        stream::unfold((vec![], cursor, true, query), move |(mut data, cursor, first, query)| async move {
-            if let Some(item) = data.pop() {
-                Some((item, (data, cursor, false, query)))
-            } else if (cursor.is_none() && first) || cursor.is_some() {
-                let page =
-                    self.query_transaction_blocks(query.clone(), cursor, Some(100), descending_order).await.ok()?;
-                let mut data = page.data;
-                data.reverse();
-                data.pop().map(|item| (item, (data, page.next_cursor, false, query)))
-            } else {
-                None
-            }
-        })
+        stream::unfold(
+            (vec![], cursor, true, query),
+            move |(mut data, cursor, first, query)| async move {
+                if let Some(item) = data.pop() {
+                    Some((item, (data, cursor, false, query)))
+                } else if (cursor.is_none() && first) || cursor.is_some() {
+                    let page = self
+                        .query_transaction_blocks(
+                            query.clone(),
+                            cursor,
+                            Some(100),
+                            descending_order,
+                        )
+                        .await
+                        .ok()?;
+                    let mut data = page.data;
+                    data.reverse();
+                    data.pop()
+                        .map(|item| (item, (data, page.next_cursor, false, query)))
+                } else {
+                    None
+                }
+            },
+        )
     }
 
     /// Subscribe to a stream of transactions.
@@ -570,9 +605,12 @@ impl ReadApi {
         filter: TransactionFilter,
     ) -> SuiRpcResult<impl Stream<Item = SuiRpcResult<SuiTransactionBlockEffects>>> {
         let Some(c) = &self.api.ws else {
-            return Err(Error::Subscription("Subscription only supported by WebSocket client.".to_string()));
+            return Err(Error::Subscription(
+                "Subscription only supported by WebSocket client.".to_string(),
+            ));
         };
-        let subscription: Subscription<SuiTransactionBlockEffects> = c.subscribe_transaction(filter).await?;
+        let subscription: Subscription<SuiTransactionBlockEffects> =
+            c.subscribe_transaction(filter).await?;
         Ok(subscription.map(|item| Ok(item?)))
     }
 
@@ -581,7 +619,11 @@ impl ReadApi {
         &self,
         package: ObjectID,
     ) -> SuiRpcResult<BTreeMap<String, SuiMoveNormalizedModule>> {
-        Ok(self.api.http.get_normalized_move_modules_by_package(package).await?)
+        Ok(self
+            .api
+            .http
+            .get_normalized_move_modules_by_package(package)
+            .await?)
     }
 
     // TODO(devx): we can probably cache this given an epoch
@@ -595,8 +637,15 @@ impl ReadApi {
     /// Simulate running the transaction, including all standard checks, without actually running it.
     /// This is useful for estimating the gas fees of a transaction before executing it.
     /// You can also use it to identify any side-effects of a transaction before you execute it on the network.
-    pub async fn dry_run_transaction_block(&self, tx: TransactionData) -> SuiRpcResult<DryRunTransactionBlockResponse> {
-        Ok(self.api.http.dry_run_transaction_block(Base64::from_bytes(&bcs::to_bytes(&tx)?)).await?)
+    pub async fn dry_run_transaction_block(
+        &self,
+        tx: TransactionData,
+    ) -> SuiRpcResult<DryRunTransactionBlockResponse> {
+        Ok(self
+            .api
+            .http
+            .dry_run_transaction_block(Base64::from_bytes(&bcs::to_bytes(&tx)?))
+            .await?)
     }
 
     /// Return the inspection of the transaction block, or an error upon failure.
@@ -643,7 +692,10 @@ impl ReadApi {
     }
 
     /// Return the protocol config, or an error upon failure.
-    pub async fn get_protocol_config(&self, version: Option<BigInt<u64>>) -> SuiRpcResult<ProtocolConfigResponse> {
+    pub async fn get_protocol_config(
+        &self,
+        version: Option<BigInt<u64>>,
+    ) -> SuiRpcResult<ProtocolConfigResponse> {
         Ok(self.api.http.get_protocol_config(version).await?)
     }
 
@@ -652,7 +704,26 @@ impl ReadApi {
         object_id: ObjectID,
         version: SequenceNumber,
     ) -> SuiRpcResult<SuiPastObjectResponse> {
-        Ok(self.api.http.try_get_object_before_version(object_id, version).await?)
+        Ok(self
+            .api
+            .http
+            .try_get_object_before_version(object_id, version)
+            .await?)
+    }
+
+    /// Verify a zkLogin signature against bytes that is parsed using intent_scope, and the sui address.
+    pub async fn verify_zklogin_signature(
+        &self,
+        bytes: String,
+        signature: String,
+        intent_scope: ZkLoginIntentScope,
+        address: SuiAddress,
+    ) -> SuiRpcResult<ZkLoginVerifyResult> {
+        Ok(self
+            .api
+            .http
+            .verify_zklogin_signature(bytes, signature, intent_scope, address)
+            .await?)
     }
 }
 
@@ -694,12 +765,15 @@ impl CoinReadApi {
         &self,
         owner: SuiAddress,
         coin_type: Option<String>,
-        cursor: Option<ObjectID>,
+        cursor: Option<String>,
         limit: Option<usize>,
     ) -> SuiRpcResult<CoinPage> {
-        Ok(self.api.http.get_coins(owner, coin_type, cursor, limit).await?)
+        Ok(self
+            .api
+            .http
+            .get_coins(owner, coin_type, cursor, limit)
+            .await?)
     }
-
     /// Return a paginated response with all the coins for the given address, or an error upon failure.
     ///
     /// This function includes all coins. If needed to filter by coin type, use the `get_coins` method instead.
@@ -725,7 +799,7 @@ impl CoinReadApi {
     pub async fn get_all_coins(
         &self,
         owner: SuiAddress,
-        cursor: Option<ObjectID>,
+        cursor: Option<String>,
         limit: Option<usize>,
     ) -> SuiRpcResult<CoinPage> {
         Ok(self.api.http.get_all_coins(owner, cursor, limit).await?)
@@ -753,17 +827,34 @@ impl CoinReadApi {
     ///     Ok(())
     /// }
     /// ```
-    pub fn get_coins_stream(&self, owner: SuiAddress, coin_type: Option<String>) -> impl Stream<Item = Coin> + '_ {
+    pub fn get_coins_stream(
+        &self,
+        owner: SuiAddress,
+        coin_type: Option<String>,
+    ) -> impl Stream<Item = Coin> + '_ {
         stream::unfold(
-            (vec![], /* cursor */ None, /* has_next_page */ true, coin_type),
+            (
+                vec![],
+                /* cursor */ None,
+                /* has_next_page */ true,
+                coin_type,
+            ),
             move |(mut data, cursor, has_next_page, coin_type)| async move {
                 if let Some(item) = data.pop() {
-                    Some((item, (data, cursor, /* has_next_page */ true, coin_type)))
+                    Some((item, (data, cursor, has_next_page, coin_type)))
                 } else if has_next_page {
-                    let page = self.get_coins(owner, coin_type.clone(), cursor, Some(100)).await.ok()?;
+                    let page = self
+                        .get_coins(owner, coin_type.clone(), cursor, Some(100))
+                        .await
+                        .ok()?;
                     let mut data = page.data;
                     data.reverse();
-                    data.pop().map(|item| (item, (data, page.next_cursor, page.has_next_page, coin_type)))
+                    data.pop().map(|item| {
+                        (
+                            item,
+                            (data, page.next_cursor, page.has_next_page, coin_type),
+                        )
+                    })
                 } else {
                     None
                 }
@@ -846,7 +937,11 @@ impl CoinReadApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_balance(&self, owner: SuiAddress, coin_type: Option<String>) -> SuiRpcResult<Balance> {
+    pub async fn get_balance(
+        &self,
+        owner: SuiAddress,
+        coin_type: Option<String>,
+    ) -> SuiRpcResult<Balance> {
         Ok(self.api.http.get_balance(owner, coin_type).await?)
     }
 
@@ -894,7 +989,10 @@ impl CoinReadApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_coin_metadata(&self, coin_type: String) -> SuiRpcResult<Option<SuiCoinMetadata>> {
+    pub async fn get_coin_metadata(
+        &self,
+        coin_type: String,
+    ) -> SuiRpcResult<Option<SuiCoinMetadata>> {
         Ok(self.api.http.get_coin_metadata(coin_type).await?)
     }
 
@@ -948,7 +1046,7 @@ impl EventApi {
     /// async fn main() -> Result<(), anyhow::Error> {
     ///     let sui = SuiClientBuilder::default()
     ///         .ws_url("wss://rpc.mainnet.sui.io:443")
-    ///         .build("https://fullnode.mainnet.sui.io:443")
+    ///         .build("https://rpc-mainnet.onelabs.cc:443")
     ///         .await?;
     ///     let mut subscribe_all = sui
     ///         .event_api()
@@ -969,7 +1067,9 @@ impl EventApi {
                 let subscription: Subscription<SuiEvent> = c.subscribe_event(filter).await?;
                 Ok(subscription.map(|item| Ok(item?)))
             }
-            _ => Err(Error::Subscription("Subscription only supported by WebSocket client.".to_string())),
+            _ => Err(Error::Subscription(
+                "Subscription only supported by WebSocket client.".to_string(),
+            )),
         }
     }
 
@@ -989,7 +1089,11 @@ impl EventApi {
         limit: Option<usize>,
         descending_order: bool,
     ) -> SuiRpcResult<EventPage> {
-        Ok(self.api.http.query_events(query, cursor, limit, Some(descending_order)).await?)
+        Ok(self
+            .api
+            .http
+            .query_events(query, cursor, limit, Some(descending_order))
+            .await?)
     }
 
     /// Return a stream of events for the given event filter.
@@ -1002,18 +1106,25 @@ impl EventApi {
         cursor: Option<EventID>,
         descending_order: bool,
     ) -> impl Stream<Item = SuiEvent> + '_ {
-        stream::unfold((vec![], cursor, true, query), move |(mut data, cursor, first, query)| async move {
-            if let Some(item) = data.pop() {
-                Some((item, (data, cursor, false, query)))
-            } else if (cursor.is_none() && first) || cursor.is_some() {
-                let page = self.query_events(query.clone(), cursor, Some(100), descending_order).await.ok()?;
-                let mut data = page.data;
-                data.reverse();
-                data.pop().map(|item| (item, (data, page.next_cursor, false, query)))
-            } else {
-                None
-            }
-        })
+        stream::unfold(
+            (vec![], cursor, true, query),
+            move |(mut data, cursor, first, query)| async move {
+                if let Some(item) = data.pop() {
+                    Some((item, (data, cursor, false, query)))
+                } else if (cursor.is_none() && first) || cursor.is_some() {
+                    let page = self
+                        .query_events(query.clone(), cursor, Some(100), descending_order)
+                        .await
+                        .ok()?;
+                    let mut data = page.data;
+                    data.reverse();
+                    data.pop()
+                        .map(|item| (item, (data, page.next_cursor, false, query)))
+                } else {
+                    None
+                }
+            },
+        )
     }
 }
 
@@ -1062,7 +1173,13 @@ impl QuorumDriverApi {
         }
 
         // JSON-RPC ignores WaitForLocalExecution, so simulate it by polling for the transaction.
-        let mut poll_response = tokio::time::timeout(WAIT_FOR_LOCAL_EXECUTION_TIMEOUT, async {
+        let wait_for_local_execution_timeout: Duration = if cfg!(msim) {
+            // In simtests, fullnodes can stop receiving checkpoints for > 30s.
+            Duration::from_secs(120)
+        } else {
+            Duration::from_secs(60)
+        };
+        let mut poll_response = tokio::time::timeout(wait_for_local_execution_timeout, async {
             // Apply a short delay to give the full node a chance to catch up.
             tokio::time::sleep(WAIT_FOR_LOCAL_EXECUTION_DELAY).await;
 
@@ -1070,14 +1187,20 @@ impl QuorumDriverApi {
             loop {
                 interval.tick().await;
 
-                if let Ok(poll_response) = self.api.http.get_transaction_block(*tx.digest(), Some(options.clone())).await
+                if let Ok(poll_response) = self
+                    .api
+                    .http
+                    .get_transaction_block(*tx.digest(), Some(options.clone()))
+                    .await
                 {
                     break poll_response;
                 }
             }
         })
         .await
-        .map_err(|_| Error::FailToConfirmTransactionStatus(*tx.digest(), start.elapsed().as_secs()))?;
+        .map_err(|_| {
+            Error::FailToConfirmTransactionStatus(*tx.digest(), start.elapsed().as_secs())
+        })?;
 
         poll_response.confirmed_local_execution = Some(true);
         Ok(poll_response)
@@ -1119,7 +1242,10 @@ impl GovernanceApi {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn get_committee_info(&self, epoch: Option<BigInt<u64>>) -> SuiRpcResult<SuiCommittee> {
+    pub async fn get_committee_info(
+        &self,
+        epoch: Option<BigInt<u64>>,
+    ) -> SuiRpcResult<SuiCommittee> {
         Ok(self.api.http.get_committee_info(epoch).await?)
     }
 

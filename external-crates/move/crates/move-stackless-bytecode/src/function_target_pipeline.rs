@@ -4,7 +4,7 @@
 
 use core::fmt;
 use std::{
-    collections::{btree_map::Entry as MapEntry, BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, btree_map::Entry as MapEntry},
     fmt::Formatter,
     fs,
 };
@@ -129,7 +129,12 @@ pub trait FunctionTargetProcessor {
     }
 
     /// A function which creates a dump of the processors results, for debugging.
-    fn dump_result(&self, _f: &mut Formatter<'_>, _env: &GlobalEnv, _targets: &FunctionTargetsHolder) -> fmt::Result {
+    fn dump_result(
+        &self,
+        _f: &mut Formatter<'_>,
+        _env: &GlobalEnv,
+        _targets: &FunctionTargetsHolder,
+    ) -> fmt::Result {
         Ok(())
     }
 }
@@ -140,7 +145,7 @@ pub struct ProcessorResultDisplay<'a> {
     pub processor: &'a dyn FunctionTargetProcessor,
 }
 
-impl<'a> fmt::Display for ProcessorResultDisplay<'a> {
+impl fmt::Display for ProcessorResultDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.processor.dump_result(f, self.env, self.targets)
     }
@@ -159,15 +164,22 @@ impl FunctionTargetsHolder {
     }
 
     /// Gets an iterator for all functions and variants in this holder.
-    pub fn get_funs_and_variants(&self) -> impl Iterator<Item = (QualifiedId<FunId>, FunctionVariant)> + '_ {
-        self.targets.iter().flat_map(|(id, vs)| vs.keys().map(move |v| (*id, v.clone())))
+    pub fn get_funs_and_variants(
+        &self,
+    ) -> impl Iterator<Item = (QualifiedId<FunId>, FunctionVariant)> + '_ {
+        self.targets
+            .iter()
+            .flat_map(|(id, vs)| vs.keys().map(move |v| (*id, v.clone())))
     }
 
     /// Adds a new function target. The target will be initialized from the Move byte code.
     pub fn add_target(&mut self, func_env: &FunctionEnv<'_>) {
         let generator = StacklessBytecodeGenerator::new(func_env);
         let data = generator.generate_function();
-        self.targets.entry(func_env.get_qualified_id()).or_default().insert(FunctionVariant::Baseline, data);
+        self.targets
+            .entry(func_env.get_qualified_id())
+            .or_default()
+            .insert(FunctionVariant::Baseline, data);
     }
 
     /// Gets a function target for read-only consumption, for the given variant.
@@ -178,17 +190,29 @@ impl FunctionTargetsHolder {
     ) -> FunctionTarget<'env> {
         let data = self
             .get_data(&func_env.get_qualified_id(), variant)
-            .unwrap_or_else(|| panic!("expected function target: {} ({:?})", func_env.get_full_name_str(), variant));
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected function target: {} ({:?})",
+                    func_env.get_full_name_str(),
+                    variant
+                )
+            });
         FunctionTarget::new(func_env, data)
     }
 
     pub fn has_target(&self, func_env: &FunctionEnv<'_>, variant: &FunctionVariant) -> bool {
-        self.get_data(&func_env.get_qualified_id(), variant).is_some()
+        self.get_data(&func_env.get_qualified_id(), variant)
+            .is_some()
     }
 
     /// Gets all available variants for function.
     pub fn get_target_variants(&self, func_env: &FunctionEnv<'_>) -> Vec<FunctionVariant> {
-        self.targets.get(&func_env.get_qualified_id()).expect("function targets exist").keys().cloned().collect_vec()
+        self.targets
+            .get(&func_env.get_qualified_id())
+            .expect("function targets exist")
+            .keys()
+            .cloned()
+            .collect_vec()
     }
 
     /// Gets targets for all available variants.
@@ -205,22 +229,43 @@ impl FunctionTargetsHolder {
     }
 
     /// Gets function data for a variant.
-    pub fn get_data(&self, id: &QualifiedId<FunId>, variant: &FunctionVariant) -> Option<&FunctionData> {
+    pub fn get_data(
+        &self,
+        id: &QualifiedId<FunId>,
+        variant: &FunctionVariant,
+    ) -> Option<&FunctionData> {
         self.targets.get(id).and_then(|vs| vs.get(variant))
     }
 
     /// Gets mutable function data for a variant.
-    pub fn get_data_mut(&mut self, id: &QualifiedId<FunId>, variant: &FunctionVariant) -> Option<&mut FunctionData> {
+    pub fn get_data_mut(
+        &mut self,
+        id: &QualifiedId<FunId>,
+        variant: &FunctionVariant,
+    ) -> Option<&mut FunctionData> {
         self.targets.get_mut(id).and_then(|vs| vs.get_mut(variant))
     }
 
     /// Removes function data for a variant.
-    pub fn remove_target_data(&mut self, id: &QualifiedId<FunId>, variant: &FunctionVariant) -> FunctionData {
-        self.targets.get_mut(id).expect("function target exists").remove(variant).expect("variant exists")
+    pub fn remove_target_data(
+        &mut self,
+        id: &QualifiedId<FunId>,
+        variant: &FunctionVariant,
+    ) -> FunctionData {
+        self.targets
+            .get_mut(id)
+            .expect("function target exists")
+            .remove(variant)
+            .expect("variant exists")
     }
 
     /// Sets function data for a function's variant.
-    pub fn insert_target_data(&mut self, id: &QualifiedId<FunId>, variant: FunctionVariant, data: FunctionData) {
+    pub fn insert_target_data(
+        &mut self,
+        id: &QualifiedId<FunId>,
+        variant: FunctionVariant,
+        data: FunctionData,
+    ) {
         self.targets.entry(*id).or_default().insert(variant, data);
     }
 
@@ -235,7 +280,9 @@ impl FunctionTargetsHolder {
         for variant in self.get_target_variants(func_env) {
             // Remove data so we can own it.
             let data = self.remove_target_data(&id, &variant);
-            if let Some(processed_data) = processor.process_and_maybe_remove(self, func_env, data, scc_opt) {
+            if let Some(processed_data) =
+                processor.process_and_maybe_remove(self, func_env, data, scc_opt)
+            {
                 // Put back processed data.
                 self.insert_target_data(&id, variant, processed_data);
             }
@@ -252,14 +299,21 @@ impl FunctionTargetPipeline {
 
     /// Gets the last processor in the pipeline, for testing.
     pub fn last_processor(&self) -> &dyn FunctionTargetProcessor {
-        self.processors.iter().last().expect("pipeline not empty").as_ref()
+        self.processors
+            .iter()
+            .last()
+            .expect("pipeline not empty")
+            .as_ref()
     }
 
     /// Build the call graph
     fn build_call_graph(
         env: &GlobalEnv,
         targets: &FunctionTargetsHolder,
-    ) -> (DiGraph<QualifiedId<FunId>, ()>, BTreeMap<QualifiedId<FunId>, NodeIndex>) {
+    ) -> (
+        DiGraph<QualifiedId<FunId>, ()>,
+        BTreeMap<QualifiedId<FunId>, NodeIndex>,
+    ) {
         let mut graph = DiGraph::new();
         let mut nodes = BTreeMap::new();
         for fun_id in targets.get_funs() {
@@ -270,7 +324,9 @@ impl FunctionTargetPipeline {
             let src_idx = nodes.get(&fun_id).unwrap();
             let fun_env = env.get_function(fun_id);
             for callee in fun_env.get_called_functions() {
-                let dst_idx = nodes.get(&callee).expect("callee is not in function targets");
+                let dst_idx = nodes
+                    .get(&callee)
+                    .expect("callee is not in function targets");
                 graph.add_edge(*src_idx, *dst_idx, ());
             }
         }
@@ -283,7 +339,10 @@ impl FunctionTargetPipeline {
     fn derive_call_graph_sccs(
         env: &GlobalEnv,
         graph: &DiGraph<QualifiedId<FunId>, ()>,
-    ) -> (Vec<Vec<NodeIndex>>, BTreeMap<QualifiedId<FunId>, Option<BTreeSet<QualifiedId<FunId>>>>) {
+    ) -> (
+        Vec<Vec<NodeIndex>>,
+        BTreeMap<QualifiedId<FunId>, Option<BTreeSet<QualifiedId<FunId>>>>,
+    ) {
         let mut sccs = BTreeMap::new();
         // Returned SCCs are in reverse topological order.
         let scc_nodes = petgraph::algo::tarjan_scc(graph);
@@ -340,7 +399,10 @@ impl FunctionTargetPipeline {
             for node_idx in scc {
                 let fun_id = *graph.node_weight(node_idx).unwrap();
                 let fun_env = env.get_function(fun_id);
-                worklist.push((fun_id, fun_env.get_called_functions().into_iter().collect_vec()));
+                worklist.push((
+                    fun_id,
+                    fun_env.get_called_functions().into_iter().collect_vec(),
+                ));
             }
         }
 
@@ -416,7 +478,8 @@ impl FunctionTargetPipeline {
                             targets.process(&func_env, processor.as_ref(), None);
                         }
                         Either::Right(scc) => 'fixedpoint: loop {
-                            let scc_env: Vec<_> = scc.iter().map(|fid| env.get_function(*fid)).collect();
+                            let scc_env: Vec<_> =
+                                scc.iter().map(|fid| env.get_function(*fid)).collect();
                             for fid in scc {
                                 let func_env = env.get_function(*fid);
                                 targets.process(&func_env, processor.as_ref(), Some(&scc_env));
@@ -460,7 +523,14 @@ impl FunctionTargetPipeline {
         self.run_with_hook(
             env,
             targets,
-            |holders| Self::dump_to_file(dump_base_name, 0, "stackless", &Self::get_pre_pipeline_dump(env, holders)),
+            |holders| {
+                Self::dump_to_file(
+                    dump_base_name,
+                    0,
+                    "stackless",
+                    &Self::get_pre_pipeline_dump(env, holders),
+                )
+            },
             |step_count, processor, holders| {
                 let suffix = processor.name();
                 Self::dump_to_file(
@@ -489,7 +559,14 @@ impl FunctionTargetPipeline {
         targets: &FunctionTargetsHolder,
         processor: &dyn FunctionTargetProcessor,
     ) -> String {
-        let mut dump = format!("{}", ProcessorResultDisplay { env, targets, processor });
+        let mut dump = format!(
+            "{}",
+            ProcessorResultDisplay {
+                env,
+                targets,
+                processor,
+            }
+        );
         if !processor.is_single_run() {
             if !dump.is_empty() {
                 dump = format!("\n\n{}", dump);
@@ -507,14 +584,23 @@ impl FunctionTargetPipeline {
     }
 
     /// Generate dot files for control-flow graphs.
-    fn dump_cfg(env: &GlobalEnv, targets: &FunctionTargetsHolder, base_name: &str, step_count: usize, suffix: &str) {
+    fn dump_cfg(
+        env: &GlobalEnv,
+        targets: &FunctionTargetsHolder,
+        base_name: &str,
+        step_count: usize,
+        suffix: &str,
+    ) {
         for (fun_id, variants) in &targets.targets {
             let func_env = env.get_function(*fun_id);
             let func_name = func_env.get_full_name_str();
             let func_name = func_name.replace("::", "__");
             for (variant, data) in variants {
                 if !data.code.is_empty() {
-                    let dot_file = format!("{}_{}_{}_{}_{}_cfg.dot", base_name, step_count, suffix, func_name, variant);
+                    let dot_file = format!(
+                        "{}_{}_{}_{}_{}_cfg.dot",
+                        base_name, step_count, suffix, func_name, variant
+                    );
                     debug!("generating dot graph for cfg in `{}`", dot_file);
                     let func_target = FunctionTarget::new(&func_env, data);
                     let dot_graph = generate_cfg_in_dot_format(&func_target);

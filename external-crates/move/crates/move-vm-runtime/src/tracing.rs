@@ -33,18 +33,27 @@ const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
 const MOVE_VM_STEPPING_ENV_VAR_NAME: &str = "MOVE_VM_STEP";
 
 #[cfg(any(debug_assertions, feature = "tracing"))]
-static FILE_PATH: Lazy<String> =
-    Lazy::new(|| env::var(MOVE_VM_TRACING_ENV_VAR_NAME).unwrap_or_else(|_| "move_vm_trace.trace".to_string()));
+static FILE_PATH: Lazy<String> = Lazy::new(|| {
+    env::var(MOVE_VM_TRACING_ENV_VAR_NAME).unwrap_or_else(|_| "move_vm_trace.trace".to_string())
+});
 
 #[cfg(any(debug_assertions, feature = "tracing"))]
 static TRACING_ENABLED: Lazy<bool> = Lazy::new(|| env::var(MOVE_VM_TRACING_ENV_VAR_NAME).is_ok());
 
 #[cfg(any(debug_assertions, feature = "tracing"))]
-static DEBUGGING_ENABLED: Lazy<bool> = Lazy::new(|| env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok());
+static DEBUGGING_ENABLED: Lazy<bool> =
+    Lazy::new(|| env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok());
 
 #[cfg(any(debug_assertions, feature = "tracing"))]
-static LOGGING_FILE: Lazy<Mutex<File>> =
-    Lazy::new(|| Mutex::new(OpenOptions::new().create(true).append(true).open(&*FILE_PATH).unwrap()));
+static LOGGING_FILE: Lazy<Mutex<File>> = Lazy::new(|| {
+    Mutex::new(
+        OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&*FILE_PATH)
+            .unwrap(),
+    )
+});
 
 #[cfg(any(debug_assertions, feature = "tracing"))]
 static DEBUG_CONTEXT: Lazy<Mutex<DebugContext>> = Lazy::new(|| Mutex::new(DebugContext::new()));
@@ -73,7 +82,10 @@ pub(crate) fn trace(
         .unwrap();
     }
     if *DEBUGGING_ENABLED {
-        DEBUG_CONTEXT.lock().unwrap().debug_loop(function_desc, locals, pc, instr, loader, interp);
+        DEBUG_CONTEXT
+            .lock()
+            .unwrap()
+            .debug_loop(function_desc, locals, pc, instr, loader, interp);
     }
 }
 
@@ -82,6 +94,13 @@ macro_rules! trace {
     ($function_desc:expr, $locals:expr, $pc:expr, $instr:tt, $resolver:expr, $interp:expr) => {
         // Only include this code in debug releases
         #[cfg(any(debug_assertions, feature = "tracing"))]
-        $crate::tracing::trace(&$function_desc, $locals, $pc, &$instr, $resolver.loader(), $interp)
+        $crate::tracing::trace(
+            &$function_desc,
+            $locals,
+            $pc,
+            &$instr,
+            $resolver.loader(),
+            $interp,
+        )
     };
 }

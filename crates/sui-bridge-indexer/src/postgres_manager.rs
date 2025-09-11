@@ -1,43 +1,36 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    models::SuiProgressStore,
-    schema,
-    schema::{
-        governance_actions,
-        sui_error_transactions,
-        sui_progress_store::txn_digest,
-        token_transfer,
-        token_transfer_data,
-    },
-    ProcessedTxnData,
-};
-use diesel::{
-    query_dsl::methods::FilterDsl,
-    upsert::excluded,
-    ExpressionMethods,
-    OptionalExtension,
-    QueryDsl,
-    SelectableHelper,
-};
-use diesel_async::{
-    pooled_connection::{bb8::Pool, AsyncDieselConnectionManager},
-    scoped_futures::ScopedFutureExt,
-    AsyncConnection,
-    AsyncPgConnection,
-    RunQueryDsl,
-};
+use crate::ProcessedTxnData;
+use diesel::query_dsl::methods::FilterDsl;
+use diesel::upsert::excluded;
+use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
+use diesel_async::pooled_connection::bb8::Pool;
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::AsyncConnection;
+use diesel_async::AsyncPgConnection;
+use diesel_async::RunQueryDsl;
+use sui_bridge_schema::models::SuiProgressStore;
+use sui_bridge_schema::schema::governance_actions;
+use sui_bridge_schema::schema::sui_progress_store::txn_digest;
+use sui_bridge_schema::schema::{sui_error_transactions, token_transfer_data};
+use sui_bridge_schema::{schema, schema::token_transfer};
 use sui_types::digests::TransactionDigest;
 
-pub(crate) type PgPool = diesel_async::pooled_connection::bb8::Pool<diesel_async::AsyncPgConnection>;
+pub(crate) type PgPool =
+    diesel_async::pooled_connection::bb8::Pool<diesel_async::AsyncPgConnection>;
 
 const SUI_PROGRESS_STORE_DUMMY_KEY: i32 = 1;
 
 pub async fn get_connection_pool(database_url: String) -> PgPool {
     let manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
 
-    Pool::builder().test_on_check_out(true).build(manager).await.expect("Could not build Postgres DB connection pool")
+    Pool::builder()
+        .test_on_check_out(true)
+        .build(manager)
+        .await
+        .expect("Could not build Postgres DB connection pool")
 }
 
 // TODO: add retry logic
@@ -68,20 +61,29 @@ pub async fn write(pool: &PgPool, token_txns: Vec<ProcessedTxnData>) -> Result<(
             async move {
                 diesel::insert_into(token_transfer_data::table)
                     .values(&data)
-                    .on_conflict((schema::token_transfer_data::dsl::chain_id, schema::token_transfer_data::dsl::nonce))
+                    .on_conflict((
+                        schema::token_transfer_data::dsl::chain_id,
+                        schema::token_transfer_data::dsl::nonce,
+                    ))
                     .do_update()
                     .set((
                         token_transfer_data::txn_hash.eq(excluded(token_transfer_data::txn_hash)),
                         token_transfer_data::chain_id.eq(excluded(token_transfer_data::chain_id)),
                         token_transfer_data::nonce.eq(excluded(token_transfer_data::nonce)),
-                        token_transfer_data::block_height.eq(excluded(token_transfer_data::block_height)),
-                        token_transfer_data::timestamp_ms.eq(excluded(token_transfer_data::timestamp_ms)),
-                        token_transfer_data::sender_address.eq(excluded(token_transfer_data::sender_address)),
-                        token_transfer_data::destination_chain.eq(excluded(token_transfer_data::destination_chain)),
-                        token_transfer_data::recipient_address.eq(excluded(token_transfer_data::recipient_address)),
+                        token_transfer_data::block_height
+                            .eq(excluded(token_transfer_data::block_height)),
+                        token_transfer_data::timestamp_ms
+                            .eq(excluded(token_transfer_data::timestamp_ms)),
+                        token_transfer_data::sender_address
+                            .eq(excluded(token_transfer_data::sender_address)),
+                        token_transfer_data::destination_chain
+                            .eq(excluded(token_transfer_data::destination_chain)),
+                        token_transfer_data::recipient_address
+                            .eq(excluded(token_transfer_data::recipient_address)),
                         token_transfer_data::token_id.eq(excluded(token_transfer_data::token_id)),
                         token_transfer_data::amount.eq(excluded(token_transfer_data::amount)),
-                        token_transfer_data::is_finalized.eq(excluded(token_transfer_data::is_finalized)),
+                        token_transfer_data::is_finalized
+                            .eq(excluded(token_transfer_data::is_finalized)),
                     ))
                     .filter(token_transfer_data::is_finalized.eq(false))
                     .execute(conn)
@@ -126,10 +128,16 @@ pub async fn write(pool: &PgPool, token_txns: Vec<ProcessedTxnData>) -> Result<(
     Ok(())
 }
 
-pub async fn update_sui_progress_store(pool: &PgPool, tx_digest: TransactionDigest) -> Result<(), anyhow::Error> {
+pub async fn update_sui_progress_store(
+    pool: &PgPool,
+    tx_digest: TransactionDigest,
+) -> Result<(), anyhow::Error> {
     let mut conn = pool.get().await?;
     diesel::insert_into(schema::sui_progress_store::table)
-        .values(&SuiProgressStore { id: SUI_PROGRESS_STORE_DUMMY_KEY, txn_digest: tx_digest.inner().to_vec() })
+        .values(&SuiProgressStore {
+            id: SUI_PROGRESS_STORE_DUMMY_KEY,
+            txn_digest: tx_digest.inner().to_vec(),
+        })
         .on_conflict(schema::sui_progress_store::dsl::id)
         .do_update()
         .set(txn_digest.eq(tx_digest.inner().to_vec()))
@@ -140,13 +148,15 @@ pub async fn update_sui_progress_store(pool: &PgPool, tx_digest: TransactionDige
 
 pub async fn read_sui_progress_store(pool: &PgPool) -> anyhow::Result<Option<TransactionDigest>> {
     let mut conn = pool.get().await?;
-    let val: Option<SuiProgressStore> = crate::schema::sui_progress_store::dsl::sui_progress_store
+    let val: Option<SuiProgressStore> = schema::sui_progress_store::dsl::sui_progress_store
         .select(SuiProgressStore::as_select())
         .first(&mut conn)
         .await
         .optional()?;
     match val {
-        Some(val) => Ok(Some(TransactionDigest::try_from(val.txn_digest.as_slice())?)),
+        Some(val) => Ok(Some(TransactionDigest::try_from(
+            val.txn_digest.as_slice(),
+        )?)),
         None => Ok(None),
     }
 }

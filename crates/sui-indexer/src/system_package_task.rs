@@ -18,8 +18,16 @@ pub(crate) struct SystemPackageTask {
 }
 
 impl SystemPackageTask {
-    pub(crate) fn new(reader: IndexerReader, cancel: CancellationToken, interval: Duration) -> Self {
-        Self { reader, cancel, interval }
+    pub(crate) fn new(
+        reader: IndexerReader,
+        cancel: CancellationToken,
+        interval: Duration,
+    ) -> Self {
+        Self {
+            reader,
+            cancel,
+            interval,
+        }
     }
 
     pub(crate) async fn run(&self) {

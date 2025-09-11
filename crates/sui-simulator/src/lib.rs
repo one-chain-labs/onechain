@@ -16,7 +16,7 @@ pub use anemo_tower;
 pub use fastcrypto;
 pub use lru;
 pub use move_package;
-pub use narwhal_network;
+pub use mysten_network;
 pub use sui_framework;
 pub use sui_move_build;
 pub use sui_types;
@@ -27,7 +27,9 @@ pub use tower;
 #[cfg(msim)]
 pub mod configs {
     use msim::*;
-    use std::{collections::HashMap, ops::Range, time::Duration};
+    use std::collections::HashMap;
+    use std::ops::Range;
+    use std::time::Duration;
 
     use tracing::info;
 
@@ -45,7 +47,10 @@ pub mod configs {
         let range = ms_to_dur(range);
         SimConfig {
             net: NetworkConfig {
-                latency: LatencyConfig { default_latency: LatencyDistribution::uniform(range), ..Default::default() },
+                latency: LatencyConfig {
+                    default_latency: LatencyDistribution::uniform(range),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         }
@@ -65,7 +70,11 @@ pub mod configs {
         SimConfig {
             net: NetworkConfig {
                 latency: LatencyConfig {
-                    default_latency: LatencyDistribution::bimodal(baseline, degraded, degraded_freq),
+                    default_latency: LatencyDistribution::bimodal(
+                        baseline,
+                        degraded,
+                        degraded_freq,
+                    ),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -87,7 +96,11 @@ pub mod configs {
                 info!("Using test config for SUI_SIM_CONFIG={}", env);
                 cfg
             } else {
-                panic!("No config found for SUI_SIM_CONFIG={}. Available configs are: {:?}", env, env_configs.keys());
+                panic!(
+                    "No config found for SUI_SIM_CONFIG={}. Available configs are: {:?}",
+                    env,
+                    env_configs.keys()
+                );
             }
         } else {
             info!("Using default test config");
@@ -136,13 +149,21 @@ pub fn current_simnode_id() -> msim::task::NodeId {
     msim::runtime::NodeHandle::current().id()
 }
 
+pub fn has_mainnet_protocol_config_override() -> bool {
+    use sui_types::{digests::ChainIdentifier, supported_protocol_versions::Chain};
+
+    ChainIdentifier::default().chain() == Chain::Mainnet
+}
+
 #[cfg(msim)]
 pub mod random {
     use super::*;
 
     use rand_crate::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
     use serde::Serialize;
-    use std::{cell::RefCell, collections::HashSet, hash::Hash};
+    use std::cell::RefCell;
+    use std::collections::HashSet;
+    use std::hash::Hash;
 
     /// Given a value, produce a random probability using the value as a seed, with
     /// an additional seed that is constant only for the current test thread.

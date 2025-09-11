@@ -52,14 +52,32 @@ fn run(
 
     let fun_name = Identifier::new("foo").unwrap();
 
-    let ty_args: Vec<_> = ty_arg_tags.into_iter().map(|tag| sess.load_type(&tag)).collect::<VMResult<_>>()?;
+    let ty_args: Vec<_> = ty_arg_tags
+        .into_iter()
+        .map(|tag| sess.load_type(&tag))
+        .collect::<VMResult<_>>()?;
 
-    let args: Vec<_> = args.into_iter().map(|val| val.simple_serialize().unwrap()).collect();
+    let args: Vec<_> = args
+        .into_iter()
+        .map(|val| val.simple_serialize().unwrap())
+        .collect();
 
-    let SerializedReturnValues { return_values, mutable_reference_outputs: _ } =
-        sess.execute_function_bypass_visibility(&module_id, &fun_name, ty_args, args, &mut UnmeteredGasMeter)?;
+    let SerializedReturnValues {
+        return_values,
+        mutable_reference_outputs: _,
+    } = sess.execute_function_bypass_visibility(
+        &module_id,
+        &fun_name,
+        ty_args,
+        args,
+        &mut UnmeteredGasMeter,
+        None,
+    )?;
 
-    Ok(return_values.into_iter().map(|(bytes, _layout)| bytes).collect())
+    Ok(return_values
+        .into_iter()
+        .map(|(bytes, _layout)| bytes)
+        .collect())
 }
 
 fn expect_success(
@@ -90,12 +108,24 @@ fn return_u64() {
 
 #[test]
 fn return_u64_bool() {
-    expect_success(&[], "(): (u64, bool)", "(42, true)", vec![], vec![], &[MoveTypeLayout::U64, MoveTypeLayout::Bool])
+    expect_success(
+        &[],
+        "(): (u64, bool)",
+        "(42, true)",
+        vec![],
+        vec![],
+        &[MoveTypeLayout::U64, MoveTypeLayout::Bool],
+    )
 }
 
 #[test]
 fn return_signer_ref() {
-    expect_success(&[], "(s: &signer): &signer", "s", vec![], vec![MoveValue::Signer(TEST_ADDR)], &[
-        MoveTypeLayout::Signer,
-    ])
+    expect_success(
+        &[],
+        "(s: &signer): &signer",
+        "s",
+        vec![],
+        vec![MoveValue::Signer(TEST_ADDR)],
+        &[MoveTypeLayout::Signer],
+    )
 }

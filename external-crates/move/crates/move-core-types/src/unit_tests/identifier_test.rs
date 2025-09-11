@@ -4,7 +4,7 @@
 
 use crate::{
     gas_algebra::AbstractMemorySize,
-    identifier::{IdentStr, Identifier, ALLOWED_IDENTIFIERS, ALLOWED_NO_SELF_IDENTIFIERS},
+    identifier::{ALLOWED_IDENTIFIERS, IdentStr, Identifier},
 };
 use bcs::test_helpers::assert_canonical_encode_decode;
 use once_cell::sync::Lazy;
@@ -26,11 +26,13 @@ fn valid_identifiers() {
         "_0",
         "__",
         "____________________",
-        // TODO: <SELF> is an exception. It should be removed once CompiledScript goes away.
-        "<SELF>",
     ];
     for identifier in &valid_identifiers {
-        assert!(Identifier::is_valid(identifier), "Identifier '{}' should be valid", identifier);
+        assert!(
+            Identifier::is_valid(identifier),
+            "Identifier '{}' should be valid",
+            identifier
+        );
     }
 }
 
@@ -52,9 +54,15 @@ fn invalid_identifiers() {
         ">>><<<",
         "foo::bar::<<>>",
         "foo!!bar!!<<>>",
+        // <SELF> is no longer an exception.
+        "<SELF>",
     ];
     for identifier in &invalid_identifiers {
-        assert!(!Identifier::is_valid(identifier), "Identifier '{}' should be invalid", identifier);
+        assert!(
+            !Identifier::is_valid(identifier),
+            "Identifier '{}' should be invalid",
+            identifier
+        );
     }
 }
 
@@ -76,6 +84,8 @@ fn invalid_identifier_deser() {
         ">>><<<",
         "foo::bar::<<>>",
         "foo!!bar!!<<>>",
+        // <SELF> is no longer an exception.
+        "<SELF>",
     ];
     for identifier in &invalid_identifiers {
         let bytes = bcs::to_bytes(identifier).unwrap();
@@ -93,7 +103,7 @@ proptest! {
     }
 
     #[test]
-    fn valid_identifiers_proptest(identifier in ALLOWED_NO_SELF_IDENTIFIERS) {
+    fn valid_identifiers_proptest(identifier in ALLOWED_IDENTIFIERS) {
         prop_assert!(Identifier::is_valid(identifier));
     }
 

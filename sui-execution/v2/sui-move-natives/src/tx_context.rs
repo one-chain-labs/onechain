@@ -4,7 +4,9 @@
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
-use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+};
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
 use sui_types::base_types::{ObjectID, TransactionDigest};
@@ -28,9 +30,15 @@ pub fn derive_id(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 2);
 
-    let tx_context_derive_id_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().tx_context_derive_id_cost_params.clone();
-    native_charge_gas_early_exit!(context, tx_context_derive_id_cost_params.tx_context_derive_id_cost_base);
+    let tx_context_derive_id_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .tx_context_derive_id_cost_params
+        .clone();
+    native_charge_gas_early_exit!(
+        context,
+        tx_context_derive_id_cost_params.tx_context_derive_id_cost_base
+    );
 
     let ids_created = pop_arg!(args, u64);
     let tx_hash = pop_arg!(args, Vec<u8>);
@@ -41,5 +49,8 @@ pub fn derive_id(
     let obj_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
     obj_runtime.new_id(address.into())?;
 
-    Ok(NativeResult::ok(context.gas_used(), smallvec![Value::address(address)]))
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![Value::address(address)],
+    ))
 }

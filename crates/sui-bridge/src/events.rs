@@ -8,28 +8,30 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::{
-    crypto::BridgeAuthorityPublicKey,
-    error::{BridgeError, BridgeResult},
-    types::{BridgeAction, SuiToEthBridgeAction},
-};
+use crate::crypto::BridgeAuthorityPublicKey;
+use crate::error::BridgeError;
+use crate::error::BridgeResult;
+use crate::types::BridgeAction;
+use crate::types::SuiToEthBridgeAction;
 use ethers::types::Address as EthAddress;
-use fastcrypto::encoding::{Encoding, Hex};
+use fastcrypto::encoding::Encoding;
+use fastcrypto::encoding::Hex;
 use move_core_types::language_storage::StructTag;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use sui_json_rpc_types::SuiEvent;
-use sui_types::{
-    base_types::SuiAddress,
-    bridge::{BridgeChainId, MoveTypeBridgeMessageKey, MoveTypeCommitteeMember, MoveTypeCommitteeMemberRegistration},
-    collection_types::VecMap,
-    crypto::ToFromBytes,
-    digests::TransactionDigest,
-    parse_sui_type_tag,
-    TypeTag,
-    BRIDGE_PACKAGE_ID,
-};
+use sui_types::base_types::SuiAddress;
+use sui_types::bridge::BridgeChainId;
+use sui_types::bridge::MoveTypeBridgeMessageKey;
+use sui_types::bridge::MoveTypeCommitteeMember;
+use sui_types::bridge::MoveTypeCommitteeMemberRegistration;
+use sui_types::collection_types::VecMap;
+use sui_types::crypto::ToFromBytes;
+use sui_types::digests::TransactionDigest;
+use sui_types::parse_sui_type_tag;
+use sui_types::TypeTag;
+use sui_types::BRIDGE_PACKAGE_ID;
 
 // `TokendDepositedEvent` emitted in bridge.move
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -45,6 +47,7 @@ pub struct MoveTokenDepositedEvent {
 
 macro_rules! new_move_event {
     ($struct_name:ident, $move_struct_name:ident) => {
+
         // `$move_struct_name` emitted in bridge.move
         #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
         pub struct $move_struct_name {
@@ -70,7 +73,10 @@ macro_rules! new_move_event {
                         event.message_key.source_chain,
                     ))
                 })?;
-                Ok(Self { nonce: event.message_key.bridge_seq_num, source_chain })
+                Ok(Self {
+                    nonce: event.message_key.bridge_seq_num,
+                    source_chain,
+                })
             }
         }
     };
@@ -78,7 +84,10 @@ macro_rules! new_move_event {
 
 new_move_event!(TokenTransferClaimed, MoveTokenTransferClaimed);
 new_move_event!(TokenTransferApproved, MoveTokenTransferApproved);
-new_move_event!(TokenTransferAlreadyApproved, MoveTokenTransferAlreadyApproved);
+new_move_event!(
+    TokenTransferAlreadyApproved,
+    MoveTokenTransferAlreadyApproved
+);
 new_move_event!(TokenTransferAlreadyClaimed, MoveTokenTransferAlreadyClaimed);
 new_move_event!(TokenTransferLimitExceed, MoveTokenTransferLimitExceed);
 
@@ -138,10 +147,17 @@ impl TryFrom<MoveTokenRegistrationEvent> for TokenRegistrationEvent {
 
     fn try_from(event: MoveTokenRegistrationEvent) -> BridgeResult<Self> {
         let type_name = parse_sui_type_tag(&format!("0x{}", event.type_name)).map_err(|e| {
-            BridgeError::InternalError(format!("Failed to parse TypeTag: {e}, type name: {}", event.type_name))
+            BridgeError::InternalError(format!(
+                "Failed to parse TypeTag: {e}, type name: {}",
+                event.type_name
+            ))
         })?;
 
-        Ok(Self { type_name, decimal: event.decimal, native_token: event.native_token })
+        Ok(Self {
+            type_name,
+            decimal: event.decimal,
+            native_token: event.native_token,
+        })
     }
 }
 
@@ -170,7 +186,10 @@ impl TryFrom<MoveNewTokenEvent> for NewTokenEvent {
 
     fn try_from(event: MoveNewTokenEvent) -> BridgeResult<Self> {
         let type_name = parse_sui_type_tag(&format!("0x{}", event.type_name)).map_err(|e| {
-            BridgeError::InternalError(format!("Failed to parse TypeTag: {e}, type name: {}", event.type_name))
+            BridgeError::InternalError(format!(
+                "Failed to parse TypeTag: {e}, type name: {}",
+                event.type_name
+            ))
         })?;
 
         Ok(Self {
@@ -214,8 +233,16 @@ impl TryFrom<MoveCommitteeUpdateEvent> for CommitteeUpdate {
     type Error = BridgeError;
 
     fn try_from(event: MoveCommitteeUpdateEvent) -> BridgeResult<Self> {
-        let members = event.members.contents.into_iter().map(|v| v.value).collect();
-        Ok(Self { members, stake_participation_percentage: event.stake_participation_percentage })
+        let members = event
+            .members
+            .contents
+            .into_iter()
+            .map(|v| v.value)
+            .collect();
+        Ok(Self {
+            members,
+            stake_participation_percentage: event.stake_participation_percentage,
+        })
     }
 }
 
@@ -235,7 +262,10 @@ impl TryFrom<MoveBlocklistValidatorEvent> for BlocklistValidatorEvent {
                 BridgeError::Generic(format!("Failed to convert MoveBlocklistValidatorEvent to BlocklistValidatorEvent. Failed to convert public key to BridgeAuthorityPublicKey: {:?}", e))
             )
         ).collect::<BridgeResult<Vec<_>>>()?;
-        Ok(Self { blocklisted: event.blocklisted, public_keys })
+        Ok(Self {
+            blocklisted: event.blocklisted,
+            public_keys,
+        })
     }
 }
 
@@ -408,21 +438,21 @@ pub mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::{
-        crypto::BridgeAuthorityKeyPair,
-        e2e_tests::test_utils::BridgeTestClusterBuilder,
-        types::{BridgeAction, SuiToEthBridgeAction},
-    };
+    use crate::crypto::BridgeAuthorityKeyPair;
+    use crate::e2e_tests::test_utils::BridgeTestClusterBuilder;
+    use crate::types::BridgeAction;
+    use crate::types::SuiToEthBridgeAction;
     use ethers::types::Address as EthAddress;
-    use sui_json_rpc_types::{BcsEvent, SuiEvent};
-    use sui_types::{
-        base_types::{ObjectID, SuiAddress},
-        bridge::{BridgeChainId, TOKEN_ID_SUI},
-        crypto::get_key_pair,
-        digests::TransactionDigest,
-        event::EventID,
-        Identifier,
-    };
+    use sui_json_rpc_types::BcsEvent;
+    use sui_json_rpc_types::SuiEvent;
+    use sui_types::base_types::ObjectID;
+    use sui_types::base_types::SuiAddress;
+    use sui_types::bridge::BridgeChainId;
+    use sui_types::bridge::TOKEN_ID_SUI;
+    use sui_types::crypto::get_key_pair;
+    use sui_types::digests::TransactionDigest;
+    use sui_types::event::EventID;
+    use sui_types::Identifier;
 
     /// Returns a test SuiEvent and corresponding BridgeAction
     pub fn get_test_sui_event_and_action(identifier: Identifier) -> (SuiEvent, BridgeAction) {
@@ -456,7 +486,10 @@ pub mod tests {
         let event = SuiEvent {
             type_: SuiToEthTokenBridgeV1.get().unwrap().clone(),
             bcs: BcsEvent::new(bcs::to_bytes(&emitted_event).unwrap()),
-            id: EventID { tx_digest, event_seq: event_idx as u64 },
+            id: EventID {
+                tx_digest,
+                event_seq: event_idx as u64,
+            },
 
             // The following fields do not matter as of writing,
             // but if tests start to fail, it's worth checking these fields.

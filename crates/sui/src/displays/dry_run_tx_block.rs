@@ -4,26 +4,31 @@
 use crate::{client_commands::estimate_gas_budget_from_gas_cost, displays::Pretty};
 use std::fmt::{Display, Formatter};
 use sui_json_rpc_types::{
-    DryRunTransactionBlockResponse,
-    ObjectChange,
-    SuiTransactionBlockDataAPI,
+    DryRunTransactionBlockResponse, ObjectChange, SuiTransactionBlockDataAPI,
     SuiTransactionBlockEffectsAPI,
 };
 use tabled::{
     builder::Builder as TableBuilder,
     settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
 };
-impl<'a> Display for Pretty<'a, DryRunTransactionBlockResponse> {
+impl Display for Pretty<'_, DryRunTransactionBlockResponse> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(response) = self;
 
-        writeln!(f, "Dry run completed, execution status: {}", response.effects.status())?;
+        writeln!(
+            f,
+            "Dry run completed, execution status: {}",
+            response.effects.status()
+        )?;
 
         let mut builder = TableBuilder::default();
         builder.push_record(vec![format!("{}", response.input)]);
         let mut table = builder.build();
         table.with(TablePanel::header("Dry Run Transaction Data"));
-        table.with(TableStyle::rounded().horizontals([HorizontalLine::new(1, TableStyle::modern().get_horizontal())]));
+        table.with(TableStyle::rounded().horizontals([HorizontalLine::new(
+            1,
+            TableStyle::modern().get_horizontal(),
+        )]));
         writeln!(f, "{}", table)?;
         writeln!(f, "{}", response.effects)?;
         write!(f, "{}", response.events)?;
@@ -34,8 +39,14 @@ impl<'a> Display for Pretty<'a, DryRunTransactionBlockResponse> {
             writeln!(f, "╰─────────────────────────────╯")?;
         } else {
             let mut builder = TableBuilder::default();
-            let (mut created, mut deleted, mut mutated, mut published, mut transferred, mut wrapped) =
-                (vec![], vec![], vec![], vec![], vec![], vec![]);
+            let (
+                mut created,
+                mut deleted,
+                mut mutated,
+                mut published,
+                mut transferred,
+                mut wrapped,
+            ) = (vec![], vec![], vec![], vec![], vec![], vec![]);
             for obj in &response.object_changes {
                 match obj {
                     ObjectChange::Created { .. } => created.push(obj),
@@ -56,9 +67,10 @@ impl<'a> Display for Pretty<'a, DryRunTransactionBlockResponse> {
 
             let mut table = builder.build();
             table.with(TablePanel::header("Object Changes"));
-            table.with(
-                TableStyle::rounded().horizontals([HorizontalLine::new(1, TableStyle::modern().get_horizontal())]),
-            );
+            table.with(TableStyle::rounded().horizontals([HorizontalLine::new(
+                1,
+                TableStyle::modern().get_horizontal(),
+            )]));
             writeln!(f, "{}", table)?;
         }
         if response.balance_changes.is_empty() {
@@ -72,21 +84,39 @@ impl<'a> Display for Pretty<'a, DryRunTransactionBlockResponse> {
             }
             let mut table = builder.build();
             table.with(TablePanel::header("Balance Changes"));
-            table.with(
-                TableStyle::rounded().horizontals([HorizontalLine::new(1, TableStyle::modern().get_horizontal())]),
-            );
+            table.with(TableStyle::rounded().horizontals([HorizontalLine::new(
+                1,
+                TableStyle::modern().get_horizontal(),
+            )]));
             writeln!(f, "{}", table)?;
         }
-        writeln!(f, "Dry run completed, execution status: {}", response.effects.status())?;
+        writeln!(
+            f,
+            "Dry run completed, execution status: {}",
+            response.effects.status()
+        )?;
         writeln!(
             f,
             "Estimated gas cost (includes a small buffer): {} MIST",
-            estimate_gas_budget_from_gas_cost(response.effects.gas_cost_summary(), response.input.gas_data().price)
-        )
+            estimate_gas_budget_from_gas_cost(
+                response.effects.gas_cost_summary(),
+                response.input.gas_data().price
+            )
+        )?;
+
+        if let Some(err) = &response.execution_error_source {
+            writeln!(f, "Execution error: {}", err)?;
+        }
+
+        Ok(())
     }
 }
 
-fn write_obj_changes<T: Display>(values: Vec<T>, output_string: &str, builder: &mut TableBuilder) -> std::fmt::Result {
+fn write_obj_changes<T: Display>(
+    values: Vec<T>,
+    output_string: &str,
+    builder: &mut TableBuilder,
+) -> std::fmt::Result {
     if !values.is_empty() {
         builder.push_record(vec![format!("{} Objects: ", output_string)]);
         for obj in values {

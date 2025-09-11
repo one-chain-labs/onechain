@@ -18,7 +18,12 @@ simple_visitor!(
     fn visit_exp_custom(&mut self, exp: &T::Exp) -> bool {
         // we do not care about `while` since there is another lint that handles reporting
         // that `while (true)` should be `loop`
-        let UnannotatedExp_::Loop { name: _, has_break: false, body } = &exp.exp.value else {
+        let UnannotatedExp_::Loop {
+            name: _,
+            has_break: false,
+            body,
+        } = &exp.exp.value
+        else {
             return false;
         };
         // TODO maybe move this to Loop? Bit of an n^2 problem here in the worst case

@@ -20,7 +20,10 @@ pub fn schema_derive(input: TokenStream) -> TokenStream {
                         let field_name = field.ident.as_ref().unwrap().to_string();
                         (
                             format!("\"{}\".to_string()", field_name),
-                            format!("if idx == {} {{ return self.{}.clone().into(); }}", idx, field_name),
+                            format!(
+                                "if idx == {} {{ return self.{}.clone().into(); }}",
+                                idx, field_name
+                            ),
                         )
                     })
                     .unzip();
@@ -31,7 +34,8 @@ pub fn schema_derive(input: TokenStream) -> TokenStream {
         _ => panic!("not supported struct for parquet serialization"),
     };
     let schema_tokens: proc_macro2::TokenStream = schema.parse().unwrap();
-    let getter_implementation_tokens: proc_macro2::TokenStream = getter_implementation.parse().unwrap();
+    let getter_implementation_tokens: proc_macro2::TokenStream =
+        getter_implementation.parse().unwrap();
     quote! {
         impl ParquetSchema for #struct_name {
             fn schema() -> Vec<String> {

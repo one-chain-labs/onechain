@@ -11,14 +11,15 @@ use crate::execution_value::SuiResolver;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag},
-    resolver::{LinkageResolver, ModuleResolver, ResourceResolver},
+    language_storage::ModuleId,
+    resolver::{LinkageResolver, ModuleResolver},
 };
+use sui_types::storage::{get_module, PackageObject};
 use sui_types::{
     base_types::ObjectID,
     error::{ExecutionError, SuiError, SuiResult},
     move_package::{MovePackage, TypeOrigin, UpgradeInfo},
-    storage::{get_module, BackingPackageStore, PackageObject},
+    storage::BackingPackageStore,
 };
 
 /// Exposes module and linkage resolution to the Move runtime.  The first by delegating to
@@ -153,7 +154,12 @@ impl<'state> LinkageView<'state> {
         // Pre-populate the type origin cache with entries from the current package -- this is
         // necessary to serve "defining module" requests for unpublished packages, but will also
         // speed up other requests.
-        for TypeOrigin { module_name, datatype_name: struct_name, package: defining_id } in context.type_origin_table() {
+        for TypeOrigin {
+            module_name,
+            datatype_name: struct_name,
+            package: defining_id,
+        } in context.type_origin_table()
+        {
             let Ok(module_name) = Identifier::from_str(module_name) else {
                 invariant_violation!("Module name isn't an identifier: {module_name}");
             };
@@ -177,8 +183,16 @@ impl<'state> LinkageView<'state> {
         }
     }
 
-    fn get_cached_type_origin(&self, runtime_id: &ModuleId, struct_: &IdentStr) -> Option<AccountAddress> {
-        self.type_origin_cache.borrow().get(runtime_id)?.get(struct_).cloned()
+    fn get_cached_type_origin(
+        &self,
+        runtime_id: &ModuleId,
+        struct_: &IdentStr,
+    ) -> Option<AccountAddress> {
+        self.type_origin_cache
+            .borrow()
+            .get(runtime_id)?
+            .get(struct_)
+            .cloned()
     }
 
     fn add_type_origin(
@@ -222,7 +236,7 @@ impl From<&MovePackage> for PackageLinkage {
     }
 }
 
-impl<'state> LinkageResolver for LinkageView<'state> {
+impl LinkageResolver for LinkageView<'_> {
     type Error = SuiError;
 
     fn link_context(&self) -> AccountAddress {
@@ -246,7 +260,10 @@ impl<'state> LinkageResolver for LinkageView<'state> {
         // The request is to relocate a module in the package that the link context is from.  This
         // entry will not be stored in the linkage table, so must be handled specially.
         if module_id.address() == &linkage.runtime_id {
-            return Ok(ModuleId::new(linkage.storage_id, module_id.name().to_owned()));
+            return Ok(ModuleId::new(
+                linkage.storage_id,
+                module_id.name().to_owned(),
+            ));
         }
 
         let runtime_id = ObjectID::from_address(*module_id.address());
@@ -258,16 +275,25 @@ impl<'state> LinkageResolver for LinkageView<'state> {
             );
         };
 
-        Ok(ModuleId::new(upgrade.upgraded_id.into(), module_id.name().to_owned()))
+        Ok(ModuleId::new(
+            upgrade.upgraded_id.into(),
+            module_id.name().to_owned(),
+        ))
     }
 
-    fn defining_module(&self, runtime_id: &ModuleId, struct_: &IdentStr) -> Result<ModuleId, Self::Error> {
+    fn defining_module(
+        &self,
+        runtime_id: &ModuleId,
+        struct_: &IdentStr,
+    ) -> Result<ModuleId, Self::Error> {
         match &self.linkage_info {
             LinkageInfo::Set(_) => (),
             LinkageInfo::Universal => return Ok(runtime_id.clone()),
 
             LinkageInfo::Unset => {
-                invariant_violation!("No linkage context set for defining module query on {runtime_id}::{struct_}.")
+                invariant_violation!(
+                    "No linkage context set for defining module query on {runtime_id}::{struct_}."
+                )
             }
         };
 
@@ -280,7 +306,11 @@ impl<'state> LinkageResolver for LinkageView<'state> {
             invariant_violation!("Missing dependent package in store: {storage_id}",)
         };
 
-        for TypeOrigin { module_name, datatype_name: struct_name, package } in package.move_package().type_origin_table()
+        for TypeOrigin {
+            module_name,
+            datatype_name: struct_name,
+            package,
+        } in package.move_package().type_origin_table()
         {
             if module_name == runtime_id.name().as_str() && struct_name == struct_.as_str() {
                 self.add_type_origin(runtime_id.clone(), struct_.to_owned(), *package)?;
@@ -295,17 +325,9 @@ impl<'state> LinkageResolver for LinkageView<'state> {
     }
 }
 
-/** Remaining implementations delegated to state_view *************************/
+// Remaining implementations delegated to state_view
 
-impl<'state> ResourceResolver for LinkageView<'state> {
-    type Error = SuiError;
-
-    fn get_resource(&self, address: &AccountAddress, typ: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
-        self.resolver.get_resource(address, typ)
-    }
-}
-
-impl<'state> ModuleResolver for LinkageView<'state> {
+impl ModuleResolver for LinkageView<'_> {
     type Error = SuiError;
 
     fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
@@ -313,7 +335,7 @@ impl<'state> ModuleResolver for LinkageView<'state> {
     }
 }
 
-impl<'state> BackingPackageStore for LinkageView<'state> {
+impl BackingPackageStore for LinkageView<'_> {
     fn get_package_object(&self, package_id: &ObjectID) -> SuiResult<Option<PackageObject>> {
         self.resolver.get_package_object(package_id)
     }

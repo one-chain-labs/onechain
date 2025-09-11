@@ -39,7 +39,8 @@ pub struct MonoInfo {
 
 /// Get the information computed by this analysis.
 pub fn get_info(env: &GlobalEnv) -> Rc<MonoInfo> {
-    env.get_extension::<MonoInfo>().unwrap_or_else(|| Rc::new(MonoInfo::default()))
+    env.get_extension::<MonoInfo>()
+        .unwrap_or_else(|| Rc::new(MonoInfo::default()))
 }
 
 pub struct MonoAnalysisProcessor();
@@ -64,11 +65,25 @@ impl FunctionTargetProcessor for MonoAnalysisProcessor {
         self.analyze(env, targets);
     }
 
-    fn dump_result(&self, f: &mut fmt::Formatter, env: &GlobalEnv, _targets: &FunctionTargetsHolder) -> fmt::Result {
+    fn dump_result(
+        &self,
+        f: &mut fmt::Formatter,
+        env: &GlobalEnv,
+        _targets: &FunctionTargetsHolder,
+    ) -> fmt::Result {
         writeln!(f, "\n\n==== mono-analysis result ====\n")?;
-        let info = env.get_extension::<MonoInfo>().expect("monomorphization analysis not run");
-        let tctx = TypeDisplayContext::WithEnv { env, type_param_names: None };
-        let display_inst = |tys: &[Type]| tys.iter().map(|ty| ty.display(&tctx).to_string()).join(", ");
+        let info = env
+            .get_extension::<MonoInfo>()
+            .expect("monomorphization analysis not run");
+        let tctx = TypeDisplayContext::WithEnv {
+            env,
+            type_param_names: None,
+        };
+        let display_inst = |tys: &[Type]| {
+            tys.iter()
+                .map(|ty| ty.display(&tctx).to_string())
+                .join(", ")
+        };
         for (sid, insts) in &info.structs {
             let sname = env.get_struct(*sid).get_full_name_str();
             writeln!(f, "struct {} = {{", sname)?;
@@ -86,7 +101,11 @@ impl FunctionTargetProcessor for MonoAnalysisProcessor {
             writeln!(f, "}}")?;
         }
         for (module, insts) in &info.native_inst {
-            writeln!(f, "module {} = {{", env.get_module(*module).get_full_name_str())?;
+            writeln!(
+                f,
+                "module {} = {{",
+                env.get_module(*module).get_full_name_str()
+            )?;
             for inst in insts {
                 writeln!(f, "  <{}>", display_inst(inst))?;
             }
@@ -113,7 +132,11 @@ impl MonoAnalysisProcessor {
         };
         // Analyze functions
         analyzer.analyze_funs();
-        let Analyzer { mut info, done_types, .. } = analyzer;
+        let Analyzer {
+            mut info,
+            done_types,
+            ..
+        } = analyzer;
         info.all_types = done_types;
         env.set_extension(info);
     }
@@ -129,7 +152,7 @@ struct Analyzer<'a> {
     inst_opt: Option<Vec<Type>>,
 }
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     fn analyze_funs(&mut self) {
         // Analyze top-level, verified functions. Any functions they call will be queued
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
@@ -148,10 +171,17 @@ impl<'a> Analyzer<'a> {
         // specific instantiation.
         while let Some((fun, variant, inst)) = self.todo_funs.pop() {
             self.inst_opt = Some(inst);
-            self.analyze_fun(self.targets.get_target(&self.env.get_function(fun), &variant));
+            self.analyze_fun(
+                self.targets
+                    .get_target(&self.env.get_function(fun), &variant),
+            );
             let inst = std::mem::take(&mut self.inst_opt).unwrap();
             // Insert it into final analysis result.
-            self.info.funs.entry((fun, variant.clone())).or_default().insert(inst.clone());
+            self.info
+                .funs
+                .entry((fun, variant.clone()))
+                .or_default()
+                .insert(inst.clone());
             self.done_funs.insert((fun, variant, inst));
         }
     }
@@ -210,7 +240,11 @@ impl<'a> Analyzer<'a> {
                     // Mark the associated module to be instantiated with the given actuals.
                     // This will instantiate all functions in the module with matching number
                     // of type parameters.
-                    self.info.native_inst.entry(callee_env.module_env.get_id()).or_default().insert(actuals);
+                    self.info
+                        .native_inst
+                        .entry(callee_env.module_env.get_id())
+                        .or_default()
+                        .insert(actuals);
                 }
             }
             Call(_, _, WriteBack(_, edge), ..) => {
@@ -254,7 +288,9 @@ impl<'a> Analyzer<'a> {
             Type::Vector(et) => {
                 self.info.vec_inst.insert(et.as_ref().clone());
             }
-            Type::Datatype(mid, sid, targs) => self.add_struct(self.env.get_module(*mid).into_struct(*sid), targs),
+            Type::Datatype(mid, sid, targs) => {
+                self.add_struct(self.env.get_module(*mid).into_struct(*sid), targs)
+            }
             Type::TypeParameter(idx) => {
                 self.info.type_params.insert(*idx);
             }
@@ -264,9 +300,17 @@ impl<'a> Analyzer<'a> {
 
     fn add_struct(&mut self, struct_: StructEnv<'_>, targs: &[Type]) {
         if struct_.is_native() && !targs.is_empty() {
-            self.info.native_inst.entry(struct_.module_env.get_id()).or_default().insert(targs.to_owned());
+            self.info
+                .native_inst
+                .entry(struct_.module_env.get_id())
+                .or_default()
+                .insert(targs.to_owned());
         } else {
-            self.info.structs.entry(struct_.get_qualified_id()).or_default().insert(targs.to_owned());
+            self.info
+                .structs
+                .entry(struct_.get_qualified_id())
+                .or_default()
+                .insert(targs.to_owned());
             for field in struct_.get_fields() {
                 self.add_type(&field.get_type().instantiate(targs));
             }

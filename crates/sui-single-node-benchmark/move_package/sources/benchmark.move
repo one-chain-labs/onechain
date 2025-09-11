@@ -4,9 +4,9 @@
 module move_benchmark::benchmark {
     use std::ascii;
     use std::ascii::String;
-    use one::coin::Coin;
-    use one::dynamic_field;
-    use one::oct::OCT;
+    use sui::coin::Coin;
+    use sui::dynamic_field;
+    use sui::oct::OCT;
 
     #[allow(lint(self_transfer))]
     public fun transfer_coin(coin: Coin<OCT>, ctx: &TxContext) {

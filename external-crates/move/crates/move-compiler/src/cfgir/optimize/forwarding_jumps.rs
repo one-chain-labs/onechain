@@ -31,7 +31,7 @@ use move_proc_macros::growing_stack;
 use crate::{
     cfgir::{
         ast::remap_labels,
-        cfg::{MutForwardCFG, CFG},
+        cfg::{CFG, MutForwardCFG},
     },
     diagnostics::DiagnosticReporter,
     expansion::ast::Mutability,
@@ -108,10 +108,16 @@ fn find_forwarding_jump_destinations(blocks: &BasicBlocks) -> LabelMap {
         }
     }
 
-    final_jumps.into_iter().filter(|(from, to)| from != to).collect()
+    final_jumps
+        .into_iter()
+        .filter(|(from, to)| from != to)
+        .collect()
 }
 
-fn optimize_forwarding_jumps(blocks: &mut BasicBlocks, final_jumps: BTreeMap<Label, Label>) -> bool {
+fn optimize_forwarding_jumps(
+    blocks: &mut BasicBlocks,
+    final_jumps: BTreeMap<Label, Label>,
+) -> bool {
     let mut changed = false;
     for block in blocks.values_mut() {
         for cmd in block {
@@ -125,7 +131,10 @@ fn optimize_forwarding_jumps(blocks: &mut BasicBlocks, final_jumps: BTreeMap<Lab
 fn optimize_cmd(sp!(_, cmd_): &mut Command, final_jumps: &BTreeMap<Label, Label>) -> bool {
     use Command_ as C;
     match cmd_ {
-        C::Jump { target, from_user: _ } => {
+        C::Jump {
+            target,
+            from_user: _,
+        } => {
             if let Some(final_target) = final_jumps.get(target) {
                 *target = *final_target;
                 true
@@ -133,7 +142,11 @@ fn optimize_cmd(sp!(_, cmd_): &mut Command, final_jumps: &BTreeMap<Label, Label>
                 false
             }
         }
-        C::JumpIf { cond: _, if_true, if_false } => {
+        C::JumpIf {
+            cond: _,
+            if_true,
+            if_false,
+        } => {
             let mut result = false;
             if let Some(final_target) = final_jumps.get(if_true) {
                 *if_true = *final_target;
@@ -151,8 +164,12 @@ fn optimize_cmd(sp!(_, cmd_): &mut Command, final_jumps: &BTreeMap<Label, Label>
 
 // Once we've inlined all our jumps, we need to renumber the remaining blocks for compactness.
 fn remap_in_order(start: Label, blocks: &mut BasicBlocks) {
-    let mut remapping =
-        blocks.keys().copied().enumerate().map(|(ndx, lbl)| (lbl, Label(ndx))).collect::<BTreeMap<Label, Label>>();
+    let mut remapping = blocks
+        .keys()
+        .copied()
+        .enumerate()
+        .map(|(ndx, lbl)| (lbl, Label(ndx)))
+        .collect::<BTreeMap<Label, Label>>();
     remapping.insert(start, start);
     let owned_blocks = std::mem::take(blocks);
     let (_start, remapped_blocks) = remap_labels(&remapping, start, owned_blocks);

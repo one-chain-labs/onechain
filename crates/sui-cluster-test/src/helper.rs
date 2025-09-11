@@ -5,13 +5,9 @@ use anyhow::bail;
 use move_core_types::language_storage::TypeTag;
 use sui_json_rpc_types::{BalanceChange, SuiData, SuiObjectData, SuiObjectDataOptions};
 use sui_sdk::SuiClient;
-use sui_types::{
-    base_types::ObjectID,
-    error::SuiObjectResponseError,
-    gas_coin::GasCoin,
-    object::Owner,
-    parse_sui_type_tag,
-};
+use sui_types::error::SuiObjectResponseError;
+use sui_types::gas_coin::GasCoin;
+use sui_types::{base_types::ObjectID, object::Owner, parse_sui_type_tag};
 use tracing::{debug, trace};
 
 /// A util struct that helps verify Sui Object.
@@ -58,7 +54,11 @@ impl ObjectChecker {
         if self.is_sui_coin == Some(false) {
             panic!("'check_into_gas_coin' shouldn't be called with 'is_sui_coin' set as false");
         }
-        self.is_sui_coin(true).check(client).await.unwrap().into_gas_coin()
+        self.is_sui_coin(true)
+            .check(client)
+            .await
+            .unwrap()
+            .into_gas_coin()
     }
 
     pub async fn check_into_object(self, client: &SuiClient) -> SuiObjectData {
@@ -71,7 +71,13 @@ impl ObjectChecker {
         let object_id = self.object_id;
         let object_info = client
             .read_api()
-            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_type().with_owner().with_bcs())
+            .get_object_with_options(
+                object_id,
+                SuiObjectDataOptions::new()
+                    .with_type()
+                    .with_owner()
+                    .with_bcs(),
+            )
             .await
             .or_else(|err| bail!("Failed to get object info (id: {}), err: {err}", object_id))?;
 
@@ -79,12 +85,32 @@ impl ObjectChecker {
 
         match (object_info.data, object_info.error) {
             (None, Some(SuiObjectResponseError::NotExists { object_id })) => {
-                panic!("Node can't find gas object {} with client {:?}", object_id, client.read_api())
+                panic!(
+                    "Node can't find gas object {} with client {:?}",
+                    object_id,
+                    client.read_api()
+                )
             }
-            (None, Some(SuiObjectResponseError::DynamicFieldNotFound { parent_object_id: object_id })) => {
-                panic!("Node can't find dynamic field for {} with client {:?}", object_id, client.read_api())
+            (
+                None,
+                Some(SuiObjectResponseError::DynamicFieldNotFound {
+                    parent_object_id: object_id,
+                }),
+            ) => {
+                panic!(
+                    "Node can't find dynamic field for {} with client {:?}",
+                    object_id,
+                    client.read_api()
+                )
             }
-            (None, Some(SuiObjectResponseError::Deleted { object_id, version: _, digest: _ })) => {
+            (
+                None,
+                Some(SuiObjectResponseError::Deleted {
+                    object_id,
+                    version: _,
+                    digest: _,
+                }),
+            ) => {
                 if !self.is_deleted {
                     panic!("Gas object {} was deleted", object_id);
                 }
@@ -95,8 +121,10 @@ impl ObjectChecker {
                     panic!("Expect Gas object {} deleted, but it is not", object_id);
                 }
                 if let Some(owner) = self.owner {
-                    let object_owner =
-                        object.owner.clone().unwrap_or_else(|| panic!("Object {} does not have owner", object_id));
+                    let object_owner = object
+                        .owner
+                        .clone()
+                        .unwrap_or_else(|| panic!("Object {} does not have owner", object_id));
                     assert_eq!(
                         object_owner, owner,
                         "Gas coin {} does not belong to {}, but {}",
@@ -135,11 +163,9 @@ impl CheckerResultObject {
     pub fn new(gas_coin: Option<GasCoin>, object: Option<SuiObjectData>) -> Self {
         Self { gas_coin, object }
     }
-
     pub fn into_gas_coin(self) -> GasCoin {
         self.gas_coin.unwrap()
     }
-
     pub fn into_object(self) -> SuiObjectData {
         self.object.unwrap()
     }
@@ -175,7 +201,6 @@ impl BalanceChangeChecker {
         self.owner = Some(owner);
         self
     }
-
     pub fn coin_type(mut self, coin_type: &str) -> Self {
         self.coin_type = Some(parse_sui_type_tag(coin_type).unwrap());
         self
@@ -187,7 +212,11 @@ impl BalanceChangeChecker {
     }
 
     pub fn check(self, event: &BalanceChange) {
-        let BalanceChange { owner, coin_type, amount } = event;
+        let BalanceChange {
+            owner,
+            coin_type,
+            amount,
+        } = event;
 
         assert_eq_if_present!(self.owner, owner, "owner");
         assert_eq_if_present!(self.coin_type, coin_type, "coin_type");

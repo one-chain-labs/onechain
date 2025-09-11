@@ -5,15 +5,20 @@ use std::{
     env,
     path::{Path, PathBuf},
 };
+
 use tonic_build::manual::{Builder, Method, Service};
 
 type Result<T> = ::std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 fn main() -> Result<()> {
-    let out_dir =
-        if env::var("DUMP_GENERATED_GRPC").is_ok() { PathBuf::from("") } else { PathBuf::from(env::var("OUT_DIR")?) };
+    let out_dir = if env::var("DUMP_GENERATED_GRPC").is_ok() {
+        PathBuf::from("")
+    } else {
+        PathBuf::from(env::var("OUT_DIR")?)
+    };
 
     let codec_path = "mysten_network::codec::BcsCodec";
+    let prost_codec_path = "tonic::codec::ProstCodec";
 
     let validator_service = Service::builder()
         .name("Validator")
@@ -21,19 +26,28 @@ fn main() -> Result<()> {
         .comment("The Validator interface")
         .method(
             Method::builder()
-                .name("transaction")
-                .route_name("Transaction")
-                .input_type("sui_types::transaction::Transaction")
-                .output_type("sui_types::messages_grpc::HandleTransactionResponse")
-                .codec_path(codec_path)
+                .name("submit_transaction")
+                .route_name("SubmitTransaction")
+                .input_type("sui_types::messages_grpc::RawSubmitTxRequest")
+                .output_type("sui_types::messages_grpc::RawSubmitTxResponse")
+                .codec_path(prost_codec_path)
                 .build(),
         )
         .method(
             Method::builder()
-                .name("transaction_v2")
-                .route_name("TransactionV2")
-                .input_type("sui_types::messages_grpc::HandleTransactionRequestV2")
-                .output_type("sui_types::messages_grpc::HandleTransactionResponseV2")
+                .name("wait_for_effects")
+                .route_name("WaitForEffects")
+                .input_type("sui_types::messages_grpc::RawWaitForEffectsRequest")
+                .output_type("sui_types::messages_grpc::RawWaitForEffectsResponse")
+                .codec_path(prost_codec_path)
+                .build(),
+        )
+        .method(
+            Method::builder()
+                .name("transaction")
+                .route_name("Transaction")
+                .input_type("sui_types::transaction::Transaction")
+                .output_type("sui_types::messages_grpc::HandleTransactionResponse")
                 .codec_path(codec_path)
                 .build(),
         )
@@ -118,9 +132,20 @@ fn main() -> Result<()> {
                 .codec_path(codec_path)
                 .build(),
         )
+        .method(
+            Method::builder()
+                .name("validator_health")
+                .route_name("ValidatorHealth")
+                .input_type("sui_types::messages_grpc::RawValidatorHealthRequest")
+                .output_type("sui_types::messages_grpc::RawValidatorHealthResponse")
+                .codec_path(prost_codec_path)
+                .build(),
+        )
         .build();
 
-    Builder::new().out_dir(&out_dir).compile(&[validator_service]);
+    Builder::new()
+        .out_dir(&out_dir)
+        .compile(&[validator_service]);
 
     build_anemo_services(&out_dir);
 
@@ -202,5 +227,7 @@ fn build_anemo_services(out_dir: &Path) {
         )
         .build();
 
-    anemo_build::manual::Builder::new().out_dir(out_dir).compile(&[discovery, state_sync, randomness]);
+    anemo_build::manual::Builder::new()
+        .out_dir(out_dir)
+        .compile(&[discovery, state_sync, randomness]);
 }

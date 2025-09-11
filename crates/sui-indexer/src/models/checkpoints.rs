@@ -4,13 +4,13 @@
 use diesel::prelude::*;
 
 use sui_json_rpc_types::Checkpoint as RpcCheckpoint;
-use sui_types::{base_types::TransactionDigest, digests::CheckpointDigest, gas::GasCostSummary};
+use sui_types::base_types::TransactionDigest;
+use sui_types::digests::CheckpointDigest;
+use sui_types::gas::GasCostSummary;
 
-use crate::{
-    errors::IndexerError,
-    schema::{chain_identifier, checkpoints, pruner_cp_watermark},
-    types::IndexedCheckpoint,
-};
+use crate::errors::IndexerError;
+use crate::schema::{chain_identifier, checkpoints, pruner_cp_watermark};
+use crate::types::IndexedCheckpoint;
 
 #[derive(Queryable, Insertable, Selectable, Debug, Clone, Default)]
 #[diesel(table_name = chain_identifier)]
@@ -47,9 +47,16 @@ impl From<&IndexedCheckpoint> for StoredCheckpoint {
             sequence_number: c.sequence_number as i64,
             checkpoint_digest: c.checkpoint_digest.into_inner().to_vec(),
             epoch: c.epoch as i64,
-            tx_digests: c.tx_digests.iter().map(|tx| Some(tx.into_inner().to_vec())).collect(),
+            tx_digests: c
+                .tx_digests
+                .iter()
+                .map(|tx| Some(tx.into_inner().to_vec()))
+                .collect(),
             network_total_transactions: c.network_total_transactions as i64,
-            previous_checkpoint_digest: c.previous_checkpoint_digest.as_ref().map(|d| (*d).into_inner().to_vec()),
+            previous_checkpoint_digest: c
+                .previous_checkpoint_digest
+                .as_ref()
+                .map(|d| (*d).into_inner().to_vec()),
             timestamp_ms: c.timestamp_ms as i64,
             total_gas_cost: c.total_gas_cost,
             computation_cost: c.computation_cost as i64,
@@ -58,7 +65,10 @@ impl From<&IndexedCheckpoint> for StoredCheckpoint {
             non_refundable_storage_fee: c.non_refundable_storage_fee as i64,
             checkpoint_commitments: bcs::to_bytes(&c.checkpoint_commitments).unwrap(),
             validator_signature: bcs::to_bytes(&c.validator_signature).unwrap(),
-            end_of_epoch_data: c.end_of_epoch_data.as_ref().map(|d| bcs::to_bytes(d).unwrap()),
+            end_of_epoch_data: c
+                .end_of_epoch_data
+                .as_ref()
+                .map(|d| bcs::to_bytes(d).unwrap()),
             end_of_epoch: c.end_of_epoch_data.is_some(),
             min_tx_sequence_number: Some(c.min_tx_sequence_number as i64),
             max_tx_sequence_number: Some(c.max_tx_sequence_number as i64),
@@ -68,14 +78,14 @@ impl From<&IndexedCheckpoint> for StoredCheckpoint {
 
 impl TryFrom<StoredCheckpoint> for RpcCheckpoint {
     type Error = IndexerError;
-
     fn try_from(checkpoint: StoredCheckpoint) -> Result<RpcCheckpoint, IndexerError> {
-        let parsed_digest = CheckpointDigest::try_from(checkpoint.checkpoint_digest.clone()).map_err(|e| {
-            IndexerError::PersistentStorageDataCorruptionError(format!(
-                "Failed to decode checkpoint digest: {:?} with err: {:?}",
-                checkpoint.checkpoint_digest, e
-            ))
-        })?;
+        let parsed_digest = CheckpointDigest::try_from(checkpoint.checkpoint_digest.clone())
+            .map_err(|e| {
+                IndexerError::PersistentStorageDataCorruptionError(format!(
+                    "Failed to decode checkpoint digest: {:?} with err: {:?}",
+                    checkpoint.checkpoint_digest, e
+                ))
+            })?;
 
         let parsed_previous_digest: Option<CheckpointDigest> = checkpoint
             .previous_checkpoint_digest
@@ -97,28 +107,32 @@ impl TryFrom<StoredCheckpoint> for RpcCheckpoint {
                     None => Err(IndexerError::PersistentStorageDataCorruptionError(
                         "tx_digests should not contain null elements".to_string(),
                     )),
-                    Some(tx_digest) => TransactionDigest::try_from(tx_digest.as_slice()).map_err(|e| {
-                        IndexerError::PersistentStorageDataCorruptionError(format!(
-                            "Failed to decode transaction digest: {:?} with err: {:?}",
-                            tx_digest, e
-                        ))
-                    }),
+                    Some(tx_digest) => {
+                        TransactionDigest::try_from(tx_digest.as_slice()).map_err(|e| {
+                            IndexerError::PersistentStorageDataCorruptionError(format!(
+                                "Failed to decode transaction digest: {:?} with err: {:?}",
+                                tx_digest, e
+                            ))
+                        })
+                    }
                 })
                 .collect::<Result<Vec<TransactionDigest>, IndexerError>>()?
         };
-        let validator_signature = bcs::from_bytes(&checkpoint.validator_signature).map_err(|e| {
-            IndexerError::PersistentStorageDataCorruptionError(format!(
-                "Failed to decode validator signature: {:?} with err: {:?}",
-                checkpoint.validator_signature, e
-            ))
-        })?;
+        let validator_signature =
+            bcs::from_bytes(&checkpoint.validator_signature).map_err(|e| {
+                IndexerError::PersistentStorageDataCorruptionError(format!(
+                    "Failed to decode validator signature: {:?} with err: {:?}",
+                    checkpoint.validator_signature, e
+                ))
+            })?;
 
-        let checkpoint_commitments = bcs::from_bytes(&checkpoint.checkpoint_commitments).map_err(|e| {
-            IndexerError::PersistentStorageDataCorruptionError(format!(
-                "Failed to decode checkpoint commitments: {:?} with err: {:?}",
-                checkpoint.checkpoint_commitments, e
-            ))
-        })?;
+        let checkpoint_commitments =
+            bcs::from_bytes(&checkpoint.checkpoint_commitments).map_err(|e| {
+                IndexerError::PersistentStorageDataCorruptionError(format!(
+                    "Failed to decode checkpoint commitments: {:?} with err: {:?}",
+                    checkpoint.checkpoint_commitments, e
+                ))
+            })?;
 
         let end_of_epoch_data = checkpoint
             .end_of_epoch_data

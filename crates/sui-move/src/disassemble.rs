@@ -3,15 +3,15 @@
 
 use clap::Parser;
 use move_binary_format::CompiledModule;
+use move_bytecode_source_map::utils::serialize_to_json_string;
 use move_cli::base;
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_package::BuildConfig;
-use std::{
-    fs::File,
-    io::{BufReader, Read},
-    path::{Path, PathBuf},
-};
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[group(id = "sui-move-disassemmble")]
@@ -26,10 +26,18 @@ pub struct Disassemble {
 
     #[clap(short = 'i', long = "interactive")]
     interactive: bool,
+
+    /// Print the "bytecode map" (source map for disassembled bytecode)
+    #[clap(long = "bytecode-map")]
+    pub bytecode_map: bool,
 }
 
 impl Disassemble {
-    pub fn execute(self, package_path: Option<&Path>, build_config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(
+        self,
+        package_path: Option<&Path>,
+        build_config: BuildConfig,
+    ) -> anyhow::Result<()> {
         if base::reroot_path(Some(&self.module_path)).is_ok() {
             // disassembling bytecode inside the source package that produced it--use the source info
             let module_name = self
@@ -44,13 +52,17 @@ impl Disassemble {
                 package_name: None,
                 module_or_script_name: module_name,
                 debug: self.debug,
+                bytecode_map: self.bytecode_map,
             }
             .execute(package_path, build_config)?;
             return Ok(());
         }
 
         // disassembling a bytecode file with no source info
-        assert!(Path::new(&self.module_path).exists(), "Bad path to .mv file");
+        assert!(
+            Path::new(&self.module_path).exists(),
+            "Bad path to .mv file"
+        );
 
         let mut bytes = Vec::new();
         let mut file = BufReader::new(File::open(self.module_path)?);
@@ -63,7 +75,11 @@ impl Disassemble {
             println!("{module:#?}");
         } else {
             let d = Disassembler::from_module(&module, Spanned::unsafe_no_loc(()).loc)?;
-            println!("{}", d.disassemble()?);
+            let (disassemble_string, bcode_map) = d.disassemble_with_source_map()?;
+            if self.bytecode_map {
+                println!("{}", serialize_to_json_string(&bcode_map)?);
+            }
+            println!("{}", disassemble_string);
         }
 
         Ok(())

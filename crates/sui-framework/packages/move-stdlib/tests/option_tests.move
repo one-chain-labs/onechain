@@ -188,6 +188,12 @@ fun do_destroy() {
 
     some.do!(|el| { let NoDrop {} = el; });
     none.do!(|el| { let NoDrop {} = el; });
+
+    option::some(5).do!(|x| x); // return value
+    option::some(5).do!(|_| {}); // no return value
+
+    option::some(5).destroy!(|x| x); // return value
+    option::some(5).destroy!(|_| {}); // no return value
 }
 
 #[test]
@@ -198,6 +204,11 @@ fun do_ref_mut() {
     opt.do_ref!(|x| counter = *x);
 
     assert!(counter == 100);
+
+    opt.do_ref!(|x| *x); // return value
+    opt.do_ref!(|_| {}); // no return value
+    opt.do_mut!(|_| 5); // return value
+    opt.do_mut!(|_| {}); // no return value
 }
 
 #[test]
@@ -268,13 +279,28 @@ fun is_some_and() {
 fun destroy_or() {
     assert!(option::none().destroy_or!(10) == 10);
     assert!(option::some(5).destroy_or!(10) == 5);
+
+    let some = option::some(10);
+    assert!(some.destroy_or!(0) == 10);
+    assert!(some.is_some()); // value was copied!
 }
 
 #[test]
 fun destroy_or_no_drop() {
     let none = option::none<NoDrop>().destroy_or!(NoDrop {});
-    let some = option::some(NoDrop {}).destroy_or!(NoDrop {});
+    let some = option::some(NoDrop {}).destroy_or!(abort);
 
     let NoDrop {} = some;
     let NoDrop {} = none;
+}
+
+#[test]
+fun extract_or() {
+    let mut none = option::none<u64>();
+    assert!(none.extract_or!(10) == 10);
+    assert!(none.is_none());
+
+    let mut some = option::some(5);
+    assert!(some.extract_or!(10) == 5);
+    assert!(some.is_none());
 }

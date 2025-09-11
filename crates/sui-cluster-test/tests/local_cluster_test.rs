@@ -13,13 +13,17 @@ async fn cluster_test() {
 #[tokio::test]
 async fn test_sui_cluster() {
     use reqwest::StatusCode;
-    use sui_cluster_test::cluster::{Cluster, LocalNewCluster};
+    use sui_cluster_test::cluster::Cluster;
+    use sui_cluster_test::cluster::LocalNewCluster;
     use sui_graphql_rpc::client::simple_client::SimpleClient;
     use tokio::time::sleep;
 
     telemetry_subscribers::init_for_testing();
 
-    let opts = ClusterTestOpt { with_indexer_and_graphql: true, ..ClusterTestOpt::new_local() };
+    let opts = ClusterTestOpt {
+        with_indexer_and_graphql: true,
+        ..ClusterTestOpt::new_local()
+    };
 
     let cluster = LocalNewCluster::start(&opts).await.unwrap();
 
@@ -35,7 +39,10 @@ async fn test_sui_cluster() {
             }
         }
     "#;
-    let resp = SimpleClient::new(grphql_url).execute_to_graphql(query.to_string(), true, vec![], vec![]).await.unwrap();
+    let resp = SimpleClient::new(grphql_url)
+        .execute_to_graphql(query.to_string(), true, vec![], vec![])
+        .await
+        .unwrap();
 
     assert!(resp.errors().is_empty());
     assert!(resp.http_status() == StatusCode::OK);

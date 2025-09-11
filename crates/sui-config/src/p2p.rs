@@ -40,7 +40,7 @@ pub struct P2pConfig {
 }
 
 fn default_listen_address() -> SocketAddr {
-    "0.0.0.0:8080".parse().unwrap()
+    "0.0.0.0:8084".parse().unwrap()
 }
 
 impl Default for P2pConfig {
@@ -62,7 +62,8 @@ impl P2pConfig {
     pub fn excessive_message_size(&self) -> usize {
         const EXCESSIVE_MESSAGE_SIZE: usize = 32 << 20;
 
-        self.excessive_message_size.unwrap_or(EXCESSIVE_MESSAGE_SIZE)
+        self.excessive_message_size
+            .unwrap_or(EXCESSIVE_MESSAGE_SIZE)
     }
 
     pub fn set_discovery_config(mut self, discovery_config: DiscoveryConfig) -> Self {
@@ -204,37 +205,45 @@ impl StateSyncConfig {
     pub fn synced_checkpoint_broadcast_channel_capacity(&self) -> usize {
         const SYNCED_CHECKPOINT_BROADCAST_CHANNEL_CAPACITY: usize = 1_024;
 
-        self.synced_checkpoint_broadcast_channel_capacity.unwrap_or(SYNCED_CHECKPOINT_BROADCAST_CHANNEL_CAPACITY)
+        self.synced_checkpoint_broadcast_channel_capacity
+            .unwrap_or(SYNCED_CHECKPOINT_BROADCAST_CHANNEL_CAPACITY)
     }
 
     pub fn checkpoint_header_download_concurrency(&self) -> usize {
         const CHECKPOINT_HEADER_DOWNLOAD_CONCURRENCY: usize = 400;
 
-        self.checkpoint_header_download_concurrency.unwrap_or(CHECKPOINT_HEADER_DOWNLOAD_CONCURRENCY)
+        self.checkpoint_header_download_concurrency
+            .unwrap_or(CHECKPOINT_HEADER_DOWNLOAD_CONCURRENCY)
     }
 
     pub fn checkpoint_content_download_concurrency(&self) -> usize {
         const CHECKPOINT_CONTENT_DOWNLOAD_CONCURRENCY: usize = 400;
 
-        self.checkpoint_content_download_concurrency.unwrap_or(CHECKPOINT_CONTENT_DOWNLOAD_CONCURRENCY)
+        self.checkpoint_content_download_concurrency
+            .unwrap_or(CHECKPOINT_CONTENT_DOWNLOAD_CONCURRENCY)
     }
 
     pub fn checkpoint_content_download_tx_concurrency(&self) -> u64 {
         const CHECKPOINT_CONTENT_DOWNLOAD_TX_CONCURRENCY: u64 = 50_000;
 
-        self.checkpoint_content_download_tx_concurrency.unwrap_or(CHECKPOINT_CONTENT_DOWNLOAD_TX_CONCURRENCY)
+        self.checkpoint_content_download_tx_concurrency
+            .unwrap_or(CHECKPOINT_CONTENT_DOWNLOAD_TX_CONCURRENCY)
     }
 
     pub fn timeout(&self) -> Duration {
         const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
-        self.timeout_ms.map(Duration::from_millis).unwrap_or(DEFAULT_TIMEOUT)
+        self.timeout_ms
+            .map(Duration::from_millis)
+            .unwrap_or(DEFAULT_TIMEOUT)
     }
 
     pub fn checkpoint_content_timeout(&self) -> Duration {
         const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 
-        self.checkpoint_content_timeout_ms.map(Duration::from_millis).unwrap_or(DEFAULT_TIMEOUT)
+        self.checkpoint_content_timeout_ms
+            .map(Duration::from_millis)
+            .unwrap_or(DEFAULT_TIMEOUT)
     }
 
     pub fn wait_interval_when_no_peer_to_sync_content(&self) -> Duration {
@@ -322,7 +331,8 @@ impl DiscoveryConfig {
     pub fn target_concurrent_connections(&self) -> usize {
         const TARGET_CONCURRENT_CONNECTIONS: usize = 4;
 
-        self.target_concurrent_connections.unwrap_or(TARGET_CONCURRENT_CONNECTIONS)
+        self.target_concurrent_connections
+            .unwrap_or(TARGET_CONCURRENT_CONNECTIONS)
     }
 
     pub fn peers_to_query(&self) -> usize {
@@ -383,19 +393,23 @@ impl RandomnessConfig {
     pub fn max_partial_sigs_rounds_ahead(&self) -> u64 {
         const MAX_PARTIAL_SIGS_ROUNDS_AHEAD: u64 = 50;
 
-        self.max_partial_sigs_rounds_ahead.unwrap_or(MAX_PARTIAL_SIGS_ROUNDS_AHEAD)
+        self.max_partial_sigs_rounds_ahead
+            .unwrap_or(MAX_PARTIAL_SIGS_ROUNDS_AHEAD)
     }
 
     pub fn max_partial_sigs_concurrent_sends(&self) -> usize {
         const MAX_PARTIAL_SIGS_CONCURRENT_SENDS: usize = 20;
 
-        self.max_partial_sigs_concurrent_sends.unwrap_or(MAX_PARTIAL_SIGS_CONCURRENT_SENDS)
+        self.max_partial_sigs_concurrent_sends
+            .unwrap_or(MAX_PARTIAL_SIGS_CONCURRENT_SENDS)
     }
-
     pub fn partial_signature_retry_interval(&self) -> Duration {
         const PARTIAL_SIGNATURE_RETRY_INTERVAL: u64 = 5_000; // 5 seconds
 
-        Duration::from_millis(self.partial_signature_retry_interval_ms.unwrap_or(PARTIAL_SIGNATURE_RETRY_INTERVAL))
+        Duration::from_millis(
+            self.partial_signature_retry_interval_ms
+                .unwrap_or(PARTIAL_SIGNATURE_RETRY_INTERVAL),
+        )
     }
 
     pub fn mailbox_capacity(&self) -> usize {
@@ -407,12 +421,14 @@ impl RandomnessConfig {
     pub fn send_partial_signatures_inflight_limit(&self) -> usize {
         const SEND_PARTIAL_SIGNATURES_INFLIGHT_LIMIT: usize = 20;
 
-        self.send_partial_signatures_inflight_limit.unwrap_or(SEND_PARTIAL_SIGNATURES_INFLIGHT_LIMIT)
+        self.send_partial_signatures_inflight_limit
+            .unwrap_or(SEND_PARTIAL_SIGNATURES_INFLIGHT_LIMIT)
     }
 
     pub fn max_ignored_peer_weight_factor(&self) -> f64 {
         const MAX_IGNORED_PEER_WEIGHT_FACTOR: f64 = 0.2;
 
-        self.max_ignored_peer_weight_factor.unwrap_or(MAX_IGNORED_PEER_WEIGHT_FACTOR)
+        self.max_ignored_peer_weight_factor
+            .unwrap_or(MAX_IGNORED_PEER_WEIGHT_FACTOR)
     }
 }

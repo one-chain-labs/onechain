@@ -3,10 +3,8 @@
 
 use super::ClientError;
 use async_graphql::{Response, ServerError, Value};
-use reqwest::{
-    header::{HeaderMap, HeaderName},
-    Response as ReqwestResponse,
-};
+use reqwest::header::{HeaderMap, HeaderName};
+use reqwest::Response as ReqwestResponse;
 use serde_json::json;
 use std::{collections::BTreeMap, net::SocketAddr};
 use sui_graphql_rpc_headers::VERSION_HEADER;
@@ -28,9 +26,16 @@ impl GraphqlResponse {
         let status = resp.status();
         let full_response: Response = resp.json().await.map_err(ClientError::InnerClientError)?;
 
-        Ok(Self { headers, remote_address, http_version, status, full_response })
+        Ok(Self {
+            headers,
+            remote_address,
+            http_version,
+            status,
+            full_response,
+        })
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn graphql_version(&self) -> Result<String, ClientError> {
         Ok(self
             .headers
@@ -81,17 +86,23 @@ impl GraphqlResponse {
         self.full_response.errors.clone()
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn usage(&self) -> Result<Option<BTreeMap<String, u64>>, ClientError> {
         Ok(match self.full_response.extensions.get("usage").cloned() {
             Some(Value::Object(obj)) => Some(
                 obj.into_iter()
                     .map(|(k, v)| match v {
                         Value::Number(n) => {
-                            n.as_u64()
-                                .ok_or(ClientError::InvalidUsageNumber { usage_name: k.to_string(), usage_number: n })
+                            n.as_u64().ok_or(ClientError::InvalidUsageNumber {
+                                usage_name: k.to_string(),
+                                usage_number: n,
+                            })
                         }
                         .map(|q| (k.to_string(), q)),
-                        _ => Err(ClientError::InvalidUsageValue { usage_name: k.to_string(), usage_value: v }),
+                        _ => Err(ClientError::InvalidUsageValue {
+                            usage_name: k.to_string(),
+                            usage_value: v,
+                        }),
                     })
                     .collect::<Result<BTreeMap<String, u64>, ClientError>>()?,
             ),

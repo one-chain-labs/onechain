@@ -41,7 +41,11 @@ pub mod stackless_bytecode_generator;
 pub mod stackless_control_flow_graph;
 
 /// Print function targets for testing and debugging.
-pub fn print_targets_for_test(env: &GlobalEnv, header: &str, targets: &FunctionTargetsHolder) -> String {
+pub fn print_targets_for_test(
+    env: &GlobalEnv,
+    header: &str,
+    targets: &FunctionTargetsHolder,
+) -> String {
     let mut text = String::new();
     writeln!(&mut text, "============ {} ================", header).unwrap();
     for module_env in env.get_modules() {

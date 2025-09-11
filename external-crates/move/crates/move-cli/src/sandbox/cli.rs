@@ -3,31 +3,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    DEFAULT_BUILD_DIR, Move, NativeFunctionRecord,
     sandbox::{
         self,
-        utils::{on_disk_state_view::OnDiskStateView, PackageContext},
+        utils::{PackageContext, on_disk_state_view::OnDiskStateView},
     },
-    Move,
-    NativeFunctionRecord,
-    DEFAULT_BUILD_DIR,
 };
 use anyhow::Result;
 use clap::Parser;
-use move_core_types::{
-    language_storage::TypeTag,
-    parsing::values::ParsedValue,
-    transaction_argument::TransactionArgument,
-};
+use move_core_types::parsing::values::ParsedValue;
+use move_core_types::{language_storage::TypeTag, runtime_value::MoveValue};
 use move_package::compilation::package_layout::CompiledPackageLayout;
 use move_vm_test_utils::gas_schedule::CostTable;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
-fn parse_transaction_argument(s: &str) -> Result<TransactionArgument> {
+
+fn parse_move_value(s: &str) -> Result<MoveValue> {
     let x: ParsedValue<()> = ParsedValue::parse(s)?;
-    let move_value = x.into_concrete_value(&|_| None)?;
-    TransactionArgument::try_from(move_value)
+    x.into_concrete_value(&|_| None)
 }
 
 #[derive(Parser)]
@@ -84,11 +79,11 @@ pub enum SandboxCommand {
         /// ASCII strings (e.g., 'b"hi" will parse as the vector<u8> value [68, 69]).
         #[clap(
             long = "args",
-            value_parser = parse_transaction_argument,
+            value_parser = parse_move_value,
             num_args(1..),
             action = clap::ArgAction::Append,
         )]
-        args: Vec<TransactionArgument>,
+        args: Vec<MoveValue>,
         /// Possibly-empty list of type arguments passed to the transaction (e.g., `T` in
         /// `main<T>()`). Must match the type arguments kinds expected by `script_file`.
         #[clap(
@@ -198,8 +193,14 @@ impl SandboxCommand {
         storage_dir: &Path,
     ) -> Result<()> {
         match self {
-            SandboxCommand::Publish { ignore_breaking_changes, with_deps, bundle, override_ordering } => {
-                let context = PackageContext::new(&move_args.package_path, &move_args.build_config)?;
+            SandboxCommand::Publish {
+                ignore_breaking_changes,
+                with_deps,
+                bundle,
+                override_ordering,
+            } => {
+                let context =
+                    PackageContext::new(&move_args.package_path, &move_args.build_config)?;
                 let state = context.prepare_state(storage_dir)?;
                 sandbox::commands::publish(
                     natives,
@@ -213,8 +214,17 @@ impl SandboxCommand {
                     move_args.verbose,
                 )
             }
-            SandboxCommand::Run { module_file, function_name, signers, args, type_args, gas_budget, dry_run } => {
-                let context = PackageContext::new(&move_args.package_path, &move_args.build_config)?;
+            SandboxCommand::Run {
+                module_file,
+                function_name,
+                signers,
+                args,
+                type_args,
+                gas_budget,
+                dry_run,
+            } => {
+                let context =
+                    PackageContext::new(&move_args.package_path, &move_args.build_config)?;
                 let state = context.prepare_state(storage_dir)?;
                 sandbox::commands::run(
                     natives,
@@ -231,15 +241,21 @@ impl SandboxCommand {
                     move_args.verbose,
                 )
             }
-            SandboxCommand::Test { use_temp_dir, track_cov } => sandbox::commands::run_all(
-                move_args.package_path.as_deref().unwrap_or_else(|| Path::new(".")),
+            SandboxCommand::Test {
+                use_temp_dir,
+                track_cov,
+            } => sandbox::commands::run_all(
+                move_args
+                    .package_path
+                    .as_deref()
+                    .unwrap_or_else(|| Path::new(".")),
                 &std::env::current_exe()?,
                 *use_temp_dir,
                 *track_cov,
             ),
             SandboxCommand::View { file } => {
-                let state =
-                    PackageContext::new(&move_args.package_path, &move_args.build_config)?.prepare_state(storage_dir)?;
+                let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
+                    .prepare_state(storage_dir)?;
                 sandbox::commands::view(&state, file)
             }
             SandboxCommand::Clean {} => {
@@ -250,22 +266,27 @@ impl SandboxCommand {
                 }
 
                 // delete build
-                let build_dir =
-                    Path::new(&move_args.build_config.install_dir.as_ref().unwrap_or(&PathBuf::from(DEFAULT_BUILD_DIR)))
-                        .join(CompiledPackageLayout::Root.path());
+                let build_dir = Path::new(
+                    &move_args
+                        .build_config
+                        .install_dir
+                        .as_ref()
+                        .unwrap_or(&PathBuf::from(DEFAULT_BUILD_DIR)),
+                )
+                .join(CompiledPackageLayout::Root.path());
                 if build_dir.exists() {
                     fs::remove_dir_all(&build_dir)?;
                 }
                 Ok(())
             }
             SandboxCommand::Doctor {} => {
-                let state =
-                    PackageContext::new(&move_args.package_path, &move_args.build_config)?.prepare_state(storage_dir)?;
+                let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
+                    .prepare_state(storage_dir)?;
                 sandbox::commands::doctor(&state)
             }
             SandboxCommand::Generate { cmd } => {
-                let state =
-                    PackageContext::new(&move_args.package_path, &move_args.build_config)?.prepare_state(storage_dir)?;
+                let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
+                    .prepare_state(storage_dir)?;
                 handle_generate_commands(cmd, &state)
             }
         }
@@ -274,15 +295,17 @@ impl SandboxCommand {
 
 fn handle_generate_commands(cmd: &GenerateCommand, state: &OnDiskStateView) -> Result<()> {
     match cmd {
-        GenerateCommand::StructLayouts { module, options } => sandbox::commands::generate::generate_struct_layouts(
-            module,
-            &options.struct_,
-            &options.type_args,
-            options.separator.clone(),
-            options.omit_addresses,
-            options.ignore_phantom_types,
-            options.shallow,
-            state,
-        ),
+        GenerateCommand::StructLayouts { module, options } => {
+            sandbox::commands::generate::generate_struct_layouts(
+                module,
+                &options.struct_,
+                &options.type_args,
+                options.separator.clone(),
+                options.omit_addresses,
+                options.ignore_phantom_types,
+                options.shallow,
+                state,
+            )
+        }
     }
 }

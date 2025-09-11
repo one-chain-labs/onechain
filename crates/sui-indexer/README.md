@@ -59,11 +59,11 @@ git fetch upstream devnet && git reset --hard upstream/devnet
 - run indexer as a writer, which pulls data from fullnode and writes data to DB
 ```sh
 # Change the RPC_CLIENT_URL to http://0.0.0.0:9000 to run indexer against local validator & fullnode
-cargo run --bin sui-indexer -- --db-url "<DATABASE_URL>" --rpc-client-url "https://fullnode.devnet.sui.io:443" --fullnode-sync-worker --reset-db
+cargo run --bin sui-indexer -- --db-url "<DATABASE_URL>" --rpc-client-url "https://rpc-devnet.onelabs.cc:443" --fullnode-sync-worker --reset-db
 ```
 - run indexer as a reader, which is a JSON RPC server with the [interface](https://docs.sui.io/sui-api-ref#suix_getallbalances)
 ```
-cargo run --bin sui-indexer -- --db-url "<DATABASE_URL>" --rpc-client-url "https://fullnode.devnet.sui.io:443" --rpc-server-worker
+cargo run --bin sui-indexer -- --db-url "<DATABASE_URL>" --rpc-client-url "https://rpc-devnet.onelabs.cc:443" --rpc-server-worker
 ```
 More flags info can be found in this [file](src/main.rs#L41).
 
@@ -123,7 +123,7 @@ Note that you need an existing database for this to work. Using the DATABASE_URL
 
 ```sh
 # Change the RPC_CLIENT_URL to http://0.0.0.0:9000 to run indexer against local validator & fullnode
-cargo run --bin sui-indexer --features mysql-feature --no-default-features -- --db-url "<DATABASE_URL>" --rpc-client-url "https://fullnode.devnet.sui.io:443" --fullnode-sync-worker --reset-db
+cargo run --bin sui-indexer --features mysql-feature --no-default-features -- --db-url "<DATABASE_URL>" --rpc-client-url "https://rpc-devnet.onelabs.cc:443" --fullnode-sync-worker --reset-db
 ```
 
 ### Extending the indexer

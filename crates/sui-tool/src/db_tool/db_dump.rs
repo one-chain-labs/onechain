@@ -5,35 +5,27 @@ use anyhow::{anyhow, Ok};
 use clap::{Parser, ValueEnum};
 use comfy_table::{Cell, ContentArrangement, Row, Table};
 use prometheus::Registry;
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-    str,
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
+use std::str;
+use std::sync::Arc;
 use strum_macros::EnumString;
-use sui_archival::reader::ArchiveReaderBalancer;
 use sui_config::node::AuthorityStorePruningConfig;
-use sui_core::{
-    authority::{
-        authority_per_epoch_store::AuthorityEpochTables,
-        authority_store_pruner::{AuthorityStorePruner, AuthorityStorePruningMetrics, EPOCH_DURATION_MS_FOR_TESTING},
-        authority_store_tables::AuthorityPerpetualTables,
-        authority_store_types::{StoreData, StoreObject},
-    },
-    checkpoints::CheckpointStore,
-    epoch::committee_store::CommitteeStoreTables,
-    jsonrpc_index::IndexStoreTables,
-    rpc_index::RpcIndexStore,
+use sui_core::authority::authority_per_epoch_store::AuthorityEpochTables;
+use sui_core::authority::authority_store_pruner::{
+    AuthorityStorePruner, AuthorityStorePruningMetrics, EPOCH_DURATION_MS_FOR_TESTING,
 };
-use sui_storage::mutex_table::RwLockTable;
+use sui_core::authority::authority_store_tables::AuthorityPerpetualTables;
+use sui_core::authority::authority_store_types::{StoreData, StoreObject};
+use sui_core::checkpoints::CheckpointStore;
+use sui_core::epoch::committee_store::CommitteeStoreTables;
+use sui_core::jsonrpc_index::IndexStoreTables;
+use sui_core::rpc_index::RpcIndexStore;
 use sui_types::base_types::{EpochId, ObjectID};
 use tracing::info;
-use typed_store::{
-    rocks::{default_db_options, MetricConf},
-    rocksdb::MultiThreaded,
-    traits::{Map, TableSummary},
-};
+use typed_store::rocks::{default_db_options, MetricConf};
+use typed_store::rocksdb::MultiThreaded;
+use typed_store::traits::{Map, TableSummary};
 
 #[derive(EnumString, Clone, Parser, Debug, ValueEnum)]
 pub enum StoreName {
@@ -49,20 +41,23 @@ impl std::fmt::Display for StoreName {
 }
 
 pub fn list_tables(path: PathBuf) -> anyhow::Result<Vec<String>> {
-    typed_store::rocksdb::DBWithThreadMode::<MultiThreaded>::list_cf(&default_db_options().options, path)
-        .map_err(|e| e.into())
-        .map(|q| {
-            q.iter()
-                .filter_map(|s| {
-                    // The `default` table is not used
-                    if s != "default" {
-                        Some(s.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        })
+    typed_store::rocksdb::DBWithThreadMode::<MultiThreaded>::list_cf(
+        &default_db_options().options,
+        path,
+    )
+    .map_err(|e| e.into())
+    .map(|q| {
+        q.iter()
+            .filter_map(|s| {
+                // The `default` table is not used
+                if s != "default" {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    })
 }
 
 pub fn table_summary(
@@ -82,10 +77,13 @@ pub fn table_summary(
             }
         }
         StoreName::Index => {
-            IndexStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default()).table_summary(table_name)
+            IndexStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default())
+                .table_summary(table_name)
         }
-        StoreName::Epoch => CommitteeStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default())
-            .table_summary(table_name),
+        StoreName::Epoch => {
+            CommitteeStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default())
+                .table_summary(table_name)
+        }
     }
     .map_err(|err| anyhow!(err.to_string()))
 }
@@ -101,31 +99,38 @@ pub fn print_table_metadata(
             let epoch_tables = AuthorityEpochTables::describe_tables();
             if epoch_tables.contains_key(table_name) {
                 let epoch = epoch.ok_or_else(|| anyhow!("--epoch is required"))?;
-                AuthorityEpochTables::open_readonly(epoch, &db_path).next_shared_object_versions.rocksdb
+                AuthorityEpochTables::open_readonly(epoch, &db_path)
+                    .next_shared_object_versions_v2
+                    .db
             } else {
-                AuthorityPerpetualTables::open_readonly(&db_path).objects.rocksdb
+                AuthorityPerpetualTables::open_readonly(&db_path).objects.db
             }
         }
         StoreName::Index => {
             IndexStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default())
                 .event_by_move_module
-                .rocksdb
+                .db
         }
         StoreName::Epoch => {
-            CommitteeStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default()).committee_map.rocksdb
+            CommitteeStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default())
+                .committee_map
+                .db
         }
     };
 
     let mut table = Table::new();
-    table.set_content_arrangement(ContentArrangement::Dynamic).set_width(200).set_header(vec![
-        "name",
-        "level",
-        "num_entries",
-        "start_key",
-        "end_key",
-        "num_deletions",
-        "file_size",
-    ]);
+    table
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_width(200)
+        .set_header(vec![
+            "name",
+            "level",
+            "num_entries",
+            "start_key",
+            "end_key",
+            "num_deletions",
+            "file_size",
+        ]);
 
     for file in db.live_files()?.iter() {
         if file.column_family_name != table_name {
@@ -135,8 +140,12 @@ pub fn print_table_metadata(
         row.add_cell(Cell::new(&file.name));
         row.add_cell(Cell::new(file.level));
         row.add_cell(Cell::new(file.num_entries));
-        row.add_cell(Cell::new(hex::encode(file.start_key.as_ref().unwrap_or(&"".as_bytes().to_vec()))));
-        row.add_cell(Cell::new(hex::encode(file.end_key.as_ref().unwrap_or(&"".as_bytes().to_vec()))));
+        row.add_cell(Cell::new(hex::encode(
+            file.start_key.as_ref().unwrap_or(&"".as_bytes().to_vec()),
+        )));
+        row.add_cell(Cell::new(hex::encode(
+            file.end_key.as_ref().unwrap_or(&"".as_bytes().to_vec()),
+        )));
         row.add_cell(Cell::new(file.num_deletions));
         row.add_cell(Cell::new(file.size));
         table.add_row(row);
@@ -146,9 +155,9 @@ pub fn print_table_metadata(
     Ok(())
 }
 
-pub fn duplicate_objects_summary(db_path: PathBuf) -> (usize, usize, usize, usize) {
+pub fn duplicate_objects_summary(db_path: PathBuf) -> anyhow::Result<(usize, usize, usize, usize)> {
     let perpetual_tables = AuthorityPerpetualTables::open_readonly(&db_path);
-    let iter = perpetual_tables.objects.unbounded_iter();
+    let iter = perpetual_tables.objects.safe_iter();
     let mut total_count = 0;
     let mut duplicate_count = 0;
     let mut total_bytes = 0;
@@ -157,7 +166,8 @@ pub fn duplicate_objects_summary(db_path: PathBuf) -> (usize, usize, usize, usiz
     let mut object_id: ObjectID = ObjectID::random();
     let mut data: HashMap<Vec<u8>, usize> = HashMap::new();
 
-    for (key, value) in iter {
+    for item in iter {
+        let (key, value) = item?;
         if let StoreObject::Value(store_object) = value.migrate().into_inner() {
             if let StoreData::Move(object) = store_object.data {
                 if object_id != key.0 {
@@ -174,7 +184,7 @@ pub fn duplicate_objects_summary(db_path: PathBuf) -> (usize, usize, usize, usiz
             }
         }
     }
-    (total_count, duplicate_count, total_bytes, duplicated_bytes)
+    Ok((total_count, duplicate_count, total_bytes, duplicated_bytes))
 }
 
 pub fn compact(db_path: PathBuf) -> anyhow::Result<()> {
@@ -185,30 +195,31 @@ pub fn compact(db_path: PathBuf) -> anyhow::Result<()> {
 
 pub async fn prune_objects(db_path: PathBuf) -> anyhow::Result<()> {
     let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path.join("store"), None));
-    let checkpoint_store = Arc::new(CheckpointStore::open_tables_read_write(
-        db_path.join("checkpoints"),
-        MetricConf::default(),
-        None,
-        None,
-    ));
+    let checkpoint_store = CheckpointStore::new(&db_path.join("checkpoints"));
     let rpc_index = RpcIndexStore::new_without_init(&db_path);
-    let highest_pruned_checkpoint = checkpoint_store.get_highest_pruned_checkpoint_seq_number()?;
+    let highest_pruned_checkpoint = checkpoint_store
+        .get_highest_pruned_checkpoint_seq_number()?
+        .unwrap_or(0);
     let latest_checkpoint = checkpoint_store.get_highest_executed_checkpoint()?;
-    info!("Latest executed checkpoint sequence num: {}", latest_checkpoint.map(|x| x.sequence_number).unwrap_or(0));
+    info!(
+        "Latest executed checkpoint sequence num: {}",
+        latest_checkpoint.map(|x| x.sequence_number).unwrap_or(0)
+    );
     info!("Highest pruned checkpoint: {}", highest_pruned_checkpoint);
     let metrics = AuthorityStorePruningMetrics::new(&Registry::default());
-    let lock_table = Arc::new(RwLockTable::new(1));
     info!("Pruning setup for db at path: {:?}", db_path.display());
-    let pruning_config = AuthorityStorePruningConfig { num_epochs_to_retain: 0, ..Default::default() };
+    let pruning_config = AuthorityStorePruningConfig {
+        num_epochs_to_retain: 0,
+        ..Default::default()
+    };
     info!("Starting object pruning");
     AuthorityStorePruner::prune_objects_for_eligible_epochs(
         &perpetual_db,
         &checkpoint_store,
         Some(&rpc_index),
-        &lock_table,
+        None,
         pruning_config,
         metrics,
-        usize::MAX,
         EPOCH_DURATION_MS_FOR_TESTING,
     )
     .await?;
@@ -217,29 +228,22 @@ pub async fn prune_objects(db_path: PathBuf) -> anyhow::Result<()> {
 
 pub async fn prune_checkpoints(db_path: PathBuf) -> anyhow::Result<()> {
     let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path.join("store"), None));
-    let checkpoint_store = Arc::new(CheckpointStore::open_tables_read_write(
-        db_path.join("checkpoints"),
-        MetricConf::default(),
-        None,
-        None,
-    ));
+    let checkpoint_store = CheckpointStore::new(&db_path.join("checkpoints"));
     let rpc_index = RpcIndexStore::new_without_init(&db_path);
     let metrics = AuthorityStorePruningMetrics::new(&Registry::default());
-    let lock_table = Arc::new(RwLockTable::new(1));
     info!("Pruning setup for db at path: {:?}", db_path.display());
-    let pruning_config =
-        AuthorityStorePruningConfig { num_epochs_to_retain_for_checkpoints: Some(1), ..Default::default() };
+    let pruning_config = AuthorityStorePruningConfig {
+        num_epochs_to_retain_for_checkpoints: Some(1),
+        ..Default::default()
+    };
     info!("Starting txns and effects pruning");
-    let archive_readers = ArchiveReaderBalancer::default();
     AuthorityStorePruner::prune_checkpoints_for_eligible_epochs(
         &perpetual_db,
         &checkpoint_store,
         Some(&rpc_index),
-        &lock_table,
+        None,
         pruning_config,
         metrics,
-        usize::MAX,
-        archive_readers,
         EPOCH_DURATION_MS_FOR_TESTING,
     )
     .await?;
@@ -260,31 +264,40 @@ pub fn dump_table(
             let epoch_tables = AuthorityEpochTables::describe_tables();
             if epoch_tables.contains_key(table_name) {
                 let epoch = epoch.ok_or_else(|| anyhow!("--epoch is required"))?;
-                AuthorityEpochTables::open_readonly(epoch, &db_path).dump(table_name, page_size, page_number)
+                AuthorityEpochTables::open_readonly(epoch, &db_path).dump(
+                    table_name,
+                    page_size,
+                    page_number,
+                )
             } else {
-                AuthorityPerpetualTables::open_readonly(&db_path).dump(table_name, page_size, page_number)
+                let perpetual_tables = AuthorityPerpetualTables::describe_tables();
+                assert!(perpetual_tables.contains_key(table_name));
+                AuthorityPerpetualTables::open_readonly(&db_path).dump(
+                    table_name,
+                    page_size,
+                    page_number,
+                )
             }
         }
-        StoreName::Index => IndexStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default()).dump(
-            table_name,
-            page_size,
-            page_number,
-        ),
-        StoreName::Epoch => CommitteeStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default()).dump(
-            table_name,
-            page_size,
-            page_number,
-        ),
+        StoreName::Index => {
+            IndexStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default()).dump(
+                table_name,
+                page_size,
+                page_number,
+            )
+        }
+        StoreName::Epoch => {
+            CommitteeStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default())
+                .dump(table_name, page_size, page_number)
+        }
     }
     .map_err(|err| anyhow!(err.to_string()))
 }
 
 #[cfg(test)]
 mod test {
-    use sui_core::authority::{
-        authority_per_epoch_store::AuthorityEpochTables,
-        authority_store_tables::AuthorityPerpetualTables,
-    };
+    use sui_core::authority::authority_per_epoch_store::AuthorityEpochTables;
+    use sui_core::authority::authority_store_tables::AuthorityPerpetualTables;
 
     use crate::db_tool::db_dump::{dump_table, list_tables, StoreName};
 
@@ -298,8 +311,10 @@ mod test {
 
         // Get all the tables for AuthorityEpochTables
         let tables = {
-            let mut epoch_tables = list_tables(AuthorityEpochTables::path(0, &primary_path)).unwrap();
-            let mut perpetual_tables = list_tables(AuthorityPerpetualTables::path(&primary_path)).unwrap();
+            let mut epoch_tables =
+                list_tables(AuthorityEpochTables::path(0, &primary_path)).unwrap();
+            let mut perpetual_tables =
+                list_tables(AuthorityPerpetualTables::path(&primary_path)).unwrap();
             epoch_tables.append(&mut perpetual_tables);
             epoch_tables
         };
@@ -307,7 +322,16 @@ mod test {
         let mut missing_tables = vec![];
         for t in tables {
             println!("{}", t);
-            if dump_table(StoreName::Validator, Some(0), primary_path.clone(), &t, 0, 0).is_err() {
+            if dump_table(
+                StoreName::Validator,
+                Some(0),
+                primary_path.clone(),
+                &t,
+                0,
+                0,
+            )
+            .is_err()
+            {
                 missing_tables.push(t);
             }
         }

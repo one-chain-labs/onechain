@@ -37,7 +37,12 @@ impl FullNodeReconfigObserver {
             fullnode_client: SuiClientBuilder::default()
                 .build(fullnode_rpc_url)
                 .await
-                .unwrap_or_else(|e| panic!("Can't create SuiClient with rpc url {fullnode_rpc_url}: {:?}", e)),
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Can't create SuiClient with rpc url {fullnode_rpc_url}: {:?}",
+                        e
+                    )
+                }),
             committee_store,
             safe_client_metrics_base,
             auth_agg_metrics,
@@ -54,13 +59,20 @@ impl ReconfigObserver<NetworkAuthorityClient> for FullNodeReconfigObserver {
     async fn run(&mut self, driver: Arc<dyn AuthorityAggregatorUpdatable<NetworkAuthorityClient>>) {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-            match self.fullnode_client.governance_api().get_latest_sui_system_state().await {
+            match self
+                .fullnode_client
+                .governance_api()
+                .get_latest_sui_system_state()
+                .await
+            {
                 Ok(sui_system_state) => {
                     let epoch_id = sui_system_state.epoch;
                     if epoch_id > driver.epoch() {
                         debug!(epoch_id, "Got SuiSystemState in newer epoch");
                         let new_committee = sui_system_state.get_sui_committee_for_benchmarking();
-                        let _ = self.committee_store.insert_new_committee(new_committee.committee());
+                        let _ = self
+                            .committee_store
+                            .insert_new_committee(new_committee.committee());
                         let auth_agg = AuthorityAggregator::new_from_committee(
                             sui_system_state.get_sui_committee_for_benchmarking(),
                             &self.committee_store,
@@ -70,7 +82,10 @@ impl ReconfigObserver<NetworkAuthorityClient> for FullNodeReconfigObserver {
                         );
                         driver.update_authority_aggregator(Arc::new(auth_agg));
                     } else {
-                        trace!(epoch_id, "Ignored SystemState from a previous or current epoch",);
+                        trace!(
+                            epoch_id,
+                            "Ignored SystemState from a previous or current epoch",
+                        );
                     }
                 }
                 Err(err) => error!("Can't get SuiSystemState from Full Node: {:?}", err,),

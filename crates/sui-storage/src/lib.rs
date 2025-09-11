@@ -10,24 +10,20 @@ use fastcrypto::hash::{HashFunction, Sha3_256};
 use futures::StreamExt;
 use itertools::Itertools;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    fs,
-    fs::File,
-    io,
-    io::{BufReader, Read, Write},
-    ops::Range,
-    path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
+use std::ops::Range;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::{fs, io};
+use sui_types::committee::Committee;
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointSequenceNumber, VerifiedCheckpoint,
 };
-use sui_types::{
-    committee::Committee,
-    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointSequenceNumber, VerifiedCheckpoint},
-    storage::WriteStore,
-};
+use sui_types::storage::WriteStore;
 use tracing::debug;
 
 pub mod blob;
@@ -42,13 +38,17 @@ pub mod write_path_pending_tx_log;
 
 pub const SHA3_BYTES: usize = 32;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum StorageFormat {
     Blob = 0,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum FileCompression {
     None = 0,
@@ -63,7 +63,6 @@ impl FileCompression {
         encoder.finish()?;
         Ok(())
     }
-
     pub fn compress(&self, source: &std::path::Path) -> io::Result<()> {
         match self {
             FileCompression::Zstd => {
@@ -77,7 +76,6 @@ impl FileCompression {
         }
         Ok(())
     }
-
     pub fn decompress(&self, source: &PathBuf) -> Result<Box<dyn Read>> {
         let file = File::open(source)?;
         let res: Box<dyn Read> = match self {
@@ -86,7 +84,6 @@ impl FileCompression {
         };
         Ok(res)
     }
-
     pub fn bytes_decompress(&self, bytes: Bytes) -> Result<Box<dyn Read>> {
         let res: Box<dyn Read> = match self {
             FileCompression::Zstd => Box::new(zstd::stream::Decoder::new(bytes.reader())?),
@@ -129,10 +126,17 @@ pub fn compress<R: Read, W: Write>(reader: &mut R, writer: &mut W) -> Result<()>
     Ok(())
 }
 
-pub fn read<R: Read + 'static>(expected_magic: u32, mut reader: R) -> Result<(Box<dyn Read>, StorageFormat)> {
+pub fn read<R: Read + 'static>(
+    expected_magic: u32,
+    mut reader: R,
+) -> Result<(Box<dyn Read>, StorageFormat)> {
     let magic = reader.read_u32::<BigEndian>()?;
     if magic != expected_magic {
-        Err(anyhow!("Unexpected magic string in file: {:?}, expected: {:?}", magic, expected_magic))
+        Err(anyhow!(
+            "Unexpected magic string in file: {:?}, expected: {:?}",
+            magic,
+            expected_magic
+        ))
     } else {
         let storage_format = StorageFormat::try_from(reader.read_u8()?)?;
         let file_compression = FileCompression::try_from(reader.read_u8()?)?;
@@ -159,7 +163,10 @@ pub fn verify_checkpoint_with_committee(
     current: &VerifiedCheckpoint,
     checkpoint: CertifiedCheckpointSummary,
 ) -> Result<VerifiedCheckpoint, CertifiedCheckpointSummary> {
-    assert_eq!(*checkpoint.sequence_number(), current.sequence_number().checked_add(1).unwrap());
+    assert_eq!(
+        *checkpoint.sequence_number(),
+        current.sequence_number().checked_add(1).unwrap()
+    );
 
     if Some(*current.digest()) != checkpoint.previous_digest {
         debug!(
@@ -174,7 +181,9 @@ pub fn verify_checkpoint_with_committee(
     }
 
     let current_epoch = current.epoch();
-    if checkpoint.epoch() != current_epoch && checkpoint.epoch() != current_epoch.checked_add(1).unwrap() {
+    if checkpoint.epoch() != current_epoch
+        && checkpoint.epoch() != current_epoch.checked_add(1).unwrap()
+    {
         debug!(
             checkpoint_seq = checkpoint.sequence_number(),
             checkpoint_epoch = checkpoint.epoch(),
@@ -185,7 +194,9 @@ pub fn verify_checkpoint_with_committee(
         return Err(checkpoint);
     }
 
-    if checkpoint.epoch() == current_epoch.checked_add(1).unwrap() && current.next_epoch_committee().is_none() {
+    if checkpoint.epoch() == current_epoch.checked_add(1).unwrap()
+        && current.next_epoch_committee().is_none()
+    {
         debug!(
             checkpoint_seq = checkpoint.sequence_number(),
             checkpoint_epoch = checkpoint.epoch(),
@@ -197,10 +208,12 @@ pub fn verify_checkpoint_with_committee(
         return Err(checkpoint);
     }
 
-    checkpoint.verify_authority_signatures(&committee).map_err(|e| {
-        debug!("error verifying checkpoint: {e}");
-        checkpoint.clone()
-    })?;
+    checkpoint
+        .verify_authority_signatures(&committee)
+        .map_err(|e| {
+            debug!("error verifying checkpoint: {e}");
+            checkpoint.clone()
+        })?;
     Ok(VerifiedCheckpoint::new_unchecked(checkpoint))
 }
 
@@ -234,12 +247,22 @@ pub async fn verify_checkpoint_range<S>(
     let range_clone = checkpoint_range.clone();
     futures::stream::iter(range_clone.into_iter().tuple_windows())
         .map(|(a, b)| {
-            let current = store.get_checkpoint_by_sequence_number(a).unwrap_or_else(|| {
-                panic!("Checkpoint {} should exist in store after summary sync but does not", a);
-            });
-            let next = store.get_checkpoint_by_sequence_number(b).unwrap_or_else(|| {
-                panic!("Checkpoint {} should exist in store after summary sync but does not", a);
-            });
+            let current = store
+                .get_checkpoint_by_sequence_number(a)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Checkpoint {} should exist in store after summary sync but does not",
+                        a
+                    );
+                });
+            let next = store
+                .get_checkpoint_by_sequence_number(b)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Checkpoint {} should exist in store after summary sync but does not",
+                        a
+                    );
+                });
             let committee = store.get_committee(next.epoch()).unwrap_or_else(|| {
                 panic!(
                     "BUG: should have committee for epoch {} before we try to verify checkpoint {}",
@@ -259,67 +282,13 @@ pub async fn verify_checkpoint_range<S>(
             futures::future::ready(())
         })
         .await;
-    let last = checkpoint_range.last().expect("Received empty checkpoint range");
-    let final_checkpoint =
-        store.get_checkpoint_by_sequence_number(last).expect("Expected end of checkpoint range to exist in store");
-    store.update_highest_verified_checkpoint(&final_checkpoint).expect("Failed to update highest verified checkpoint");
-}
-
-fn hard_link(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
-    fs::create_dir_all(&dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        if ty.is_dir() {
-            hard_link(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        } else {
-            fs::hard_link(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        }
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::hard_link;
-    use tempfile::TempDir;
-    use typed_store::{
-        reopen,
-        rocks::{open_cf, DBMap, MetricConf, ReadWriteOptions},
-        Map,
-    };
-
-    #[tokio::test]
-    pub async fn test_db_hard_link() -> anyhow::Result<()> {
-        let input = TempDir::new()?;
-        let input_path = input.path();
-
-        let output = TempDir::new()?;
-        let output_path = output.path();
-
-        const FIRST_CF: &str = "First_CF";
-        const SECOND_CF: &str = "Second_CF";
-
-        let db_a = open_cf(input_path, None, MetricConf::new("test_db_hard_link_1"), &[FIRST_CF, SECOND_CF]).unwrap();
-
-        let (db_map_1, db_map_2) = reopen!(&db_a, FIRST_CF;<i32, String>, SECOND_CF;<i32, String>);
-
-        let keys_vals_cf1 = (1..100).map(|i| (i, i.to_string()));
-        let keys_vals_cf2 = (1..100).map(|i| (i, i.to_string()));
-
-        assert!(db_map_1.multi_insert(keys_vals_cf1).is_ok());
-        assert!(db_map_2.multi_insert(keys_vals_cf2).is_ok());
-
-        // set up db hard link
-        hard_link(input_path, output_path)?;
-        let db_b = open_cf(output_path, None, MetricConf::new("test_db_hard_link_2"), &[FIRST_CF, SECOND_CF]).unwrap();
-
-        let (db_map_1, db_map_2) = reopen!(&db_b, FIRST_CF;<i32, String>, SECOND_CF;<i32, String>);
-        for i in 1..100 {
-            assert!(db_map_1.contains_key(&i).expect("Failed to call contains key"));
-            assert!(db_map_2.contains_key(&i).expect("Failed to call contains key"));
-        }
-
-        Ok(())
-    }
+    let last = checkpoint_range
+        .last()
+        .expect("Received empty checkpoint range");
+    let final_checkpoint = store
+        .get_checkpoint_by_sequence_number(last)
+        .expect("Expected end of checkpoint range to exist in store");
+    store
+        .update_highest_verified_checkpoint(&final_checkpoint)
+        .expect("Failed to update highest verified checkpoint");
 }

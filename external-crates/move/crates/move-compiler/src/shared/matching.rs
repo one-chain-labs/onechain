@@ -8,7 +8,7 @@ use crate::{
     ice,
     naming::ast::{self as N, Type, Var},
     parser::ast::{BinOp_, ConstantName, Field, VariantName},
-    shared::{program_info::ProgramInfo, unique_map::UniqueMap, CompilationEnv},
+    shared::{CompilationEnv, program_info::ProgramInfo, unique_map::UniqueMap},
     typing::ast::{self as T, MatchArm_, MatchPattern, UnannotatedPat_ as TP},
 };
 use move_ir_types::location::*;
@@ -96,7 +96,11 @@ pub trait MatchContext<const AFTER_TYPING: bool> {
         fields
             .into_iter()
             .map(|(_, field_name, field_type)| {
-                (field_name, self.new_match_var(field_name.to_string(), pattern_loc), make_imm_ref_ty(field_type))
+                (
+                    field_name,
+                    self.new_match_var(field_name.to_string(), pattern_loc),
+                    make_imm_ref_ty(field_type),
+                )
             })
             .collect::<Vec<_>>()
     }
@@ -111,7 +115,11 @@ pub trait MatchContext<const AFTER_TYPING: bool> {
         fields
             .into_iter()
             .map(|(_, field_name, field_type)| {
-                (field_name, self.new_match_var(field_name.to_string(), pattern_loc), field_type)
+                (
+                    field_name,
+                    self.new_match_var(field_name.to_string(), pattern_loc),
+                    field_type,
+                )
             })
             .collect::<Vec<_>>()
     }
@@ -124,7 +132,10 @@ pub trait MatchContext<const AFTER_TYPING: bool> {
 impl FringeEntry {
     pub fn into_move_exp(self) -> T::Exp {
         let FringeEntry { var, ty } = self;
-        let move_exp = T::UnannotatedExp_::Move { from_user: false, var };
+        let move_exp = T::UnannotatedExp_::Move {
+            from_user: false,
+            var,
+        };
         T::exp(ty, sp(var.loc, move_exp))
     }
 }
@@ -136,14 +147,25 @@ impl PatternArm {
 
     /// Returns true if every entry is a wildcard or binder.
     fn is_wild_arm(&self) -> bool {
-        self.pats.iter().all(|pat| matches!(pat.pat.value, TP::Wildcard | TP::Binder(_, _)))
+        self.pats
+            .iter()
+            .all(|pat| matches!(pat.pat.value, TP::Wildcard | TP::Binder(_, _)))
     }
 
     fn all_wild_arm(&mut self, fringe: &VecDeque<FringeEntry>) -> Option<ArmResult> {
         if self.is_wild_arm() {
             let bindings = self.make_arm_bindings(fringe);
-            let PatternArm { pats: _, guard, arm } = self;
-            let arm = ArmResult { loc: arm.orig_pattern.pat.loc, bindings, guard: guard.clone(), arm: arm.clone() };
+            let PatternArm {
+                pats: _,
+                guard,
+                arm,
+            } = self;
+            let arm = ArmResult {
+                loc: arm.orig_pattern.pat.loc,
+                bindings,
+                guard: guard.clone(),
+                arm: arm.clone(),
+            };
             Some(arm)
         } else {
             None
@@ -181,7 +203,11 @@ impl PatternArm {
                 }
                 TP::At(_, inner) => first_variant_recur(*inner),
                 TP::Struct(..) | TP::BorrowStruct(..) => None,
-                TP::Constant(_, _) | TP::Binder(_, _) | TP::Literal(_) | TP::Wildcard | TP::ErrorPat => None,
+                TP::Constant(_, _)
+                | TP::Binder(_, _)
+                | TP::Literal(_)
+                | TP::Wildcard
+                | TP::ErrorPat => None,
                 TP::Or(_, _) => unreachable!(),
             }
         }
@@ -206,7 +232,11 @@ impl PatternArm {
                 }
                 TP::At(_, inner) => first_struct_recur(*inner),
                 TP::Variant(..) | TP::BorrowVariant(..) => None,
-                TP::Constant(_, _) | TP::Binder(_, _) | TP::Literal(_) | TP::Wildcard | TP::ErrorPat => None,
+                TP::Constant(_, _)
+                | TP::Binder(_, _)
+                | TP::Literal(_)
+                | TP::Wildcard
+                | TP::ErrorPat => None,
                 TP::Or(_, _) => unreachable!(),
             }
         }
@@ -247,11 +277,15 @@ impl PatternArm {
         let first_pattern = output.pats.pop_front().unwrap();
         let loc = first_pattern.pat.loc;
         match first_pattern.pat.value {
-            TP::Variant(mident, enum_, name, _, fields) | TP::BorrowVariant(_, mident, enum_, name, _, fields)
+            TP::Variant(mident, enum_, name, _, fields)
+            | TP::BorrowVariant(_, mident, enum_, name, _, fields)
                 if &name == ctor_name =>
             {
                 let field_pats = fields.clone().map(|_key, (ndx, (_, pat))| (ndx, pat));
-                let decl_fields = context.program_info().enum_variant_fields(&mident, &enum_, &name).unwrap();
+                let decl_fields = context
+                    .program_info()
+                    .enum_variant_fields(&mident, &enum_, &name)
+                    .unwrap();
                 let ordered_pats = order_fields_by_decl(decl_fields, field_pats);
                 for (_, _, pat) in ordered_pats.into_iter().rev() {
                     output.pats.push_front(pat);
@@ -262,23 +296,35 @@ impl PatternArm {
             TP::Struct(_, _, _, _) | TP::BorrowStruct(_, _, _, _, _) => None,
             TP::Literal(_) => None,
             TP::Binder(mut_, x) => {
-                for arg_type in arg_types.clone().into_iter().map(|ty| ty_to_wildcard_pattern(ty.clone(), loc)).rev() {
+                for arg_type in arg_types
+                    .clone()
+                    .into_iter()
+                    .map(|ty| ty_to_wildcard_pattern(ty.clone(), loc))
+                    .rev()
+                {
                     output.pats.push_front(arg_type);
                 }
                 Some((vec![(mut_, x)], output))
             }
             TP::Wildcard => {
-                for arg_type in arg_types.clone().into_iter().map(|ty| ty_to_wildcard_pattern(ty.clone(), loc)).rev() {
+                for arg_type in arg_types
+                    .clone()
+                    .into_iter()
+                    .map(|ty| ty_to_wildcard_pattern(ty.clone(), loc))
+                    .rev()
+                {
                     output.pats.push_front(arg_type);
                 }
                 Some((vec![], output))
             }
             TP::At(x, inner) => {
                 output.pats.push_front(*inner);
-                output.specialize_variant(context, ctor_name, arg_types).map(|(mut binders, inner)| {
-                    binders.push((Mutability::Imm, x));
-                    (binders, inner)
-                })
+                output
+                    .specialize_variant(context, ctor_name, arg_types)
+                    .map(|(mut binders, inner)| {
+                        binders.push((Mutability::Imm, x));
+                        (binders, inner)
+                    })
             }
             TP::ErrorPat => None,
             TP::Constant(_, _) | TP::Or(_, _) => unreachable!(),
@@ -294,9 +340,13 @@ impl PatternArm {
         let first_pattern = output.pats.pop_front().unwrap();
         let loc = first_pattern.pat.loc;
         match first_pattern.pat.value {
-            TP::Struct(mident, struct_, _, fields) | TP::BorrowStruct(_, mident, struct_, _, fields) => {
+            TP::Struct(mident, struct_, _, fields)
+            | TP::BorrowStruct(_, mident, struct_, _, fields) => {
                 let field_pats = fields.clone().map(|_key, (ndx, (_, pat))| (ndx, pat));
-                let decl_fields = context.program_info().struct_fields(&mident, &struct_).unwrap();
+                let decl_fields = context
+                    .program_info()
+                    .struct_fields(&mident, &struct_)
+                    .unwrap();
                 let ordered_pats = order_fields_by_decl(decl_fields, field_pats);
                 for (_, _, pat) in ordered_pats.into_iter().rev() {
                     output.pats.push_front(pat);
@@ -306,23 +356,35 @@ impl PatternArm {
             TP::Literal(_) => None,
             TP::Variant(_, _, _, _, _) | TP::BorrowVariant(_, _, _, _, _, _) => None,
             TP::Binder(mut_, x) => {
-                for arg_type in arg_types.clone().into_iter().map(|ty| ty_to_wildcard_pattern(ty.clone(), loc)).rev() {
+                for arg_type in arg_types
+                    .clone()
+                    .into_iter()
+                    .map(|ty| ty_to_wildcard_pattern(ty.clone(), loc))
+                    .rev()
+                {
                     output.pats.push_front(arg_type);
                 }
                 Some((vec![(mut_, x)], output))
             }
             TP::Wildcard => {
-                for arg_type in arg_types.clone().into_iter().map(|ty| ty_to_wildcard_pattern(ty.clone(), loc)).rev() {
+                for arg_type in arg_types
+                    .clone()
+                    .into_iter()
+                    .map(|ty| ty_to_wildcard_pattern(ty.clone(), loc))
+                    .rev()
+                {
                     output.pats.push_front(arg_type);
                 }
                 Some((vec![], output))
             }
             TP::At(x, inner) => {
                 output.pats.push_front(*inner);
-                output.specialize_struct(context, arg_types).map(|(mut binders, inner)| {
-                    binders.push((Mutability::Imm, x));
-                    (binders, inner)
-                })
+                output
+                    .specialize_struct(context, arg_types)
+                    .map(|(mut binders, inner)| {
+                        binders.push((Mutability::Imm, x));
+                        (binders, inner)
+                    })
             }
             TP::ErrorPat => None,
             TP::Constant(_, _) | TP::Or(_, _) => unreachable!(),
@@ -342,10 +404,12 @@ impl PatternArm {
             TP::Constant(_, _) | TP::Or(_, _) => unreachable!(),
             TP::At(x, inner) => {
                 output.pats.push_front(*inner);
-                output.specialize_literal(literal).map(|(mut binders, inner)| {
-                    binders.push((Mutability::Imm, x));
-                    (binders, inner)
-                })
+                output
+                    .specialize_literal(literal)
+                    .map(|(mut binders, inner)| {
+                        binders.push((Mutability::Imm, x));
+                        (binders, inner)
+                    })
             }
             TP::ErrorPat => None,
         }
@@ -395,13 +459,24 @@ impl PatternMatrix {
         let mut patterns = vec![];
         let mut rhss = vec![];
         for sp!(_, arm) in arms {
-            let MatchArm_ { pattern, binders: _, guard, guard_binders, rhs_binders, rhs } = arm;
+            let MatchArm_ {
+                pattern,
+                binders: _,
+                guard,
+                guard_binders,
+                rhs_binders,
+                rhs,
+            } = arm;
             rhss.push(*rhs);
             let index = rhss.len() - 1;
             let new_patterns = flatten_or(pattern);
             for mut pat in new_patterns {
                 let (guard, const_binders) = const_pats_to_guards(context, &mut pat, guard.clone());
-                let arm = Arm { orig_pattern: pat.clone(), rhs_binders: rhs_binders.clone(), index };
+                let arm = Arm {
+                    orig_pattern: pat.clone(),
+                    rhs_binders: rhs_binders.clone(),
+                    index,
+                };
                 // Make a match pattern that only holds guard binders
                 let guard_binders = guard_binders.union_with(&const_binders, |k, _, x| {
                     let msg = "Match compilation made a binder for this during const compilation";
@@ -409,7 +484,11 @@ impl PatternMatrix {
                     *x
                 });
                 let pat = apply_pattern_subst(pat, &guard_binders);
-                patterns.push(PatternArm { pats: VecDeque::from([pat]), guard, arm });
+                patterns.push(PatternArm {
+                    pats: VecDeque::from([pat]),
+                    guard,
+                    arm,
+                });
             }
         }
         (PatternMatrix { tys, loc, patterns }, rhss)
@@ -424,12 +503,18 @@ impl PatternMatrix {
     }
 
     pub fn all_errors(&self) -> bool {
-        self.patterns.iter().all(|arm| arm.pats.iter().all(|pat| matches!(pat.pat.value, TP::ErrorPat)))
+        self.patterns.iter().all(|arm| {
+            arm.pats
+                .iter()
+                .all(|pat| matches!(pat.pat.value, TP::ErrorPat))
+        })
     }
 
     /// Returns true if there is an arm made up entirely of wildcards / binders with no guard.
     pub fn has_default_arm(&self) -> bool {
-        self.patterns.iter().any(|pat| pat.is_wild_arm() && pat.guard.is_none())
+        self.patterns
+            .iter()
+            .any(|pat| pat.is_wild_arm() && pat.guard.is_none())
     }
 
     pub fn wild_tree_opt(&mut self, fringe: &VecDeque<FringeEntry>) -> Option<Vec<ArmResult>> {
@@ -466,12 +551,18 @@ impl PatternMatrix {
         let mut bindings = vec![];
         let loc = self.loc;
         for entry in &self.patterns {
-            if let Some((mut new_bindings, arm)) = entry.specialize_variant(context, ctor_name, &arg_types) {
+            if let Some((mut new_bindings, arm)) =
+                entry.specialize_variant(context, ctor_name, &arg_types)
+            {
                 bindings.append(&mut new_bindings);
                 patterns.push(arm)
             }
         }
-        let tys = arg_types.into_iter().cloned().chain(self.tys.clone().into_iter().skip(1)).collect::<Vec<_>>();
+        let tys = arg_types
+            .into_iter()
+            .cloned()
+            .chain(self.tys.clone().into_iter().skip(1))
+            .collect::<Vec<_>>();
         let matrix = PatternMatrix { tys, loc, patterns };
         (bindings, matrix)
     }
@@ -490,7 +581,11 @@ impl PatternMatrix {
                 patterns.push(arm)
             }
         }
-        let tys = arg_types.into_iter().cloned().chain(self.tys.clone().into_iter().skip(1)).collect::<Vec<_>>();
+        let tys = arg_types
+            .into_iter()
+            .cloned()
+            .chain(self.tys.clone().into_iter().skip(1))
+            .collect::<Vec<_>>();
         let matrix = PatternMatrix { tys, loc, patterns };
         (bindings, matrix)
     }
@@ -526,7 +621,10 @@ impl PatternMatrix {
     }
 
     pub fn first_variant_ctors(&self) -> BTreeMap<VariantName, (Loc, Fields<Type>)> {
-        self.patterns.iter().flat_map(|pat| pat.first_variant()).collect()
+        self.patterns
+            .iter()
+            .flat_map(|pat| pat.first_variant())
+            .collect()
     }
 
     pub fn first_struct_ctors(&self) -> Option<(Loc, Fields<Type>)> {
@@ -534,7 +632,10 @@ impl PatternMatrix {
     }
 
     pub fn first_lits(&self) -> BTreeSet<Value> {
-        self.patterns.iter().flat_map(|pat| pat.first_lit()).collect()
+        self.patterns
+            .iter()
+            .flat_map(|pat| pat.first_lit())
+            .collect()
     }
 
     pub fn has_guards(&self) -> bool {
@@ -552,28 +653,38 @@ impl PatternMatrix {
 //**************************************************************************************************
 
 fn ty_to_wildcard_pattern(ty: Type, loc: Loc) -> T::MatchPattern {
-    T::MatchPattern { ty, pat: sp(loc, T::UnannotatedPat_::Wildcard) }
+    T::MatchPattern {
+        ty,
+        pat: sp(loc, T::UnannotatedPat_::Wildcard),
+    }
 }
 
 // NB: this converts any binders not in `env` to wildcards, and strips any `at` pattern binders
 // that is not in the `env`
 fn apply_pattern_subst(pat: MatchPattern, env: &UniqueMap<Var, Var>) -> MatchPattern {
-    let MatchPattern { ty, pat: sp!(ploc, pat) } = pat;
+    let MatchPattern {
+        ty,
+        pat: sp!(ploc, pat),
+    } = pat;
     let new_pat = match pat {
         TP::Variant(m, e, v, ta, spats) => {
-            let out_fields = spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
+            let out_fields =
+                spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
             TP::Variant(m, e, v, ta, out_fields)
         }
         TP::BorrowVariant(mut_, m, e, v, ta, spats) => {
-            let out_fields = spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
+            let out_fields =
+                spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
             TP::BorrowVariant(mut_, m, e, v, ta, out_fields)
         }
         TP::Struct(m, s, ta, spats) => {
-            let out_fields = spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
+            let out_fields =
+                spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
             TP::Struct(m, s, ta, out_fields)
         }
         TP::BorrowStruct(mut_, m, s, ta, spats) => {
-            let out_fields = spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
+            let out_fields =
+                spats.map(|_, (ndx, (t, pat))| (ndx, (t, apply_pattern_subst(pat, env))));
             TP::BorrowStruct(mut_, m, s, ta, out_fields)
         }
         TP::At(x, inner) => {
@@ -581,7 +692,10 @@ fn apply_pattern_subst(pat: MatchPattern, env: &UniqueMap<Var, Var>) -> MatchPat
             // Since we are only applying the guard environment, this may be unused here.
             // If it is, we simply elide the `@` form.
             if let Some(y) = env.get(&x) {
-                TP::At(sp(xloc, y.value), Box::new(apply_pattern_subst(*inner, env)))
+                TP::At(
+                    sp(xloc, y.value),
+                    Box::new(apply_pattern_subst(*inner, env)),
+                )
             } else {
                 apply_pattern_subst(*inner, env).pat.value
             }
@@ -597,7 +711,10 @@ fn apply_pattern_subst(pat: MatchPattern, env: &UniqueMap<Var, Var>) -> MatchPat
         pat @ (TP::Literal(_) | TP::ErrorPat | TP::Wildcard) => pat,
         TP::Constant(_, _) | TP::Or(_, _) => unreachable!(),
     };
-    MatchPattern { ty, pat: sp(ploc, new_pat) }
+    MatchPattern {
+        ty,
+        pat: sp(ploc, new_pat),
+    }
 }
 
 fn flatten_or(pat: MatchPattern) -> Vec<MatchPattern> {
@@ -632,7 +749,10 @@ fn flatten_or(pat: MatchPattern) -> Vec<MatchPattern> {
                 .into_iter()
                 .map(|field_list| MatchPattern {
                     ty: pat.ty.clone(),
-                    pat: sp(ploc, TP::BorrowVariant(mut_, m, e, v, ta.clone(), field_list)),
+                    pat: sp(
+                        ploc,
+                        TP::BorrowVariant(mut_, m, e, v, ta.clone(), field_list),
+                    ),
                 })
                 .collect::<Vec<_>>()
         }
@@ -666,7 +786,10 @@ fn flatten_or(pat: MatchPattern) -> Vec<MatchPattern> {
         }
         TP::At(x, inner) => flatten_or(*inner)
             .into_iter()
-            .map(|pat| MatchPattern { ty: pat.ty.clone(), pat: sp(ploc, TP::At(x, Box::new(pat))) })
+            .map(|pat| MatchPattern {
+                ty: pat.ty.clone(),
+                pat: sp(ploc, TP::At(x, Box::new(pat))),
+            })
             .collect::<Vec<_>>(),
     }
 }
@@ -769,7 +892,9 @@ fn const_pats_to_guards<const AFTER_TYPING: bool, MC: MatchContext<AFTER_TYPING>
     (combine_guards(const_guards, guard), const_guard_map)
 }
 
-fn combine_pattern_fields(fields: Fields<(Type, Vec<MatchPattern>)>) -> Vec<Fields<(Type, MatchPattern)>> {
+fn combine_pattern_fields(
+    fields: Fields<(Type, Vec<MatchPattern>)>,
+) -> Vec<Fields<(Type, MatchPattern)>> {
     type VFields = Vec<(Field, (usize, (Spanned<N::Type_>, MatchPattern)))>;
     type VVFields = Vec<(Field, (usize, (Spanned<N::Type_>, Vec<MatchPattern>)))>;
 
@@ -794,7 +919,10 @@ fn combine_pattern_fields(fields: Fields<(Type, Vec<MatchPattern>)>) -> Vec<Fiel
 
     let mut vvfields: VVFields = fields.into_iter().collect::<Vec<_>>();
     let output_vec = combine_recur(&mut vvfields);
-    output_vec.into_iter().map(|vfields| UniqueMap::maybe_from_iter(vfields.into_iter()).unwrap()).collect::<Vec<_>>()
+    output_vec
+        .into_iter()
+        .map(|vfields| UniqueMap::maybe_from_iter(vfields.into_iter()).unwrap())
+        .collect::<Vec<_>>()
 }
 
 /// Helper function for creating an ordered list of fields Field information and Fields.
@@ -802,8 +930,10 @@ pub fn order_fields_by_decl<T: std::fmt::Debug>(
     decl_fields: UniqueMap<Field, usize>,
     fields: Fields<T>,
 ) -> Vec<(usize, Field, T)> {
-    let mut texp_fields: Vec<(usize, Field, T)> =
-        fields.into_iter().map(|(f, (_exp_idx, t))| (*decl_fields.get(&f).unwrap(), f, t)).collect();
+    let mut texp_fields: Vec<(usize, Field, T)> = fields
+        .into_iter()
+        .map(|(f, (_exp_idx, t))| (*decl_fields.get(&f).unwrap(), f, t))
+        .collect();
     texp_fields.sort_by(|(decl_idx1, _, _), (decl_idx2, _, _)| decl_idx1.cmp(decl_idx2));
     texp_fields
 }
@@ -823,7 +953,16 @@ fn make_const_test(ty: N::Type, var: N::Var, loc: Loc, m: ModuleIdent, c: Consta
     use T::UnannotatedExp_ as E;
     let base_ty = sp(loc, ty.value.base_type_());
     let ref_ty = sp(loc, N::Type_::Ref(false, Box::new(base_ty.clone())));
-    let var_exp = T::exp(ref_ty.clone(), sp(loc, E::Move { from_user: false, var }));
+    let var_exp = T::exp(
+        ref_ty.clone(),
+        sp(
+            loc,
+            E::Move {
+                from_user: false,
+                var,
+            },
+        ),
+    );
     let const_exp = {
         // We're in a guard, so we need to borrow the constant immutable.
         let const_exp = T::exp(base_ty, sp(loc, E::Constant(m, c)));
@@ -835,14 +974,22 @@ fn make_const_test(ty: N::Type, var: N::Var, loc: Loc, m: ModuleIdent, c: Consta
 
 pub fn make_eq_test(loc: Loc, lhs: T::Exp, rhs: T::Exp) -> T::Exp {
     let bool = N::Type_::bool(loc);
-    let equality_exp_ =
-        T::UnannotatedExp_::BinopExp(Box::new(lhs), sp(loc, BinOp_::Eq), Box::new(bool.clone()), Box::new(rhs));
+    let equality_exp_ = T::UnannotatedExp_::BinopExp(
+        Box::new(lhs),
+        sp(loc, BinOp_::Eq),
+        Box::new(bool.clone()),
+        Box::new(rhs),
+    );
     T::exp(bool, sp(loc, equality_exp_))
 }
 
 fn make_and_test(loc: Loc, lhs: T::Exp, rhs: T::Exp) -> T::Exp {
     let bool = N::Type_::bool(loc);
-    let equality_exp_ =
-        T::UnannotatedExp_::BinopExp(Box::new(lhs), sp(loc, BinOp_::And), Box::new(bool.clone()), Box::new(rhs));
+    let equality_exp_ = T::UnannotatedExp_::BinopExp(
+        Box::new(lhs),
+        sp(loc, BinOp_::And),
+        Box::new(bool.clone()),
+        Box::new(rhs),
+    );
     T::exp(bool, sp(loc, equality_exp_))
 }

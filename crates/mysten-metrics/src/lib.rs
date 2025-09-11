@@ -6,24 +6,17 @@ use dashmap::DashMap;
 use parking_lot::Mutex;
 use prometheus::core::{AtomicI64, GenericGauge};
 use simple_server_timing_header::Timer;
-use std::{
-    future::Future,
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-    time::Instant,
-};
+use std::future::Future;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::time::Instant;
 
 use once_cell::sync::OnceCell;
 use prometheus::{
-    register_histogram_with_registry,
-    register_int_counter_vec_with_registry,
-    register_int_gauge_vec_with_registry,
-    Histogram,
-    IntCounterVec,
-    IntGaugeVec,
-    Registry,
+    register_histogram_with_registry, register_int_counter_vec_with_registry,
+    register_int_gauge_vec_with_registry, Histogram, IntCounterVec, IntGaugeVec, Registry,
     TextEncoder,
 };
 use tap::TapFallible;
@@ -42,22 +35,27 @@ pub use guards::*;
 pub const TX_TYPE_SINGLE_WRITER_TX: &str = "single_writer";
 pub const TX_TYPE_SHARED_OBJ_TX: &str = "shared_object";
 
-pub const SUBSECOND_LATENCY_SEC_BUCKETS: &[f64] = &[0.005, 0.01, 0.02, 0.03, 0.05, 0.075, 0.1, 0.2, 0.3, 0.5, 0.7, 1.];
-
-pub const COARSE_LATENCY_SEC_BUCKETS: &[f64] =
-    &[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.2, 0.3, 0.5, 0.7, 1., 2., 3., 5., 10., 20., 30., 60.];
-
-pub const LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.001, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.,
-    1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2., 2.5, 3., 3.5, 4., 4.5, 5., 6., 7., 8., 9., 10., 15., 20., 25., 30.,
-    60., 90.,
+pub const SUBSECOND_LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.02, 0.03, 0.05, 0.075, 0.1, 0.2, 0.3, 0.5, 0.7, 1.,
 ];
 
-pub const COUNT_BUCKETS: &[f64] = &[2., 5., 10., 20., 50., 100., 200., 500., 1000., 2000., 5000., 10000.];
+pub const COARSE_LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.2, 0.3, 0.5, 0.7, 1., 2., 3., 5., 10., 20., 30., 60.,
+];
+
+pub const LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.001, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6,
+    0.7, 0.8, 0.9, 1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2., 2.5, 3., 3.5, 4., 4.5, 5.,
+    6., 7., 8., 9., 10., 15., 20., 25., 30., 60., 90.,
+];
+
+pub const COUNT_BUCKETS: &[f64] = &[
+    2., 5., 10., 20., 50., 100., 200., 500., 1000., 2000., 5000., 10000.,
+];
 
 pub const BYTES_BUCKETS: &[f64] = &[
-    1024., 4096., 16384., 65536., 262144., 524288., 1048576., 2097152., 4194304., 8388608., 16777216., 33554432.,
-    67108864.,
+    1024., 4096., 16384., 65536., 262144., 524288., 1048576., 2097152., 4194304., 8388608.,
+    16777216., 33554432., 67108864.,
 ];
 
 #[derive(Debug)]
@@ -152,8 +150,7 @@ impl Metrics {
                 "Number of system invariant violations",
                 &["name"],
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
         }
     }
 }
@@ -193,7 +190,10 @@ pub async fn with_new_server_timing<T>(fut: impl Future<Output = T> + Send + 'st
 
 /// Create a new task-local ServerTiming context and run the provided future within it.
 /// Only intended for use by macros within this module.
-pub async fn with_server_timing<T>(timer: Arc<Mutex<Timer>>, fut: impl Future<Output = T> + Send + 'static) -> T {
+pub async fn with_server_timing<T>(
+    timer: Arc<Mutex<Timer>>,
+    fut: impl Future<Output = T> + Send + 'static,
+) -> T {
     let mut ret = None;
     SERVER_TIMING
         .scope(timer, async {
@@ -229,8 +229,11 @@ macro_rules! monitored_future {
     }};
 
     ($metric: ident, $fut: expr, $name: expr, $logging_level: ident, $logging_enabled: expr) => {{
-        let location: &str =
-            if $name.is_empty() { concat!(file!(), ':', line!()) } else { concat!(file!(), ':', $name) };
+        let location: &str = if $name.is_empty() {
+            concat!(file!(), ':', line!())
+        } else {
+            concat!(file!(), ':', $name)
+        };
 
         async move {
             let metrics = $crate::get_metrics();
@@ -245,14 +248,22 @@ macro_rules! monitored_future {
             };
             let _logging_guard = if $logging_enabled {
                 Some($crate::scopeguard::guard((), |_| {
-                    tracing::event!(tracing::Level::$logging_level, "Future {} completed", location);
+                    tracing::event!(
+                        tracing::Level::$logging_level,
+                        "Future {} completed",
+                        location
+                    );
                 }))
             } else {
                 None
             };
 
             if $logging_enabled {
-                tracing::event!(tracing::Level::$logging_level, "Spawning future {}", location);
+                tracing::event!(
+                    tracing::Level::$logging_level,
+                    "Spawning future {}",
+                    location
+                );
             }
 
             $fut.await
@@ -274,22 +285,34 @@ macro_rules! forward_server_timing_and_spawn {
 #[macro_export]
 macro_rules! spawn_monitored_task {
     ($fut: expr) => {
-        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(tasks, $fut, "", INFO, false))
+        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(
+            tasks, $fut, "", INFO, false
+        ))
     };
 }
 
 #[macro_export]
 macro_rules! spawn_logged_monitored_task {
     ($fut: expr) => {
-        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(tasks, $fut, "", INFO, true))
+        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(
+            tasks, $fut, "", INFO, true
+        ))
     };
 
     ($fut: expr, $name: expr) => {
-        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(tasks, $fut, $name, INFO, true))
+        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(
+            tasks, $fut, $name, INFO, true
+        ))
     };
 
     ($fut: expr, $name: expr, $logging_level: ident) => {
-        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(tasks, $fut, $name, $logging_level, true))
+        $crate::forward_server_timing_and_spawn!($crate::monitored_future!(
+            tasks,
+            $fut,
+            $name,
+            $logging_level,
+            true
+        ))
     };
 }
 
@@ -301,8 +324,14 @@ pub struct MonitoredScopeGuard {
 
 impl Drop for MonitoredScopeGuard {
     fn drop(&mut self) {
-        self.metrics.scope_duration_ns.with_label_values(&[self.name]).add(self.timer.elapsed().as_nanos() as i64);
-        self.metrics.scope_entrance.with_label_values(&[self.name]).dec();
+        self.metrics
+            .scope_duration_ns
+            .with_label_values(&[self.name])
+            .add(self.timer.elapsed().as_nanos() as i64);
+        self.metrics
+            .scope_entrance
+            .with_label_values(&[self.name])
+            .dec();
     }
 }
 
@@ -319,7 +348,11 @@ pub fn monitored_scope(name: &'static str) -> Option<MonitoredScopeGuard> {
     if let Some(m) = metrics {
         m.scope_iterations.with_label_values(&[name]).inc();
         m.scope_entrance.with_label_values(&[name]).inc();
-        Some(MonitoredScopeGuard { metrics: m, name, timer: Instant::now() })
+        Some(MonitoredScopeGuard {
+            metrics: m,
+            name,
+            timer: Instant::now(),
+        })
     } else {
         None
     }
@@ -333,7 +366,8 @@ impl<F: Future> MonitoredFutureExt for F {
     fn in_monitored_scope(self, name: &'static str) -> MonitoredScopeFuture<Self> {
         MonitoredScopeFuture {
             f: Box::pin(self),
-            active_duration_metric: get_metrics().map(|m| m.future_active_duration_ns.with_label_values(&[name])),
+            active_duration_metric: get_metrics()
+                .map(|m| m.future_active_duration_ns.with_label_values(&[name])),
             _scope: monitored_scope(name),
         }
     }
@@ -368,7 +402,10 @@ where
     F: Future,
 {
     pub fn new(inner: F) -> Self {
-        Self { finished: false, inner: Box::pin(inner) }
+        Self {
+            finished: false,
+            inner: Box::pin(inner),
+        }
     }
 
     pub fn is_finished(&self) -> bool {
@@ -424,7 +461,7 @@ pub type RegistryID = Uuid;
 /// A service to manage the prometheus registries. This service allow us to create
 /// a new Registry on demand and keep it accessible for processing/polling.
 /// The service can be freely cloned/shared across threads.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RegistryService {
     // Holds a Registry that is supposed to be used
     default_registry: Registry,
@@ -435,7 +472,10 @@ impl RegistryService {
     // Creates a new registry service and also adds the main/default registry that is supposed to
     // be preserved and never get removed
     pub fn new(default_registry: Registry) -> Self {
-        Self { default_registry, registries_by_id: Arc::new(DashMap::new()) }
+        Self {
+            default_registry,
+            registries_by_id: Arc::new(DashMap::new()),
+        }
     }
 
     // Returns the default registry for the service that someone can use
@@ -450,7 +490,11 @@ impl RegistryService {
     // swap an existing registry - we expected a removal to happen explicitly.
     pub fn add(&self, registry: Registry) -> RegistryID {
         let registry_id = Uuid::new_v4();
-        if self.registries_by_id.insert(registry_id, registry).is_some() {
+        if self
+            .registries_by_id
+            .insert(registry_id, registry)
+            .is_some()
+        {
             panic!("Other Registry already detected for the same id {registry_id}");
         }
 
@@ -465,7 +509,11 @@ impl RegistryService {
 
     // Returns all the registries of the service
     pub fn get_all(&self) -> Vec<Registry> {
-        let mut registries: Vec<Registry> = self.registries_by_id.iter().map(|r| r.value().clone()).collect();
+        let mut registries: Vec<Registry> = self
+            .registries_by_id
+            .iter()
+            .map(|r| r.value().clone())
+            .collect();
         registries.push(self.default_registry.clone());
 
         registries
@@ -494,13 +542,13 @@ pub fn uptime_metric(
 
     let start_time = std::time::Instant::now();
     let uptime = move || start_time.elapsed().as_secs();
-    let metric =
-        prometheus_closure_metric::ClosureMetric::new(opts, prometheus_closure_metric::ValueType::Counter, uptime, &[
-            process,
-            version,
-            chain_identifier,
-        ])
-        .unwrap();
+    let metric = prometheus_closure_metric::ClosureMetric::new(
+        opts,
+        prometheus_closure_metric::ValueType::Counter,
+        uptime,
+        &[process, version, chain_identifier],
+    )
+    .unwrap();
 
     Box::new(metric)
 }
@@ -529,15 +577,19 @@ pub fn bridge_uptime_metric(
 
     let start_time = std::time::Instant::now();
     let uptime = move || start_time.elapsed().as_secs();
-    let metric =
-        prometheus_closure_metric::ClosureMetric::new(opts, prometheus_closure_metric::ValueType::Counter, uptime, &[
+    let metric = prometheus_closure_metric::ClosureMetric::new(
+        opts,
+        prometheus_closure_metric::ValueType::Counter,
+        uptime,
+        &[
             process,
             version,
             sui_chain_identifier,
             eth_chain_identifier,
             if client_enabled { "true" } else { "false" },
-        ])
-        .unwrap();
+        ],
+    )
+    .unwrap();
 
     Box::new(metric)
 }
@@ -559,28 +611,38 @@ pub fn start_prometheus_server(addr: SocketAddr) -> RegistryService {
         return registry_service;
     }
 
-    let app = Router::new().route(METRICS_ROUTE, get(metrics)).layer(Extension(registry_service.clone()));
+    let app = Router::new()
+        .route(METRICS_ROUTE, get(metrics))
+        .layer(Extension(registry_service.clone()));
 
     tokio::spawn(async move {
         let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-        axum::serve(listener, app.into_make_service()).await.unwrap();
+        axum::serve(listener, app.into_make_service())
+            .await
+            .unwrap();
     });
 
     registry_service
 }
 
-pub async fn metrics(Extension(registry_service): Extension<RegistryService>) -> (StatusCode, String) {
+pub async fn metrics(
+    Extension(registry_service): Extension<RegistryService>,
+) -> (StatusCode, String) {
     let metrics_families = registry_service.gather_all();
     match TextEncoder.encode_to_string(&metrics_families) {
         Ok(metrics) => (StatusCode::OK, metrics),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, format!("unable to encode metrics: {error}")),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("unable to encode metrics: {error}"),
+        ),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::RegistryService;
-    use prometheus::{IntCounter, Registry};
+    use prometheus::IntCounter;
+    use prometheus::Registry;
 
     #[test]
     fn registry_service() {
@@ -590,13 +652,19 @@ mod tests {
         let registry_service = RegistryService::new(default_registry.clone());
         let default_counter = IntCounter::new("counter", "counter_desc").unwrap();
         default_counter.inc();
-        default_registry.register(Box::new(default_counter)).unwrap();
+        default_registry
+            .register(Box::new(default_counter))
+            .unwrap();
 
         // AND add a metric to the default registry
 
         // AND a registry with one metric
         let registry_1 = Registry::new_custom(Some("narwhal".to_string()), None).unwrap();
-        registry_1.register(Box::new(IntCounter::new("counter_1", "counter_1_desc").unwrap())).unwrap();
+        registry_1
+            .register(Box::new(
+                IntCounter::new("counter_1", "counter_1_desc").unwrap(),
+            ))
+            .unwrap();
 
         // WHEN
         let registry_1_id = registry_service.add(registry_1);
@@ -617,7 +685,11 @@ mod tests {
 
         // AND add a second registry with a metric
         let registry_2 = Registry::new_custom(Some("sui".to_string()), None).unwrap();
-        registry_2.register(Box::new(IntCounter::new("counter_2", "counter_2_desc").unwrap())).unwrap();
+        registry_2
+            .register(Box::new(
+                IntCounter::new("counter_2", "counter_2_desc").unwrap(),
+            ))
+            .unwrap();
         let _registry_2_id = registry_service.add(registry_2);
 
         // THEN all the metrics should be returned

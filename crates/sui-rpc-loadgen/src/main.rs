@@ -8,29 +8,25 @@ use anyhow::Result;
 use clap::Parser;
 use payload::AddressQueryType;
 
-use std::{
-    error::Error,
-    path::PathBuf,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::error::Error;
+use std::path::PathBuf;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
 use sui_types::crypto::{EncodeDecodeBase64, SuiKeyPair};
 use tracing::info;
 
-use crate::{
-    load_test::{LoadTest, LoadTestConfig},
-    payload::{
-        load_addresses_from_file,
-        load_digests_from_file,
-        load_objects_from_file,
-        Command,
-        RpcCommandProcessor,
-        SignerInfo,
-    },
+use crate::load_test::{LoadTest, LoadTestConfig};
+use crate::payload::{
+    load_addresses_from_file, load_digests_from_file, load_objects_from_file, Command,
+    RpcCommandProcessor, SignerInfo,
 };
 
 #[derive(Parser)]
-#[clap(name = "Sui RPC Load Generator", version = "0.1", about = "A load test application for Sui RPC")]
+#[clap(
+    name = "Sui RPC Load Generator",
+    version = "0.1",
+    about = "A load test application for Sui RPC"
+)]
 struct Opts {
     // TODO(chris): support running multiple commands at once
     #[clap(subcommand)]
@@ -42,10 +38,10 @@ struct Opts {
     #[clap(long, num_args(1..), default_value = "http://127.0.0.1:9000")]
     pub urls: Vec<String>,
     /// the path to log file directory
-    #[clap(long, default_value = "~/.one/one_config/logs")]
+    #[clap(long, default_value = "~/.sui/sui_config/logs")]
     logs_directory: String,
 
-    #[clap(long, default_value = "~/.one/loadgen/data")]
+    #[clap(long, default_value = "~/.sui/loadgen/data")]
     data_directory: String,
 }
 
@@ -92,8 +88,8 @@ pub enum ClapCommand {
         #[clap(flatten)]
         common: CommonOptions,
     },
-    #[clap(name = "pay-sui")]
-    PaySui {
+    #[clap(name = "pay-oct")]
+    PayOct {
         // TODO(chris) customize recipients and amounts
         #[clap(flatten)]
         common: CommonOptions,
@@ -141,18 +137,18 @@ pub enum ClapCommand {
 
 fn get_keypair() -> Result<SignerInfo> {
     // TODO(chris) allow pass in custom path for keystore
-    // Load keystore from ~/.one/one_config/one.keystore
-    let keystore_path = get_sui_config_directory().join("one.keystore");
+    // Load keystore from ~/.sui/sui_config/sui.keystore
+    let keystore_path = get_sui_config_directory().join("sui.keystore");
     let keystore = Keystore::from(FileBasedKeystore::new(&keystore_path)?);
     let active_address = keystore.addresses().pop().unwrap();
-    let keypair: &SuiKeyPair = keystore.get_key(&active_address)?;
+    let keypair: &SuiKeyPair = keystore.export(&active_address)?;
     println!("using address {active_address} for signing");
     Ok(SignerInfo::new(keypair.encode_base64()))
 }
 
 fn get_sui_config_directory() -> PathBuf {
     match dirs::home_dir() {
-        Some(v) => v.join(".one").join("one_config"),
+        Some(v) => v.join(".sui").join("sui_config"),
         None => panic!("Cannot obtain home directory path"),
     }
 }
@@ -194,7 +190,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let (command, common, need_keystore) = match opts.command {
         ClapCommand::DryRun { common } => (Command::new_dry_run(), common, false),
-        ClapCommand::PaySui { common } => (Command::new_pay_oct(), common, true),
+        ClapCommand::PayOct { common } => (Command::new_pay_oct(), common, true),
         ClapCommand::GetCheckpoints {
             common,
             start,
@@ -203,21 +199,42 @@ async fn main() -> Result<(), Box<dyn Error>> {
             skip_verify_objects,
             skip_record,
         } => (
-            Command::new_get_checkpoints(start, end, !skip_verify_transactions, !skip_verify_objects, !skip_record),
+            Command::new_get_checkpoints(
+                start,
+                end,
+                !skip_verify_transactions,
+                !skip_verify_objects,
+                !skip_record,
+            ),
             common,
             false,
         ),
-        ClapCommand::QueryTransactionBlocks { common, address_type } => {
+        ClapCommand::QueryTransactionBlocks {
+            common,
+            address_type,
+        } => {
             let addresses = load_addresses_from_file(expand_path(&opts.data_directory));
-            (Command::new_query_transaction_blocks(address_type, addresses), common, false)
+            (
+                Command::new_query_transaction_blocks(address_type, addresses),
+                common,
+                false,
+            )
         }
         ClapCommand::MultiGetTransactionBlocks { common } => {
             let digests = load_digests_from_file(expand_path(&opts.data_directory));
-            (Command::new_multi_get_transaction_blocks(digests), common, false)
+            (
+                Command::new_multi_get_transaction_blocks(digests),
+                common,
+                false,
+            )
         }
         ClapCommand::GetAllBalances { common, chunk_size } => {
             let addresses = load_addresses_from_file(expand_path(&opts.data_directory));
-            (Command::new_get_all_balances(addresses, chunk_size), common, false)
+            (
+                Command::new_get_all_balances(addresses, chunk_size),
+                common,
+                false,
+            )
         }
         ClapCommand::MultiGetObjects { common } => {
             let objects = load_objects_from_file(expand_path(&opts.data_directory));
@@ -225,7 +242,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         ClapCommand::GetReferenceGasPrice { common } => {
             let num_repeats = common.num_chunks_per_thread;
-            (Command::new_get_reference_gas_price(num_repeats), common, false)
+            (
+                Command::new_get_reference_gas_price(num_repeats),
+                common,
+                false,
+            )
         }
         ClapCommand::GetObject { common, chunk_size } => {
             let objects = load_objects_from_file(expand_path(&opts.data_directory));
@@ -235,8 +256,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let signer_info = need_keystore.then_some(get_keypair()?);
 
-    let command =
-        command.with_repeat_interval(Duration::from_millis(common.interval_in_ms)).with_repeat_n_times(common.repeat);
+    let command = command
+        .with_repeat_interval(Duration::from_millis(common.interval_in_ms))
+        .with_repeat_n_times(common.repeat);
 
     let processor = RpcCommandProcessor::new(&opts.urls, expand_path(&opts.data_directory)).await;
 

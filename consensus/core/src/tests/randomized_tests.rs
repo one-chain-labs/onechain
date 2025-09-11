@@ -10,14 +10,15 @@ use rand::{prelude::SliceRandom, rngs::StdRng, Rng, SeedableRng};
 use crate::{
     block::{BlockAPI, Slot},
     block_manager::BlockManager,
-    block_verifier::NoopBlockVerifier,
     commit::DecidedLeader,
     context::Context,
     dag_state::DagState,
     leader_schedule::{LeaderSchedule, LeaderSwapTable},
     storage::mem_store::MemStore,
     test_dag::create_random_dag,
-    universal_committer::{universal_committer_builder::UniversalCommitterBuilder, UniversalCommitter},
+    universal_committer::{
+        universal_committer_builder::UniversalCommitterBuilder, UniversalCommitter,
+    },
 };
 
 const NUM_RUNS: u32 = 100;
@@ -38,11 +39,18 @@ async fn test_randomized_dag_all_direct_commit() {
         let authority = authority_setup(num_authorities, 0);
 
         let include_leader_percentage = 100;
-        let dag_builder = create_random_dag(seed, include_leader_percentage, NUM_ROUNDS, authority.context.clone());
+        let dag_builder = create_random_dag(
+            seed,
+            include_leader_percentage,
+            NUM_ROUNDS,
+            authority.context.clone(),
+        );
 
         dag_builder.persist_all_blocks(authority.dag_state.clone());
 
-        tracing::info!("Running test with committee size {num_authorities} & {NUM_ROUNDS} rounds in the DAG...");
+        tracing::info!(
+            "Running test with committee size {num_authorities} & {NUM_ROUNDS} rounds in the DAG..."
+        );
 
         let last_decided = Slot::new_for_test(0, 0);
         let sequence = authority.committer.try_decide(last_decided);
@@ -52,9 +60,12 @@ async fn test_randomized_dag_all_direct_commit() {
         for (i, leader_block) in sequence.iter().enumerate() {
             // First sequenced leader should be in round 1.
             let leader_round = i as u32 + 1;
-            if let DecidedLeader::Commit(ref block) = leader_block {
+            if let DecidedLeader::Commit(ref block, _direct) = leader_block {
                 assert_eq!(block.round(), leader_round);
-                assert_eq!(block.author(), authority.committer.get_leaders(leader_round)[0]);
+                assert_eq!(
+                    block.author(),
+                    authority.committer.get_leaders(leader_round)[0]
+                );
             } else {
                 panic!("Expected a committed leader")
             };
@@ -85,9 +96,16 @@ async fn test_randomized_dag_and_decision_sequence() {
         let mut authority_1 = authority_setup(num_authorities, 1);
 
         let include_leader_percentage = 50;
-        let dag_builder = create_random_dag(seed, include_leader_percentage, NUM_ROUNDS, authority_1.context.clone());
+        let dag_builder = create_random_dag(
+            seed,
+            include_leader_percentage,
+            NUM_ROUNDS,
+            authority_1.context.clone(),
+        );
 
-        tracing::info!("Running test with committee size {num_authorities} & {NUM_ROUNDS} rounds in the DAG...");
+        tracing::info!(
+        "Running test with committee size {num_authorities} & {NUM_ROUNDS} rounds in the DAG..."
+        );
 
         let mut all_blocks = dag_builder.blocks.values().cloned().collect::<Vec<_>>();
         all_blocks.shuffle(&mut random_test_setup.seeded_rng);
@@ -96,7 +114,9 @@ async fn test_randomized_dag_and_decision_sequence() {
         let mut last_decided = Slot::new_for_test(0, 0);
         let mut i = 0;
         while i < all_blocks.len() {
-            let chunk_size = random_test_setup.seeded_rng.gen_range(1..=(all_blocks.len() - i));
+            let chunk_size = random_test_setup
+                .seeded_rng
+                .gen_range(1..=(all_blocks.len() - i));
             let chunk = &all_blocks[i..i + chunk_size];
 
             let _ = authority_1.block_manager.try_accept_blocks(chunk.to_vec());
@@ -123,7 +143,9 @@ async fn test_randomized_dag_and_decision_sequence() {
         let mut last_decided = Slot::new_for_test(0, 0);
         let mut i = 0;
         while i < all_blocks.len() {
-            let chunk_size = random_test_setup.seeded_rng.gen_range(1..=(all_blocks.len() - i));
+            let chunk_size = random_test_setup
+                .seeded_rng
+                .gen_range(1..=(all_blocks.len() - i));
             let chunk = &all_blocks[i..i + chunk_size];
 
             let _ = authority_2.block_manager.try_accept_blocks(chunk.to_vec());
@@ -155,18 +177,33 @@ struct AuthorityTestFixture {
 
 fn authority_setup(num_authorities: usize, authority_index: u32) -> AuthorityTestFixture {
     let context = Arc::new(
-        Context::new_for_test(num_authorities).0.with_authority_index(AuthorityIndex::new_for_test(authority_index)),
+        Context::new_for_test(num_authorities)
+            .0
+            .with_authority_index(AuthorityIndex::new_for_test(authority_index)),
     );
-    let leader_schedule = Arc::new(LeaderSchedule::new(context.clone(), LeaderSwapTable::default()));
-    let dag_state = Arc::new(RwLock::new(DagState::new(context.clone(), Arc::new(MemStore::new()))));
+    let leader_schedule = Arc::new(LeaderSchedule::new(
+        context.clone(),
+        LeaderSwapTable::default(),
+    ));
+    let dag_state = Arc::new(RwLock::new(DagState::new(
+        context.clone(),
+        Arc::new(MemStore::new()),
+    )));
 
     // Create committer with pipelining and only 1 leader per leader round
     let committer =
-        UniversalCommitterBuilder::new(context.clone(), leader_schedule, dag_state.clone()).with_pipeline(true).build();
+        UniversalCommitterBuilder::new(context.clone(), leader_schedule, dag_state.clone())
+            .with_pipeline(true)
+            .build();
 
-    let block_manager = BlockManager::new(context.clone(), dag_state.clone(), Arc::new(NoopBlockVerifier));
+    let block_manager = BlockManager::new(context.clone(), dag_state.clone());
 
-    AuthorityTestFixture { context, dag_state, committer, block_manager }
+    AuthorityTestFixture {
+        context,
+        dag_state,
+        committer,
+        block_manager,
+    }
 }
 
 struct RandomTestFixture {

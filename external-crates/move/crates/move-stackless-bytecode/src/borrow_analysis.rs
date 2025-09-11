@@ -52,12 +52,18 @@ pub struct WriteBackAction {
 impl BorrowInfo {
     /// Gets the children of this node.
     fn get_children(&self, node: &BorrowNode) -> Vec<&BorrowNode> {
-        self.borrowed_by.get(node).map(|s| s.iter().map(|(n, _)| n).collect()).unwrap_or_default()
+        self.borrowed_by
+            .get(node)
+            .map(|s| s.iter().map(|(n, _)| n).collect())
+            .unwrap_or_default()
     }
 
     /// Gets the parents (together with the edges) of this node.
     fn get_incoming(&self, node: &BorrowNode) -> Vec<&(BorrowNode, BorrowEdge)> {
-        self.borrows_from.get(node).map(|s| s.iter().collect()).unwrap_or_default()
+        self.borrows_from
+            .get(node)
+            .map(|s| s.iter().collect())
+            .unwrap_or_default()
     }
 
     /// Checks whether a node is in use. A node is used if it is in the live_nodes set
@@ -66,7 +72,9 @@ impl BorrowInfo {
         if self.live_nodes.contains(node) {
             true
         } else {
-            self.get_children(node).iter().any(|child| self.is_in_use(child))
+            self.get_children(node)
+                .iter()
+                .any(|child| self.is_in_use(child))
         }
     }
 
@@ -88,7 +96,11 @@ impl BorrowInfo {
 
     /// Start from this node and follow-up the borrow chain until reaching a live/in-use ancestor.
     /// Collect possible paths (from this node to a live ancestor) and return them in the DFS order.
-    fn collect_dying_ancestor_trees(&self, node: &BorrowNode, next: &BorrowInfo) -> Vec<Vec<WriteBackAction>> {
+    fn collect_dying_ancestor_trees(
+        &self,
+        node: &BorrowNode,
+        next: &BorrowInfo,
+    ) -> Vec<Vec<WriteBackAction>> {
         let mut trees = vec![];
         self.collect_dying_ancestor_trees_recursive(node, next, vec![], &mut trees);
         trees
@@ -120,8 +132,14 @@ impl BorrowInfo {
                         // of this function and this node need to be further traced upwards.
                         for (parent, edge) in incoming {
                             let mut appended = order.clone();
-                            appended.push(WriteBackAction { src: *index, dst: parent.clone(), edge: edge.clone() });
-                            self.collect_dying_ancestor_trees_recursive(parent, next, appended, trees);
+                            appended.push(WriteBackAction {
+                                src: *index,
+                                dst: parent.clone(),
+                                edge: edge.clone(),
+                            });
+                            self.collect_dying_ancestor_trees_recursive(
+                                parent, next, appended, trees,
+                            );
                         }
                     }
                 }
@@ -143,23 +161,36 @@ impl BorrowInfo {
                 parts.push(format!("{}: {}", name, value));
             }
         };
-        add("live_nodes", self.live_nodes.iter().map(|node| format!("{}", node.display(func_target))).join(", "));
-        let borrows_str = |(node1, borrows): (&BorrowNode, &SetDomain<(BorrowNode, BorrowEdge)>)| {
-            format!(
-                "{} -> {{{}}}",
-                node1.display(func_target),
-                borrows
-                    .iter()
-                    .map(|(node2, edge)| format!(
-                        "({}, {})",
-                        edge.display(func_target.global_env()),
-                        node2.display(func_target)
-                    ))
-                    .join(", ")
-            )
-        };
-        add("borrowed_by", self.borrowed_by.iter().map(borrows_str).join(", "));
-        add("borrows_from", self.borrows_from.iter().map(borrows_str).join(", "));
+        add(
+            "live_nodes",
+            self.live_nodes
+                .iter()
+                .map(|node| format!("{}", node.display(func_target)))
+                .join(", "),
+        );
+        let borrows_str =
+            |(node1, borrows): (&BorrowNode, &SetDomain<(BorrowNode, BorrowEdge)>)| {
+                format!(
+                    "{} -> {{{}}}",
+                    node1.display(func_target),
+                    borrows
+                        .iter()
+                        .map(|(node2, edge)| format!(
+                            "({}, {})",
+                            edge.display(func_target.global_env()),
+                            node2.display(func_target)
+                        ))
+                        .join(", ")
+                )
+            };
+        add(
+            "borrowed_by",
+            self.borrowed_by.iter().map(borrows_str).join(", "),
+        );
+        add(
+            "borrows_from",
+            self.borrows_from.iter().map(borrows_str).join(", "),
+        );
         parts.iter().join("\n")
     }
 
@@ -172,13 +203,20 @@ impl BorrowInfo {
     }
 
     fn add_edge(&mut self, parent: BorrowNode, child: BorrowNode, weight: BorrowEdge) -> bool {
-        self.borrowed_by.entry(parent).or_default().insert((child, weight)).is_none()
+        self.borrowed_by
+            .entry(parent)
+            .or_default()
+            .insert((child, weight))
+            .is_none()
     }
 
     fn consolidate(&mut self) {
         for (src, outgoing) in self.borrowed_by.iter() {
             for (dst, edge) in outgoing.iter() {
-                self.borrows_from.entry(dst.clone()).or_default().insert((src.clone(), edge.clone()));
+                self.borrows_from
+                    .entry(dst.clone())
+                    .or_default()
+                    .insert((src.clone(), edge.clone()));
             }
         }
     }
@@ -186,7 +224,12 @@ impl BorrowInfo {
     /// Collect those leaves which are returned and summarize them in a hyper edge.
     /// Each of those leaves has a path `in_mut -> ref1 .. -> refn -> out_mut`.
     /// We create a hyper edge `in_mut --summarize(ref1, .., refn)-> out_mut` for it.
-    fn summarize(&mut self, target: &FunctionTarget<'_>, ret_info: &BorrowInfo, ret_values: &[TempIndex]) {
+    fn summarize(
+        &mut self,
+        target: &FunctionTarget<'_>,
+        ret_info: &BorrowInfo,
+        ret_values: &[TempIndex],
+    ) {
         for (src, outgoing) in ret_info.borrows_from.iter() {
             if let BorrowNode::Reference(idx) = src {
                 if let Some(pos) = ret_values.iter().position(|i| i == idx) {
@@ -228,10 +271,17 @@ impl BorrowInfo {
                     path.pop().unwrap()
                 } else {
                     path.reverse();
-                    let flattened = path.iter().flat_map(|e| e.flatten().into_iter()).cloned().collect();
+                    let flattened = path
+                        .iter()
+                        .flat_map(|e| e.flatten().into_iter())
+                        .cloned()
+                        .collect();
                     BorrowEdge::Hyper(flattened)
                 };
-                self.borrowed_by.entry(dest.clone()).or_default().insert((leaf.clone(), edge));
+                self.borrowed_by
+                    .entry(dest.clone())
+                    .or_default()
+                    .insert((leaf.clone(), edge));
             }
         }
     }
@@ -246,17 +296,27 @@ impl BorrowInfo {
         outs: &[TempIndex],
     ) {
         let get_in = |idx: usize| {
-            assert!(idx < ins.len(), "inconsistent borrow information: undefined input");
+            assert!(
+                idx < ins.len(),
+                "inconsistent borrow information: undefined input"
+            );
             ins[idx]
         };
         for (ret_idx, out) in outs.iter().enumerate() {
-            if let Some(edges) = callee_summary.borrows_from.get(&BorrowNode::ReturnPlaceholder(ret_idx)) {
+            if let Some(edges) = callee_summary
+                .borrows_from
+                .get(&BorrowNode::ReturnPlaceholder(ret_idx))
+            {
                 let out_node = BorrowNode::Reference(*out);
                 self.add_node(out_node.clone());
                 for (in_node, edge) in edges.iter() {
                     if let BorrowNode::Reference(in_idx) = in_node {
                         let actual_in_node = BorrowNode::Reference(get_in(*in_idx));
-                        self.add_edge(actual_in_node, out_node.clone(), edge.instantiate(callee_targs));
+                        self.add_edge(
+                            actual_in_node,
+                            out_node.clone(),
+                            edge.instantiate(callee_targs),
+                        );
                     }
                 }
             } else {
@@ -294,7 +354,6 @@ impl BorrowAnnotation {
     pub fn get_summary(&self) -> &BorrowInfo {
         &self.summary
     }
-
     pub fn get_borrow_info_at(&self, code_offset: CodeOffset) -> Option<&BorrowInfoAtCodeOffset> {
         self.code_map.get(&code_offset)
     }
@@ -303,7 +362,11 @@ impl BorrowAnnotation {
         let mut result = self.summary.join(&other.summary);
         for (offset, info) in self.code_map.iter_mut() {
             let other_info = other.code_map.get(offset).unwrap();
-            result = result.combine(info.before.join(&other_info.before).combine(info.after.join(&other_info.after)));
+            result = result.combine(
+                info.before
+                    .join(&other_info.before)
+                    .combine(info.after.join(&other_info.after)),
+            );
         }
         result
     }
@@ -332,11 +395,12 @@ impl FunctionTargetProcessor for BorrowAnalysisProcessor {
         mut data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        let mut borrow_annotation = get_custom_annotation_or_none(func_env, &self.borrow_natives).unwrap_or_else(|| {
-            let func_target = FunctionTarget::new(func_env, &data);
-            let analyzer = BorrowAnalysis::new(&func_target, targets, &self.borrow_natives);
-            analyzer.analyze(&data.code)
-        });
+        let mut borrow_annotation = get_custom_annotation_or_none(func_env, &self.borrow_natives)
+            .unwrap_or_else(|| {
+                let func_target = FunctionTarget::new(func_env, &data);
+                let analyzer = BorrowAnalysis::new(&func_target, targets, &self.borrow_natives);
+                analyzer.analyze(&data.code)
+            });
 
         // Annotate function target with computed borrow data
         let fixedpoint = match scc_opt {
@@ -349,7 +413,9 @@ impl FunctionTargetProcessor for BorrowAnalysisProcessor {
                 },
             },
         };
-        data.annotations.borrow_mut().set::<BorrowAnnotation>(borrow_annotation, fixedpoint);
+        data.annotations
+            .borrow_mut()
+            .set::<BorrowAnnotation>(borrow_annotation, fixedpoint);
         data
     }
 
@@ -365,14 +431,24 @@ impl FunctionTargetProcessor for BorrowAnalysisProcessor {
         "borrow_analysis".to_string()
     }
 
-    fn dump_result(&self, f: &mut fmt::Formatter, env: &GlobalEnv, targets: &FunctionTargetsHolder) -> fmt::Result {
+    fn dump_result(
+        &self,
+        f: &mut fmt::Formatter,
+        env: &GlobalEnv,
+        targets: &FunctionTargetsHolder,
+    ) -> fmt::Result {
         writeln!(f, "\n\n==== borrow analysis summaries ====\n")?;
         for ref module in env.get_modules() {
             for ref fun in module.get_functions() {
                 for (_, ref target) in targets.get_targets(fun) {
                     if let Some(an) = target.get_annotations().get::<BorrowAnnotation>() {
                         if !an.summary.is_empty() {
-                            writeln!(f, "fun {}[{}]", fun.get_full_name_str(), target.data.variant)?;
+                            writeln!(
+                                f,
+                                "fun {}[{}]",
+                                fun.get_full_name_str(),
+                                target.data.variant
+                            )?;
                             writeln!(f, "{}\n", an.summary.borrow_info_str(target))?;
                         }
                     }
@@ -385,7 +461,10 @@ impl FunctionTargetProcessor for BorrowAnalysisProcessor {
 
 /// If fun_env matches one of the functions implementing custom mutable borrow semantics,
 /// return the name of this function
-fn get_custom_borrow_info_or_none(fun_env: &FunctionEnv, borrow_natives: &Vec<String>) -> Option<String> {
+fn get_custom_borrow_info_or_none(
+    fun_env: &FunctionEnv,
+    borrow_natives: &Vec<String>,
+) -> Option<String> {
     for name in borrow_natives {
         if &fun_env.get_full_name_str() == name {
             return Some(name.to_string());
@@ -395,21 +474,32 @@ fn get_custom_borrow_info_or_none(fun_env: &FunctionEnv, borrow_natives: &Vec<St
 }
 
 /// Create a borrow annotation that captures the borrow relation between function params and returns
-fn summarize_custom_borrow(edge_kind: IndexEdgeKind, params: &[usize], returns: &[usize]) -> BorrowAnnotation {
+fn summarize_custom_borrow(
+    edge_kind: IndexEdgeKind,
+    params: &[usize],
+    returns: &[usize],
+) -> BorrowAnnotation {
     let mut an = BorrowAnnotation::default();
     for param_index in params {
         for return_index in returns {
             let param_node = BorrowNode::Reference(*param_index);
             let return_node = BorrowNode::ReturnPlaceholder(*return_index);
             let edge = BorrowEdge::Index(edge_kind.clone());
-            an.summary.borrowed_by.entry(param_node).or_default().insert((return_node, edge));
+            an.summary
+                .borrowed_by
+                .entry(param_node)
+                .or_default()
+                .insert((return_node, edge));
         }
     }
     an.summary.consolidate();
     an
 }
 
-fn get_custom_annotation_or_none(fun_env: &FunctionEnv, borrow_natives: &Vec<String>) -> Option<BorrowAnnotation> {
+fn get_custom_annotation_or_none(
+    fun_env: &FunctionEnv,
+    borrow_natives: &Vec<String>,
+) -> Option<BorrowAnnotation> {
     match get_custom_borrow_info_or_none(fun_env, borrow_natives) {
         None => {
             // check whether this borrow has known special semantics
@@ -423,7 +513,11 @@ fn get_custom_annotation_or_none(fun_env: &FunctionEnv, borrow_natives: &Vec<Str
                 None
             }
         }
-        Some(name) => Some(summarize_custom_borrow(IndexEdgeKind::Custom(name), &[0], &[0])),
+        Some(name) => Some(summarize_custom_borrow(
+            IndexEdgeKind::Custom(name),
+            &[0],
+            &[0],
+        )),
     }
 }
 
@@ -440,9 +534,17 @@ impl<'a> BorrowAnalysis<'a> {
         targets: &'a FunctionTargetsHolder,
         borrow_natives: &'a Vec<String>,
     ) -> Self {
-        let livevar_annotation = func_target.get_annotations().get::<LiveVarAnnotation>().expect("livevar annotation");
+        let livevar_annotation = func_target
+            .get_annotations()
+            .get::<LiveVarAnnotation>()
+            .expect("livevar annotation");
 
-        Self { func_target, livevar_annotation, targets, borrow_natives }
+        Self {
+            func_target,
+            livevar_annotation,
+            targets,
+            borrow_natives,
+        }
     }
 
     fn analyze(&self, instrs: &[Bytecode]) -> BorrowAnnotation {
@@ -488,15 +590,16 @@ impl<'a> BorrowAnalysis<'a> {
     }
 }
 
-impl<'a> TransferFunctions for BorrowAnalysis<'a> {
+impl TransferFunctions for BorrowAnalysis<'_> {
     type State = BorrowInfo;
-
     const BACKWARD: bool = false;
 
     fn execute(&self, state: &mut BorrowInfo, instr: &Bytecode, code_offset: CodeOffset) {
         use Bytecode::*;
-        let livevar_annotation_at =
-            self.livevar_annotation.get_live_var_info_at(code_offset).expect("livevar annotation");
+        let livevar_annotation_at = self
+            .livevar_annotation
+            .get_live_var_info_at(code_offset)
+            .expect("livevar annotation");
 
         match instr {
             Assign(_, dest, src, kind) => {
@@ -516,7 +619,11 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                     }
                     AssignKind::Store => {
                         if self.func_target.get_local_type(*src).is_mutable_reference() {
-                            assert!(self.func_target.get_local_type(*dest).is_mutable_reference());
+                            assert!(
+                                self.func_target
+                                    .get_local_type(*dest)
+                                    .is_mutable_reference()
+                            );
                             state.add_edge(src_node, dest_node, BorrowEdge::Direct);
                         }
                     }
@@ -535,14 +642,21 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                         state.add_node(dest_node.clone());
                         state.add_edge(src_node, dest_node, BorrowEdge::Direct);
                     }
-                    BorrowGlobal(mid, sid, inst) if livevar_annotation_at.after.contains(&dests[0]) => {
+                    BorrowGlobal(mid, sid, inst)
+                        if livevar_annotation_at.after.contains(&dests[0]) =>
+                    {
                         let dest_node = self.borrow_node(dests[0]);
-                        let src_node =
-                            BorrowNode::GlobalRoot(QualifiedInstId { module_id: *mid, id: *sid, inst: inst.to_owned() });
+                        let src_node = BorrowNode::GlobalRoot(QualifiedInstId {
+                            module_id: *mid,
+                            id: *sid,
+                            inst: inst.to_owned(),
+                        });
                         state.add_node(dest_node.clone());
                         state.add_edge(src_node, dest_node, BorrowEdge::Direct);
                     }
-                    BorrowField(mid, sid, inst, field) if livevar_annotation_at.after.contains(&dests[0]) => {
+                    BorrowField(mid, sid, inst, field)
+                        if livevar_annotation_at.after.contains(&dests[0]) =>
+                    {
                         let dest_node = self.borrow_node(dests[0]);
                         let src_node = self.borrow_node(srcs[0]);
                         state.add_node(dest_node.clone());
@@ -553,31 +667,44 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                         );
                     }
                     Function(mid, fid, targs) => {
-                        let callee_env = &self.func_target.global_env().get_function_qid(mid.qualified(*fid));
+                        let callee_env = &self
+                            .func_target
+                            .global_env()
+                            .get_function_qid(mid.qualified(*fid));
 
-                        let callee_annotation = get_custom_annotation_or_none(callee_env, self.borrow_natives)
-                            .unwrap_or_else(|| {
-                                let callee_info = if mid.qualified(*fid) == self.func_target.func_env.get_qualified_id()
-                                {
-                                    // self recursion (this is because we removed the current target from `self.targets`)
-                                    self.func_target.get_annotations().get::<BorrowAnnotation>()
-                                } else {
-                                    let callee_target = self.targets.get_target(callee_env, &FunctionVariant::Baseline);
-                                    callee_target.get_annotations().get::<BorrowAnnotation>()
-                                };
-                                match callee_info {
-                                    None => {
-                                        // 1st iteration of the recursive case
-                                        BorrowAnnotation::default()
+                        let callee_annotation =
+                            get_custom_annotation_or_none(callee_env, self.borrow_natives)
+                                .unwrap_or_else(|| {
+                                    let callee_info = if mid.qualified(*fid)
+                                        == self.func_target.func_env.get_qualified_id()
+                                    {
+                                        // self recursion (this is because we removed the current target from `self.targets`)
+                                        self.func_target.get_annotations().get::<BorrowAnnotation>()
+                                    } else {
+                                        let callee_target = self
+                                            .targets
+                                            .get_target(callee_env, &FunctionVariant::Baseline);
+                                        callee_target.get_annotations().get::<BorrowAnnotation>()
+                                    };
+                                    match callee_info {
+                                        None => {
+                                            // 1st iteration of the recursive case
+                                            BorrowAnnotation::default()
+                                        }
+                                        Some(annotation) => {
+                                            // non-recursive case or Nth iteration of fixedpoint (N >= 1)
+                                            annotation.clone()
+                                        }
                                     }
-                                    Some(annotation) => {
-                                        // non-recursive case or Nth iteration of fixedpoint (N >= 1)
-                                        annotation.clone()
-                                    }
-                                }
-                            });
+                                });
 
-                        state.instantiate(callee_env, targs, &callee_annotation.summary, srcs, dests);
+                        state.instantiate(
+                            callee_env,
+                            targs,
+                            &callee_annotation.summary,
+                            srcs,
+                            dests,
+                        );
                     }
                     OpaqueCallBegin(_, _, _) | OpaqueCallEnd(_, _, _) => {
                         // just skip
@@ -593,7 +720,10 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
         }
 
         // Update live_vars.
-        for idx in livevar_annotation_at.before.difference(&livevar_annotation_at.after) {
+        for idx in livevar_annotation_at
+            .before
+            .difference(&livevar_annotation_at.after)
+        {
             if self.func_target.get_local_type(*idx).is_reference() {
                 let node = self.borrow_node(*idx);
                 state.del_node(&node);
@@ -602,7 +732,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
     }
 }
 
-impl<'a> DataflowAnalysis for BorrowAnalysis<'a> {}
+impl DataflowAnalysis for BorrowAnalysis<'_> {}
 
 impl AbstractDomain for BorrowInfo {
     fn join(&mut self, other: &Self) -> JoinResult {
@@ -616,8 +746,13 @@ impl AbstractDomain for BorrowInfo {
 // Formatting
 
 /// Format a borrow annotation.
-pub fn format_borrow_annotation(func_target: &FunctionTarget<'_>, code_offset: CodeOffset) -> Option<String> {
-    if let Some(BorrowAnnotation { code_map, .. }) = func_target.get_annotations().get::<BorrowAnnotation>() {
+pub fn format_borrow_annotation(
+    func_target: &FunctionTarget<'_>,
+    code_offset: CodeOffset,
+) -> Option<String> {
+    if let Some(BorrowAnnotation { code_map, .. }) =
+        func_target.get_annotations().get::<BorrowAnnotation>()
+    {
         if let Some(map_at) = code_map.get(&code_offset) {
             if !map_at.before.is_empty() {
                 return Some(map_at.before.borrow_info_str(func_target));

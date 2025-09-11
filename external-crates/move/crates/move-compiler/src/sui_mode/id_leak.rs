@@ -3,50 +3,29 @@
 
 use crate::{
     cfgir::{
+        CFGContext, MemberName,
         absint::JoinResult,
         cfg::ImmForwardCFG,
         visitor::{
-            cfg_satisfies,
-            LocalState,
-            SimpleAbsInt,
-            SimpleAbsIntConstructor,
-            SimpleDomain,
-            SimpleExecutionContext,
+            LocalState, SimpleAbsInt, SimpleAbsIntConstructor, SimpleDomain,
+            SimpleExecutionContext, cfg_satisfies,
         },
-        CFGContext,
-        MemberName,
     },
     diag,
     diagnostics::{Diagnostic, Diagnostics},
     editions::Flavor,
-    expansion::ast::{ModuleIdent, TargetKind},
+    expansion::ast::ModuleIdent,
     hlir::ast::{self as H, Exp, Label, ModuleCall, SingleType, Type, Type_, Var},
-    parser::ast::Ability_,
-    shared::{program_info::TypingProgramInfo, Identifier},
+    parser::ast::{Ability_, TargetKind},
+    shared::{Identifier, program_info::TypingProgramInfo},
     sui_mode::{
-        AUTHENTICATOR_STATE_CREATE,
-        AUTHENTICATOR_STATE_MODULE_NAME,
-        BRIDGE_ADDR_VALUE,
-        BRIDGE_CREATE,
-        BRIDGE_MODULE_NAME,
-        CLOCK_MODULE_NAME,
-        DENY_LIST_CREATE,
-        DENY_LIST_MODULE_NAME,
-        ID_LEAK_DIAG,
-        OBJECT_MODULE_NAME,
-        OBJECT_NEW,
-        OBJECT_NEW_UID_FROM_HASH,
-        RANDOMNESS_MODULE_NAME,
-        RANDOMNESS_STATE_CREATE,
-        SUI_ADDR_NAME,
-        SUI_ADDR_VALUE,
-        SUI_CLOCK_CREATE,
-        SUI_SYSTEM_ADDR_VALUE,
-        SUI_SYSTEM_CREATE,
-        SUI_SYSTEM_MODULE_NAME,
-        TEST_SCENARIO_MODULE_NAME,
-        TS_NEW_OBJECT,
-        UID_TYPE_NAME,
+        ACCUMULATOR_CREATE, ACCUMULATOR_MODULE_NAME, AUTHENTICATOR_STATE_CREATE,
+        AUTHENTICATOR_STATE_MODULE_NAME, BRIDGE_ADDR_VALUE, BRIDGE_CREATE, BRIDGE_MODULE_NAME,
+        CLOCK_MODULE_NAME, DENY_LIST_CREATE, DENY_LIST_MODULE_NAME, ID_LEAK_DIAG,
+        OBJECT_MODULE_NAME, OBJECT_NEW, OBJECT_NEW_UID_FROM_HASH, RANDOMNESS_MODULE_NAME,
+        RANDOMNESS_STATE_CREATE, SUI_ADDR_NAME, SUI_ADDR_VALUE, SUI_CLOCK_CREATE,
+        SUI_SYSTEM_ADDR_VALUE, SUI_SYSTEM_CREATE, SUI_SYSTEM_MODULE_NAME,
+        TEST_SCENARIO_MODULE_NAME, TS_NEW_OBJECT, UID_TYPE_NAME,
     },
 };
 use move_core_types::account_address::AccountAddress;
@@ -60,12 +39,25 @@ pub const FRESH_ID_FUNCTIONS: &[(AccountAddress, Symbol, Symbol)] = &[
     (SUI_ADDR_VALUE, TEST_SCENARIO_MODULE_NAME, TS_NEW_OBJECT),
 ];
 pub const FUNCTIONS_TO_SKIP: &[(AccountAddress, Symbol, Symbol)] = &[
-    (SUI_SYSTEM_ADDR_VALUE, SUI_SYSTEM_MODULE_NAME, SUI_SYSTEM_CREATE),
+    (
+        SUI_SYSTEM_ADDR_VALUE,
+        SUI_SYSTEM_MODULE_NAME,
+        SUI_SYSTEM_CREATE,
+    ),
     (SUI_ADDR_VALUE, CLOCK_MODULE_NAME, SUI_CLOCK_CREATE),
-    (SUI_ADDR_VALUE, AUTHENTICATOR_STATE_MODULE_NAME, AUTHENTICATOR_STATE_CREATE),
-    (SUI_ADDR_VALUE, RANDOMNESS_MODULE_NAME, RANDOMNESS_STATE_CREATE),
+    (
+        SUI_ADDR_VALUE,
+        AUTHENTICATOR_STATE_MODULE_NAME,
+        AUTHENTICATOR_STATE_CREATE,
+    ),
+    (
+        SUI_ADDR_VALUE,
+        RANDOMNESS_MODULE_NAME,
+        RANDOMNESS_STATE_CREATE,
+    ),
     (SUI_ADDR_VALUE, DENY_LIST_MODULE_NAME, DENY_LIST_CREATE),
     (BRIDGE_ADDR_VALUE, BRIDGE_MODULE_NAME, BRIDGE_CREATE),
+    (SUI_ADDR_VALUE, ACCUMULATOR_MODULE_NAME, ACCUMULATOR_CREATE),
 ];
 
 //**************************************************************************************************
@@ -115,14 +107,20 @@ impl SimpleAbsIntConstructor for IDLeakVerifier {
             // Skip if not sui
             return None;
         }
-        if !matches!(minfo.target_kind, TargetKind::Source { is_root_package: true }) {
+        if !matches!(
+            minfo.target_kind,
+            TargetKind::Source {
+                is_root_package: true
+            }
+        ) {
             // Skip non-source, dependency modules
             return None;
         }
 
         if let MemberName::Function(n) = &context.member {
-            let should_skip =
-                FUNCTIONS_TO_SKIP.iter().any(|to_skip| module.value.is(&to_skip.0, to_skip.1) && n.value == to_skip.2);
+            let should_skip = FUNCTIONS_TO_SKIP
+                .iter()
+                .any(|to_skip| module.value.is(&to_skip.0, to_skip.1) && n.value == to_skip.2);
             if should_skip {
                 return None;
             }
@@ -141,20 +139,25 @@ impl SimpleAbsIntConstructor for IDLeakVerifier {
             },
         );
 
-        Some(IDLeakVerifierAI { module, info: context.info })
+        Some(IDLeakVerifierAI {
+            module,
+            info: context.info,
+        })
     }
 }
 
-impl<'a> SimpleAbsInt for IDLeakVerifierAI<'a> {
-    type ExecutionContext = ExecutionContext;
+impl SimpleAbsInt for IDLeakVerifierAI<'_> {
     type State = State;
+    type ExecutionContext = ExecutionContext;
 
     fn finish(&mut self, _final_states: BTreeMap<Label, State>, diags: Diagnostics) -> Diagnostics {
         diags
     }
 
     fn start_command(&self, _: &mut State) -> ExecutionContext {
-        ExecutionContext { diags: Diagnostics::new() }
+        ExecutionContext {
+            diags: Diagnostics::new(),
+        }
     }
 
     fn finish_command(&self, context: ExecutionContext, _state: &mut State) -> Diagnostics {
@@ -162,7 +165,12 @@ impl<'a> SimpleAbsInt for IDLeakVerifierAI<'a> {
         diags
     }
 
-    fn exp_custom(&self, context: &mut ExecutionContext, state: &mut State, e: &Exp) -> Option<Vec<Value>> {
+    fn exp_custom(
+        &self,
+        context: &mut ExecutionContext,
+        state: &mut State,
+        e: &Exp,
+    ) -> Option<Vec<Value>> {
         use H::UnannotatedExp_ as E;
 
         let e__ = &e.exp.value;
@@ -214,7 +222,10 @@ impl<'a> SimpleAbsInt for IDLeakVerifierAI<'a> {
         f: &ModuleCall,
         _args: Vec<Value>,
     ) -> Option<Vec<Value>> {
-        if FRESH_ID_FUNCTIONS.iter().any(|makes_fresh| f.is(&makes_fresh.0, makes_fresh.1, makes_fresh.2)) {
+        if FRESH_ID_FUNCTIONS
+            .iter()
+            .any(|makes_fresh| f.is(&makes_fresh.0, makes_fresh.1, makes_fresh.2))
+        {
             return Some(vec![Value::FreshID(*loc)]);
         }
         Some(match &return_ty.value {
@@ -226,7 +237,9 @@ impl<'a> SimpleAbsInt for IDLeakVerifierAI<'a> {
 }
 
 fn value_for_ty(loc: &Loc, sp!(_, t): &SingleType) -> Value {
-    if t.is_apply(&SUI_ADDR_VALUE, OBJECT_MODULE_NAME, UID_TYPE_NAME).is_some() {
+    if t.is_apply(&SUI_ADDR_VALUE, OBJECT_MODULE_NAME, UID_TYPE_NAME)
+        .is_some()
+    {
         Value::NotFresh(*loc)
     } else {
         Value::Other
@@ -254,9 +267,9 @@ impl SimpleDomain for State {
 
             (Value::FreshID(_), Value::FreshID(_)) => *v1,
 
-            (Value::FreshID(_), Value::Other) | (Value::Other, Value::FreshID(_)) | (Value::Other, Value::Other) => {
-                Value::Other
-            }
+            (Value::FreshID(_), Value::Other)
+            | (Value::Other, Value::FreshID(_))
+            | (Value::Other, Value::Other) => Value::Other,
         }
     }
 

@@ -11,7 +11,7 @@ use rand::{
     Rng,
 };
 use std::collections::{HashMap, HashSet};
-use sui_test_transaction_builder::make_transfer_sui_transaction;
+use sui_test_transaction_builder::make_transfer_oct_transaction;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::{debug, trace};
 
@@ -127,12 +127,17 @@ async fn test_hash_collections() {
 async fn test_net_determinism() {
     let mut test_cluster = TestClusterBuilder::new().build().await;
 
-    let txn = make_transfer_sui_transaction(&test_cluster.wallet, None, None).await;
+    let txn = make_transfer_oct_transaction(&test_cluster.wallet, None, None).await;
     let digest = test_cluster.execute_transaction(txn).await.digest;
 
     sleep(Duration::from_millis(1000)).await;
 
     let handle = test_cluster.spawn_new_fullnode().await;
 
-    handle.sui_node.state().get_transaction_cache_reader().notify_read_executed_effects(&[digest]).await;
+    handle
+        .sui_node
+        .state()
+        .get_transaction_cache_reader()
+        .notify_read_executed_effects("", &[digest])
+        .await;
 }

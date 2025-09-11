@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    execution_value::{RawValueType, Value},
-    type_resolver::TypeTagResolver,
-};
+use crate::execution_value::{RawValueType, Value};
+use crate::type_resolver::TypeTagResolver;
 use move_core_types::language_storage::TypeTag;
-use sui_types::{error::ExecutionError, execution::ExecutionResult, transaction::Argument, transfer::Receiving};
+use sui_types::{
+    error::ExecutionError, execution::ExecutionResult, transaction::Argument, transfer::Receiving,
+};
 
 pub type TransactionIndex = usize;
 
@@ -46,6 +46,23 @@ pub trait ExecutionMode {
         acc: &mut Self::ExecutionResults,
         argument_updates: Self::ArgumentUpdates,
         command_result: &[Value],
+    ) -> Result<(), ExecutionError>;
+
+    // == Arg/Result V2 ==
+
+    const TRACK_EXECUTION: bool;
+
+    fn add_argument_update_v2(
+        acc: &mut Self::ArgumentUpdates,
+        arg: Argument,
+        bytes: Vec<u8>,
+        type_: TypeTag,
+    ) -> Result<(), ExecutionError>;
+
+    fn finish_command_v2(
+        acc: &mut Self::ExecutionResults,
+        argument_updates: Vec<(Argument, Vec<u8>, TypeTag)>,
+        command_result: Vec<(Vec<u8>, TypeTag)>,
     ) -> Result<(), ExecutionError>;
 }
 
@@ -93,6 +110,25 @@ impl ExecutionMode for Normal {
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
+
+    const TRACK_EXECUTION: bool = false;
+
+    fn add_argument_update_v2(
+        _acc: &mut Self::ArgumentUpdates,
+        _arg: Argument,
+        _bytes: Vec<u8>,
+        _type_: TypeTag,
+    ) -> Result<(), ExecutionError> {
+        invariant_violation!("should not be called");
+    }
+
+    fn finish_command_v2(
+        _acc: &mut Self::ExecutionResults,
+        _argument_updates: Vec<(Argument, Vec<u8>, TypeTag)>,
+        _command_result: Vec<(Vec<u8>, TypeTag)>,
+    ) -> Result<(), ExecutionError> {
+        invariant_violation!("should not be called");
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -138,6 +174,25 @@ impl ExecutionMode for Genesis {
         _command_result: &[Value],
     ) -> Result<(), ExecutionError> {
         Ok(())
+    }
+
+    const TRACK_EXECUTION: bool = false;
+
+    fn add_argument_update_v2(
+        _acc: &mut Self::ArgumentUpdates,
+        _arg: Argument,
+        _bytes: Vec<u8>,
+        _type_: TypeTag,
+    ) -> Result<(), ExecutionError> {
+        invariant_violation!("should not be called");
+    }
+
+    fn finish_command_v2(
+        _acc: &mut Self::ExecutionResults,
+        _argument_updates: Vec<(Argument, Vec<u8>, TypeTag)>,
+        _command_result: Vec<(Vec<u8>, TypeTag)>,
+    ) -> Result<(), ExecutionError> {
+        invariant_violation!("should not be called");
     }
 }
 
@@ -191,6 +246,25 @@ impl ExecutionMode for System {
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
+
+    const TRACK_EXECUTION: bool = false;
+
+    fn add_argument_update_v2(
+        _acc: &mut Self::ArgumentUpdates,
+        _arg: Argument,
+        _bytes: Vec<u8>,
+        _type_: TypeTag,
+    ) -> Result<(), ExecutionError> {
+        invariant_violation!("should not be called");
+    }
+
+    fn finish_command_v2(
+        _acc: &mut Self::ExecutionResults,
+        _argument_updates: Vec<(Argument, Vec<u8>, TypeTag)>,
+        _command_result: Vec<(Vec<u8>, TypeTag)>,
+    ) -> Result<(), ExecutionError> {
+        invariant_violation!("should not be called");
+    }
 }
 
 /// WARNING! Using this mode will bypass all normal checks around Move entry functions! This
@@ -243,19 +317,45 @@ impl<const SKIP_ALL_CHECKS: bool> ExecutionMode for DevInspect<SKIP_ALL_CHECKS> 
         argument_updates: Self::ArgumentUpdates,
         command_result: &[Value],
     ) -> Result<(), ExecutionError> {
-        let command_bytes =
-            command_result.iter().map(|value| value_to_bytes_and_tag(resolver, value)).collect::<Result<_, _>>()?;
+        let command_bytes = command_result
+            .iter()
+            .map(|value| value_to_bytes_and_tag(resolver, value))
+            .collect::<Result<_, _>>()?;
         acc.push((argument_updates, command_bytes));
+        Ok(())
+    }
+
+    const TRACK_EXECUTION: bool = true;
+
+    fn add_argument_update_v2(
+        acc: &mut Self::ArgumentUpdates,
+        arg: Argument,
+        bytes: Vec<u8>,
+        type_: TypeTag,
+    ) -> Result<(), ExecutionError> {
+        acc.push((arg, bytes, type_));
+        Ok(())
+    }
+
+    fn finish_command_v2(
+        acc: &mut Self::ExecutionResults,
+        argument_updates: Vec<(Argument, Vec<u8>, TypeTag)>,
+        command_result: Vec<(Vec<u8>, TypeTag)>,
+    ) -> Result<(), ExecutionError> {
+        acc.push((argument_updates, command_result));
         Ok(())
     }
 }
 
-fn value_to_bytes_and_tag(resolver: &impl TypeTagResolver, value: &Value) -> Result<(Vec<u8>, TypeTag), ExecutionError> {
+fn value_to_bytes_and_tag(
+    resolver: &impl TypeTagResolver,
+    value: &Value,
+) -> Result<(Vec<u8>, TypeTag), ExecutionError> {
     let (type_tag, bytes) = match value {
         Value::Object(obj) => {
             let tag = resolver.get_type_tag(&obj.type_)?;
             let mut bytes = vec![];
-            obj.write_bcs_bytes(&mut bytes);
+            obj.write_bcs_bytes(&mut bytes, None)?;
             (tag, bytes)
         }
         Value::Raw(RawValueType::Any, bytes) => {
@@ -266,7 +366,10 @@ fn value_to_bytes_and_tag(resolver: &impl TypeTagResolver, value: &Value) -> Res
             let tag = resolver.get_type_tag(ty)?;
             (tag, bytes.clone())
         }
-        Value::Receiving(id, seqno, _) => (Receiving::type_tag(), Receiving::new(*id, *seqno).to_bcs_bytes()),
+        Value::Receiving(id, seqno, _) => (
+            Receiving::type_tag(),
+            Receiving::new(*id, *seqno).to_bcs_bytes(),
+        ),
     };
     Ok((bytes, type_tag))
 }

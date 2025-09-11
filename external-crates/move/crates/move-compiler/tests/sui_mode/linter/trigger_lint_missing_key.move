@@ -1,5 +1,5 @@
 module a::trigger_lint_cases {
-    use one::object::UID;
+    use sui::object::UID;
 
     // This should trigger the linter warning (true positive)
     struct MissingKeyAbility {
@@ -8,7 +8,7 @@ module a::trigger_lint_cases {
 
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

@@ -1,7 +1,7 @@
 // TxContext by immutable or mutable ref
 
 module a::m {
-    use one::tx_context;
+    use sui::tx_context;
     public entry fun f(_: &tx_context::TxContext) {
         abort 0
     }
@@ -11,6 +11,6 @@ module a::m {
     }
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

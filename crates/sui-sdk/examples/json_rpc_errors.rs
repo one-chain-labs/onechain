@@ -10,7 +10,10 @@ use utils::setup_for_read;
 async fn main() -> Result<(), anyhow::Error> {
     let (sui, active_address) = setup_for_read().await?;
     let coin_type = Some("0x42".to_string());
-    let coins = sui.coin_read_api().get_coins(active_address, coin_type.clone(), None, Some(5)).await;
+    let coins = sui
+        .coin_read_api()
+        .get_coins(active_address, coin_type.clone(), None, Some(5))
+        .await;
     let error = coins.unwrap_err();
     if let Error::RpcError(rpc_error) = error {
         let converted: JsonRpcError = rpc_error.into();

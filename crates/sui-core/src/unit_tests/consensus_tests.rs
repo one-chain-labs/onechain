@@ -2,36 +2,41 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashSet;
+use std::time::Duration;
 
 use super::*;
-use crate::{
-    authority::{authority_tests::init_state_with_objects, AuthorityState},
-    checkpoints::CheckpointServiceNoop,
-    consensus_handler::SequencedConsensusTransaction,
-    mock_consensus::with_block_status,
-};
-use consensus_core::{BlockRef, BlockStatus};
+use crate::authority::shared_object_version_manager::AssignedTxAndVersions;
+use crate::authority::ExecutionEnv;
+use crate::authority::{authority_tests::init_state_with_objects, AuthorityState};
+use crate::checkpoints::CheckpointServiceNoop;
+use crate::consensus_handler::SequencedConsensusTransaction;
+use crate::execution_scheduler::ExecutionSchedulerAPI;
+use crate::mock_consensus::with_block_status;
+use consensus_core::BlockStatus;
+use consensus_types::block::BlockRef;
 use fastcrypto::traits::KeyPair;
 use move_core_types::{account_address::AccountAddress, ident_str};
 use parking_lot::Mutex;
-use rand::{rngs::StdRng, SeedableRng};
+use rand::rngs::StdRng;
+use rand::{thread_rng, Rng, SeedableRng};
+use sui_macros::sim_test;
+use sui_types::crypto::{deterministic_random_account_key, AccountKeyPair};
+use sui_types::gas::GasCostSummary;
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSignatureMessage, CheckpointSummary,
+    SignedCheckpointSummary,
+};
+use sui_types::utils::{make_committee_key_num, to_sender_signed_transaction};
+use sui_types::SUI_FRAMEWORK_PACKAGE_ID;
 use sui_types::{
     base_types::{ExecutionDigests, ObjectID, SuiAddress},
-    crypto::{deterministic_random_account_key, AccountKeyPair},
-    gas::GasCostSummary,
-    messages_checkpoint::{CheckpointContents, CheckpointSignatureMessage, CheckpointSummary, SignedCheckpointSummary},
     object::Object,
     transaction::{
-        CallArg,
-        CertifiedTransaction,
-        ObjectArg,
-        TransactionData,
-        VerifiedTransaction,
+        CallArg, CertifiedTransaction, ObjectArg, TransactionData, VerifiedTransaction,
         TEST_ONLY_GAS_UNIT_FOR_OBJECT_BASICS,
     },
-    utils::{make_committee_key, to_sender_signed_transaction},
-    SUI_FRAMEWORK_PACKAGE_ID,
 };
+use tokio::time::sleep;
 
 /// Fixture: a few test gas objects.
 pub fn test_gas_objects() -> Vec<Object> {
@@ -49,7 +54,10 @@ pub fn test_gas_objects() -> Vec<Object> {
 }
 
 /// Fixture: create a few test certificates containing a shared object.
-pub async fn test_certificates(authority: &AuthorityState, shared_object: Object) -> Vec<CertifiedTransaction> {
+pub async fn test_certificates(
+    authority: &AuthorityState,
+    shared_object: Object,
+) -> Vec<CertifiedTransaction> {
     test_certificates_with_gas_objects(authority, &test_gas_objects(), shared_object).await
 }
 
@@ -94,10 +102,15 @@ pub async fn test_certificates_with_gas_objects(
         )
         .unwrap();
 
-        let transaction = epoch_store.verify_transaction(to_sender_signed_transaction(data, &keypair)).unwrap();
+        let transaction = epoch_store
+            .verify_transaction(to_sender_signed_transaction(data, &keypair))
+            .unwrap();
 
         // Submit the transaction and assemble a certificate.
-        let response = authority.handle_transaction(&epoch_store, transaction.clone()).await.unwrap();
+        let response = authority
+            .handle_transaction(&epoch_store, transaction.clone())
+            .await
+            .unwrap();
         let vote = response.status.into_signed_for_testing();
         let certificate = CertifiedTransaction::new(
             transaction.into_message(),
@@ -131,8 +144,12 @@ pub async fn test_user_transaction(
     let mut object_args: Vec<_> = input_objs
         .into_iter()
         .map(|obj| {
-            if obj.is_shared() {
-                ObjectArg::SharedObject { id: obj.id(), initial_shared_version: obj.version(), mutable: true }
+            if obj.is_consensus() {
+                ObjectArg::SharedObject {
+                    id: obj.id(),
+                    initial_shared_version: obj.version(),
+                    mutable: true,
+                }
             } else {
                 ObjectArg::ImmOrOwnedObject(obj.compute_object_reference())
             }
@@ -161,7 +178,9 @@ pub async fn test_user_transaction(
     )
     .unwrap();
 
-    epoch_store.verify_transaction(to_sender_signed_transaction(data, keypair)).unwrap()
+    epoch_store
+        .verify_transaction(to_sender_signed_transaction(data, keypair))
+        .unwrap()
 }
 
 pub fn make_consensus_adapter_for_test(
@@ -186,14 +205,18 @@ pub fn make_consensus_adapter_for_test(
             &self,
             transactions: &[ConsensusTransaction],
             epoch_store: &Arc<AuthorityPerEpochStore>,
-        ) -> SuiResult<BlockStatusReceiver> {
-            let sequenced_transactions: Vec<SequencedConsensusTransaction> =
-                transactions.iter().map(|txn| SequencedConsensusTransaction::new_test(txn.clone())).collect();
+        ) -> SuiResult<(Vec<ConsensusPosition>, BlockStatusReceiver)> {
+            let sequenced_transactions: Vec<SequencedConsensusTransaction> = transactions
+                .iter()
+                .map(|txn| SequencedConsensusTransaction::new_test(txn.clone()))
+                .collect();
 
             let checkpoint_service = Arc::new(CheckpointServiceNoop {});
             let mut transactions = Vec::new();
+            let mut assigned_versions = Vec::new();
             let mut executed_via_checkpoint = 0;
 
+            let num_transactions = sequenced_transactions.len();
             for tx in sequenced_transactions {
                 if let Some(transaction_digest) = tx.transaction.executable_transaction_digest() {
                     if self.process_via_checkpoint.contains(&transaction_digest) {
@@ -202,27 +225,7 @@ pub fn make_consensus_adapter_for_test(
                             .expect("Should not fail");
                         executed_via_checkpoint += 1;
                     } else {
-                        transactions.extend(
-                            epoch_store
-                                .process_consensus_transactions_for_tests(
-                                    vec![tx],
-                                    &checkpoint_service,
-                                    self.state.get_object_cache_reader().as_ref(),
-                                    &self.state.metrics,
-                                    true,
-                                )
-                                .await?,
-                        );
-                    }
-                } else if let SequencedConsensusTransactionKey::External(ConsensusTransactionKey::CheckpointSignature(
-                    _,
-                    checkpoint_sequence_number,
-                )) = tx.transaction.key()
-                {
-                    epoch_store.notify_synced_checkpoint(checkpoint_sequence_number);
-                } else {
-                    transactions.extend(
-                        epoch_store
+                        let (txns, versions) = epoch_store
                             .process_consensus_transactions_for_tests(
                                 vec![tx],
                                 &checkpoint_service,
@@ -230,8 +233,23 @@ pub fn make_consensus_adapter_for_test(
                                 &self.state.metrics,
                                 true,
                             )
-                            .await?,
-                    );
+                            .await?;
+
+                        transactions.extend(txns);
+                        assigned_versions.extend(versions.0);
+                    }
+                } else {
+                    let (txns, versions) = epoch_store
+                        .process_consensus_transactions_for_tests(
+                            vec![tx],
+                            &checkpoint_service,
+                            self.state.get_object_cache_reader().as_ref(),
+                            &self.state.metrics,
+                            true,
+                        )
+                        .await?;
+                    transactions.extend(txns);
+                    assigned_versions.extend(versions.0);
                 }
             }
 
@@ -241,12 +259,45 @@ pub fn make_consensus_adapter_for_test(
                 "Some transactions were not executed via checkpoint"
             );
 
+            let assigned_versions = AssignedTxAndVersions::new(assigned_versions).into_map();
+            let transactions = transactions
+                .into_iter()
+                .map(|tx| {
+                    let assigned_versions = assigned_versions
+                        .get(&tx.key())
+                        .cloned()
+                        .unwrap_or_default();
+                    (
+                        tx,
+                        ExecutionEnv::new().with_assigned_versions(assigned_versions),
+                    )
+                })
+                .collect();
+
             if self.execute {
-                self.state.transaction_manager().enqueue(transactions, epoch_store);
+                self.state
+                    .execution_scheduler()
+                    .enqueue(transactions, epoch_store);
             }
 
-            assert!(!self.mock_block_status_receivers.lock().is_empty(), "No mock submit responses left");
-            Ok(self.mock_block_status_receivers.lock().remove(0))
+            assert!(
+                !self.mock_block_status_receivers.lock().is_empty(),
+                "No mock submit responses left"
+            );
+
+            let mut consensus_positions = Vec::new();
+            for index in 0..num_transactions {
+                consensus_positions.push(ConsensusPosition {
+                    epoch: epoch_store.epoch(),
+                    index: index as u16,
+                    block: BlockRef::MIN,
+                });
+            }
+
+            Ok((
+                consensus_positions,
+                self.mock_block_status_receivers.lock().remove(0),
+            ))
         }
     }
     let epoch_store = state.epoch_store_for_testing();
@@ -258,6 +309,7 @@ pub fn make_consensus_adapter_for_test(
             execute,
             mock_block_status_receivers: Arc::new(Mutex::new(mock_block_status_receivers)),
         }),
+        state.checkpoint_store.clone(),
         state.name,
         Arc::new(ConnectionMonitorStatusForTests {}),
         100_000,
@@ -279,7 +331,10 @@ async fn submit_transaction_to_consensus_adapter() {
     let shared_object = Object::shared_for_testing();
     objects.push(shared_object.clone());
     let state = init_state_with_objects(objects).await;
-    let certificate = test_certificates(&state, shared_object).await.pop().unwrap();
+    let certificate = test_certificates(&state, shared_object)
+        .await
+        .pop()
+        .unwrap();
     let epoch_store = state.epoch_store_for_testing();
 
     // Make a new consensus adapter instance.
@@ -289,13 +344,23 @@ async fn submit_transaction_to_consensus_adapter() {
         with_block_status(BlockStatus::GarbageCollected(BlockRef::MIN)),
         with_block_status(BlockStatus::Sequenced(BlockRef::MIN)),
     ];
-    let adapter = make_consensus_adapter_for_test(state.clone(), HashSet::new(), false, block_status_receivers);
+    let adapter = make_consensus_adapter_for_test(
+        state.clone(),
+        HashSet::new(),
+        false,
+        block_status_receivers,
+    );
 
     // Submit the transaction and ensure the adapter reports success to the caller. Note
     // that consensus may drop some transactions (so we may need to resubmit them).
     let transaction = ConsensusTransaction::new_certificate_message(&state.name, certificate);
     let waiter = adapter
-        .submit(transaction.clone(), Some(&epoch_store.get_reconfig_state_read_lock_guard()), &epoch_store)
+        .submit(
+            transaction.clone(),
+            Some(&epoch_store.get_reconfig_state_read_lock_guard()),
+            &epoch_store,
+            None,
+        )
         .unwrap();
     waiter.await.unwrap();
 }
@@ -321,10 +386,12 @@ async fn submit_multiple_transactions_to_consensus_adapter() {
     process_via_checkpoint.insert(*certificates[1].digest());
 
     // Make a new consensus adapter instance.
-    let adapter =
-        make_consensus_adapter_for_test(state.clone(), process_via_checkpoint, false, vec![with_block_status(
-            BlockStatus::Sequenced(BlockRef::MIN),
-        )]);
+    let adapter = make_consensus_adapter_for_test(
+        state.clone(),
+        process_via_checkpoint,
+        false,
+        vec![with_block_status(BlockStatus::Sequenced(BlockRef::MIN))],
+    );
 
     // Submit the transaction and ensure the adapter reports success to the caller. Note
     // that consensus may drop some transactions (so we may need to resubmit them).
@@ -334,30 +401,38 @@ async fn submit_multiple_transactions_to_consensus_adapter() {
         .collect::<Vec<_>>();
 
     let waiter = adapter
-        .submit_batch(&transactions, Some(&epoch_store.get_reconfig_state_read_lock_guard()), &epoch_store)
+        .submit_batch(
+            &transactions,
+            Some(&epoch_store.get_reconfig_state_read_lock_guard()),
+            &epoch_store,
+            None,
+        )
         .unwrap();
     waiter.await.unwrap();
 }
 
-#[tokio::test]
+#[sim_test]
 async fn submit_checkpoint_signature_to_consensus_adapter() {
     telemetry_subscribers::init_for_testing();
 
     let mut rng = StdRng::seed_from_u64(1_100);
-    let (keys, committee) = make_committee_key(&mut rng);
+    let (keys, committee) = make_committee_key_num(1, &mut rng);
 
     // Initialize an authority
     let state = init_state_with_objects(vec![]).await;
     let epoch_store = state.epoch_store_for_testing();
 
     // Make a new consensus adapter instance.
-    let adapter = make_consensus_adapter_for_test(state, HashSet::new(), false, vec![with_block_status(
-        BlockStatus::Sequenced(BlockRef::MIN),
-    )]);
+    let adapter = make_consensus_adapter_for_test(
+        state.clone(),
+        HashSet::new(),
+        false,
+        vec![with_block_status(BlockStatus::Sequenced(BlockRef::MIN))],
+    );
 
     let checkpoint_summary = CheckpointSummary::new(
         &ProtocolConfig::get_for_max_version_UNSAFE(),
-        1,
+        0,
         2,
         10,
         &CheckpointContents::new_with_digests_only_for_tests([ExecutionDigests::random()]),
@@ -370,14 +445,58 @@ async fn submit_checkpoint_signature_to_consensus_adapter() {
 
     let authority_key = &keys[0];
     let authority = authority_key.public().into();
-    let signed_checkpoint_summary =
-        SignedCheckpointSummary::new(committee.epoch, checkpoint_summary, authority_key, authority);
+    let signed_checkpoint_summary = SignedCheckpointSummary::new(
+        committee.epoch,
+        checkpoint_summary.clone(),
+        authority_key,
+        authority,
+    );
 
-    let transactions = vec![ConsensusTransaction::new_checkpoint_signature_message(CheckpointSignatureMessage {
-        summary: signed_checkpoint_summary,
-    })];
-    let waiter = adapter
-        .submit_batch(&transactions, Some(&epoch_store.get_reconfig_state_read_lock_guard()), &epoch_store)
-        .unwrap();
-    waiter.await.unwrap();
+    let checkpoint_cert = CertifiedCheckpointSummary::new(
+        checkpoint_summary,
+        vec![signed_checkpoint_summary.auth_sig().clone()],
+        &committee,
+    )
+    .unwrap();
+
+    let verified_checkpoint_summary = checkpoint_cert.try_into_verified(&committee).unwrap();
+
+    let t1 = tokio::spawn({
+        let state = state.clone();
+        let verified_checkpoint_summary = verified_checkpoint_summary.clone();
+
+        async move {
+            let delay = Duration::from_millis(thread_rng().gen_range(0..1000));
+            sleep(delay).await;
+            state
+                .checkpoint_store
+                .insert_verified_checkpoint(&verified_checkpoint_summary)
+                .unwrap();
+            state
+                .checkpoint_store
+                .update_highest_synced_checkpoint(&verified_checkpoint_summary)
+                .unwrap();
+        }
+    });
+
+    let t2 = tokio::spawn(async move {
+        let transactions = vec![ConsensusTransaction::new_checkpoint_signature_message(
+            CheckpointSignatureMessage {
+                summary: signed_checkpoint_summary,
+            },
+        )];
+
+        let waiter = adapter
+            .submit_batch(
+                &transactions,
+                Some(&epoch_store.get_reconfig_state_read_lock_guard()),
+                &epoch_store,
+                None,
+            )
+            .unwrap();
+        waiter.await.unwrap();
+    });
+
+    t1.await.unwrap();
+    t2.await.unwrap();
 }

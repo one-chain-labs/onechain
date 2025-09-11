@@ -3,29 +3,16 @@
 
 use crate::SecurityWatchdogConfig;
 use anyhow::anyhow;
-use arrow_array::{
-    cast::AsArray,
-    types::{
-        Decimal128Type,
-        Float16Type,
-        Float32Type,
-        Float64Type,
-        Int16Type,
-        Int32Type,
-        Int64Type,
-        Int8Type,
-        UInt16Type,
-        UInt32Type,
-        UInt64Type,
-        UInt8Type,
-    },
-    Array,
-    Float32Array,
-    RecordBatch,
+use arrow_array::cast::AsArray;
+use arrow_array::types::{
+    Decimal128Type, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
+    Int8Type, UInt16Type, UInt32Type, UInt64Type, UInt8Type,
 };
+use arrow_array::{Array, Float32Array, RecordBatch};
 use lexical_util::num::AsPrimitive;
 use snowflake_api::{QueryResult, SnowflakeApi};
-use std::{any::Any, collections::HashMap};
+use std::any::Any;
+use std::collections::HashMap;
 use tracing::info;
 
 pub type Row = HashMap<String, Box<dyn Any + Send>>;
@@ -50,7 +37,10 @@ macro_rules! insert_primitive_values {
                     entry.insert($name.clone(), Box::new(value.value(i)));
                 } else {
                     $rows.push(HashMap::new());
-                    $rows.last_mut().unwrap().insert($name.clone(), Box::new(value.value(i)));
+                    $rows
+                        .last_mut()
+                        .unwrap()
+                        .insert($name.clone(), Box::new(value.value(i)));
                 }
             }
             continue;
@@ -67,7 +57,10 @@ macro_rules! insert_string_values {
                     entry.insert($name.clone(), Box::new(value.value(i).to_string()));
                 } else {
                     $rows.push(HashMap::new());
-                    $rows.last_mut().unwrap().insert($name.clone(), Box::new(value.value(i).to_string()));
+                    $rows
+                        .last_mut()
+                        .unwrap()
+                        .insert($name.clone(), Box::new(value.value(i).to_string()));
                 }
             }
             continue;
@@ -116,9 +109,17 @@ impl SnowflakeQueryRunner {
         })
     }
 
-    pub fn from_config(config: &SecurityWatchdogConfig, sf_password: String) -> anyhow::Result<Self> {
+    pub fn from_config(
+        config: &SecurityWatchdogConfig,
+        sf_password: String,
+    ) -> anyhow::Result<Self> {
         Self::new(
-            config.sf_account_identifier.as_ref().cloned().unwrap().as_str(),
+            config
+                .sf_account_identifier
+                .as_ref()
+                .cloned()
+                .unwrap()
+                .as_str(),
             config.sf_warehouse.as_ref().cloned().unwrap().as_str(),
             config.sf_database.as_ref().cloned().unwrap().as_str(),
             config.sf_schema.as_ref().cloned().unwrap().as_str(),
@@ -178,7 +179,10 @@ impl SnowflakeQueryRunner {
             let schema = batch.schema();
             let data_type = schema.fields()[index].data_type();
             let metadata = schema.fields()[index].metadata();
-            info!("Skipping column: {}, data_type: {:?}, metadata: {:?}", name, data_type, metadata);
+            info!(
+                "Skipping column: {}, data_type: {:?}, metadata: {:?}",
+                name, data_type, metadata
+            );
         }
         Ok(rows)
     }

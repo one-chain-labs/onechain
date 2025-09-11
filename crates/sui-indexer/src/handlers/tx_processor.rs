@@ -4,21 +4,20 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use sui_json_rpc::{get_balance_changes_from_effect, get_object_changes, ObjectProvider};
-use sui_rpc_api::CheckpointData;
-use sui_types::{
-    base_types::{ObjectID, SequenceNumber},
-    digests::TransactionDigest,
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    object::Object,
-    transaction::{TransactionData, TransactionDataAPI},
-};
+use sui_json_rpc::get_balance_changes_from_effect;
+use sui_json_rpc::get_object_changes;
+use sui_json_rpc::ObjectProvider;
+use sui_types::base_types::ObjectID;
+use sui_types::base_types::SequenceNumber;
+use sui_types::digests::TransactionDigest;
+use sui_types::effects::{TransactionEffects, TransactionEffectsAPI};
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::object::Object;
+use sui_types::transaction::{TransactionData, TransactionDataAPI};
 
-use crate::{
-    errors::IndexerError,
-    metrics::IndexerMetrics,
-    types::{IndexedObjectChange, IndexerResult},
-};
+use crate::errors::IndexerError;
+use crate::metrics::IndexerMetrics;
+use crate::types::{IndexedObjectChange, IndexerResult};
 
 pub struct InMemObjectCache {
     id_map: HashMap<ObjectID, Object>,
@@ -27,7 +26,10 @@ pub struct InMemObjectCache {
 
 impl InMemObjectCache {
     pub fn new() -> Self {
-        Self { id_map: HashMap::new(), seq_map: HashMap::new() }
+        Self {
+            id_map: HashMap::new(),
+            seq_map: HashMap::new(),
+        }
     }
 
     pub fn insert_object(&mut self, obj: Object) {
@@ -64,7 +66,10 @@ impl TxChangesProcessor {
         for obj in objects {
             object_cache.insert_object(<&Object>::clone(obj).clone());
         }
-        Self { object_cache, metrics }
+        Self {
+            object_cache,
+            metrics,
+        }
     }
 
     pub(crate) async fn get_changes(
@@ -72,8 +77,14 @@ impl TxChangesProcessor {
         tx: &TransactionData,
         effects: &TransactionEffects,
         tx_digest: &TransactionDigest,
-    ) -> IndexerResult<(Vec<sui_json_rpc_types::BalanceChange>, Vec<IndexedObjectChange>)> {
-        let _timer = self.metrics.indexing_tx_object_changes_latency.start_timer();
+    ) -> IndexerResult<(
+        Vec<sui_json_rpc_types::BalanceChange>,
+        Vec<IndexedObjectChange>,
+    )> {
+        let _timer = self
+            .metrics
+            .indexing_tx_object_changes_latency
+            .start_timer();
         let object_change: Vec<_> = get_object_changes(
             self,
             effects,
@@ -89,8 +100,12 @@ impl TxChangesProcessor {
         let balance_change = get_balance_changes_from_effect(
             self,
             effects,
-            tx.input_objects()
-                .unwrap_or_else(|e| panic!("Checkpointed tx {:?} has inavlid input objects: {e}", tx_digest,)),
+            tx.input_objects().unwrap_or_else(|e| {
+                panic!(
+                    "Checkpointed tx {:?} has invalid input objects: {e}",
+                    tx_digest,
+                )
+            }),
             None,
         )
         .await?;
@@ -102,14 +117,25 @@ impl TxChangesProcessor {
 impl ObjectProvider for TxChangesProcessor {
     type Error = IndexerError;
 
-    async fn get_object(&self, id: &ObjectID, version: &SequenceNumber) -> Result<Object, Self::Error> {
-        let object = self.object_cache.get(id, Some(version)).as_ref().map(|o| <&Object>::clone(o).clone());
+    async fn get_object(
+        &self,
+        id: &ObjectID,
+        version: &SequenceNumber,
+    ) -> Result<Object, Self::Error> {
+        let object = self
+            .object_cache
+            .get(id, Some(version))
+            .as_ref()
+            .map(|o| <&Object>::clone(o).clone());
         if let Some(o) = object {
             self.metrics.indexing_get_object_in_mem_hit.inc();
             return Ok(o);
         }
 
-        panic!("Object {} is not found in TxChangesProcessor as an ObjectProvider (fn get_object)", id);
+        panic!(
+            "Object {} is not found in TxChangesProcessor as an ObjectProvider (fn get_object)",
+            id
+        );
     }
 
     async fn find_object_lt_or_eq_version(
@@ -118,7 +144,11 @@ impl ObjectProvider for TxChangesProcessor {
         version: &SequenceNumber,
     ) -> Result<Option<Object>, Self::Error> {
         // First look up the exact version in object_cache.
-        let object = self.object_cache.get(id, Some(version)).as_ref().map(|o| <&Object>::clone(o).clone());
+        let object = self
+            .object_cache
+            .get(id, Some(version))
+            .as_ref()
+            .map(|o| <&Object>::clone(o).clone());
         if let Some(o) = object {
             self.metrics.indexing_get_object_in_mem_hit.inc();
             return Ok(Some(o));
@@ -127,10 +157,19 @@ impl ObjectProvider for TxChangesProcessor {
         // Second look up the latest version in object_cache. This may be
         // called when the object is deleted hence the version at deletion
         // is given.
-        let object = self.object_cache.get(id, None).as_ref().map(|o| <&Object>::clone(o).clone());
+        let object = self
+            .object_cache
+            .get(id, None)
+            .as_ref()
+            .map(|o| <&Object>::clone(o).clone());
         if let Some(o) = object {
             if o.version() > *version {
-                panic!("Found a higher version {} for object {}, expected lt_or_eq {}", o.version(), id, *version);
+                panic!(
+                    "Found a higher version {} for object {}, expected lt_or_eq {}",
+                    o.version(),
+                    id,
+                    *version
+                );
             }
             if o.version() <= *version {
                 self.metrics.indexing_get_object_in_mem_hit.inc();
@@ -138,10 +177,7 @@ impl ObjectProvider for TxChangesProcessor {
             }
         }
 
-        panic!(
-            "Object {} is not found in TxChangesProcessor as an ObjectProvider (fn find_object_lt_or_eq_version)",
-            id
-        );
+        panic!("Object {} is not found in TxChangesProcessor as an ObjectProvider (fn find_object_lt_or_eq_version)", id);
     }
 }
 
@@ -153,16 +189,30 @@ pub(crate) struct EpochEndIndexingObjectStore<'a> {
 
 impl<'a> EpochEndIndexingObjectStore<'a> {
     pub fn new(data: &'a CheckpointData) -> Self {
-        Self { objects: data.latest_live_output_objects() }
+        Self {
+            objects: data.latest_live_output_objects(),
+        }
     }
 }
 
-impl<'a> sui_types::storage::ObjectStore for EpochEndIndexingObjectStore<'a> {
+impl sui_types::storage::ObjectStore for EpochEndIndexingObjectStore<'_> {
     fn get_object(&self, object_id: &ObjectID) -> Option<Object> {
-        self.objects.iter().find(|o| o.id() == *object_id).cloned().cloned()
+        self.objects
+            .iter()
+            .find(|o| o.id() == *object_id)
+            .cloned()
+            .cloned()
     }
 
-    fn get_object_by_key(&self, object_id: &ObjectID, version: sui_types::base_types::VersionNumber) -> Option<Object> {
-        self.objects.iter().find(|o| o.id() == *object_id && o.version() == version).cloned().cloned()
+    fn get_object_by_key(
+        &self,
+        object_id: &ObjectID,
+        version: sui_types::base_types::VersionNumber,
+    ) -> Option<Object> {
+        self.objects
+            .iter()
+            .find(|o| o.id() == *object_id && o.version() == version)
+            .cloned()
+            .cloned()
     }
 }

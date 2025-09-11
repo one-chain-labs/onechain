@@ -6,30 +6,20 @@ use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
 use std::collections::{BTreeMap, HashMap};
 use sui_config::genesis;
+use sui_types::storage::{get_module, load_package_object_from_object_store, PackageObject};
 use sui_types::{
     base_types::{AuthorityName, ObjectID, SequenceNumber, SuiAddress},
     committee::{Committee, EpochId},
     crypto::{AccountKeyPair, AuthorityKeyPair},
-    digests::{ObjectDigest, TransactionDigest, TransactionEventsDigest},
+    digests::{ObjectDigest, TransactionDigest},
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::SuiError,
     messages_checkpoint::{
-        CheckpointContents,
-        CheckpointContentsDigest,
-        CheckpointDigest,
-        CheckpointSequenceNumber,
+        CheckpointContents, CheckpointContentsDigest, CheckpointDigest, CheckpointSequenceNumber,
         VerifiedCheckpoint,
     },
     object::{Object, Owner},
-    storage::{
-        get_module,
-        load_package_object_from_object_store,
-        BackingPackageStore,
-        ChildObjectResolver,
-        ObjectStore,
-        PackageObject,
-        ParentSync,
-    },
+    storage::{BackingPackageStore, ChildObjectResolver, ObjectStore, ParentSync},
     transaction::VerifiedTransaction,
 };
 
@@ -45,9 +35,7 @@ pub struct InMemoryStore {
     // Transaction data
     transactions: HashMap<TransactionDigest, VerifiedTransaction>,
     effects: HashMap<TransactionDigest, TransactionEffects>,
-    events: HashMap<TransactionEventsDigest, TransactionEvents>,
-    // Map from transaction digest to events digest for easy lookup
-    events_tx_digest_index: HashMap<TransactionDigest, TransactionEventsDigest>,
+    events: HashMap<TransactionDigest, TransactionEvents>,
 
     // Committee data
     epoch_to_committee: Vec<Committee>,
@@ -71,33 +59,43 @@ impl InMemoryStore {
         self.checkpoints.get(&sequence_number)
     }
 
-    pub fn get_checkpoint_by_digest(&self, digest: &CheckpointDigest) -> Option<&VerifiedCheckpoint> {
+    pub fn get_checkpoint_by_digest(
+        &self,
+        digest: &CheckpointDigest,
+    ) -> Option<&VerifiedCheckpoint> {
         self.checkpoint_digest_to_sequence_number
             .get(digest)
             .and_then(|sequence_number| self.get_checkpoint_by_sequence_number(*sequence_number))
     }
 
     pub fn get_highest_checkpint(&self) -> Option<&VerifiedCheckpoint> {
-        self.checkpoints.last_key_value().map(|(_, checkpoint)| checkpoint)
+        self.checkpoints
+            .last_key_value()
+            .map(|(_, checkpoint)| checkpoint)
     }
 
-    pub fn get_checkpoint_contents(&self, digest: &CheckpointContentsDigest) -> Option<&CheckpointContents> {
+    pub fn get_checkpoint_contents(
+        &self,
+        digest: &CheckpointContentsDigest,
+    ) -> Option<&CheckpointContents> {
         self.checkpoint_contents.get(digest)
     }
 
     pub fn get_committee_by_epoch(&self, epoch: EpochId) -> Option<&Committee> {
         self.epoch_to_committee.get(epoch as usize)
     }
-
     pub fn get_transaction(&self, digest: &TransactionDigest) -> Option<&VerifiedTransaction> {
         self.transactions.get(digest)
     }
 
-    pub fn get_transaction_effects(&self, digest: &TransactionDigest) -> Option<&TransactionEffects> {
+    pub fn get_transaction_effects(
+        &self,
+        digest: &TransactionDigest,
+    ) -> Option<&TransactionEffects> {
         self.effects.get(digest)
     }
 
-    pub fn get_transaction_events(&self, digest: &TransactionEventsDigest) -> Option<&TransactionEvents> {
+    pub fn get_transaction_events(&self, digest: &TransactionDigest) -> Option<&TransactionEvents> {
         self.events.get(digest)
     }
 
@@ -107,7 +105,9 @@ impl InMemoryStore {
     }
 
     pub fn get_object_at_version(&self, id: &ObjectID, version: SequenceNumber) -> Option<&Object> {
-        self.objects.get(id).and_then(|versions| versions.get(&version))
+        self.objects
+            .get(id)
+            .and_then(|versions| versions.get(&version))
     }
 
     pub fn get_system_state(&self) -> sui_types::sui_system_state::SuiSystemState {
@@ -125,24 +125,34 @@ impl InMemoryStore {
         self.live_objects
             .iter()
             .flat_map(|(id, version)| self.get_object_at_version(id, *version))
-            .filter(move |object| matches!(object.owner, Owner::AddressOwner(addr) if addr == owner))
+            .filter(
+                move |object| matches!(object.owner, Owner::AddressOwner(addr) if addr == owner),
+            )
     }
 }
 
 impl InMemoryStore {
     pub fn insert_checkpoint(&mut self, checkpoint: VerifiedCheckpoint) {
         if let Some(end_of_epoch_data) = &checkpoint.data().end_of_epoch_data {
-            let next_committee = end_of_epoch_data.next_epoch_committee.iter().cloned().collect();
-            let committee = Committee::new(checkpoint.epoch().checked_add(1).unwrap(), next_committee);
+            let next_committee = end_of_epoch_data
+                .next_epoch_committee
+                .iter()
+                .cloned()
+                .collect();
+            let committee =
+                Committee::new(checkpoint.epoch().checked_add(1).unwrap(), next_committee);
             self.insert_committee(committee);
         }
 
-        self.checkpoint_digest_to_sequence_number.insert(*checkpoint.digest(), *checkpoint.sequence_number());
-        self.checkpoints.insert(*checkpoint.sequence_number(), checkpoint);
+        self.checkpoint_digest_to_sequence_number
+            .insert(*checkpoint.digest(), *checkpoint.sequence_number());
+        self.checkpoints
+            .insert(*checkpoint.sequence_number(), checkpoint);
     }
 
     pub fn insert_checkpoint_contents(&mut self, contents: CheckpointContents) {
-        self.checkpoint_contents.insert(*contents.digest(), contents);
+        self.checkpoint_contents
+            .insert(*contents.digest(), contents);
     }
 
     pub fn insert_committee(&mut self, committee: Committee) {
@@ -183,8 +193,7 @@ impl InMemoryStore {
     }
 
     pub fn insert_events(&mut self, tx_digest: &TransactionDigest, events: TransactionEvents) {
-        self.events_tx_digest_index.insert(*tx_digest, events.digest());
-        self.events.insert(events.digest(), events);
+        self.events.insert(*tx_digest, events);
     }
 
     pub fn update_objects(
@@ -199,13 +208,19 @@ impl InMemoryStore {
         for (object_id, object) in written_objects {
             let version = object.version();
             self.live_objects.insert(object_id, version);
-            self.objects.entry(object_id).or_default().insert(version, object);
+            self.objects
+                .entry(object_id)
+                .or_default()
+                .insert(version, object);
         }
     }
 }
 
 impl BackingPackageStore for InMemoryStore {
-    fn get_package_object(&self, package_id: &ObjectID) -> sui_types::error::SuiResult<Option<PackageObject>> {
+    fn get_package_object(
+        &self,
+        package_id: &ObjectID,
+    ) -> sui_types::error::SuiResult<Option<PackageObject>> {
         load_package_object_from_object_store(self, package_id)
     }
 }
@@ -233,7 +248,8 @@ impl ChildObjectResolver for InMemoryStore {
 
         if child_object.version() > child_version_upper_bound {
             return Err(SuiError::UnsupportedFeatureError {
-                error: "TODO InMemoryStorage::read_child_object does not yet support bounded reads".to_owned(),
+                error: "TODO InMemoryStorage::read_child_object does not yet support bounded reads"
+                    .to_owned(),
             });
         }
 
@@ -247,7 +263,8 @@ impl ChildObjectResolver for InMemoryStore {
         receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
     ) -> sui_types::error::SuiResult<Option<Object>> {
-        let recv_object = match crate::store::SimulatorStore::get_object(self, receiving_object_id) {
+        let recv_object = match crate::store::SimulatorStore::get_object(self, receiving_object_id)
+        {
             None => return Ok(None),
             Some(obj) => obj,
         };
@@ -267,7 +284,9 @@ impl GetModule for InMemoryStore {
     type Item = CompiledModule;
 
     fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<Self::Item>, Self::Error> {
-        Ok(self.get_module(id)?.map(|bytes| CompiledModule::deserialize_with_defaults(&bytes).unwrap()))
+        Ok(self
+            .get_module(id)?
+            .map(|bytes| CompiledModule::deserialize_with_defaults(&bytes).unwrap()))
     }
 }
 
@@ -284,13 +303,20 @@ impl ObjectStore for InMemoryStore {
         self.get_object(object_id).cloned()
     }
 
-    fn get_object_by_key(&self, object_id: &ObjectID, version: sui_types::base_types::VersionNumber) -> Option<Object> {
+    fn get_object_by_key(
+        &self,
+        object_id: &ObjectID,
+        version: sui_types::base_types::VersionNumber,
+    ) -> Option<Object> {
         self.get_object_at_version(object_id, version).cloned()
     }
 }
 
 impl ParentSync for InMemoryStore {
-    fn get_latest_parent_entry_ref_deprecated(&self, _object_id: ObjectID) -> Option<sui_types::base_types::ObjectRef> {
+    fn get_latest_parent_entry_ref_deprecated(
+        &self,
+        _object_id: ObjectID,
+    ) -> Option<sui_types::base_types::ObjectRef> {
         panic!("Never called in newer protocol versions")
     }
 }
@@ -303,17 +329,31 @@ pub struct KeyStore {
 }
 
 impl KeyStore {
-    pub fn from_network_config(network_config: &sui_swarm_config::network_config::NetworkConfig) -> Self {
+    pub fn from_network_config(
+        network_config: &sui_swarm_config::network_config::NetworkConfig,
+    ) -> Self {
         use fastcrypto::traits::KeyPair;
 
         let validator_keys = network_config
             .validator_configs()
             .iter()
-            .map(|config| (config.protocol_public_key(), config.protocol_key_pair().copy()))
+            .map(|config| {
+                (
+                    config.protocol_public_key(),
+                    config.protocol_key_pair().copy(),
+                )
+            })
             .collect();
 
-        let account_keys = network_config.account_keys.iter().map(|key| (key.public().into(), key.copy())).collect();
-        Self { validator_keys, account_keys }
+        let account_keys = network_config
+            .account_keys
+            .iter()
+            .map(|key| (key.public().into(), key.copy()))
+            .collect();
+        Self {
+            validator_keys,
+            account_keys,
+        }
     }
 
     pub fn validator(&self, name: &AuthorityName) -> Option<&AuthorityKeyPair> {
@@ -330,7 +370,8 @@ impl SimulatorStore for InMemoryStore {
         &self,
         sequence_number: CheckpointSequenceNumber,
     ) -> Option<VerifiedCheckpoint> {
-        self.get_checkpoint_by_sequence_number(sequence_number).cloned()
+        self.get_checkpoint_by_sequence_number(sequence_number)
+            .cloned()
     }
 
     fn get_checkpoint_by_digest(&self, digest: &CheckpointDigest) -> Option<VerifiedCheckpoint> {
@@ -341,7 +382,10 @@ impl SimulatorStore for InMemoryStore {
         self.get_highest_checkpint().cloned()
     }
 
-    fn get_checkpoint_contents(&self, digest: &CheckpointContentsDigest) -> Option<CheckpointContents> {
+    fn get_checkpoint_contents(
+        &self,
+        digest: &CheckpointContentsDigest,
+    ) -> Option<CheckpointContents> {
         self.get_checkpoint_contents(digest).cloned()
     }
 
@@ -357,12 +401,8 @@ impl SimulatorStore for InMemoryStore {
         self.get_transaction_effects(digest).cloned()
     }
 
-    fn get_transaction_events(&self, digest: &TransactionEventsDigest) -> Option<TransactionEvents> {
+    fn get_transaction_events(&self, digest: &TransactionDigest) -> Option<TransactionEvents> {
         self.get_transaction_events(digest).cloned()
-    }
-
-    fn get_transaction_events_by_tx_digest(&self, tx_digest: &TransactionDigest) -> Option<TransactionEvents> {
-        self.events_tx_digest_index.get(tx_digest).and_then(|x| self.events.get(x)).cloned()
     }
 
     fn get_object(&self, id: &ObjectID) -> Option<Object> {

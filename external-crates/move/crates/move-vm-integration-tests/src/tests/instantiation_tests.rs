@@ -8,36 +8,13 @@
 use move_binary_format::{
     errors::VMResult,
     file_format::{
-        AbilitySet,
-        AddressIdentifierIndex,
-        Bytecode,
-        Bytecode::*,
-        CodeUnit,
-        CompiledModule,
-        Constant,
-        ConstantPoolIndex,
-        DatatypeHandle,
-        DatatypeHandleIndex,
-        DatatypeTyParameter,
-        FieldDefinition,
-        FunctionDefinition,
-        FunctionHandle,
-        FunctionHandleIndex,
-        FunctionInstantiation,
-        FunctionInstantiationIndex,
-        IdentifierIndex,
-        ModuleHandle,
-        ModuleHandleIndex,
-        Signature,
-        SignatureIndex,
-        SignatureToken,
-        SignatureToken::*,
-        StructDefInstantiation,
-        StructDefInstantiationIndex,
-        StructDefinition,
-        StructDefinitionIndex,
-        StructFieldInformation,
-        TypeSignature,
+        AbilitySet, AddressIdentifierIndex, Bytecode, Bytecode::*, CodeUnit, CompiledModule,
+        Constant, ConstantPoolIndex, DatatypeHandle, DatatypeHandleIndex, DatatypeTyParameter,
+        FieldDefinition, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
+        FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex, ModuleHandle,
+        ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, SignatureToken::*,
+        StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, TypeSignature,
     },
 };
 use move_core_types::{
@@ -53,8 +30,8 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::{
-    gas_schedule::{Gas, GasStatus, INITIAL_COST_SCHEDULE},
     InMemoryStorage,
+    gas_schedule::{Gas, GasStatus, INITIAL_COST_SCHEDULE},
 };
 #[cfg(feature = "tracing")]
 use move_vm_types::gas::GasMeter;
@@ -87,33 +64,89 @@ fn get_gas_meter<'a>(gas_val: u64) -> GasStatus<'a> {
 // can be used for profiling
 fn main_run(gas_val: u64) {
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), load_pop);
-    println!("* load_pop: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* load_pop: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), vec_pack_instantiated);
-    println!("* vec_pack_instantiated: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* vec_pack_instantiated: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), vec_pack_gen_simple);
-    println!("* vec_pack_gen_simple: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* vec_pack_gen_simple: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), vec_pack_gen_deep);
-    println!("* vec_pack_gen_deep: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* vec_pack_gen_deep: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), vec_pack_gen_deep_50);
-    println!("* vec_pack_gen_deep_50: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* vec_pack_gen_deep_50: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), vec_pack_gen_deep_500);
-    println!("* vec_pack_gen_deep_500: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* vec_pack_gen_deep_500: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), instantiated_gen_call);
-    println!("* instantiated_gen_call: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* instantiated_gen_call: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), simple_gen_call);
-    println!("* simple_gen_call: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* simple_gen_call: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), deep_gen_call);
-    println!("* deep_gen_call: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* deep_gen_call: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), deep_gen_call_50);
-    println!("* deep_gen_call_50: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* deep_gen_call_50: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), deep_gen_call_500);
-    println!("* deep_gen_call_500: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* deep_gen_call_500: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), instantiated_rec_gen_call);
-    println!("* instantiated_rec_gen_call: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* instantiated_rec_gen_call: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), simple_rec_gen_call);
-    println!("* simple_rec_gen_call: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* simple_rec_gen_call: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
     let (res, time) = run_with_module(&mut get_gas_meter(gas_val), deep_rec_gen_call);
-    println!("* deep_rec_gen_call: {} - Status: {:?}", time, res.err().unwrap().major_status());
+    println!(
+        "* deep_rec_gen_call: {} - Status: {:?}",
+        time,
+        res.err().unwrap().major_status()
+    );
 }
 
 #[test]
@@ -127,67 +160,135 @@ fn test_instantiation_no_instantiation() {
 // Common runner for all tests.
 // Run a control test (load_pop) and an instantiation test which is then
 // compared against the control.
-// Ensure that tests complete with "out of gas" and withing a given time range.
+// Ensure that tests complete with "out of gas" and within a given time range.
 fn test_runner(
     gas_val: u64,
     test_name: &str,
-    entry_spec: fn(AccountAddress, &mut Session<&'_ InMemoryStorage>) -> (ModuleId, Identifier, Vec<TypeTag>),
+    entry_spec: fn(
+        AccountAddress,
+        &mut Session<&'_ InMemoryStorage>,
+    ) -> (ModuleId, Identifier, Vec<TypeTag>),
     check_result: fn(u128, u128) -> bool,
 ) {
     assert!(gas_val > 0, "Must provide a positive gas budget");
     let mut gas: GasStatus = get_gas_meter(gas_val);
     let (res, ref_time) = run_with_module(&mut gas, load_pop);
-    assert_eq!(res.err().unwrap().major_status(), StatusCode::OUT_OF_GAS, "Must finish OutOfGas");
+    assert_eq!(
+        res.err().unwrap().major_status(),
+        StatusCode::OUT_OF_GAS,
+        "Must finish OutOfGas"
+    );
     let mut gas: GasStatus = get_gas_meter(gas_val);
     let (res, time) = run_with_module(&mut gas, entry_spec);
     let err = res.err().unwrap().major_status();
     println!("* {}: {}ms - Status: {:?}", test_name, time, err);
     // assert_eq!(err, StatusCode::OUT_OF_GAS, "Must finish OutOfGas");
-    assert!(check_result(time, ref_time), "Instantion test taking too long {}", time);
+    assert!(
+        check_result(time, ref_time),
+        "Instantiation test taking too long {}",
+        time
+    );
 }
 
 #[test]
 fn test_instantiation_vec_pack_instantiated() {
-    test_runner(1000, "vec_pack_instantiated", vec_pack_instantiated, |time, ref_time| time < ref_time * 10);
+    test_runner(
+        1000,
+        "vec_pack_instantiated",
+        vec_pack_instantiated,
+        |time, ref_time| time < ref_time * 10,
+    );
 }
 
 #[test]
 fn test_instantiation_vec_pack_gen_simple() {
-    test_runner(1000, "vec_pack_gen_simple", vec_pack_gen_simple, |time, ref_time| time < ref_time * 10);
+    test_runner(
+        1000,
+        "vec_pack_gen_simple",
+        vec_pack_gen_simple,
+        |time, ref_time| time < ref_time * 10,
+    );
 }
 
 #[test]
 fn test_instantiation_vec_pack_gen_deep() {
-    test_runner(1000, "vec_pack_gen_deep", vec_pack_gen_deep, |time, ref_time| time < ref_time * 1000);
-    test_runner(1000, "vec_pack_gen_deep_50", vec_pack_gen_deep_50, |time, ref_time| time < ref_time * 1000);
-    test_runner(1000, "vec_pack_gen_deep_500", vec_pack_gen_deep_500, |time, ref_time| time < ref_time * 1000);
+    test_runner(
+        1000,
+        "vec_pack_gen_deep",
+        vec_pack_gen_deep,
+        |time, ref_time| time < ref_time * 1000,
+    );
+    test_runner(
+        1000,
+        "vec_pack_gen_deep_50",
+        vec_pack_gen_deep_50,
+        |time, ref_time| time < ref_time * 1000,
+    );
+    test_runner(
+        1000,
+        "vec_pack_gen_deep_500",
+        vec_pack_gen_deep_500,
+        |time, ref_time| time < ref_time * 1000,
+    );
 }
 
 #[test]
 fn test_instantiation_instantiated_gen_call() {
-    test_runner(1000, "instantiated_gen_call", instantiated_gen_call, |time, ref_time| time < ref_time * 1000);
+    test_runner(
+        1000,
+        "instantiated_gen_call",
+        instantiated_gen_call,
+        |time, ref_time| time < ref_time * 1000,
+    );
 }
 
 #[test]
 fn test_instantiation_simple_gen_call() {
-    test_runner(1000, "simple_gen_call", simple_gen_call, |time, ref_time| time < ref_time * 1000);
+    test_runner(
+        1000,
+        "simple_gen_call",
+        simple_gen_call,
+        |time, ref_time| time < ref_time * 1000,
+    );
 }
 
 #[test]
 fn test_instantiation_deep_gen_call() {
-    test_runner(1000, "deep_gen_call", deep_gen_call, |time, ref_time| time < ref_time * 100);
-    test_runner(1000, "deep_gen_call_50", deep_gen_call_50, |time, ref_time| time < ref_time * 100);
-    test_runner(1000, "deep_gen_call_500", deep_gen_call_500, |time, ref_time| time < ref_time * 100);
+    test_runner(1000, "deep_gen_call", deep_gen_call, |time, ref_time| {
+        time < ref_time * 100
+    });
+    test_runner(
+        1000,
+        "deep_gen_call_50",
+        deep_gen_call_50,
+        |time, ref_time| time < ref_time * 100,
+    );
+    test_runner(
+        1000,
+        "deep_gen_call_500",
+        deep_gen_call_500,
+        |time, ref_time| time < ref_time * 100,
+    );
 }
 
 #[test]
 fn test_instantiation_simple_rec_gen_call() {
-    test_runner(1000, "simple_rec_gen_call", simple_rec_gen_call, |time, ref_time| time < ref_time * 10);
+    test_runner(
+        1000,
+        "simple_rec_gen_call",
+        simple_rec_gen_call,
+        |time, ref_time| time < ref_time * 10,
+    );
 }
 
 #[test]
 fn test_instantiation_deep_rec_gen_call() {
-    test_runner(1000, "deep_rec_gen_call", deep_rec_gen_call, |time, ref_time| time < ref_time * 1000);
+    test_runner(
+        1000,
+        "deep_rec_gen_call",
+        deep_rec_gen_call,
+        |time, ref_time| time < ref_time * 1000,
+    );
 }
 
 // Generate a verifiable module with a snippet of code that can be used to test instantiations.
@@ -221,7 +322,11 @@ fn make_module(
     mut func_inst_signatures: Vec<Signature>,
 ) -> (ModuleId, Identifier) {
     // default signatures
-    let mut signatures = vec![Signature(vec![]), Signature(vec![U64]), Signature(vec![TypeParameter(0)])];
+    let mut signatures = vec![
+        Signature(vec![]),
+        Signature(vec![U64]),
+        Signature(vec![TypeParameter(0)]),
+    ];
     let locals_idx = if let Some(sig) = locals_sig {
         signatures.push(sig);
         signatures.len() - 1
@@ -235,10 +340,18 @@ fn make_module(
     signatures.append(&mut func_inst_signatures);
 
     let func_type_params = vec![AbilitySet::VECTOR; func_type_params_count];
-    let rec_func_type_params =
-        if func_type_params_count == 0 { vec![AbilitySet::VECTOR] } else { func_type_params.clone() };
-    let struct_type_parameters =
-        vec![DatatypeTyParameter { constraints: AbilitySet::EMPTY, is_phantom: false }; struct_type_params_count];
+    let rec_func_type_params = if func_type_params_count == 0 {
+        vec![AbilitySet::VECTOR]
+    } else {
+        func_type_params.clone()
+    };
+    let struct_type_parameters = vec![
+        DatatypeTyParameter {
+            constraints: AbilitySet::EMPTY,
+            is_phantom: false,
+        };
+        struct_type_params_count
+    ];
 
     // create the code for the single entry point
     let mut code = vec![];
@@ -250,14 +363,18 @@ fn make_module(
     // struct definition instantiations
     let mut struct_def_instantiations = vec![];
     for idx in struct_inst_start..func_inst_start {
-        struct_def_instantiations
-            .push(StructDefInstantiation { def: StructDefinitionIndex(0), type_parameters: SignatureIndex(idx as u16) });
+        struct_def_instantiations.push(StructDefInstantiation {
+            def: StructDefinitionIndex(0),
+            type_parameters: SignatureIndex(idx as u16),
+        });
     }
 
     // function instantiations
     let entry_point = Identifier::new(ENTRY_POINT_NAME).unwrap();
-    let mut function_instantiations =
-        vec![FunctionInstantiation { handle: FunctionHandleIndex(1), type_parameters: SignatureIndex(2) }];
+    let mut function_instantiations = vec![FunctionInstantiation {
+        handle: FunctionHandleIndex(1),
+        type_parameters: SignatureIndex(2),
+    }];
     for idx in func_inst_start..signatures.len() {
         function_instantiations.push(FunctionInstantiation {
             handle: FunctionHandleIndex(func_handle_idxs[idx - func_inst_start]),
@@ -267,9 +384,13 @@ fn make_module(
 
     let module = CompiledModule {
         version: 6,
+        publishable: true,
         // Module definition
         self_module_handle_idx: ModuleHandleIndex(0),
-        module_handles: vec![ModuleHandle { address: AddressIdentifierIndex(0), name: IdentifierIndex(0) }],
+        module_handles: vec![ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex(0),
+        }],
         // struct definition
         datatype_handles: vec![DatatypeHandle {
             module: ModuleHandleIndex(0),
@@ -314,7 +435,11 @@ fn make_module(
                 visibility: move_binary_format::file_format::Visibility::Public,
                 is_entry: true,
                 acquires_global_resources: vec![],
-                code: Some(CodeUnit { locals: SignatureIndex(locals_idx as u16), jump_tables: vec![], code }),
+                code: Some(CodeUnit {
+                    locals: SignatureIndex(locals_idx as u16),
+                    jump_tables: vec![],
+                    code,
+                }),
             },
             FunctionDefinition {
                 function: FunctionHandleIndex(1),
@@ -344,7 +469,11 @@ fn make_module(
                 visibility: move_binary_format::file_format::Visibility::Public,
                 is_entry: false,
                 acquires_global_resources: vec![],
-                code: Some(CodeUnit { locals: SignatureIndex(locals_idx as u16), jump_tables: vec![], code: vec![Ret] }),
+                code: Some(CodeUnit {
+                    locals: SignatureIndex(locals_idx as u16),
+                    jump_tables: vec![],
+                    code: vec![Ret],
+                }),
             },
         ],
         // addresses
@@ -365,7 +494,10 @@ fn make_module(
             Identifier::new(EMPTY_NAME).unwrap(),
         ],
         // constants
-        constant_pool: vec![Constant { type_: Address, data: addr.to_vec() }],
+        constant_pool: vec![Constant {
+            type_: Address,
+            data: addr.to_vec(),
+        }],
         // signatures
         signatures,
         // struct instantiations
@@ -387,8 +519,12 @@ fn make_module(
     move_bytecode_verifier::verify_module_unmetered(&module).expect("verification failed");
 
     let mut mod_bytes = vec![];
-    module.serialize_with_version(module.version, &mut mod_bytes).expect("Module must serialize");
-    session.publish_module(mod_bytes, addr, &mut GasStatus::new_unmetered()).expect("Module must publish");
+    module
+        .serialize_with_version(module.version, &mut mod_bytes)
+        .expect("Module must serialize");
+    session
+        .publish_module(mod_bytes, addr, &mut GasStatus::new_unmetered())
+        .expect("Module must publish");
     (module.self_id(), entry_point)
 }
 
@@ -399,7 +535,10 @@ fn make_module(
 // Report time spent, if it terminates (no gas it will never end; use for profiling).
 fn run_with_module(
     gas: &mut GasStatus,
-    entry_spec: fn(AccountAddress, &mut Session<&'_ InMemoryStorage>) -> (ModuleId, Identifier, Vec<TypeTag>),
+    entry_spec: fn(
+        AccountAddress,
+        &mut Session<&'_ InMemoryStorage>,
+    ) -> (ModuleId, Identifier, Vec<TypeTag>),
 ) -> (VMResult<SerializedReturnValues>, u128) {
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
 
@@ -413,7 +552,10 @@ fn run_with_module(
 
     let now = Instant::now();
 
-    let type_args = type_arg_tags.into_iter().map(|tag| session.load_type(&tag)).collect::<VMResult<Vec<_>>>();
+    let type_args = type_arg_tags
+        .into_iter()
+        .map(|tag| session.load_type(&tag))
+        .collect::<VMResult<Vec<_>>>();
     move_vm_profiler::tracing_feature_enabled! {
         gas.set_profiler(GasProfiler::init(
             &session.vm_config().profiler_config,
@@ -422,7 +564,13 @@ fn run_with_module(
         ));
     }
     let res = type_args.and_then(|type_args| {
-        session.execute_entry_function(&module_id, entry_name.as_ref(), type_args, Vec::<Vec<u8>>::new(), gas)
+        session.execute_entry_function(
+            &module_id,
+            entry_name.as_ref(),
+            type_args,
+            Vec::<Vec<u8>>::new(),
+            gas,
+        )
     });
 
     let time = now.elapsed().as_millis();
@@ -430,7 +578,10 @@ fn run_with_module(
 }
 
 // Call a simple load u8 and pop loop
-fn load_pop(addr: AccountAddress, session: &mut Session<&'_ InMemoryStorage>) -> (ModuleId, Identifier, Vec<TypeTag>) {
+fn load_pop(
+    addr: AccountAddress,
+    session: &mut Session<&'_ InMemoryStorage>,
+) -> (ModuleId, Identifier, Vec<TypeTag>) {
     //
     // Module definition and publishing
     let func_type_params_count = 0;

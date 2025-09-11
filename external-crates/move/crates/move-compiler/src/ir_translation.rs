@@ -29,9 +29,10 @@ pub fn fix_syntax_and_write(out_path: &Path, contents: String) {
     // Module|Address. ~> Module|Address::
     let contents = replace!(contents, r"(([A-Z]\w*)|(\}\})|(0x\d+))\.", "$1::");
     // add fun keyword to functions
-    let contents = replace!(contents, r"(((public|native| )*))(\w+\(.*\).*\{)", |cap: &Captures| format!(
-        "{}fun {}",
-        &cap[1], &cap[4]
-    ));
+    let contents = replace!(
+        contents,
+        r"(((public|native| )*))(\w+\(.*\).*\{)",
+        |cap: &Captures| format!("{}fun {}", &cap[1], &cap[4])
+    );
     fs::write(out_path, contents.as_bytes()).unwrap();
 }

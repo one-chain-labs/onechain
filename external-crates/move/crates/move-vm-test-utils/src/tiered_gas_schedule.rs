@@ -10,13 +10,7 @@
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     gas_algebra::{
-        AbstractMemorySize,
-        GasQuantity,
-        InternalGas,
-        InternalGasUnit,
-        NumArgs,
-        NumBytes,
-        ToUnit,
+        AbstractMemorySize, GasQuantity, InternalGas, InternalGasUnit, NumArgs, NumBytes, ToUnit,
         ToUnitFractional,
     },
     language_storage::ModuleId,
@@ -46,8 +40,8 @@ impl ToUnit<InternalGasUnit> for GasUnit {
 }
 
 impl ToUnitFractional<GasUnit> for InternalGasUnit {
-    const DENOMINATOR: u64 = 1000;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1000;
 }
 
 /// The size in bytes for a non-string or address constant on the stack
@@ -81,9 +75,15 @@ pub struct CostTable {
 }
 
 impl CostTable {
-    fn get_current_and_future_tier(tiers: &BTreeMap<u64, u64>, current: u64, default: u64) -> (u64, Option<u64>) {
-        let current_cost =
-            tiers.get(&current).or_else(|| tiers.range(..current).next_back().map(|(_, v)| v)).unwrap_or(&default);
+    fn get_current_and_future_tier(
+        tiers: &BTreeMap<u64, u64>,
+        current: u64,
+        default: u64,
+    ) -> (u64, Option<u64>) {
+        let current_cost = tiers
+            .get(&current)
+            .or_else(|| tiers.range(..current).next_back().map(|(_, v)| v))
+            .unwrap_or(&default);
         let next_tier_start = tiers
             .range::<u64, _>((Bound::Excluded(current), Bound::Unbounded))
             .next()
@@ -92,15 +92,27 @@ impl CostTable {
     }
 
     pub fn instruction_tier(&self, instr_count: u64) -> (u64, Option<u64>) {
-        Self::get_current_and_future_tier(&self.instruction_tiers, instr_count, INSTRUCTION_TIER_DEFAULT)
+        Self::get_current_and_future_tier(
+            &self.instruction_tiers,
+            instr_count,
+            INSTRUCTION_TIER_DEFAULT,
+        )
     }
 
     pub fn stack_height_tier(&self, stack_height: u64) -> (u64, Option<u64>) {
-        Self::get_current_and_future_tier(&self.stack_height_tiers, stack_height, STACK_HEIGHT_TIER_DEFAULT)
+        Self::get_current_and_future_tier(
+            &self.stack_height_tiers,
+            stack_height,
+            STACK_HEIGHT_TIER_DEFAULT,
+        )
     }
 
     pub fn stack_size_tier(&self, stack_size: u64) -> (u64, Option<u64>) {
-        Self::get_current_and_future_tier(&self.stack_size_tiers, stack_size, STACK_SIZE_TIER_DEFAULT)
+        Self::get_current_and_future_tier(
+            &self.stack_size_tiers,
+            stack_size,
+            STACK_SIZE_TIER_DEFAULT,
+        )
     }
 }
 
@@ -117,18 +129,28 @@ pub struct GasCost {
 
 impl GasCost {
     pub fn new(instruction_gas: u64, memory_gas: u64, stack_height_gas: u64) -> Self {
-        Self { instruction_gas, memory_gas, stack_height_gas }
+        Self {
+            instruction_gas,
+            memory_gas,
+            stack_height_gas,
+        }
     }
 
     /// Convert a GasCost to a total gas charge in `InternalGas`.
     #[inline]
     pub fn total(&self) -> u64 {
-        self.instruction_gas.add(self.memory_gas).add(self.stack_height_gas)
+        self.instruction_gas
+            .add(self.memory_gas)
+            .add(self.stack_height_gas)
     }
 
     #[inline]
     pub fn total_internal(&self) -> InternalGas {
-        GasQuantity::new(self.instruction_gas.add(self.memory_gas).add(self.stack_height_gas))
+        GasQuantity::new(
+            self.instruction_gas
+                .add(self.memory_gas)
+                .add(self.stack_height_gas),
+        )
     }
 }
 
@@ -170,9 +192,12 @@ impl<'a> GasStatus<'a> {
     /// Charge for every operation and fail when there is no more gas to pay for operations.
     /// This is the instantiation that must be used when executing a user script.
     pub fn new(cost_table: &'a CostTable, gas_left: Gas) -> Self {
-        let (stack_height_current_tier_mult, stack_height_next_tier_start) = cost_table.stack_height_tier(0);
-        let (stack_size_current_tier_mult, stack_size_next_tier_start) = cost_table.stack_size_tier(0);
-        let (instructions_current_tier_mult, instructions_next_tier_start) = cost_table.instruction_tier(0);
+        let (stack_height_current_tier_mult, stack_height_next_tier_start) =
+            cost_table.stack_height_tier(0);
+        let (stack_size_current_tier_mult, stack_size_next_tier_start) =
+            cost_table.stack_size_tier(0);
+        let (instructions_current_tier_mult, instructions_next_tier_start) =
+            cost_table.instruction_tier(0);
         Self {
             gas_left: gas_left.to_unit(),
             cost_table,
@@ -232,7 +257,8 @@ impl<'a> GasStatus<'a> {
 
         if let Some(stack_height_tier_next) = self.stack_height_next_tier_start {
             if self.stack_height_current > stack_height_tier_next {
-                let (next_mul, next_tier) = self.cost_table.stack_height_tier(self.stack_height_current);
+                let (next_mul, next_tier) =
+                    self.cost_table.stack_height_tier(self.stack_height_current);
                 self.stack_height_current_tier_mult = next_mul;
                 self.stack_height_next_tier_start = next_tier;
             }
@@ -255,7 +281,8 @@ impl<'a> GasStatus<'a> {
 
         if let Some(instr_tier_next) = self.instructions_next_tier_start {
             if self.instructions_executed > instr_tier_next {
-                let (instr_cost, next_tier) = self.cost_table.instruction_tier(self.instructions_executed);
+                let (instr_cost, next_tier) =
+                    self.cost_table.instruction_tier(self.instructions_executed);
                 self.instructions_current_tier_mult = instr_cost;
                 self.instructions_next_tier_start = next_tier;
             }
@@ -277,7 +304,8 @@ impl<'a> GasStatus<'a> {
 
         if let Some(stack_size_tier_next) = self.stack_size_next_tier_start {
             if self.stack_size_current > stack_size_tier_next {
-                let (next_mul, next_tier) = self.cost_table.stack_size_tier(self.stack_size_current);
+                let (next_mul, next_tier) =
+                    self.cost_table.stack_size_tier(self.stack_size_current);
                 self.stack_size_current_tier_mult = next_mul;
                 self.stack_size_next_tier_start = next_tier;
             }
@@ -362,7 +390,9 @@ impl<'a> GasStatus<'a> {
 }
 
 /// Returns a tuple of (<pops>, <pushes>, <stack_size_decrease>, <stack_size_increase>)
-fn get_simple_instruction_stack_change(instr: SimpleInstruction) -> (u64, u64, AbstractMemorySize, AbstractMemorySize) {
+fn get_simple_instruction_stack_change(
+    instr: SimpleInstruction,
+) -> (u64, u64, AbstractMemorySize, AbstractMemorySize) {
     use SimpleInstruction::*;
 
     match instr {
@@ -395,7 +425,12 @@ fn get_simple_instruction_stack_change(instr: SimpleInstruction) -> (u64, u64, A
         Add | Sub | Mul | Mod | Div => (2, 1, Type::U8.size() + Type::U8.size(), Type::U256.size()),
         BitOr | BitAnd | Xor => (2, 1, Type::U8.size() + Type::U8.size(), Type::U256.size()),
         Shl | Shr => (2, 1, Type::U8.size() + Type::U8.size(), Type::U256.size()),
-        Or | And => (2, 1, Type::Bool.size() + Type::Bool.size(), Type::Bool.size()),
+        Or | And => (
+            2,
+            1,
+            Type::Bool.size() + Type::Bool.size(),
+            Type::Bool.size(),
+        ),
         Lt | Gt | Le | Ge => (2, 1, Type::U8.size() + Type::U8.size(), Type::Bool.size()),
         Not => (1, 1, Type::Bool.size(), Type::Bool.size()),
         Abort => (1, 0, Type::U64.size(), 0.into()),
@@ -410,7 +445,7 @@ impl<'b> GasMeter for GasStatus<'b> {
     }
 
     fn charge_pop(&mut self, popped_val: impl ValueView) -> PartialVMResult<()> {
-        self.charge(1, 0, 1, 0, popped_val.legacy_abstract_memory_size().into())
+        self.charge(1, 0, 1, 0, abstract_memory_size(popped_val).into())
     }
 
     fn charge_native_function(
@@ -420,11 +455,16 @@ impl<'b> GasMeter for GasStatus<'b> {
     ) -> PartialVMResult<()> {
         // Charge for the number of pushes on to the stack that the return of this function is
         // going to cause.
-        let pushes = ret_vals.as_ref().map(|ret_vals| ret_vals.len()).unwrap_or(0) as u64;
+        let pushes = ret_vals
+            .as_ref()
+            .map(|ret_vals| ret_vals.len())
+            .unwrap_or(0) as u64;
         // Calculate the number of bytes that are getting pushed onto the stack.
         let size_increase = ret_vals
             .map(|ret_vals| {
-                ret_vals.fold(AbstractMemorySize::zero(), |acc, elem| acc + elem.legacy_abstract_memory_size())
+                ret_vals.fold(AbstractMemorySize::zero(), |acc, elem| {
+                    acc + abstract_memory_size(elem)
+                })
             })
             .unwrap_or_else(AbstractMemorySize::zero);
         // Charge for the stack operations. We don't count this as an "instruction" since we
@@ -451,8 +491,9 @@ impl<'b> GasMeter for GasStatus<'b> {
         // charge for them.
         let pops = args.len() as u64;
         // Calculate the size decrease of the stack from the above pops.
-        let stack_reduction_size =
-            args.fold(AbstractMemorySize::new(pops), |acc, elem| acc + elem.legacy_abstract_memory_size());
+        let stack_reduction_size = args.fold(AbstractMemorySize::new(pops), |acc, elem| {
+            acc + abstract_memory_size(elem)
+        });
         // Track that this is going to be popping from the operand stack. We also increment the
         // instruction count as we need to account for the `Call` bytecode that initiated this
         // native call.
@@ -470,8 +511,9 @@ impl<'b> GasMeter for GasStatus<'b> {
         let pops = args.len() as u64;
         // Size stays the same -- we're just moving it from the operand stack to the locals. But
         // the size on the operand stack is reduced by sum_{args} arg.size().
-        let stack_reduction_size =
-            args.fold(AbstractMemorySize::new(0), |acc, elem| acc + elem.legacy_abstract_memory_size());
+        let stack_reduction_size = args.fold(AbstractMemorySize::new(0), |acc, elem| {
+            acc + abstract_memory_size(elem)
+        });
         self.charge(1, 0, pops, 0, stack_reduction_size.into())
     }
 
@@ -486,8 +528,9 @@ impl<'b> GasMeter for GasStatus<'b> {
         // We have to perform this many pops from the operand stack for this function call.
         let pops = args.len() as u64;
         // Calculate the size reduction on the operand stack.
-        let stack_reduction_size =
-            args.fold(AbstractMemorySize::new(0), |acc, elem| acc + elem.legacy_abstract_memory_size());
+        let stack_reduction_size = args.fold(AbstractMemorySize::new(0), |acc, elem| {
+            acc + abstract_memory_size(elem)
+        });
         // Charge for the pops, no pushes, and account for the stack size decrease. Also track the
         // `CallGeneric` instruction we must have encountered for this.
         self.charge(1, 0, pops, 0, stack_reduction_size.into())
@@ -498,28 +541,31 @@ impl<'b> GasMeter for GasStatus<'b> {
         self.charge(1, 1, 0, u64::from(size), 0)
     }
 
-    fn charge_ld_const_after_deserialization(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_ld_const_after_deserialization(
+        &mut self,
+        _val: impl ValueView,
+    ) -> PartialVMResult<()> {
         // We already charged for this based on the bytes that we're loading so don't charge again.
         Ok(())
     }
 
     fn charge_copy_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         // Charge for the copy of the local onto the stack.
-        self.charge(1, 1, 0, val.legacy_abstract_memory_size().into(), 0)
+        self.charge(1, 1, 0, abstract_memory_size(val).into(), 0)
     }
 
     fn charge_move_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         // Charge for the move of the local on to the stack. Note that we charge here since we
         // aren't tracking the local size (at least not yet). If we were, this should be a net-zero
         // operation in terms of memory usage.
-        self.charge(1, 1, 0, val.legacy_abstract_memory_size().into(), 0)
+        self.charge(1, 1, 0, abstract_memory_size(val).into(), 0)
     }
 
     fn charge_store_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         // Charge for the storing of the value on the stack into a local. Note here that if we were
         // also accounting for the size of the locals that this would be a net-zero operation in
         // terms of memory.
-        self.charge(1, 0, 1, 0, val.legacy_abstract_memory_size().into())
+        self.charge(1, 0, 1, 0, abstract_memory_size(val).into())
     }
 
     fn charge_pack(
@@ -545,31 +591,61 @@ impl<'b> GasMeter for GasStatus<'b> {
     }
 
     fn charge_variant_switch(&mut self, val: impl ValueView) -> PartialVMResult<()> {
-        self.charge(1, 0, 1, 0, val.legacy_abstract_memory_size().into())
+        self.charge(1, 0, 1, 0, abstract_memory_size(val).into())
     }
 
     fn charge_read_ref(&mut self, ref_val: impl ValueView) -> PartialVMResult<()> {
         // We read the reference so we are decreasing the size of the stack by the size of the
         // reference, and adding to it the size of the value that has been read from that
         // reference.
-        self.charge(1, 1, 1, ref_val.legacy_abstract_memory_size().into(), REFERENCE_SIZE.into())
+        self.charge(
+            1,
+            1,
+            1,
+            abstract_memory_size(ref_val).into(),
+            REFERENCE_SIZE.into(),
+        )
     }
 
-    fn charge_write_ref(&mut self, new_val: impl ValueView, old_val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_write_ref(
+        &mut self,
+        new_val: impl ValueView,
+        old_val: impl ValueView,
+    ) -> PartialVMResult<()> {
         // TODO(tzakian): We should account for this elsewhere as the owner of data the
         // reference points to won't be on the stack. For now though, we treat it as adding to the
         // stack size.
-        self.charge(1, 1, 2, new_val.legacy_abstract_memory_size().into(), old_val.legacy_abstract_memory_size().into())
+        self.charge(
+            1,
+            1,
+            2,
+            abstract_memory_size(new_val).into(),
+            abstract_memory_size(old_val).into(),
+        )
     }
 
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        let size_reduction = lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size();
-        self.charge(1, 1, 2, (Type::Bool.size() + size_reduction).into(), size_reduction.into())
+        let size_reduction =
+            abstract_memory_size_with_traversal(lhs) + abstract_memory_size_with_traversal(rhs);
+        self.charge(
+            1,
+            1,
+            2,
+            (Type::Bool.size() + size_reduction).into(),
+            size_reduction.into(),
+        )
     }
 
     fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        let size_reduction = lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size();
-        self.charge(1, 1, 2, Type::Bool.size().into(), size_reduction.into())
+        let size_reduction =
+            abstract_memory_size_with_traversal(lhs) + abstract_memory_size_with_traversal(rhs);
+        self.charge(
+            1,
+            1,
+            2,
+            (Type::Bool.size() + size_reduction).into(),
+            size_reduction.into(),
+        )
     }
 
     fn charge_vec_pack<'a>(
@@ -579,7 +655,7 @@ impl<'b> GasMeter for GasStatus<'b> {
     ) -> PartialVMResult<()> {
         // We will perform `num_args` number of pops.
         let num_args = args.len() as u64;
-        // The amount of data on the stack stays contstant except we have some extra metadata for
+        // The amount of data on the stack stays constant except we have some extra metadata for
         // the vector to hold the length of the vector.
         self.charge(1, 1, num_args, VEC_SIZE.into(), 0)
     }
@@ -588,16 +664,35 @@ impl<'b> GasMeter for GasStatus<'b> {
         self.charge(1, 1, 1, Type::U64.size().into(), REFERENCE_SIZE.into())
     }
 
-    fn charge_vec_borrow(&mut self, _is_mut: bool, _ty: impl TypeView, _is_success: bool) -> PartialVMResult<()> {
-        self.charge(1, 1, 2, REFERENCE_SIZE.into(), (REFERENCE_SIZE + Type::U64.size()).into())
+    fn charge_vec_borrow(
+        &mut self,
+        _is_mut: bool,
+        _ty: impl TypeView,
+        _is_success: bool,
+    ) -> PartialVMResult<()> {
+        self.charge(
+            1,
+            1,
+            2,
+            REFERENCE_SIZE.into(),
+            (REFERENCE_SIZE + Type::U64.size()).into(),
+        )
     }
 
-    fn charge_vec_push_back(&mut self, _ty: impl TypeView, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_vec_push_back(
+        &mut self,
+        _ty: impl TypeView,
+        _val: impl ValueView,
+    ) -> PartialVMResult<()> {
         // The value was already on the stack, so we aren't increasing the number of bytes on the stack.
         self.charge(1, 0, 2, 0, REFERENCE_SIZE.into())
     }
 
-    fn charge_vec_pop_back(&mut self, _ty: impl TypeView, _val: Option<impl ValueView>) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(
+        &mut self,
+        _ty: impl TypeView,
+        _val: Option<impl ValueView>,
+    ) -> PartialVMResult<()> {
         self.charge(1, 1, 1, 0, REFERENCE_SIZE.into())
     }
 
@@ -618,7 +713,10 @@ impl<'b> GasMeter for GasStatus<'b> {
         self.charge(1, 1, 1, 0, size_decrease.into())
     }
 
-    fn charge_drop_frame(&mut self, _locals: impl Iterator<Item = impl ValueView>) -> PartialVMResult<()> {
+    fn charge_drop_frame(
+        &mut self,
+        _locals: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -686,7 +784,19 @@ pub fn initial_cost_schedule() -> CostTable {
     .into_iter()
     .collect();
 
-    CostTable { instruction_tiers, stack_size_tiers, stack_height_tiers }
+    CostTable {
+        instruction_tiers,
+        stack_size_tiers,
+        stack_height_tiers,
+    }
+}
+
+fn abstract_memory_size(v: impl ValueView) -> AbstractMemorySize {
+    v.abstract_memory_size(false)
+}
+
+fn abstract_memory_size_with_traversal(v: impl ValueView) -> AbstractMemorySize {
+    v.abstract_memory_size(true)
 }
 
 static ZERO_COST_SCHEDULE: Lazy<CostTable> = Lazy::new(zero_cost_schedule);

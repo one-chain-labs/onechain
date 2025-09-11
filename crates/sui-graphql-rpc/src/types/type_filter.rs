@@ -2,17 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{string_input::impl_string_input, sui_address::SuiAddress};
-use crate::{filter, raw_query::RawQuery};
+use crate::filter;
+use crate::raw_query::RawQuery;
 use async_graphql::*;
 use move_core_types::language_storage::StructTag;
 use std::{fmt, result::Result, str::FromStr};
 use sui_types::{
-    parse_sui_address,
-    parse_sui_fq_name,
-    parse_sui_module_id,
-    parse_sui_struct_tag,
-    parse_sui_type_tag,
-    TypeTag,
+    parse_sui_address, parse_sui_fq_name, parse_sui_module_id, parse_sui_struct_tag,
+    parse_sui_type_tag, TypeTag,
 };
 
 /// A GraphQL scalar containing a filter on types that requires an exact match.
@@ -73,12 +70,20 @@ impl TypeFilter {
     ) -> RawQuery {
         match self {
             TypeFilter::ByModule(ModuleFilter::ByPackage(p)) => {
-                let statement = format!("{} = '\\x{}'::bytea", package_field, hex::encode(p.into_vec()));
+                let statement = format!(
+                    "{} = '\\x{}'::bytea",
+                    package_field,
+                    hex::encode(p.into_vec())
+                );
                 query = filter!(query, statement);
             }
 
             TypeFilter::ByModule(ModuleFilter::ByModule(p, m)) => {
-                let statement = format!("{} = '\\x{}'::bytea", package_field, hex::encode(p.into_vec()));
+                let statement = format!(
+                    "{} = '\\x{}'::bytea",
+                    package_field,
+                    hex::encode(p.into_vec())
+                );
                 query = filter!(query, statement);
                 let m = m.to_string();
                 let statement = module_field.to_string() + " = {}";
@@ -90,7 +95,11 @@ impl TypeFilter {
             TypeFilter::ByType(tag) if tag.type_params.is_empty() => {
                 let m = tag.module.to_string();
                 let n = tag.name.to_string();
-                let statement = format!("{} = '\\x{}'::bytea", package_field, hex::encode(tag.address.to_vec()));
+                let statement = format!(
+                    "{} = '\\x{}'::bytea",
+                    package_field,
+                    hex::encode(tag.address.to_vec())
+                );
                 query = filter!(query, statement);
                 let statement = module_field.to_string() + " = {}";
                 query = filter!(query, statement, m);
@@ -101,7 +110,11 @@ impl TypeFilter {
             TypeFilter::ByType(tag) => {
                 let m = tag.module.to_string();
                 let n = tag.name.to_string();
-                let statement = format!("{} = '\\x{}'::bytea", package_field, hex::encode(tag.address.to_vec()));
+                let statement = format!(
+                    "{} = '\\x{}'::bytea",
+                    package_field,
+                    hex::encode(tag.address.to_vec())
+                );
                 query = filter!(query, statement);
                 let statement = module_field.to_string() + " = {}";
                 query = filter!(query, statement, m);
@@ -128,11 +141,13 @@ impl TypeFilter {
             (T::ByModule(m), T::ByModule(n)) => m.clone().intersect(n.clone()).map(T::ByModule),
 
             (T::ByType(s), T::ByType(t)) if s.type_params.is_empty() => {
-                ((&s.address, &s.module, &s.name) == (&t.address, &t.module, &t.name)).then_some(other)
+                ((&s.address, &s.module, &s.name) == (&t.address, &t.module, &t.name))
+                    .then_some(other)
             }
 
             (T::ByType(s), T::ByType(t)) if t.type_params.is_empty() => {
-                ((&s.address, &s.module, &s.name) == (&t.address, &t.module, &t.name)).then_some(self)
+                ((&s.address, &s.module, &s.name) == (&t.address, &t.module, &t.name))
+                    .then_some(self)
             }
 
             // If both sides are type filters, then at this point, we know that if they are both
@@ -140,16 +155,22 @@ impl TypeFilter {
             // type queries which must be equal to each other to intersect.
             (T::ByType(_), T::ByType(_)) => (self == other).then_some(self),
 
-            (T::ByType(s), T::ByModule(M::ByPackage(q))) => (SuiAddress::from(s.address) == *q).then_some(self),
-
-            (T::ByType(s), T::ByModule(M::ByModule(q, n))) => {
-                ((SuiAddress::from(s.address), s.module.as_str()) == (*q, n.as_str())).then_some(self)
+            (T::ByType(s), T::ByModule(M::ByPackage(q))) => {
+                (SuiAddress::from(s.address) == *q).then_some(self)
             }
 
-            (T::ByModule(M::ByPackage(p)), T::ByType(t)) => (SuiAddress::from(t.address) == *p).then_some(other),
+            (T::ByType(s), T::ByModule(M::ByModule(q, n))) => {
+                ((SuiAddress::from(s.address), s.module.as_str()) == (*q, n.as_str()))
+                    .then_some(self)
+            }
+
+            (T::ByModule(M::ByPackage(p)), T::ByType(t)) => {
+                (SuiAddress::from(t.address) == *p).then_some(other)
+            }
 
             (T::ByModule(M::ByModule(p, m)), T::ByType(t)) => {
-                ((SuiAddress::from(t.address), t.module.as_str()) == (*p, m.as_str())).then_some(other)
+                ((SuiAddress::from(t.address), t.module.as_str()) == (*p, m.as_str()))
+                    .then_some(other)
             }
         }
     }
@@ -171,9 +192,13 @@ impl FqNameFilter {
             (F::ByFqName(p, _, _), F::ByModule(M::ByPackage(q))) => (p == q).then_some(self),
             (F::ByModule(M::ByPackage(p)), F::ByFqName(q, _, _)) => (p == q).then_some(other),
 
-            (F::ByFqName(p, m, _), F::ByModule(M::ByModule(q, n))) => ((p, m) == (q, n)).then_some(self),
+            (F::ByFqName(p, m, _), F::ByModule(M::ByModule(q, n))) => {
+                ((p, m) == (q, n)).then_some(self)
+            }
 
-            (F::ByModule(M::ByModule(p, m)), F::ByFqName(q, n, _)) => ((p, m) == (q, n)).then_some(other),
+            (F::ByModule(M::ByModule(p, m)), F::ByFqName(q, n, _)) => {
+                ((p, m) == (q, n)).then_some(other)
+            }
         }
     }
 }
@@ -185,9 +210,8 @@ impl ModuleFilter {
     /// addresses simultaneously), in which case `None` is returned.
     pub(crate) fn intersect(self, other: Self) -> Option<Self> {
         match (&self, &other) {
-            (Self::ByPackage(_), Self::ByPackage(_)) | (Self::ByModule(_, _), Self::ByModule(_, _)) => {
-                (self == other).then_some(self)
-            }
+            (Self::ByPackage(_), Self::ByPackage(_))
+            | (Self::ByModule(_, _), Self::ByModule(_, _)) => (self == other).then_some(self),
 
             (Self::ByPackage(p), Self::ByModule(q, _)) => (p == q).then_some(other),
             (Self::ByModule(p, _), Self::ByPackage(q)) => (p == q).then_some(self),
@@ -207,31 +231,37 @@ impl FromStr for ExactTypeFilter {
         if let Ok(tag) = parse_sui_type_tag(s) {
             Ok(ExactTypeFilter(tag))
         } else {
-            Err(Error::InvalidFormat("package::module::type<type_params> or primitive type"))
+            Err(Error::InvalidFormat(
+                "package::module::type<type_params> or primitive type",
+            ))
         }
     }
 }
 
 impl FromStr for TypeFilter {
     type Err = Error;
-
     fn from_str(s: &str) -> Result<Self, Error> {
         if let Ok(tag) = parse_sui_struct_tag(s) {
             Ok(TypeFilter::ByType(tag))
         } else if let Ok(filter) = ModuleFilter::from_str(s) {
             Ok(TypeFilter::ByModule(filter))
         } else {
-            Err(Error::InvalidFormat("package[::module[::type[<type_params>]]] or primitive type"))
+            Err(Error::InvalidFormat(
+                "package[::module[::type[<type_params>]]] or primitive type",
+            ))
         }
     }
 }
 
 impl FromStr for FqNameFilter {
     type Err = Error;
-
     fn from_str(s: &str) -> Result<Self, Error> {
         if let Ok((module, name)) = parse_sui_fq_name(s) {
-            Ok(FqNameFilter::ByFqName(SuiAddress::from(*module.address()), module.name().to_string(), name))
+            Ok(FqNameFilter::ByFqName(
+                SuiAddress::from(*module.address()),
+                module.name().to_string(),
+                name,
+            ))
         } else if let Ok(filter) = ModuleFilter::from_str(s) {
             Ok(FqNameFilter::ByModule(filter))
         } else {
@@ -242,10 +272,12 @@ impl FromStr for FqNameFilter {
 
 impl FromStr for ModuleFilter {
     type Err = Error;
-
     fn from_str(s: &str) -> Result<Self, Error> {
         if let Ok(module) = parse_sui_module_id(s) {
-            Ok(ModuleFilter::ByModule(SuiAddress::from(*module.address()), module.name().to_string()))
+            Ok(ModuleFilter::ByModule(
+                SuiAddress::from(*module.address()),
+                module.name().to_string(),
+            ))
         } else if let Ok(package) = parse_sui_address(s) {
             Ok(ModuleFilter::ByPackage(package.into()))
         } else {
@@ -313,7 +345,9 @@ mod tests {
         ]
         .into_iter();
 
-        let filters: Vec<_> = inputs.map(|i| ExactTypeFilter::from_str(i).unwrap().to_string()).collect();
+        let filters: Vec<_> = inputs
+            .map(|i| ExactTypeFilter::from_str(i).unwrap().to_string())
+            .collect();
 
         let expect = expect![[r#"
             u8
@@ -328,9 +362,17 @@ mod tests {
 
     #[test]
     fn test_valid_type_filters() {
-        let inputs = ["0x2", "0x2::coin", "0x2::coin::Coin", "0x2::coin::Coin<0x2::oct::OCT>"].into_iter();
+        let inputs = [
+            "0x2",
+            "0x2::coin",
+            "0x2::coin::Coin",
+            "0x2::coin::Coin<0x2::oct::OCT>",
+        ]
+        .into_iter();
 
-        let filters: Vec<_> = inputs.map(|i| TypeFilter::from_str(i).unwrap().to_string()).collect();
+        let filters: Vec<_> = inputs
+            .map(|i| TypeFilter::from_str(i).unwrap().to_string())
+            .collect();
 
         let expect = expect![[r#"
             0x0000000000000000000000000000000000000000000000000000000000000002::
@@ -342,9 +384,17 @@ mod tests {
 
     #[test]
     fn test_valid_function_filters() {
-        let inputs = ["0x2", "0x2::coin", "0x2::object::new", "0x2::tx_context::TxContext"].into_iter();
+        let inputs = [
+            "0x2",
+            "0x2::coin",
+            "0x2::object::new",
+            "0x2::tx_context::TxContext",
+        ]
+        .into_iter();
 
-        let filters: Vec<_> = inputs.map(|i| FqNameFilter::from_str(i).unwrap().to_string()).collect();
+        let filters: Vec<_> = inputs
+            .map(|i| FqNameFilter::from_str(i).unwrap().to_string())
+            .collect();
 
         let expect = expect![[r#"
             0x0000000000000000000000000000000000000000000000000000000000000002::
@@ -356,9 +406,11 @@ mod tests {
 
     #[test]
     fn test_invalid_function_filters() {
-        for invalid_function_filter in
-            ["0x2::coin::Coin<0x2::oct::OCT>", "vector<u256>", "vector<0x3::staking_pool::StakedOct>"]
-        {
+        for invalid_function_filter in [
+            "0x2::coin::Coin<0x2::oct::OCT>",
+            "vector<u256>",
+            "vector<0x3::staking_pool::StakedOct>",
+        ] {
             assert!(FqNameFilter::from_str(invalid_function_filter).is_err());
         }
     }
@@ -380,9 +432,13 @@ mod tests {
 
     #[test]
     fn test_invalid_type_filters() {
-        for invalid_type_filter in
-            ["not_a_real_type", "0x1:missing::colon", "0x2::trailing::", "0x3::mismatched::bra<0x4::ke::ts", "vector"]
-        {
+        for invalid_type_filter in [
+            "not_a_real_type",
+            "0x1:missing::colon",
+            "0x2::trailing::",
+            "0x3::mismatched::bra<0x4::ke::ts",
+            "vector",
+        ] {
             assert!(TypeFilter::from_str(invalid_type_filter).is_err());
         }
     }
@@ -431,11 +487,20 @@ mod tests {
         let coin_usd = TypeFilter::from_str("0x2::coin::Coin<0x3::usd::USD>").unwrap();
         let std_utf8 = TypeFilter::from_str("0x1::string::String").unwrap();
 
-        assert_eq!(sui.clone().intersect(coin_mod.clone()), Some(coin_mod.clone()));
+        assert_eq!(
+            sui.clone().intersect(coin_mod.clone()),
+            Some(coin_mod.clone())
+        );
 
-        assert_eq!(coin_typ.clone().intersect(coin_mod.clone()), Some(coin_typ.clone()));
+        assert_eq!(
+            coin_typ.clone().intersect(coin_mod.clone()),
+            Some(coin_typ.clone())
+        );
 
-        assert_eq!(coin_sui.clone().intersect(coin_typ.clone()), Some(coin_sui.clone()));
+        assert_eq!(
+            coin_sui.clone().intersect(coin_typ.clone()),
+            Some(coin_sui.clone())
+        );
 
         assert_eq!(sui.clone().intersect(std_utf8.clone()), None);
         assert_eq!(coin_sui.clone().intersect(coin_usd.clone()), None);

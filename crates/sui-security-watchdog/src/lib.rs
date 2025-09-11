@@ -9,7 +9,11 @@ mod query_runner;
 pub mod scheduler;
 
 #[derive(Parser, Clone, Debug)]
-#[clap(name = "Sui Security Watchdog", about = "Watchdog service to monitor chain data.", rename_all = "kebab-case")]
+#[clap(
+    name = "Sui Security Watchdog",
+    about = "Watchdog service to monitor chain data.",
+    rename_all = "kebab-case"
+)]
 pub struct SecurityWatchdogConfig {
     #[clap(long)]
     pub pd_wallet_monitoring_service_id: String,

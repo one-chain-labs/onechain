@@ -13,7 +13,9 @@ pub(crate) struct AllowedPeersUpdatable {
 
 impl AllowedPeersUpdatable {
     pub fn new(allowed_peers: Arc<HashSet<anemo::PeerId>>) -> Self {
-        Self { allowed_peers: Arc::new(ArcSwap::new(allowed_peers)) }
+        Self {
+            allowed_peers: Arc::new(ArcSwap::new(allowed_peers)),
+        }
     }
 
     pub fn update(&self, allowed_peers: Arc<HashSet<anemo::PeerId>>) {
@@ -25,7 +27,9 @@ impl AuthorizeRequest for AllowedPeersUpdatable {
     fn authorize(&self, request: &mut anemo::Request<Bytes>) -> Result<(), anemo::Response<Bytes>> {
         use anemo::types::response::{IntoResponse, StatusCode};
 
-        let peer_id = request.peer_id().ok_or_else(|| StatusCode::InternalServerError.into_response())?;
+        let peer_id = request
+            .peer_id()
+            .ok_or_else(|| StatusCode::InternalServerError.into_response())?;
 
         if self.allowed_peers.load().contains(peer_id) {
             Ok(())

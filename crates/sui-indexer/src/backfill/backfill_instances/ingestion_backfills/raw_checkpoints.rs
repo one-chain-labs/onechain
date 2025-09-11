@@ -1,12 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    backfill::backfill_instances::ingestion_backfills::IngestionBackfillTrait,
-    database::ConnectionPool,
-    models::raw_checkpoints::StoredRawCheckpoint,
-    schema::raw_checkpoints::dsl::raw_checkpoints,
-};
+use crate::backfill::backfill_instances::ingestion_backfills::IngestionBackfillTrait;
+use crate::database::ConnectionPool;
+use crate::models::raw_checkpoints::StoredRawCheckpoint;
+use crate::schema::raw_checkpoints::dsl::raw_checkpoints;
 use diesel_async::RunQueryDsl;
 use sui_types::full_checkpoint_content::CheckpointData;
 

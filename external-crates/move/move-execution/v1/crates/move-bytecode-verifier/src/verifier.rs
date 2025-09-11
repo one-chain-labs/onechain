@@ -4,17 +4,11 @@
 
 //! This module contains the public APIs supported by the bytecode verifier.
 use crate::{
-    ability_field_requirements,
-    check_duplication::DuplicationChecker,
-    code_unit_verifier::CodeUnitVerifier,
-    constants,
-    friends,
-    instantiation_loops::InstantiationLoopChecker,
-    instruction_consistency::InstructionConsistency,
-    limits::LimitsVerifier,
-    script_signature,
-    script_signature::no_additional_script_signature_checks,
-    signature::SignatureChecker,
+    ability_field_requirements, check_duplication::DuplicationChecker,
+    code_unit_verifier::CodeUnitVerifier, constants, friends,
+    instantiation_loops::InstantiationLoopChecker, instruction_consistency::InstructionConsistency,
+    limits::LimitsVerifier, script_signature,
+    script_signature::no_additional_script_signature_checks, signature::SignatureChecker,
     struct_defs::RecursiveStructDefChecker,
 };
 use move_binary_format::{
@@ -49,14 +43,20 @@ pub fn verify_module_with_config_for_test(
 ) -> VMResult<()> {
     const MAX_MODULE_SIZE: usize = 65355;
     let mut bytes = vec![];
-    module.serialize_with_version(VERSION_6, &mut bytes).unwrap();
+    module
+        .serialize_with_version(VERSION_6, &mut bytes)
+        .unwrap();
     let now = Instant::now();
     let result = verify_module_with_config_metered(config, module, meter);
     eprintln!(
         "--> {}: verification time: {:.3}ms, result: {}, size: {}kb",
         name,
         (now.elapsed().as_micros() as f64) / 1000.0,
-        if let Err(e) = &result { format!("{:?}", e.major_status()) } else { "Ok".to_string() },
+        if let Err(e) = &result {
+            format!("{:?}", e.major_status())
+        } else {
+            "Ok".to_string()
+        },
         bytes.len() / 1000
     );
     // Also check whether the module actually fits into our payload size
@@ -93,6 +93,9 @@ pub fn verify_module_with_config_metered(
     script_signature::verify_module(module, no_additional_script_signature_checks)
 }
 
-pub fn verify_module_with_config_unmetered(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
+pub fn verify_module_with_config_unmetered(
+    config: &VerifierConfig,
+    module: &CompiledModule,
+) -> VMResult<()> {
     verify_module_with_config_metered(config, module, &mut DummyMeter)
 }

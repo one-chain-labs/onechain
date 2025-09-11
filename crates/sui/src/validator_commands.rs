@@ -22,7 +22,7 @@ use sui_types::{
     sui_system_state::{
         sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
         sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-        SUI_SYSTEM_MODULE_NAME,
+        SUI_SYSTEM_MODULE_NAME
     },
     SUI_SYSTEM_PACKAGE_ID,
 };
@@ -31,43 +31,36 @@ use tap::tap::TapOptional;
 use crate::fire_drill::get_gas_obj_ref;
 use clap::*;
 use colored::Colorize;
+use fastcrypto::traits::ToFromBytes;
 use fastcrypto::{
     encoding::{Base64, Encoding},
-    traits::{KeyPair, ToFromBytes},
+    traits::KeyPair,
 };
 use serde::Serialize;
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
-use sui_bridge::{
-    metrics::BridgeMetrics,
-    sui_client::SuiClient as SuiBridgeClient,
-    sui_transaction_builder::{build_committee_register_transaction, build_committee_update_url_transaction},
+use sui_bridge::metrics::BridgeMetrics;
+use sui_bridge::sui_client::SuiClient as SuiBridgeClient;
+use sui_bridge::sui_transaction_builder::{
+    build_committee_register_transaction, build_committee_update_url_transaction,
 };
-use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions};
+use sui_json_rpc_types::{
+    SuiObjectDataOptions, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
+};
 use sui_keys::{
     key_derive::generate_new_key,
     keypair_file::{
-        read_authority_keypair_from_file,
-        read_key,
-        read_keypair_from_file,
-        read_network_keypair_from_file,
-        write_authority_keypair_to_file,
-        write_keypair_to_file,
+        read_authority_keypair_from_file, read_keypair_from_file, read_network_keypair_from_file,
+        write_authority_keypair_to_file, write_keypair_to_file,
     },
-    keystore::AccountKeystore,
 };
-use sui_sdk::{wallet_context::WalletContext, SuiClient};
-use sui_types::{
-    crypto::{
-        generate_proof_of_possession,
-        get_authority_key_pair,
-        AuthorityKeyPair,
-        AuthorityPublicKeyBytes,
-        NetworkKeyPair,
-        SignatureScheme,
-        SuiKeyPair,
-    },
-    transaction::{CallArg, ObjectArg, Transaction, TransactionData},
+use sui_keys::{keypair_file::read_key, keystore::AccountKeystore};
+use sui_sdk::wallet_context::WalletContext;
+use sui_sdk::SuiClient;
+use sui_types::crypto::{
+    generate_proof_of_possession, get_authority_key_pair, AuthorityPublicKeyBytes,
 };
+use sui_types::crypto::{AuthorityKeyPair, NetworkKeyPair, SignatureScheme, SuiKeyPair};
+use sui_types::transaction::{CallArg, ObjectArg, Transaction, TransactionData};
 
 #[path = "unit_tests/validator_tests.rs"]
 #[cfg(test)]
@@ -143,7 +136,7 @@ pub enum SuiValidatorCommand {
         /// Validator's OperationCap ID can be found by using the `display-metadata` subcommand.
         #[clap(name = "operation-cap-id", long)]
         operation_cap_id: Option<ObjectID>,
-        /// The OneChain Address of the validator is being reported or un-reported
+        /// The Sui Address of the validator is being reported or un-reported
         #[clap(name = "reportee-address")]
         reportee_address: SuiAddress,
         /// If true, undo an existing report.
@@ -199,7 +192,7 @@ pub enum SuiValidatorCommand {
         #[clap(name = "gas-budget", long)]
         gas_budget: Option<u64>,
     },
-    /// Update OneChain native bridge committee node url
+    /// Update sui native bridge committee node url
     UpdateBridgeCommitteeNodeUrl {
         /// New node url to be registered in the on chain bridge object.
         #[clap(long)]
@@ -243,7 +236,11 @@ pub enum SuiValidatorCommandResponse {
     },
 }
 
-fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyPair>) -> Result<()> {
+fn make_key_files(
+    file_name: PathBuf,
+    is_protocol_key: bool,
+    key: Option<SuiKeyPair>,
+) -> Result<()> {
     if file_name.exists() {
         println!("Use existing {:?} key file.", file_name);
         return Ok(());
@@ -254,7 +251,10 @@ fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyP
     } else {
         let kp = match key {
             Some(key) => {
-                println!("Generated new key file {:?} based on one.keystore file.", file_name);
+                println!(
+                    "Generated new key file {:?} based on one.keystore file.",
+                    file_name
+                );
                 key
             }
             None => {
@@ -269,7 +269,10 @@ fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyP
 }
 
 impl SuiValidatorCommand {
-    pub async fn execute(self, context: &mut WalletContext) -> Result<SuiValidatorCommandResponse, anyhow::Error> {
+    pub async fn execute(
+        self,
+        context: &mut WalletContext,
+    ) -> Result<SuiValidatorCommandResponse, anyhow::Error> {
         let sui_address = context.active_address()?;
 
         let ret = Ok(match self {
@@ -283,9 +286,11 @@ impl SuiValidatorCommand {
             } => {
                 let dir = std::env::current_dir()?;
                 let protocol_key_file_name = dir.join("protocol.key");
-                let account_key = match context.config.keystore.get_key(&sui_address)? {
+                let account_key = match context.config.keystore.export(&sui_address)? {
                     SuiKeyPair::Ed25519(account_key) => SuiKeyPair::Ed25519(account_key.copy()),
-                    _ => panic!("Other account key types supported yet, please use Ed25519 keys for now."),
+                    _ => panic!(
+                        "Other account key types supported yet, please use Ed25519 keys for now."
+                    ),
                 };
                 let account_key_file_name = dir.join("account.key");
                 let network_key_file_name = dir.join("network.key");
@@ -295,25 +300,37 @@ impl SuiValidatorCommand {
                 make_key_files(network_key_file_name.clone(), false, None)?;
                 make_key_files(worker_key_file_name.clone(), false, None)?;
 
-                let keypair: AuthorityKeyPair = read_authority_keypair_from_file(protocol_key_file_name)?;
+                let keypair: AuthorityKeyPair =
+                    read_authority_keypair_from_file(protocol_key_file_name)?;
                 let account_keypair: SuiKeyPair = read_keypair_from_file(account_key_file_name)?;
-                let worker_keypair: NetworkKeyPair = read_network_keypair_from_file(worker_key_file_name)?;
-                let network_keypair: NetworkKeyPair = read_network_keypair_from_file(network_key_file_name)?;
-                let pop = generate_proof_of_possession(&keypair, (&account_keypair.public()).into());
+                let worker_keypair: NetworkKeyPair =
+                    read_network_keypair_from_file(worker_key_file_name)?;
+                let network_keypair: NetworkKeyPair =
+                    read_network_keypair_from_file(network_key_file_name)?;
+                let pop =
+                    generate_proof_of_possession(&keypair, (&account_keypair.public()).into());
                 let validator_info = GenesisValidatorInfo {
                     info: sui_genesis_builder::validator_info::ValidatorInfo {
                         name,
                         protocol_key: keypair.public().into(),
                         worker_key: worker_keypair.public().clone(),
                         account_address: SuiAddress::from(&account_keypair.public()),
-                        revenue_receiving_address: SuiAddress::from(&account_keypair.public()),
                         network_key: network_keypair.public().clone(),
                         gas_price,
                         commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
-                        network_address: Multiaddr::try_from(format!("/dns/{}/tcp/8080/http", host_name))?,
+                        network_address: Multiaddr::try_from(format!(
+                            "/dns/{}/tcp/8080/http",
+                            host_name
+                        ))?,
                         p2p_address: Multiaddr::try_from(format!("/dns/{}/udp/8084", host_name))?,
-                        narwhal_primary_address: Multiaddr::try_from(format!("/dns/{}/udp/8081", host_name))?,
-                        narwhal_worker_address: Multiaddr::try_from(format!("/dns/{}/udp/8082", host_name))?,
+                        narwhal_primary_address: Multiaddr::try_from(format!(
+                            "/dns/{}/udp/8081",
+                            host_name
+                        ))?,
+                        narwhal_worker_address: Multiaddr::try_from(format!(
+                            "/dns/{}/udp/8082",
+                            host_name
+                        ))?,
                         description,
                         image_url,
                         project_url,
@@ -324,55 +341,82 @@ impl SuiValidatorCommand {
                 let validator_info_file_name = dir.join("validator.info");
                 let validator_info_bytes = serde_yaml::to_string(&validator_info)?;
                 fs::write(validator_info_file_name.clone(), validator_info_bytes)?;
-                println!("Generated validator info file: {:?}.", validator_info_file_name);
+                println!(
+                    "Generated validator info file: {:?}.",
+                    validator_info_file_name
+                );
                 SuiValidatorCommandResponse::MakeValidatorInfo
             }
             SuiValidatorCommand::BecomeCandidate { file, gas_budget } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let validator_info_bytes = fs::read(file)?;
                 // Note: we should probably rename the struct or evolve it accordingly.
-                let validator_info: GenesisValidatorInfo = serde_yaml::from_slice(&validator_info_bytes)?;
+                let validator_info: GenesisValidatorInfo =
+                    serde_yaml::from_slice(&validator_info_bytes)?;
                 let validator = validator_info.info;
 
                 let args = vec![
                     CallArg::Pure(
-                        bcs::to_bytes(&AuthorityPublicKeyBytes::from_bytes(validator.protocol_key().as_bytes())?)
+                        bcs::to_bytes(&AuthorityPublicKeyBytes::from_bytes(
+                            validator.protocol_key().as_bytes(),
+                        )?)
+                        .unwrap(),
+                    ),
+                    CallArg::Pure(
+                        bcs::to_bytes(&validator.network_key().as_bytes().to_vec()).unwrap(),
+                    ),
+                    CallArg::Pure(
+                        bcs::to_bytes(&validator.worker_key().as_bytes().to_vec()).unwrap(),
+                    ),
+                    CallArg::Pure(
+                        bcs::to_bytes(&validator_info.proof_of_possession.as_ref().to_vec())
                             .unwrap(),
                     ),
-                    CallArg::Pure(bcs::to_bytes(&validator.network_key().as_bytes().to_vec()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.worker_key().as_bytes().to_vec()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator_info.proof_of_possession.as_ref().to_vec()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.name().to_owned().into_bytes()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.description.clone().into_bytes()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.image_url.clone().into_bytes()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.project_url.clone().into_bytes()).unwrap()),
+                    CallArg::Pure(
+                        bcs::to_bytes(&validator.name().to_owned().into_bytes()).unwrap(),
+                    ),
+                    CallArg::Pure(
+                        bcs::to_bytes(&validator.description.clone().into_bytes()).unwrap(),
+                    ),
+                    CallArg::Pure(
+                        bcs::to_bytes(&validator.image_url.clone().into_bytes()).unwrap(),
+                    ),
+                    CallArg::Pure(
+                        bcs::to_bytes(&validator.project_url.clone().into_bytes()).unwrap(),
+                    ),
                     CallArg::Pure(bcs::to_bytes(validator.network_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.p2p_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_primary_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_worker_address()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.revenue_receiving_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.gas_price()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.commission_rate()).unwrap()),
                 ];
-                let response = call_0x5(context, "request_add_validator_candidate", args, gas_budget).await?;
+                let response =
+                    call_0x5(context, "request_add_validator_candidate", args, gas_budget).await?;
                 SuiValidatorCommandResponse::BecomeCandidate(response)
             }
 
             SuiValidatorCommand::JoinCommittee { gas_budget } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let response = call_0x5(context, "request_add_validator", vec![], gas_budget).await?;
+                let response =
+                    call_0x5(context, "request_add_validator", vec![], gas_budget).await?;
                 SuiValidatorCommandResponse::JoinCommittee(response)
             }
 
             SuiValidatorCommand::LeaveCommittee { gas_budget } => {
                 // Only an active validator can leave committee.
-                let _status = check_status(context, HashSet::from([ValidatorStatus::Active])).await?;
+                let _status =
+                    check_status(context, HashSet::from([ValidatorStatus::Active])).await?;
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let response = call_0x5(context, "request_remove_validator", vec![], gas_budget).await?;
+                let response =
+                    call_0x5(context, "request_remove_validator", vec![], gas_budget).await?;
                 SuiValidatorCommandResponse::LeaveCommittee(response)
             }
 
-            SuiValidatorCommand::DisplayMetadata { validator_address, json } => {
+            SuiValidatorCommand::DisplayMetadata {
+                validator_address,
+                json,
+            } => {
                 let validator_address = validator_address.unwrap_or(context.active_address()?);
                 // Default display with json serialization for better UX.
                 let sui_client = context.get_client().await?;
@@ -380,32 +424,57 @@ impl SuiValidatorCommand {
                 SuiValidatorCommandResponse::DisplayMetadata
             }
 
-            SuiValidatorCommand::UpdateMetadata { metadata, gas_budget } => {
+            SuiValidatorCommand::UpdateMetadata {
+                metadata,
+                gas_budget,
+            } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let resp = update_metadata(context, metadata, gas_budget).await?;
                 SuiValidatorCommandResponse::UpdateMetadata(resp)
             }
-            SuiValidatorCommand::UpdateGasPrice { operation_cap_id, gas_price, gas_budget } => {
+
+            SuiValidatorCommand::UpdateGasPrice {
+                operation_cap_id,
+                gas_price,
+                gas_budget,
+            } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let resp = update_gas_price(context, operation_cap_id, gas_price, gas_budget).await?;
+                let resp =
+                    update_gas_price(context, operation_cap_id, gas_price, gas_budget).await?;
                 SuiValidatorCommandResponse::UpdateGasPrice(resp)
             }
 
-            SuiValidatorCommand::ReportValidator { operation_cap_id, reportee_address, undo_report, gas_budget } => {
+            SuiValidatorCommand::ReportValidator {
+                operation_cap_id,
+                reportee_address,
+                undo_report,
+                gas_budget,
+            } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let undo_report = undo_report.unwrap_or(false);
-                let resp =
-                    report_validator(context, reportee_address, operation_cap_id, undo_report, gas_budget).await?;
+                let resp = report_validator(
+                    context,
+                    reportee_address,
+                    operation_cap_id,
+                    undo_report,
+                    gas_budget,
+                )
+                .await?;
                 SuiValidatorCommandResponse::ReportValidator(resp)
             }
 
-            SuiValidatorCommand::SerializePayloadForPoP { account_address, protocol_public_key } => {
+            SuiValidatorCommand::SerializePayloadForPoP {
+                account_address,
+                protocol_public_key,
+            } => {
                 let mut msg: Vec<u8> = Vec::new();
                 msg.extend_from_slice(protocol_public_key.as_bytes());
                 msg.extend_from_slice(account_address.as_ref());
-                let mut intent_msg_bytes =
-                    bcs::to_bytes(&IntentMessage::new(Intent::sui_app(IntentScope::ProofOfPossession), msg))
-                        .expect("Message serialization should not fail");
+                let mut intent_msg_bytes = bcs::to_bytes(&IntentMessage::new(
+                    Intent::sui_app(IntentScope::ProofOfPossession),
+                    msg,
+                ))
+                .expect("Message serialization should not fail");
                 DEFAULT_EPOCH_ID.write(&mut intent_msg_bytes);
                 SuiValidatorCommandResponse::SerializedPayload(Base64::encode(&intent_msg_bytes))
             }
@@ -417,17 +486,26 @@ impl SuiValidatorCommand {
                 gas_budget,
             } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let (_status, _summary, cap_obj_ref) = get_cap_object_ref(context, Some(operation_cap_id)).await?;
+                let (_status, _summary, cap_obj_ref) =
+                    get_cap_object_ref(context, Some(operation_cap_id)).await?;
 
                 let args = vec![
                     CallArg::Object(ObjectArg::ImmOrOwnedObject(cap_obj_ref)),
                     CallArg::Pure(bcs::to_bytes(&new_gas_price).unwrap()),
                 ];
-                let data =
-                    construct_unsigned_0x5_txn(context, sender_address, "request_set_gas_price", args, gas_budget)
-                        .await?;
+                let data = construct_unsigned_0x5_txn(
+                    context,
+                    sender_address,
+                    "request_set_gas_price",
+                    args,
+                    gas_budget,
+                )
+                .await?;
                 let serialized_data = Base64::encode(bcs::to_bytes(&data)?);
-                SuiValidatorCommandResponse::DisplayGasPriceUpdateRawTxn { data, serialized_data }
+                SuiValidatorCommandResponse::DisplayGasPriceUpdateRawTxn {
+                    data,
+                    serialized_data,
+                }
             }
             SuiValidatorCommand::RegisterBridgeCommittee {
                 bridge_authority_key_path,
@@ -436,32 +514,49 @@ impl SuiValidatorCommand {
                 validator_address,
                 gas_budget,
             } => {
-                let parsed_url = Url::parse(&bridge_authority_url).map_err(|e: ParseError| anyhow!(e))?;
+                let parsed_url =
+                    Url::parse(&bridge_authority_url).map_err(|e: ParseError| anyhow!(e))?;
                 if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
-                    anyhow::bail!("URL scheme has to be http or https: {}", parsed_url.scheme());
+                    anyhow::bail!(
+                        "URL scheme has to be http or https: {}",
+                        parsed_url.scheme()
+                    );
                 }
                 // Read bridge keypair
                 let ecdsa_keypair = match read_key(&bridge_authority_key_path, true)? {
                     SuiKeyPair::Secp256k1(key) => key,
                     _ => unreachable!("we required secp256k1 key in `read_key`"),
                 };
-                let address =
-                    check_address(context.active_address()?, validator_address, print_unsigned_transaction_only)?;
+                let address = check_address(
+                    context.active_address()?,
+                    validator_address,
+                    print_unsigned_transaction_only,
+                )?;
                 // Make sure the address is a validator
                 let sui_client = context.get_client().await?;
-                let active_validators =
-                    sui_client.governance_api().get_latest_sui_system_state().await?.active_validators;
-                if !active_validators.into_iter().any(|s| s.sui_address == address) {
+                let active_validators = sui_client
+                    .governance_api()
+                    .get_latest_sui_system_state()
+                    .await?
+                    .active_validators;
+                if !active_validators
+                    .into_iter()
+                    .any(|s| s.sui_address == address)
+                {
                     bail!("Address {} is not in the committee", address);
                 }
                 println!("Starting bridge committee registration for Sui validator: {address}, with bridge public key: {} and url: {}", ecdsa_keypair.public, bridge_authority_url);
-                let sui_rpc_url = &context.config.get_active_env().unwrap().rpc;
+                let sui_rpc_url = &context.get_active_env().unwrap().rpc;
                 let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
                 let bridge_client = SuiBridgeClient::new(sui_rpc_url, bridge_metrics).await?;
-                let bridge = bridge_client.get_mutable_bridge_object_arg_must_succeed().await;
+                let bridge = bridge_client
+                    .get_mutable_bridge_object_arg_must_succeed()
+                    .await;
 
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let (_, gas) = context.gas_for_owner_budget(address, gas_budget, Default::default()).await?;
+                let (_, gas) = context
+                    .gas_for_owner_budget(address, gas_budget, Default::default())
+                    .await?;
 
                 let gas_price = context.get_reference_gas_price().await?;
                 let tx_data = build_committee_register_transaction(
@@ -483,7 +578,10 @@ impl SuiValidatorCommand {
                 } else {
                     let tx = context.sign_transaction(&tx_data);
                     let response = context.execute_transaction_must_succeed(tx).await;
-                    println!("Committee registration successful. Transaction digest: {}", response.digest);
+                    println!(
+                        "Committee registration successful. Transaction digest: {}",
+                        response.digest
+                    );
                     SuiValidatorCommandResponse::RegisterBridgeCommittee {
                         execution_response: Some(response),
                         serialized_unsigned_transaction: None,
@@ -496,19 +594,33 @@ impl SuiValidatorCommand {
                 validator_address,
                 gas_budget,
             } => {
-                let parsed_url = Url::parse(&bridge_authority_url).map_err(|e: ParseError| anyhow!(e))?;
+                let parsed_url =
+                    Url::parse(&bridge_authority_url).map_err(|e: ParseError| anyhow!(e))?;
                 if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
-                    anyhow::bail!("URL scheme has to be http or https: {}", parsed_url.scheme());
+                    anyhow::bail!(
+                        "URL scheme has to be http or https: {}",
+                        parsed_url.scheme()
+                    );
                 }
                 // Make sure the address is member of the committee
-                let address =
-                    check_address(context.active_address()?, validator_address, print_unsigned_transaction_only)?;
-                let sui_rpc_url = &context.config.get_active_env().unwrap().rpc;
+                let address = check_address(
+                    context.active_address()?,
+                    validator_address,
+                    print_unsigned_transaction_only,
+                )?;
+                let sui_rpc_url = &context.get_active_env().unwrap().rpc;
                 let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
                 let bridge_client = SuiBridgeClient::new(sui_rpc_url, bridge_metrics).await?;
-                let committee_members =
-                    bridge_client.get_bridge_summary().await.map_err(|e| anyhow!("{e:?}"))?.committee.members;
-                if !committee_members.into_iter().any(|(_, m)| m.sui_address == address) {
+                let committee_members = bridge_client
+                    .get_bridge_summary()
+                    .await
+                    .map_err(|e| anyhow!("{e:?}"))?
+                    .committee
+                    .members;
+                if !committee_members
+                    .into_iter()
+                    .any(|(_, m)| m.sui_address == address)
+                {
                     bail!("Address {} is not in the committee", address);
                 }
                 println!(
@@ -516,10 +628,14 @@ impl SuiValidatorCommand {
                     bridge_authority_url
                 );
 
-                let bridge = bridge_client.get_mutable_bridge_object_arg_must_succeed().await;
+                let bridge = bridge_client
+                    .get_mutable_bridge_object_arg_must_succeed()
+                    .await;
 
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let (_, gas) = context.gas_for_owner_budget(address, gas_budget, Default::default()).await?;
+                let (_, gas) = context
+                    .gas_for_owner_budget(address, gas_budget, Default::default())
+                    .await?;
 
                 let gas_price = context.get_reference_gas_price().await?;
                 let tx_data = build_committee_update_url_transaction(
@@ -540,7 +656,10 @@ impl SuiValidatorCommand {
                 } else {
                     let tx = context.sign_transaction(&tx_data);
                     let response = context.execute_transaction_must_succeed(tx).await;
-                    println!("Update Bridge validator node URL successful. Transaction digest: {}", response.digest);
+                    println!(
+                        "Update Bridge validator node URL successful. Transaction digest: {}",
+                        response.digest
+                    );
                     SuiValidatorCommandResponse::UpdateBridgeCommitteeURL {
                         execution_response: Some(response),
                         serialized_unsigned_transaction: None,
@@ -560,14 +679,16 @@ fn check_address(
     if !print_unsigned_transaction_only {
         if let Some(validator_address) = validator_address {
             if validator_address != active_address {
-                bail!("`--validator-address` must be the same as the current active address: {}", active_address);
+                bail!(
+                    "`--validator-address` must be the same as the current active address: {}",
+                    active_address
+                );
             }
         }
         Ok(active_address)
     } else {
-        validator_address.ok_or_else(|| {
-            anyhow!("--validator-address must be provided when `print_unsigned_transaction_only` is true")
-        })
+        validator_address
+            .ok_or_else(|| anyhow!("--validator-address must be provided when `print_unsigned_transaction_only` is true"))
     }
 }
 
@@ -577,14 +698,22 @@ pub async fn get_cap_object_ref(
 ) -> Result<(ValidatorStatus, SuiValidatorSummary, ObjectRef)> {
     let sui_client = context.get_client().await?;
     if let Some(operation_cap_id) = operation_cap_id {
-        let (status, summary) = get_validator_summary_from_cap_id(&sui_client, operation_cap_id).await?;
+        let (status, summary) =
+            get_validator_summary_from_cap_id(&sui_client, operation_cap_id).await?;
         let cap_obj_ref = sui_client
             .read_api()
-            .get_object_with_options(summary.operation_cap_id, SuiObjectDataOptions::default().with_owner())
+            .get_object_with_options(
+                summary.operation_cap_id,
+                SuiObjectDataOptions::default().with_owner(),
+            )
             .await?
             .object_ref_if_exists()
             .ok_or_else(|| anyhow!("OperationCap {} does not exist", operation_cap_id))?;
-        Ok::<(ValidatorStatus, SuiValidatorSummary, ObjectRef), anyhow::Error>((status, summary, cap_obj_ref))
+        Ok::<(ValidatorStatus, SuiValidatorSummary, ObjectRef), anyhow::Error>((
+            status,
+            summary,
+            cap_obj_ref,
+        ))
     } else {
         // Sender is Reporter Validator itself.
         let validator_address = context.active_address()?;
@@ -601,8 +730,9 @@ pub async fn get_cap_object_ref(
             .map_err(|e| anyhow!(e))?;
         // Safe to unwrap as we ask with `with_owner`.
         let owner = resp.owner().unwrap();
-        let cap_obj_ref =
-            resp.object_ref_if_exists().unwrap_or_else(|| panic!("OperationCap {} shall exist.", cap_object_id));
+        let cap_obj_ref = resp
+            .object_ref_if_exists()
+            .unwrap_or_else(|| panic!("OperationCap {} shall exist.", cap_object_id));
         if owner != Owner::AddressOwner(context.active_address()?) {
             anyhow::bail!(
                 "OperationCap {} is not owned by the sender address {} but {:?}",
@@ -654,7 +784,11 @@ async fn report_validator(
         CallArg::Object(ObjectArg::ImmOrOwnedObject(cap_obj_ref)),
         CallArg::Pure(bcs::to_bytes(&reportee_address).unwrap()),
     ];
-    let function_name = if undo_report { "undo_report_validator" } else { "report_validator" };
+    let function_name = if undo_report {
+        "undo_report_validator"
+    } else {
+        "report_validator"
+    };
     call_0x5(context, function_name, args, gas_budget).await
 }
 
@@ -662,11 +796,16 @@ async fn get_validator_summary_from_cap_id(
     client: &SuiClient,
     operation_cap_id: ObjectID,
 ) -> anyhow::Result<(ValidatorStatus, SuiValidatorSummary)> {
-    let resp =
-        client.read_api().get_object_with_options(operation_cap_id, SuiObjectDataOptions::default().with_bcs()).await?;
-    let bcs = resp
-        .move_object_bcs()
-        .ok_or_else(|| anyhow::anyhow!("Object {} does not exist or does not return bcs bytes", operation_cap_id))?;
+    let resp = client
+        .read_api()
+        .get_object_with_options(operation_cap_id, SuiObjectDataOptions::default().with_bcs())
+        .await?;
+    let bcs = resp.move_object_bcs().ok_or_else(|| {
+        anyhow::anyhow!(
+            "Object {} does not exist or does not return bcs bytes",
+            operation_cap_id
+        )
+    })?;
     let cap = bcs::from_bytes::<UnverifiedValidatorOperationCapV1>(bcs).map_err(|e| {
         anyhow::anyhow!(
             "Can't convert bcs bytes of object {} to UnverifiedValidatorOperationCapV1: {}",
@@ -679,12 +818,16 @@ async fn get_validator_summary_from_cap_id(
         .await?
         .ok_or_else(|| anyhow::anyhow!("{} is not a validator", validator_address))?;
     if summary.operation_cap_id != operation_cap_id {
-        anyhow::bail!("Validator {}'s current operation cap id is {}", validator_address, summary.operation_cap_id);
+        anyhow::bail!(
+            "Validator {}'s current operation cap id is {}",
+            validator_address,
+            summary.operation_cap_id
+        );
     }
     Ok((status, summary))
 }
 
-pub async fn construct_unsigned_0x5_txn(
+async fn construct_unsigned_0x5_txn(
     context: &mut WalletContext,
     sender: SuiAddress,
     function: &'static str,
@@ -694,7 +837,10 @@ pub async fn construct_unsigned_0x5_txn(
     let sui_client = context.get_client().await?;
     let mut args = vec![CallArg::SUI_SYSTEM_MUT];
     args.extend(call_args);
-    let rgp = sui_client.governance_api().get_reference_gas_price().await?;
+    let rgp = sui_client
+        .governance_api()
+        .get_reference_gas_price()
+        .await?;
 
     let gas_obj_ref = get_gas_obj_ref(sender, &sui_client, gas_budget).await?;
     TransactionData::new_move_call(
@@ -717,15 +863,22 @@ pub async fn call_0x5(
     gas_budget: u64,
 ) -> anyhow::Result<SuiTransactionBlockResponse> {
     let sender = context.active_address()?;
-    let tx_data = construct_unsigned_0x5_txn(context, sender, function, call_args, gas_budget).await?;
-    let signature = context.config.keystore.sign_secure(&sender, &tx_data, Intent::sui_transaction())?;
+    let tx_data =
+        construct_unsigned_0x5_txn(context, sender, function, call_args, gas_budget).await?;
+    let signature =
+        context
+            .config
+            .keystore
+            .sign_secure(&sender, &tx_data, Intent::sui_transaction())?;
     let transaction = Transaction::from_data(tx_data, vec![signature]);
     let sui_client = context.get_client().await?;
     sui_client
         .quorum_driver_api()
         .execute_transaction_block(
             transaction,
-            SuiTransactionBlockResponseOptions::new().with_input().with_effects(),
+            SuiTransactionBlockResponseOptions::new()
+                .with_input()
+                .with_effects(),
             Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution),
         )
         .await
@@ -759,8 +912,15 @@ impl Display for SuiValidatorCommandResponse {
             SuiValidatorCommandResponse::SerializedPayload(response) => {
                 write!(writer, "Serialized payload: {}", response)?;
             }
-            SuiValidatorCommandResponse::DisplayGasPriceUpdateRawTxn { data, serialized_data } => {
-                write!(writer, "Transaction: {:?}, \nSerialized transaction: {:?}", data, serialized_data)?;
+            SuiValidatorCommandResponse::DisplayGasPriceUpdateRawTxn {
+                data,
+                serialized_data,
+            } => {
+                write!(
+                    writer,
+                    "Transaction: {:?}, \nSerialized transaction: {:?}",
+                    data, serialized_data
+                )?;
             }
             SuiValidatorCommandResponse::RegisterBridgeCommittee {
                 execution_response,
@@ -773,7 +933,11 @@ impl Display for SuiValidatorCommandResponse {
                 if let Some(response) = execution_response {
                     write!(writer, "{}", write_transaction_response(response)?)?;
                 } else {
-                    write!(writer, "Serialized transaction for signing: {:?}", serialized_unsigned_transaction)?;
+                    write!(
+                        writer,
+                        "Serialized transaction for signing: {:?}",
+                        serialized_unsigned_transaction
+                    )?;
                 }
             }
         }
@@ -781,7 +945,9 @@ impl Display for SuiValidatorCommandResponse {
     }
 }
 
-pub fn write_transaction_response(response: &SuiTransactionBlockResponse) -> Result<String, fmt::Error> {
+pub fn write_transaction_response(
+    response: &SuiTransactionBlockResponse,
+) -> Result<String, fmt::Error> {
     // we requested with for full_content, so the following content should be available.
     let success = response.status_ok().unwrap();
     let lines = vec![
@@ -803,7 +969,10 @@ pub fn write_transaction_response(response: &SuiTransactionBlockResponse) -> Res
 impl Debug for SuiValidatorCommandResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let string = serde_json::to_string_pretty(self);
-        let s = string.unwrap_or_else(|err| format!("{err}").red().to_string());
+        let s = match string {
+            Ok(s) => s,
+            Err(err) => format!("{err}").red().to_string(),
+        };
         write!(f, "{}", s)
     }
 }
@@ -812,9 +981,14 @@ impl SuiValidatorCommandResponse {
     pub fn print(&self, pretty: bool) {
         match self {
             // Don't print empty responses
-            SuiValidatorCommandResponse::MakeValidatorInfo | SuiValidatorCommandResponse::DisplayMetadata => {}
+            SuiValidatorCommandResponse::MakeValidatorInfo
+            | SuiValidatorCommandResponse::DisplayMetadata => {}
             other => {
-                let line = if pretty { format!("{other}") } else { format!("{:?}", other) };
+                let line = if pretty {
+                    format!("{other}")
+                } else {
+                    format!("{:?}", other)
+                };
                 // Log line by line
                 for line in line.lines() {
                     println!("{line}");
@@ -834,10 +1008,19 @@ pub async fn get_validator_summary(
     client: &SuiClient,
     validator_address: SuiAddress,
 ) -> anyhow::Result<Option<(ValidatorStatus, SuiValidatorSummary)>> {
-    let SuiSystemStateSummary { active_validators, pending_active_validators_id, .. } =
-        client.governance_api().get_latest_sui_system_state().await?;
+    let SuiSystemStateSummary {
+        active_validators,
+        pending_active_validators_id,
+        ..
+    } = client
+        .governance_api()
+        .get_latest_sui_system_state()
+        .await?;
     let mut status = None;
-    let mut active_validators = active_validators.into_iter().map(|s| (s.sui_address, s)).collect::<BTreeMap<_, _>>();
+    let mut active_validators = active_validators
+        .into_iter()
+        .map(|s| (s.sui_address, s))
+        .collect::<BTreeMap<_, _>>();
     let validator_info = if active_validators.contains_key(&validator_address) {
         status = Some(ValidatorStatus::Active);
         Some(active_validators.remove(&validator_address).unwrap())
@@ -858,9 +1041,16 @@ pub async fn get_validator_summary(
     Ok(Some((status.unwrap(), validator_info.unwrap())))
 }
 
-async fn display_metadata(client: &SuiClient, validator_address: SuiAddress, json: bool) -> anyhow::Result<()> {
+async fn display_metadata(
+    client: &SuiClient,
+    validator_address: SuiAddress,
+    json: bool,
+) -> anyhow::Result<()> {
     match get_validator_summary(client, validator_address).await? {
-        None => println!("{} is not an active or pending Validator.", validator_address),
+        None => println!(
+            "{} is not an active or pending Validator.",
+            validator_address
+        ),
         Some((status, info)) => {
             println!("{}'s valdiator status: {:?}", validator_address, status);
             if json {
@@ -888,16 +1078,27 @@ async fn get_pending_candidate_summary(
         .collect::<Vec<_>>();
     let resps = sui_client
         .read_api()
-        .multi_get_object_with_options(pending_validators, SuiObjectDataOptions::default().with_bcs())
+        .multi_get_object_with_options(
+            pending_validators,
+            SuiObjectDataOptions::default().with_bcs(),
+        )
         .await?;
     for resp in resps {
         // We always expect an objectId from the response as one of data/error should be included.
         let object_id = resp.object_id()?;
-        let bcs = resp
-            .move_object_bcs()
-            .ok_or_else(|| anyhow::anyhow!("Object {} does not exist or does not return bcs bytes", object_id))?;
-        let field = bcs::from_bytes::<Field<u64, ValidatorV1>>(bcs)
-            .map_err(|e| anyhow::anyhow!("Can't convert bcs bytes of object {} to ValidatorV1: {}", object_id, e,))?;
+        let bcs = resp.move_object_bcs().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Object {} does not exist or does not return bcs bytes",
+                object_id
+            )
+        })?;
+        let field = bcs::from_bytes::<Field<u64, ValidatorV1>>(bcs).map_err(|e| {
+            anyhow::anyhow!(
+                "Can't convert bcs bytes of object {} to ValidatorV1: {}",
+                object_id,
+                e,
+            )
+        })?;
         if field.value.verified_metadata().sui_address == validator_address {
             return Ok(Some(field.value));
         }
@@ -953,15 +1154,21 @@ async fn update_metadata(
             call_0x5(context, "update_validator_name", args, gas_budget).await
         }
         MetadataUpdate::Description { description } => {
-            let args = vec![CallArg::Pure(bcs::to_bytes(&description.into_bytes()).unwrap())];
+            let args = vec![CallArg::Pure(
+                bcs::to_bytes(&description.into_bytes()).unwrap(),
+            )];
             call_0x5(context, "update_validator_description", args, gas_budget).await
         }
         MetadataUpdate::ImageUrl { image_url } => {
-            let args = vec![CallArg::Pure(bcs::to_bytes(&image_url.into_bytes()).unwrap())];
+            let args = vec![CallArg::Pure(
+                bcs::to_bytes(&image_url.into_bytes()).unwrap(),
+            )];
             call_0x5(context, "update_validator_image_url", args, gas_budget).await
         }
         MetadataUpdate::ProjectUrl { project_url } => {
-            let args = vec![CallArg::Pure(bcs::to_bytes(&project_url.into_bytes()).unwrap())];
+            let args = vec![CallArg::Pure(
+                bcs::to_bytes(&project_url.into_bytes()).unwrap(),
+            )];
             call_0x5(context, "update_validator_project_url", args, gas_budget).await
         }
         MetadataUpdate::NetworkAddress { network_address } => {
@@ -971,44 +1178,86 @@ async fn update_metadata(
             }
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&network_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_network_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_network_address",
+                args,
+                gas_budget,
+            )
+            .await
         }
         MetadataUpdate::PrimaryAddress { primary_address } => {
-            primary_address
-                .to_anemo_address()
-                .map_err(|_| anyhow!("Invalid primary address, it must look like `/[ip4,ip6,dns]/.../udp/port`"))?;
+            primary_address.to_anemo_address().map_err(|_| {
+                anyhow!("Invalid primary address, it must look like `/[ip4,ip6,dns]/.../udp/port`")
+            })?;
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&primary_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_primary_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_primary_address",
+                args,
+                gas_budget,
+            )
+            .await
         }
         MetadataUpdate::WorkerAddress { worker_address } => {
-            worker_address
-                .to_anemo_address()
-                .map_err(|_| anyhow!("Invalid worker address, it must look like `/[ip4,ip6,dns]/.../udp/port`"))?;
+            worker_address.to_anemo_address().map_err(|_| {
+                anyhow!("Invalid worker address, it must look like `/[ip4,ip6,dns]/.../udp/port`")
+            })?;
             // Only an active validator can leave committee.
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&worker_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_worker_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_worker_address",
+                args,
+                gas_budget,
+            )
+            .await
         }
         MetadataUpdate::P2pAddress { p2p_address } => {
-            p2p_address
-                .to_anemo_address()
-                .map_err(|_| anyhow!("Invalid p2p address, it must look like `/[ip4,ip6,dns]/.../udp/port`"))?;
+            p2p_address.to_anemo_address().map_err(|_| {
+                anyhow!("Invalid p2p address, it must look like `/[ip4,ip6,dns]/.../udp/port`")
+            })?;
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&p2p_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_p2p_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_p2p_address",
+                args,
+                gas_budget,
+            )
+            .await
         }
         MetadataUpdate::NetworkPubKey { file } => {
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
-            let network_pub_key: NetworkPublicKey = read_network_keypair_from_file(file)?.public().clone();
-            let args = vec![CallArg::Pure(bcs::to_bytes(&network_pub_key.as_bytes().to_vec()).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_network_pubkey", args, gas_budget).await
+            let network_pub_key: NetworkPublicKey =
+                read_network_keypair_from_file(file)?.public().clone();
+            let args = vec![CallArg::Pure(
+                bcs::to_bytes(&network_pub_key.as_bytes().to_vec()).unwrap(),
+            )];
+            call_0x5(
+                context,
+                "update_validator_next_epoch_network_pubkey",
+                args,
+                gas_budget,
+            )
+            .await
         }
         MetadataUpdate::WorkerPubKey { file } => {
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
-            let worker_pub_key: NetworkPublicKey = read_network_keypair_from_file(file)?.public().clone();
-            let args = vec![CallArg::Pure(bcs::to_bytes(&worker_pub_key.as_bytes().to_vec()).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_worker_pubkey", args, gas_budget).await
+            let worker_pub_key: NetworkPublicKey =
+                read_network_keypair_from_file(file)?.public().clone();
+            let args = vec![CallArg::Pure(
+                bcs::to_bytes(&worker_pub_key.as_bytes().to_vec()).unwrap(),
+            )];
+            call_0x5(
+                context,
+                "update_validator_next_epoch_worker_pubkey",
+                args,
+                gas_budget,
+            )
+            .await
         }
         MetadataUpdate::ProtocolPubKey { file } => {
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
@@ -1018,16 +1267,28 @@ async fn update_metadata(
             let pop = generate_proof_of_possession(&protocol_key_pair, sui_address);
             let args = vec![
                 CallArg::Pure(
-                    bcs::to_bytes(&AuthorityPublicKeyBytes::from_bytes(protocol_pub_key.as_bytes())?).unwrap(),
+                    bcs::to_bytes(&AuthorityPublicKeyBytes::from_bytes(
+                        protocol_pub_key.as_bytes(),
+                    )?)
+                    .unwrap(),
                 ),
                 CallArg::Pure(bcs::to_bytes(&pop.as_ref().to_vec()).unwrap()),
             ];
-            call_0x5(context, "update_validator_next_epoch_protocol_pubkey", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_protocol_pubkey",
+                args,
+                gas_budget,
+            )
+            .await
         }
     }
 }
 
-async fn check_status(context: &mut WalletContext, allowed_status: HashSet<ValidatorStatus>) -> Result<ValidatorStatus> {
+async fn check_status(
+    context: &mut WalletContext,
+    allowed_status: HashSet<ValidatorStatus>,
+) -> Result<ValidatorStatus> {
     let sui_client = context.get_client().await?;
     let validator_address = context.active_address()?;
     let summary = get_validator_summary(&sui_client, validator_address).await?;

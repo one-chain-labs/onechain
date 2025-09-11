@@ -5,17 +5,17 @@ import { Node } from '../..';
 import { MoveOptions, printFn, treeFn } from '../../printer';
 import { AstPath, Doc, doc } from 'prettier';
 import { block, shouldBreakFirstChild } from '../../utilities';
-const { group, indent, join, hardlineWithoutBreakParent } = doc.builders;
+const { group, indent, join, conditionalGroup, hardlineWithoutBreakParent } = doc.builders;
 
 /** The type of the node implemented in this file */
 const NODE_TYPE = 'block';
 
 export default function (path: AstPath<Node>): treeFn | null {
-	if (path.node.type === NODE_TYPE) {
-		return printBlock;
-	}
+    if (path.node.type === NODE_TYPE) {
+        return printBlock;
+    }
 
-	return null;
+    return null;
 }
 
 /**
@@ -23,47 +23,50 @@ export default function (path: AstPath<Node>): treeFn | null {
  * lambda expressions.
  */
 export function printNonBreakingBlock(
-	path: AstPath<Node>,
-	options: MoveOptions,
-	print: printFn,
+    path: AstPath<Node>,
+    options: MoveOptions,
+    print: printFn,
 ): Doc {
-	const length = path.node.nonFormattingChildren.length;
+    const length = path.node.nonFormattingChildren.length;
 
-	if (length == 0) {
-		return '{}';
-	}
+    if (length == 0) {
+        return '{}';
+    }
 
-	return group([
-		'{',
-		indent(hardlineWithoutBreakParent),
-		indent(join(hardlineWithoutBreakParent, path.map(print, 'namedAndEmptyLineChildren'))),
-		hardlineWithoutBreakParent,
-		'}',
-	]);
+    return group([
+        '{',
+        indent(hardlineWithoutBreakParent),
+        indent(join(hardlineWithoutBreakParent, path.map(print, 'namedAndEmptyLineChildren'))),
+        hardlineWithoutBreakParent,
+        '}',
+    ]);
 }
 
 export function printBreakableBlock(
-	path: AstPath<Node>,
-	options: MoveOptions,
-	print: printFn,
+    path: AstPath<Node>,
+    options: MoveOptions,
+    print: printFn,
 ): Doc {
-	const length = path.node.nonFormattingChildren.length;
+    const length = path.node.nonFormattingChildren.length;
 
-	if (length == 0) {
-		return '{}';
-	}
+    if (length == 0) {
+        return '{}';
+    }
 
-	return block({
-		options,
-		print,
-		path,
-		shouldBreak: shouldBreakFirstChild(path),
-	});
+    return block({
+        options,
+        print,
+        path,
+        shouldBreak: shouldBreakFirstChild(path),
+    });
 }
 
 /**
  * Print `block` node.
  */
 export function printBlock(path: AstPath<Node>, options: MoveOptions, print: printFn): Doc {
-	return printNonBreakingBlock(path, options, print);
+    return conditionalGroup([
+        printBreakableBlock(path, options, print),
+        printNonBreakingBlock(path, options, print),
+    ]);
 }

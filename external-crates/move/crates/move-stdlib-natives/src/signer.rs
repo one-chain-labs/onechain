@@ -13,7 +13,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
-    values::{values_impl::SignerRef, Value},
+    values::{Value, values_impl::SignerRef},
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
@@ -42,13 +42,18 @@ fn native_borrow_address(
     native_charge_gas_early_exit!(context, gas_params.base);
     let signer_reference = pop_arg!(arguments, SignerRef);
 
-    Ok(NativeResult::ok(context.gas_used(), smallvec![signer_reference.borrow_signer()?]))
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![signer_reference.borrow_signer()?],
+    ))
 }
 
 pub fn make_native_borrow_address(gas_params: BorrowAddressGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_borrow_address(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_borrow_address(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -60,7 +65,10 @@ pub struct GasParameters {
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [("borrow_address", make_native_borrow_address(gas_params.borrow_address))];
+    let natives = [(
+        "borrow_address",
+        make_native_borrow_address(gas_params.borrow_address),
+    )];
 
     make_module_natives(natives)
 }

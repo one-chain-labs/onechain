@@ -4,19 +4,15 @@
 use async_graphql::*;
 use move_core_types::{
     account_address::AccountAddress,
-    annotated_value as A,
-    ident_str,
+    annotated_value as A, ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{StructTag, TypeTag},
 };
 use serde::{Deserialize, Serialize};
 use sui_types::object::bounded_visitor::BoundedVisitor;
 
-use crate::{
-    data::package_resolver::PackageResolver,
-    error::Error,
-    types::{json::Json, move_type::unexpected_signer_error},
-};
+use crate::data::package_resolver::PackageResolver;
+use crate::{error::Error, types::json::Json, types::move_type::unexpected_signer_error};
 
 use super::{base64::Base64, big_int::BigInt, move_type::MoveType, sui_address::SuiAddress};
 
@@ -97,11 +93,16 @@ pub(crate) struct MoveField {
 impl MoveValue {
     /// Structured contents of a Move value.
     async fn data(&self, ctx: &Context<'_>) -> Result<MoveData> {
-        let resolver: &PackageResolver =
-            ctx.data().map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string())).extend()?;
+        let resolver: &PackageResolver = ctx
+            .data()
+            .map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string()))
+            .extend()?;
 
         let Some(layout) = self.type_.layout_impl(resolver).await.extend()? else {
-            return Err(Error::Internal("Move value must have valid layout".to_string())).extend();
+            return Err(Error::Internal(
+                "Move value must have valid layout".to_string(),
+            ))
+            .extend();
         };
 
         // Factor out into its own non-GraphQL, non-async function for better testability
@@ -121,11 +122,16 @@ impl MoveValue {
     /// This form is offered as a less verbose convenience in cases where the layout of the type is
     /// known by the client.
     async fn json(&self, ctx: &Context<'_>) -> Result<Json> {
-        let resolver: &PackageResolver =
-            ctx.data().map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string())).extend()?;
+        let resolver: &PackageResolver = ctx
+            .data()
+            .map_err(|_| Error::Internal("Unable to fetch Package Cache.".to_string()))
+            .extend()?;
 
         let Some(layout) = self.type_.layout_impl(resolver).await.extend()? else {
-            return Err(Error::Internal("Move value must have valid layout".to_string())).extend();
+            return Err(Error::Internal(
+                "Move value must have valid layout".to_string(),
+            ))
+            .extend();
         };
 
         // Factor out into its own non-GraphQL, non-async function for better testability
@@ -143,7 +149,10 @@ impl MoveValue {
         // TODO (annotated-visitor): deserializing directly using a custom visitor.
         BoundedVisitor::deserialize_value(&self.bcs.0[..], &layout).map_err(|_| {
             let type_tag: TypeTag = (&layout).into();
-            Error::Internal(format!("Failed to deserialize Move value for type: {}", type_tag))
+            Error::Internal(format!(
+                "Failed to deserialize Move value for type: {}",
+                type_tag
+            ))
         })
     }
 
@@ -173,7 +182,11 @@ impl TryFrom<A::MoveValue> for MoveData {
             V::Bool(b) => Self::Bool(b),
             V::Address(a) => Self::Address(a.into()),
 
-            V::Vector(v) => Self::Vector(v.into_iter().map(MoveData::try_from).collect::<Result<Vec<_>, _>>()?),
+            V::Vector(v) => Self::Vector(
+                v.into_iter()
+                    .map(MoveData::try_from)
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
 
             V::Struct(s) => {
                 let A::MoveStruct { type_, fields } = s;
@@ -183,7 +196,9 @@ impl TryFrom<A::MoveValue> for MoveData {
                         Some(value) => Some(Box::new(MoveData::try_from(value)?)),
                         None => None,
                     })
-                } else if is_type(&type_, &STD, MOD_ASCII, TYP_STRING) || is_type(&type_, &STD, MOD_STRING, TYP_STRING) {
+                } else if is_type(&type_, &STD, MOD_ASCII, TYP_STRING)
+                    || is_type(&type_, &STD, MOD_STRING, TYP_STRING)
+                {
                     // 0x1::ascii::String, 0x1::string::String
                     Self::String(extract_string(&type_, fields)?)
                 } else if is_type(&type_, &SUI, MOD_OBJECT, TYP_UID) {
@@ -194,14 +209,26 @@ impl TryFrom<A::MoveValue> for MoveData {
                     Self::Id(extract_id(&type_, fields)?.into())
                 } else {
                     // Arbitrary structs
-                    let fields: Result<Vec<_>, _> = fields.into_iter().map(MoveField::try_from).collect();
+                    let fields: Result<Vec<_>, _> =
+                        fields.into_iter().map(MoveField::try_from).collect();
                     Self::Struct(fields?)
                 }
             }
 
-            V::Variant(A::MoveVariant { type_: _, variant_name, tag: _, fields }) => {
-                let fields = fields.into_iter().map(MoveField::try_from).collect::<Result<_, _>>()?;
-                Self::Variant(MoveVariant { name: variant_name.to_string(), fields })
+            V::Variant(A::MoveVariant {
+                type_: _,
+                variant_name,
+                tag: _,
+                fields,
+            }) => {
+                let fields = fields
+                    .into_iter()
+                    .map(MoveField::try_from)
+                    .collect::<Result<_, _>>()?;
+                Self::Variant(MoveVariant {
+                    name: variant_name.to_string(),
+                    fields,
+                })
             }
 
             // Sui does not support `signer` as a type.
@@ -214,7 +241,10 @@ impl TryFrom<(Identifier, A::MoveValue)> for MoveField {
     type Error = Error;
 
     fn try_from((ident, value): (Identifier, A::MoveValue)) -> Result<Self, Error> {
-        Ok(MoveField { name: ident.to_string(), value: MoveData::try_from(value)? })
+        Ok(MoveField {
+            name: ident.to_string(),
+            value: MoveData::try_from(value)?,
+        })
     }
 }
 
@@ -231,7 +261,11 @@ fn try_to_json_value(value: A::MoveValue) -> Result<Value, Error> {
         V::Bool(b) => Value::Boolean(b),
         V::Address(a) => Value::String(a.to_canonical_string(/* with_prefix */ true)),
 
-        V::Vector(xs) => Value::List(xs.into_iter().map(try_to_json_value).collect::<Result<_, _>>()?),
+        V::Vector(xs) => Value::List(
+            xs.into_iter()
+                .map(try_to_json_value)
+                .collect::<Result<_, _>>()?,
+        ),
 
         V::Struct(s) => {
             let A::MoveStruct { type_, fields } = s;
@@ -241,32 +275,49 @@ fn try_to_json_value(value: A::MoveValue) -> Result<Value, Error> {
                     Some(value) => try_to_json_value(value)?,
                     None => Value::Null,
                 }
-            } else if is_type(&type_, &STD, MOD_ASCII, TYP_STRING) || is_type(&type_, &STD, MOD_STRING, TYP_STRING) {
+            } else if is_type(&type_, &STD, MOD_ASCII, TYP_STRING)
+                || is_type(&type_, &STD, MOD_STRING, TYP_STRING)
+            {
                 // 0x1::ascii::String, 0x1::string::String
                 Value::String(extract_string(&type_, fields)?)
             } else if is_type(&type_, &SUI, MOD_OBJECT, TYP_UID) {
                 // 0x2::object::UID
-                Value::String(extract_uid(&type_, fields)?.to_canonical_string(/* with_prefix */ true))
+                Value::String(
+                    extract_uid(&type_, fields)?.to_canonical_string(/* with_prefix */ true),
+                )
             } else if is_type(&type_, &SUI, MOD_OBJECT, TYP_ID) {
                 // 0x2::object::ID
-                Value::String(extract_id(&type_, fields)?.to_canonical_string(/* with_prefix */ true))
+                Value::String(
+                    extract_id(&type_, fields)?.to_canonical_string(/* with_prefix */ true),
+                )
             } else {
                 // Arbitrary structs
                 Value::Object(
                     fields
                         .into_iter()
-                        .map(|(name, value)| Ok((Name::new(name.to_string()), try_to_json_value(value)?)))
+                        .map(|(name, value)| {
+                            Ok((Name::new(name.to_string()), try_to_json_value(value)?))
+                        })
                         .collect::<Result<_, Error>>()?,
                 )
             }
         }
 
-        V::Variant(A::MoveVariant { type_: _, variant_name, tag: _, fields }) => {
+        V::Variant(A::MoveVariant {
+            type_: _,
+            variant_name,
+            tag: _,
+            fields,
+        }) => {
             let fields = fields
                 .into_iter()
                 .map(|(name, value)| Ok((Name::new(name.to_string()), try_to_json_value(value)?)))
                 .collect::<Result<_, Error>>()?;
-            Value::Object(vec![(Name::new(variant_name.to_string()), Value::Object(fields))].into_iter().collect())
+            Value::Object(
+                vec![(Name::new(variant_name.to_string()), Value::Object(fields))]
+                    .into_iter()
+                    .collect(),
+            )
         }
         // Sui does not support `signer` as a type.
         V::Signer(_) => return Err(unexpected_signer_error()),
@@ -274,17 +325,24 @@ fn try_to_json_value(value: A::MoveValue) -> Result<Value, Error> {
 }
 
 fn is_type(tag: &StructTag, address: &AccountAddress, module: &IdentStr, name: &IdentStr) -> bool {
-    &tag.address == address && tag.module.as_ident_str() == module && tag.name.as_ident_str() == name
+    &tag.address == address
+        && tag.module.as_ident_str() == module
+        && tag.name.as_ident_str() == name
 }
 
 macro_rules! extract_field {
     ($type:expr, $fields:expr, $name:ident) => {{
         let _name = ident_str!(stringify!($name));
         let _type = $type;
-        if let Some(value) = ($fields).into_iter().find_map(|(name, value)| (&*name == _name).then_some(value)) {
+        if let Some(value) = ($fields)
+            .into_iter()
+            .find_map(|(name, value)| (&*name == _name).then_some(value))
+        {
             value
         } else {
-            return Err(Error::Internal(format!("Couldn't find expected field '{_name}' of {_type}.")));
+            return Err(Error::Internal(format!(
+                "Couldn't find expected field '{_name}' of {_type}."
+            )));
         }
     }};
 }
@@ -316,7 +374,10 @@ fn extract_bytes(value: A::MoveValue) -> Result<Vec<u8>, Error> {
 /// ```
 ///
 /// Which is conformed to by both `std::ascii::String` and `std::string::String`.
-fn extract_string(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) -> Result<String, Error> {
+fn extract_string(
+    type_: &StructTag,
+    fields: Vec<(Identifier, A::MoveValue)>,
+) -> Result<String, Error> {
     let bytes = extract_bytes(extract_field!(type_, fields, bytes))?;
     String::from_utf8(bytes).map_err(|e| {
         const PREFIX: usize = 30;
@@ -341,10 +402,15 @@ fn extract_string(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) ->
 /// ```
 ///
 /// Which matches `0x2::object::ID`.
-fn extract_id(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) -> Result<AccountAddress, Error> {
+fn extract_id(
+    type_: &StructTag,
+    fields: Vec<(Identifier, A::MoveValue)>,
+) -> Result<AccountAddress, Error> {
     use A::MoveValue as V;
     let V::Address(addr) = extract_field!(type_, fields, bytes) else {
-        return Err(Error::Internal("Expected ID.bytes to have type address.".to_string()));
+        return Err(Error::Internal(
+            "Expected ID.bytes to have type address.".to_string(),
+        ));
     };
 
     Ok(addr)
@@ -358,15 +424,22 @@ fn extract_id(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) -> Res
 /// ```
 ///
 /// Which matches `0x2::object::UID`.
-fn extract_uid(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) -> Result<AccountAddress, Error> {
+fn extract_uid(
+    type_: &StructTag,
+    fields: Vec<(Identifier, A::MoveValue)>,
+) -> Result<AccountAddress, Error> {
     use A::MoveValue as V;
     let V::Struct(s) = extract_field!(type_, fields, id) else {
-        return Err(Error::Internal("Expected UID.id to be a struct".to_string()));
+        return Err(Error::Internal(
+            "Expected UID.id to be a struct".to_string(),
+        ));
     };
 
     let A::MoveStruct { type_, fields } = s;
     if !is_type(&type_, &SUI, MOD_OBJECT, TYP_ID) {
-        return Err(Error::Internal("Expected UID.id to have type ID.".to_string()));
+        return Err(Error::Internal(
+            "Expected UID.id to have type ID.".to_string(),
+        ));
     }
 
     extract_id(&type_, fields)
@@ -380,13 +453,20 @@ fn extract_uid(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) -> Re
 /// ```
 ///
 /// Where `vec` contains at most one element.  This matches the shape of `0x1::option::Option<T>`.
-fn extract_option(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) -> Result<Option<A::MoveValue>, Error> {
+fn extract_option(
+    type_: &StructTag,
+    fields: Vec<(Identifier, A::MoveValue)>,
+) -> Result<Option<A::MoveValue>, Error> {
     let A::MoveValue::Vector(mut elements) = extract_field!(type_, fields, vec) else {
-        return Err(Error::Internal("Expected Option.vec to be a vector.".to_string()));
+        return Err(Error::Internal(
+            "Expected Option.vec to be a vector.".to_string(),
+        ));
     };
 
     if elements.len() > 1 {
-        return Err(Error::Internal("Expected Option.vec to contain at most one element.".to_string()));
+        return Err(Error::Internal(
+            "Expected Option.vec to contain at most one element.".to_string(),
+        ));
     };
 
     Ok(elements.pop())
@@ -408,10 +488,10 @@ mod tests {
         ($type:literal { $($name:literal : $layout:expr),* $(,)?}) => {
             A::MoveTypeLayout::Struct(Box::new(S {
                 type_: StructTag::from_str($type).expect("Failed to parse struct"),
-                fields: Box::new(vec![$(MoveFieldLayout {
+                fields: vec![$(MoveFieldLayout {
                     name: ident_str!($name).to_owned(),
                     layout: $layout,
-                }),*])
+                }),*]
             }))
         }
     }
@@ -539,14 +619,22 @@ mod tests {
 
     #[test]
     fn u256_data() {
-        let v = data(L::U256, U256::from_str("42424242424242424242424242424242424242424").unwrap());
-        let expect = expect![[r#"Ok(Number(BigInt("42424242424242424242424242424242424242424")))"#]];
+        let v = data(
+            L::U256,
+            U256::from_str("42424242424242424242424242424242424242424").unwrap(),
+        );
+        let expect =
+            expect![[r#"Ok(Number(BigInt("42424242424242424242424242424242424242424")))"#]];
         expect.assert_eq(&format!("{v:?}"));
     }
 
     #[test]
     fn u256_json() {
-        let v = json(L::U256, U256::from_str("42424242424242424242424242424242424242424").unwrap()).unwrap();
+        let v = json(
+            L::U256,
+            U256::from_str("42424242424242424242424242424242424242424").unwrap(),
+        )
+        .unwrap();
         let expect = expect![[r#""42424242424242424242424242424242424242424""#]];
         expect.assert_eq(&format!("{v}"));
     }
@@ -624,7 +712,8 @@ mod tests {
     #[test]
     fn address_json() {
         let v = json(L::Address, address("0x42")).unwrap();
-        let expect = expect![[r#""0x0000000000000000000000000000000000000000000000000000000000000042""#]];
+        let expect =
+            expect![[r#""0x0000000000000000000000000000000000000000000000000000000000000042""#]];
         expect.assert_eq(&format!("{v}"));
     }
 
@@ -650,7 +739,8 @@ mod tests {
         });
 
         let v = json(l, address("0x42")).unwrap();
-        let expect = expect![[r#""0x0000000000000000000000000000000000000000000000000000000000000042""#]];
+        let expect =
+            expect![[r#""0x0000000000000000000000000000000000000000000000000000000000000042""#]];
         expect.assert_eq(&format!("{v}"));
     }
 
@@ -671,10 +761,13 @@ mod tests {
 
         let v = data(
             l,
-            (vec![] as Vec<Vec<u8>>, vec![
-                (44u16, vec!["Hello, world!"], address("0x45")),
-                (46u16, vec![], address("0x47")),
-            ]),
+            (
+                vec![] as Vec<Vec<u8>>,
+                vec![
+                    (44u16, vec!["Hello, world!"], address("0x45")),
+                    (46u16, vec![], address("0x47")),
+                ],
+            ),
         );
 
         let expect = expect![[r#"
@@ -839,10 +932,13 @@ mod tests {
 
         let v = json(
             l,
-            (vec![] as Vec<Vec<u8>>, vec![
-                (44u16, vec!["Hello, world!"], address("0x45")),
-                (46u16, vec![], address("0x47")),
-            ]),
+            (
+                vec![] as Vec<Vec<u8>>,
+                vec![
+                    (44u16, vec!["Hello, world!"], address("0x45")),
+                    (46u16, vec![], address("0x47")),
+                ],
+            ),
         )
         .unwrap();
 
@@ -873,7 +969,10 @@ mod tests {
 
     #[test]
     fn signer_nested_data() {
-        let v = data(vector_layout!(L::Signer), vec![address("0x42"), address("0x43")]);
+        let v = data(
+            vector_layout!(L::Signer),
+            vec![address("0x42"), address("0x43")],
+        );
         let expect = expect![[r#"
             Err(
                 Internal(
@@ -885,7 +984,11 @@ mod tests {
 
     #[test]
     fn signer_nested_json() {
-        let err = json(vector_layout!(L::Signer), vec![address("0x42"), address("0x43")]).unwrap_err();
+        let err = json(
+            vector_layout!(L::Signer),
+            vec![address("0x42"), address("0x43")],
+        )
+        .unwrap_err();
 
         let expect = expect![[r#"Internal("Unexpected value of type: signer.")"#]];
         expect.assert_eq(&format!("{err:?}"));

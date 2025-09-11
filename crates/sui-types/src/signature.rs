@@ -1,35 +1,34 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::SuiAddress,
-    committee::EpochId,
-    crypto::{CompressedSignature, PublicKey, Signature, SignatureScheme, SuiSignature, ZkLoginAuthenticatorAsBytes},
-    digests::ZKLoginInputsDigest,
-    error::{SuiError, SuiResult},
-    multisig::MultiSig,
-    multisig_legacy::MultiSigLegacy,
-    passkey_authenticator::PasskeyAuthenticator,
-    signature_verification::VerifiedDigestCache,
-    zk_login_authenticator::ZkLoginAuthenticator,
+use crate::committee::EpochId;
+use crate::crypto::{
+    CompressedSignature, PasskeyAuthenticatorAsBytes, PublicKey, SignatureScheme, SuiSignature,
+    ZkLoginAuthenticatorAsBytes,
 };
+use crate::digests::ZKLoginInputsDigest;
+use crate::error::SuiError;
+use crate::multisig_legacy::MultiSigLegacy;
+use crate::passkey_authenticator::PasskeyAuthenticator;
+use crate::signature_verification::VerifiedDigestCache;
+use crate::zk_login_authenticator::ZkLoginAuthenticator;
+use crate::{base_types::SuiAddress, crypto::Signature, error::SuiResult, multisig::MultiSig};
 pub use enum_dispatch::enum_dispatch;
+use fastcrypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
+use fastcrypto::secp256k1::{Secp256k1PublicKey, Secp256k1Signature};
+use fastcrypto::secp256r1::{Secp256r1PublicKey, Secp256r1Signature};
 use fastcrypto::{
-    ed25519::{Ed25519PublicKey, Ed25519Signature},
     error::FastCryptoError,
-    secp256k1::{Secp256k1PublicKey, Secp256k1Signature},
-    secp256r1::{Secp256r1PublicKey, Secp256r1Signature},
     traits::{EncodeDecodeBase64, ToFromBytes},
 };
-use fastcrypto_zkp::bn254::{
-    zk_login::{JwkId, OIDCProvider, JWK},
-    zk_login_api::ZkLoginEnv,
-};
+use fastcrypto_zkp::bn254::zk_login::{JwkId, OIDCProvider, JWK};
+use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
 use im::hashmap::HashMap as ImHashMap;
 use schemars::JsonSchema;
 use serde::Serialize;
 use shared_crypto::intent::IntentMessage;
-use std::{hash::Hash, sync::Arc};
+use std::hash::Hash;
+use std::sync::Arc;
 #[derive(Default, Debug, Clone)]
 pub struct VerifyParams {
     // map from JwkId (iss, kid) => JWK
@@ -38,7 +37,9 @@ pub struct VerifyParams {
     pub zk_login_env: ZkLoginEnv,
     pub verify_legacy_zklogin_address: bool,
     pub accept_zklogin_in_multisig: bool,
+    pub accept_passkey_in_multisig: bool,
     pub zklogin_max_epoch_upper_bound_delta: Option<u64>,
+    pub additional_multisig_checks: bool,
 }
 
 impl VerifyParams {
@@ -48,7 +49,9 @@ impl VerifyParams {
         zk_login_env: ZkLoginEnv,
         verify_legacy_zklogin_address: bool,
         accept_zklogin_in_multisig: bool,
+        accept_passkey_in_multisig: bool,
         zklogin_max_epoch_upper_bound_delta: Option<u64>,
+        additional_multisig_checks: bool,
     ) -> Self {
         Self {
             oidc_provider_jwks,
@@ -56,7 +59,9 @@ impl VerifyParams {
             zk_login_env,
             verify_legacy_zklogin_address,
             accept_zklogin_in_multisig,
+            accept_passkey_in_multisig,
             zklogin_max_epoch_upper_bound_delta,
+            additional_multisig_checks,
         }
     }
 }
@@ -64,7 +69,11 @@ impl VerifyParams {
 /// A lightweight trait that all members of [enum GenericSignature] implement.
 #[enum_dispatch]
 pub trait AuthenticatorTrait {
-    fn verify_user_authenticator_epoch(&self, epoch: EpochId, max_epoch_upper_bound_delta: Option<u64>) -> SuiResult;
+    fn verify_user_authenticator_epoch(
+        &self,
+        epoch: EpochId,
+        max_epoch_upper_bound_delta: Option<u64>,
+    ) -> SuiResult;
 
     fn verify_claims<T>(
         &self,
@@ -95,7 +104,6 @@ impl GenericSignature {
     pub fn is_zklogin(&self) -> bool {
         matches!(self, GenericSignature::ZkLoginAuthenticator(_))
     }
-
     pub fn is_passkey(&self) -> bool {
         matches!(self, GenericSignature::PasskeyAuthenticator(_))
     }
@@ -115,7 +123,10 @@ impl GenericSignature {
     where
         T: Serialize,
     {
-        self.verify_user_authenticator_epoch(epoch, verify_params.zklogin_max_epoch_upper_bound_delta)?;
+        self.verify_user_authenticator_epoch(
+            epoch,
+            verify_params.zklogin_max_epoch_upper_bound_delta,
+        )?;
         self.verify_claims(value, author, verify_params, zklogin_inputs_cache)
     }
 
@@ -127,30 +138,46 @@ impl GenericSignature {
                 let bytes = s.signature_bytes();
                 match s.scheme() {
                     SignatureScheme::ED25519 => Ok(CompressedSignature::Ed25519(
-                        (&Ed25519Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
-                            error: "Cannot parse ed25519 sig".to_string(),
+                        (&Ed25519Signature::from_bytes(bytes).map_err(|_| {
+                            SuiError::InvalidSignature {
+                                error: "Cannot parse ed25519 sig".to_string(),
+                            }
                         })?)
                             .into(),
                     )),
                     SignatureScheme::Secp256k1 => Ok(CompressedSignature::Secp256k1(
-                        (&Secp256k1Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
-                            error: "Cannot parse secp256k1 sig".to_string(),
+                        (&Secp256k1Signature::from_bytes(bytes).map_err(|_| {
+                            SuiError::InvalidSignature {
+                                error: "Cannot parse secp256k1 sig".to_string(),
+                            }
                         })?)
                             .into(),
                     )),
-                    SignatureScheme::Secp256r1 => Ok(CompressedSignature::Secp256r1(
-                        (&Secp256r1Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
-                            error: "Cannot parse secp256r1 sig".to_string(),
-                        })?)
-                            .into(),
-                    )),
-                    _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
+                    SignatureScheme::Secp256r1 | SignatureScheme::PasskeyAuthenticator => {
+                        Ok(CompressedSignature::Secp256r1(
+                            (&Secp256r1Signature::from_bytes(bytes).map_err(|_| {
+                                SuiError::InvalidSignature {
+                                    error: "Cannot parse secp256r1 sig".to_string(),
+                                }
+                            })?)
+                                .into(),
+                        ))
+                    }
+
+                    _ => Err(SuiError::UnsupportedFeatureError {
+                        error: "Unsupported signature scheme".to_string(),
+                    }),
                 }
             }
-            GenericSignature::ZkLoginAuthenticator(s) => {
-                Ok(CompressedSignature::ZkLogin(ZkLoginAuthenticatorAsBytes(s.as_ref().to_vec())))
-            }
-            _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
+            GenericSignature::ZkLoginAuthenticator(s) => Ok(CompressedSignature::ZkLogin(
+                ZkLoginAuthenticatorAsBytes(s.as_ref().to_vec()),
+            )),
+            GenericSignature::PasskeyAuthenticator(s) => Ok(CompressedSignature::Passkey(
+                PasskeyAuthenticatorAsBytes(s.as_ref().to_vec()),
+            )),
+            _ => Err(SuiError::UnsupportedFeatureError {
+                error: "Unsupported signature scheme".to_string(),
+            }),
         }
     }
 
@@ -162,18 +189,21 @@ impl GenericSignature {
                 let bytes = s.public_key_bytes();
                 match s.scheme() {
                     SignatureScheme::ED25519 => Ok(PublicKey::Ed25519(
-                        (&Ed25519PublicKey::from_bytes(bytes)
-                            .map_err(|_| SuiError::KeyConversionError("Cannot parse ed25519 pk".to_string()))?)
+                        (&Ed25519PublicKey::from_bytes(bytes).map_err(|_| {
+                            SuiError::KeyConversionError("Cannot parse ed25519 pk".to_string())
+                        })?)
                             .into(),
                     )),
                     SignatureScheme::Secp256k1 => Ok(PublicKey::Secp256k1(
-                        (&Secp256k1PublicKey::from_bytes(bytes)
-                            .map_err(|_| SuiError::KeyConversionError("Cannot parse secp256k1 pk".to_string()))?)
+                        (&Secp256k1PublicKey::from_bytes(bytes).map_err(|_| {
+                            SuiError::KeyConversionError("Cannot parse secp256k1 pk".to_string())
+                        })?)
                             .into(),
                     )),
                     SignatureScheme::Secp256r1 => Ok(PublicKey::Secp256r1(
-                        (&Secp256r1PublicKey::from_bytes(bytes)
-                            .map_err(|_| SuiError::KeyConversionError("Cannot parse secp256r1 pk".to_string()))?)
+                        (&Secp256r1PublicKey::from_bytes(bytes).map_err(|_| {
+                            SuiError::KeyConversionError("Cannot parse secp256r1 pk".to_string())
+                        })?)
                             .into(),
                     )),
                     _ => Err(SuiError::UnsupportedFeatureError {
@@ -182,7 +212,10 @@ impl GenericSignature {
                 }
             }
             GenericSignature::ZkLoginAuthenticator(s) => s.get_pk(),
-            _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
+            GenericSignature::PasskeyAuthenticator(s) => s.get_pk(),
+            _ => Err(SuiError::UnsupportedFeatureError {
+                error: "Unsupported signature scheme".to_string(),
+            }),
         }
     }
 }
@@ -194,13 +227,15 @@ impl GenericSignature {
 /// of [struct Multisig] i.e. `flag || bcs_bytes(Multisig)`.
 impl ToFromBytes for GenericSignature {
     fn from_bytes(bytes: &[u8]) -> Result<Self, FastCryptoError> {
-        match SignatureScheme::from_flag_byte(bytes.first().ok_or(FastCryptoError::InputTooShort(0))?) {
+        match SignatureScheme::from_flag_byte(
+            bytes.first().ok_or(FastCryptoError::InputTooShort(0))?,
+        ) {
             Ok(x) => match x {
-                SignatureScheme::ED25519 | SignatureScheme::Secp256k1 | SignatureScheme::Secp256r1 => {
-                    Ok(GenericSignature::Signature(
-                        Signature::from_bytes(bytes).map_err(|_| FastCryptoError::InvalidSignature)?,
-                    ))
-                }
+                SignatureScheme::ED25519
+                | SignatureScheme::Secp256k1
+                | SignatureScheme::Secp256r1 => Ok(GenericSignature::Signature(
+                    Signature::from_bytes(bytes).map_err(|_| FastCryptoError::InvalidSignature)?,
+                )),
                 SignatureScheme::MultiSig => match MultiSig::from_bytes(bytes) {
                     Ok(multisig) => Ok(GenericSignature::MultiSig(multisig)),
                     Err(_) => {

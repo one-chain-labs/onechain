@@ -3,19 +3,20 @@
 
 use async_trait::async_trait;
 use fastcrypto::encoding::Base64;
-use jsonrpsee::{core::RpcResult, http_client::HttpClient, RpcModule};
+use jsonrpsee::core::RpcResult;
+use jsonrpsee::http_client::HttpClient;
+use jsonrpsee::RpcModule;
 
 use sui_json_rpc::SuiRpcModule;
 use sui_json_rpc_api::{WriteApiClient, WriteApiServer};
 use sui_json_rpc_types::{
-    DevInspectArgs,
-    DevInspectResults,
-    DryRunTransactionBlockResponse,
-    SuiTransactionBlockResponse,
+    DevInspectArgs, DevInspectResults, DryRunTransactionBlockResponse, SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
 };
 use sui_open_rpc::Module;
-use sui_types::{base_types::SuiAddress, quorum_driver_types::ExecuteTransactionRequestType, sui_serde::BigInt};
+use sui_types::base_types::SuiAddress;
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::sui_serde::BigInt;
 
 use crate::types::SuiTransactionBlockResponseWithOptions;
 
@@ -25,7 +26,9 @@ pub(crate) struct WriteApi {
 
 impl WriteApi {
     pub fn new(fullnode_client: HttpClient) -> Self {
-        Self { fullnode: fullnode_client }
+        Self {
+            fullnode: fullnode_client,
+        }
     }
 }
 
@@ -38,8 +41,11 @@ impl WriteApiServer for WriteApi {
         options: Option<SuiTransactionBlockResponseOptions>,
         request_type: Option<ExecuteTransactionRequestType>,
     ) -> RpcResult<SuiTransactionBlockResponse> {
-        let sui_transaction_response =
-            self.fullnode.execute_transaction_block(tx_bytes, signatures, options.clone(), request_type).await?;
+        let sui_transaction_response = self
+            .fullnode
+            .execute_transaction_block(tx_bytes, signatures, options.clone(), request_type)
+            .await
+            .map_err(crate::errors::client_error_to_error_object)?;
         Ok(SuiTransactionBlockResponseWithOptions {
             response: sui_transaction_response,
             options: options.unwrap_or_default(),
@@ -55,11 +61,26 @@ impl WriteApiServer for WriteApi {
         epoch: Option<BigInt<u64>>,
         additional_args: Option<DevInspectArgs>,
     ) -> RpcResult<DevInspectResults> {
-        self.fullnode.dev_inspect_transaction_block(sender_address, tx_bytes, gas_price, epoch, additional_args).await
+        self.fullnode
+            .dev_inspect_transaction_block(
+                sender_address,
+                tx_bytes,
+                gas_price,
+                epoch,
+                additional_args,
+            )
+            .await
+            .map_err(crate::errors::client_error_to_error_object)
     }
 
-    async fn dry_run_transaction_block(&self, tx_bytes: Base64) -> RpcResult<DryRunTransactionBlockResponse> {
-        self.fullnode.dry_run_transaction_block(tx_bytes).await
+    async fn dry_run_transaction_block(
+        &self,
+        tx_bytes: Base64,
+    ) -> RpcResult<DryRunTransactionBlockResponse> {
+        self.fullnode
+            .dry_run_transaction_block(tx_bytes)
+            .await
+            .map_err(crate::errors::client_error_to_error_object)
     }
 }
 

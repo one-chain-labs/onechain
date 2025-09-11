@@ -1,17 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, net::SocketAddr, path::PathBuf};
+use std::collections::HashSet;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use sui_core::authority_client::AuthorityAPI;
 use sui_macros::*;
 use sui_test_transaction_builder::publish_package;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef},
-    effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
-    error::{SuiError, UserInputError},
-    object::Owner,
-    transaction::{CallArg, ObjectArg, Transaction},
-};
+use sui_types::base_types::{ObjectID, ObjectRef};
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::effects::{TransactionEffects, TransactionEvents};
+use sui_types::error::{SuiError, UserInputError};
+use sui_types::object::Owner;
+use sui_types::transaction::{CallArg, ObjectArg, Transaction};
 use test_cluster::{TestCluster, TestClusterBuilder};
 
 #[sim_test]
@@ -25,8 +26,10 @@ async fn receive_object_feature_deny() {
 
     let env = TestEnvironment::new().await;
     let (parent, child) = env.start().await;
-    let arguments =
-        vec![CallArg::Object(ObjectArg::ImmOrOwnedObject(parent)), CallArg::Object(ObjectArg::Receiving(child))];
+    let arguments = vec![
+        CallArg::Object(ObjectArg::ImmOrOwnedObject(parent)),
+        CallArg::Object(ObjectArg::Receiving(child)),
+    ];
     let txn = env.create_move_call("receiver", arguments).await;
     let err = env
         .test_cluster
@@ -41,7 +44,12 @@ async fn receive_object_feature_deny() {
         .map(|_| ())
         .unwrap_err();
 
-    assert!(matches!(err, SuiError::UserInputError { error: UserInputError::Unsupported(..) }));
+    assert!(matches!(
+        err,
+        SuiError::UserInputError {
+            error: UserInputError::Unsupported(..)
+        }
+    ));
 }
 
 #[sim_test]
@@ -114,7 +122,8 @@ async fn delete_of_object_with_reconfiguration_receive_of_old_parent_and_child_a
 }
 
 #[sim_test]
-async fn delete_of_object_with_reconfiguration_receive_of_new_parent_and_old_child_after_reconfig() {
+async fn delete_of_object_with_reconfiguration_receive_of_new_parent_and_old_child_after_reconfig()
+{
     let env = TestEnvironment::new().await;
     let (parent, child) = env.start().await;
     let new_parent = env.delete(parent, child).await;
@@ -129,11 +138,16 @@ fn get_parent_and_child(created: Vec<(ObjectRef, Owner)>) -> (ObjectRef, ObjectR
     let (child, parent_id) = created
         .iter()
         .find_map(|child @ (_, owner)| match owner {
-            Owner::AddressOwner(j) if created_addrs.contains(&ObjectID::from(*j)) => Some((child, (*j).into())),
+            Owner::AddressOwner(j) if created_addrs.contains(&ObjectID::from(*j)) => {
+                Some((child, (*j).into()))
+            }
             _ => None,
         })
         .unwrap();
-    let parent = created.iter().find(|((id, _, _), _)| *id == parent_id).unwrap();
+    let parent = created
+        .iter()
+        .find(|((id, _, _), _)| *id == parent_id)
+        .unwrap();
     (parent.0, child.0)
 }
 
@@ -148,10 +162,17 @@ impl TestEnvironment {
 
         let move_package = publish_move_package(&test_cluster).await.0;
 
-        Self { test_cluster, move_package }
+        Self {
+            test_cluster,
+            move_package,
+        }
     }
 
-    async fn create_move_call(&self, function: &'static str, arguments: Vec<CallArg>) -> Transaction {
+    async fn create_move_call(
+        &self,
+        function: &'static str,
+        arguments: Vec<CallArg>,
+    ) -> Transaction {
         let transaction = self
             .test_cluster
             .test_transaction_builder()
@@ -167,7 +188,9 @@ impl TestEnvironment {
         arguments: Vec<CallArg>,
     ) -> anyhow::Result<(TransactionEffects, TransactionEvents)> {
         let transaction = self.create_move_call(function, arguments).await;
-        self.test_cluster.execute_transaction_return_raw_effects(transaction).await
+        self.test_cluster
+            .execute_transaction_return_raw_effects(transaction)
+            .await
     }
 
     async fn start(&self) -> (ObjectRef, ObjectRef) {
@@ -177,32 +200,60 @@ impl TestEnvironment {
         get_parent_and_child(fx.created())
     }
 
-    async fn receive(&self, parent: ObjectRef, child: ObjectRef) -> anyhow::Result<(ObjectRef, ObjectRef)> {
-        let arguments =
-            vec![CallArg::Object(ObjectArg::ImmOrOwnedObject(parent)), CallArg::Object(ObjectArg::Receiving(child))];
+    async fn receive(
+        &self,
+        parent: ObjectRef,
+        child: ObjectRef,
+    ) -> anyhow::Result<(ObjectRef, ObjectRef)> {
+        let arguments = vec![
+            CallArg::Object(ObjectArg::ImmOrOwnedObject(parent)),
+            CallArg::Object(ObjectArg::Receiving(child)),
+        ];
         let fx = self.move_call("receiver", arguments).await?;
         assert!(fx.0.status().is_ok());
         let new_child_ref =
             fx.0.mutated_excluding_gas()
                 .iter()
-                .find_map(|(oref, _)| if oref.0 == child.0 { Some(*oref) } else { None })
+                .find_map(
+                    |(oref, _)| {
+                        if oref.0 == child.0 {
+                            Some(*oref)
+                        } else {
+                            None
+                        }
+                    },
+                )
                 .unwrap();
         let new_parent_ref =
             fx.0.mutated_excluding_gas()
                 .iter()
-                .find_map(|(oref, _)| if oref.0 == parent.0 { Some(*oref) } else { None })
+                .find_map(|(oref, _)| {
+                    if oref.0 == parent.0 {
+                        Some(*oref)
+                    } else {
+                        None
+                    }
+                })
                 .unwrap();
         Ok((new_parent_ref, new_child_ref))
     }
 
     async fn delete(&self, parent: ObjectRef, child: ObjectRef) -> ObjectRef {
-        let arguments =
-            vec![CallArg::Object(ObjectArg::ImmOrOwnedObject(parent)), CallArg::Object(ObjectArg::Receiving(child))];
+        let arguments = vec![
+            CallArg::Object(ObjectArg::ImmOrOwnedObject(parent)),
+            CallArg::Object(ObjectArg::Receiving(child)),
+        ];
         let fx = self.move_call("deleter", arguments).await.unwrap();
         assert!(fx.0.status().is_ok());
         fx.0.mutated_excluding_gas()
             .iter()
-            .find_map(|(oref, _)| if oref.0 == parent.0 { Some(*oref) } else { None })
+            .find_map(|(oref, _)| {
+                if oref.0 == parent.0 {
+                    Some(*oref)
+                } else {
+                    None
+                }
+            })
             .unwrap()
     }
 }

@@ -1,23 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{path::PathBuf, str::FromStr, time::Duration};
+use std::str::FromStr;
+use std::{path::PathBuf, time::Duration};
 
 use sui_graphql_rpc::{
     config::{ConnectionConfig, ServiceConfig},
     test_infra::cluster::{
-        start_graphql_server_with_fn_rpc,
-        start_network_cluster,
-        wait_for_graphql_checkpoint_catchup,
-        wait_for_graphql_server,
-        NetworkCluster,
+        start_graphql_server_with_fn_rpc, start_network_cluster,
+        wait_for_graphql_checkpoint_catchup, wait_for_graphql_server, NetworkCluster,
     },
 };
 use sui_graphql_rpc_client::simple_client::SimpleClient;
-use sui_json_rpc::name_service::{Domain, DomainFormat};
 use sui_json_rpc_types::ObjectChange;
 use sui_move_build::BuildConfig;
-use sui_pg_temp_db::get_available_port;
+use sui_name_service::{Domain, DomainFormat};
+use sui_pg_db::temp::get_available_port;
 use sui_types::{
     base_types::{ObjectID, SequenceNumber},
     digests::ObjectDigest,
@@ -25,8 +23,7 @@ use sui_types::{
     object::Owner,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{CallArg, ObjectArg},
-    Identifier,
-    SUI_FRAMEWORK_PACKAGE_ID,
+    Identifier, SUI_FRAMEWORK_PACKAGE_ID,
 };
 const DOT_MOVE_PKG: &str = "tests/move_registry/move_registry/";
 const DEMO_PKG: &str = "tests/move_registry/demo/";
@@ -64,7 +61,16 @@ async fn test_move_registry_e2e() {
     let org = "org.sui".to_string();
 
     // Register the package: First, for the "base" chain state.
-    register_pkg(&network_cluster, pkg_id, registry_id, v1, name.clone(), org.clone(), None).await;
+    register_pkg(
+        &network_cluster,
+        pkg_id,
+        registry_id,
+        v1,
+        name.clone(),
+        org.clone(),
+        None,
+    )
+    .await;
 
     // Register the package for the external resolver.
     register_pkg(
@@ -83,7 +89,13 @@ async fn test_move_registry_e2e() {
     // The first cluster uses internal resolution (mimics our base network, does not rely on external chain).
     let internal_client = init_move_registry_gql(
         network_cluster.graphql_connection_config.clone(),
-        ServiceConfig::move_registry_test_defaults(false, None, Some(pkg_id.into()), Some(registry_id.0), None),
+        ServiceConfig::move_registry_test_defaults(
+            false,
+            None,
+            Some(pkg_id.into()),
+            Some(registry_id.0),
+            None,
+        ),
     )
     .await;
 
@@ -116,9 +128,18 @@ async fn test_move_registry_e2e() {
 
     eprintln!("Latest checkpoint: {:?}", latest_checkpoint);
 
-    wait_for_graphql_checkpoint_catchup(&internal_client, latest_checkpoint, Duration::from_millis(500)).await;
+    wait_for_graphql_checkpoint_catchup(
+        &internal_client,
+        latest_checkpoint,
+        Duration::from_millis(500),
+    )
+    .await;
 
-    let mvr_name = format!("{}/{}", Domain::from_str(&org).unwrap().format(DomainFormat::At), name);
+    let mvr_name = format!(
+        "{}/{}",
+        Domain::from_str(&org).unwrap().format(DomainFormat::At),
+        name
+    );
 
     eprintln!("MVR Name: {}", mvr_name);
 
@@ -137,9 +158,15 @@ async fn test_move_registry_e2e() {
         type_query(&format!("{}{}", &mvr_name, DEMO_TYPE_V3)),
     );
 
-    let internal_resolution = internal_client.execute(query.clone(), vec![]).await.unwrap();
+    let internal_resolution = internal_client
+        .execute(query.clone(), vec![])
+        .await
+        .unwrap();
 
-    let external_resolution = external_client.execute(query.clone(), vec![]).await.unwrap();
+    let external_resolution = external_client
+        .execute(query.clone(), vec![])
+        .await
+        .unwrap();
 
     test_results(internal_resolution, &v1, &v2, &v3, "internal resolution");
     test_results(external_resolution, &v1, &v2, &v3, "external resolution");
@@ -157,7 +184,9 @@ fn test_results(
 ) {
     eprintln!("Testing results for: {}", indicator);
     assert_eq!(
-        query_result["data"]["valid_latest"]["address"].as_str().unwrap(),
+        query_result["data"]["valid_latest"]["address"]
+            .as_str()
+            .unwrap(),
         v3.to_string(),
         "The latest version should have been v3",
     );
@@ -180,27 +209,48 @@ fn test_results(
         "V3 response did not correspond to the expected value",
     );
 
-    assert!(query_result["data"]["v4"].is_null(), "V4 should not have been found");
-
-    assert_eq!(query_result["data"]["v1_type"]["repr"].as_str().unwrap(), format!("{}{}", v1, DEMO_TYPE));
-
-    assert_eq!(query_result["data"]["v2_type"]["repr"].as_str().unwrap(), format!("{}{}", v2, DEMO_TYPE_V2));
+    assert!(
+        query_result["data"]["v4"].is_null(),
+        "V4 should not have been found"
+    );
 
     assert_eq!(
-        query_result["data"]["v3_type"]["layout"]["struct"]["type"].as_str().unwrap(),
+        query_result["data"]["v1_type"]["repr"].as_str().unwrap(),
+        format!("{}{}", v1, DEMO_TYPE)
+    );
+
+    assert_eq!(
+        query_result["data"]["v2_type"]["repr"].as_str().unwrap(),
+        format!("{}{}", v2, DEMO_TYPE_V2)
+    );
+
+    assert_eq!(
+        query_result["data"]["v3_type"]["layout"]["struct"]["type"]
+            .as_str()
+            .unwrap(),
         format!("{}{}", v3, DEMO_TYPE_V3)
     );
 
     assert_eq!(
-        query_result["data"]["v3_type"]["layout"]["struct"]["type"].as_str().unwrap(),
+        query_result["data"]["v3_type"]["layout"]["struct"]["type"]
+            .as_str()
+            .unwrap(),
         query_result["data"]["v3_type"]["repr"].as_str().unwrap()
     );
 }
 
-async fn init_move_registry_gql(connection_config: ConnectionConfig, config: ServiceConfig) -> SimpleClient {
-    let _gql_handle = start_graphql_server_with_fn_rpc(connection_config.clone(), None, None, config).await;
+async fn init_move_registry_gql(
+    connection_config: ConnectionConfig,
+    config: ServiceConfig,
+) -> SimpleClient {
+    let _gql_handle =
+        start_graphql_server_with_fn_rpc(connection_config.clone(), None, None, config).await;
 
-    let server_url = format!("http://{}:{}/", connection_config.host(), connection_config.port());
+    let server_url = format!(
+        "http://{}:{}/",
+        connection_config.host(),
+        connection_config.port()
+    );
 
     // Starts graphql client
     let client = SimpleClient::new(server_url);
@@ -219,7 +269,11 @@ async fn register_pkg(
     chain_id: Option<String>,
 ) {
     let is_network_call = chain_id.is_some();
-    let function = if is_network_call { "set_network" } else { "add_record" };
+    let function = if is_network_call {
+        "set_network"
+    } else {
+        "add_record"
+    };
 
     let mut args = vec![
         CallArg::Object(ObjectArg::SharedObject {
@@ -243,36 +297,54 @@ async fn register_pkg(
         .move_call(move_registry_package_id, "move_registry", function, args)
         .build();
 
-    cluster.validator_fullnode_handle.sign_and_execute_transaction(&tx).await;
+    cluster
+        .validator_fullnode_handle
+        .sign_and_execute_transaction(&tx)
+        .await;
 
     eprintln!("Added record successfully: {:?}", (app, org, chain_id));
 }
 
 // Publishes the Demo PKG, upgrades it twice and returns v1, v2 and v3 package ids.
 async fn publish_demo_pkg(cluster: &NetworkCluster) -> (ObjectID, ObjectID, ObjectID) {
-    let tx = cluster.validator_fullnode_handle.test_transaction_builder().await.publish(PathBuf::from(DEMO_PKG)).build();
+    let tx = cluster
+        .validator_fullnode_handle
+        .test_transaction_builder()
+        .await
+        .publish(PathBuf::from(DEMO_PKG))
+        .build();
 
-    let executed = cluster.validator_fullnode_handle.sign_and_execute_transaction(&tx).await;
+    let executed = cluster
+        .validator_fullnode_handle
+        .sign_and_execute_transaction(&tx)
+        .await;
     let object_changes = executed.object_changes.unwrap();
 
     let v1 = object_changes
         .iter()
-        .find_map(
-            |object| {
-                if let ObjectChange::Published { package_id, .. } = object {
-                    Some(*package_id)
-                } else {
-                    None
-                }
-            },
-        )
+        .find_map(|object| {
+            if let ObjectChange::Published { package_id, .. } = object {
+                Some(*package_id)
+            } else {
+                None
+            }
+        })
         .unwrap();
 
     let upgrade_cap = object_changes
         .iter()
         .find_map(|object| {
-            if let ObjectChange::Created { object_id, object_type, digest, version, .. } = object {
-                if object_type.module.as_str() == "package" && object_type.name.as_str() == "UpgradeCap" {
+            if let ObjectChange::Created {
+                object_id,
+                object_type,
+                digest,
+                version,
+                ..
+            } = object
+            {
+                if object_type.module.as_str() == "package"
+                    && object_type.name.as_str() == "UpgradeCap"
+                {
                     Some(UpgradeCap(*object_id, *version, *digest))
                 } else {
                     None
@@ -298,12 +370,20 @@ async fn upgrade_pkg(
     // build the package upgrade to V2.
     let mut builder = ProgrammableTransactionBuilder::new();
 
-    let compiled_package = BuildConfig::new_for_testing().build(&PathBuf::from(package_path)).unwrap();
+    let compiled_package = BuildConfig::new_for_testing()
+        .build(&PathBuf::from(package_path))
+        .unwrap();
     let digest = compiled_package.get_package_digest(false);
     let modules = compiled_package.get_package_bytes(false);
     let dependencies = compiled_package.get_dependency_storage_package_ids();
 
-    let cap = builder.obj(ObjectArg::ImmOrOwnedObject((upgrade_cap.0, upgrade_cap.1, upgrade_cap.2))).unwrap();
+    let cap = builder
+        .obj(ObjectArg::ImmOrOwnedObject((
+            upgrade_cap.0,
+            upgrade_cap.1,
+            upgrade_cap.2,
+        )))
+        .unwrap();
 
     let policy = builder.pure(UpgradePolicy::Compatible as u8).unwrap();
 
@@ -327,30 +407,45 @@ async fn upgrade_pkg(
         vec![cap, receipt],
     );
 
-    let tx = cluster.validator_fullnode_handle.test_transaction_builder().await.programmable(builder.finish()).build();
+    let tx = cluster
+        .validator_fullnode_handle
+        .test_transaction_builder()
+        .await
+        .programmable(builder.finish())
+        .build();
 
-    let upgraded = cluster.validator_fullnode_handle.sign_and_execute_transaction(&tx).await;
+    let upgraded = cluster
+        .validator_fullnode_handle
+        .sign_and_execute_transaction(&tx)
+        .await;
 
     let object_changes = upgraded.object_changes.unwrap();
 
     let pkg_id = object_changes
         .iter()
-        .find_map(
-            |object| {
-                if let ObjectChange::Published { package_id, .. } = object {
-                    Some(*package_id)
-                } else {
-                    None
-                }
-            },
-        )
+        .find_map(|object| {
+            if let ObjectChange::Published { package_id, .. } = object {
+                Some(*package_id)
+            } else {
+                None
+            }
+        })
         .unwrap();
 
     let upgrade_cap = object_changes
         .iter()
         .find_map(|object| {
-            if let ObjectChange::Mutated { object_id, object_type, digest, version, .. } = object {
-                if object_type.module.as_str() == "package" && object_type.name.as_str() == "UpgradeCap" {
+            if let ObjectChange::Mutated {
+                object_id,
+                object_type,
+                digest,
+                version,
+                ..
+            } = object
+            {
+                if object_type.module.as_str() == "package"
+                    && object_type.name.as_str() == "UpgradeCap"
+                {
                     Some(UpgradeCap(*object_id, *version, *digest))
                 } else {
                     None
@@ -364,13 +459,26 @@ async fn upgrade_pkg(
     (pkg_id, upgrade_cap)
 }
 
-async fn publish_move_registry_package(cluster: &NetworkCluster) -> (ObjectID, (ObjectID, SequenceNumber)) {
+async fn publish_move_registry_package(
+    cluster: &NetworkCluster,
+) -> (ObjectID, (ObjectID, SequenceNumber)) {
     let package_path = PathBuf::from(DOT_MOVE_PKG);
-    let tx = cluster.validator_fullnode_handle.test_transaction_builder().await.publish(package_path).build();
+    let tx = cluster
+        .validator_fullnode_handle
+        .test_transaction_builder()
+        .await
+        .publish(package_path)
+        .build();
 
-    let sig = cluster.validator_fullnode_handle.wallet.sign_transaction(&tx);
+    let sig = cluster
+        .validator_fullnode_handle
+        .wallet
+        .sign_transaction(&tx);
 
-    let executed = cluster.validator_fullnode_handle.execute_transaction(sig).await;
+    let executed = cluster
+        .validator_fullnode_handle
+        .execute_transaction(sig)
+        .await;
 
     let (mut pkg_id, mut obj_id) = (None, None);
 
@@ -379,10 +487,19 @@ async fn publish_move_registry_package(cluster: &NetworkCluster) -> (ObjectID, (
             ObjectChange::Published { package_id, .. } => {
                 pkg_id = Some(package_id);
             }
-            ObjectChange::Created { object_id, object_type, owner, .. } => {
-                if object_type.module.as_str() == "move_registry" && object_type.name.as_str() == "MoveRegistry" {
+            ObjectChange::Created {
+                object_id,
+                object_type,
+                owner,
+                ..
+            } => {
+                if object_type.module.as_str() == "move_registry"
+                    && object_type.name.as_str() == "MoveRegistry"
+                {
                     let initial_shared_version = match owner {
-                        Owner::Shared { initial_shared_version } => initial_shared_version,
+                        Owner::Shared {
+                            initial_shared_version,
+                        } => initial_shared_version,
                         _ => panic!("MoveRegistry should be shared"),
                     };
 

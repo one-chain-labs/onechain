@@ -6,7 +6,7 @@
 /// with SUI.
 module examples::sword {
     use examples::gem::GEM;
-    use one::token::{Self, Token, ActionRequest};
+    use sui::token::{Self, Token, ActionRequest};
 
     /// Trying to purchase a sword with an incorrect amount.
     const EWrongAmount: u64 = 0;
@@ -25,16 +25,15 @@ module examples::sword {
 }
 
 /// Module that defines the in-game currency: GEMs which can be purchased with
-/// SUI and used to buy swords (in the `sword` module).
+/// OCT and used to buy swords (in the `sword` module).
 module examples::gem {
-    use std::{option::none, string::{Self, String}};
-    use one::{
-        balance::{Self, Balance},
-        coin::{Self, Coin, TreasuryCap},
-        oct::OCT,
-        token::{Self, Token, ActionRequest},
-        tx_context::sender
-    };
+    use std::option::none;
+    use std::string::{Self, String};
+    use sui::balance::{Self, Balance};
+    use sui::coin::{Self, Coin, TreasuryCap};
+    use sui::oct::OCT;
+    use sui::token::{Self, Token, ActionRequest};
+    use sui::tx_context::sender;
 
     /// Trying to purchase Gems with an unexpected amount.
     const EUnknownAmount: u64 = 0;
@@ -52,7 +51,6 @@ module examples::gem {
     const LARGE_BUNDLE: u64 = 1_000_000_000_000;
     const LARGE_AMOUNT: u64 = 100_000;
 
-    #[allow(lint(coin_field))]
     /// Gems can be purchased through the `Store`.
     public struct GemStore has key {
         id: UID,

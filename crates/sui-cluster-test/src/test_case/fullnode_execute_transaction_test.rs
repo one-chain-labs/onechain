@@ -3,9 +3,13 @@
 
 use crate::{TestCaseImpl, TestContext};
 use async_trait::async_trait;
-use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions};
+use sui_json_rpc_types::{
+    SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions,
+};
 use sui_sdk::SuiClient;
-use sui_types::{base_types::TransactionDigest, quorum_driver_types::ExecuteTransactionRequestType};
+use sui_types::{
+    base_types::TransactionDigest, quorum_driver_types::ExecuteTransactionRequestType,
+};
 use tracing::info;
 
 pub struct FullNodeExecuteTransactionTest;
@@ -16,7 +20,12 @@ impl FullNodeExecuteTransactionTest {
             .read_api()
             .get_transaction_with_options(tx_digest, SuiTransactionBlockResponseOptions::new())
             .await
-            .unwrap_or_else(|e| panic!("Failed get transaction {:?} from fullnode: {:?}", tx_digest, e));
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed get transaction {:?} from fullnode: {:?}",
+                    tx_digest, e
+                )
+            });
     }
 }
 
@@ -61,7 +70,11 @@ impl TestCaseImpl for FullNodeExecuteTransactionTest {
         assert_eq!(txn_digest, response.digest);
         let effects = response.effects.unwrap();
         if !matches!(effects.status(), SuiExecutionStatus::Success { .. }) {
-            panic!("Failed to execute transfer transaction {:?}: {:?}", txn_digest, effects.status())
+            panic!(
+                "Failed to execute transfer transaction {:?}: {:?}",
+                txn_digest,
+                effects.status()
+            )
         }
         // Verify fullnode observes the txn
         ctx.let_fullnode_sync(vec![txn_digest], 5).await;
@@ -83,7 +96,11 @@ impl TestCaseImpl for FullNodeExecuteTransactionTest {
         assert_eq!(txn_digest, response.digest);
         let effects = response.effects.unwrap();
         if !matches!(effects.status(), SuiExecutionStatus::Success { .. }) {
-            panic!("Failed to execute transfer transaction {:?}: {:?}", txn_digest, effects.status())
+            panic!(
+                "Failed to execute transfer transaction {:?}: {:?}",
+                txn_digest,
+                effects.status()
+            )
         }
         // Unlike in other execution modes, there's no need to wait for the node to sync
         Self::verify_transaction(fullnode, txn_digest).await;

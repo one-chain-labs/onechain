@@ -58,20 +58,40 @@ impl<T: BenchmarkType> Default for BenchmarkParameters<T> {
 
 impl<T: BenchmarkType> Debug for BenchmarkParameters<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}-{:?}-{}-{}", self.benchmark_type, self.faults, self.nodes, self.load)
+        write!(
+            f,
+            "{:?}-{:?}-{}-{}",
+            self.benchmark_type, self.faults, self.nodes, self.load
+        )
     }
 }
 
 impl<T> Display for BenchmarkParameters<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} nodes ({}) - {} tx/s", self.nodes, self.faults, self.load)
+        write!(
+            f,
+            "{} nodes ({}) - {} tx/s",
+            self.nodes, self.faults, self.load
+        )
     }
 }
 
 impl<T> BenchmarkParameters<T> {
     /// Make a new benchmark parameters.
-    pub fn new(benchmark_type: T, nodes: usize, faults: FaultsType, load: usize, duration: Duration) -> Self {
-        Self { benchmark_type, nodes, faults, load, duration }
+    pub fn new(
+        benchmark_type: T,
+        nodes: usize,
+        faults: FaultsType,
+        load: usize,
+        duration: Duration,
+    ) -> Self {
+        Self {
+            benchmark_type,
+            nodes,
+            faults,
+            load,
+            duration,
+        }
     }
 }
 
@@ -120,7 +140,13 @@ impl<T: BenchmarkType> Iterator for BenchmarkParametersGenerator<T> {
     /// Return the next set of benchmark parameters to run.
     fn next(&mut self) -> Option<Self::Item> {
         self.next_load.map(|load| {
-            BenchmarkParameters::new(self.benchmark_type.clone(), self.nodes, self.faults.clone(), load, self.duration)
+            BenchmarkParameters::new(
+                self.benchmark_type.clone(),
+                self.nodes,
+                self.faults.clone(),
+                load,
+                self.duration,
+            )
         })
     }
 }
@@ -173,7 +199,10 @@ impl<T: BenchmarkType> BenchmarkParametersGenerator<T> {
     }
 
     /// Detects whether the latest benchmark parameters run the system out of capacity.
-    fn out_of_capacity(last_result: &MeasurementsCollection<T>, new_result: &MeasurementsCollection<T>) -> bool {
+    fn out_of_capacity(
+        last_result: &MeasurementsCollection<T>,
+        new_result: &MeasurementsCollection<T>,
+    ) -> bool {
         // We consider the system is out of capacity if the latency increased by over 5x with
         // respect to the latest run.
         let threshold = last_result.aggregate_average_latency() * 5;
@@ -213,7 +242,8 @@ impl<T: BenchmarkType> BenchmarkParametersGenerator<T> {
                         }
                         (Some(lower), None) => {
                             if Self::out_of_capacity(lower, &result) {
-                                let next = (lower.transaction_load() + result.transaction_load()) / 2;
+                                let next =
+                                    (lower.transaction_load() + result.transaction_load()) / 2;
                                 self.upper_bound_result = Some(result);
                                 Some(next)
                             } else {
@@ -252,7 +282,9 @@ pub mod test {
     use super::{BenchmarkParametersGenerator, BenchmarkType, LoadType};
 
     /// Mock benchmark type for unit tests.
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+    #[derive(
+        Serialize, Deserialize, Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Default,
+    )]
     pub struct TestBenchmarkType;
 
     impl Display for TestBenchmarkType {
@@ -275,7 +307,10 @@ pub mod test {
     fn set_lower_bound() {
         let settings = Settings::new_for_test();
         let nodes = 4;
-        let load = LoadType::Search { starting_load: 100, max_iterations: 10 };
+        let load = LoadType::Search {
+            starting_load: 100,
+            max_iterations: 10,
+        };
         let mut generator = BenchmarkParametersGenerator::<TestBenchmarkType>::new(nodes, load);
         let parameters = generator.next().unwrap();
 
@@ -287,7 +322,10 @@ pub mod test {
         assert_eq!(next_parameters.unwrap().load, 200);
 
         assert!(generator.lower_bound_result.is_some());
-        assert_eq!(generator.lower_bound_result.unwrap().transaction_load(), 100);
+        assert_eq!(
+            generator.lower_bound_result.unwrap().transaction_load(),
+            100
+        );
         assert!(generator.upper_bound_result.is_none());
     }
 
@@ -295,7 +333,10 @@ pub mod test {
     fn set_upper_bound() {
         let settings = Settings::new_for_test();
         let nodes = 4;
-        let load = LoadType::Search { starting_load: 100, max_iterations: 10 };
+        let load = LoadType::Search {
+            starting_load: 100,
+            max_iterations: 10,
+        };
         let mut generator = BenchmarkParametersGenerator::<TestBenchmarkType>::new(nodes, load);
         let first_parameters = generator.next().unwrap();
 
@@ -316,16 +357,25 @@ pub mod test {
         assert_eq!(third_parameters.unwrap().load, 150);
 
         assert!(generator.lower_bound_result.is_some());
-        assert_eq!(generator.lower_bound_result.unwrap().transaction_load(), 100);
+        assert_eq!(
+            generator.lower_bound_result.unwrap().transaction_load(),
+            100
+        );
         assert!(generator.upper_bound_result.is_some());
-        assert_eq!(generator.upper_bound_result.unwrap().transaction_load(), 200);
+        assert_eq!(
+            generator.upper_bound_result.unwrap().transaction_load(),
+            200
+        );
     }
 
     #[test]
     fn max_iterations() {
         let settings = Settings::new_for_test();
         let nodes = 4;
-        let load = LoadType::Search { starting_load: 100, max_iterations: 0 };
+        let load = LoadType::Search {
+            starting_load: 100,
+            max_iterations: 0,
+        };
         let mut generator = BenchmarkParametersGenerator::<TestBenchmarkType>::new(nodes, load);
         let parameters = generator.next().unwrap();
 

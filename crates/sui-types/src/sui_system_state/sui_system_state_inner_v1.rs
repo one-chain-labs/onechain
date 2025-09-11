@@ -19,18 +19,16 @@ use crate::{
     storage::ObjectStore,
     sui_system_state::epoch_start_sui_system_state::EpochStartSystemState,
 };
+use super::epoch_start_sui_system_state::EpochStartValidatorInfoV1;
+use super::sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary};
+use super::{get_validators_from_table_vec, AdvanceEpochParams, SuiSystemStateTrait};
 use anyhow::Result;
 use fastcrypto::traits::ToFromBytes;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
+use crate::gas::GasCostSummary;
 
-use super::{
-    epoch_start_sui_system_state::EpochStartValidatorInfoV1,
-    get_validators_from_table_vec,
-    sui_system_state_summary::{SuiSupperCommitteeSummary, SuiSystemStateSummary, SuiValidatorSummary},
-    AdvanceEpochParams,
-    SuiSystemStateTrait,
-};
+use super::sui_system_state_summary::{SuiSupperCommitteeSummary};
 
 const E_METADATA_INVALID_POP: u64 = 0;
 const E_METADATA_INVALID_PUBKEY: u64 = 1;
@@ -269,7 +267,8 @@ impl ValidatorMetadataV1 {
 /// Rust version of the Move sui::validator::Validator type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ValidatorV1 {
-    metadata: ValidatorMetadataV1,
+    //metadata: ValidatorMetadataV1,
+    pub metadata: ValidatorMetadataV1,
     #[serde(skip)]
     verified_metadata: OnceCell<VerifiedValidatorMetadataV1>,
     pub revenue_receiving_address: SuiAddress,
@@ -514,6 +513,15 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV1 {
 
     fn safe_mode(&self) -> bool {
         self.safe_mode
+    }
+
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary {
+            computation_cost: self.safe_mode_computation_rewards.value(),
+            storage_cost: self.safe_mode_storage_rewards.value(),
+            storage_rebate: self.safe_mode_storage_rebates,
+            non_refundable_storage_fee: self.safe_mode_non_refundable_storage_fee,
+        }
     }
 
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {

@@ -3,31 +3,27 @@
 
 use super::config::{ClusterTestOpt, Env};
 use async_trait::async_trait;
-use std::{net::SocketAddr, path::Path};
-use sui_config::{
-    local_ip_utils::get_available_port,
-    Config,
-    PersistedConfig,
-    SUI_KEYSTORE_FILENAME,
-    SUI_NETWORK_CONFIG,
+use std::net::SocketAddr;
+use std::path::Path;
+use sui_config::local_ip_utils::get_available_port;
+use sui_config::Config;
+use sui_config::{PersistedConfig, SUI_KEYSTORE_FILENAME, SUI_NETWORK_CONFIG};
+use sui_graphql_rpc::config::{ConnectionConfig, ServiceConfig};
+use sui_graphql_rpc::test_infra::cluster::start_graphql_server_with_fn_rpc;
+use sui_indexer::test_utils::{
+    start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing,
 };
-use sui_graphql_rpc::{
-    config::{ConnectionConfig, ServiceConfig},
-    test_infra::cluster::start_graphql_server_with_fn_rpc,
-};
-use sui_indexer::test_utils::{start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing};
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
-use sui_pg_temp_db::TempDb;
-use sui_sdk::{
-    sui_client_config::{SuiClientConfig, SuiEnv},
-    wallet_context::WalletContext,
-};
+use sui_pg_db::temp::TempDb;
+use sui_sdk::sui_client_config::{SuiClientConfig, SuiEnv};
+use sui_sdk::wallet_context::WalletContext;
 use sui_swarm::memory::Swarm;
-use sui_swarm_config::{genesis_config::GenesisConfig, network_config::NetworkConfig};
-use sui_types::{
-    base_types::SuiAddress,
-    crypto::{get_key_pair, AccountKeyPair, KeypairTraits, SuiKeyPair},
-};
+use sui_swarm_config::genesis_config::GenesisConfig;
+use sui_swarm_config::network_config::NetworkConfig;
+use sui_types::base_types::SuiAddress;
+use sui_types::crypto::KeypairTraits;
+use sui_types::crypto::SuiKeyPair;
+use sui_types::crypto::{get_key_pair, AccountKeyPair};
 use tempfile::tempdir;
 use test_cluster::{TestCluster, TestClusterBuilder};
 use tracing::info;
@@ -46,7 +42,9 @@ const TESTNET_FULLNODE_ADDR: &str = "https://rpc-testnet.onelabs.cc:443";
 pub struct ClusterFactory;
 
 impl ClusterFactory {
-    pub async fn start(options: &ClusterTestOpt) -> Result<Box<dyn Cluster + Sync + Send>, anyhow::Error> {
+    pub async fn start(
+        options: &ClusterTestOpt,
+    ) -> Result<Box<dyn Cluster + Sync + Send>, anyhow::Error> {
         Ok(match &options.env {
             Env::NewLocal => Box::new(LocalNewCluster::start(options).await?),
             _ => Box::new(RemoteRunningCluster::start(options).await?),
@@ -86,21 +84,46 @@ pub struct RemoteRunningCluster {
 impl Cluster for RemoteRunningCluster {
     async fn start(options: &ClusterTestOpt) -> Result<Self, anyhow::Error> {
         let (fullnode_url, faucet_url) = match options.env {
-            Env::Devnet => (String::from(DEVNET_FULLNODE_ADDR), String::from(DEVNET_FAUCET_ADDR)),
-            Env::Staging => (String::from(STAGING_FULLNODE_ADDR), String::from(STAGING_FAUCET_ADDR)),
-            Env::Ci => (String::from(CONTINUOUS_FULLNODE_ADDR), String::from(CONTINUOUS_FAUCET_ADDR)),
-            Env::CiNomad => (String::from(CONTINUOUS_NOMAD_FULLNODE_ADDR), String::from(CONTINUOUS_NOMAD_FAUCET_ADDR)),
-            Env::Testnet => (String::from(TESTNET_FULLNODE_ADDR), String::from(TESTNET_FAUCET_ADDR)),
+            Env::Devnet => (
+                String::from(DEVNET_FULLNODE_ADDR),
+                String::from(DEVNET_FAUCET_ADDR),
+            ),
+            Env::Staging => (
+                String::from(STAGING_FULLNODE_ADDR),
+                String::from(STAGING_FAUCET_ADDR),
+            ),
+            Env::Ci => (
+                String::from(CONTINUOUS_FULLNODE_ADDR),
+                String::from(CONTINUOUS_FAUCET_ADDR),
+            ),
+            Env::CiNomad => (
+                String::from(CONTINUOUS_NOMAD_FULLNODE_ADDR),
+                String::from(CONTINUOUS_NOMAD_FAUCET_ADDR),
+            ),
+            Env::Testnet => (
+                String::from(TESTNET_FULLNODE_ADDR),
+                String::from(TESTNET_FAUCET_ADDR),
+            ),
             Env::CustomRemote => (
-                options.fullnode_address.clone().expect("Expect 'fullnode_address' for Env::Custom"),
-                options.faucet_address.clone().expect("Expect 'faucet_address' for Env::Custom"),
+                options
+                    .fullnode_address
+                    .clone()
+                    .expect("Expect 'fullnode_address' for Env::Custom"),
+                options
+                    .faucet_address
+                    .clone()
+                    .expect("Expect 'faucet_address' for Env::Custom"),
             ),
             Env::NewLocal => unreachable!("NewLocal shouldn't use RemoteRunningCluster"),
         };
 
         // TODO: test connectivity before proceeding?
 
-        Ok(Self { fullnode_url, faucet_url, config_directory: tempfile::tempdir()? })
+        Ok(Self {
+            fullnode_url,
+            faucet_url,
+            config_directory: tempfile::tempdir()?,
+        })
     }
 
     fn fullnode_url(&self) -> &str {
@@ -169,9 +192,13 @@ impl Cluster for LocalNewCluster {
             assert!(options.epoch_duration_ms.is_none());
             // Load the config of the Sui authority.
             let network_config_path = config_dir.join(SUI_NETWORK_CONFIG);
-            let network_config: NetworkConfig = PersistedConfig::read(&network_config_path).map_err(|err| {
-                err.context(format!("Cannot open Sui network config file at {:?}", network_config_path))
-            })?;
+            let network_config: NetworkConfig = PersistedConfig::read(&network_config_path)
+                .map_err(|err| {
+                    err.context(format!(
+                        "Cannot open Sui network config file at {:?}",
+                        network_config_path
+                    ))
+                })?;
 
             cluster_builder = cluster_builder.set_network_config(network_config);
             cluster_builder = cluster_builder.with_config_dir(config_dir);
@@ -244,7 +271,11 @@ impl Cluster for LocalNewCluster {
             )
             .await;
 
-            (Some(database), Some(indexer_jsonrpc_address), Some(graphql_url))
+            (
+                Some(database),
+                Some(indexer_jsonrpc_address),
+                Some(graphql_url),
+            )
         } else {
             (None, None, None)
         };
@@ -295,13 +326,13 @@ impl Cluster for LocalNewCluster {
 #[async_trait]
 impl Cluster for Box<dyn Cluster + Send + Sync> {
     async fn start(_options: &ClusterTestOpt) -> Result<Self, anyhow::Error> {
-        unreachable!("If we already have a boxed Cluster trait object we wouldn't have to call this function");
+        unreachable!(
+            "If we already have a boxed Cluster trait object we wouldn't have to call this function"
+        );
     }
-
     fn fullnode_url(&self) -> &str {
         (**self).fullnode_url()
     }
-
     fn indexer_url(&self) -> &Option<String> {
         (**self).indexer_url()
     }
@@ -334,10 +365,17 @@ pub fn new_wallet_context_from_cluster(
     let keystore_path = config_dir.join(SUI_KEYSTORE_FILENAME);
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
     let address: SuiAddress = key_pair.public().into();
-    keystore.add_key(None, SuiKeyPair::Ed25519(key_pair)).unwrap();
+    keystore
+        .import(None, SuiKeyPair::Ed25519(key_pair))
+        .unwrap();
     SuiClientConfig {
         keystore,
-        envs: vec![SuiEnv { alias: "localnet".to_string(), rpc: fullnode_url.into(), ws: None, basic_auth: None }],
+        envs: vec![SuiEnv {
+            alias: "localnet".to_string(),
+            rpc: fullnode_url.into(),
+            ws: None,
+            basic_auth: None,
+        }],
         active_address: Some(address),
         active_env: Some("localnet".to_string()),
     }
@@ -345,8 +383,15 @@ pub fn new_wallet_context_from_cluster(
     .save()
     .unwrap();
 
-    info!("Initialize wallet from config path: {:?}", wallet_config_path);
+    info!(
+        "Initialize wallet from config path: {:?}",
+        wallet_config_path
+    );
 
-    WalletContext::new(&wallet_config_path, None, None)
-        .unwrap_or_else(|e| panic!("Failed to init wallet context from path {:?}, error: {e}", wallet_config_path))
+    WalletContext::new(&wallet_config_path).unwrap_or_else(|e| {
+        panic!(
+            "Failed to init wallet context from path {:?}, error: {e}",
+            wallet_config_path
+        )
+    })
 }

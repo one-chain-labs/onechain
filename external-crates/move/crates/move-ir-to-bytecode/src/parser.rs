@@ -2,14 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label},
     files::SimpleFiles,
     term::{
-        emit,
+        Config, emit,
         termcolor::{ColorChoice, StandardStream},
-        Config,
     },
 };
 use move_command_line_common::character_sets::is_permitted_chars;
@@ -25,13 +24,17 @@ use std::collections::BTreeMap;
 // array literals.
 fn verify_string(string: &str) -> Result<()> {
     let chars: Vec<char> = string.chars().collect();
-    chars.iter().enumerate().find(|(idx, _)| !is_permitted_chars(&chars, *idx)).map_or(Ok(()), |(_, c)| {
-        bail!(
-            "Invalid character '{c}' found when reading file. \
+    chars
+        .iter()
+        .enumerate()
+        .find(|(idx, _)| !is_permitted_chars(&chars, *idx))
+        .map_or(Ok(()), |(_, c)| {
+            bail!(
+                "Invalid character '{c}' found when reading file. \
                 For ASCII, only printable characters (tabs '\\t', lf '\\n' and crlf '\\r'+'\\n') \
                 are permitted. Unicode can be used, excluding certain control characters.",
-        )
-    })
+            )
+        })
 }
 
 /// Given the raw input of a file, creates a single `ModuleDefinition` struct
@@ -59,13 +62,16 @@ fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) ->
     let mut files = SimpleFiles::new();
     let id = files.add(location.file_hash(), code_str.to_string());
     let lbl = match &e {
-        ParseError::InvalidToken { message, .. } => {
-            Label::primary(id, location.usize_range()).with_message(format!("Invalid Token: {}", message))
+        ParseError::InvalidToken { message, .. } => Label::primary(id, location.usize_range())
+            .with_message(format!("Invalid Token: {}", message)),
+        ParseError::User { error, .. } => {
+            Label::primary(id, location.usize_range()).with_message(format!("{}", error))
         }
-        ParseError::User { error, .. } => Label::primary(id, location.usize_range()).with_message(format!("{}", error)),
     };
     let message = lbl.message.clone();
-    let error = Diagnostic::error().with_message("Parser Error").with_labels(vec![lbl]);
+    let error = Diagnostic::error()
+        .with_message("Parser Error")
+        .with_labels(vec![lbl]);
     let writer = &mut StandardStream::stderr(ColorChoice::Auto);
     emit(writer, &Config::default(), &files, &error).unwrap();
     bail!("ParserError: {}", message)

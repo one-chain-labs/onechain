@@ -3,25 +3,11 @@
 
 #![no_main]
 use move_binary_format::file_format::{
-    empty_module,
-    AbilitySet,
-    CodeUnit,
-    Constant,
-    DatatypeHandle,
-    DatatypeHandleIndex,
-    FieldDefinition,
-    FunctionDefinition,
-    FunctionHandle,
-    FunctionHandleIndex,
-    IdentifierIndex,
-    ModuleHandleIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken::{Address, Bool, U128, U64},
-    StructDefinition,
-    StructFieldInformation,
-    TypeSignature,
-    Visibility,
+    AbilitySet, CodeUnit, Constant, DatatypeHandle, DatatypeHandleIndex, FieldDefinition,
+    FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandleIndex,
+    Signature, SignatureIndex,
+    SignatureToken::{Address, Bool, U64, U128},
+    StructDefinition, StructFieldInformation, TypeSignature, Visibility, empty_module,
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::str::FromStr;
@@ -50,9 +36,13 @@ fuzz_target!(|code_unit: CodeUnit| {
     module.function_handles.push(fun_handle);
 
     module.signatures.pop();
-    module.signatures.push(Signature(vec![Address, U64, Address, Address, U128, Address, U64, U64, U64]));
+    module.signatures.push(Signature(vec![
+        Address, U64, Address, Address, U128, Address, U64, U64, U64,
+    ]));
     module.signatures.push(Signature(vec![]));
-    module.signatures.push(Signature(vec![Address, Bool, Address]));
+    module
+        .signatures
+        .push(Signature(vec![Address, Bool, Address]));
 
     module.identifiers.extend(
         vec![
@@ -66,7 +56,10 @@ fuzz_target!(|code_unit: CodeUnit| {
     );
     module.address_identifiers.push(AccountAddress::random());
 
-    module.constant_pool.push(Constant { type_: Address, data: AccountAddress::ZERO.into_bytes().to_vec() });
+    module.constant_pool.push(Constant {
+        type_: Address,
+        data: AccountAddress::ZERO.into_bytes().to_vec(),
+    });
 
     module.struct_defs.push(StructDefinition {
         struct_handle: DatatypeHandleIndex(0),

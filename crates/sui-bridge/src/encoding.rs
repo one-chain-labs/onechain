@@ -1,19 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{
-    AddTokensOnEvmAction,
-    AddTokensOnSuiAction,
-    AssetPriceUpdateAction,
-    BlocklistCommitteeAction,
-    BridgeAction,
-    BridgeActionType,
-    EmergencyAction,
-    EthToSuiBridgeAction,
-    EvmContractUpgradeAction,
-    LimitUpdateAction,
-    SuiToEthBridgeAction,
-};
+use crate::types::AddTokensOnEvmAction;
+use crate::types::AddTokensOnSuiAction;
+use crate::types::AssetPriceUpdateAction;
+use crate::types::BlocklistCommitteeAction;
+use crate::types::BridgeAction;
+use crate::types::BridgeActionType;
+use crate::types::EmergencyAction;
+use crate::types::EthToSuiBridgeAction;
+use crate::types::EvmContractUpgradeAction;
+use crate::types::LimitUpdateAction;
+use crate::types::SuiToEthBridgeAction;
 use enum_dispatch::enum_dispatch;
 use ethers::types::Address as EthAddress;
 use sui_types::base_types::SUI_ADDRESS_LENGTH;
@@ -159,9 +157,12 @@ impl BridgeMessageEncoding for BlocklistCommitteeAction {
         bytes.push(u8::try_from(self.members_to_update.len()).unwrap());
 
         // Add list of updated members
-        // Members are represented as pubkey dervied evm addresses (20 bytes)
-        let members_bytes =
-            self.members_to_update.iter().map(|m| m.to_eth_address().to_fixed_bytes().to_vec()).collect::<Vec<_>>();
+        // Members are represented as pubkey derived evm addresses (20 bytes)
+        let members_bytes = self
+            .members_to_update
+            .iter()
+            .map(|m| m.to_eth_address().to_fixed_bytes().to_vec())
+            .collect::<Vec<_>>();
         for members_bytes in members_bytes {
             bytes.extend_from_slice(&members_bytes);
         }
@@ -305,8 +306,14 @@ impl BridgeMessageEncoding for AddTokensOnSuiAction {
         // Add token type names
         // Unwrap: bcs serialization should not fail
         bytes.extend_from_slice(
-            &bcs::to_bytes(&self.token_type_names.iter().map(|m| m.to_canonical_string(false)).collect::<Vec<_>>())
-                .unwrap(),
+            &bcs::to_bytes(
+                &self
+                    .token_type_names
+                    .iter()
+                    .map(|m| m.to_canonical_string(false))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap(),
         );
 
         // Add token prices
@@ -384,28 +391,28 @@ impl BridgeAction {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        abi::EthToSuiTokenBridgeV1,
-        crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKeyBytes, BridgeAuthoritySignInfo},
-        events::EmittedSuiToEthTokenBridgeV1,
-        types::{BlocklistType, EmergencyActionType, USD_MULTIPLIER},
-    };
-    use ethers::{
-        abi::ParamType,
-        types::{Address as EthAddress, TxHash},
-    };
-    use fastcrypto::{
-        encoding::{Encoding, Hex},
-        hash::{HashFunction, Keccak256},
-        traits::ToFromBytes,
-    };
+    use crate::abi::EthToSuiTokenBridgeV1;
+    use crate::crypto::BridgeAuthorityKeyPair;
+    use crate::crypto::BridgeAuthorityPublicKeyBytes;
+    use crate::crypto::BridgeAuthoritySignInfo;
+    use crate::events::EmittedSuiToEthTokenBridgeV1;
+    use crate::types::BlocklistType;
+    use crate::types::EmergencyActionType;
+    use crate::types::USD_MULTIPLIER;
+    use ethers::abi::ParamType;
+    use ethers::types::{Address as EthAddress, TxHash};
+    use fastcrypto::encoding::Encoding;
+    use fastcrypto::encoding::Hex;
+    use fastcrypto::hash::HashFunction;
+    use fastcrypto::hash::Keccak256;
+    use fastcrypto::traits::ToFromBytes;
     use prometheus::Registry;
     use std::str::FromStr;
-    use sui_types::{
-        base_types::{SuiAddress, TransactionDigest},
-        bridge::{BridgeChainId, TOKEN_ID_BTC, TOKEN_ID_USDC},
-        TypeTag,
-    };
+    use sui_types::base_types::{SuiAddress, TransactionDigest};
+    use sui_types::bridge::BridgeChainId;
+    use sui_types::bridge::TOKEN_ID_BTC;
+    use sui_types::bridge::TOKEN_ID_USDC;
+    use sui_types::TypeTag;
 
     use super::*;
 
@@ -475,12 +482,16 @@ mod tests {
 
         // Assert fixed length
         // TODO: for each action type add a test to assert the length
-        assert_eq!(combined_bytes.len(), 18 + 1 + 1 + 8 + 1 + 1 + 32 + 1 + 20 + 1 + 1 + 8);
+        assert_eq!(
+            combined_bytes.len(),
+            18 + 1 + 1 + 8 + 1 + 1 + 32 + 1 + 20 + 1 + 1 + 8
+        );
         Ok(())
     }
 
     #[test]
-    fn test_bridge_message_encoding_regression_emitted_sui_to_eth_token_bridge_v1() -> anyhow::Result<()> {
+    fn test_bridge_message_encoding_regression_emitted_sui_to_eth_token_bridge_v1(
+    ) -> anyhow::Result<()> {
         telemetry_subscribers::init_for_testing();
         let registry = Registry::new();
         mysten_metrics::init_metrics(&registry);
@@ -490,9 +501,12 @@ mod tests {
         let nonce = 10u64;
         let sui_chain_id = BridgeChainId::SuiTestnet;
         let eth_chain_id = BridgeChainId::EthSepolia;
-        let sui_address =
-            SuiAddress::from_str("0x0000000000000000000000000000000000000000000000000000000000000064").unwrap();
-        let eth_address = EthAddress::from_str("0x00000000000000000000000000000000000000c8").unwrap();
+        let sui_address = SuiAddress::from_str(
+            "0x0000000000000000000000000000000000000000000000000000000000000064",
+        )
+        .unwrap();
+        let eth_address =
+            EthAddress::from_str("0x00000000000000000000000000000000000000c8").unwrap();
         let token_id = TOKEN_ID_USDC;
         let amount_sui_adjusted = 12345;
 
@@ -519,7 +533,8 @@ mod tests {
         let hash = Keccak256::digest(encoded_bytes).digest;
         assert_eq!(
             hash.to_vec(),
-            Hex::decode("6ab34c52b6264cbc12fe8c3874f9b08f8481d2e81530d136386646dbe2f8baf4").unwrap(),
+            Hex::decode("6ab34c52b6264cbc12fe8c3874f9b08f8481d2e81530d136386646dbe2f8baf4")
+                .unwrap(),
         );
         Ok(())
     }
@@ -531,7 +546,8 @@ mod tests {
         mysten_metrics::init_metrics(&registry);
 
         let pub_key_bytes = BridgeAuthorityPublicKeyBytes::from_bytes(
-            &Hex::decode("02321ede33d2c2d7a8a152f275a1484edef2098f034121a602cb7d767d38680aa4").unwrap(),
+            &Hex::decode("02321ede33d2c2d7a8a152f275a1484edef2098f034121a602cb7d767d38680aa4")
+                .unwrap(),
         )
         .unwrap();
         let blocklist_action = BridgeAction::BlocklistCommitteeAction(BlocklistCommitteeAction {
@@ -553,16 +569,11 @@ mod tests {
             68b43fd906c0b8f024a18c56e06744f7c6157c65
         ]: blocklisted members abi-encoded
         */
-        assert_eq!(
-            bytes,
-            Hex::decode(
-                "5355495f4252494447455f4d4553534147450101000000000000008102000168b43fd906c0b8f024a18c56e06744f7c6157c65"
-            )
-            .unwrap()
-        );
+        assert_eq!(bytes, Hex::decode("5355495f4252494447455f4d4553534147450101000000000000008102000168b43fd906c0b8f024a18c56e06744f7c6157c65").unwrap());
 
         let pub_key_bytes_2 = BridgeAuthorityPublicKeyBytes::from_bytes(
-            &Hex::decode("027f1178ff417fc9f5b8290bd8876f0a157a505a6c52db100a8492203ddd1d4279").unwrap(),
+            &Hex::decode("027f1178ff417fc9f5b8290bd8876f0a157a505a6c52db100a8492203ddd1d4279")
+                .unwrap(),
         )
         .unwrap();
         // its evem address: 0xacaef39832cb995c4e049437a3e2ec6a7bad1ab5
@@ -607,13 +618,7 @@ mod tests {
             68b43fd906c0b8f024a18c56e06744f7c6157c65
         ]: blocklisted members abi-encoded
         */
-        assert_eq!(
-            bytes,
-            Hex::decode(
-                "5355495f4252494447455f4d455353414745010100000000000000310c000168b43fd906c0b8f024a18c56e06744f7c6157c65"
-            )
-            .unwrap()
-        );
+        assert_eq!(bytes, Hex::decode("5355495f4252494447455f4d455353414745010100000000000000310c000168b43fd906c0b8f024a18c56e06744f7c6157c65").unwrap());
 
         let blocklist_action = BridgeAction::BlocklistCommitteeAction(BlocklistCommitteeAction {
             nonce: 94,
@@ -654,7 +659,10 @@ mod tests {
         03: chain id
         00: action type
         */
-        assert_eq!(bytes, Hex::decode("5355495f4252494447455f4d455353414745020100000000000000370200").unwrap());
+        assert_eq!(
+            bytes,
+            Hex::decode("5355495f4252494447455f4d455353414745020100000000000000370200").unwrap()
+        );
 
         let action = BridgeAction::EmergencyAction(EmergencyAction {
             nonce: 56,
@@ -670,7 +678,10 @@ mod tests {
         0b: chain id
         01: action type
         */
-        assert_eq!(bytes, Hex::decode("5355495f4252494447455f4d455353414745020100000000000000380b01").unwrap());
+        assert_eq!(
+            bytes,
+            Hex::decode("5355495f4252494447455f4d455353414745020100000000000000380b01").unwrap()
+        );
     }
 
     #[test]
@@ -693,7 +704,10 @@ mod tests {
         */
         assert_eq!(
             bytes,
-            Hex::decode("5355495f4252494447455f4d4553534147450301000000000000000f020c00000002540be400").unwrap()
+            Hex::decode(
+                "5355495f4252494447455f4d4553534147450301000000000000000f020c00000002540be400"
+            )
+            .unwrap()
         );
     }
 
@@ -717,7 +731,10 @@ mod tests {
         */
         assert_eq!(
             bytes,
-            Hex::decode("5355495f4252494447455f4d4553534147450401000000000000010a0201000000003b9aca00").unwrap()
+            Hex::decode(
+                "5355495f4252494447455f4d4553534147450401000000000000010a0201000000003b9aca00"
+            )
+            .unwrap()
         );
     }
 
@@ -787,7 +804,10 @@ mod tests {
         let function_signature = "newMockFunction(bool,uint8)";
         let selector = &Keccak256::digest(function_signature).digest[0..4];
         let mut call_data = selector.to_vec();
-        call_data.extend(ethers::abi::encode(&[ethers::abi::Token::Bool(true), ethers::abi::Token::Uint(42u8.into())]));
+        call_data.extend(ethers::abi::encode(&[
+            ethers::abi::Token::Bool(true),
+            ethers::abi::Token::Uint(42u8.into()),
+        ]));
         assert_eq!(
             Hex::encode(call_data.clone()),
             "be8fc25d0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002a"
@@ -854,9 +874,12 @@ mod tests {
         let nonce = 10u64;
         let sui_chain_id = BridgeChainId::SuiTestnet;
         let eth_chain_id = BridgeChainId::EthSepolia;
-        let sui_address =
-            SuiAddress::from_str("0x0000000000000000000000000000000000000000000000000000000000000064").unwrap();
-        let eth_address = EthAddress::from_str("0x00000000000000000000000000000000000000c8").unwrap();
+        let sui_address = SuiAddress::from_str(
+            "0x0000000000000000000000000000000000000000000000000000000000000064",
+        )
+        .unwrap();
+        let eth_address =
+            EthAddress::from_str("0x00000000000000000000000000000000000000c8").unwrap();
         let token_id = TOKEN_ID_USDC;
         let sui_adjusted_amount = 12345;
 
@@ -869,9 +892,12 @@ mod tests {
             token_id,
             sui_adjusted_amount,
         };
-        let encoded_bytes =
-            BridgeAction::EthToSuiBridgeAction(EthToSuiBridgeAction { eth_tx_hash, eth_event_index, eth_bridge_event })
-                .to_bytes();
+        let encoded_bytes = BridgeAction::EthToSuiBridgeAction(EthToSuiBridgeAction {
+            eth_tx_hash,
+            eth_event_index,
+            eth_bridge_event,
+        })
+        .to_bytes();
 
         assert_eq!(
             encoded_bytes,
@@ -881,7 +907,8 @@ mod tests {
         let hash = Keccak256::digest(encoded_bytes).digest;
         assert_eq!(
             hash.to_vec(),
-            Hex::decode("b352508c301a37bb1b68a75dd0fc42b6f692b2650818631c8f8a4d4d3e5bef46").unwrap(),
+            Hex::decode("b352508c301a37bb1b68a75dd0fc42b6f692b2650818631c8f8a4d4d3e5bef46")
+                .unwrap(),
         );
         Ok(())
     }
@@ -896,16 +923,17 @@ mod tests {
             native: false,
             token_ids: vec![1, 2, 3, 4],
             token_type_names: vec![
-                TypeTag::from_str("0x9b5e13bcd0cb23ff25c07698e89d48056c745338d8c9dbd033a4172b87027073::btc::BTC")
-                    .unwrap(),
-                TypeTag::from_str("0x7970d71c03573f540a7157f0d3970e117effa6ae16cefd50b45c749670b24e6a::eth::ETH")
-                    .unwrap(),
-                TypeTag::from_str("0x500e429a24478405d5130222b20f8570a746b6bc22423f14b4d4e6a8ea580736::usdc::USDC")
-                    .unwrap(),
-                TypeTag::from_str("0x46bfe51da1bd9511919a92eb1154149b36c0f4212121808e13e3e5857d607a9c::usdt::USDT")
-                    .unwrap(),
+                TypeTag::from_str("0x9b5e13bcd0cb23ff25c07698e89d48056c745338d8c9dbd033a4172b87027073::btc::BTC").unwrap(),
+                TypeTag::from_str("0x7970d71c03573f540a7157f0d3970e117effa6ae16cefd50b45c749670b24e6a::eth::ETH").unwrap(),
+                TypeTag::from_str("0x500e429a24478405d5130222b20f8570a746b6bc22423f14b4d4e6a8ea580736::usdc::USDC").unwrap(),
+                TypeTag::from_str("0x46bfe51da1bd9511919a92eb1154149b36c0f4212121808e13e3e5857d607a9c::usdt::USDT").unwrap(),
             ],
-            token_prices: vec![500_000_000u64, 30_000_000u64, 1_000u64, 1_000u64],
+            token_prices: vec![
+                500_000_000u64,
+                30_000_000u64,
+                1_000u64,
+                1_000u64,
+            ]
         });
         let encoded_bytes = action.to_bytes();
 
@@ -942,7 +970,14 @@ mod tests {
         for key in keys {
             let pub_key = key.public.as_bytes();
             println!("pub_key: {:?}", Hex::encode(pub_key));
-            println!("sig: {:?}", Hex::encode(BridgeAuthoritySignInfo::new(&action, &key).signature.as_bytes()));
+            println!(
+                "sig: {:?}",
+                Hex::encode(
+                    BridgeAuthoritySignInfo::new(&action, &key)
+                        .signature
+                        .as_bytes()
+                )
+            );
         }
         Ok(())
     }
@@ -950,19 +985,23 @@ mod tests {
     fn get_bridge_encoding_regression_test_keys() -> Vec<BridgeAuthorityKeyPair> {
         vec![
             BridgeAuthorityKeyPair::from_bytes(
-                &Hex::decode("e42c82337ce12d4a7ad6cd65876d91b2ab6594fd50cdab1737c91773ba7451db").unwrap(),
+                &Hex::decode("e42c82337ce12d4a7ad6cd65876d91b2ab6594fd50cdab1737c91773ba7451db")
+                    .unwrap(),
             )
             .unwrap(),
             BridgeAuthorityKeyPair::from_bytes(
-                &Hex::decode("1aacd610da3d0cc691a04b83b01c34c6c65cda0fe8d502df25ff4b3185c85687").unwrap(),
+                &Hex::decode("1aacd610da3d0cc691a04b83b01c34c6c65cda0fe8d502df25ff4b3185c85687")
+                    .unwrap(),
             )
             .unwrap(),
             BridgeAuthorityKeyPair::from_bytes(
-                &Hex::decode("53e7baf8378fbc62692e3056c2e10c6666ef8b5b3a53914830f47636d1678140").unwrap(),
+                &Hex::decode("53e7baf8378fbc62692e3056c2e10c6666ef8b5b3a53914830f47636d1678140")
+                    .unwrap(),
             )
             .unwrap(),
             BridgeAuthorityKeyPair::from_bytes(
-                &Hex::decode("08b5350a091faabd5f25b6e290bfc3f505d43208775b9110dfed5ee6c7a653f0").unwrap(),
+                &Hex::decode("08b5350a091faabd5f25b6e290bfc3f505d43208775b9110dfed5ee6c7a653f0")
+                    .unwrap(),
             )
             .unwrap(),
         ]

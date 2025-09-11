@@ -11,39 +11,34 @@ mod writer;
 
 use anyhow::Result;
 use fastcrypto::hash::MultisetHash;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use indicatif::MultiProgress;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use num_enum::IntoPrimitive;
+use num_enum::TryFromPrimitive;
 use object_store::path::Path;
 use serde::{Deserialize, Serialize};
-use std::{
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
-use sui_core::{
-    authority::{
-        authority_store_tables::{AuthorityPerpetualTables, LiveObject},
-        epoch_start_configuration::{EpochFlag, EpochStartConfiguration},
-    },
-    checkpoints::CheckpointStore,
-    epoch::committee_store::CommitteeStore,
-    state_accumulator::WrappedObject,
-};
+use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::time::Duration;
+use sui_core::authority::authority_store_tables::AuthorityPerpetualTables;
+use sui_core::authority::authority_store_tables::LiveObject;
+use sui_core::authority::epoch_start_configuration::EpochFlag;
+use sui_core::authority::epoch_start_configuration::EpochStartConfiguration;
+use sui_core::checkpoints::CheckpointStore;
+use sui_core::epoch::committee_store::CommitteeStore;
+use sui_core::global_state_hasher::WrappedObject;
 use sui_protocol_config::Chain;
-use sui_storage::{compute_sha3_checksum, object_store::util::path_to_filesystem, FileCompression, SHA3_BYTES};
-use sui_types::{
-    accumulator::Accumulator,
-    base_types::ObjectID,
-    messages_checkpoint::ECMHLiveObjectSetDigest,
-    sui_system_state::{
-        epoch_start_sui_system_state::EpochStartSystemStateTrait,
-        get_sui_system_state,
-        SuiSystemStateTrait,
-    },
-};
+use sui_storage::object_store::util::path_to_filesystem;
+use sui_storage::{compute_sha3_checksum, FileCompression, SHA3_BYTES};
+use sui_types::base_types::ObjectID;
+use sui_types::global_state_hash::GlobalStateHash;
+use sui_types::messages_checkpoint::ECMHLiveObjectSetDigest;
+use sui_types::sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait;
+use sui_types::sui_system_state::get_sui_system_state;
+use sui_types::sui_system_state::SuiSystemStateTrait;
 use tokio::time::Instant;
 
 /// The following describes the format of an object file (*.obj) used for persisting live sui objects.
@@ -127,7 +122,8 @@ const MAGIC_BYTES: usize = 4;
 const SNAPSHOT_VERSION_BYTES: usize = 1;
 const ADDRESS_LENGTH_BYTES: usize = 8;
 const PADDING_BYTES: usize = 3;
-const MANIFEST_FILE_HEADER_BYTES: usize = MAGIC_BYTES + SNAPSHOT_VERSION_BYTES + ADDRESS_LENGTH_BYTES + PADDING_BYTES;
+const MANIFEST_FILE_HEADER_BYTES: usize =
+    MAGIC_BYTES + SNAPSHOT_VERSION_BYTES + ADDRESS_LENGTH_BYTES + PADDING_BYTES;
 const FILE_MAX_BYTES: usize = 128 * 1024 * 1024;
 const OBJECT_ID_BYTES: usize = ObjectID::LENGTH;
 const SEQUENCE_NUM_BYTES: usize = 8;
@@ -140,7 +136,9 @@ const COMPRESSION_TYPE_BYTES: usize = 1;
 const FILE_METADATA_BYTES: usize =
     FILE_TYPE_BYTES + BUCKET_BYTES + BUCKET_PARTITION_BYTES + COMPRESSION_TYPE_BYTES + SHA3_BYTES;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum FileType {
     Object = 0,
@@ -159,11 +157,14 @@ pub struct FileMetadata {
 impl FileMetadata {
     pub fn file_path(&self, dir_path: &Path) -> Path {
         match self.file_type {
-            FileType::Object => dir_path.child(&*format!("{}_{}.obj", self.bucket_num, self.part_num)),
-            FileType::Reference => dir_path.child(&*format!("{}_{}.ref", self.bucket_num, self.part_num)),
+            FileType::Object => {
+                dir_path.child(&*format!("{}_{}.obj", self.bucket_num, self.part_num))
+            }
+            FileType::Reference => {
+                dir_path.child(&*format!("{}_{}.ref", self.bucket_num, self.part_num))
+            }
         }
     }
-
     pub fn local_file_path(&self, root_path: &std::path::Path, dir_path: &Path) -> Result<PathBuf> {
         path_to_filesystem(root_path.to_path_buf(), &self.file_path(dir_path))
     }
@@ -188,19 +189,16 @@ impl Manifest {
             Self::V1(manifest) => manifest.snapshot_version,
         }
     }
-
     pub fn address_length(&self) -> u64 {
         match self {
             Self::V1(manifest) => manifest.address_length,
         }
     }
-
     pub fn file_metadata(&self) -> &Vec<FileMetadata> {
         match self {
             Self::V1(manifest) => &manifest.file_metadata,
         }
     }
-
     pub fn epoch(&self) -> u64 {
         match self {
             Self::V1(manifest) => manifest.epoch,
@@ -217,13 +215,19 @@ pub fn create_file_metadata(
 ) -> Result<FileMetadata> {
     file_compression.compress(file_path)?;
     let sha3_digest = compute_sha3_checksum(file_path)?;
-    let file_metadata = FileMetadata { file_type, bucket_num, part_num, file_compression, sha3_digest };
+    let file_metadata = FileMetadata {
+        file_type,
+        bucket_num,
+        part_num,
+        file_compression,
+        sha3_digest,
+    };
     Ok(file_metadata)
 }
 
 pub async fn setup_db_state(
     epoch: u64,
-    accumulator: Accumulator,
+    accumulator: GlobalStateHash,
     perpetual_db: Arc<AuthorityPerpetualTables>,
     checkpoint_store: Arc<CheckpointStore>,
     committee_store: Arc<CommitteeStore>,
@@ -243,8 +247,13 @@ pub async fn setup_db_state(
         .expect("Error loading last checkpoint for current epoch")
         .expect("Could not load last checkpoint for current epoch");
     let flags = EpochFlag::default_for_no_config();
-    let epoch_start_configuration =
-        EpochStartConfiguration::new(new_epoch_start_state, *last_checkpoint.digest(), &perpetual_db, flags).unwrap();
+    let epoch_start_configuration = EpochStartConfiguration::new(
+        new_epoch_start_state,
+        *last_checkpoint.digest(),
+        &perpetual_db,
+        flags,
+    )
+    .unwrap();
     perpetual_db.set_epoch_start_configuration(&epoch_start_configuration)?;
     perpetual_db.insert_root_state_hash(epoch, last_checkpoint.sequence_number, accumulator)?;
     perpetual_db.set_highest_pruned_checkpoint_without_wb(last_checkpoint.sequence_number)?;
@@ -262,7 +271,9 @@ pub async fn setup_db_state(
         let include_tombstones = !simplified_unwrap_then_delete;
         let iter = perpetual_db.iter_live_object_set(include_tombstones);
         let local_digest = ECMHLiveObjectSetDigest::from(
-            accumulate_live_object_iter(Box::new(iter), m.clone(), num_live_objects).await.digest(),
+            accumulate_live_object_iter(Box::new(iter), m.clone(), num_live_objects)
+                .await
+                .digest(),
         );
         assert_eq!(
             root_digest, local_digest,
@@ -280,12 +291,11 @@ pub async fn accumulate_live_object_iter(
     iter: Box<dyn Iterator<Item = LiveObject> + '_>,
     m: MultiProgress,
     num_live_objects: u64,
-) -> Accumulator {
+) -> GlobalStateHash {
     // Monitor progress of live object accumulation
-    let accum_progress_bar = m.add(
-        ProgressBar::new(num_live_objects)
-            .with_style(ProgressStyle::with_template("[{elapsed_precise}] {wide_bar} {pos}/{len} ({msg})").unwrap()),
-    );
+    let accum_progress_bar = m.add(ProgressBar::new(num_live_objects).with_style(
+        ProgressStyle::with_template("[{elapsed_precise}] {wide_bar} {pos}/{len} ({msg})").unwrap(),
+    ));
     let accum_counter = Arc::new(AtomicU64::new(0));
     let cloned_accum_counter = accum_counter.clone();
     let cloned_progress_bar = accum_progress_bar.clone();
@@ -302,25 +312,33 @@ pub async fn accumulate_live_object_iter(
             );
             let accumulations_per_sec = num_accumulated as f64 / a_instant.elapsed().as_secs_f64();
             cloned_progress_bar.set_position(num_accumulated);
-            cloned_progress_bar.set_message(format!("DB live obj accumulations per sec: {}", accumulations_per_sec));
+            cloned_progress_bar.set_message(format!(
+                "DB live obj accumulations per sec: {}",
+                accumulations_per_sec
+            ));
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
     });
 
     // Accumulate live objects
-    let mut acc = Accumulator::default();
+    let mut acc = GlobalStateHash::default();
     for live_object in iter {
         match live_object {
             LiveObject::Normal(object) => {
                 acc.insert(object.compute_object_reference().2);
             }
             LiveObject::Wrapped(key) => {
-                acc.insert(bcs::to_bytes(&WrappedObject::new(key.0, key.1)).expect("Failed to serialize WrappedObject"));
+                acc.insert(
+                    bcs::to_bytes(&WrappedObject::new(key.0, key.1))
+                        .expect("Failed to serialize WrappedObject"),
+                );
             }
         }
         accum_counter.fetch_add(1, Ordering::Relaxed);
     }
     accum_progress_bar.finish_with_message("DB live object accumulation completed");
-    handle.await.expect("Failed to join live object accumulation progress monitor");
+    handle
+        .await
+        .expect("Failed to join live object accumulation progress monitor");
     acc
 }

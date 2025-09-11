@@ -1,13 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Similar to `one::dynamic_field`, this module allows for the access of dynamic fields. But
-/// unlike, `one::dynamic_field` the values bound to these dynamic fields _must_ be objects
+/// Similar to `sui::dynamic_field`, this module allows for the access of dynamic fields. But
+/// unlike, `sui::dynamic_field` the values bound to these dynamic fields _must_ be objects
 /// themselves. This allows for the objects to still exist within in storage, which may be important
 /// for external tools. The difference is otherwise not observable from within Move.
-module one::dynamic_object_field;
+module oct::dynamic_object_field;
 
-use one::dynamic_field::{
+use sui::dynamic_field::{
     Self as field,
     add_child_object,
     borrow_child_object,

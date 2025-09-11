@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use prometheus::{
-    register_histogram_vec_with_registry,
-    register_int_counter_vec_with_registry,
-    HistogramVec,
-    IntCounterVec,
-    Registry,
+    register_histogram_vec_with_registry, register_int_counter_vec_with_registry, HistogramVec,
+    IntCounterVec, Registry,
 };
 use std::sync::Arc;
 
@@ -48,7 +45,9 @@ impl KeyValueStoreMetrics {
                 "key_value_store_num_fetches_latency_ms",
                 "Latency of fetches from key value store",
                 &["store", "type"],
-                prometheus::exponential_buckets(1.0, 1.6, 24).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 1.6, 24)
+                    .unwrap()
+                    .to_vec(),
                 registry,
             )
             .unwrap(),
@@ -57,7 +56,9 @@ impl KeyValueStoreMetrics {
                 "key_value_store_num_fetches_batch_size",
                 "Number of keys fetched per batch",
                 &["store", "type"],
-                prometheus::exponential_buckets(1.0, 1.6, 20).unwrap().to_vec(),
+                prometheus::exponential_buckets(1.0, 1.6, 20)
+                    .unwrap()
+                    .to_vec(),
                 registry,
             )
             .unwrap(),

@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{abi::EthERC20, metered_eth_provider::MeteredEthHttpProvier, sui_bridge_watchdog::Observable};
+use crate::abi::EthERC20;
+use crate::metered_eth_provider::MeteredEthHttpProvier;
+use crate::sui_bridge_watchdog::Observable;
 use async_trait::async_trait;
-use ethers::{
-    providers::Provider,
-    types::{Address as EthAddress, U256},
-};
+use ethers::providers::Provider;
+use ethers::types::{Address as EthAddress, U256};
 use prometheus::IntGauge;
 use std::sync::Arc;
 use tokio::time::Duration;
@@ -16,6 +16,8 @@ use tracing::{error, info};
 pub enum VaultAsset {
     WETH,
     USDT,
+    WBTC,
+    LBTC,
 }
 
 pub struct EthereumVaultBalance {
@@ -40,7 +42,13 @@ impl EthereumVaultBalance {
             .call()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get decimals from token contract: {e}"))?;
-        Ok(Self { coin_contract, vault_address, decimals, asset, metric })
+        Ok(Self {
+            coin_contract,
+            vault_address,
+            decimals,
+            asset,
+            metric,
+        })
     }
 }
 
@@ -49,10 +57,15 @@ impl Observable for EthereumVaultBalance {
     fn name(&self) -> &str {
         "EthereumVaultBalance"
     }
-
     async fn observe_and_report(&self) {
-        let balance: Result<U256, ethers::contract::ContractError<Provider<MeteredEthHttpProvier>>> =
-            self.coin_contract.balance_of(self.vault_address).call().await;
+        let balance: Result<
+            U256,
+            ethers::contract::ContractError<Provider<MeteredEthHttpProvier>>,
+        > = self
+            .coin_contract
+            .balance_of(self.vault_address)
+            .call()
+            .await;
         match balance {
             Ok(balance) => {
                 // Why downcasting is safe:
@@ -74,7 +87,9 @@ impl Observable for EthereumVaultBalance {
                     // add zeroes.
                     None => {
                         let delta = 8 - self.decimals;
-                        balance.checked_mul(U256::from(10).pow(U256::from(delta))).expect("Integer overflow")
+                        balance
+                            .checked_mul(U256::from(10).pow(U256::from(delta)))
+                            .expect("Integer overflow")
                     }
                     // in this case, the token contract has the target precision
                     // so we don't need to do anything.

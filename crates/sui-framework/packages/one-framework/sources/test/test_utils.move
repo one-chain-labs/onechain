@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::test_utils;
+module oct::test_utils;
 
 public fun assert_eq<T: drop>(t1: T, t2: T) {
     assert_ref_eq(&t1, &t2)

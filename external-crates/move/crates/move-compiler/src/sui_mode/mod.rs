@@ -4,7 +4,7 @@
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
 
-use crate::diagnostics::codes::{custom, DiagnosticInfo, Severity};
+use crate::diagnostics::codes::{DiagnosticInfo, Severity, custom};
 
 pub mod id_leak;
 pub mod info;
@@ -60,6 +60,8 @@ pub const BRIDGE_ADDR_NAME: Symbol = symbol!("bridge");
 pub const BRIDGE_MODULE_NAME: Symbol = symbol!("bridge");
 pub const BRIDGE_TYPE_NAME: Symbol = symbol!("Bridge");
 pub const BRIDGE_CREATE: Symbol = symbol!("create");
+pub const ACCUMULATOR_MODULE_NAME: Symbol = symbol!("accumulator");
+pub const ACCUMULATOR_CREATE: Symbol = symbol!("create");
 
 pub const EVENT_MODULE_NAME: Symbol = symbol!("event");
 pub const EVENT_FUNCTION_NAME: Symbol = symbol!("emit");
@@ -70,9 +72,15 @@ pub const FREEZE_FUNCTION_NAME: Symbol = symbol!("freeze_object");
 pub const SHARE_FUNCTION_NAME: Symbol = symbol!("share_object");
 pub const RECEIVE_FUNCTION_NAME: Symbol = symbol!("receive");
 pub const RECEIVING_TYPE_NAME: Symbol = symbol!("Receiving");
+pub const PARTY_FUNCTION_NAME: Symbol = symbol!("party_transfer");
 
-pub const PRIVATE_TRANSFER_FUNCTIONS: &[Symbol] =
-    &[TRANSFER_FUNCTION_NAME, FREEZE_FUNCTION_NAME, SHARE_FUNCTION_NAME, RECEIVE_FUNCTION_NAME];
+pub const PRIVATE_TRANSFER_FUNCTIONS: &[Symbol] = &[
+    TRANSFER_FUNCTION_NAME,
+    FREEZE_FUNCTION_NAME,
+    SHARE_FUNCTION_NAME,
+    RECEIVE_FUNCTION_NAME,
+    PARTY_FUNCTION_NAME,
+];
 
 //**************************************************************************************************
 // Diagnostics
@@ -134,8 +142,13 @@ pub const OBJECT_DECL_DIAG: DiagnosticInfo = custom(
     /* code */ 7,
     "invalid object declaration",
 );
-pub const EVENT_EMIT_CALL_DIAG: DiagnosticInfo =
-    custom(SUI_DIAG_PREFIX, Severity::NonblockingError, /* category */ TYPING, /* code */ 8, "invalid event");
+pub const EVENT_EMIT_CALL_DIAG: DiagnosticInfo = custom(
+    SUI_DIAG_PREFIX,
+    Severity::NonblockingError,
+    /* category */ TYPING,
+    /* code */ 8,
+    "invalid event",
+);
 pub const PRIVATE_TRANSFER_CALL_DIAG: DiagnosticInfo = custom(
     SUI_DIAG_PREFIX,
     Severity::NonblockingError,

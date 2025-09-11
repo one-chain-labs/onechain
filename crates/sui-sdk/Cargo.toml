@@ -6,6 +6,14 @@ license = "Apache-2.0"
 publish = false
 edition = "2021"
 
+# This needs to be specified, in addition to the same setting
+# in the workspace Cargo.toml.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(msim)',
+  'cfg(fail_points)',
+] }
+
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
@@ -42,11 +50,15 @@ fastcrypto.workspace = true
 [dev-dependencies]
 clap.workspace = true
 dirs.workspace = true
-async-recursion.workspace = true
 tempfile.workspace = true
 futures-core.workspace = true
 futures.workspace = true
 rand.workspace = true
+test-cluster.workspace = true
+sui-macros.workspace = true
+sui-simulator.workspace = true
+prometheus.workspace = true
+sui-protocol-config.workspace = true
 
 [[example]]
 name = "coin_read_api"

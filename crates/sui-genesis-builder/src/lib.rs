@@ -3,68 +3,54 @@
 
 use anyhow::{bail, Context};
 use camino::Utf8Path;
-use fastcrypto::{hash::HashFunction, traits::KeyPair};
+use fastcrypto::hash::HashFunction;
+use fastcrypto::traits::KeyPair;
 use move_binary_format::CompiledModule;
 use move_core_types::ident_str;
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
-use std::{
-    collections::{BTreeMap, HashSet},
-    fs,
-    path::Path,
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashSet};
+use std::fs;
+use std::path::Path;
+use std::sync::Arc;
 use sui_config::genesis::{
-    Genesis,
-    GenesisCeremonyParameters,
-    GenesisChainParameters,
-    TokenDistributionSchedule,
+    Genesis, GenesisCeremonyParameters, GenesisChainParameters, TokenDistributionSchedule,
     UnsignedGenesis,
 };
 use sui_execution::{self, Executor};
 use sui_framework::{BuiltInFramework, SystemPackage};
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
-use sui_types::{
-    base_types::{ExecutionDigests, ObjectID, SequenceNumber, SuiAddress, TransactionDigest, TxContext},
-    bridge::{BridgeChainId, BRIDGE_CREATE_FUNCTION_NAME, BRIDGE_MODULE_NAME},
-    committee::Committee,
-    crypto::{
-        AuthorityKeyPair,
-        AuthorityPublicKeyBytes,
-        AuthoritySignInfo,
-        AuthoritySignInfoTrait,
-        AuthoritySignature,
-        DefaultHash,
-        SuiAuthoritySignature,
-    },
-    deny_list_v1::{DENY_LIST_CREATE_FUNC, DENY_LIST_MODULE},
-    digests::ChainIdentifier,
-    effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
-    epoch_data::EpochData,
-    gas::SuiGasStatus,
-    gas_coin::GasCoin,
-    governance::StakedOct,
-    id::UID,
-    in_memory_storage::InMemoryStorage,
-    inner_temporary_store::InnerTemporaryStore,
-    is_system_package,
-    message_envelope::Message,
-    messages_checkpoint::{
-        CertifiedCheckpointSummary,
-        CheckpointContents,
-        CheckpointSummary,
-        CheckpointVersionSpecificData,
-        CheckpointVersionSpecificDataV1,
-    },
-    metrics::LimitsMetrics,
-    object::{Object, Owner},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    sui_system_state::{get_sui_system_state, SuiSystemState, SuiSystemStateTrait},
-    transaction::{CallArg, CheckedInputObjects, Command, InputObjectKind, ObjectReadResult, Transaction},
-    BRIDGE_ADDRESS,
-    SUI_BRIDGE_OBJECT_ID,
-    SUI_FRAMEWORK_ADDRESS,
-    SUI_SYSTEM_ADDRESS,
+use sui_types::base_types::{ExecutionDigests, ObjectID, SequenceNumber, TransactionDigest};
+use sui_types::bridge::{BridgeChainId, BRIDGE_CREATE_FUNCTION_NAME, BRIDGE_MODULE_NAME};
+use sui_types::committee::Committee;
+use sui_types::crypto::{
+    AuthorityKeyPair, AuthorityPublicKeyBytes, AuthoritySignInfo, AuthoritySignInfoTrait,
+    AuthoritySignature, DefaultHash, SuiAuthoritySignature,
 };
+use sui_types::deny_list_v1::{DENY_LIST_CREATE_FUNC, DENY_LIST_MODULE};
+use sui_types::digests::ChainIdentifier;
+use sui_types::effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents};
+use sui_types::epoch_data::EpochData;
+use sui_types::execution_params::ExecutionOrEarlyError;
+use sui_types::gas::SuiGasStatus;
+use sui_types::gas_coin::GasCoin;
+use sui_types::governance::StakedOct;
+use sui_types::id::UID;
+use sui_types::in_memory_storage::InMemoryStorage;
+use sui_types::inner_temporary_store::InnerTemporaryStore;
+use sui_types::is_system_package;
+use sui_types::message_envelope::Message;
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSummary,
+    CheckpointVersionSpecificData, CheckpointVersionSpecificDataV1,
+};
+use sui_types::metrics::LimitsMetrics;
+use sui_types::object::{Object, Owner};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::sui_system_state::{get_sui_system_state, SuiSystemState, SuiSystemStateTrait};
+use sui_types::transaction::{
+    CallArg, CheckedInputObjects, Command, InputObjectKind, ObjectReadResult, Transaction,
+};
+use sui_types::{BRIDGE_ADDRESS, SUI_BRIDGE_OBJECT_ID, SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS};
 use tracing::trace;
 use validator_info::{GenesisValidatorInfo, GenesisValidatorMetadata, ValidatorInfo};
 
@@ -109,7 +95,10 @@ impl Builder {
         self
     }
 
-    pub fn with_token_distribution_schedule(mut self, token_distribution_schedule: TokenDistributionSchedule) -> Self {
+    pub fn with_token_distribution_schedule(
+        mut self,
+        token_distribution_schedule: TokenDistributionSchedule,
+    ) -> Self {
         self.token_distribution_schedule = Some(token_distribution_schedule);
         self
     }
@@ -131,8 +120,18 @@ impl Builder {
         self
     }
 
-    pub fn add_validator(mut self, validator: ValidatorInfo, proof_of_possession: AuthoritySignature) -> Self {
-        self.validators.insert(validator.protocol_key(), GenesisValidatorInfo { info: validator, proof_of_possession });
+    pub fn add_validator(
+        mut self,
+        validator: ValidatorInfo,
+        proof_of_possession: AuthoritySignature,
+    ) -> Self {
+        self.validators.insert(
+            validator.protocol_key(),
+            GenesisValidatorInfo {
+                info: validator,
+                proof_of_possession,
+            },
+        );
         self
     }
 
@@ -149,9 +148,16 @@ impl Builder {
             "provided keypair does not correspond to a validator in the validator set"
         );
         let checkpoint_signature = {
-            let intent_msg = IntentMessage::new(Intent::sui_app(IntentScope::CheckpointSummary), checkpoint.clone());
+            let intent_msg = IntentMessage::new(
+                Intent::sui_app(IntentScope::CheckpointSummary),
+                checkpoint.clone(),
+            );
             let signature = AuthoritySignature::new_secure(&intent_msg, &checkpoint.epoch, keypair);
-            AuthoritySignInfo { epoch: checkpoint.epoch, authority: name, signature }
+            AuthoritySignInfo {
+                epoch: checkpoint.epoch,
+                authority: name,
+                signature,
+            }
         };
 
         self.signatures.insert(name, checkpoint_signature);
@@ -174,16 +180,21 @@ impl Builder {
         let objects = self.objects.clone().into_values().collect::<Vec<_>>();
         let validators = self.validators.clone().into_values().collect::<Vec<_>>();
 
-        let token_distribution_schedule = if let Some(token_distribution_schedule) = &self.token_distribution_schedule {
-            token_distribution_schedule.clone()
-        } else {
-            TokenDistributionSchedule::new_for_validators_with_default_allocation(
-                validators.iter().map(|v| v.info.sui_address()),
-            )
-        };
+        let token_distribution_schedule =
+            if let Some(token_distribution_schedule) = &self.token_distribution_schedule {
+                token_distribution_schedule.clone()
+            } else {
+                TokenDistributionSchedule::new_for_validators_with_default_allocation(
+                    validators.iter().map(|v| v.info.sui_address()),
+                )
+            };
 
-        self.built_genesis =
-            Some(build_unsigned_genesis_data(&self.parameters, &token_distribution_schedule, &validators, &objects));
+        self.built_genesis = Some(build_unsigned_genesis_data(
+            &self.parameters,
+            &token_distribution_schedule,
+            &validators,
+            &objects,
+        ));
 
         self.token_distribution_schedule = Some(token_distribution_schedule);
 
@@ -191,8 +202,12 @@ impl Builder {
     }
 
     fn committee(objects: &[Object]) -> Committee {
-        let sui_system_object = get_sui_system_state(&objects).expect("Sui System State object must always exist");
-        sui_system_object.get_current_epoch_committee().committee().clone()
+        let sui_system_object =
+            get_sui_system_state(&objects).expect("Sui System State object must always exist");
+        sui_system_object
+            .get_current_epoch_committee()
+            .committee()
+            .clone()
     }
 
     pub fn protocol_version(&self) -> ProtocolVersion {
@@ -200,8 +215,14 @@ impl Builder {
     }
 
     pub fn build(mut self) -> Genesis {
-        let UnsignedGenesis { checkpoint, checkpoint_contents, transaction, effects, events, objects } =
-            self.build_unsigned_genesis_checkpoint();
+        let UnsignedGenesis {
+            checkpoint,
+            checkpoint_contents,
+            transaction,
+            effects,
+            events,
+            objects,
+        } = self.build_unsigned_genesis_checkpoint();
 
         let committee = Self::committee(&objects);
 
@@ -211,7 +232,14 @@ impl Builder {
             CertifiedCheckpointSummary::new(checkpoint, signatures, &committee).unwrap()
         };
 
-        let genesis = Genesis::new(checkpoint, checkpoint_contents, transaction, effects, events, objects);
+        let genesis = Genesis::new(
+            checkpoint,
+            checkpoint_contents,
+            transaction,
+            effects,
+            events,
+            objects,
+        );
 
         // Verify that all on-chain state was properly created
         self.validate().unwrap();
@@ -234,9 +262,12 @@ impl Builder {
         }
 
         for validator in self.validators.values() {
-            validator
-                .validate()
-                .with_context(|| format!("metadata for validator {} is invalid", validator.info.name()))?;
+            validator.validate().with_context(|| {
+                format!(
+                    "metadata for validator {} is invalid",
+                    validator.info.name()
+                )
+            })?;
         }
 
         if let Some(token_distribution_schedule) = &self.token_distribution_schedule {
@@ -291,67 +322,141 @@ impl Builder {
         } else {
             assert!(unsigned_genesis.authenticator_state_object().is_none());
         }
-        assert_eq!(protocol_config.random_beacon(), unsigned_genesis.has_randomness_state_object());
+        assert_eq!(
+            protocol_config.random_beacon(),
+            unsigned_genesis.has_randomness_state_object()
+        );
 
-        assert_eq!(protocol_config.enable_bridge(), unsigned_genesis.has_bridge_object());
+        assert_eq!(
+            protocol_config.enable_bridge(),
+            unsigned_genesis.has_bridge_object()
+        );
 
-        assert_eq!(protocol_config.enable_coin_deny_list_v1(), unsigned_genesis.coin_deny_list_state().is_some(),);
+        assert_eq!(
+            protocol_config.enable_coin_deny_list_v1(),
+            unsigned_genesis.coin_deny_list_state().is_some(),
+        );
 
-        assert_eq!(self.validators.len(), system_state.validators.active_validators.len());
+        assert_eq!(
+            self.validators.len(),
+            system_state.validators.active_validators.len()
+        );
         let mut address_to_pool_id = BTreeMap::new();
-        for (validator, onchain_validator) in
-            self.validators.values().zip(system_state.validators.active_validators.iter())
+        for (validator, onchain_validator) in self
+            .validators
+            .values()
+            .zip(system_state.validators.active_validators.iter())
         {
             let metadata = onchain_validator.verified_metadata();
 
             // Validators should not have duplicate addresses so the result of insertion should be None.
-            assert!(address_to_pool_id.insert(metadata.sui_address, onchain_validator.staking_pool.id).is_none());
+            assert!(address_to_pool_id
+                .insert(metadata.sui_address, onchain_validator.staking_pool.id)
+                .is_none());
             assert_eq!(validator.info.sui_address(), metadata.sui_address);
             assert_eq!(validator.info.protocol_key(), metadata.sui_pubkey_bytes());
             assert_eq!(validator.info.network_key, metadata.network_pubkey);
             assert_eq!(validator.info.worker_key, metadata.worker_pubkey);
-            assert_eq!(validator.proof_of_possession.as_ref().to_vec(), metadata.proof_of_possession_bytes);
+            assert_eq!(
+                validator.proof_of_possession.as_ref().to_vec(),
+                metadata.proof_of_possession_bytes
+            );
             assert_eq!(validator.info.name(), &metadata.name);
             assert_eq!(validator.info.description, metadata.description);
             assert_eq!(validator.info.image_url, metadata.image_url);
             assert_eq!(validator.info.project_url, metadata.project_url);
             assert_eq!(validator.info.network_address(), &metadata.net_address);
             assert_eq!(validator.info.p2p_address, metadata.p2p_address);
-            assert_eq!(validator.info.narwhal_primary_address, metadata.primary_address);
-            assert_eq!(validator.info.narwhal_worker_address, metadata.worker_address);
+            assert_eq!(
+                validator.info.narwhal_primary_address,
+                metadata.primary_address
+            );
+            assert_eq!(
+                validator.info.narwhal_worker_address,
+                metadata.worker_address
+            );
 
             assert_eq!(validator.info.gas_price, onchain_validator.gas_price);
-            assert_eq!(validator.info.commission_rate, onchain_validator.commission_rate);
+            assert_eq!(
+                validator.info.commission_rate,
+                onchain_validator.commission_rate
+            );
         }
 
         assert_eq!(system_state.epoch, 0);
         assert_eq!(system_state.protocol_version, protocol_version);
         assert_eq!(system_state.storage_fund.non_refundable_balance.value(), 0);
-        assert_eq!(system_state.storage_fund.total_object_storage_rebates.value(), 0);
+        assert_eq!(
+            system_state
+                .storage_fund
+                .total_object_storage_rebates
+                .value(),
+            0
+        );
 
         assert_eq!(system_state.parameters.epoch_duration_ms, epoch_duration_ms);
-        assert_eq!(system_state.parameters.stake_subsidy_start_epoch, stake_subsidy_start_epoch,);
-        assert_eq!(system_state.parameters.max_validator_count, max_validator_count,);
-        assert_eq!(system_state.parameters.min_validator_joining_stake, min_validator_joining_stake,);
-        assert_eq!(system_state.parameters.validator_low_stake_threshold, validator_low_stake_threshold,);
-        assert_eq!(system_state.parameters.validator_very_low_stake_threshold, validator_very_low_stake_threshold,);
-        assert_eq!(system_state.parameters.validator_low_stake_grace_period, validator_low_stake_grace_period,);
+        assert_eq!(
+            system_state.parameters.stake_subsidy_start_epoch,
+            stake_subsidy_start_epoch,
+        );
+        assert_eq!(
+            system_state.parameters.max_validator_count,
+            max_validator_count,
+        );
+        assert_eq!(
+            system_state.parameters.min_validator_joining_stake,
+            min_validator_joining_stake,
+        );
+        assert_eq!(
+            system_state.parameters.validator_low_stake_threshold,
+            validator_low_stake_threshold,
+        );
+        assert_eq!(
+            system_state.parameters.validator_very_low_stake_threshold,
+            validator_very_low_stake_threshold,
+        );
+        assert_eq!(
+            system_state.parameters.validator_low_stake_grace_period,
+            validator_low_stake_grace_period,
+        );
 
         assert_eq!(system_state.stake_subsidy.distribution_counter, 0);
-        assert_eq!(system_state.stake_subsidy.current_distribution_amount, stake_subsidy_initial_distribution_amount,);
-        assert_eq!(system_state.stake_subsidy.stake_subsidy_period_length, stake_subsidy_period_length,);
-        assert_eq!(system_state.stake_subsidy.stake_subsidy_decrease_rate, stake_subsidy_decrease_rate,);
+        assert_eq!(
+            system_state.stake_subsidy.current_distribution_amount,
+            stake_subsidy_initial_distribution_amount,
+        );
+        assert_eq!(
+            system_state.stake_subsidy.stake_subsidy_period_length,
+            stake_subsidy_period_length,
+        );
+        assert_eq!(
+            system_state.stake_subsidy.stake_subsidy_decrease_rate,
+            stake_subsidy_decrease_rate,
+        );
 
         assert!(!system_state.safe_mode);
-        assert_eq!(system_state.epoch_start_timestamp_ms, chain_start_timestamp_ms,);
+        assert_eq!(
+            system_state.epoch_start_timestamp_ms,
+            chain_start_timestamp_ms,
+        );
         assert_eq!(system_state.validators.pending_removals.len(), 0);
-        assert_eq!(system_state.validators.pending_active_validators.contents.size, 0);
+        assert_eq!(
+            system_state
+                .validators
+                .pending_active_validators
+                .contents
+                .size,
+            0
+        );
         assert_eq!(system_state.validators.inactive_validators.size, 0);
         assert_eq!(system_state.validators.validator_candidates.size, 0);
 
         // Check distribution is correct
         let token_distribution_schedule = self.token_distribution_schedule.clone().unwrap();
-        assert_eq!(system_state.stake_subsidy.balance.value(), token_distribution_schedule.stake_subsidy_fund_mist);
+        assert_eq!(
+            system_state.stake_subsidy.balance.value(),
+            token_distribution_schedule.stake_subsidy_fund_mist
+        );
 
         let mut gas_objects: BTreeMap<ObjectID, (&Object, GasCoin)> = unsigned_genesis
             .objects()
@@ -366,8 +471,9 @@ impl Builder {
 
         for allocation in token_distribution_schedule.allocations {
             if let Some(staked_with_validator) = allocation.staked_with_validator {
-                let staking_pool_id =
-                    *address_to_pool_id.get(&staked_with_validator).expect("staking pool should exist");
+                let staking_pool_id = *address_to_pool_id
+                    .get(&staked_with_validator)
+                    .expect("staking pool should exist");
                 let staked_oct_object_id = staked_oct_objects
                     .iter()
                     .find(|(_k, (o, s))| {
@@ -381,7 +487,10 @@ impl Builder {
                     .map(|(k, _)| *k)
                     .expect("all allocations should be present");
                 let staked_oct_object = staked_oct_objects.remove(&staked_oct_object_id).unwrap();
-                assert_eq!(staked_oct_object.0.owner, Owner::AddressOwner(allocation.recipient_address));
+                assert_eq!(
+                    staked_oct_object.0.owner,
+                    Owner::AddressOwner(allocation.recipient_address)
+                );
                 assert_eq!(staked_oct_object.1.principal(), allocation.amount_mist);
                 assert_eq!(staked_oct_object.1.pool_id(), staking_pool_id);
                 assert_eq!(staked_oct_object.1.activation_epoch(), 0);
@@ -390,7 +499,8 @@ impl Builder {
                     .iter()
                     .find(|(_k, (o, g))| {
                         if let Owner::AddressOwner(owner) = &o.owner {
-                            *owner == allocation.recipient_address && g.value() == allocation.amount_mist
+                            *owner == allocation.recipient_address
+                                && g.value() == allocation.amount_mist
                         } else {
                             false
                         }
@@ -398,7 +508,10 @@ impl Builder {
                     .map(|(k, _)| *k)
                     .expect("all allocations should be present");
                 let gas_object = gas_objects.remove(&gas_object_id).unwrap();
-                assert_eq!(gas_object.0.owner, Owner::AddressOwner(allocation.recipient_address));
+                assert_eq!(
+                    gas_object.0.owner,
+                    Owner::AddressOwner(allocation.recipient_address)
+                );
                 assert_eq!(gas_object.1.value(), allocation.amount_mist,);
             }
         }
@@ -436,13 +549,17 @@ impl Builder {
 
         // Load parameters
         let parameters_file = path.join(GENESIS_BUILDER_PARAMETERS_FILE);
-        let parameters =
-            serde_yaml::from_slice(&fs::read(parameters_file).context("unable to read genesis parameters file")?)
-                .context("unable to deserialize genesis parameters")?;
+        let parameters = serde_yaml::from_slice(
+            &fs::read(parameters_file).context("unable to read genesis parameters file")?,
+        )
+        .context("unable to deserialize genesis parameters")?;
 
-        let token_distribution_schedule_file = path.join(GENESIS_BUILDER_TOKEN_DISTRIBUTION_SCHEDULE_FILE);
+        let token_distribution_schedule_file =
+            path.join(GENESIS_BUILDER_TOKEN_DISTRIBUTION_SCHEDULE_FILE);
         let token_distribution_schedule = if token_distribution_schedule_file.exists() {
-            Some(TokenDistributionSchedule::from_csv(fs::File::open(token_distribution_schedule_file)?)?)
+            Some(TokenDistributionSchedule::from_csv(fs::File::open(
+                token_distribution_schedule_file,
+            )?)?)
         } else {
             None
         };
@@ -457,8 +574,9 @@ impl Builder {
 
             let path = entry.path();
             let validator_info_bytes = fs::read(path)?;
-            let validator_info: GenesisValidatorInfo = serde_yaml::from_slice(&validator_info_bytes)
-                .with_context(|| format!("unable to load validator info for {path}"))?;
+            let validator_info: GenesisValidatorInfo =
+                serde_yaml::from_slice(&validator_info_bytes)
+                    .with_context(|| format!("unable to load validator info for {path}"))?;
             committee.insert(validator_info.info.protocol_key(), validator_info);
         }
 
@@ -501,7 +619,10 @@ impl Builder {
             // Verify loaded genesis matches one build from the constituent parts
             let built = builder.build_unsigned_genesis_checkpoint();
             loaded_genesis.checkpoint_contents.digest(); // cache digest before compare
-            assert_eq!(built, loaded_genesis, "loaded genesis does not match built genesis");
+            assert_eq!(
+                built, loaded_genesis,
+                "loaded genesis does not match built genesis"
+            );
 
             // Just to double check that its set after building above
             assert!(builder.unsigned_genesis_checkpoint().is_some());
@@ -521,8 +642,9 @@ impl Builder {
         fs::write(parameters_file, serde_yaml::to_string(&self.parameters)?)?;
 
         if let Some(token_distribution_schedule) = &self.token_distribution_schedule {
-            token_distribution_schedule
-                .to_csv(fs::File::create(path.join(GENESIS_BUILDER_TOKEN_DISTRIBUTION_SCHEDULE_FILE))?)?;
+            token_distribution_schedule.to_csv(fs::File::create(
+                path.join(GENESIS_BUILDER_TOKEN_DISTRIBUTION_SCHEDULE_FILE),
+            )?)?;
         }
 
         // Write Signatures
@@ -540,41 +662,44 @@ impl Builder {
 
         for (_pubkey, validator) in self.validators {
             let validator_info_bytes = serde_yaml::to_string(&validator)?;
-            fs::write(committee_dir.join(validator.info.name()), validator_info_bytes)?;
+            fs::write(
+                committee_dir.join(validator.info.name()),
+                validator_info_bytes,
+            )?;
         }
 
         if let Some(genesis) = &self.built_genesis {
             let genesis_bytes = bcs::to_bytes(&genesis)?;
-            fs::write(path.join(GENESIS_BUILDER_UNSIGNED_GENESIS_FILE), genesis_bytes)?;
+            fs::write(
+                path.join(GENESIS_BUILDER_UNSIGNED_GENESIS_FILE),
+                genesis_bytes,
+            )?;
         }
 
         Ok(())
     }
 }
 
-// Create a Genesis Txn Context to be used when generating genesis objects by hashing all of the
+// Create a Genesis Txn Digest to be used when generating genesis objects by hashing all of the
 // inputs into genesis ans using that as our "Txn Digest". This is done to ensure that coin objects
 // created between chains are unique
-fn create_genesis_context(
-    epoch_data: &EpochData,
+fn create_genesis_digest(
     genesis_chain_parameters: &GenesisChainParameters,
     genesis_validators: &[GenesisValidatorMetadata],
     token_distribution_schedule: &TokenDistributionSchedule,
     system_packages: &[SystemPackage],
-) -> TxContext {
+) -> TransactionDigest {
     let mut hasher = DefaultHash::default();
     hasher.update(b"sui-genesis");
     hasher.update(bcs::to_bytes(genesis_chain_parameters).unwrap());
     hasher.update(bcs::to_bytes(genesis_validators).unwrap());
     hasher.update(bcs::to_bytes(token_distribution_schedule).unwrap());
     for system_package in system_packages {
-        hasher.update(bcs::to_bytes(system_package.bytes()).unwrap());
+        hasher.update(bcs::to_bytes(&system_package.bytes).unwrap());
     }
 
     let hash = hasher.finalize();
-    let genesis_transaction_digest = TransactionDigest::new(hash.into());
-
-    TxContext::new(&SuiAddress::default(), &genesis_transaction_digest, epoch_data)
+    TransactionDigest::new(hash.into())
 }
 
 fn get_genesis_protocol_config(version: ProtocolVersion) -> ProtocolConfig {
@@ -598,26 +723,31 @@ fn build_unsigned_genesis_data(
     }
 
     let genesis_chain_parameters = parameters.to_genesis_chain_parameters();
-    let genesis_validators = validators.iter().cloned().map(GenesisValidatorMetadata::from).collect::<Vec<_>>();
+    let genesis_validators = validators
+        .iter()
+        .cloned()
+        .map(GenesisValidatorMetadata::from)
+        .collect::<Vec<_>>();
 
     token_distribution_schedule.validate();
-    token_distribution_schedule
-        .check_all_stake_operations_are_for_valid_validators(genesis_validators.iter().map(|v| v.sui_address));
+    token_distribution_schedule.check_all_stake_operations_are_for_valid_validators(
+        genesis_validators.iter().map(|v| v.sui_address),
+    );
 
     let epoch_data = EpochData::new_genesis(genesis_chain_parameters.chain_start_timestamp_ms);
 
     // Get the correct system packages for our protocol version. If we cannot find the snapshot
     // that means that we must be at the latest version and we should use the latest version of the
     // framework.
-    let mut system_packages = sui_framework_snapshot::load_bytecode_snapshot(parameters.protocol_version.as_u64())
-        .unwrap_or_else(|_| BuiltInFramework::iter_system_packages().cloned().collect());
+    let mut system_packages =
+        sui_framework_snapshot::load_bytecode_snapshot(parameters.protocol_version.as_u64())
+            .unwrap_or_else(|_| BuiltInFramework::iter_system_packages().cloned().collect());
 
     // if system packages are provided in `objects`, update them with the provided bytes.
     // This is a no-op under normal conditions and only an issue with certain tests.
     update_system_packages_from_objects(&mut system_packages, objects);
 
-    let mut genesis_ctx = create_genesis_context(
-        &epoch_data,
+    let genesis_digest = create_genesis_digest(
         &genesis_chain_parameters,
         &genesis_validators,
         token_distribution_schedule,
@@ -629,7 +759,8 @@ fn build_unsigned_genesis_data(
     let metrics = Arc::new(LimitsMetrics::new(&registry));
 
     let objects = create_genesis_objects(
-        &mut genesis_ctx,
+        &epoch_data,
+        &genesis_digest,
         objects,
         &genesis_validators,
         &genesis_chain_parameters,
@@ -642,8 +773,12 @@ fn build_unsigned_genesis_data(
 
     let (genesis_transaction, genesis_effects, genesis_events, objects) =
         create_genesis_transaction(objects, &protocol_config, metrics, &epoch_data);
-    let (checkpoint, checkpoint_contents) =
-        create_genesis_checkpoint(&protocol_config, parameters, &genesis_transaction, &genesis_effects);
+    let (checkpoint, checkpoint_contents) = create_genesis_checkpoint(
+        &protocol_config,
+        parameters,
+        &genesis_transaction,
+        &genesis_effects,
+    );
 
     UnsignedGenesis {
         checkpoint,
@@ -667,13 +802,21 @@ fn build_unsigned_genesis_data(
 // The Bridge is an example of that and what led to this code. The bridge depends
 // on `sui_system` which is mocked in some tests, but would be in the loader
 // cache courtesy of the Bridge, thus causing the problem.
-fn update_system_packages_from_objects(system_packages: &mut Vec<SystemPackage>, objects: &[Object]) {
+fn update_system_packages_from_objects(
+    system_packages: &mut Vec<SystemPackage>,
+    objects: &[Object],
+) {
     // Filter `objects` for system packages, and make `SystemPackage`s out of them.
     let system_package_overrides: BTreeMap<ObjectID, Vec<Vec<u8>>> = objects
         .iter()
         .filter_map(|obj| {
             let pkg = obj.data.try_as_package()?;
-            is_system_package(pkg.id()).then(|| (pkg.id(), pkg.serialized_module_map().values().cloned().collect()))
+            is_system_package(pkg.id()).then(|| {
+                (
+                    pkg.id(),
+                    pkg.serialized_module_map().values().cloned().collect(),
+                )
+            })
         })
         .collect();
 
@@ -692,15 +835,21 @@ fn create_genesis_checkpoint(
     transaction: &Transaction,
     effects: &TransactionEffects,
 ) -> (CheckpointSummary, CheckpointContents) {
-    let execution_digests = ExecutionDigests { transaction: *transaction.digest(), effects: effects.digest() };
-    let contents = CheckpointContents::new_with_digests_and_signatures([execution_digests], vec![vec![]]);
-    let version_specific_data = match protocol_config.checkpoint_summary_version_specific_data_as_option() {
-        None | Some(0) => Vec::new(),
-        Some(1) => {
-            bcs::to_bytes(&CheckpointVersionSpecificData::V1(CheckpointVersionSpecificDataV1::default())).unwrap()
-        }
-        _ => unimplemented!("unrecognized version_specific_data version for CheckpointSummary"),
+    let execution_digests = ExecutionDigests {
+        transaction: *transaction.digest(),
+        effects: effects.digest(),
     };
+    let contents =
+        CheckpointContents::new_with_digests_and_signatures([execution_digests], vec![vec![]]);
+    let version_specific_data =
+        match protocol_config.checkpoint_summary_version_specific_data_as_option() {
+            None | Some(0) => Vec::new(),
+            Some(1) => bcs::to_bytes(&CheckpointVersionSpecificData::V1(
+                CheckpointVersionSpecificDataV1::default(),
+            ))
+            .unwrap(),
+            _ => unimplemented!("unrecognized version_specific_data version for CheckpointSummary"),
+        };
     let checkpoint = CheckpointSummary {
         epoch: 0,
         sequence_number: 0,
@@ -722,7 +871,12 @@ fn create_genesis_transaction(
     protocol_config: &ProtocolConfig,
     metrics: Arc<LimitsMetrics>,
     epoch_data: &EpochData,
-) -> (Transaction, TransactionEffects, TransactionEvents, Vec<Object>) {
+) -> (
+    Transaction,
+    TransactionEffects,
+    TransactionEvents,
+    Vec<Object>,
+) {
     let genesis_transaction = {
         let genesis_objects = objects
             .into_iter()
@@ -731,16 +885,23 @@ fn create_genesis_transaction(
                     o.decrement_version_to(SequenceNumber::MIN);
                 }
 
-                if let Owner::Shared { initial_shared_version } = &mut object.owner {
+                if let Owner::Shared {
+                    initial_shared_version,
+                } = &mut object.owner
+                {
                     *initial_shared_version = SequenceNumber::MIN;
                 }
 
                 let object = object.into_inner();
-                sui_types::transaction::GenesisObject::RawObject { data: object.data, owner: object.owner }
+                sui_types::transaction::GenesisObject::RawObject {
+                    data: object.data,
+                    owner: object.owner,
+                }
             })
             .collect();
 
-        sui_types::transaction::VerifiedTransaction::new_genesis_transaction(genesis_objects).into_inner()
+        sui_types::transaction::VerifiedTransaction::new_genesis_transaction(genesis_objects)
+            .into_inner()
     };
 
     let genesis_digest = *genesis_transaction.digest();
@@ -748,29 +909,31 @@ fn create_genesis_transaction(
     let (effects, events, objects) = {
         let silent = true;
 
-        let executor =
-            sui_execution::executor(protocol_config, silent, None).expect("Creating an executor should not fail here");
+        let executor = sui_execution::executor(protocol_config, silent, None)
+            .expect("Creating an executor should not fail here");
 
         let expensive_checks = false;
-        let certificate_deny_set = HashSet::new();
         let transaction_data = &genesis_transaction.data().intent_message().value;
-        let (kind, signer, _) = transaction_data.execution_parts();
+        let (kind, signer, mut gas_data) = transaction_data.execution_parts();
+        gas_data.payment = vec![];
         let input_objects = CheckedInputObjects::new_for_genesis(vec![]);
-        let (inner_temp_store, _, effects, _execution_error) = executor.execute_transaction_to_effects(
-            &InMemoryStorage::new(Vec::new()),
-            protocol_config,
-            metrics,
-            expensive_checks,
-            &certificate_deny_set,
-            &epoch_data.epoch_id(),
-            epoch_data.epoch_start_timestamp(),
-            input_objects,
-            vec![],
-            SuiGasStatus::new_unmetered(),
-            kind,
-            signer,
-            genesis_digest,
-        );
+        let (inner_temp_store, _, effects, _timings, _execution_error) = executor
+            .execute_transaction_to_effects(
+                &InMemoryStorage::new(Vec::new()),
+                protocol_config,
+                metrics,
+                expensive_checks,
+                ExecutionOrEarlyError::Ok(()),
+                &epoch_data.epoch_id(),
+                epoch_data.epoch_start_timestamp(),
+                input_objects,
+                gas_data,
+                SuiGasStatus::new_unmetered(),
+                kind,
+                signer,
+                genesis_digest,
+                &mut None,
+            );
         assert!(inner_temp_store.input_objects.is_empty());
         assert!(inner_temp_store.mutable_inputs.is_empty());
         assert!(effects.mutated().is_empty());
@@ -787,7 +950,8 @@ fn create_genesis_transaction(
 }
 
 fn create_genesis_objects(
-    genesis_ctx: &mut TxContext,
+    epoch_data: &EpochData,
+    genesis_digest: &TransactionDigest,
     input_objects: &[Object],
     validators: &[GenesisValidatorMetadata],
     parameters: &GenesisChainParameters,
@@ -799,20 +963,23 @@ fn create_genesis_objects(
     // We don't know the chain ID here since we haven't yet created the genesis checkpoint.
     // However since we know there are no chain specific protool config options in genesis,
     // we use Chain::Unknown here.
-    let protocol_config =
-        ProtocolConfig::get_for_version(ProtocolVersion::new(parameters.protocol_version), Chain::Unknown);
+    let protocol_config = ProtocolConfig::get_for_version(
+        ProtocolVersion::new(parameters.protocol_version),
+        Chain::Unknown,
+    );
 
     let silent = true;
-    let executor =
-        sui_execution::executor(&protocol_config, silent, None).expect("Creating an executor should not fail here");
+    let executor = sui_execution::executor(&protocol_config, silent, None)
+        .expect("Creating an executor should not fail here");
 
     for system_package in system_packages.into_iter() {
         process_package(
             &mut store,
             executor.as_ref(),
-            genesis_ctx,
+            epoch_data,
+            genesis_digest,
             &system_package.modules(),
-            system_package.dependencies().to_vec(),
+            system_package.dependencies,
             &protocol_config,
             metrics.clone(),
         )
@@ -829,7 +996,8 @@ fn create_genesis_objects(
         &mut store,
         executor.as_ref(),
         validators,
-        genesis_ctx,
+        epoch_data,
+        genesis_digest,
         parameters,
         token_distribution_schedule,
         metrics,
@@ -842,7 +1010,8 @@ fn create_genesis_objects(
 fn process_package(
     store: &mut InMemoryStorage,
     executor: &dyn Executor,
-    ctx: &mut TxContext,
+    epoch_data: &EpochData,
+    genesis_digest: &TransactionDigest,
     modules: &[CompiledModule],
     dependencies: Vec<ObjectID>,
     protocol_config: &ProtocolConfig,
@@ -856,18 +1025,27 @@ fn process_package(
     #[cfg(debug_assertions)]
     {
         use move_core_types::account_address::AccountAddress;
-        let to_be_published_addresses: HashSet<_> = modules.iter().map(|module| *module.self_id().address()).collect();
+        let to_be_published_addresses: HashSet<_> = modules
+            .iter()
+            .map(|module| *module.self_id().address())
+            .collect();
         assert!(
             // An object either exists on-chain, or is one of the packages to be published.
-            dependencies.iter().zip(dependency_objects.iter()).all(|(dependency, obj_opt)| obj_opt.is_some()
-                || to_be_published_addresses.contains(&AccountAddress::from(*dependency)))
+            dependencies
+                .iter()
+                .zip(dependency_objects.iter())
+                .all(|(dependency, obj_opt)| obj_opt.is_some()
+                    || to_be_published_addresses.contains(&AccountAddress::from(*dependency)))
         );
     }
     let loaded_dependencies: Vec<_> = dependencies
         .iter()
         .zip(dependency_objects)
         .filter_map(|(dependency, object)| {
-            Some(ObjectReadResult::new(InputObjectKind::MovePackage(*dependency), object?.clone().into()))
+            Some(ObjectReadResult::new(
+                InputObjectKind::MovePackage(*dependency),
+                object?.clone().into(),
+            ))
         })
         .collect();
 
@@ -889,7 +1067,9 @@ fn process_package(
         &*store,
         protocol_config,
         metrics,
-        ctx,
+        epoch_data.epoch_id(),
+        epoch_data.epoch_start_timestamp(),
+        genesis_digest,
         CheckedInputObjects::new_for_genesis(loaded_dependencies),
         pt,
     )?;
@@ -903,7 +1083,8 @@ pub fn generate_genesis_system_object(
     store: &mut InMemoryStorage,
     executor: &dyn Executor,
     genesis_validators: &[GenesisValidatorMetadata],
-    genesis_ctx: &mut TxContext,
+    epoch_data: &EpochData,
+    genesis_digest: &TransactionDigest,
     genesis_chain_parameters: &GenesisChainParameters,
     token_distribution_schedule: &TokenDistributionSchedule,
     metrics: Arc<LimitsMetrics>,
@@ -953,6 +1134,17 @@ pub fn generate_genesis_system_object(
                 vec![],
             )?;
         }
+
+        if protocol_config.enable_accumulators() {
+            builder.move_call(
+                SUI_FRAMEWORK_ADDRESS.into(),
+                ident_str!("accumulator").to_owned(),
+                ident_str!("create").to_owned(),
+                vec![],
+                vec![],
+            )?;
+        }
+
         if protocol_config.enable_coin_deny_list_v1() {
             builder.move_call(
                 SUI_FRAMEWORK_ADDRESS.into(),
@@ -964,7 +1156,9 @@ pub fn generate_genesis_system_object(
         }
 
         if protocol_config.enable_bridge() {
-            let bridge_uid = builder.input(CallArg::Pure(UID::new(SUI_BRIDGE_OBJECT_ID).to_bcs_bytes())).unwrap();
+            let bridge_uid = builder
+                .input(CallArg::Pure(UID::new(SUI_BRIDGE_OBJECT_ID).to_bcs_bytes()))
+                .unwrap();
             // TODO(bridge): this needs to be passed in as a parameter for next testnet regenesis
             // Hardcoding chain id to SuiCustom
             let bridge_chain_id = builder.pure(BridgeChainId::SuiCustom).unwrap();
@@ -1013,7 +1207,9 @@ pub fn generate_genesis_system_object(
         &*store,
         &protocol_config,
         metrics,
-        genesis_ctx,
+        epoch_data.epoch_id(),
+        epoch_data.epoch_start_timestamp(),
+        genesis_digest,
         CheckedInputObjects::new_for_genesis(vec![]),
         pt,
     )?;
@@ -1035,22 +1231,17 @@ pub fn generate_genesis_system_object(
 
 #[cfg(test)]
 mod test {
-    use crate::{validator_info::ValidatorInfo, Builder};
+    use crate::validator_info::ValidatorInfo;
+    use crate::Builder;
     use fastcrypto::traits::KeyPair;
-    use sui_config::{
-        genesis::*,
-        local_ip_utils,
-        node::{DEFAULT_COMMISSION_RATE, DEFAULT_VALIDATOR_GAS_PRICE},
-    };
-    use sui_types::{
-        base_types::SuiAddress,
-        crypto::{
-            generate_proof_of_possession,
-            get_key_pair_from_rng,
-            AccountKeyPair,
-            AuthorityKeyPair,
-            NetworkKeyPair,
-        },
+    use sui_config::genesis::*;
+    use sui_config::local_ip_utils;
+    use sui_config::node::DEFAULT_COMMISSION_RATE;
+    use sui_config::node::DEFAULT_VALIDATOR_GAS_PRICE;
+    use sui_types::base_types::SuiAddress;
+    use sui_types::crypto::{
+        generate_proof_of_possession, get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair,
+        NetworkKeyPair,
     };
 
     #[test]
@@ -1079,13 +1270,11 @@ mod test {
         let worker_key: NetworkKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
         let account_key: AccountKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
         let network_key: NetworkKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
-        let addr = SuiAddress::from(account_key.public());
         let validator = ValidatorInfo {
             name: "0".into(),
             protocol_key: key.public().into(),
             worker_key: worker_key.public().clone(),
-            account_address: addr,
-            revenue_receiving_address: addr,
+            account_address: SuiAddress::from(account_key.public()),
             network_key: network_key.public().clone(),
             gas_price: DEFAULT_VALIDATOR_GAS_PRICE,
             commission_rate: DEFAULT_COMMISSION_RATE,

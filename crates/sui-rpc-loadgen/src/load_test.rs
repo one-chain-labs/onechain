@@ -1,10 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    error::Error,
-    time::{Duration, Instant},
-};
+use std::error::Error;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc::Sender;
 
 use tokio::sync::mpsc;
@@ -60,7 +58,9 @@ impl<R: Processor + Send + Sync + Clone + 'static> LoadTest<R> {
 
         let elapsed_time = start_time.elapsed();
         // TODO(chris): clean up this logic
-        let total_commands = num_successful_commands * (self.config.max_repeat + 1) * self.config.num_chunks_per_thread;
+        let total_commands = num_successful_commands
+            * (self.config.max_repeat + 1)
+            * self.config.num_chunks_per_thread;
 
         println!(
             "Total successful commands: {}, total time {:?}, commands per second {:.2}",
@@ -78,7 +78,10 @@ impl<R: Processor + Send + Sync + Clone + 'static> LoadTest<R> {
         println!("Running with {} threads...", payloads.len());
         for payload in payloads.iter() {
             let tx = tx.clone();
-            let worker_thread = WorkerThread { processor: self.processor.clone(), payload: payload.clone() };
+            let worker_thread = WorkerThread {
+                processor: self.processor.clone(),
+                payload: payload.clone(),
+            };
             tokio::spawn(async move {
                 let num_successful_commands = worker_thread.run().await;
                 tx.send(num_successful_commands).await.unwrap();

@@ -2,22 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    analysis::{DefMap, add_member_use_def, find_datatype},
     compiler_info::CompilerInfo,
     symbols::{
-        add_member_use_def,
-        expansion_mod_ident_to_map_key,
-        find_datatype,
+        def_info::DefInfo,
+        mod_defs::{MemberDefInfo, ModuleDefs},
         type_def_loc,
-        DefInfo,
-        DefMap,
-        LocalDef,
-        MemberDefInfo,
-        ModuleDefs,
-        References,
-        UseDef,
-        UseDefMap,
+        use_def::{References, UseDef, UseDefMap},
     },
-    utils::{ignored_function, loc_start_to_lsp_position_opt},
+    utils::{expansion_mod_ident_to_map_key, ignored_function, loc_start_to_lsp_position_opt},
 };
 
 use move_compiler::{
@@ -25,18 +18,18 @@ use move_compiler::{
     expansion::ast::{self as E, ModuleIdent},
     naming::ast as N,
     parser::ast::{self as P, ConstantName},
-    shared::{files::MappedFiles, ide::MacroCallInfo, Identifier, Name},
+    shared::{Identifier, Name, files::MappedFiles, ide::MacroCallInfo},
     typing::{
         ast as T,
         visitor::{LValueKind, TypingVisitorContext},
     },
 };
-use move_ir_types::location::{sp, Loc};
+use move_ir_types::location::{Loc, sp};
 use move_symbol_pool::Symbol;
 
 use im::OrdMap;
 use lsp_types::Position;
-use std::collections::BTreeMap;
+use std::{cmp, collections::BTreeMap};
 
 /// Data used during anlysis over typed AST
 pub struct TypingAnalysisContext<'a> {
@@ -71,17 +64,44 @@ pub struct TypingAnalysisContext<'a> {
     pub compiler_info: &'a mut CompilerInfo,
 }
 
-fn def_info_to_type_def_loc(mod_outer_defs: &BTreeMap<String, ModuleDefs>, def_info: &DefInfo) -> Option<Loc> {
+/// Definition of a local (or parameter)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LocalDef {
+    /// Location of the definition
+    pub def_loc: Loc,
+    /// Type of definition
+    pub def_type: N::Type,
+}
+
+impl PartialOrd for LocalDef {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for LocalDef {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.def_loc.cmp(&other.def_loc)
+    }
+}
+
+fn def_info_to_type_def_loc(
+    mod_outer_defs: &BTreeMap<String, ModuleDefs>,
+    def_info: &DefInfo,
+) -> Option<Loc> {
     match def_info {
         DefInfo::Type(t) => type_def_loc(mod_outer_defs, t),
         DefInfo::Function(..) => None,
         DefInfo::Struct(mod_ident, name, ..) => {
             let mod_ident_str = expansion_mod_ident_to_map_key(mod_ident);
-            mod_outer_defs.get(&mod_ident_str).and_then(|mod_defs| find_datatype(mod_defs, name))
+            mod_outer_defs
+                .get(&mod_ident_str)
+                .and_then(|mod_defs| find_datatype(mod_defs, name))
         }
         DefInfo::Enum(mod_ident, name, ..) => {
             let mod_ident_str = expansion_mod_ident_to_map_key(mod_ident);
-            mod_outer_defs.get(&mod_ident_str).and_then(|mod_defs| find_datatype(mod_defs, name))
+            mod_outer_defs
+                .get(&mod_ident_str)
+                .and_then(|mod_defs| find_datatype(mod_defs, name))
         }
         DefInfo::Variant(..) => None,
         DefInfo::Field(.., t, _) => type_def_loc(mod_outer_defs, t),
@@ -118,7 +138,8 @@ impl TypingAnalysisContext<'_> {
         let tname = tp.user_specified_name.value;
         let fhash = tp.user_specified_name.loc.file_hash();
         // enter self-definition for type param
-        let type_def_info = DefInfo::Type(sp(tp.user_specified_name.loc, N::Type_::Param(tp.clone())));
+        let type_def_info =
+            DefInfo::Type(sp(tp.user_specified_name.loc, N::Type_::Param(tp.clone())));
         let ident_type_def_loc = def_info_to_type_def_loc(self.mod_outer_defs, &type_def_info);
 
         self.use_defs.insert(
@@ -133,7 +154,8 @@ impl TypingAnalysisContext<'_> {
                 ident_type_def_loc,
             ),
         );
-        self.def_info.insert(tp.user_specified_name.loc, type_def_info);
+        self.def_info
+            .insert(tp.user_specified_name.loc, type_def_info);
         let exists = self.type_params.insert(tname, tp.user_specified_name.loc);
         debug_assert!(exists.is_none());
     }
@@ -206,7 +228,13 @@ impl TypingAnalysisContext<'_> {
             debug_assert!(false);
             return;
         };
-        self.expression_scope.insert(*name, LocalDef { def_loc: *loc, def_type: def_type.clone() });
+        self.expression_scope.insert(
+            *name,
+            LocalDef {
+                def_loc: *loc,
+                def_type: def_type.clone(),
+            },
+        );
         // in other languages only one definition is allowed per scope but in move an (and
         // in rust) a variable can be re-defined in the same scope replacing the previous
         // definition
@@ -225,7 +253,10 @@ impl TypingAnalysisContext<'_> {
                 ident_type_def_loc,
             ),
         );
-        self.def_info.insert(*loc, DefInfo::Local(*name, def_type, with_let, mutable, guard_loc));
+        self.def_info.insert(
+            *loc,
+            DefInfo::Local(*name, def_type, with_let, mutable, guard_loc),
+        );
     }
 
     /// Add a use for and identifier whose definition is expected to be local to a function, and
@@ -269,12 +300,15 @@ impl TypingAnalysisContext<'_> {
         let mod_name = module_ident.value.module;
         let mod_name_start_opt = self.file_start_position_opt(&mod_name.loc());
 
-        let Some(mod_defs) = self.mod_outer_defs.get_mut(&expansion_mod_ident_to_map_key(&module_ident.value)) else {
+        let Some(mod_defs) = self
+            .mod_outer_defs
+            .get_mut(&expansion_mod_ident_to_map_key(&module_ident.value))
+        else {
             // this should not happen but due to a fix in unifying generation of mod ident map keys,
             // but just in case - it's better to report it than to crash the analyzer due to
             // unchecked unwrap
             eprintln!(
-                "WARNING: could not locate module {:?} when processing a call to {}{}",
+                "WARNING: could not locate module {:?} when processing a call to {}::{}",
                 module_ident.value, module_ident.value, fun_def_name
             );
             return None;
@@ -363,11 +397,20 @@ impl TypingAnalysisContext<'_> {
     }
 
     /// Add a type for a struct field given its type
-    fn add_struct_field_type_use_def(&mut self, field_type: &N::Type, use_name: &Symbol, use_pos: &Loc) {
+    fn add_struct_field_type_use_def(
+        &mut self,
+        field_type: &N::Type,
+        use_name: &Symbol,
+        use_pos: &Loc,
+    ) {
         let sp!(_, typ) = field_type;
         match typ {
             N::Type_::Ref(_, t) => self.add_struct_field_type_use_def(t, use_name, use_pos),
-            N::Type_::Apply(_, sp!(_, N::TypeName_::ModuleType(sp!(_, mod_ident), struct_name)), _) => {
+            N::Type_::Apply(
+                _,
+                sp!(_, N::TypeName_::ModuleType(sp!(_, mod_ident), struct_name)),
+                _,
+            ) => {
                 self.add_field_use_def(
                     mod_ident,
                     &struct_name.value(),
@@ -416,7 +459,15 @@ impl TypingAnalysisContext<'_> {
 
         self.use_defs.insert(
             name_start.line,
-            UseDef::new(self.references, self.alias_lengths, use_loc.file_hash(), name_start, *vloc, &use_name, None),
+            UseDef::new(
+                self.references,
+                self.alias_lengths,
+                use_loc.file_hash(),
+                name_start,
+                *vloc,
+                &use_name,
+                None,
+            ),
         );
     }
 
@@ -465,7 +516,11 @@ impl TypingAnalysisContext<'_> {
                 return;
             };
             // get variant's fields
-            let MemberDefInfo::Struct { field_defs, positional } = &def.info else {
+            let MemberDefInfo::Struct {
+                field_defs,
+                positional,
+            } = &def.info
+            else {
                 return;
             };
             (field_defs, positional)
@@ -520,7 +575,10 @@ impl TypingAnalysisContext<'_> {
             return;
         };
         assert!(self.current_mod_ident_str.is_some());
-        let Some(callsite_mod_defs) = self.mod_outer_defs.get_mut(&self.current_mod_ident_str.clone().unwrap()) else {
+        let Some(callsite_mod_defs) = self
+            .mod_outer_defs
+            .get_mut(&self.current_mod_ident_str.clone().unwrap())
+        else {
             return;
         };
         if let Some(info) = callsite_mod_defs.call_infos.get_mut(&fun_use.loc) {
@@ -552,7 +610,8 @@ impl TypingAnalysisContext<'_> {
                     self.process_match_patterm(pat);
                 }
             }
-            UA::Struct(mident, name, tyargs, fields) | UA::BorrowStruct(_, mident, name, tyargs, fields) => {
+            UA::Struct(mident, name, tyargs, fields)
+            | UA::BorrowStruct(_, mident, name, tyargs, fields) => {
                 self.add_datatype_use_def(mident, name);
                 tyargs.iter().for_each(|t| self.visit_type(None, t));
                 for (fpos, fname, (_, (_, pat))) in fields.iter() {
@@ -588,7 +647,14 @@ impl TypingAnalysisContext<'_> {
         self.process_match_patterm(&arm.pattern);
         let guard_loc = arm.guard.as_ref().map(|exp| exp.exp.loc);
         arm.binders.iter().for_each(|(var, ty)| {
-            self.add_local_def(&var.loc, &var.value.name, ty.clone(), false, false, guard_loc);
+            self.add_local_def(
+                &var.loc,
+                &var.value.name,
+                ty.clone(),
+                false,
+                false,
+                guard_loc,
+            );
         });
 
         if let Some(exp) = &arm.guard {
@@ -606,25 +672,31 @@ impl TypingAnalysisContext<'_> {
             //   conditions hold, we change the displayed info for this variable to reflect
             //   it being an immutable reference
             let guard_loc = exp.exp.loc;
-            self.compiler_info.guards.entry(guard_loc.file_hash()).or_default().insert(guard_loc);
+            self.compiler_info
+                .guards
+                .entry(guard_loc.file_hash())
+                .or_default()
+                .insert(guard_loc);
         }
         self.visit_exp(&arm.rhs);
     }
 }
 
-impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
-    // We do want to visit lvalues.
-    const VISIT_LVALUES: bool = true;
-    // We do want to visit types.
-    const VISIT_TYPES: bool = true;
-    // We do want to visit lvalues.
-    const VISIT_USE_FUNS: bool = true;
-
+impl TypingVisitorContext for TypingAnalysisContext<'_> {
     // Nothing to do -- we're not producing errors.
     fn push_warning_filter_scope(&mut self, _filter: WarningFilters) {}
 
     // Nothing to do -- we're not producing errors.
     fn pop_warning_filter_scope(&mut self) {}
+
+    // We do want to visit types.
+    const VISIT_TYPES: bool = true;
+
+    // We do want to visit lvalues.
+    const VISIT_LVALUES: bool = true;
+
+    // We do want to visit lvalues.
+    const VISIT_USE_FUNS: bool = true;
 
     fn visit_struct(
         &mut self,
@@ -656,7 +728,7 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
             self.add_type_param(&stp.param);
         }
         if let N::StructFields::Defined(positional, fields) = &sdef.fields {
-            for (fpos, fname, (_, ty)) in fields {
+            for (fpos, fname, (_, (_, ty))) in fields {
                 self.visit_type(None, ty);
                 if !*positional {
                     // Enter self-definition for field name (unwrap safe - done when inserting def),
@@ -667,7 +739,8 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
                     // positional fields (and the latter's fields don't have the actual names).
                     let start = self.file_start_position(&fpos);
                     let field_info = DefInfo::Type(ty.clone());
-                    let ident_type_def_loc = def_info_to_type_def_loc(self.mod_outer_defs, &field_info);
+                    let ident_type_def_loc =
+                        def_info_to_type_def_loc(self.mod_outer_defs, &field_info);
                     self.use_defs.insert(
                         start.line,
                         UseDef::new(
@@ -748,7 +821,7 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
             ),
         );
         if let N::VariantFields::Defined(positional, fields) = &vdef.fields {
-            for (floc, fname, (_, ty)) in fields {
+            for (floc, fname, (_, (_, ty))) in fields {
                 self.visit_type(None, ty);
                 if !*positional {
                     // enter self-definition for field name (unwrap safe - done when inserting def),
@@ -756,7 +829,8 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
                     // for more detailed explanation)
                     let start = self.file_start_position(&floc);
                     let field_info = DefInfo::Type(ty.clone());
-                    let ident_type_def_loc = def_info_to_type_def_loc(self.mod_outer_defs, &field_info);
+                    let ident_type_def_loc =
+                        def_info_to_type_def_loc(self.mod_outer_defs, &field_info);
                     self.use_defs.insert(
                         start.line,
                         UseDef::new(
@@ -876,7 +950,12 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
         while let Some(next) = lvalue_queue.pop() {
             match &next.value {
                 T::LValue_::Ignore => (),
-                T::LValue_::Var { mut_, var, ty, unused_binding: _ } => {
+                T::LValue_::Var {
+                    mut_,
+                    var,
+                    ty,
+                    unused_binding: _,
+                } => {
                     match kind {
                         LValueKind::Bind => {
                             self.add_local_def(
@@ -990,7 +1069,9 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
                         );
                         visitor.visit_exp(init_exp);
                     }
-                    tyargs.iter().for_each(|t| visitor.visit_type(Some(exp_loc), t));
+                    tyargs
+                        .iter()
+                        .for_each(|t| visitor.visit_type(Some(exp_loc), t));
                     true
                 }
                 TE::Borrow(_, exp, field) => {
@@ -1012,7 +1093,9 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
                         );
                         visitor.visit_exp(init_exp);
                     }
-                    tyargs.iter().for_each(|t| visitor.visit_type(Some(exp_loc), t));
+                    tyargs
+                        .iter()
+                        .for_each(|t| visitor.visit_type(Some(exp_loc), t));
                     true
                 }
                 TE::VariantMatch(..) => {
@@ -1025,13 +1108,18 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
                     v.iter().for_each(|arm| visitor.process_match_arm(arm));
                     true
                 }
-                TE::ErrorConstant { line_number_loc: _, error_constant } => {
+                TE::ErrorConstant {
+                    line_number_loc: _,
+                    error_code: _,
+                    error_constant,
+                } => {
                     // assume that constant is defined in the same module where it's used
                     // TODO: if above ever changes, we need to update this (presumably
                     // `ErrorConstant` will carry module ident at this point)
                     if let Some(name) = error_constant {
-                        if let Some(mod_def) =
-                            visitor.mod_outer_defs.get(visitor.current_mod_ident_str.as_ref().unwrap())
+                        if let Some(mod_def) = visitor
+                            .mod_outer_defs
+                            .get(visitor.current_mod_ident_str.as_ref().unwrap())
                         {
                             visitor.add_const_use_def(&mod_def.ident.clone(), name);
                         }
@@ -1067,7 +1155,13 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
         let expanded_lambda = self.compiler_info.is_expanded_lambda(&exp.exp.loc);
         if let Some(macro_call_info) = self.compiler_info.get_macro_info(&exp.exp.loc) {
             debug_assert!(!expanded_lambda, "Compiler info issue");
-            let MacroCallInfo { module, name, method_name, type_arguments, by_value_args } = macro_call_info.clone();
+            let MacroCallInfo {
+                module,
+                name,
+                method_name,
+                type_arguments,
+                by_value_args,
+            } = macro_call_info.clone();
             self.process_module_call(&module, &name, method_name, &type_arguments, None);
             by_value_args.iter().for_each(|a| self.visit_seq_item(a));
             let old_traverse_mode = self.traverse_only;
@@ -1101,7 +1195,11 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
                     return true;
                 };
                 let Some(def_loc) = self.type_params.get(&use_name) else {
-                    debug_assert!(false, "Could not find type for {use_name:#?} in {:#?}", self.type_params);
+                    debug_assert!(
+                        false,
+                        "Could not find type for {use_name:#?} in {:#?}",
+                        self.type_params
+                    );
                     return true;
                 };
                 let ident_type_def_loc = type_def_loc(self.mod_outer_defs, ty);
@@ -1134,12 +1232,17 @@ impl<'a> TypingVisitorContext for TypingAnalysisContext<'a> {
             | N::Type_::Fun(_, _)
             | N::Type_::Var(_)
             | N::Type_::Anything
+            | N::Type_::Void
             | N::Type_::UnresolvedError => false,
         }
     }
 
     fn visit_use_funs(&mut self, use_funs: &N::UseFuns) {
-        let N::UseFuns { resolved, implicit_candidates, color: _ } = use_funs;
+        let N::UseFuns {
+            resolved,
+            implicit_candidates,
+            color: _,
+        } = use_funs;
 
         // at typing there should be no unresolved candidates (it's also checked in typing
         // translaction pass)

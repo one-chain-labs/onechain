@@ -3,7 +3,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DataEnum, DeriveInput, ItemFn};
+use syn::{Data, DataEnum, DeriveInput, ItemFn, parse_macro_input};
 
 /// This macro generates a function `order_to_variant_map` which returns a map
 /// of the position of each variant to the name of the variant.
@@ -29,7 +29,12 @@ use syn::{parse_macro_input, Data, DataEnum, DeriveInput, ItemFn};
 #[proc_macro_attribute]
 pub fn test_variant_order(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Remove whitespace between the slashes
-    let path = attr.to_string().split('/').map(|x| x.trim().to_string()).collect::<Vec<String>>().join("/");
+    let path = attr
+        .to_string()
+        .split('/')
+        .map(|x| x.trim().to_string())
+        .collect::<Vec<String>>()
+        .join("/");
 
     let item_orig = item.clone();
     let ast_orig = parse_macro_input!(item_orig as DeriveInput);
@@ -91,7 +96,12 @@ const STACK_PER_CALL: usize = 1024 * 1024 * 8; // 8MB
 #[proc_macro_attribute]
 pub fn growing_stack(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
-    let ItemFn { attrs, vis, sig, block } = input_fn;
+    let ItemFn {
+        attrs,
+        vis,
+        sig,
+        block,
+    } = input_fn;
 
     let output = quote! {
         #(#attrs)* #vis #sig {

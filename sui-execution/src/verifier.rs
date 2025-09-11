@@ -5,7 +5,8 @@ use move_binary_format::CompiledModule;
 use move_bytecode_verifier_meter::Meter;
 use move_vm_config::verifier::MeterConfig;
 use sui_protocol_config::ProtocolConfig;
-use sui_types::{error::SuiResult, execution_config_utils::to_binary_config};
+use sui_types::error::SuiResult;
+use sui_types::execution_config_utils::to_binary_config;
 
 pub trait Verifier {
     /// Create a new bytecode verifier meter.
@@ -38,6 +39,17 @@ pub trait Verifier {
             // Although we failed, we don't care since it wasn't because of a timeout.
             return Ok(());
         };
+
+        for module in &modules {
+            for identifier in module.identifiers() {
+                if identifier.as_str() == "<SELF>" {
+                    return Err(sui_types::error::UserInputError::InvalidIdentifier {
+                        error: format!("invalid identifier: {}", identifier),
+                    }
+                    .into());
+                }
+            }
+        }
 
         self.meter_compiled_modules(protocol_config, &modules, meter)
     }

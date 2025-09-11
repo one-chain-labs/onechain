@@ -23,7 +23,7 @@ use move_binary_format::{
     file_format::CompiledModule,
     file_format_common::VERSION_6,
 };
-use move_bytecode_verifier_meter::{dummy::DummyMeter, Meter};
+use move_bytecode_verifier_meter::{Meter, dummy::DummyMeter};
 use move_vm_config::verifier::VerifierConfig;
 use std::time::Instant;
 
@@ -49,7 +49,11 @@ pub fn verify_module_with_config_for_test(
 ) -> VMResult<()> {
     const MAX_MODULE_SIZE: usize = 65355;
     let mut bytes = vec![];
-    let version = if config.bytecode_version > VERSION_6 { module.version } else { VERSION_6 };
+    let version = if config.bytecode_version > VERSION_6 {
+        module.version
+    } else {
+        VERSION_6
+    };
     module.serialize_with_version(version, &mut bytes).unwrap();
     let now = Instant::now();
     let result = verify_module_with_config_metered(config, module, meter);
@@ -57,7 +61,11 @@ pub fn verify_module_with_config_for_test(
         "--> {}: verification time: {:.3}ms, result: {}, size: {}kb",
         name,
         (now.elapsed().as_micros() as f64) / 1000.0,
-        if let Err(e) = &result { format!("{:?}", e.major_status()) } else { "Ok".to_string() },
+        if let Err(e) = &result {
+            format!("{:?}", e.major_status())
+        } else {
+            "Ok".to_string()
+        },
         bytes.len() / 1000
     );
     // Also check whether the module actually fits into our payload size
@@ -76,6 +84,25 @@ pub fn verify_module_with_config_metered(
     meter: &mut (impl Meter + ?Sized),
 ) -> VMResult<()> {
     let ability_cache = &mut AbilityCache::new(module);
+    verify_module_with_config_metered_up_to_code_units(config, module, ability_cache, meter)?;
+    code_unit_verifier::verify_module(config, module, ability_cache, meter)?;
+
+    script_signature::verify_module(module, no_additional_script_signature_checks)
+}
+
+pub fn verify_module_with_config_unmetered(
+    config: &VerifierConfig,
+    module: &CompiledModule,
+) -> VMResult<()> {
+    verify_module_with_config_metered(config, module, &mut DummyMeter)
+}
+
+pub fn verify_module_with_config_metered_up_to_code_units<'env>(
+    config: &'env VerifierConfig,
+    module: &'env CompiledModule,
+    ability_cache: &mut AbilityCache<'env>,
+    meter: &mut (impl Meter + ?Sized),
+) -> VMResult<()> {
     BoundsChecker::verify_module(module).map_err(|e| {
         // We can't point the error at the module, because if bounds-checking
         // failed, we cannot safely index into module's handle to itself.
@@ -90,11 +117,5 @@ pub fn verify_module_with_config_metered(
     ability_field_requirements::verify_module(module, ability_cache, meter)?;
     RecursiveDataDefChecker::verify_module(module)?;
     InstantiationLoopChecker::verify_module(module)?;
-    code_unit_verifier::verify_module(config, module, ability_cache, meter)?;
-
-    script_signature::verify_module(module, no_additional_script_signature_checks)
-}
-
-pub fn verify_module_with_config_unmetered(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
-    verify_module_with_config_metered(config, module, &mut DummyMeter)
+    Ok(())
 }

@@ -29,7 +29,11 @@ use crate::{
 ///
 /// The first assumption is checked and will trigger an assert failure if violated. The second
 /// is unchecked, but would be a nice property for the prover.
-pub fn get_packed_types(env: &GlobalEnv, targets: &FunctionTargetsHolder, coin_types: Vec<Type>) -> BTreeSet<StructTag> {
+pub fn get_packed_types(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    coin_types: Vec<Type>,
+) -> BTreeSet<StructTag> {
     let mut packed_types = BTreeSet::new();
     for module_env in env.get_modules() {
         let module_name = module_env.get_identifier().to_string();
@@ -40,18 +44,26 @@ pub fn get_packed_types(env: &GlobalEnv, targets: &FunctionTargetsHolder, coin_t
                 let annotation = fun_target
                     .get_annotations()
                     .get::<PackedTypesState>()
-                    .expect("Invariant violation: usage analysis should be run before calling this");
+                    .expect(
+                        "Invariant violation: usage analysis should be run before calling this",
+                    );
 
                 packed_types.extend(annotation.closed_types.clone());
                 // instantiate the tx script open types with XUS, XDX
                 if is_script {
                     let num_type_parameters = func_env.get_type_parameters().len();
-                    assert!(num_type_parameters <= 1, "Assuming that transaction scripts have <= 1 type parameters for simplicity. If there can be >1 type parameter, the code here must account for all permutations of type params");
+                    assert!(
+                        num_type_parameters <= 1,
+                        "Assuming that transaction scripts have <= 1 type parameters for simplicity. If there can be >1 type parameter, the code here must account for all permutations of type params"
+                    );
 
                     if num_type_parameters == 1 {
                         for open_ty in annotation.open_types.iter() {
                             for coin_ty in &coin_types {
-                                match open_ty.instantiate(vec![coin_ty.clone()].as_slice()).into_type_tag(env) {
+                                match open_ty
+                                    .instantiate(vec![coin_ty.clone()].as_slice())
+                                    .into_type_tag(env)
+                                {
                                     Some(TypeTag::Struct(s)) => {
                                         packed_types.insert(*s);
                                     }
@@ -81,7 +93,10 @@ struct PackedTypesState {
 impl AbstractDomain for PackedTypesState {
     // TODO: would be cool to add a derive(Join) macro for this
     fn join(&mut self, other: &Self) -> JoinResult {
-        match (self.closed_types.join(&other.closed_types), self.open_types.join(&other.open_types)) {
+        match (
+            self.closed_types.join(&other.closed_types),
+            self.open_types.join(&other.open_types),
+        ) {
             (JoinResult::Unchanged, JoinResult::Unchanged) => JoinResult::Unchanged,
             _ => JoinResult::Changed,
         }
@@ -92,9 +107,8 @@ struct PackedTypesAnalysis<'a> {
     cache: SummaryCache<'a>,
 }
 
-impl<'a> TransferFunctions for PackedTypesAnalysis<'a> {
+impl TransferFunctions for PackedTypesAnalysis<'_> {
     type State = PackedTypesState;
-
     const BACKWARD: bool = false;
 
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, _offset: CodeOffset) {
@@ -112,13 +126,16 @@ impl<'a> TransferFunctions for PackedTypesAnalysis<'a> {
                         }
                         None => {
                             // type is open
-                            state.open_types.insert(Type::Datatype(*mid, *sid, types.clone()));
+                            state
+                                .open_types
+                                .insert(Type::Datatype(*mid, *sid, types.clone()));
                         }
                     }
                 }
                 Function(mid, fid, types) => {
-                    if let Some(summary) =
-                        self.cache.get::<PackedTypesState>(mid.qualified(*fid), &FunctionVariant::Baseline)
+                    if let Some(summary) = self
+                        .cache
+                        .get::<PackedTypesState>(mid.qualified(*fid), &FunctionVariant::Baseline)
                     {
                         // add closed types
                         for ty in summary.closed_types.iter() {
@@ -152,9 +169,13 @@ impl<'a> TransferFunctions for PackedTypesAnalysis<'a> {
     }
 }
 
-impl<'a> DataflowAnalysis for PackedTypesAnalysis<'a> {}
-impl<'a> CompositionalAnalysis<PackedTypesState> for PackedTypesAnalysis<'a> {
-    fn to_summary(&self, state: PackedTypesState, _fun_target: &FunctionTarget) -> PackedTypesState {
+impl DataflowAnalysis for PackedTypesAnalysis<'_> {}
+impl CompositionalAnalysis<PackedTypesState> for PackedTypesAnalysis<'_> {
+    fn to_summary(
+        &self,
+        state: PackedTypesState,
+        _fun_target: &FunctionTarget,
+    ) -> PackedTypesState {
         state
     }
 }

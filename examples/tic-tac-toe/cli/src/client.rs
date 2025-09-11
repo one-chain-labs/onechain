@@ -40,7 +40,7 @@ use crate::{
 
 #[derive(Parser, Debug)]
 pub struct Connection {
-    /// The Sui CLI config file, (default: ~/.one/one_config/client.yaml)
+    /// The Sui CLI config file, (default: ~/.sui/sui_config/client.yaml)
     #[clap(long)]
     config: Option<PathBuf>,
 
@@ -61,12 +61,12 @@ impl Client {
     pub(crate) fn new(conn: Connection) -> Result<Self> {
         let Some(config) = conn.config.or_else(|| {
             let mut default = dirs::home_dir()?;
-            default.extend([".one", "one_config", "client.yaml"]);
+            default.extend([".sui", "sui_config", "client.yaml"]);
             Some(default)
         }) else {
             bail!(
                 "Cannot find wallet config. No config was supplied, and the default path \
-                 (~/.one/one_config/client.yaml) does not exist.",
+                 (~/.sui/sui_config/client.yaml) does not exist.",
             );
         };
 

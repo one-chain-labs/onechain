@@ -1,14 +1,14 @@
-module one::object {
+module oct::object {
     public struct ID()
     public struct UID()
 }
-module one::transfer {}
-module one::tx_context {
+module oct::transfer {}
+module oct::tx_context {
     public struct TxContext()
 }
 
 module a::m {
-    use one::object::{Self, ID, UID};
-    use one::transfer;
-    use one::tx_context::{Self, TxContext};
+    use sui::object::{Self, ID, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
 }

@@ -1,10 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    path::PathBuf,
-    sync::{Arc, RwLock},
-};
+use std::sync::Arc;
+use std::{path::PathBuf, sync::RwLock};
 use tracing::info;
 
 use clap::Parser;
@@ -12,18 +10,8 @@ use clap::Parser;
 use telemetry_subscribers::TelemetryConfig;
 
 use sui_source_validation_service::{
-    host_port,
-    initialize,
-    parse_config,
-    serve,
-    start_prometheus_server,
-    watch_for_upgrades,
-    AppState,
-    DirectorySource,
-    Network,
-    PackageSource,
-    RepositorySource,
-    SourceServiceMetrics,
+    host_port, initialize, parse_config, serve, start_prometheus_server, watch_for_upgrades,
+    AppState, DirectorySource, Network, PackageSource, RepositorySource, SourceServiceMetrics,
     METRICS_HOST_PORT,
 };
 
@@ -50,9 +38,18 @@ pub async fn main() -> anyhow::Result<()> {
     let prometheus_registry = registry_service.default_registry();
     let metrics = SourceServiceMetrics::new(&prometheus_registry);
 
-    let app_state = Arc::new(RwLock::new(AppState { sources, metrics: Some(metrics), sources_list }));
+    let app_state = Arc::new(RwLock::new(AppState {
+        sources,
+        metrics: Some(metrics),
+        sources_list,
+    }));
     let mut threads = vec![];
-    let networks_to_watch = vec![Network::Mainnet, Network::Testnet, Network::Devnet, Network::Localnet];
+    let networks_to_watch = vec![
+        Network::Mainnet,
+        Network::Testnet,
+        Network::Devnet,
+        Network::Localnet,
+    ];
     // spawn a watcher thread for upgrades for each network
     for network in networks_to_watch {
         let app_state_copy = app_state.clone();
@@ -76,7 +73,9 @@ pub async fn main() -> anyhow::Result<()> {
         if packages.is_empty() {
             continue;
         }
-        let watcher = tokio::spawn(async move { watch_for_upgrades(packages, app_state_copy, network, None).await });
+        let watcher = tokio::spawn(async move {
+            watch_for_upgrades(packages, app_state_copy, network, None).await
+        });
         threads.push(watcher);
     }
 

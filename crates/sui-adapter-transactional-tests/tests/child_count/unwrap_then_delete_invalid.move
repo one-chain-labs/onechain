@@ -9,37 +9,37 @@
 //# publish
 
 module test::m {
-    use one::dynamic_object_field as ofield;
+    use sui::dynamic_object_field as ofield;
 
     public struct S has key, store {
-        id: one::object::UID,
+        id: sui::object::UID,
     }
 
     public struct R has key {
-        id: one::object::UID,
+        id: sui::object::UID,
         s: S,
     }
 
     public entry fun mint(ctx: &mut TxContext) {
-        let s = S { id: one::object::new(ctx) };
-        one::transfer::transfer(s, tx_context::sender(ctx))
+        let s = S { id: sui::object::new(ctx) };
+        sui::transfer::transfer(s, tx_context::sender(ctx))
     }
 
     public entry fun add(parent: &mut S, idx: u64, ctx: &mut TxContext) {
-        let child = S { id: one::object::new(ctx) };
+        let child = S { id: sui::object::new(ctx) };
         ofield::add(&mut parent.id, idx, child);
     }
 
     public entry fun wrap(s: S, ctx: &mut TxContext) {
-        let r = R { id: one::object::new(ctx), s };
-        one::transfer::transfer(r, tx_context::sender(ctx))
+        let r = R { id: sui::object::new(ctx), s };
+        sui::transfer::transfer(r, tx_context::sender(ctx))
     }
 
     public entry fun delete(r: R) {
         let R { id, s } = r;
-        one::object::delete(id);
+        sui::object::delete(id);
         let S { id } = s;
-        one::object::delete(id);
+        sui::object::delete(id);
     }
 }
 

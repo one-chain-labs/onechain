@@ -6,24 +6,11 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{
     fold::{fold_expr, fold_item_macro, fold_stmt, Fold},
     parse::Parser,
-    parse2,
-    parse_macro_input,
+    parse2, parse_macro_input,
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute,
-    BinOp,
-    Data,
-    DataEnum,
-    DeriveInput,
-    Expr,
-    ExprBinary,
-    ExprMacro,
-    Item,
-    ItemMacro,
-    Stmt,
-    StmtMacro,
-    Token,
-    UnOp,
+    Attribute, BinOp, Data, DataEnum, DeriveInput, Expr, ExprBinary, ExprMacro, Item, ItemMacro,
+    Stmt, StmtMacro, Token, UnOp,
 };
 
 #[proc_macro_attribute]
@@ -51,7 +38,7 @@ pub fn init_static_initializers(_args: TokenStream, item: TokenStream) -> TokenS
             std::thread::spawn(|| {
                 use sui_protocol_config::ProtocolConfig;
                 ::sui_simulator::telemetry_subscribers::init_for_testing();
-                ::sui_simulator::sui_types::execution::get_denied_certificates();
+                ::sui_simulator::sui_types::execution_params::get_denied_certificates_for_sim_test();
                 ::sui_simulator::sui_framework::BuiltInFramework::all_package_ids();
                 ::sui_simulator::sui_types::gas::SuiGasStatus::new_unmetered();
 
@@ -71,7 +58,7 @@ pub fn init_static_initializers(_args: TokenStream, item: TokenStream) -> TokenS
 
                     register_package_hooks(Box::new(SuiPackageHooks {}));
                     let mut path = PathBuf::from(env!("SIMTEST_STATIC_INIT_MOVE"));
-                    let mut build_config = BuildConfig::default();
+                    let mut build_config = BuildConfig::new_for_testing();
 
                     build_config.config.install_dir = Some(TempDir::new().unwrap().keep());
                     let _all_module_bytes = build_config
@@ -80,16 +67,15 @@ pub fn init_static_initializers(_args: TokenStream, item: TokenStream) -> TokenS
                         .get_package_bytes(/* with_unpublished_deps */ false);
                 }
 
+                use std::sync::Arc;
 
                 use ::sui_simulator::anemo_tower::callback::CallbackLayer;
                 use ::sui_simulator::anemo_tower::trace::DefaultMakeSpan;
                 use ::sui_simulator::anemo_tower::trace::DefaultOnFailure;
                 use ::sui_simulator::anemo_tower::trace::TraceLayer;
-                use ::sui_simulator::narwhal_network::metrics::MetricsMakeCallbackHandler;
-                use ::sui_simulator::narwhal_network::metrics::NetworkMetrics;
-
-                use std::sync::Arc;
                 use ::sui_simulator::fastcrypto::traits::KeyPair;
+                use ::sui_simulator::mysten_network::metrics::MetricsMakeCallbackHandler;
+                use ::sui_simulator::mysten_network::metrics::NetworkMetrics;
                 use ::sui_simulator::rand_crate::rngs::{StdRng, OsRng};
                 use ::sui_simulator::rand::SeedableRng;
                 use ::sui_simulator::tower::ServiceBuilder;
@@ -203,15 +189,18 @@ pub fn sim_test(args: TokenStream, item: TokenStream) -> TokenStream {
     let arg_parser = Punctuated::<syn::Meta, Token![,]>::parse_terminated;
     let args = arg_parser.parse(args).unwrap().into_iter();
 
-    let ignore =
-        input.attrs.iter().find(|attr| attr.path().is_ident("ignore")).map_or(quote! {}, |_| quote! { #[ignore] });
+    let ignore = input
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("ignore"))
+        .map_or(quote! {}, |_| quote! { #[ignore] });
 
     let result = if cfg!(msim) {
         let sig = &input.sig;
         let return_type = &sig.output;
         let body = &input.block;
         quote! {
-            #[::sui_simulator::sim_test(crate = "sui_simulator", #(#args)*)]
+            #[::sui_simulator::sim_test(crate = "sui_simulator", #(#args),*)]
             #[::sui_macros::init_static_initializers]
             #ignore
             #sig {
@@ -306,7 +295,10 @@ struct CheckArithmetic;
 
 impl CheckArithmetic {
     fn maybe_skip_macro(&self, attrs: &mut Vec<Attribute>) -> bool {
-        if let Some(idx) = attrs.iter().position(|attr| attr.path().is_ident("skip_checked_arithmetic")) {
+        if let Some(idx) = attrs
+            .iter()
+            .position(|attr| attr.path().is_ident("skip_checked_arithmetic"))
+        {
             // Skip processing macro because it is annotated with
             // #[skip_checked_arithmetic]
             attrs.remove(idx);
@@ -316,18 +308,24 @@ impl CheckArithmetic {
         }
     }
 
-    fn process_macro_contents(&mut self, tokens: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
+    fn process_macro_contents(
+        &mut self,
+        tokens: proc_macro2::TokenStream,
+    ) -> syn::Result<proc_macro2::TokenStream> {
         // Parse the macro's contents as a comma-separated list of expressions.
         let parser = Punctuated::<Expr, Token![,]>::parse_terminated;
         let Ok(exprs) = parser.parse(tokens.clone().into()) else {
             return Err(syn::Error::new_spanned(
                 tokens,
-                "could not process macro contents - use #[skip_checked_arithmetic] to skip this macro",
+                "could not process macro contents - use #[skip_checked_arithmetic] to skip this macro"
             ));
         };
 
         // Fold each sub expression.
-        let folded_exprs = exprs.into_iter().map(|expr| self.fold_expr(expr)).collect::<Vec<_>>();
+        let folded_exprs = exprs
+            .into_iter()
+            .map(|expr| self.fold_expr(expr))
+            .collect::<Vec<_>>();
 
         // Convert the folded expressions back into tokens and reconstruct the macro.
         let mut folded_tokens = proc_macro2::TokenStream::new();
@@ -348,15 +346,27 @@ impl Fold for CheckArithmetic {
     fn fold_stmt(&mut self, stmt: Stmt) -> Stmt {
         let stmt = fold_stmt(self, stmt);
         if let Stmt::Macro(stmt_macro) = stmt {
-            let StmtMacro { mut attrs, mut mac, semi_token } = stmt_macro;
+            let StmtMacro {
+                mut attrs,
+                mut mac,
+                semi_token,
+            } = stmt_macro;
 
             if self.maybe_skip_macro(&mut attrs) {
-                Stmt::Macro(StmtMacro { attrs, mac, semi_token })
+                Stmt::Macro(StmtMacro {
+                    attrs,
+                    mac,
+                    semi_token,
+                })
             } else {
                 match self.process_macro_contents(mac.tokens.clone()) {
                     Ok(folded_tokens) => {
                         mac.tokens = folded_tokens;
-                        Stmt::Macro(StmtMacro { attrs, mac, semi_token })
+                        Stmt::Macro(StmtMacro {
+                            attrs,
+                            mac,
+                            semi_token,
+                        })
                     }
                     Err(error) => parse2(error.to_compile_error()).unwrap(),
                 }
@@ -403,7 +413,12 @@ impl Fold for CheckArithmetic {
             }
 
             Expr::Binary(expr_binary) => {
-                let ExprBinary { attrs, mut left, op, mut right } = expr_binary;
+                let ExprBinary {
+                    attrs,
+                    mut left,
+                    op,
+                    mut right,
+                } = expr_binary;
 
                 fn remove_parens(expr: &mut Expr) {
                     if let Expr::Paren(paren) = expr {
@@ -493,7 +508,12 @@ impl Fold for CheckArithmetic {
                         wrap_op_assign!(left, right, checked_rem, span)
                     }
                     _ => {
-                        let expr_binary = ExprBinary { attrs, left, op, right };
+                        let expr_binary = ExprBinary {
+                            attrs,
+                            left,
+                            op,
+                            right,
+                        };
                         quote_spanned!(span => #expr_binary)
                     }
                 }

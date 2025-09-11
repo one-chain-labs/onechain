@@ -10,7 +10,7 @@
 /// companion to existing open-loop (`Coin`) systems.
 ///
 /// ```
-/// Module:      one::balance       one::coin             one::token
+/// Module:      sui::balance       sui::coin             sui::token
 /// Main type:   Balance<T>         Coin<T>               Token<T>
 /// Capability:  Supply<T>  <---->  TreasuryCap<T> <----> TreasuryCap<T>
 /// Abilities:   store              key + store           key
@@ -19,17 +19,16 @@
 /// The Token system allows for fine-grained control over the actions performed
 /// on the token. And hence it is highly suitable for applications that require
 /// control over the currency which a simple open-loop system can't provide.
-module one::token;
+module oct::token;
 
-use std::{string::String, type_name::{Self, TypeName}};
-use one::{
-    balance::{Self, Balance},
-    coin::{Coin, TreasuryCap},
-    dynamic_field as df,
-    event,
-    vec_map::{Self, VecMap},
-    vec_set::{Self, VecSet}
-};
+use std::string::String;
+use std::type_name::{Self, TypeName};
+use sui::balance::{Self, Balance};
+use sui::coin::{Coin, TreasuryCap};
+use sui::dynamic_field as df;
+use sui::event;
+use sui::vec_map::{Self, VecMap};
+use sui::vec_set::{Self, VecSet};
 
 /// The action is not allowed (defined) in the policy.
 const EUnknownAction: u64 = 0;
@@ -122,7 +121,7 @@ public struct ActionRequest<phantom T> {
 /// Dynamic field key for the `TokenPolicy` to store the `Config` for a
 /// specific action `Rule`. There can be only one configuration per
 /// `Rule` per `TokenPolicy`.
-public struct RuleKey<phantom T> has store, copy, drop { is_protected: bool }
+public struct RuleKey<phantom T> has copy, drop, store { is_protected: bool }
 
 /// An event emitted when a `TokenPolicy` is created and shared. Because
 /// `TokenPolicy` can only be shared (and potentially frozen in the future),

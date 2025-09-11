@@ -65,7 +65,10 @@ mod count {
 
     impl Context {
         pub fn new(signature: &FunctionSignature) -> Self {
-            let mut ctx = Context { assigned: BTreeMap::new(), used: BTreeMap::new() };
+            let mut ctx = Context {
+                assigned: BTreeMap::new(),
+                used: BTreeMap::new(),
+            };
             for (_, v, _) in &signature.parameters {
                 ctx.assign(v, false);
             }
@@ -100,7 +103,12 @@ mod count {
                 .into_iter()
                 .filter(|(_v, count)| count.map(|c| c == 1).unwrap_or(false))
                 .map(|(v, _count)| v)
-                .filter(|v| used.get(v).unwrap_or(&None).map(|c| c == 1).unwrap_or(false))
+                .filter(|v| {
+                    used.get(v)
+                        .unwrap_or(&None)
+                        .map(|c| c == 1)
+                        .unwrap_or(false)
+                })
                 .collect()
         }
     }
@@ -131,13 +139,20 @@ mod count {
 
     fn lvalues(context: &mut Context, ls: &[LValue], substitutable_rvalues: Vec<bool>) {
         assert!(ls.len() == substitutable_rvalues.len());
-        ls.iter().zip(substitutable_rvalues).for_each(|(l, substitutable)| lvalue(context, l, substitutable))
+        ls.iter()
+            .zip(substitutable_rvalues)
+            .for_each(|(l, substitutable)| lvalue(context, l, substitutable))
     }
 
     fn lvalue(context: &mut Context, sp!(_, l_): &LValue, substitutable: bool) {
         use LValue_ as L;
         match l_ {
-            L::Ignore | L::Unpack(_, _, _) | L::UnpackVariant(..) => (),
+            L::Ignore => (),
+            L::Unpack(_, _, field_lvalues) | L::UnpackVariant(_, _, _, _, _, field_lvalues) => {
+                for (_field, fl) in field_lvalues {
+                    lvalue(context, fl, /* substitutable */ false);
+                }
+            }
             L::Var { var, .. } => context.assign(var, substitutable),
         }
     }
@@ -146,7 +161,11 @@ mod count {
     fn exp(context: &mut Context, parent_e: &Exp) {
         use UnannotatedExp_ as E;
         match &parent_e.exp.value {
-            E::Unit { .. } | E::Value(_) | E::Constant(_) | E::UnresolvedError | E::ErrorConstant { .. } => (),
+            E::Unit { .. }
+            | E::Value(_)
+            | E::Constant(_)
+            | E::UnresolvedError
+            | E::ErrorConstant { .. } => (),
 
             E::BorrowLocal(_, var) => context.used(var, false),
 
@@ -163,9 +182,11 @@ mod count {
                 }
             }
 
-            E::Freeze(e) | E::Dereference(e) | E::UnaryExp(_, e) | E::Borrow(_, e, _, _) | E::Cast(e, _) => {
-                exp(context, e)
-            }
+            E::Freeze(e)
+            | E::Dereference(e)
+            | E::UnaryExp(_, e)
+            | E::Borrow(_, e, _, _)
+            | E::Cast(e, _) => exp(context, e),
 
             E::BinopExp(e1, _, e2) => {
                 exp(context, e1);
@@ -209,10 +230,14 @@ mod count {
 
             E::Cast(e, _) => can_subst_exp_single(e),
             E::UnaryExp(op, e) => can_subst_exp_unary(op) && can_subst_exp_single(e),
-            E::BinopExp(e1, op, e2) => can_subst_exp_binary(op) && can_subst_exp_single(e1) && can_subst_exp_single(e2),
+            E::BinopExp(e1, op, e2) => {
+                can_subst_exp_binary(op) && can_subst_exp_single(e1) && can_subst_exp_single(e2)
+            }
             E::Multiple(es) => es.iter().all(can_subst_exp_single),
             E::Pack(_, _, fields) => fields.iter().all(|(_, _, e)| can_subst_exp_single(e)),
-            E::PackVariant(_, _, _, fields) => fields.iter().all(|(_, _, e)| can_subst_exp_single(e)),
+            E::PackVariant(_, _, _, fields) => {
+                fields.iter().all(|(_, _, e)| can_subst_exp_single(e))
+            }
             E::Vector(_, _, _, eargs) => eargs.iter().all(can_subst_exp_single),
 
             E::Unreachable => panic!("ICE should not analyze dead code"),
@@ -259,7 +284,10 @@ mod eliminate {
 
     impl Context {
         pub fn new(ssa_temps: BTreeSet<Var>) -> Self {
-            Context { ssa_temps, eliminated: BTreeMap::new() }
+            Context {
+                ssa_temps,
+                eliminated: BTreeMap::new(),
+            }
         }
 
         pub fn finished(&self) -> bool {
@@ -313,12 +341,23 @@ mod eliminate {
         use LValue_ as L;
         match l_ {
             l_ @ (L::Ignore | L::Unpack(_, _, _) | L::UnpackVariant(..)) => LRes::Same(sp(loc, l_)),
-            L::Var { var, ty, unused_assignment } => {
+            L::Var {
+                var,
+                ty,
+                unused_assignment,
+            } => {
                 let contained = context.ssa_temps.remove(&var);
                 if contained {
                     LRes::Elim(var)
                 } else {
-                    LRes::Same(sp(loc, L::Var { var, ty, unused_assignment }))
+                    LRes::Same(sp(
+                        loc,
+                        L::Var {
+                            var,
+                            ty,
+                            unused_assignment,
+                        },
+                    ))
                 }
             }
         }
@@ -351,9 +390,11 @@ mod eliminate {
                     exp(context, arg);
                 }
             }
-            E::Freeze(e) | E::Dereference(e) | E::UnaryExp(_, e) | E::Borrow(_, e, _, _) | E::Cast(e, _) => {
-                exp(context, e)
-            }
+            E::Freeze(e)
+            | E::Dereference(e)
+            | E::UnaryExp(_, e)
+            | E::Borrow(_, e, _, _)
+            | E::Cast(e, _) => exp(context, e),
 
             E::BinopExp(e1, _, e2) => {
                 exp(context, e1);
@@ -362,7 +403,9 @@ mod eliminate {
 
             E::Pack(_, _, fields) => fields.iter_mut().for_each(|(_, _, e)| exp(context, e)),
 
-            E::PackVariant(_, _, _, fields) => fields.iter_mut().for_each(|(_, _, e)| exp(context, e)),
+            E::PackVariant(_, _, _, fields) => {
+                fields.iter_mut().for_each(|(_, _, e)| exp(context, e))
+            }
 
             E::Multiple(es) => es.iter_mut().for_each(|e| exp(context, e)),
 
@@ -423,6 +466,14 @@ mod eliminate {
     }
 
     fn unit(loc: Loc) -> Exp {
-        H::exp(sp(loc, Type_::Unit), sp(loc, UnannotatedExp_::Unit { case: UnitCase::Implicit }))
+        H::exp(
+            sp(loc, Type_::Unit),
+            sp(
+                loc,
+                UnannotatedExp_::Unit {
+                    case: UnitCase::Implicit,
+                },
+            ),
+        )
     }
 }

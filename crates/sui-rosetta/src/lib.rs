@@ -1,9 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{net::SocketAddr, num::NonZeroUsize, string::ToString, sync::Arc};
+use std::net::SocketAddr;
+use std::num::NonZeroUsize;
+use std::string::ToString;
+use std::sync::Arc;
 
-use axum::{routing::post, Extension, Router};
+use axum::routing::post;
+use axum::{Extension, Router};
 use lru::LruCache;
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
@@ -12,11 +16,10 @@ use tracing::info;
 
 use sui_sdk::{SuiClient, SUI_COIN_TYPE};
 
-use crate::{
-    errors::{Error, Error::MissingMetadata},
-    state::{CheckpointBlockProvider, OnlineServerContext},
-    types::{Currency, CurrencyMetadata, SuiEnv},
-};
+use crate::errors::Error;
+use crate::errors::Error::MissingMetadata;
+use crate::state::{CheckpointBlockProvider, OnlineServerContext};
+use crate::types::{Currency, CurrencyMetadata, SuiEnv};
 
 #[cfg(test)]
 #[path = "unit_tests/lib_tests.rs"]
@@ -35,7 +38,9 @@ pub mod types;
 pub static SUI: Lazy<Currency> = Lazy::new(|| Currency {
     symbol: "SUI".to_string(),
     decimals: 9,
-    metadata: CurrencyMetadata { coin_type: SUI_COIN_TYPE.to_string() },
+    metadata: CurrencyMetadata {
+        coin_type: SUI_COIN_TYPE.to_string(),
+    },
 });
 
 pub struct RosettaOnlineServer {
@@ -46,8 +51,14 @@ pub struct RosettaOnlineServer {
 impl RosettaOnlineServer {
     pub fn new(env: SuiEnv, client: SuiClient) -> Self {
         let coin_cache = CoinMetadataCache::new(client.clone(), NonZeroUsize::new(1000).unwrap());
-        let blocks = Arc::new(CheckpointBlockProvider::new(client.clone(), coin_cache.clone()));
-        Self { env, context: OnlineServerContext::new(client, blocks, coin_cache) }
+        let blocks = Arc::new(CheckpointBlockProvider::new(
+            client.clone(),
+            coin_cache.clone(),
+        ));
+        Self {
+            env,
+            context: OnlineServerContext::new(client, blocks, coin_cache),
+        }
     }
 
     pub async fn serve(self, addr: SocketAddr) {
@@ -67,7 +78,10 @@ impl RosettaOnlineServer {
 
         let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
 
-        info!("Sui Rosetta online server listening on {}", listener.local_addr().unwrap());
+        info!(
+            "Sui Rosetta online server listening on {}",
+            listener.local_addr().unwrap()
+        );
         axum::serve(listener, app).await.unwrap();
     }
 }
@@ -95,7 +109,10 @@ impl RosettaOfflineServer {
             .layer(Extension(self.env));
         let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
 
-        info!("Sui Rosetta offline server listening on {}", listener.local_addr().unwrap());
+        info!(
+            "Sui Rosetta offline server listening on {}",
+            listener.local_addr().unwrap()
+        );
         axum::serve(listener, app).await.unwrap();
     }
 }
@@ -108,19 +125,28 @@ pub struct CoinMetadataCache {
 
 impl CoinMetadataCache {
     pub fn new(client: SuiClient, size: NonZeroUsize) -> Self {
-        Self { client, metadata: Arc::new(Mutex::new(LruCache::new(size))) }
+        Self {
+            client,
+            metadata: Arc::new(Mutex::new(LruCache::new(size))),
+        }
     }
 
     pub async fn get_currency(&self, type_tag: &TypeTag) -> Result<Currency, Error> {
         let mut cache = self.metadata.lock().await;
         if !cache.contains(type_tag) {
-            let metadata =
-                self.client.coin_read_api().get_coin_metadata(type_tag.to_string()).await?.ok_or(MissingMetadata)?;
+            let metadata = self
+                .client
+                .coin_read_api()
+                .get_coin_metadata(type_tag.to_string())
+                .await?
+                .ok_or(MissingMetadata)?;
 
             let ccy = Currency {
                 symbol: metadata.symbol,
                 decimals: metadata.decimals as u64,
-                metadata: CurrencyMetadata { coin_type: type_tag.to_string() },
+                metadata: CurrencyMetadata {
+                    coin_type: type_tag.to_string(),
+                },
             };
             cache.push(type_tag.clone(), ccy);
         }

@@ -10,7 +10,10 @@ use sui_move::unit_test::run_move_unit_tests;
 use sui_move_build::BuildConfig;
 
 pub(crate) const EXAMPLES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples");
-pub(crate) const FRAMEWORK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/sui-framework/packages");
+pub(crate) const FRAMEWORK: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../crates/sui-framework/packages"
+);
 
 /// Ensure packages build outside of test mode.
 pub(crate) fn build(path: &Path) -> datatest_stable::Result<()> {
@@ -26,7 +29,9 @@ pub(crate) fn build(path: &Path) -> datatest_stable::Result<()> {
     config.config.silence_warnings = false;
     config.config.lint_flag = LintFlag::LEVEL_DEFAULT;
 
-    config.build(path).unwrap_or_else(|e| panic!("Building package {}.\nWith error {e}", path.display()));
+    config
+        .build(path)
+        .unwrap_or_else(|e| panic!("Building package {}.\nWith error {e}", path.display()));
 
     Ok(())
 }
@@ -52,7 +57,10 @@ pub(crate) fn tests(path: &Path) -> datatest_stable::Result<()> {
     let mut testing_config = UnitTestingConfig::default_with_bound(Some(3_000_000));
     testing_config.filter = std::env::var("FILTER").ok().map(|s| s.to_string());
 
-    assert_eq!(run_move_unit_tests(path, move_config, Some(testing_config), false).unwrap(), UnitTestResult::Success);
+    assert_eq!(
+        run_move_unit_tests(path, move_config, Some(testing_config), false, false).unwrap(),
+        UnitTestResult::Success
+    );
 
     Ok(())
 }

@@ -7,7 +7,7 @@
 
 //# publish
 module test::m1 {
-    fun priv(_: &mut one::tx_context::TxContext) {}
+    fun priv(_: &mut sui::tx_context::TxContext) {}
 }
 
 //# programmable

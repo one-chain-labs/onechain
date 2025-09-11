@@ -6,11 +6,9 @@
 #[cfg(test)]
 mod unit_tests;
 
-use std::{
-    cmp::Ordering,
-    fmt::{self, Debug},
-    num::NonZeroU64,
-};
+use std::cmp::Ordering;
+use std::fmt::{self, Debug};
+use std::num::NonZeroU64;
 
 #[derive(Default, Debug)]
 /// An abstract value that compresses runs of the same value to reduce space usage
@@ -22,7 +20,10 @@ pub struct AbstractStack<T> {
 impl<T: Eq + Clone + Debug> AbstractStack<T> {
     /// Creates an empty stack
     pub fn new() -> Self {
-        Self { values: vec![], len: 0 }
+        Self {
+            values: vec![],
+            len: 0,
+        }
     }
 
     /// Returns true iff the stack is empty
@@ -40,7 +41,9 @@ impl<T: Eq + Clone + Debug> AbstractStack<T> {
         // len is 0 ==> empty
         debug_assert!(self.len != 0 || self.values.is_empty());
         // len not 0 ==> !empty and last element len <= len
-        debug_assert!(self.len == 0 || (!self.values.is_empty() && self.values.last().unwrap().0 <= self.len));
+        debug_assert!(
+            self.len == 0 || (!self.values.is_empty() && self.values.last().unwrap().0 <= self.len)
+        );
         self.len
     }
 

@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{backfill::BackfillTaskKind, db::ConnectionPoolConfig, handlers::pruner::PrunableTable};
+use crate::db::ConnectionPoolConfig;
+use crate::{backfill::BackfillTaskKind, handlers::pruner::PrunableTable};
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 use strum::IntoEnumIterator;
-use sui_json_rpc::name_service::NameServiceConfig;
+use sui_name_service::NameServiceConfig;
 use sui_types::base_types::{ObjectID, SuiAddress};
 use url::Url;
 
@@ -15,7 +16,10 @@ use url::Url;
 const OBJECTS_HISTORY_EPOCHS_TO_KEEP: u64 = 2;
 
 #[derive(Parser, Clone, Debug)]
-#[clap(name = "Sui indexer", about = "An off-fullnode service serving data from Sui protocol")]
+#[clap(
+    name = "Sui indexer",
+    about = "An off-fullnode service serving data from Sui protocol"
+)]
 pub struct IndexerConfig {
     #[clap(long, alias = "db-url")]
     pub database_url: Url,
@@ -45,15 +49,31 @@ pub struct NameServiceOptions {
 
 impl NameServiceOptions {
     pub fn to_config(&self) -> NameServiceConfig {
-        let Self { package_address, registry_id, reverse_registry_id } = self.clone();
-        NameServiceConfig { package_address, registry_id, reverse_registry_id }
+        let Self {
+            package_address,
+            registry_id,
+            reverse_registry_id,
+        } = self.clone();
+        NameServiceConfig {
+            package_address,
+            registry_id,
+            reverse_registry_id,
+        }
     }
 }
 
 impl Default for NameServiceOptions {
     fn default() -> Self {
-        let NameServiceConfig { package_address, registry_id, reverse_registry_id } = NameServiceConfig::default();
-        Self { package_address, registry_id, reverse_registry_id }
+        let NameServiceConfig {
+            package_address,
+            registry_id,
+            reverse_registry_id,
+        } = NameServiceConfig::default();
+        Self {
+            package_address,
+            registry_id,
+            reverse_registry_id,
+        }
     }
 }
 
@@ -122,7 +142,14 @@ pub struct IngestionConfig {
 
     /// Whether to delete processed checkpoint files from the local directory,
     /// when running Fullnode-colocated indexer.
-    #[arg(long, default_value_t = true)]
+    #[arg(
+        long,
+        default_value_t = true,
+        default_missing_value = "true",
+        action = clap::ArgAction::Set,
+        num_args = 0..=1,
+        require_equals = false,
+    )]
     pub gc_checkpoint_files: bool,
 }
 
@@ -140,7 +167,8 @@ impl Default for IngestionConfig {
             end_checkpoint: None,
             checkpoint_download_queue_size: Self::DEFAULT_CHECKPOINT_DOWNLOAD_QUEUE_SIZE,
             checkpoint_download_timeout: Self::DEFAULT_CHECKPOINT_DOWNLOAD_TIMEOUT,
-            checkpoint_download_queue_size_bytes: Self::DEFAULT_CHECKPOINT_DOWNLOAD_QUEUE_SIZE_BYTES,
+            checkpoint_download_queue_size_bytes:
+                Self::DEFAULT_CHECKPOINT_DOWNLOAD_QUEUE_SIZE_BYTES,
             gc_checkpoint_files: true,
         }
     }
@@ -163,8 +191,8 @@ pub struct BackFillConfig {
 }
 
 impl BackFillConfig {
-    const DEFAULT_CHUNK_SIZE: usize = 1000;
     const DEFAULT_MAX_CONCURRENCY: usize = 10;
+    const DEFAULT_CHUNK_SIZE: usize = 1000;
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -179,11 +207,6 @@ pub enum Command {
         pruning_options: PruningOptions,
         #[command(flatten)]
         upload_options: UploadOptions,
-        /// If true, the indexer will run in MVR mode. It will only index data to
-        /// `objects_snapshot`, `objects_history`, `packages`, `checkpoints`, and `epochs` to
-        /// support MVR queries.
-        #[clap(long, default_value_t = false)]
-        mvr_mode: bool,
     },
     JsonRpcService(JsonRpcConfig),
     ResetDatabase {
@@ -215,8 +238,6 @@ pub enum Command {
         #[command(flatten)]
         backfill_config: BackFillConfig,
     },
-    /// Restore the database from formal snaphots.
-    Restore(RestoreConfig),
 }
 
 #[derive(Args, Default, Debug, Clone)]
@@ -245,14 +266,20 @@ impl PruningOptions {
 
         let contents = std::fs::read_to_string(config_path)
             .expect("Failed to read default retention policy and overrides from file");
-        let retention_with_overrides =
-            toml::de::from_str::<RetentionConfig>(&contents).expect("Failed to parse into RetentionConfig struct");
+        let retention_with_overrides = toml::de::from_str::<RetentionConfig>(&contents)
+            .expect("Failed to parse into RetentionConfig struct");
 
         let default_retention = retention_with_overrides.epochs_to_keep;
 
-        assert!(default_retention > 0, "Default retention must be greater than 0");
         assert!(
-            retention_with_overrides.overrides.values().all(|&policy| policy > 0),
+            default_retention > 0,
+            "Default retention must be greater than 0"
+        );
+        assert!(
+            retention_with_overrides
+                .overrides
+                .values()
+                .all(|&policy| policy > 0),
             "All retention overrides must be greater than 0"
         );
 
@@ -265,12 +292,18 @@ impl RetentionConfig {
     /// `finalize()` on the instance to update the `policies` field with the default retention
     /// policy for all tables that do not have an override specified.
     pub fn new(epochs_to_keep: u64, overrides: HashMap<PrunableTable, u64>) -> Self {
-        Self { epochs_to_keep, overrides }
+        Self {
+            epochs_to_keep,
+            overrides,
+        }
     }
 
     pub fn new_with_default_retention_only_for_testing(epochs_to_keep: u64) -> Self {
         let mut overrides = HashMap::new();
-        overrides.insert(PrunableTable::ObjectsHistory, OBJECTS_HISTORY_EPOCHS_TO_KEEP);
+        overrides.insert(
+            PrunableTable::ObjectsHistory,
+            OBJECTS_HISTORY_EPOCHS_TO_KEEP,
+        );
 
         Self::new(epochs_to_keep, HashMap::new())
     }
@@ -280,7 +313,10 @@ impl RetentionConfig {
     /// `epochs_to_keep`. Some tables like `objects_history` will observe a different default
     /// retention policy. These default values are overridden by any entries in `overrides`.
     pub fn retention_policies(self) -> HashMap<PrunableTable, u64> {
-        let RetentionConfig { epochs_to_keep, mut overrides } = self;
+        let RetentionConfig {
+            epochs_to_keep,
+            mut overrides,
+        } = self;
 
         for table in PrunableTable::iter() {
             let default_retention = match table {
@@ -318,7 +354,10 @@ impl SnapshotLagConfig {
 
 impl Default for SnapshotLagConfig {
     fn default() -> Self {
-        SnapshotLagConfig { snapshot_min_lag: Self::DEFAULT_MIN_LAG, sleep_duration: Self::DEFAULT_SLEEP_DURATION_SEC }
+        SnapshotLagConfig {
+            snapshot_min_lag: Self::DEFAULT_MIN_LAG,
+            sleep_duration: Self::DEFAULT_SLEEP_DURATION_SEC,
+        }
     }
 }
 
@@ -331,47 +370,18 @@ pub struct UploadOptions {
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct RestoreConfig {
-    #[arg(long, env = "START_EPOCH", required = true)]
-    pub start_epoch: u64,
-    #[arg(long, env = "SNAPSHOT_ENDPOINT")]
-    pub snapshot_endpoint: String,
-    #[arg(long, env = "SNAPSHOT_BUCKET")]
-    pub snapshot_bucket: String,
-    #[arg(long, env = "SNAPSHOT_DOWNLOAD_DIR", required = true)]
-    pub snapshot_download_dir: String,
-
-    #[arg(long, env = "GCS_ARCHIVE_BUCKET")]
-    pub gcs_archive_bucket: String,
-    #[arg(long, env = "GCS_DISPLAY_BUCKET")]
-    pub gcs_display_bucket: String,
-
-    #[arg(env = "OBJECT_STORE_CONCURRENT_LIMIT")]
-    pub object_store_concurrent_limit: usize,
-    #[arg(env = "OBJECT_STORE_MAX_TIMEOUT_SECS")]
-    pub object_store_max_timeout_secs: u64,
-}
-
-impl Default for RestoreConfig {
-    fn default() -> Self {
-        Self {
-            start_epoch: 0, // not used b/c it's required
-            snapshot_endpoint: "https://formal-snapshot.mainnet.sui.io".to_string(),
-            snapshot_bucket: "mysten-mainnet-formal".to_string(),
-            snapshot_download_dir: "".to_string(), // not used b/c it's required
-            gcs_archive_bucket: "mysten-mainnet-archives".to_string(),
-            gcs_display_bucket: "mysten-mainnet-display-table".to_string(),
-            object_store_concurrent_limit: 50,
-            object_store_max_timeout_secs: 512,
-        }
-    }
-}
-
-#[derive(Args, Debug, Clone)]
 pub struct BenchmarkConfig {
-    #[arg(long, default_value_t = 200, help = "Number of transactions in a checkpoint.")]
+    #[arg(
+        long,
+        default_value_t = 200,
+        help = "Number of transactions in a checkpoint."
+    )]
     pub checkpoint_size: u64,
-    #[arg(long, default_value_t = 2000, help = "Total number of synthetic checkpoints to generate.")]
+    #[arg(
+        long,
+        default_value_t = 2000,
+        help = "Total number of synthetic checkpoints to generate."
+    )]
     pub num_checkpoints: u64,
     #[arg(
         long,
@@ -379,7 +389,11 @@ pub struct BenchmarkConfig {
         help = "Customize the first checkpoint sequence number to be committed, must be non-zero."
     )]
     pub starting_checkpoint: u64,
-    #[arg(long, default_value_t = false, help = "Whether to reset the database before running.")]
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Whether to reset the database before running."
+    )]
     pub reset_db: bool,
     #[arg(
         long,
@@ -472,13 +486,27 @@ mod test {
         "#;
         temp_file.write_all(toml_content.as_bytes()).unwrap();
         let temp_path: PathBuf = temp_file.path().to_path_buf();
-        let pruning_options = PruningOptions { pruning_config_path: Some(temp_path.clone()) };
+        let pruning_options = PruningOptions {
+            pruning_config_path: Some(temp_path.clone()),
+        };
         let retention_config = pruning_options.load_from_file().unwrap();
 
         // Assert the parsed values
         assert_eq!(retention_config.epochs_to_keep, 5);
-        assert_eq!(retention_config.overrides.get(&PrunableTable::ObjectsHistory).copied(), Some(10));
-        assert_eq!(retention_config.overrides.get(&PrunableTable::Transactions).copied(), Some(20));
+        assert_eq!(
+            retention_config
+                .overrides
+                .get(&PrunableTable::ObjectsHistory)
+                .copied(),
+            Some(10)
+        );
+        assert_eq!(
+            retention_config
+                .overrides
+                .get(&PrunableTable::Transactions)
+                .copied(),
+            Some(20)
+        );
         assert_eq!(retention_config.overrides.len(), 2);
 
         let retention_policies = retention_config.retention_policies();
@@ -508,13 +536,27 @@ mod test {
         "#;
         temp_file.write_all(toml_content.as_bytes()).unwrap();
         let temp_path: PathBuf = temp_file.path().to_path_buf();
-        let pruning_options = PruningOptions { pruning_config_path: Some(temp_path.clone()) };
+        let pruning_options = PruningOptions {
+            pruning_config_path: Some(temp_path.clone()),
+        };
         let retention_config = pruning_options.load_from_file().unwrap();
 
         // Assert the parsed values
         assert_eq!(retention_config.epochs_to_keep, 5);
-        assert_eq!(retention_config.overrides.get(&PrunableTable::TxAffectedAddresses).copied(), Some(10));
-        assert_eq!(retention_config.overrides.get(&PrunableTable::Transactions).copied(), Some(20));
+        assert_eq!(
+            retention_config
+                .overrides
+                .get(&PrunableTable::TxAffectedAddresses)
+                .copied(),
+            Some(10)
+        );
+        assert_eq!(
+            retention_config
+                .overrides
+                .get(&PrunableTable::Transactions)
+                .copied(),
+            Some(20)
+        );
         assert_eq!(retention_config.overrides.len(), 2);
 
         let retention_policies = retention_config.retention_policies();

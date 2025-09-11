@@ -7,28 +7,16 @@ use anyhow::Result;
 use fastcrypto::traits::KeyPair;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use sui_config::{
-    genesis::{GenesisCeremonyParameters, TokenAllocation},
-    local_ip_utils,
-    node::{DEFAULT_COMMISSION_RATE, DEFAULT_VALIDATOR_GAS_PRICE},
-    Config,
-};
+use sui_config::genesis::{GenesisCeremonyParameters, TokenAllocation};
+use sui_config::node::{DEFAULT_COMMISSION_RATE, DEFAULT_VALIDATOR_GAS_PRICE};
+use sui_config::{local_ip_utils, Config};
 use sui_genesis_builder::validator_info::{GenesisValidatorInfo, ValidatorInfo};
-use sui_types::{
-    base_types::SuiAddress,
-    crypto::{
-        generate_proof_of_possession,
-        get_key_pair_from_rng,
-        AccountKeyPair,
-        AuthorityKeyPair,
-        AuthorityPublicKeyBytes,
-        NetworkKeyPair,
-        NetworkPublicKey,
-        PublicKey,
-        SuiKeyPair,
-    },
-    multiaddr::Multiaddr,
+use sui_types::base_types::SuiAddress;
+use sui_types::crypto::{
+    generate_proof_of_possession, get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair,
+    AuthorityPublicKeyBytes, NetworkKeyPair, NetworkPublicKey, PublicKey, SuiKeyPair,
 };
+use sui_types::multiaddr::Multiaddr;
 use tracing::info;
 
 // All information needed to build a NodeConfig for a state sync fullnode.
@@ -80,7 +68,6 @@ impl ValidatorGenesisConfig {
             worker_key,
             network_key,
             account_address: SuiAddress::from(&account_key),
-            revenue_receiving_address: SuiAddress::from(&account_key),
             gas_price: self.gas_price,
             commission_rate: self.commission_rate,
             network_address,
@@ -91,8 +78,12 @@ impl ValidatorGenesisConfig {
             image_url: String::new(),
             project_url: String::new(),
         };
-        let proof_of_possession = generate_proof_of_possession(&self.key_pair, (&self.account_key_pair.public()).into());
-        GenesisValidatorInfo { info, proof_of_possession }
+        let proof_of_possession =
+            generate_proof_of_possession(&self.key_pair, (&self.account_key_pair.public()).into());
+        GenesisValidatorInfo {
+            info,
+            proof_of_possession,
+        }
     }
 
     /// Use validator public key as validator name.
@@ -106,6 +97,7 @@ pub struct ValidatorGenesisConfigBuilder {
     protocol_key_pair: Option<AuthorityKeyPair>,
     account_key_pair: Option<AccountKeyPair>,
     ip: Option<String>,
+    stake: Option<u64>,
     gas_price: Option<u64>,
     /// If set, the validator will use deterministic addresses based on the port offset.
     /// This is useful for benchmarking.
@@ -134,6 +126,11 @@ impl ValidatorGenesisConfigBuilder {
         self
     }
 
+    pub fn with_stake(mut self, stake: u64) -> Self {
+        self.stake = Some(stake);
+        self
+    }
+
     pub fn with_gas_price(mut self, gas_price: u64) -> Self {
         self.gas_price = Some(gas_price);
         self
@@ -151,10 +148,15 @@ impl ValidatorGenesisConfigBuilder {
 
     pub fn build<R: rand::RngCore + rand::CryptoRng>(self, rng: &mut R) -> ValidatorGenesisConfig {
         let ip = self.ip.unwrap_or_else(local_ip_utils::get_new_ip);
+        let stake = self.stake.unwrap_or(default_stake());
         let localhost = local_ip_utils::localhost_for_testing();
 
-        let protocol_key_pair = self.protocol_key_pair.unwrap_or_else(|| get_key_pair_from_rng(rng).1);
-        let account_key_pair = self.account_key_pair.unwrap_or_else(|| get_key_pair_from_rng(rng).1);
+        let protocol_key_pair = self
+            .protocol_key_pair
+            .unwrap_or_else(|| get_key_pair_from_rng(rng).1);
+        let account_key_pair = self
+            .account_key_pair
+            .unwrap_or_else(|| get_key_pair_from_rng(rng).1);
         let gas_price = self.gas_price.unwrap_or(DEFAULT_VALIDATOR_GAS_PRICE);
 
         let (worker_key_pair, network_key_pair): (NetworkKeyPair, NetworkKeyPair) =
@@ -172,8 +174,10 @@ impl ValidatorGenesisConfigBuilder {
             (
                 local_ip_utils::new_deterministic_tcp_address_for_testing(&ip, offset),
                 local_ip_utils::new_deterministic_udp_address_for_testing(&ip, offset + 1),
-                local_ip_utils::new_deterministic_tcp_address_for_testing(&ip, offset + 2).with_zero_ip(),
-                local_ip_utils::new_deterministic_tcp_address_for_testing(&ip, offset + 3).with_zero_ip(),
+                local_ip_utils::new_deterministic_tcp_address_for_testing(&ip, offset + 2)
+                    .with_zero_ip(),
+                local_ip_utils::new_deterministic_tcp_address_for_testing(&ip, offset + 3)
+                    .with_zero_ip(),
                 local_ip_utils::new_deterministic_udp_address_for_testing(&ip, offset + 4),
                 local_ip_utils::new_deterministic_udp_address_for_testing(&ip, offset + 5),
                 local_ip_utils::new_deterministic_tcp_address_for_testing(&ip, offset + 6),
@@ -190,7 +194,9 @@ impl ValidatorGenesisConfigBuilder {
             )
         };
 
-        let p2p_listen_address = self.p2p_listen_ip_address.map(|ip| SocketAddr::new(ip, p2p_address.port().unwrap()));
+        let p2p_listen_address = self
+            .p2p_listen_ip_address
+            .map(|ip| SocketAddr::new(ip, p2p_address.port().unwrap()));
 
         ValidatorGenesisConfig {
             key_pair: protocol_key_pair,
@@ -207,7 +213,7 @@ impl ValidatorGenesisConfigBuilder {
             narwhal_primary_address,
             narwhal_worker_address,
             consensus_address,
-            stake: sui_types::governance::VALIDATOR_LOW_STAKE_THRESHOLD_MIST,
+            stake,
             name: None,
         }
     }
@@ -242,6 +248,7 @@ impl GenesisConfig {
                 address
             };
 
+
             // Populate gas itemized objects
             account.gas_amounts.iter().for_each(|a| {
                 allocations.push(TokenAllocation {
@@ -265,7 +272,7 @@ fn default_multiaddr_address() -> Multiaddr {
 }
 
 fn default_stake() -> u64 {
-    sui_types::governance::VALIDATOR_LOW_STAKE_THRESHOLD_MIST
+    20_000_000_000_000_000
 }
 
 fn default_bls12381_key_pair() -> AuthorityKeyPair {
@@ -293,18 +300,21 @@ const DEFAULT_NUMBER_OF_ACCOUNT: usize = 5;
 pub const DEFAULT_NUMBER_OF_OBJECT_PER_ACCOUNT: usize = 5;
 
 impl GenesisConfig {
-    /// Port offset for benchmarks' genesis configs.
-    pub const BENCHMARKS_PORT_OFFSET: u16 = 2000;
     /// A predictable rng seed used to generate benchmark configs. This seed may also be needed
     /// by other crates (e.g. the load generators).
     pub const BENCHMARKS_RNG_SEED: u64 = 0;
-    /// Trigger epoch change every hour minutes.
-    const BENCHMARK_EPOCH_DURATION_MS: u64 = 60 * 60 * 1000;
+    /// Port offset for benchmarks' genesis configs.
+    pub const BENCHMARKS_PORT_OFFSET: u16 = 2000;
     /// The gas amount for each genesis gas object.
     const BENCHMARK_GAS_AMOUNT: u64 = 50_000_000_000_000_000;
+    /// Trigger epoch change every hour minutes.
+    const BENCHMARK_EPOCH_DURATION_MS: u64 = 60 * 60 * 1000;
 
     pub fn for_local_testing() -> Self {
-        Self::custom_genesis(DEFAULT_NUMBER_OF_ACCOUNT, DEFAULT_NUMBER_OF_OBJECT_PER_ACCOUNT)
+        Self::custom_genesis(
+            DEFAULT_NUMBER_OF_ACCOUNT,
+            DEFAULT_NUMBER_OF_OBJECT_PER_ACCOUNT,
+        )
     }
 
     pub fn for_local_testing_with_addresses(addresses: Vec<SuiAddress>) -> Self {
@@ -314,14 +324,22 @@ impl GenesisConfig {
     pub fn custom_genesis(num_accounts: usize, num_objects_per_account: usize) -> Self {
         let mut accounts = Vec::new();
         for _ in 0..num_accounts {
-            accounts
-                .push(AccountConfig { address: None, gas_amounts: vec![DEFAULT_GAS_AMOUNT; num_objects_per_account] })
+            accounts.push(AccountConfig {
+                address: None,
+                gas_amounts: vec![DEFAULT_GAS_AMOUNT; num_objects_per_account],
+            })
         }
 
-        Self { accounts, ..Default::default() }
+        Self {
+            accounts,
+            ..Default::default()
+        }
     }
 
-    pub fn custom_genesis_with_addresses(addresses: Vec<SuiAddress>, num_objects_per_account: usize) -> Self {
+    pub fn custom_genesis_with_addresses(
+        addresses: Vec<SuiAddress>,
+        num_objects_per_account: usize,
+    ) -> Self {
         let mut accounts = Vec::new();
         for address in addresses {
             accounts.push(AccountConfig {
@@ -330,7 +348,10 @@ impl GenesisConfig {
             })
         }
 
-        Self { accounts, ..Default::default() }
+        Self {
+            accounts,
+            ..Default::default()
+        }
     }
 
     /// Generate a genesis config allowing to easily bootstrap a network for benchmarking purposes. This
@@ -389,7 +410,9 @@ impl GenesisConfig {
     /// get the same keypair used for genesis (hence the importance of the seedable rng).
     pub fn benchmark_gas_keys(n: usize) -> Vec<SuiKeyPair> {
         let mut rng = StdRng::seed_from_u64(Self::BENCHMARKS_RNG_SEED);
-        (0..n).map(|_| SuiKeyPair::Ed25519(NetworkKeyPair::generate(&mut rng))).collect()
+        (0..n)
+            .map(|_| SuiKeyPair::Ed25519(NetworkKeyPair::generate(&mut rng)))
+            .collect()
     }
 
     pub fn add_faucet_account(mut self) -> Self {

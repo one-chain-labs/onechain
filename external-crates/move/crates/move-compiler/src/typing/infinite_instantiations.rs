@@ -4,11 +4,11 @@
 
 use super::core::{self, Subst, TParamSubst};
 use crate::{
-    diagnostics::{codes::TypeSafety, Diagnostic},
+    diagnostics::{Diagnostic, codes::TypeSafety},
     expansion::ast::ModuleIdent,
     naming::ast::{self as N, TParam, TParamID, Type, Type_},
     parser::ast::FunctionName,
-    shared::{unique_map::UniqueMap, CompilationEnv},
+    shared::{CompilationEnv, unique_map::UniqueMap},
     typing::ast as T,
 };
 use move_ir_types::location::*;
@@ -45,17 +45,29 @@ impl<'a> Context<'a> {
         tparams: &'a BTreeMap<ModuleIdent, BTreeMap<FunctionName, &'a Vec<TParam>>>,
         current_module: ModuleIdent,
     ) -> Self {
-        Context { tparams, current_module, tparam_type_arguments: BTreeMap::new() }
+        Context {
+            tparams,
+            current_module,
+            tparam_type_arguments: BTreeMap::new(),
+        }
     }
 
     fn add_usage(&mut self, loc: Loc, module: &ModuleIdent, fname: &FunctionName, targs: &[Type]) {
         if &self.current_module != module {
             return;
         }
-        self.tparams[module][fname].iter().zip(targs).for_each(|(tparam, targ)| {
-            let info = EdgeInfo { name: *fname, type_argument: targ.clone(), loc, edge: Edge::Identity };
-            Self::add_tparam_edges(&mut self.tparam_type_arguments, tparam, info, targ)
-        })
+        self.tparams[module][fname]
+            .iter()
+            .zip(targs)
+            .for_each(|(tparam, targ)| {
+                let info = EdgeInfo {
+                    name: *fname,
+                    type_argument: targ.clone(),
+                    loc,
+                    edge: Edge::Identity,
+                };
+                Self::add_tparam_edges(&mut self.tparam_type_arguments, tparam, info, targ)
+            })
     }
 
     fn add_tparam_edges(
@@ -67,25 +79,42 @@ impl<'a> Context<'a> {
         use N::Type_::*;
         match targ_ {
             Var(_) => panic!("ICE tvar after expansion"),
-            Unit | Anything | UnresolvedError => (),
+            Unit | Anything | Void | UnresolvedError => (),
             Ref(_, t) => {
-                let info = EdgeInfo { edge: Edge::Nested, ..info };
+                let info = EdgeInfo {
+                    edge: Edge::Nested,
+                    ..info
+                };
                 Self::add_tparam_edges(acc, tparam, info, t)
             }
             Apply(_, _, tys) => {
-                let info = EdgeInfo { edge: Edge::Nested, ..info };
-                tys.iter().for_each(|t| Self::add_tparam_edges(acc, tparam, info.clone(), t))
+                let info = EdgeInfo {
+                    edge: Edge::Nested,
+                    ..info
+                };
+                tys.iter()
+                    .for_each(|t| Self::add_tparam_edges(acc, tparam, info.clone(), t))
             }
             Fun(tys, t) => {
-                let info = EdgeInfo { edge: Edge::Nested, ..info };
-                tys.iter().for_each(|t| Self::add_tparam_edges(acc, tparam, info.clone(), t));
+                let info = EdgeInfo {
+                    edge: Edge::Nested,
+                    ..info
+                };
+                tys.iter()
+                    .for_each(|t| Self::add_tparam_edges(acc, tparam, info.clone(), t));
                 Self::add_tparam_edges(acc, tparam, info.clone(), t)
             }
             Param(tp) => {
                 let tp_neighbors = acc.entry(tp.clone()).or_default();
                 match tp_neighbors.get(tparam) {
-                    Some(EdgeInfo { edge: Edge::Nested, .. }) => (),
-                    None | Some(EdgeInfo { edge: Edge::Identity, .. }) => {
+                    Some(EdgeInfo {
+                        edge: Edge::Nested, ..
+                    }) => (),
+                    None
+                    | Some(EdgeInfo {
+                        edge: Edge::Identity,
+                        ..
+                    }) => {
                         tp_neighbors.insert(tparam.clone(), info);
                     }
                 }
@@ -97,7 +126,11 @@ impl<'a> Context<'a> {
         let edges = self
             .tparam_type_arguments
             .iter()
-            .flat_map(|(parent, children)| children.iter().map(move |(child, info)| (parent, child, info.edge)));
+            .flat_map(|(parent, children)| {
+                children
+                    .iter()
+                    .map(move |(child, info)| (parent, child, info.edge))
+            });
         DiGraphMap::from_edges(edges)
     }
 }
@@ -106,23 +139,34 @@ impl<'a> Context<'a> {
 // Modules
 //**************************************************************************************************
 
-pub fn modules(compilation_env: &CompilationEnv, modules: &UniqueMap<ModuleIdent, T::ModuleDefinition>) {
+pub fn modules(
+    compilation_env: &CompilationEnv,
+    modules: &UniqueMap<ModuleIdent, T::ModuleDefinition>,
+) {
     let tparams = modules
         .key_cloned_iter()
         .map(|(mname, mdef)| {
-            let tparams =
-                mdef.functions.key_cloned_iter().map(|(fname, fdef)| (fname, &fdef.signature.type_parameters)).collect();
+            let tparams = mdef
+                .functions
+                .key_cloned_iter()
+                .map(|(fname, fdef)| (fname, &fdef.signature.type_parameters))
+                .collect();
             (mname, tparams)
         })
         .collect();
-    modules.key_cloned_iter().for_each(|(mname, m)| module(compilation_env, &tparams, mname, m))
+    modules
+        .key_cloned_iter()
+        .for_each(|(mname, m)| module(compilation_env, &tparams, mname, m))
 }
 
 macro_rules! scc_edges {
     ($graph:expr, $scc:expr) => {{
         let g = $graph;
         let s = $scc;
-        s.iter().flat_map(move |v| s.iter().filter_map(move |u| g.edge_weight(v, u).cloned().map(|e| (v, e, u))))
+        s.iter().flat_map(move |v| {
+            s.iter()
+                .filter_map(move |u| g.edge_weight(v, u).cloned().map(|e| (v, e, u)))
+        })
     }};
 }
 
@@ -134,7 +178,10 @@ fn module<'a>(
 ) {
     let reporter = compilation_env.diagnostic_reporter_at_top_level();
     let context = &mut Context::new(tparams, mname);
-    module.functions.key_cloned_iter().for_each(|(_fname, fdef)| function_body(context, &fdef.body));
+    module
+        .functions
+        .key_cloned_iter()
+        .for_each(|(_fname, fdef)| function_body(context, &fdef.body));
     let graph = context.instantiation_graph();
     // - get the strongly connected components
     // - fitler out SCCs that do not contain a 'nested' or 'strong' edge
@@ -272,12 +319,22 @@ fn exp_list_item(context: &mut Context, item: &T::ExpListItem) {
 // Errors
 //**************************************************************************************************
 
-fn cycle_error(context: &Context, graph: &DiGraphMap<&TParam, Edge>, scc: Vec<&TParam>) -> Diagnostic {
+fn cycle_error(
+    context: &Context,
+    graph: &DiGraphMap<&TParam, Edge>,
+    scc: Vec<&TParam>,
+) -> Diagnostic {
     let critical_edge = scc_edges!(graph, &scc).find(|(_, e, _)| e == &Edge::Nested);
     // tail -> head
     let (critical_tail, _, critical_head) = critical_edge.unwrap();
-    let (_, cycle_nodes) =
-        petgraph_astar(graph, critical_head, |finish| &finish == critical_tail, |_e| 1, |_| 0).unwrap();
+    let (_, cycle_nodes) = petgraph_astar(
+        graph,
+        critical_head,
+        |finish| &finish == critical_tail,
+        |_e| 1,
+        |_| 0,
+    )
+    .unwrap();
     assert!(!cycle_nodes.is_empty());
     let next = |i| (i + 1) % cycle_nodes.len();
     let prev = |i: usize| i.checked_sub(1).unwrap_or(cycle_nodes.len() - 1);
@@ -287,7 +344,10 @@ fn cycle_error(context: &Context, graph: &DiGraphMap<&TParam, Edge>, scc: Vec<&T
     let arg_info = &context.tparam_type_arguments[cycle_nodes[prev(0)]][cycle_nodes[0]];
 
     let call_loc = arg_info.loc;
-    let call_msg = format!("Invalid call to '{}::{}'", &context.current_module, &arg_info.name,);
+    let call_msg = format!(
+        "Invalid call to '{}::{}'",
+        &context.current_module, &arg_info.name,
+    );
     let ty_loc = arg_info.type_argument.loc;
     let ty_str = core::error_format(&arg_info.type_argument, &Subst::empty());
     let case = match cycle_nodes.len() {
@@ -315,9 +375,15 @@ fn cycle_error(context: &Context, graph: &DiGraphMap<&TParam, Edge>, scc: Vec<&T
             let prev_tparam = cycle_nodes[prev(0)];
             let init_state = &context.tparam_type_arguments[prev_tparam][ftparam];
             let ftparam_ty = {
-                let qualified_ = Symbol::from(format!("{}::{}", &init_state.name, &ftparam.user_specified_name));
+                let qualified_ = Symbol::from(format!(
+                    "{}::{}",
+                    &init_state.name, &ftparam.user_specified_name
+                ));
                 let qualified = sp(ftparam.user_specified_name.loc, qualified_);
-                let qualified_tp = TParam { user_specified_name: qualified, ..ftparam.clone() };
+                let qualified_tp = TParam {
+                    user_specified_name: qualified,
+                    ..ftparam.clone()
+                };
                 sp(init_state.loc, Type_::Param(qualified_tp))
             };
             let init_call = make_call_string(context, init_state, ftparam.id, &ftparam_ty);
@@ -339,11 +405,18 @@ fn cycle_error(context: &Context, graph: &DiGraphMap<&TParam, Edge>, scc: Vec<&T
                 res
             })
             .collect::<Vec<_>>();
-        cycle_calls.iter().enumerate().for_each(|(i, (loc, next_call))| {
-            let (_, prev_call) = if i == 0 { &init_call } else { &cycle_calls[prev(i)] };
-            let msg = format!("'{}' calls '{}'", prev_call, next_call);
-            secondary_labels.push((*loc, msg))
-        });
+        cycle_calls
+            .iter()
+            .enumerate()
+            .for_each(|(i, (loc, next_call))| {
+                let (_, prev_call) = if i == 0 {
+                    &init_call
+                } else {
+                    &cycle_calls[prev(i)]
+                };
+                let msg = format!("'{}' calls '{}'", prev_call, next_call);
+                secondary_labels.push((*loc, msg))
+            });
     }
 
     Diagnostic::new(
@@ -354,23 +427,48 @@ fn cycle_error(context: &Context, graph: &DiGraphMap<&TParam, Edge>, scc: Vec<&T
     )
 }
 
-fn make_subst(context: &Context, loc: Loc, state: &EdgeInfo, tparam: TParamID, tparam_ty: Type) -> TParamSubst {
+fn make_subst(
+    context: &Context,
+    loc: Loc,
+    state: &EdgeInfo,
+    tparam: TParamID,
+    tparam_ty: Type,
+) -> TParamSubst {
     let mut tparam_ty = Some(tparam_ty);
     context.tparams[&context.current_module][&state.name]
         .iter()
         .map(|tp| {
-            let ty = if tp.id == tparam { tparam_ty.take().unwrap() } else { sp(loc, Type_::Anything) };
+            let ty = if tp.id == tparam {
+                tparam_ty.take().unwrap()
+            } else {
+                sp(loc, Type_::Anything)
+            };
             (tp.id, ty)
         })
         .collect::<TParamSubst>()
 }
 
-fn make_call_string(context: &Context, cur: &EdgeInfo, tparam: TParamID, targ: &Type) -> (Loc, String) {
+fn make_call_string(
+    context: &Context,
+    cur: &EdgeInfo,
+    tparam: TParamID,
+    targ: &Type,
+) -> (Loc, String) {
     let targs = context.tparams[&context.current_module][&cur.name]
         .iter()
-        .map(|tp| if tp.id == tparam { core::error_format_nested(targ, &Subst::empty()) } else { "_".to_owned() })
+        .map(|tp| {
+            if tp.id == tparam {
+                core::error_format_nested(targ, &Subst::empty())
+            } else {
+                "_".to_owned()
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ");
-    let targs = if targs.is_empty() { targs } else { format!("<{}>", targs) };
+    let targs = if targs.is_empty() {
+        targs
+    } else {
+        format!("<{}>", targs)
+    };
     (cur.loc, format!("{}{}", &cur.name, targs))
 }

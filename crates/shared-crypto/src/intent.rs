@@ -4,7 +4,8 @@
 use eyre::eyre;
 use fastcrypto::encoding::decode_bytes_hex;
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use serde_repr::Deserialize_repr;
+use serde_repr::Serialize_repr;
 use std::str::FromStr;
 
 pub const INTENT_PREFIX_LENGTH: usize = 3;
@@ -20,7 +21,6 @@ pub enum IntentVersion {
 
 impl TryFrom<u8> for IntentVersion {
     type Error = eyre::Report;
-
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         bcs::from_bytes(&[value]).map_err(|_| eyre!("Invalid IntentVersion"))
     }
@@ -41,7 +41,6 @@ pub enum AppId {
 // TODO(joyqvq): Use num_derive
 impl TryFrom<u8> for AppId {
     type Error = eyre::Report;
-
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         bcs::from_bytes(&[value]).map_err(|_| eyre!("Invalid AppId"))
     }
@@ -73,7 +72,6 @@ pub enum IntentScope {
 
 impl TryFrom<u8> for IntentScope {
     type Error = eyre::Report;
-
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         bcs::from_bytes(&[value]).map_err(|_| eyre!("Invalid IntentScope"))
     }
@@ -100,13 +98,16 @@ impl Intent {
         if bytes.len() != INTENT_PREFIX_LENGTH {
             return Err(eyre!("Invalid Intent"));
         }
-        Ok(Self { scope: bytes[0].try_into()?, version: bytes[1].try_into()?, app_id: bytes[2].try_into()? })
+        Ok(Self {
+            scope: bytes[0].try_into()?,
+            version: bytes[1].try_into()?,
+            app_id: bytes[2].try_into()?,
+        })
     }
 }
 
 impl FromStr for Intent {
     type Err = eyre::Report;
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes: Vec<u8> = decode_bytes_hex(s).map_err(|_| eyre!("Invalid Intent"))?;
         Self::from_bytes(bytes.as_slice())
@@ -115,23 +116,43 @@ impl FromStr for Intent {
 
 impl Intent {
     pub fn sui_app(scope: IntentScope) -> Self {
-        Self { version: IntentVersion::V0, scope, app_id: AppId::Sui }
+        Self {
+            version: IntentVersion::V0,
+            scope,
+            app_id: AppId::Sui,
+        }
     }
 
     pub fn sui_transaction() -> Self {
-        Self { scope: IntentScope::TransactionData, version: IntentVersion::V0, app_id: AppId::Sui }
+        Self {
+            scope: IntentScope::TransactionData,
+            version: IntentVersion::V0,
+            app_id: AppId::Sui,
+        }
     }
 
     pub fn personal_message() -> Self {
-        Self { scope: IntentScope::PersonalMessage, version: IntentVersion::V0, app_id: AppId::Sui }
+        Self {
+            scope: IntentScope::PersonalMessage,
+            version: IntentVersion::V0,
+            app_id: AppId::Sui,
+        }
     }
 
     pub fn narwhal_app(scope: IntentScope) -> Self {
-        Self { scope, version: IntentVersion::V0, app_id: AppId::Narwhal }
+        Self {
+            scope,
+            version: IntentVersion::V0,
+            app_id: AppId::Narwhal,
+        }
     }
 
     pub fn consensus_app(scope: IntentScope) -> Self {
-        Self { scope, version: IntentVersion::V0, app_id: AppId::Consensus }
+        Self {
+            scope,
+            version: IntentVersion::V0,
+            app_id: AppId::Consensus,
+        }
     }
 }
 

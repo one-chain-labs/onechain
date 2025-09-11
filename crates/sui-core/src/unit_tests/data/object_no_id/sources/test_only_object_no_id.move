@@ -7,6 +7,6 @@ module object_no_id::test_only_object_no_id {
 
     #[test]
     fun bad_share() {
-        one::transfer::share_object(NotObject{f: 42});
+        sui::transfer::share_object(NotObject{f: 42});
     }
 }

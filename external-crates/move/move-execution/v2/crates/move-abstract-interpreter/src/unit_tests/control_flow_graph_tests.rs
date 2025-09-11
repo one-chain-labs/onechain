@@ -8,7 +8,15 @@ use move_binary_format::file_format::Bytecode;
 fn traversal_no_loops() {
     let cfg = {
         use Bytecode::*;
-        VMControlFlowGraph::new(&[/* L0 */ LdTrue, /*    */ BrTrue(3), /* L2 */ Branch(3), /* L3 */ Ret], &[])
+        VMControlFlowGraph::new(
+            &[
+                /* L0 */ LdTrue,
+                /*    */ BrTrue(3),
+                /* L2 */ Branch(3),
+                /* L3 */ Ret,
+            ],
+            &[],
+        )
     };
 
     cfg.display();
@@ -43,7 +51,14 @@ fn traversal_loops() {
 fn traversal_non_loop_back_branch() {
     let cfg = {
         use Bytecode::*;
-        VMControlFlowGraph::new(&[/* L0 */ Branch(2), /* L1 */ Ret, /* L2 */ Branch(1)], &[])
+        VMControlFlowGraph::new(
+            &[
+                /* L0 */ Branch(2),
+                /* L1 */ Ret,
+                /* L2 */ Branch(1),
+            ],
+            &[],
+        )
     };
 
     cfg.display();

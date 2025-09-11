@@ -4,16 +4,17 @@
 
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::insta_assert;
 use move_compiler::{diagnostics::warning_filters::WarningFiltersBuilder, shared::PackagePaths};
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
-use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_stackless_bytecode::{
     borrow_analysis::BorrowAnalysisProcessor,
     clean_and_optimize::CleanAndOptimizeProcessor,
     eliminate_imm_refs::EliminateImmRefsProcessor,
     escape_analysis::EscapeAnalysisProcessor,
-    function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder, ProcessorResultDisplay},
+    function_target_pipeline::{
+        FunctionTargetPipeline, FunctionTargetsHolder, ProcessorResultDisplay,
+    },
     livevar_analysis::LiveVarAnalysisProcessor,
     memory_instrumentation::MemoryInstrumentationProcessor,
     mut_ref_instrumentation::MutRefInstrumenter,
@@ -21,9 +22,29 @@ use move_stackless_bytecode::{
     print_targets_for_test,
     reaching_def_analysis::ReachingDefProcessor,
 };
-use std::path::Path;
+use regex::Regex;
+use std::{fs::File, io::Read, path::Path};
 
-fn get_tested_transformation_pipeline(dir_name: &str) -> anyhow::Result<Option<FunctionTargetPipeline>> {
+// Extracts lines out of some text file where each line starts with `start` which can be a regular
+// expressions. Returns the list of such lines with `start` stripped. Use as in
+// `extract_test_directives(file, "// dep:")`.
+fn extract_test_directives(path: &Path, start: &str) -> anyhow::Result<Vec<String>> {
+    let rex = Regex::new(&format!("(?m)^{}(?P<ann>.*?)$", start)).unwrap();
+    let mut content = String::new();
+    let mut file = File::open(path)?;
+    file.read_to_string(&mut content)?;
+    let mut at = 0;
+    let mut res = vec![];
+    while let Some(cap) = rex.captures(&content[at..]) {
+        res.push(cap.name("ann").unwrap().as_str().trim().to_string());
+        at += cap.get(0).unwrap().end();
+    }
+    Ok(res)
+}
+
+fn get_tested_transformation_pipeline(
+    dir_name: &str,
+) -> anyhow::Result<Option<FunctionTargetPipeline>> {
     match dir_name {
         "from_move" => Ok(None),
         "eliminate_imm_refs" => {
@@ -96,7 +117,10 @@ fn get_tested_transformation_pipeline(dir_name: &str) -> anyhow::Result<Option<F
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             Ok(Some(pipeline))
         }
-        _ => Err(anyhow!("the sub-directory `{}` has no associated pipeline to test", dir_name)),
+        _ => Err(anyhow!(
+            "the sub-directory `{}` has no associated pipeline to test",
+            dir_name
+        )),
     }
 }
 
@@ -104,7 +128,11 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let mut sources = extract_test_directives(path, "// dep:")?;
     sources.push(path.to_string_lossy().to_string());
     let env: GlobalEnv = run_model_builder_with_options(
-        vec![PackagePaths { name: None, paths: sources, named_address_map: move_stdlib::move_stdlib_named_addresses() }],
+        vec![PackagePaths {
+            name: None,
+            paths: sources,
+            named_address_map: move_stdlib::named_addresses(),
+        }],
         vec![],
         ModelBuilderOptions::default(),
         Some(WarningFiltersBuilder::unused_warnings_filter_for_test()),
@@ -114,7 +142,10 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         env.report_diag(&mut error_writer, Severity::Error);
         String::from_utf8_lossy(&error_writer.into_inner()).to_string()
     } else {
-        let options = ProverOptions { stable_test_output: true, ..Default::default() };
+        let options = ProverOptions {
+            stable_test_output: true,
+            ..Default::default()
+        };
         env.set_extension(options);
         let dir_name = path
             .parent()
@@ -138,9 +169,18 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             pipeline.run(&env, &mut targets);
             let processor = pipeline.last_processor();
             if !processor.is_single_run() {
-                text += &print_targets_for_test(&env, &format!("after pipeline `{}`", dir_name), &targets);
+                text += &print_targets_for_test(
+                    &env,
+                    &format!("after pipeline `{}`", dir_name),
+                    &targets,
+                );
             }
-            text += &ProcessorResultDisplay { env: &env, targets: &targets, processor }.to_string();
+            text += &ProcessorResultDisplay {
+                env: &env,
+                targets: &targets,
+                processor,
+            }
+            .to_string();
         }
         // add Warning and Error diagnostics to output
         let mut error_writer = Buffer::no_color();
@@ -151,8 +191,10 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         }
         text
     };
-    let baseline_path = path.with_extension(EXP_EXT);
-    verify_or_update_baseline(baseline_path.as_path(), &out)?;
+    insta_assert! {
+        input_path: path,
+        contents: out,
+    };
     Ok(())
 }
 

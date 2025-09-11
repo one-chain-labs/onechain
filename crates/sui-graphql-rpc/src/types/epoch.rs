@@ -3,33 +3,32 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use crate::{
-    connection::ScanConnection,
-    consistency::Checkpointed,
-    context_data::db_data_provider::{convert_to_validators, PgManager},
-    data::{self, DataLoader, Db, DbConnection, QueryExecutor},
-    error::Error,
-    server::watermark_task::Watermark,
-};
+use crate::connection::ScanConnection;
+use crate::consistency::Checkpointed;
+use crate::context_data::db_data_provider::{convert_to_validators, PgManager};
+use crate::data::{self, DataLoader, Db, DbConnection, QueryExecutor};
+use crate::error::Error;
+use crate::server::watermark_task::Watermark;
 
-use super::{
-    big_int::BigInt,
-    checkpoint::{self, Checkpoint},
-    cursor::{self, Page, Paginated, ScanLimited, Target},
-    date_time::DateTime,
-    protocol_config::ProtocolConfigs,
-    system_state_summary::SystemStateSummary,
-    transaction_block::{self, TransactionBlock, TransactionBlockFilter},
-    uint53::UInt53,
-    validator_set::ValidatorSet,
-};
-use async_graphql::{connection::Connection, dataloader::Loader, *};
+use super::big_int::BigInt;
+use super::checkpoint::{self, Checkpoint};
+use super::cursor::{self, Page, Paginated, ScanLimited, Target};
+use super::date_time::DateTime;
+use super::protocol_config::ProtocolConfigs;
+use super::system_state_summary::SystemStateSummary;
+use super::transaction_block::{self, TransactionBlock, TransactionBlockFilter};
+use super::uint53::UInt53;
+use super::validator_set::ValidatorSet;
+use async_graphql::connection::Connection;
+use async_graphql::dataloader::Loader;
+use async_graphql::*;
 use connection::{CursorType, Edge};
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use fastcrypto::encoding::{Base58, Encoding};
 use serde::{Deserialize, Serialize};
-use sui_indexer::{models::epoch::QueryableEpochInfo, schema::epochs};
+use sui_indexer::models::epoch::QueryableEpochInfo;
+use sui_indexer::schema::epochs;
 use sui_types::messages_checkpoint::CheckpointCommitment as EpochCommitment;
 
 #[derive(Clone)]
@@ -82,11 +81,16 @@ impl Epoch {
 
     /// Validator related properties, including the active validators.
     async fn validator_set(&self, ctx: &Context<'_>) -> Result<Option<ValidatorSet>> {
-        let system_state =
-            ctx.data_unchecked::<PgManager>().fetch_sui_system_state(Some(self.stored.epoch as u64)).await?;
+        let system_state = ctx
+            .data_unchecked::<PgManager>()
+            .fetch_sui_system_state(Some(self.stored.epoch as u64))
+            .await?;
 
-        let active_validators =
-            convert_to_validators(system_state.clone(), self.checkpoint_viewed_at, self.stored.epoch as u64);
+        let active_validators = convert_to_validators(
+            system_state.clone(),
+            self.checkpoint_viewed_at,
+            self.stored.epoch as u64,
+        );
         let validator_set = ValidatorSet {
             total_stake: Some(BigInt::from(self.stored.total_stake)),
             active_validators: Some(active_validators),
@@ -111,7 +115,10 @@ impl Epoch {
 
     /// The epoch's ending timestamp.
     async fn end_timestamp(&self) -> Result<Option<DateTime>, Error> {
-        self.stored.epoch_end_timestamp.map(DateTime::from_ms).transpose()
+        self.stored
+            .epoch_end_timestamp
+            .map(DateTime::from_ms)
+            .transpose()
     }
 
     /// The total number of checkpoints in this epoch.
@@ -124,13 +131,18 @@ impl Epoch {
             }
         };
 
-        Ok(Some(UInt53::from(last - self.stored.first_checkpoint_id as u64)))
+        Ok(Some(UInt53::from(
+            last - self.stored.first_checkpoint_id as u64,
+        )))
     }
 
     /// The total number of transaction blocks in this epoch.
     async fn total_transactions(&self) -> Result<Option<UInt53>> {
         // TODO: this currently returns None for the current epoch. Fix this.
-        Ok(self.stored.epoch_total_transactions.map(|v| UInt53::from(v as u64)))
+        Ok(self
+            .stored
+            .epoch_total_transactions
+            .map(|v| UInt53::from(v as u64)))
     }
 
     /// The total amount of gas fees (in MIST) that were paid in this epoch.
@@ -140,7 +152,9 @@ impl Epoch {
 
     /// The total MIST rewarded as stake.
     async fn total_stake_rewards(&self) -> Option<BigInt> {
-        self.stored.total_stake_rewards_distributed.map(BigInt::from)
+        self.stored
+            .total_stake_rewards_distributed
+            .map(BigInt::from)
     }
 
     /// The amount added to total gas fees to make up the total stake rewards.
@@ -158,7 +172,9 @@ impl Epoch {
     /// The difference between the fund inflow and outflow, representing
     /// the net amount of storage fees accumulated in this epoch.
     async fn net_inflow(&self) -> Option<BigInt> {
-        if let (Some(fund_inflow), Some(fund_outflow)) = (self.stored.storage_charge, self.stored.storage_rebate) {
+        if let (Some(fund_inflow), Some(fund_outflow)) =
+            (self.stored.storage_charge, self.stored.storage_rebate)
+        {
             Some(BigInt::from(fund_inflow - fund_outflow))
         } else {
             None
@@ -179,12 +195,17 @@ impl Epoch {
     /// The epoch's corresponding protocol configuration, including the feature flags and the
     /// configuration options.
     async fn protocol_configs(&self, ctx: &Context<'_>) -> Result<ProtocolConfigs> {
-        ProtocolConfigs::query(ctx.data_unchecked(), Some(self.protocol_version())).await.extend()
+        ProtocolConfigs::query(ctx.data_unchecked(), Some(self.protocol_version()))
+            .await
+            .extend()
     }
 
     #[graphql(flatten)]
     async fn system_state_summary(&self, ctx: &Context<'_>) -> Result<SystemStateSummary> {
-        let state = ctx.data_unchecked::<PgManager>().fetch_sui_system_state(Some(self.stored.epoch as u64)).await?;
+        let state = ctx
+            .data_unchecked::<PgManager>()
+            .fetch_sui_system_state(Some(self.stored.epoch as u64))
+            .await?;
         Ok(SystemStateSummary { native: state })
     }
 
@@ -194,8 +215,9 @@ impl Epoch {
         let Some(commitments) = self.stored.epoch_commitments.as_ref() else {
             return Ok(None);
         };
-        let commitments: Vec<EpochCommitment> = bcs::from_bytes(commitments)
-            .map_err(|e| Error::Internal(format!("Error deserializing commitments: {e}")).extend())?;
+        let commitments: Vec<EpochCommitment> = bcs::from_bytes(commitments).map_err(|e| {
+            Error::Internal(format!("Error deserializing commitments: {e}")).extend()
+        })?;
 
         let digest = commitments.into_iter().next().map(|commitment| {
             let EpochCommitment::ECMHLiveObjectSetDigest(digest) = commitment;
@@ -216,7 +238,14 @@ impl Epoch {
     ) -> Result<Connection<String, Checkpoint>> {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
         let epoch = self.stored.epoch as u64;
-        Checkpoint::paginate(ctx.data_unchecked(), page, Some(epoch), self.checkpoint_viewed_at).await.extend()
+        Checkpoint::paginate(
+            ctx.data_unchecked(),
+            page,
+            Some(epoch),
+            self.checkpoint_viewed_at,
+        )
+        .await
+        .extend()
     }
 
     /// The epoch's corresponding transaction blocks.
@@ -250,17 +279,25 @@ impl Epoch {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
         #[allow(clippy::unnecessary_lazy_evaluations)] // rust-lang/rust-clippy#9422
-        let Some(filter) = filter.unwrap_or_default().intersect(TransactionBlockFilter {
-            // If `first_checkpoint_id` is 0, we include the 0th checkpoint by leaving it None
-            after_checkpoint: (self.stored.first_checkpoint_id > 0)
-                .then(|| UInt53::from(self.stored.first_checkpoint_id as u64 - 1)),
-            before_checkpoint: self.stored.last_checkpoint_id.map(|id| UInt53::from(id as u64 + 1)),
-            ..Default::default()
-        }) else {
+        let Some(filter) = filter
+            .unwrap_or_default()
+            .intersect(TransactionBlockFilter {
+                // If `first_checkpoint_id` is 0, we include the 0th checkpoint by leaving it None
+                after_checkpoint: (self.stored.first_checkpoint_id > 0)
+                    .then(|| UInt53::from(self.stored.first_checkpoint_id as u64 - 1)),
+                before_checkpoint: self
+                    .stored
+                    .last_checkpoint_id
+                    .map(|id| UInt53::from(id as u64 + 1)),
+                ..Default::default()
+            })
+        else {
             return Ok(ScanConnection::new(false, false));
         };
 
-        TransactionBlock::paginate(ctx, page, filter, self.checkpoint_viewed_at, scan_limit).await.extend()
+        TransactionBlock::paginate(ctx, page, filter, self.checkpoint_viewed_at, scan_limit)
+            .await
+            .extend()
     }
 }
 
@@ -279,7 +316,11 @@ impl Epoch {
     ) -> Result<Option<Self>, Error> {
         if let Some(epoch_id) = filter {
             let DataLoader(dl) = ctx.data_unchecked();
-            dl.load_one(EpochKey { epoch_id, checkpoint_viewed_at }).await
+            dl.load_one(EpochKey {
+                epoch_id,
+                checkpoint_viewed_at,
+            })
+            .await
         } else {
             Self::query_latest_at(ctx.data_unchecked(), checkpoint_viewed_at).await
         }
@@ -288,7 +329,10 @@ impl Epoch {
     /// Look up the latest `Epoch` from the database, optionally filtered by a consistency cursor
     /// (querying for a consistency cursor in the past looks for the latest epoch as of that
     /// cursor).
-    pub(crate) async fn query_latest_at(db: &Db, checkpoint_viewed_at: u64) -> Result<Option<Self>, Error> {
+    pub(crate) async fn query_latest_at(
+        db: &Db,
+        checkpoint_viewed_at: u64,
+    ) -> Result<Option<Self>, Error> {
         use epochs::dsl;
 
         let stored: Option<QueryableEpochInfo> = db
@@ -311,7 +355,10 @@ impl Epoch {
             .await
             .map_err(|e| Error::Internal(format!("Failed to fetch epoch: {e}")))?;
 
-        Ok(stored.map(|stored| Epoch { stored, checkpoint_viewed_at }))
+        Ok(stored.map(|stored| Epoch {
+            stored,
+            checkpoint_viewed_at,
+        }))
     }
 
     pub(crate) async fn paginate(
@@ -326,12 +373,16 @@ impl Epoch {
         let (prev, next, results) = db
             .execute(move |conn| {
                 async move {
-                    page.paginate_query::<QueryableEpochInfo, _, _, _>(conn, checkpoint_viewed_at, move || {
-                        dsl::epochs
-                            .select(QueryableEpochInfo::as_select())
-                            .filter(dsl::first_checkpoint_id.le(checkpoint_viewed_at as i64))
-                            .into_boxed()
-                    })
+                    page.paginate_query::<QueryableEpochInfo, _, _, _>(
+                        conn,
+                        checkpoint_viewed_at,
+                        move || {
+                            dsl::epochs
+                                .select(QueryableEpochInfo::as_select())
+                                .filter(dsl::first_checkpoint_id.le(checkpoint_viewed_at as i64))
+                                .into_boxed()
+                        },
+                    )
                     .await
                 }
                 .scope_boxed()
@@ -342,7 +393,13 @@ impl Epoch {
         let mut conn = Connection::new(prev, next);
         for stored in results {
             let cursor = stored.cursor(checkpoint_viewed_at).encode_cursor();
-            conn.edges.push(Edge::new(cursor, Epoch { stored, checkpoint_viewed_at }));
+            conn.edges.push(Edge::new(
+                cursor,
+                Epoch {
+                    stored,
+                    checkpoint_viewed_at,
+                },
+            ));
         }
 
         Ok(conn)
@@ -372,7 +429,10 @@ impl Paginated<Cursor> for QueryableEpochInfo {
 
 impl Target<Cursor> for QueryableEpochInfo {
     fn cursor(&self, checkpoint_viewed_at: u64) -> Cursor {
-        Cursor::new(EpochCursor { checkpoint_viewed_at, epoch_id: self.epoch as u64 })
+        Cursor::new(EpochCursor {
+            checkpoint_viewed_at,
+            epoch_id: self.epoch as u64,
+        })
     }
 }
 
@@ -386,8 +446,8 @@ impl ScanLimited for Cursor {}
 
 #[async_trait::async_trait]
 impl Loader<EpochKey> for Db {
-    type Error = Error;
     type Value = Epoch;
+    type Error = Error;
 
     async fn load(&self, keys: &[EpochKey]) -> Result<HashMap<EpochKey, Epoch>, Error> {
         use epochs::dsl;
@@ -408,14 +468,19 @@ impl Loader<EpochKey> for Db {
             .await
             .map_err(|e| Error::Internal(format!("Failed to fetch epochs: {e}")))?;
 
-        let epoch_id_to_stored: BTreeMap<_, _> =
-            epochs.into_iter().map(|stored| (stored.epoch as u64, stored)).collect();
+        let epoch_id_to_stored: BTreeMap<_, _> = epochs
+            .into_iter()
+            .map(|stored| (stored.epoch as u64, stored))
+            .collect();
 
         Ok(keys
             .iter()
             .filter_map(|key| {
                 let stored = epoch_id_to_stored.get(&key.epoch_id).cloned()?;
-                let epoch = Epoch { stored, checkpoint_viewed_at: key.checkpoint_viewed_at };
+                let epoch = Epoch {
+                    stored,
+                    checkpoint_viewed_at: key.checkpoint_viewed_at,
+                };
 
                 // We filter by checkpoint viewed at in memory because it should be quite rare that
                 // this query actually filters something (only in edge cases), and not trying to

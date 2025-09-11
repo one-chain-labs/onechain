@@ -1,71 +1,53 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-    fmt::Write,
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt::Write;
 
-use super::{
-    available_range::AvailableRange,
-    balance::{self, Balance},
-    big_int::BigInt,
-    coin::Coin,
-    coin_metadata::CoinMetadata,
-    cursor::{self, Page, RawPaginated, ScanLimited, Target},
-    digest::Digest,
-    display::{Display, DisplayEntry},
-    dynamic_field::{DynamicField, DynamicFieldName},
-    move_object::MoveObject,
-    move_package::MovePackage,
-    owner::{Authenticator, Owner, OwnerImpl},
-    stake::StakedOct,
-    sui_address::{addr, SuiAddress},
-    suins_registration::{DomainFormat, SuinsRegistration},
-    transaction_block,
-    transaction_block::{TransactionBlock, TransactionBlockFilter},
-    type_filter::{ExactTypeFilter, TypeFilter},
-    uint53::UInt53,
-};
-use crate::{
-    connection::ScanConnection,
-    consistency::{build_objects_query, Checkpointed, View},
-    data::{package_resolver::PackageResolver, DataLoader, Db, DbConnection, QueryExecutor},
-    error::Error,
-    filter,
-    or_filter,
-    raw_query::RawQuery,
-    types::{address::Address, base64::Base64, intersect},
-};
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    dataloader::Loader,
-    *,
-};
+use super::available_range::AvailableRange;
+use super::balance::{self, Balance};
+use super::big_int::BigInt;
+use super::coin::Coin;
+use super::coin_metadata::CoinMetadata;
+use super::cursor::{self, Page, RawPaginated, ScanLimited, Target};
+use super::digest::Digest;
+use super::display::{Display, DisplayEntry};
+use super::dynamic_field::{DynamicField, DynamicFieldName};
+use super::move_object::MoveObject;
+use super::move_package::MovePackage;
+use super::owner::OwnerImpl;
+use super::stake::StakedOct;
+use super::sui_address::addr;
+use super::suins_registration::{DomainFormat, SuinsRegistration};
+use super::transaction_block;
+use super::transaction_block::TransactionBlockFilter;
+use super::type_filter::{ExactTypeFilter, TypeFilter};
+use super::uint53::UInt53;
+use super::{owner::Owner, sui_address::SuiAddress, transaction_block::TransactionBlock};
+use crate::connection::ScanConnection;
+use crate::consistency::{build_objects_query, Checkpointed, View};
+use crate::data::package_resolver::PackageResolver;
+use crate::data::{DataLoader, Db, DbConnection, QueryExecutor};
+use crate::error::Error;
+use crate::raw_query::RawQuery;
+use crate::types::base64::Base64;
+use crate::types::intersect;
+use crate::{filter, or_filter};
+use async_graphql::connection::{CursorType, Edge};
+use async_graphql::dataloader::Loader;
+use async_graphql::{connection::Connection, *};
 use diesel::{BoolExpressionMethods, ExpressionMethods, QueryDsl, SelectableHelper};
 use diesel_async::scoped_futures::ScopedFutureExt;
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveTypeLayout},
-    language_storage::StructTag,
-};
+use move_core_types::language_storage::StructTag;
 use serde::{Deserialize, Serialize};
-use sui_indexer::{
-    models::{
-        obj_indices::StoredObjectVersion,
-        objects::{StoredFullHistoryObject, StoredHistoryObject},
-    },
-    schema::{full_objects_history, objects_version},
-    types::{ObjectStatus as NativeObjectStatus, OwnerType},
-};
-use sui_types::{
-    object::{
-        bounded_visitor::BoundedVisitor,
-        MoveObject as NativeMoveObject,
-        Object as NativeObject,
-        Owner as NativeOwner,
-    },
-    TypeTag,
-};
+use sui_indexer::models::obj_indices::StoredObjectVersion;
+use sui_indexer::models::objects::{StoredFullHistoryObject, StoredHistoryObject};
+use sui_indexer::schema::{full_objects_history, objects_version};
+use sui_indexer::types::ObjectStatus as NativeObjectStatus;
+use sui_indexer::types::OwnerType;
+use sui_types::object::{Object as NativeObject, Owner as NativeOwner};
+use sui_types::TypeTag;
+use tokio::join;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Object {
@@ -128,7 +110,7 @@ pub(crate) struct ObjectRef {
 ///
 /// - Type matches the `type` filter,
 /// - AND, whose owner matches the `owner` filter,
-/// - AND, whose ID is in `objectIds` OR whose ID and version is in `objectKeys`.
+/// - AND, whose ID is in `objectIds`.
 #[derive(InputObject, Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ObjectFilter {
     /// Filter objects by their type's `package`, `package::module`, or their fully qualified type
@@ -143,9 +125,6 @@ pub(crate) struct ObjectFilter {
 
     /// Filter for live objects by their IDs.
     pub object_ids: Option<Vec<SuiAddress>>,
-
-    /// Filter for live or potentially historical objects by their ID and version.
-    pub object_keys: Option<Vec<ObjectKey>>,
 }
 
 #[derive(InputObject, Debug, Clone, Eq, PartialEq)]
@@ -154,14 +133,14 @@ pub(crate) struct ObjectKey {
     pub version: UInt53,
 }
 
-/// The object's owner type: Immutable, Shared, Parent, or Address.
+/// The object's owner type: Immutable, Shared, Parent, Address, or ConsensusAddress.
 #[derive(Union, Clone)]
 pub(crate) enum ObjectOwner {
     Immutable(Immutable),
     Shared(Shared),
     Parent(Parent),
     Address(AddressOwner),
-    ConsensusV2(ConsensusV2),
+    ConsensusAddress(ConsensusAddressOwner),
 }
 
 /// An immutable object is an object that can't be mutated, transferred, or deleted.
@@ -197,13 +176,11 @@ pub(crate) struct AddressOwner {
     owner: Option<Owner>,
 }
 
-/// A ConsensusV2 object is an object that is automatically versioned by the consensus protocol
-/// and allows different authentication modes based on the chosen authenticator.
-/// (Initially, only single-owner authentication is supported.)
+/// Same as AddressOwner, but the object is versioned by consensus.
 #[derive(SimpleObject, Clone)]
-pub(crate) struct ConsensusV2 {
+pub(crate) struct ConsensusAddressOwner {
     start_version: UInt53,
-    authenticator: Option<Authenticator>,
+    owner: Option<Owner>,
 }
 
 /// Filter for a point query of an Object.
@@ -290,7 +267,11 @@ pub(crate) struct HistoricalObjectCursor {
         ty = "ScanConnection<String, TransactionBlock>",
         desc = "The transaction blocks that sent objects to this object."
     ),
-    field(name = "bcs", ty = "Option<Base64>", desc = "The Base64-encoded BCS serialization of the object's content.")
+    field(
+        name = "bcs",
+        ty = "Option<Base64>",
+        desc = "The Base64-encoded BCS serialization of the object's content."
+    )
 )]
 pub(crate) enum IObject {
     Object(Object),
@@ -357,12 +338,18 @@ impl Object {
         before: Option<Cursor>,
         filter: Option<ObjectFilter>,
     ) -> Result<Connection<String, MoveObject>> {
-        OwnerImpl::from(self).objects(ctx, first, after, last, before, filter).await
+        OwnerImpl::from(self)
+            .objects(ctx, first, after, last, before, filter)
+            .await
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
     /// it defaults to `0x2::oct::OCT`.
-    pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
+    pub(crate) async fn balance(
+        &self,
+        ctx: &Context<'_>,
+        type_: Option<ExactTypeFilter>,
+    ) -> Result<Option<Balance>> {
         OwnerImpl::from(self).balance(ctx, type_).await
     }
 
@@ -375,7 +362,9 @@ impl Object {
         last: Option<u64>,
         before: Option<balance::Cursor>,
     ) -> Result<Connection<String, Balance>> {
-        OwnerImpl::from(self).balances(ctx, first, after, last, before).await
+        OwnerImpl::from(self)
+            .balances(ctx, first, after, last, before)
+            .await
     }
 
     /// The coin objects for this object.
@@ -390,7 +379,9 @@ impl Object {
         before: Option<Cursor>,
         type_: Option<ExactTypeFilter>,
     ) -> Result<Connection<String, Coin>> {
-        OwnerImpl::from(self).coins(ctx, first, after, last, before, type_).await
+        OwnerImpl::from(self)
+            .coins(ctx, first, after, last, before, type_)
+            .await
     }
 
     /// The `0x3::staking_pool::StakedOct` objects owned by this object.
@@ -402,7 +393,9 @@ impl Object {
         last: Option<u64>,
         before: Option<Cursor>,
     ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(self).staked_octs(ctx, first, after, last, before).await
+        OwnerImpl::from(self)
+            .staked_octs(ctx, first, after, last, before)
+            .await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -424,7 +417,9 @@ impl Object {
         last: Option<u64>,
         before: Option<Cursor>,
     ) -> Result<Connection<String, SuinsRegistration>> {
-        OwnerImpl::from(self).suins_registrations(ctx, first, after, last, before).await
+        OwnerImpl::from(self)
+            .suins_registrations(ctx, first, after, last, before)
+            .await
     }
 
     pub(crate) async fn version(&self) -> UInt53 {
@@ -454,7 +449,10 @@ impl Object {
     }
 
     /// The transaction block that created this version of the object.
-    pub(crate) async fn previous_transaction_block(&self, ctx: &Context<'_>) -> Result<Option<TransactionBlock>> {
+    pub(crate) async fn previous_transaction_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<TransactionBlock>> {
         ObjectImpl(self).previous_transaction_block(ctx).await
     }
 
@@ -494,7 +492,9 @@ impl Object {
         filter: Option<TransactionBlockFilter>,
         scan_limit: Option<u64>,
     ) -> Result<ScanConnection<String, TransactionBlock>> {
-        ObjectImpl(self).received_transaction_blocks(ctx, first, after, last, before, filter, scan_limit).await
+        ObjectImpl(self)
+            .received_transaction_blocks(ctx, first, after, last, before, filter, scan_limit)
+            .await
     }
 
     /// The Base64-encoded BCS serialization of the object's content.
@@ -515,8 +515,14 @@ impl Object {
     ///
     /// Dynamic fields on wrapped objects can be accessed by using the same API under the Owner
     /// type.
-    async fn dynamic_field(&self, ctx: &Context<'_>, name: DynamicFieldName) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(self).dynamic_field(ctx, name, Some(self.root_version())).await
+    async fn dynamic_field(
+        &self,
+        ctx: &Context<'_>,
+        name: DynamicFieldName,
+    ) -> Result<Option<DynamicField>> {
+        OwnerImpl::from(self)
+            .dynamic_field(ctx, name, Some(self.root_version()))
+            .await
     }
 
     /// Access a dynamic object field on an object using its name. Names are arbitrary Move values
@@ -526,8 +532,14 @@ impl Object {
     ///
     /// Dynamic fields on wrapped objects can be accessed by using the same API under the Owner
     /// type.
-    async fn dynamic_object_field(&self, ctx: &Context<'_>, name: DynamicFieldName) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(self).dynamic_object_field(ctx, name, Some(self.root_version())).await
+    async fn dynamic_object_field(
+        &self,
+        ctx: &Context<'_>,
+        name: DynamicFieldName,
+    ) -> Result<Option<DynamicField>> {
+        OwnerImpl::from(self)
+            .dynamic_object_field(ctx, name, Some(self.root_version()))
+            .await
     }
 
     /// The dynamic fields and dynamic object fields on an object.
@@ -542,7 +554,9 @@ impl Object {
         last: Option<u64>,
         before: Option<Cursor>,
     ) -> Result<Connection<String, DynamicField>> {
-        OwnerImpl::from(self).dynamic_fields(ctx, first, after, last, before, Some(self.root_version())).await
+        OwnerImpl::from(self)
+            .dynamic_fields(ctx, first, after, last, before, Some(self.root_version()))
+            .await
     }
 
     /// Attempts to convert the object into a MoveObject
@@ -566,7 +580,9 @@ impl ObjectImpl<'_> {
     }
 
     pub(crate) async fn digest(&self) -> Option<String> {
-        self.0.native_impl().map(|native| native.digest().base58_encode())
+        self.0
+            .native_impl()
+            .map(|native| native.digest().base58_encode())
     }
 
     pub(crate) async fn owner(&self) -> Option<ObjectOwner> {
@@ -596,32 +612,46 @@ impl ObjectImpl<'_> {
                     }),
                 }))
             }
-            O::Shared { initial_shared_version } => {
-                Some(ObjectOwner::Shared(Shared { initial_shared_version: initial_shared_version.value().into() }))
-            }
-            O::ConsensusV2 { start_version, authenticator } => Some(ObjectOwner::ConsensusV2(ConsensusV2 {
+            O::Shared {
+                initial_shared_version,
+            } => Some(ObjectOwner::Shared(Shared {
+                initial_shared_version: initial_shared_version.value().into(),
+            })),
+            O::ConsensusAddressOwner {
+                start_version,
+                owner,
+            } => Some(ObjectOwner::ConsensusAddress(ConsensusAddressOwner {
                 start_version: start_version.value().into(),
-                authenticator: Some(Authenticator::SingleOwner(Address {
-                    address: SuiAddress::from(*authenticator.as_single_owner()),
+                owner: Some(Owner {
+                    address: SuiAddress::from(*owner),
                     checkpoint_viewed_at: self.0.checkpoint_viewed_at,
-                })),
+                    root_version: None,
+                }),
             })),
         }
     }
 
-    pub(crate) async fn previous_transaction_block(&self, ctx: &Context<'_>) -> Result<Option<TransactionBlock>> {
+    pub(crate) async fn previous_transaction_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<TransactionBlock>> {
         let Some(native) = self.0.native_impl() else {
             return Ok(None);
         };
         let digest = native.previous_transaction;
 
-        TransactionBlock::query(ctx, TransactionBlock::by_digest(digest.into(), self.0.checkpoint_viewed_at))
-            .await
-            .extend()
+        TransactionBlock::query(
+            ctx,
+            TransactionBlock::by_digest(digest.into(), self.0.checkpoint_viewed_at),
+        )
+        .await
+        .extend()
     }
 
     pub(crate) async fn storage_rebate(&self) -> Option<BigInt> {
-        self.0.native_impl().map(|native| BigInt::from(native.storage_rebate))
+        self.0
+            .native_impl()
+            .map(|native| BigInt::from(native.storage_rebate))
     }
 
     pub(crate) async fn received_transaction_blocks(
@@ -638,12 +668,17 @@ impl ObjectImpl<'_> {
 
         let Some(filter) = filter
             .unwrap_or_default()
-            .intersect(TransactionBlockFilter { affected_address: Some(self.0.address), ..Default::default() })
+            .intersect(TransactionBlockFilter {
+                affected_address: Some(self.0.address),
+                ..Default::default()
+            })
         else {
             return Ok(ScanConnection::new(false, false));
         };
 
-        TransactionBlock::paginate(ctx, page, filter, self.0.checkpoint_viewed_at, scan_limit).await.extend()
+        TransactionBlock::paginate(ctx, page, filter, self.0.checkpoint_viewed_at, scan_limit)
+            .await
+            .extend()
     }
 
     pub(crate) async fn bcs(&self) -> Result<Option<Base64>> {
@@ -652,7 +687,12 @@ impl ObjectImpl<'_> {
             K::Indexed(_, stored) => stored.serialized_object.as_ref().map(Base64::from),
             K::NotIndexed(native) => {
                 let bytes = bcs::to_bytes(native)
-                    .map_err(|e| Error::Internal(format!("Failed to serialize object at {}: {e}", self.0.address)))
+                    .map_err(|e| {
+                        Error::Internal(format!(
+                            "Failed to serialize object at {}: {e}",
+                            self.0.address
+                        ))
+                    })
                     .extend()?;
                 Some(Base64::from(&bytes))
             }
@@ -663,6 +703,8 @@ impl ObjectImpl<'_> {
     /// `display` is part of the `IMoveObject` interface, but is implemented on `ObjectImpl` to
     /// allow for a convenience function on `Object`.
     pub(crate) async fn display(&self, ctx: &Context<'_>) -> Result<Option<Vec<DisplayEntry>>> {
+        let resolver: &PackageResolver = ctx.data_unchecked();
+
         let Some(native) = self.0.native_impl() else {
             return Ok(None);
         };
@@ -673,13 +715,30 @@ impl ObjectImpl<'_> {
             .ok_or_else(|| Error::Internal("Failed to convert object into MoveObject".to_string()))
             .extend()?;
 
-        let (struct_tag, move_struct) = deserialize_move_struct(move_object, ctx.data_unchecked()).await.extend()?;
+        let type_: TypeTag = move_object.type_().clone().into();
+        let (type_layout, display) = join!(
+            resolver.type_layout(type_.clone()),
+            Display::query(ctx.data_unchecked(), type_.clone()),
+        );
 
-        let Some(display) = Display::query(ctx.data_unchecked(), struct_tag.into()).await.extend()? else {
+        let type_layout = type_layout.map_err(|e| {
+            Error::Internal(format!(
+                "Error fetching layout for type {}: {e}",
+                move_object
+                    .type_()
+                    .to_canonical_string(/* with_prefix */ true)
+            ))
+        })?;
+
+        let Some(display) = display.extend()? else {
             return Ok(None);
         };
 
-        Ok(Some(display.render(&move_struct).extend()?))
+        Ok(Some(
+            display
+                .render(move_object.contents(), &type_layout)
+                .extend()?,
+        ))
     }
 }
 
@@ -748,6 +807,34 @@ impl Object {
         self.root_version
     }
 
+    /// Fetch objects by their id and version. If you need to query for live objects, use the
+    /// `objects` field.
+    pub(crate) async fn query_many(
+        ctx: &Context<'_>,
+        keys: Vec<ObjectKey>,
+        checkpoint_viewed_at: u64,
+    ) -> Result<Vec<Option<Self>>, Error> {
+        let DataLoader(loader) = &ctx.data_unchecked();
+
+        let keys: Vec<_> = keys
+            .into_iter()
+            .map(|key| PointLookupKey {
+                id: key.object_id,
+                version: key.version.into(),
+            })
+            .collect();
+
+        let data = loader.load_many(keys.clone()).await?;
+        Ok(keys
+            .into_iter()
+            .map(|k| {
+                data.get(&k).cloned().and_then(|bcs| {
+                    Object::new_serialized(k.id, k.version, bcs, checkpoint_viewed_at, k.version)
+                })
+            })
+            .collect())
+    }
+
     /// Query the database for a `page` of objects, optionally `filter`-ed.
     ///
     /// `checkpoint_viewed_at` represents the checkpoint sequence number at which this page was
@@ -791,7 +878,8 @@ impl Object {
         let Some((prev, next, results)) = db
             .execute_repeatable(move |conn| {
                 async move {
-                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await? else {
+                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await?
+                    else {
                         return Ok::<_, diesel::result::Error>(None);
                     };
 
@@ -808,7 +896,9 @@ impl Object {
             })
             .await?
         else {
-            return Err(Error::Client("Requested data is outside the available range".to_string()));
+            return Err(Error::Client(
+                "Requested data is outside the available range".to_string(),
+            ));
         };
 
         let mut conn: Connection<String, T> = Connection::new(prev, next);
@@ -816,7 +906,8 @@ impl Object {
             // To maintain consistency, the returned cursor should have the same upper-bound as the
             // checkpoint found on the cursor.
             let cursor = stored.cursor(checkpoint_viewed_at).encode_cursor();
-            let object = Object::try_from_stored_history_object(stored, checkpoint_viewed_at, None)?;
+            let object =
+                Object::try_from_stored_history_object(stored, checkpoint_viewed_at, None)?;
             conn.edges.push(Edge::new(cursor, downcast(object)?));
         }
 
@@ -825,34 +916,71 @@ impl Object {
 
     /// Look-up the latest version of the object as of a given checkpoint.
     pub(crate) fn latest_at(checkpoint_viewed_at: u64) -> ObjectLookup {
-        ObjectLookup::LatestAt { checkpoint_viewed_at }
+        ObjectLookup::LatestAt {
+            checkpoint_viewed_at,
+        }
     }
 
     /// Look-up the latest version of an object whose version is less than or equal to its parent's
     /// version, as of a given checkpoint.
     pub(crate) fn under_parent(parent_version: u64, checkpoint_viewed_at: u64) -> ObjectLookup {
-        ObjectLookup::UnderParent { parent_version, checkpoint_viewed_at }
+        ObjectLookup::UnderParent {
+            parent_version,
+            checkpoint_viewed_at,
+        }
     }
 
     /// Look-up a specific version of the object, as of a given checkpoint.
     pub(crate) fn at_version(version: u64, checkpoint_viewed_at: u64) -> ObjectLookup {
-        ObjectLookup::VersionAt { version, checkpoint_viewed_at }
+        ObjectLookup::VersionAt {
+            version,
+            checkpoint_viewed_at,
+        }
     }
 
-    pub(crate) async fn query(ctx: &Context<'_>, id: SuiAddress, key: ObjectLookup) -> Result<Option<Self>, Error> {
+    pub(crate) async fn query(
+        ctx: &Context<'_>,
+        id: SuiAddress,
+        key: ObjectLookup,
+    ) -> Result<Option<Self>, Error> {
         let DataLoader(loader) = &ctx.data_unchecked();
 
         match key {
-            ObjectLookup::VersionAt { version, checkpoint_viewed_at } => {
-                loader.load_one(HistoricalKey { id, version, checkpoint_viewed_at }).await
+            ObjectLookup::VersionAt {
+                version,
+                checkpoint_viewed_at,
+            } => {
+                loader
+                    .load_one(HistoricalKey {
+                        id,
+                        version,
+                        checkpoint_viewed_at,
+                    })
+                    .await
             }
 
-            ObjectLookup::UnderParent { parent_version, checkpoint_viewed_at } => {
-                loader.load_one(ParentVersionKey { id, parent_version, checkpoint_viewed_at }).await
+            ObjectLookup::UnderParent {
+                parent_version,
+                checkpoint_viewed_at,
+            } => {
+                loader
+                    .load_one(ParentVersionKey {
+                        id,
+                        parent_version,
+                        checkpoint_viewed_at,
+                    })
+                    .await
             }
 
-            ObjectLookup::LatestAt { checkpoint_viewed_at } => {
-                loader.load_one(LatestAtKey { id, checkpoint_viewed_at }).await
+            ObjectLookup::LatestAt {
+                checkpoint_viewed_at,
+            } => {
+                loader
+                    .load_one(LatestAtKey {
+                        id,
+                        checkpoint_viewed_at,
+                    })
+                    .await
             }
         }
     }
@@ -865,7 +993,10 @@ impl Object {
         type_: StructTag,
         checkpoint_viewed_at: u64,
     ) -> Result<Option<Object>, Error> {
-        let filter = ObjectFilter { type_: Some(TypeFilter::ByType(type_)), ..Default::default() };
+        let filter = ObjectFilter {
+            type_: Some(TypeFilter::ByType(type_)),
+            ..Default::default()
+        };
 
         let connection = Self::paginate(db, Page::bounded(1), filter, checkpoint_viewed_at).await?;
 
@@ -888,12 +1019,13 @@ impl Object {
     ) -> Result<Self, Error> {
         let address = addr(&history_object.object_id)?;
 
-        let object_status = NativeObjectStatus::try_from(history_object.object_status).map_err(|_| {
-            Error::Internal(format!(
-                "Unknown object status {} for object {} at version {}",
-                history_object.object_status, address, history_object.object_version
-            ))
-        })?;
+        let object_status =
+            NativeObjectStatus::try_from(history_object.object_status).map_err(|_| {
+                Error::Internal(format!(
+                    "Unknown object status {} for object {} at version {}",
+                    history_object.object_status, address, history_object.object_version
+                ))
+            })?;
 
         match object_status {
             NativeObjectStatus::Active => {
@@ -904,10 +1036,12 @@ impl Object {
                     )));
                 };
 
-                let native_object = bcs::from_bytes(serialized_object)
-                    .map_err(|_| Error::Internal(format!("Failed to deserialize object {address}")))?;
+                let native_object = bcs::from_bytes(serialized_object).map_err(|_| {
+                    Error::Internal(format!("Failed to deserialize object {address}"))
+                })?;
 
-                let root_version = root_version.unwrap_or_else(|| version_for_dynamic_fields(&native_object));
+                let root_version =
+                    root_version.unwrap_or_else(|| version_for_dynamic_fields(&native_object));
                 Ok(Self {
                     address,
                     version: history_object.object_version as u64,
@@ -916,9 +1050,9 @@ impl Object {
                     root_version,
                 })
             }
-            NativeObjectStatus::WrappedOrDeleted => {
-                Err(Error::Internal("Wrapped or deleted objects should not be loaded from DB.".to_string()))
-            }
+            NativeObjectStatus::WrappedOrDeleted => Err(Error::Internal(
+                "Wrapped or deleted objects should not be loaded from DB.".to_string(),
+            )),
         }
     }
 }
@@ -946,68 +1080,19 @@ impl ObjectFilter {
             };
         }
 
-        // Treat `object_ids` and `object_keys` as a single filter on IDs, and optionally versions,
-        // and compute the intersection of that.
-        let keys = intersect::field(self.keys(), other.keys(), |k, l| {
-            let mut combined = BTreeMap::new();
+        let object_ids = intersect::field(self.object_ids, other.object_ids, |a, b| {
+            let a = BTreeSet::from_iter(a);
+            let b = BTreeSet::from_iter(b);
 
-            for (id, v) in k {
-                if let Some(w) = l.get(&id).copied() {
-                    combined.insert(id, intersect::field(v, w, intersect::by_eq)?);
-                }
-            }
-
-            // If the intersection is empty, it means, there were some ID or Key filters in both
-            // `self` and `other`, but they don't overlap, so the final result is inconsistent.
-            (!combined.is_empty()).then_some(combined)
+            let intersection: Vec<_> = a.intersection(&b).cloned().collect();
+            (!intersection.is_empty()).then_some(intersection)
         })?;
-
-        // Extract the ID and Key filters back out. At this point, we know that if there were ID/Key
-        // filters in both `self` and `other`, then they intersected to form a consistent set of
-        // constraints, so it is safe to interpret the lack of any ID/Key filters respectively as a
-        // lack of that kind of constraint, rather than a constraint on the empty set.
-
-        let object_ids = {
-            let partition: Vec<_> = keys.iter().flatten().filter_map(|(id, v)| v.is_none().then_some(*id)).collect();
-
-            (!partition.is_empty()).then_some(partition)
-        };
-
-        let object_keys = {
-            let partition: Vec<_> = keys
-                .iter()
-                .flatten()
-                .filter_map(|(id, v)| Some(ObjectKey { object_id: *id, version: (*v)?.into() }))
-                .collect();
-
-            (!partition.is_empty()).then_some(partition)
-        };
 
         Some(Self {
             type_: intersect!(type_, TypeFilter::intersect)?,
             owner: intersect!(owner, intersect::by_eq)?,
             object_ids,
-            object_keys,
         })
-    }
-
-    /// Extract the Object ID and Key filters into one combined map from Object IDs in this filter,
-    /// to the versions they should have (or None if the filter mentions the ID but no version for
-    /// it).
-    fn keys(&self) -> Option<BTreeMap<SuiAddress, Option<u64>>> {
-        if self.object_keys.is_none() && self.object_ids.is_none() {
-            return None;
-        }
-
-        Some(BTreeMap::from_iter(
-            self.object_keys
-                .iter()
-                .flatten()
-                .map(|key| (key.object_id, Some(key.version.into())))
-                // Chain ID filters after Key filters so if there is overlap, we overwrite the key
-                // filter with the ID filter.
-                .chain(self.object_ids.iter().flatten().map(|id| (*id, None))),
-        ))
     }
 
     /// Applies ObjectFilter to the input `RawQuery` and returns a new `RawQuery`.
@@ -1023,31 +1108,13 @@ impl ObjectFilter {
                 let mut prefix = "object_id IN (";
                 for id in object_ids {
                     // SAFETY: Writing to a `String` cannot fail.
-                    write!(&mut inner, "{prefix}'\\x{}'::bytea", hex::encode(id.into_vec())).unwrap();
-                    prefix = ", ";
-                }
-                inner.push(')');
-                query = or_filter!(query, inner);
-            }
-        }
-
-        if let Some(object_keys) = &self.object_keys {
-            // Maximally strict - match a vec of 0 elements
-            if object_keys.is_empty() {
-                query = or_filter!(query, "1=0");
-            } else {
-                let mut inner = String::new();
-                let mut prefix = "(";
-                for ObjectKey { object_id, version } in object_keys {
-                    // SAFETY: Writing to a `String` cannot fail.
                     write!(
                         &mut inner,
-                        "{prefix}(object_id = '\\x{}'::bytea AND object_version = {})",
-                        hex::encode(object_id.into_vec()),
-                        version
+                        "{prefix}'\\x{}'::bytea",
+                        hex::encode(id.into_vec())
                     )
                     .unwrap();
-                    prefix = " OR ";
+                    prefix = ", ";
                 }
                 inner.push(')');
                 query = or_filter!(query, inner);
@@ -1085,7 +1152,10 @@ impl ObjectFilter {
 
 impl HistoricalObjectCursor {
     pub(crate) fn new(object_id: Vec<u8>, checkpoint_viewed_at: u64) -> Self {
-        Self { object_id, checkpoint_viewed_at }
+        Self {
+            object_id,
+            checkpoint_viewed_at,
+        }
     }
 }
 
@@ -1099,11 +1169,23 @@ impl ScanLimited for Cursor {}
 
 impl RawPaginated<Cursor> for StoredHistoryObject {
     fn filter_ge(cursor: &Cursor, query: RawQuery) -> RawQuery {
-        filter!(query, format!("candidates.object_id >= '\\x{}'::bytea", hex::encode(cursor.object_id.clone())))
+        filter!(
+            query,
+            format!(
+                "candidates.object_id >= '\\x{}'::bytea",
+                hex::encode(cursor.object_id.clone())
+            )
+        )
     }
 
     fn filter_le(cursor: &Cursor, query: RawQuery) -> RawQuery {
-        filter!(query, format!("candidates.object_id <= '\\x{}'::bytea", hex::encode(cursor.object_id.clone())))
+        filter!(
+            query,
+            format!(
+                "candidates.object_id <= '\\x{}'::bytea",
+                hex::encode(cursor.object_id.clone())
+            )
+        )
     }
 
     fn order(asc: bool, query: RawQuery) -> RawQuery {
@@ -1117,14 +1199,17 @@ impl RawPaginated<Cursor> for StoredHistoryObject {
 
 impl Target<Cursor> for StoredHistoryObject {
     fn cursor(&self, checkpoint_viewed_at: u64) -> Cursor {
-        Cursor::new(HistoricalObjectCursor::new(self.object_id.clone(), checkpoint_viewed_at))
+        Cursor::new(HistoricalObjectCursor::new(
+            self.object_id.clone(),
+            checkpoint_viewed_at,
+        ))
     }
 }
 
 #[async_trait::async_trait]
 impl Loader<HistoricalKey> for Db {
-    type Error = Error;
     type Value = Object;
+    type Error = Error;
 
     async fn load(&self, keys: &[HistoricalKey]) -> Result<HashMap<HistoricalKey, Object>, Error> {
         use objects_version::dsl as v;
@@ -1133,20 +1218,26 @@ impl Loader<HistoricalKey> for Db {
             return Ok(HashMap::new());
         }
 
-        let id_versions: BTreeSet<_> = keys.iter().map(|key| (key.id.into_vec(), key.version as i64)).collect();
+        let id_versions: BTreeSet<_> = keys
+            .iter()
+            .map(|key| (key.id.into_vec(), key.version as i64))
+            .collect();
 
         // Maps from (object_id, version) to sequence_number in the object_versions table.
         let object_versions: HashMap<_, _> = self
             .execute(move |conn| {
                 async {
                     conn.results(move || {
-                        let mut query = v::objects_version.select(StoredObjectVersion::as_select()).into_boxed();
+                        let mut query = v::objects_version
+                            .select(StoredObjectVersion::as_select())
+                            .into_boxed();
 
                         for (id, version) in id_versions.iter().cloned() {
                             // TODO: consider using something other than `or_filter` to avoid returning
                             // all results when `id_versions` is empty. It is mitigated today by the
                             // early return above.
-                            query = query.or_filter(v::object_id.eq(id).and(v::object_version.eq(version)));
+                            query = query
+                                .or_filter(v::object_id.eq(id).and(v::object_version.eq(version)));
                         }
 
                         query
@@ -1170,8 +1261,13 @@ impl Loader<HistoricalKey> for Db {
                     .is_some_and(|&seq| key.checkpoint_viewed_at >= seq as u64)
             })
             .collect();
-        let point_lookup_keys: Vec<_> =
-            filtered_keys.iter().map(|key| PointLookupKey { id: key.id, version: key.version }).collect();
+        let point_lookup_keys: Vec<_> = filtered_keys
+            .iter()
+            .map(|key| PointLookupKey {
+                id: key.id,
+                version: key.version,
+            })
+            .collect();
         let objects = self.load(&point_lookup_keys).await?;
         let results = filtered_keys
             .into_iter()
@@ -1194,10 +1290,13 @@ impl Loader<HistoricalKey> for Db {
 
 #[async_trait::async_trait]
 impl Loader<ParentVersionKey> for Db {
-    type Error = Error;
     type Value = Object;
+    type Error = Error;
 
-    async fn load(&self, keys: &[ParentVersionKey]) -> Result<HashMap<ParentVersionKey, Object>, Error> {
+    async fn load(
+        &self,
+        keys: &[ParentVersionKey],
+    ) -> Result<HashMap<ParentVersionKey, Object>, Error> {
         // Group keys by checkpoint viewed at and parent version -- we'll issue a separate query for
         // each group.
         #[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
@@ -1208,43 +1307,55 @@ impl Loader<ParentVersionKey> for Db {
 
         let mut keys_by_cursor_and_parent_version: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
         for key in keys {
-            let group_key =
-                GroupKey { checkpoint_viewed_at: key.checkpoint_viewed_at, parent_version: key.parent_version };
+            let group_key = GroupKey {
+                checkpoint_viewed_at: key.checkpoint_viewed_at,
+                parent_version: key.parent_version,
+            };
 
-            keys_by_cursor_and_parent_version.entry(group_key).or_default().insert(key.id.into_vec());
+            keys_by_cursor_and_parent_version
+                .entry(group_key)
+                .or_default()
+                .insert(key.id.into_vec());
         }
 
         // Issue concurrent reads for each group of keys.
-        let futures = keys_by_cursor_and_parent_version.into_iter().map(|(group_key, ids)| {
-            self.execute(move |conn| {
-                async move {
-                    let stored: Vec<StoredObjectVersion> = conn
-                        .results(move || {
-                            use objects_version::dsl as v;
+        let futures = keys_by_cursor_and_parent_version
+            .into_iter()
+            .map(|(group_key, ids)| {
+                self.execute(move |conn| {
+                    async move {
+                        let stored: Vec<StoredObjectVersion> = conn
+                            .results(move || {
+                                use objects_version::dsl as v;
 
-                            v::objects_version
-                                .select(StoredObjectVersion::as_select())
-                                .filter(v::object_id.eq_any(ids.iter().cloned()))
-                                .filter(v::object_version.le(group_key.parent_version as i64))
-                                .distinct_on(v::object_id)
-                                .order_by(v::object_id)
-                                .then_order_by(v::object_version.desc())
-                                .into_boxed()
-                        })
-                        .await?;
+                                v::objects_version
+                                    .select(StoredObjectVersion::as_select())
+                                    .filter(v::object_id.eq_any(ids.iter().cloned()))
+                                    .filter(v::object_version.le(group_key.parent_version as i64))
+                                    .distinct_on(v::object_id)
+                                    .order_by(v::object_id)
+                                    .then_order_by(v::object_version.desc())
+                                    .into_boxed()
+                            })
+                            .await?;
 
-                    Ok::<_, diesel::result::Error>(
-                        stored.into_iter().map(|stored| (group_key, stored)).collect::<Vec<_>>(),
-                    )
-                }
-                .scope_boxed()
-            })
-        });
+                        Ok::<_, diesel::result::Error>(
+                            stored
+                                .into_iter()
+                                .map(|stored| (group_key, stored))
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                    .scope_boxed()
+                })
+            });
 
         let groups = futures::future::join_all(futures).await;
         let mut group_map = HashMap::new();
         for group in groups {
-            for (group_key, stored) in group.map_err(|e| Error::Internal(format!("Failed to fetch objects: {e}")))? {
+            for (group_key, stored) in
+                group.map_err(|e| Error::Internal(format!("Failed to fetch objects: {e}")))?
+            {
                 // This particular object is invalid -- it didn't exist at the checkpoint we are
                 // viewing at.
                 if group_key.checkpoint_viewed_at < stored.cp_sequence_number as u64 {
@@ -1260,7 +1371,10 @@ impl Loader<ParentVersionKey> for Db {
         }
         let point_lookup_keys = group_map
             .iter()
-            .map(|(parent_key, version)| PointLookupKey { id: parent_key.id, version: *version as u64 })
+            .map(|(parent_key, version)| PointLookupKey {
+                id: parent_key.id,
+                version: *version as u64,
+            })
             .collect::<Vec<_>>();
         let objects = self.load(&point_lookup_keys).await?;
         let results = group_map
@@ -1287,46 +1401,59 @@ impl Loader<ParentVersionKey> for Db {
 
 #[async_trait::async_trait]
 impl Loader<LatestAtKey> for Db {
-    type Error = Error;
     type Value = Object;
+    type Error = Error;
 
     async fn load(&self, keys: &[LatestAtKey]) -> Result<HashMap<LatestAtKey, Object>, Error> {
         // Group keys by checkpoint viewed at -- we'll issue a separate query for each group.
         let mut keys_by_cursor_and_parent_version: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
 
         for key in keys {
-            keys_by_cursor_and_parent_version.entry(key.checkpoint_viewed_at).or_default().insert(key.id);
+            keys_by_cursor_and_parent_version
+                .entry(key.checkpoint_viewed_at)
+                .or_default()
+                .insert(key.id);
         }
 
         // Issue concurrent reads for each group of keys.
-        let futures = keys_by_cursor_and_parent_version.into_iter().map(|(checkpoint_viewed_at, ids)| {
-            self.execute_repeatable(move |conn| {
-                async move {
-                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await? else {
-                        return Ok::<Vec<(u64, StoredHistoryObject)>, diesel::result::Error>(vec![]);
-                    };
+        let futures =
+            keys_by_cursor_and_parent_version
+                .into_iter()
+                .map(|(checkpoint_viewed_at, ids)| {
+                    self.execute_repeatable(move |conn| {
+                        async move {
+                            let Some(range) =
+                                AvailableRange::result(conn, checkpoint_viewed_at).await?
+                            else {
+                                return Ok::<Vec<(u64, StoredHistoryObject)>, diesel::result::Error>(
+                                    vec![],
+                                );
+                            };
 
-                    let filter = ObjectFilter { object_ids: Some(ids.iter().cloned().collect()), ..Default::default() };
+                            let filter = ObjectFilter {
+                                object_ids: Some(ids.iter().cloned().collect()),
+                                ..Default::default()
+                            };
 
-                    Ok(conn
-                        .results(move || {
-                            build_objects_query(
-                                View::Consistent,
-                                range,
-                                &Page::bounded(ids.len() as u64),
-                                |q| filter.apply(q),
-                                |q| q,
-                            )
-                            .into_boxed()
-                        })
-                        .await?
-                        .into_iter()
-                        .map(|r| (checkpoint_viewed_at, r))
-                        .collect())
-                }
-                .scope_boxed()
-            })
-        });
+                            Ok(conn
+                                .results(move || {
+                                    build_objects_query(
+                                        View::Consistent,
+                                        range,
+                                        &Page::bounded(ids.len() as u64),
+                                        |q| filter.apply(q),
+                                        |q| q,
+                                    )
+                                    .into_boxed()
+                                })
+                                .await?
+                                .into_iter()
+                                .map(|r| (checkpoint_viewed_at, r))
+                                .collect())
+                        }
+                        .scope_boxed()
+                    })
+                });
 
         // Wait for the reads to all finish, and gather them into the result map.
         let groups = futures::future::join_all(futures).await;
@@ -1336,9 +1463,13 @@ impl Loader<LatestAtKey> for Db {
             for (checkpoint_viewed_at, stored) in
                 group.map_err(|e| Error::Internal(format!("Failed to fetch objects: {e}")))?
             {
-                let object = Object::try_from_stored_history_object(stored, checkpoint_viewed_at, None)?;
+                let object =
+                    Object::try_from_stored_history_object(stored, checkpoint_viewed_at, None)?;
 
-                let key = LatestAtKey { id: object.address, checkpoint_viewed_at };
+                let key = LatestAtKey {
+                    id: object.address,
+                    checkpoint_viewed_at,
+                };
 
                 results.insert(key, object);
             }
@@ -1350,29 +1481,40 @@ impl Loader<LatestAtKey> for Db {
 
 #[async_trait::async_trait]
 impl Loader<PointLookupKey> for Db {
-    type Error = Error;
     type Value = Option<Vec<u8>>;
+    type Error = Error;
 
-    async fn load(&self, keys: &[PointLookupKey]) -> Result<HashMap<PointLookupKey, Option<Vec<u8>>>, Error> {
+    async fn load(
+        &self,
+        keys: &[PointLookupKey],
+    ) -> Result<HashMap<PointLookupKey, Option<Vec<u8>>>, Error> {
         use full_objects_history::dsl as f;
 
         if keys.is_empty() {
             return Ok(HashMap::new());
         }
 
-        let id_versions: BTreeSet<_> = keys.iter().map(|key| (key.id.into_vec(), key.version as i64)).collect();
+        let id_versions: BTreeSet<_> = keys
+            .iter()
+            .map(|key| (key.id.into_vec(), key.version as i64))
+            .collect();
         let objects = self
             .execute(move |conn| {
                 async {
                     conn.results(move || {
-                        let mut query =
-                            f::full_objects_history.select(StoredFullHistoryObject::as_select()).into_boxed();
+                        let mut query = f::full_objects_history
+                            .select(StoredFullHistoryObject::as_select())
+                            .into_boxed();
 
                         for (id, version) in id_versions.iter() {
                             // TODO: consider using something other than `or_filter` to avoid returning
                             // all results when `id_versions` is empty. It is mitigated today by the
                             // early return above.
-                            query = query.or_filter(f::object_id.eq(id.clone()).and(f::object_version.eq(*version)));
+                            query = query.or_filter(
+                                f::object_id
+                                    .eq(id.clone())
+                                    .and(f::object_version.eq(*version)),
+                            );
                         }
 
                         query
@@ -1386,7 +1528,10 @@ impl Loader<PointLookupKey> for Db {
             .into_iter()
             .map(|o| {
                 (
-                    PointLookupKey { id: addr(&o.object_id).unwrap(), version: o.object_version as u64 },
+                    PointLookupKey {
+                        id: addr(&o.object_id).unwrap(),
+                        version: o.object_version as u64,
+                    },
                     o.serialized_object,
                 )
             })
@@ -1414,85 +1559,30 @@ impl From<&ObjectKind> for ObjectStatus {
 
 impl From<&Object> for OwnerImpl {
     fn from(object: &Object) -> Self {
-        OwnerImpl { address: object.address, checkpoint_viewed_at: object.checkpoint_viewed_at }
+        OwnerImpl {
+            address: object.address,
+            checkpoint_viewed_at: object.checkpoint_viewed_at,
+        }
     }
-}
-
-pub(crate) async fn deserialize_move_struct(
-    move_object: &NativeMoveObject,
-    resolver: &PackageResolver,
-) -> Result<(StructTag, MoveStruct), Error> {
-    let struct_tag = StructTag::from(move_object.type_().clone());
-    let contents = move_object.contents();
-    let move_type_layout = resolver.type_layout(TypeTag::from(struct_tag.clone())).await.map_err(|e| {
-        Error::Internal(format!(
-            "Error fetching layout for type {}: {e}",
-            struct_tag.to_canonical_string(/* with_prefix */ true)
-        ))
-    })?;
-
-    let MoveTypeLayout::Struct(layout) = move_type_layout else {
-        return Err(Error::Internal("Object is not a move struct".to_string()));
-    };
-
-    // TODO (annotated-visitor): Use custom visitors for extracting a dynamic field, and for
-    // creating a GraphQL MoveValue directly (not via an annotated visitor).
-    let move_struct = BoundedVisitor::deserialize_struct(contents, &layout).map_err(|e| {
-        Error::Internal(format!(
-            "Error deserializing move struct for type {}: {e}",
-            struct_tag.to_canonical_string(/* with_prefix */ true)
-        ))
-    })?;
-
-    Ok((struct_tag, move_struct))
 }
 
 /// Constructs a raw query to fetch objects from the database. Objects are filtered out if they
-/// satisfy the criteria but have a later version in the same checkpoint. If object keys are
-/// provided, or no filters are specified at all, then this final condition is not applied.
+/// satisfy the criteria but have a later version in the same checkpoint. If no filters are
+/// specified at all, then this final condition is not applied.
 fn objects_query(filter: &ObjectFilter, range: AvailableRange, page: &Page<Cursor>) -> RawQuery
 where
 {
-    if let (Some(_), Some(_)) = (&filter.object_ids, &filter.object_keys) {
-        // If both object IDs and object keys are specified, then we need to query in
-        // both historical and consistent views, and then union the results.
-        let ids_only_filter = ObjectFilter { object_keys: None, ..filter.clone() };
-        let (id_query, id_bindings) = build_objects_query(
-            View::Consistent,
-            range,
-            page,
-            move |query| ids_only_filter.apply(query),
-            move |newer| newer,
-        )
-        .finish();
-
-        let keys_only_filter = ObjectFilter { object_ids: None, ..filter.clone() };
-        let (key_query, key_bindings) = build_objects_query(
-            View::Historical,
-            range,
-            page,
-            move |query| keys_only_filter.apply(query),
-            move |newer| newer,
-        )
-        .finish();
-
-        RawQuery::new(
-            format!(
-                "SELECT * FROM (({id_query}) UNION ALL ({key_query})) AS candidates",
-                id_query = id_query,
-                key_query = key_query,
-            ),
-            id_bindings.into_iter().chain(key_bindings).collect(),
-        )
-        .order_by("object_id")
-        .limit(page.limit() as i64)
-    } else {
-        // Only one of object IDs or object keys is specified, or neither are specified.
-        let view =
-            if filter.object_keys.is_some() || !filter.has_filters() { View::Historical } else { View::Consistent };
-
-        build_objects_query(view, range, page, move |query| filter.apply(query), move |newer| newer)
-    }
+    build_objects_query(
+        if !filter.has_filters() {
+            View::Historical
+        } else {
+            View::Consistent
+        },
+        range,
+        page,
+        move |query| filter.apply(query),
+        move |newer| newer,
+    )
 }
 
 #[cfg(test)]
@@ -1502,43 +1592,46 @@ mod tests {
 
     #[test]
     fn test_owner_filter_intersection() {
-        let f0 = ObjectFilter { owner: Some(SuiAddress::from_str("0x1").unwrap()), ..Default::default() };
+        let f0 = ObjectFilter {
+            owner: Some(SuiAddress::from_str("0x1").unwrap()),
+            ..Default::default()
+        };
 
-        let f1 = ObjectFilter { owner: Some(SuiAddress::from_str("0x2").unwrap()), ..Default::default() };
+        let f1 = ObjectFilter {
+            owner: Some(SuiAddress::from_str("0x2").unwrap()),
+            ..Default::default()
+        };
 
         assert_eq!(f0.clone().intersect(f0.clone()), Some(f0.clone()));
         assert_eq!(f0.clone().intersect(f1.clone()), None);
     }
 
     #[test]
-    fn test_key_filter_intersection() {
+    fn test_object_filter_intersection() {
         let i1 = SuiAddress::from_str("0x1").unwrap();
         let i2 = SuiAddress::from_str("0x2").unwrap();
         let i3 = SuiAddress::from_str("0x3").unwrap();
-        let i4 = SuiAddress::from_str("0x4").unwrap();
 
+        // A standard object filter
         let f0 = ObjectFilter {
             object_ids: Some(vec![i1, i3]),
-            object_keys: Some(vec![ObjectKey { object_id: i2, version: 1.into() }, ObjectKey {
-                object_id: i4,
-                version: 2.into(),
-            }]),
             ..Default::default()
         };
 
+        // Overlaps with f0 on id i1
         let f1 = ObjectFilter {
             object_ids: Some(vec![i1, i2]),
-            object_keys: Some(vec![ObjectKey { object_id: i4, version: 2.into() }]),
             ..Default::default()
         };
 
-        let f2 = ObjectFilter { object_ids: Some(vec![i1, i3]), ..Default::default() };
+        // An empty filter
+        let f2 = ObjectFilter {
+            ..Default::default()
+        };
 
+        // Overlaps with f0 on id i3, and does not overlap with f1
         let f3 = ObjectFilter {
-            object_keys: Some(vec![ObjectKey { object_id: i2, version: 2.into() }, ObjectKey {
-                object_id: i4,
-                version: 2.into(),
-            }]),
+            object_ids: Some(vec![i3]),
             ..Default::default()
         };
 
@@ -1546,34 +1639,47 @@ mod tests {
             f0.clone().intersect(f1.clone()),
             Some(ObjectFilter {
                 object_ids: Some(vec![i1]),
-                object_keys: Some(vec![ObjectKey { object_id: i2, version: 1.into() }, ObjectKey {
-                    object_id: i4,
-                    version: 2.into()
-                },]),
                 ..Default::default()
             })
         );
 
         assert_eq!(
-            f1.clone().intersect(f2.clone()),
-            Some(ObjectFilter { object_ids: Some(vec![i1]), ..Default::default() })
+            f2.clone().intersect(f2.clone()),
+            Some(ObjectFilter::default())
         );
 
-        assert_eq!(
-            f1.clone().intersect(f3.clone()),
-            Some(ObjectFilter {
-                object_keys: Some(vec![ObjectKey { object_id: i2, version: 2.into() }, ObjectKey {
-                    object_id: i4,
-                    version: 2.into()
-                },]),
-                ..Default::default()
-            })
-        );
+        assert_eq!(f1.clone().intersect(f2.clone()), Some(f1.clone()));
+        assert_eq!(f1.clone().intersect(f3.clone()), None);
 
-        // i2 got a conflicting version assignment
-        assert_eq!(f0.clone().intersect(f3.clone()), None);
+        // Overlaps with f1 on i2, but does not overlap with f0 or f3. Note that this also has an
+        // owner filter
+        let f4 = ObjectFilter {
+            owner: Some(i1),
+            object_ids: Some(vec![i2]),
+            type_: None,
+        };
 
-        // No overlap between these two.
-        assert_eq!(f2.clone().intersect(f3.clone()), None);
+        // Overlaps with f0 on id i1
+        let f5 = ObjectFilter {
+            owner: None,
+            object_ids: Some(vec![i1]),
+            type_: Some(TypeFilter::ByModule(
+                crate::types::type_filter::ModuleFilter::ByPackage(i3),
+            )),
+        };
+
+        // Does not overlap with f5 because module filter is different.
+        let f6 = ObjectFilter {
+            owner: None,
+            object_ids: Some(vec![i1]),
+            type_: Some(TypeFilter::ByModule(
+                crate::types::type_filter::ModuleFilter::ByPackage(i1),
+            )),
+        };
+
+        assert_eq!(f0.clone().intersect(f4.clone()), None);
+        assert_eq!(f1.clone().intersect(f4.clone()), Some(f4.clone()));
+        assert_eq!(f0.clone().intersect(f5.clone()), Some(f5.clone()));
+        assert_eq!(f5.clone().intersect(f6.clone()), None);
     }
 }

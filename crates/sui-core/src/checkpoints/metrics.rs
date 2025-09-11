@@ -3,16 +3,9 @@
 
 use mysten_metrics::histogram::Histogram as MystenHistogram;
 use prometheus::{
-    register_histogram_with_registry,
-    register_int_counter_vec_with_registry,
-    register_int_counter_with_registry,
-    register_int_gauge_vec_with_registry,
-    register_int_gauge_with_registry,
-    Histogram,
-    IntCounter,
-    IntCounterVec,
-    IntGauge,
-    IntGaugeVec,
+    register_histogram_with_registry, register_int_counter_vec_with_registry,
+    register_int_counter_with_registry, register_int_gauge_vec_with_registry,
+    register_int_gauge_with_registry, Histogram, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
     Registry,
 };
 use std::sync::Arc;
@@ -62,24 +55,22 @@ impl CheckpointMetrics {
                 "Age of the last created checkpoint",
                 mysten_metrics::LATENCY_SEC_BUCKETS.to_vec(),
                 registry
-            )
-            .unwrap(),
+            ).unwrap(),
             last_created_checkpoint_age_ms: MystenHistogram::new_in_registry(
                 "last_created_checkpoint_age_ms",
                 "Age of the last created checkpoint",
-                registry,
+                registry
             ),
             last_certified_checkpoint_age: register_histogram_with_registry!(
                 "last_certified_checkpoint_age",
                 "Age of the last certified checkpoint",
                 mysten_metrics::LATENCY_SEC_BUCKETS.to_vec(),
                 registry
-            )
-            .unwrap(),
+            ).unwrap(),
             last_certified_checkpoint_age_ms: MystenHistogram::new_in_registry(
                 "last_certified_checkpoint_age_ms",
                 "Age of the last certified checkpoint",
-                registry,
+                registry
             ),
             checkpoint_errors: register_int_counter_with_registry!(
                 "checkpoint_errors",
@@ -142,8 +133,7 @@ impl CheckpointMetrics {
                 "Latency from consensus commit timstamp to local checkpoint creation in milliseconds",
                 mysten_metrics::LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             checkpoint_creation_latency_ms: MystenHistogram::new_in_registry(
                 "checkpoint_creation_latency_ms",
                 "Latency from consensus commit timstamp to local checkpoint creation in milliseconds",

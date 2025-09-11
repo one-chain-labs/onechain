@@ -3,27 +3,11 @@
 
 #![no_main]
 use move_binary_format::file_format::{
-    empty_module,
-    AbilitySet,
-    Bytecode,
-    CodeUnit,
-    Constant,
-    DatatypeHandle,
-    DatatypeHandleIndex,
-    FieldDefinition,
-    FunctionDefinition,
-    FunctionHandle,
-    FunctionHandleIndex,
-    IdentifierIndex,
-    ModuleHandleIndex,
-    Signature,
-    SignatureIndex,
-    SignatureToken,
+    AbilitySet, Bytecode, CodeUnit, Constant, DatatypeHandle, DatatypeHandleIndex, FieldDefinition,
+    FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandleIndex,
+    Signature, SignatureIndex, SignatureToken,
     SignatureToken::{Address, Bool},
-    StructDefinition,
-    StructFieldInformation,
-    TypeSignature,
-    Visibility,
+    StructDefinition, StructFieldInformation, TypeSignature, Visibility, empty_module,
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::str::FromStr;
@@ -62,8 +46,12 @@ fuzz_target!(|mix: Mixed| {
 
     module.signatures.pop();
     module.signatures.push(Signature(mix.param_types));
-    module.signatures.push(Signature(mix.return_type.map(|s| vec![s]).unwrap_or_default()));
-    module.signatures.push(Signature(vec![Address, Bool, Address]));
+    module.signatures.push(Signature(
+        mix.return_type.map(|s| vec![s]).unwrap_or_default(),
+    ));
+    module
+        .signatures
+        .push(Signature(vec![Address, Bool, Address]));
 
     module.identifiers.extend(
         vec![
@@ -77,7 +65,10 @@ fuzz_target!(|mix: Mixed| {
     );
     module.address_identifiers.push(AccountAddress::random());
 
-    module.constant_pool.push(Constant { type_: Address, data: AccountAddress::ZERO.into_bytes().to_vec() });
+    module.constant_pool.push(Constant {
+        type_: Address,
+        data: AccountAddress::ZERO.into_bytes().to_vec(),
+    });
 
     module.struct_defs.push(StructDefinition {
         struct_handle: DatatypeHandleIndex(0),
@@ -87,7 +78,11 @@ fuzz_target!(|mix: Mixed| {
         }]),
     });
 
-    let code_unit = CodeUnit { code: mix.code, locals: SignatureIndex(0), jump_tables: vec![] };
+    let code_unit = CodeUnit {
+        code: mix.code,
+        locals: SignatureIndex(0),
+        jump_tables: vec![],
+    };
 
     let fun_def = FunctionDefinition {
         code: Some(code_unit),

@@ -4,25 +4,25 @@
 use std::str::FromStr;
 
 use anyhow::ensure;
-use move_core_types::{
-    account_address::AccountAddress,
-    annotated_value::{MoveDatatypeLayout, MoveValue},
-    ident_str,
-    identifier::{IdentStr, Identifier},
-    language_storage::StructTag,
-};
+use move_core_types::account_address::AccountAddress;
+use move_core_types::annotated_value::MoveDatatypeLayout;
+use move_core_types::annotated_value::MoveValue;
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
+use move_core_types::identifier::Identifier;
+use move_core_types::language_storage::StructTag;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use serde_with::{serde_as, Bytes};
+use serde_with::serde_as;
+use serde_with::Bytes;
 
-use crate::{
-    base_types::{ObjectID, SuiAddress, TransactionDigest},
-    error::{SuiError, SuiResult},
-    object::bounded_visitor::BoundedVisitor,
-    sui_serde::{BigInt, Readable},
-    SUI_SYSTEM_ADDRESS,
-};
+use crate::base_types::{ObjectID, SuiAddress, TransactionDigest};
+use crate::error::{SuiError, SuiResult};
+use crate::object::bounded_visitor::BoundedVisitor;
+use crate::sui_serde::BigInt;
+use crate::sui_serde::Readable;
+use crate::SUI_SYSTEM_ADDRESS;
 
 /// A universal Sui event type encapsulating different types of events
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +51,10 @@ pub struct EventID {
 
 impl From<(TransactionDigest, u64)> for EventID {
     fn from((tx_digest_num, event_seq_number): (TransactionDigest, u64)) -> Self {
-        Self { tx_digest: tx_digest_num as TransactionDigest, event_seq: event_seq_number }
+        Self {
+            tx_digest: tx_digest_num as TransactionDigest,
+            event_seq: event_seq_number,
+        }
     }
 }
 
@@ -67,7 +70,11 @@ impl TryFrom<String> for EventID {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let values = value.split(':').collect::<Vec<_>>();
         ensure!(values.len() == 2, "Malformed EventID : {value}");
-        Ok((TransactionDigest::from_str(values[0])?, u64::from_str(values[1])?).into())
+        Ok((
+            TransactionDigest::from_str(values[0])?,
+            u64::from_str(values[1])?,
+        )
+            .into())
     }
 }
 
@@ -79,7 +86,13 @@ impl EventEnvelope {
         event: Event,
         move_struct_json_value: Value,
     ) -> Self {
-        Self { timestamp, tx_digest, event_num, event, parsed_json: move_struct_json_value }
+        Self {
+            timestamp,
+            tx_digest,
+            event_num,
+            event,
+            parsed_json: move_struct_json_value,
+        }
     }
 }
 
@@ -111,10 +124,15 @@ impl Event {
             contents,
         }
     }
-
-    pub fn move_event_to_move_value(contents: &[u8], layout: MoveDatatypeLayout) -> SuiResult<MoveValue> {
-        BoundedVisitor::deserialize_value(contents, &layout.into_layout())
-            .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })
+    pub fn move_event_to_move_value(
+        contents: &[u8],
+        layout: MoveDatatypeLayout,
+    ) -> SuiResult<MoveValue> {
+        BoundedVisitor::deserialize_value(contents, &layout.into_layout()).map_err(|e| {
+            SuiError::ObjectSerializationError {
+                error: e.to_string(),
+            }
+        })
     }
 
     pub fn is_system_epoch_info_event(&self) -> bool {
@@ -142,7 +160,7 @@ impl Event {
 }
 
 // Event emitted in move code `fun advance_epoch`
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct SystemEpochInfoEvent {
     pub epoch: u64,
     pub protocol_version: u64,

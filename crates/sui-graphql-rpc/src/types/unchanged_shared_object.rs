@@ -13,6 +13,7 @@ use super::{object_read::ObjectRead, sui_address::SuiAddress, uint53::UInt53};
 #[derive(Union)]
 pub(crate) enum UnchangedSharedObject {
     Read(SharedObjectRead),
+    // TODO: Update `Delete` to `ConsensusStreamEnded` to account for ConsensusAddressOwner objects.
     Delete(SharedObjectDelete),
     Cancelled(SharedObjectCancelled),
 }
@@ -54,28 +55,39 @@ pub(crate) struct SharedObjectCancelled {
 pub(crate) struct SharedObjectChanged;
 
 impl UnchangedSharedObject {
-    pub fn try_from(input: NativeInputSharedObject, checkpoint_viewed_at: u64) -> Result<Self, SharedObjectChanged> {
+    pub fn try_from(
+        input: NativeInputSharedObject,
+        checkpoint_viewed_at: u64,
+    ) -> Result<Self, SharedObjectChanged> {
         use NativeInputSharedObject as I;
         use UnchangedSharedObject as U;
 
         match input {
             I::Mutate(_) => Err(SharedObjectChanged),
 
-            I::ReadOnly(oref) => {
-                Ok(U::Read(SharedObjectRead { read: ObjectRead { native: oref, checkpoint_viewed_at } }))
-            }
+            I::ReadOnly(oref) => Ok(U::Read(SharedObjectRead {
+                read: ObjectRead {
+                    native: oref,
+                    checkpoint_viewed_at,
+                },
+            })),
 
-            I::ReadDeleted(id, v) => {
-                Ok(U::Delete(SharedObjectDelete { address: id.into(), version: v.value().into(), mutable: false }))
-            }
+            I::ReadConsensusStreamEnded(id, v) => Ok(U::Delete(SharedObjectDelete {
+                address: id.into(),
+                version: v.value().into(),
+                mutable: false,
+            })),
 
-            I::MutateDeleted(id, v) => {
-                Ok(U::Delete(SharedObjectDelete { address: id.into(), version: v.value().into(), mutable: true }))
-            }
+            I::MutateConsensusStreamEnded(id, v) => Ok(U::Delete(SharedObjectDelete {
+                address: id.into(),
+                version: v.value().into(),
+                mutable: true,
+            })),
 
-            I::Cancelled(id, v) => {
-                Ok(U::Cancelled(SharedObjectCancelled { address: id.into(), version: v.value().into() }))
-            }
+            I::Cancelled(id, v) => Ok(U::Cancelled(SharedObjectCancelled {
+                address: id.into(),
+                version: v.value().into(),
+            })),
         }
     }
 }

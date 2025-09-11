@@ -5,63 +5,27 @@
 use crate::{
     abstract_state::{AbstractState, AbstractValue, BorrowState, Mutability},
     error::VMError,
-    function_instantiation_for_state,
-    state_control_flow,
-    state_create_struct,
-    state_create_struct_from_inst,
-    state_local_availability_is,
-    state_local_exists,
-    state_local_has_ability,
-    state_local_place,
-    state_local_set,
-    state_local_take,
-    state_local_take_borrow,
-    state_memory_safe,
-    state_never,
-    state_register_dereference,
-    state_stack_bin_op,
-    state_stack_function_call,
-    state_stack_function_inst_call,
-    state_stack_function_inst_popn,
-    state_stack_function_popn,
-    state_stack_has,
-    state_stack_has_ability,
-    state_stack_has_integer,
-    state_stack_has_polymorphic_eq,
-    state_stack_has_reference,
-    state_stack_has_struct,
-    state_stack_has_struct_inst,
-    state_stack_is_castable,
-    state_stack_local_polymorphic_eq,
-    state_stack_pop,
-    state_stack_push,
-    state_stack_push_register,
-    state_stack_push_register_borrow,
-    state_stack_ref_polymorphic_eq,
-    state_stack_satisfies_function_inst_signature,
-    state_stack_satisfies_function_signature,
-    state_stack_satisfies_struct_signature,
-    state_stack_struct_borrow_field,
-    state_stack_struct_borrow_field_inst,
-    state_stack_struct_has_field,
-    state_stack_struct_has_field_inst,
-    state_stack_struct_inst_popn,
-    state_stack_struct_popn,
-    state_stack_unpack_struct,
-    state_stack_unpack_struct_inst,
-    struct_instantiation_for_state,
+    function_instantiation_for_state, state_control_flow, state_create_struct,
+    state_create_struct_from_inst, state_local_availability_is, state_local_exists,
+    state_local_has_ability, state_local_place, state_local_set, state_local_take,
+    state_local_take_borrow, state_memory_safe, state_never, state_register_dereference,
+    state_stack_bin_op, state_stack_function_call, state_stack_function_inst_call,
+    state_stack_function_inst_popn, state_stack_function_popn, state_stack_has,
+    state_stack_has_ability, state_stack_has_integer, state_stack_has_polymorphic_eq,
+    state_stack_has_reference, state_stack_has_struct, state_stack_has_struct_inst,
+    state_stack_is_castable, state_stack_local_polymorphic_eq, state_stack_pop, state_stack_push,
+    state_stack_push_register, state_stack_push_register_borrow, state_stack_ref_polymorphic_eq,
+    state_stack_satisfies_function_inst_signature, state_stack_satisfies_function_signature,
+    state_stack_satisfies_struct_signature, state_stack_struct_borrow_field,
+    state_stack_struct_borrow_field_inst, state_stack_struct_has_field,
+    state_stack_struct_has_field_inst, state_stack_struct_inst_popn, state_stack_struct_popn,
+    state_stack_unpack_struct, state_stack_unpack_struct_inst, struct_instantiation_for_state,
     transitions::*,
-    unpack_instantiation_for_state,
-    with_ty_param,
+    unpack_instantiation_for_state, with_ty_param,
 };
 use move_binary_format::file_format::{
-    Ability,
-    Bytecode,
-    FunctionHandleIndex,
-    FunctionInstantiationIndex,
-    SignatureToken,
-    StructDefInstantiationIndex,
-    StructDefinitionIndex,
+    Ability, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, SignatureToken,
+    StructDefInstantiationIndex, StructDefinitionIndex,
 };
 
 /// A `Precondition` is a boolean predicate on an `AbstractState`.
@@ -69,8 +33,10 @@ pub type Precondition = dyn Fn(&AbstractState) -> bool;
 
 /// A `Effect` is a function that transforms on `AbstractState` to another
 pub type NonInstantiableEffect = dyn Fn(&AbstractState) -> Result<AbstractState, VMError>;
-pub type InstantiableEffect = dyn Fn(StructDefInstantiationIndex) -> Vec<Box<NonInstantiableEffect>>;
-pub type FunctionInstantiableEffect = dyn Fn(FunctionInstantiationIndex) -> Vec<Box<NonInstantiableEffect>>;
+pub type InstantiableEffect =
+    dyn Fn(StructDefInstantiationIndex) -> Vec<Box<NonInstantiableEffect>>;
+pub type FunctionInstantiableEffect =
+    dyn Fn(FunctionInstantiationIndex) -> Vec<Box<NonInstantiableEffect>>;
 
 type Instantiation = dyn Fn(&AbstractState) -> (StructDefinitionIndex, Vec<SignatureToken>);
 type FunctionInstantiation = dyn Fn(&AbstractState) -> (FunctionHandleIndex, Vec<SignatureToken>);
@@ -79,8 +45,16 @@ type FunctionInstantiableInstruction = dyn Fn(FunctionInstantiationIndex) -> Byt
 
 pub enum Effects {
     NoTyParams(Vec<Box<NonInstantiableEffect>>),
-    TyParams(Box<Instantiation>, Box<InstantiableEffect>, Box<InstantiableInstruction>),
-    TyParamsCall(Box<FunctionInstantiation>, Box<FunctionInstantiableEffect>, Box<FunctionInstantiableInstruction>),
+    TyParams(
+        Box<Instantiation>,
+        Box<InstantiableEffect>,
+        Box<InstantiableInstruction>,
+    ),
+    TyParamsCall(
+        Box<FunctionInstantiation>,
+        Box<FunctionInstantiableEffect>,
+        Box<FunctionInstantiableInstruction>,
+    ),
 }
 
 /// The `Summary` of a bytecode instruction contains a list of `Precondition`s
@@ -103,27 +77,39 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
         },
         Bytecode::LdU8(_) => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::U8))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::U8
+            ))]),
         },
         Bytecode::LdU16(_) => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::U16))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::U16
+            ))]),
         },
         Bytecode::LdU32(_) => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::U32))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::U32
+            ))]),
         },
         Bytecode::LdU64(_) => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::U64))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::U64
+            ))]),
         },
         Bytecode::LdU128(_) => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::U128))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::U128
+            ))]),
         },
         Bytecode::LdU256(_) => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::U256))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::U256
+            ))]),
         },
         Bytecode::CastU8 => Summary {
             preconditions: vec![state_stack_is_castable!(SignatureToken::U8)],
@@ -170,15 +156,21 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
         // TODO actual constant generation
         Bytecode::LdConst(_) => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::Address))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::Address
+            ))]),
         },
         Bytecode::LdTrue => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::Bool,))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::Bool,
+            ))]),
         },
         Bytecode::LdFalse => Summary {
             preconditions: vec![],
-            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(SignatureToken::Bool))]),
+            effects: Effects::NoTyParams(vec![state_stack_push!(AbstractValue::new_primitive(
+                SignatureToken::Bool
+            ))]),
         },
         Bytecode::CopyLoc(i) => Summary {
             preconditions: vec![
@@ -245,7 +237,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
             ]),
         },
         Bytecode::ReadRef => Summary {
-            preconditions: vec![state_stack_has_reference!(0, Mutability::Either), state_memory_safe!(None)],
+            preconditions: vec![
+                state_stack_has_reference!(0, Mutability::Either),
+                state_memory_safe!(None),
+            ],
             effects: Effects::NoTyParams(vec![
                 state_stack_pop!(),
                 state_register_dereference!(),
@@ -262,7 +257,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
             effects: Effects::NoTyParams(vec![state_stack_pop!(), state_stack_pop!()]),
         },
         Bytecode::FreezeRef => Summary {
-            preconditions: vec![state_stack_has_reference!(0, Mutability::Mutable), state_memory_safe!(None)],
+            preconditions: vec![
+                state_stack_has_reference!(0, Mutability::Mutable),
+                state_memory_safe!(None),
+            ],
             effects: Effects::NoTyParams(vec![
                 state_stack_pop!(),
                 state_register_dereference!(),
@@ -299,7 +297,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
             effects: Effects::NoTyParams(vec![state_stack_bin_op!()]),
         },
         Bytecode::Not => Summary {
-            preconditions: vec![state_stack_has!(0, Some(AbstractValue::new_primitive(SignatureToken::Bool)))],
+            preconditions: vec![state_stack_has!(
+                0,
+                Some(AbstractValue::new_primitive(SignatureToken::Bool))
+            )],
             effects: Effects::NoTyParams(vec![
                 state_stack_pop!(),
                 state_stack_push!(AbstractValue::new_primitive(SignatureToken::Bool)),
@@ -326,7 +327,9 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
                 state_stack_has_integer!(1),
                 state_stack_has_polymorphic_eq!(0, 1),
             ],
-            effects: Effects::NoTyParams(vec![state_stack_bin_op!(AbstractValue::new_primitive(SignatureToken::Bool))]),
+            effects: Effects::NoTyParams(vec![state_stack_bin_op!(AbstractValue::new_primitive(
+                SignatureToken::Bool
+            ))]),
         },
         Bytecode::Pack(i) => Summary {
             preconditions: vec![state_stack_satisfies_struct_signature!(i)],
@@ -373,7 +376,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
                 state_stack_struct_has_field!(i),
                 state_memory_safe!(None),
             ],
-            effects: Effects::NoTyParams(vec![state_stack_pop!(), state_stack_struct_borrow_field!(i)]),
+            effects: Effects::NoTyParams(vec![
+                state_stack_pop!(),
+                state_stack_struct_borrow_field!(i),
+            ]),
         },
         Bytecode::MutBorrowFieldGeneric(i) => Summary {
             preconditions: vec![
@@ -381,7 +387,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
                 state_stack_struct_has_field_inst!(i),
                 state_memory_safe!(None),
             ],
-            effects: Effects::NoTyParams(vec![state_stack_pop!(), state_stack_struct_borrow_field_inst!(i)]),
+            effects: Effects::NoTyParams(vec![
+                state_stack_pop!(),
+                state_stack_struct_borrow_field_inst!(i),
+            ]),
         },
         Bytecode::ImmBorrowField(i) => Summary {
             preconditions: vec![
@@ -389,7 +398,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
                 state_stack_struct_has_field!(i),
                 state_memory_safe!(None),
             ],
-            effects: Effects::NoTyParams(vec![state_stack_pop!(), state_stack_struct_borrow_field!(i)]),
+            effects: Effects::NoTyParams(vec![
+                state_stack_pop!(),
+                state_stack_struct_borrow_field!(i),
+            ]),
         },
         Bytecode::ImmBorrowFieldGeneric(i) => Summary {
             preconditions: vec![
@@ -397,11 +409,17 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
                 state_stack_struct_has_field_inst!(i),
                 state_memory_safe!(None),
             ],
-            effects: Effects::NoTyParams(vec![state_stack_pop!(), state_stack_struct_borrow_field_inst!(i)]),
+            effects: Effects::NoTyParams(vec![
+                state_stack_pop!(),
+                state_stack_struct_borrow_field_inst!(i),
+            ]),
         },
         Bytecode::Call(i) => Summary {
             preconditions: vec![state_stack_satisfies_function_signature!(i)],
-            effects: Effects::NoTyParams(vec![state_stack_function_popn!(i), state_stack_function_call!(i)]),
+            effects: Effects::NoTyParams(vec![
+                state_stack_function_popn!(i),
+                state_stack_function_call!(i),
+            ]),
         },
         Bytecode::CallGeneric(i) => Summary {
             preconditions: vec![state_stack_satisfies_function_inst_signature!(i)],
@@ -418,9 +436,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
         },
         // Control flow instructions are called manually and thus have
         // `state_control_flow!()` as their precondition
-        Bytecode::Branch(_) => {
-            Summary { preconditions: vec![state_control_flow!()], effects: Effects::NoTyParams(vec![]) }
-        }
+        Bytecode::Branch(_) => Summary {
+            preconditions: vec![state_control_flow!()],
+            effects: Effects::NoTyParams(vec![]),
+        },
         Bytecode::BrTrue(_) => Summary {
             preconditions: vec![
                 state_control_flow!(),
@@ -435,7 +454,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
             ],
             effects: Effects::NoTyParams(vec![state_stack_pop!()]),
         },
-        Bytecode::Ret => Summary { preconditions: vec![state_control_flow!()], effects: Effects::NoTyParams(vec![]) },
+        Bytecode::Ret => Summary {
+            preconditions: vec![state_control_flow!()],
+            effects: Effects::NoTyParams(vec![]),
+        },
         Bytecode::Abort => Summary {
             preconditions: vec![
                 state_control_flow!(),
@@ -443,7 +465,10 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
             ],
             effects: Effects::NoTyParams(vec![state_stack_pop!()]),
         },
-        Bytecode::Nop => Summary { preconditions: vec![], effects: Effects::NoTyParams(vec![]) },
+        Bytecode::Nop => Summary {
+            preconditions: vec![],
+            effects: Effects::NoTyParams(vec![]),
+        },
         // Deprecated bytecodes
         Bytecode::ExistsDeprecated(_)
         | Bytecode::ExistsGenericDeprecated(_)

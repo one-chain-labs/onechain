@@ -1,24 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use jsonrpsee::core::Error as JsonRpseeError;
+use jsonrpsee::core::ClientError as JsonRpseeError;
 use move_binary_format::CompiledModule;
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
-};
-use serde::{Deserialize, Serialize};
+use move_core_types::account_address::AccountAddress;
+use move_core_types::language_storage::{ModuleId, StructTag};
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::Debug;
-use sui_json_rpc_types::{SuiEvent, SuiTransactionBlockEffects};
+use sui_json_rpc_types::SuiEvent;
+use sui_json_rpc_types::SuiTransactionBlockEffects;
 use sui_protocol_config::{Chain, ProtocolVersion};
 use sui_sdk::error::Error as SuiRpcError;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, VersionNumber},
-    digests::{ObjectDigest, TransactionDigest},
-    error::{SuiError, SuiObjectResponseError, SuiResult, UserInputError},
-    object::Object,
-    transaction::{InputObjectKind, SenderSignedData, TransactionKind},
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, VersionNumber};
+use sui_types::digests::{ObjectDigest, TransactionDigest};
+use sui_types::error::{SuiError, SuiObjectResponseError, SuiResult, UserInputError};
+use sui_types::object::Object;
+use sui_types::transaction::{InputObjectKind, SenderSignedData, TransactionKind};
 use thiserror::Error;
 use tokio::time::Duration;
 use tracing::{error, warn};
@@ -31,7 +29,8 @@ pub(crate) const RPC_TIMEOUT_ERR_NUM_RETRIES: u32 = 3;
 pub(crate) const MAX_CONCURRENT_REQUESTS: usize = 1_000;
 
 // Struct tag used in system epoch change events
-pub(crate) const EPOCH_CHANGE_STRUCT_TAG: &str = "0x3::sui_system_state_inner::SystemEpochInfoEvent";
+pub(crate) const EPOCH_CHANGE_STRUCT_TAG: &str =
+    "0x3::sui_system_state_inner::SystemEpochInfoEvent";
 
 // TODO: A lot of the information in OnChainTransactionInfo is redundant from what's already in
 // SenderSignedData. We should consider removing them.
@@ -45,6 +44,8 @@ pub struct OnChainTransactionInfo {
     pub modified_at_versions: Vec<(ObjectID, SequenceNumber)>,
     pub shared_object_refs: Vec<ObjectRef>,
     pub gas: Vec<(ObjectID, SequenceNumber, ObjectDigest)>,
+    #[serde(default)]
+    pub gas_owner: Option<SuiAddress>,
     pub gas_budget: u64,
     pub gas_price: u64,
     pub executed_epoch: u64,
@@ -97,7 +98,10 @@ pub enum ReplayEngineError {
     ObjectNotExist { id: ObjectID },
 
     #[error("ObjectVersionNotFound: {:#?} version {}", id, version)]
-    ObjectVersionNotFound { id: ObjectID, version: SequenceNumber },
+    ObjectVersionNotFound {
+        id: ObjectID,
+        version: SequenceNumber,
+    },
 
     #[error(
         "ObjectVersionTooHigh: {:#?}, requested version {}, latest version found {}",
@@ -105,12 +109,29 @@ pub enum ReplayEngineError {
         asked_version,
         latest_version
     )]
-    ObjectVersionTooHigh { id: ObjectID, asked_version: SequenceNumber, latest_version: SequenceNumber },
+    ObjectVersionTooHigh {
+        id: ObjectID,
+        asked_version: SequenceNumber,
+        latest_version: SequenceNumber,
+    },
 
-    #[error("ObjectDeleted: {:#?} at version {:#?} digest {:#?}", id, version, digest)]
-    ObjectDeleted { id: ObjectID, version: SequenceNumber, digest: ObjectDigest },
+    #[error(
+        "ObjectDeleted: {:#?} at version {:#?} digest {:#?}",
+        id,
+        version,
+        digest
+    )]
+    ObjectDeleted {
+        id: ObjectID,
+        version: SequenceNumber,
+        digest: ObjectDigest,
+    },
 
-    #[error("EffectsForked: Effects for digest {} forked with diff {}", digest, diff)]
+    #[error(
+        "EffectsForked: Effects for digest {} forked with diff {}",
+        digest,
+        diff
+    )]
     EffectsForked {
         digest: TransactionDigest,
         diff: String,
@@ -118,8 +139,15 @@ pub enum ReplayEngineError {
         local: Box<SuiTransactionBlockEffects>,
     },
 
-    #[error("Transaction {:#?} not supported by replay. Reason: {:?}", digest, reason)]
-    TransactionNotSupported { digest: TransactionDigest, reason: String },
+    #[error(
+        "Transaction {:#?} not supported by replay. Reason: {:?}",
+        digest,
+        reason
+    )]
+    TransactionNotSupported {
+        digest: TransactionDigest,
+        reason: String,
+    },
 
     #[error(
         "Fatal! No framework versions for protocol version {protocol_version}. Make sure version tables are populated"
@@ -148,7 +176,10 @@ pub enum ReplayEngineError {
     UnableToQuerySystemEvents { rpc_err: String },
 
     #[error("Internal error or cache corrupted! Object {id}{} should be in cache.", version.map(|q| format!(" version {:#?}", q)).unwrap_or_default() )]
-    InternalCacheInvariantViolation { id: ObjectID, version: Option<SequenceNumber> },
+    InternalCacheInvariantViolation {
+        id: ObjectID,
+        version: Option<SequenceNumber>,
+    },
 
     #[error("Error getting dynamic fields loaded objects: {}", rpc_err)]
     UnableToGetDynamicFieldLoadedObjects { rpc_err: String },
@@ -162,7 +193,10 @@ pub enum ReplayEngineError {
     #[error("Unable to convert string {} to URL {}", url, err)]
     InvalidUrl { url: String, err: String },
 
-    #[error("Unable to execute transaction with existing network configs {:#?}", cfgs)]
+    #[error(
+        "Unable to execute transaction with existing network configs {:#?}",
+        cfgs
+    )]
     UnableToExecuteWithNetworkConfigs { cfgs: ReplayableNetworkConfigSet },
 
     #[error("Unable to get chain id: {}", err)]
@@ -172,10 +206,18 @@ pub enum ReplayEngineError {
 impl From<SuiObjectResponseError> for ReplayEngineError {
     fn from(err: SuiObjectResponseError) -> Self {
         match err {
-            SuiObjectResponseError::NotExists { object_id } => ReplayEngineError::ObjectNotExist { id: object_id },
-            SuiObjectResponseError::Deleted { object_id, digest, version } => {
-                ReplayEngineError::ObjectDeleted { id: object_id, version, digest }
+            SuiObjectResponseError::NotExists { object_id } => {
+                ReplayEngineError::ObjectNotExist { id: object_id }
             }
+            SuiObjectResponseError::Deleted {
+                object_id,
+                digest,
+                version,
+            } => ReplayEngineError::ObjectDeleted {
+                id: object_id,
+                version,
+                digest,
+            },
             _ => ReplayEngineError::SuiObjectResponseError { err },
         }
     }
@@ -195,8 +237,12 @@ impl From<SuiError> for ReplayEngineError {
 impl From<SuiRpcError> for ReplayEngineError {
     fn from(err: SuiRpcError) -> Self {
         match err {
-            SuiRpcError::RpcError(JsonRpseeError::RequestTimeout) => ReplayEngineError::SuiRpcRequestTimeout,
-            _ => ReplayEngineError::SuiRpcError { err: format!("{:?}", err) },
+            SuiRpcError::RpcError(JsonRpseeError::RequestTimeout) => {
+                ReplayEngineError::SuiRpcRequestTimeout
+            }
+            _ => ReplayEngineError::SuiRpcError {
+                err: format!("{:?}", err),
+            },
         }
     }
 }
@@ -209,7 +255,9 @@ impl From<UserInputError> for ReplayEngineError {
 
 impl From<anyhow::Error> for ReplayEngineError {
     fn from(err: anyhow::Error) -> Self {
-        ReplayEngineError::GeneralError { err: format!("{:#?}", err) }
+        ReplayEngineError::GeneralError {
+            err: format!("{:#?}", err),
+        }
     }
 }
 

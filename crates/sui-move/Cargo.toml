@@ -1,21 +1,22 @@
 [package]
 name = "sui-move"
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
-publish.workspace = true
 version.workspace = true
+authors = ["Mysten Labs <build@mystenlabs.com>"]
+license = "Apache-2.0"
+publish = false
+edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
 colored.workspace = true
-once_cell = { workspace = true, optional = true }
+once_cell.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 tracing.workspace = true
 prometheus.workspace = true
 bin-version.workspace = true
+serde.workspace = true
 
 move-binary-format.workspace = true
 move-cli.workspace = true
@@ -23,8 +24,9 @@ move-compiler.workspace = true
 move-disassembler.workspace = true
 move-ir-types.workspace = true
 move-package.workspace = true
-move-prover.workspace = true
+move-bytecode-source-map.workspace = true
 move-unit-test.workspace = true
+move-core-types.workspace = true
 telemetry-subscribers.workspace = true
 tokio = { workspace = true, features = ["full"] }
 
@@ -34,35 +36,30 @@ sui-move-natives = { path = "../../sui-execution/latest/sui-move-natives", packa
 sui-move-build.workspace = true
 sui-protocol-config.workspace = true
 sui-types.workspace = true
+sui-package-management.workspace = true
 better_any = "0.1.1"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-jemalloc-ctl.workspace = true
+tikv-jemalloc-ctl.workspace = true
 
 [dev-dependencies]
-assert_cmd.workspace = true
 futures.workspace = true
 jsonrpsee.workspace = true
 rand.workspace = true
 tempfile.workspace = true
+walkdir.workspace = true
+insta.workspace = true
 
 move-package.workspace = true
 
 mysten-metrics.workspace = true
-sui-core.workspace = true
 sui-macros.workspace = true
-one-node.workspace = true
-sui-simulator.workspace = true
 
 [package.metadata.cargo-udeps.ignore]
-normal = ["jemalloc-ctl"]
+normal = ["tikv-jemalloc-ctl"]
+
+[lints]
+workspace = true
 
 [features]
-default = []
-build = []
-coverage = []
-disassemble = []
-prove = []
-unit_test = ["build", "dep:once_cell"]
-calibrate = []
-all = ["build", "coverage", "disassemble", "prove", "unit_test", "calibrate"]
+tracing = []

@@ -1,43 +1,33 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    fmt,
-    fmt::{Debug, Display, Formatter, Write},
-    marker::PhantomData,
-    ops::Deref,
-    str::FromStr,
-};
+use std::fmt;
+use std::fmt::Write;
+use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::str::FromStr;
 
-use fastcrypto::encoding::Hex;
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{StructTag, TypeTag},
-};
+use move_core_types::account_address::AccountAddress;
+use move_core_types::language_storage::{StructTag, TypeTag};
 use schemars::JsonSchema;
-use serde::{
-    self,
-    de::{Deserializer, Error},
-    ser::{Error as SerError, Serializer},
-    Deserialize,
-    Serialize,
-};
-use serde_with::{serde_as, Bytes, DeserializeAs, DisplayFromStr, SerializeAs};
+use serde;
+use serde::de::{Deserializer, Error};
+use serde::ser::{Error as SerError, Serializer};
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use serde_with::DisplayFromStr;
+use serde_with::{Bytes, DeserializeAs, SerializeAs};
 
 use sui_protocol_config::ProtocolVersion;
 
 use crate::{
-    parse_sui_struct_tag,
-    parse_sui_type_tag,
-    DEEPBOOK_ADDRESS,
-    SUI_CLOCK_ADDRESS,
-    SUI_FRAMEWORK_ADDRESS,
-    SUI_SYSTEM_ADDRESS,
-    SUI_SYSTEM_STATE_ADDRESS,
+    parse_sui_struct_tag, parse_sui_type_tag, DEEPBOOK_ADDRESS, SUI_CLOCK_ADDRESS,
+    SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS, SUI_SYSTEM_STATE_ADDRESS,
 };
 
 #[inline]
-fn to_custom_error<'de, D, E>(e: E) -> D::Error
+pub(crate) fn to_custom_deser_error<'de, D, E>(e: E) -> D::Error
 where
     E: Debug,
     D: Deserializer<'de>,
@@ -46,7 +36,7 @@ where
 }
 
 #[inline]
-fn to_custom_ser_error<S, E>(e: E) -> S::Error
+pub(crate) fn to_custom_ser_error<S, E>(e: E) -> S::Error
 where
     E: Debug,
     S: Serializer,
@@ -104,55 +94,6 @@ where
         } else {
             R::deserialize_as(deserializer)
         }
-    }
-}
-
-/// custom serde for AccountAddress
-pub struct HexAccountAddress;
-
-impl SerializeAs<AccountAddress> for HexAccountAddress {
-    fn serialize_as<S>(value: &AccountAddress, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        Hex::serialize_as(value, serializer)
-    }
-}
-
-impl<'de> DeserializeAs<'de, AccountAddress> for HexAccountAddress {
-    fn deserialize_as<D>(deserializer: D) -> Result<AccountAddress, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        if s.starts_with("0x") { AccountAddress::from_hex_literal(&s) } else { AccountAddress::from_hex(&s) }
-            .map_err(to_custom_error::<'de, D, _>)
-    }
-}
-
-/// Serializes a bitmap according to the roaring bitmap on-disk standard.
-/// <https://github.com/RoaringBitmap/RoaringFormatSpec>
-pub struct SuiBitmap;
-
-impl SerializeAs<roaring::RoaringBitmap> for SuiBitmap {
-    fn serialize_as<S>(source: &roaring::RoaringBitmap, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut bytes = vec![];
-
-        source.serialize_into(&mut bytes).map_err(to_custom_ser_error::<S, _>)?;
-        Bytes::serialize_as(&bytes, serializer)
-    }
-}
-
-impl<'de> DeserializeAs<'de, roaring::RoaringBitmap> for SuiBitmap {
-    fn deserialize_as<D>(deserializer: D) -> Result<roaring::RoaringBitmap, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let bytes: Vec<u8> = Bytes::deserialize_as(deserializer)?;
-        roaring::RoaringBitmap::deserialize_from(&bytes[..]).map_err(to_custom_error::<'de, D, _>)
     }
 }
 
@@ -323,7 +264,10 @@ where
 pub struct SequenceNumber(#[schemars(with = "BigInt<u64>")] u64);
 
 impl SerializeAs<crate::base_types::SequenceNumber> for SequenceNumber {
-    fn serialize_as<S>(value: &crate::base_types::SequenceNumber, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize_as<S>(
+        value: &crate::base_types::SequenceNumber,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -364,5 +308,73 @@ impl<'de> DeserializeAs<'de, ProtocolVersion> for AsProtocolVersion {
     {
         let b = BigInt::<u64>::deserialize(deserializer)?;
         Ok(ProtocolVersion::from(*b))
+    }
+}
+
+/// Serializes and deserializes a RoaringBitmap with its own on-disk standard.
+/// <https://github.com/RoaringBitmap/RoaringFormatSpec>
+pub(crate) struct SuiBitmap;
+
+impl SerializeAs<roaring::RoaringBitmap> for SuiBitmap {
+    fn serialize_as<S>(source: &roaring::RoaringBitmap, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut bytes = vec![];
+
+        source
+            .serialize_into(&mut bytes)
+            .map_err(to_custom_ser_error::<S, _>)?;
+        Bytes::serialize_as(&bytes, serializer)
+    }
+}
+
+impl<'de> DeserializeAs<'de, roaring::RoaringBitmap> for SuiBitmap {
+    fn deserialize_as<D>(deserializer: D) -> Result<roaring::RoaringBitmap, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bytes: Vec<u8> = Bytes::deserialize_as(deserializer)?;
+        deserialize_sui_bitmap(&bytes).map_err(to_custom_deser_error::<'de, D, _>)
+    }
+}
+
+// RoaringBitmap::deserialize_from() or iter() do not check for duplicates.
+// So this function is needed to sanitize the bitmap to ensure unique entries.
+fn deserialize_sui_bitmap(bytes: &[u8]) -> std::io::Result<roaring::RoaringBitmap> {
+    let orig_bitmap = roaring::RoaringBitmap::deserialize_from(bytes)?;
+    // Ensure there is no duplicated entries in the bitmap.
+    let mut seen = std::collections::BTreeSet::new();
+    let mut new_bitmap = roaring::RoaringBitmap::new();
+    for v in orig_bitmap.iter() {
+        if seen.insert(v) {
+            new_bitmap.insert(v);
+        }
+    }
+    Ok(new_bitmap)
+}
+
+#[cfg(test)]
+mod test {
+    use base64::Engine as _;
+
+    use super::*;
+
+    #[test]
+    fn test_sui_bitmap_unique_deserialize() {
+        let raw = "OjAAAAoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWAAAAFoAAABcAAAAXgAAAGAAAABiAAAAZAAAAGYAAABoAAAAagAAAAEAAQABAAEAAQABAAEAAQABAAEA";
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(raw)
+            .unwrap();
+
+        let bitmap = roaring::RoaringBitmap::deserialize_from(&bytes[..]).unwrap();
+        assert_eq!(bitmap.len(), 10);
+        let bitmap_values: Vec<u32> = bitmap.iter().collect();
+        assert_eq!(bitmap_values, vec![1; 10]);
+
+        let sui_bitmap = deserialize_sui_bitmap(&bytes[..]).unwrap();
+        assert_eq!(sui_bitmap.len(), 1);
+        let bitmap_values: Vec<u32> = sui_bitmap.iter().collect();
+        assert_eq!(bitmap_values, vec![1]);
     }
 }

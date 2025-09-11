@@ -78,15 +78,23 @@ fn native_print(
     Ok(NativeResult::ok(gas_params.base_cost, smallvec![]))
 }
 
-pub fn make_native_print(silent: bool, gas_params: PrintGasParameters, move_std_addr: AccountAddress) -> NativeFunction {
+pub fn make_native_print(
+    silent: bool,
+    gas_params: PrintGasParameters,
+    move_std_addr: AccountAddress,
+) -> NativeFunction {
     if silent {
-        Arc::new(move |_context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_print_nop(&gas_params, ty_args, args)
-        })
+        Arc::new(
+            move |_context, ty_args, args| -> PartialVMResult<NativeResult> {
+                native_print_nop(&gas_params, ty_args, args)
+            },
+        )
     } else {
-        Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_print(&gas_params, context, ty_args, args, move_std_addr)
-        })
+        Arc::new(
+            move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+                native_print(&gas_params, context, ty_args, args, move_std_addr)
+            },
+        )
     }
 }
 
@@ -132,15 +140,22 @@ fn native_print_stack_trace(
     Ok(NativeResult::ok(gas_params.base_cost, smallvec![]))
 }
 
-pub fn make_native_print_stack_trace(silent: bool, gas_params: PrintStackTraceGasParameters) -> NativeFunction {
+pub fn make_native_print_stack_trace(
+    silent: bool,
+    gas_params: PrintStackTraceGasParameters,
+) -> NativeFunction {
     if silent {
-        Arc::new(move |_context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_print_stack_trace_nop(&gas_params, ty_args, args)
-        })
+        Arc::new(
+            move |_context, ty_args, args| -> PartialVMResult<NativeResult> {
+                native_print_stack_trace_nop(&gas_params, ty_args, args)
+            },
+        )
     } else {
-        Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_print_stack_trace(&gas_params, context, ty_args, args)
-        })
+        Arc::new(
+            move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+                native_print_stack_trace(&gas_params, context, ty_args, args)
+            },
+        )
     }
 }
 
@@ -159,8 +174,14 @@ pub fn make_all(
     move_std_addr: AccountAddress,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("print", make_native_print(silent, gas_params.print, move_std_addr)),
-        ("print_stack_trace", make_native_print_stack_trace(silent, gas_params.print_stack_trace)),
+        (
+            "print",
+            make_native_print(silent, gas_params.print, move_std_addr),
+        ),
+        (
+            "print_stack_trace",
+            make_native_print_stack_trace(silent, gas_params.print_stack_trace),
+        ),
     ];
 
     make_module_natives(natives)
@@ -199,12 +220,19 @@ mod testing {
             .with_message("Could not convert Vec<MoveValue> to Vec<u8>: ".to_string())
     }
 
-    fn get_annotated_struct_layout(context: &NativeContext, ty: &Type) -> PartialVMResult<MoveStructLayout> {
+    fn get_annotated_struct_layout(
+        context: &NativeContext,
+        ty: &Type,
+    ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?.unwrap();
         match annotated_type_layout {
             MoveTypeLayout::Struct(annotated_struct_layout) => Ok(annotated_struct_layout),
-            _ => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                .with_message("Could not convert Type to fully-annotated MoveTypeLayout via NativeContext".to_string())),
+            _ => Err(
+                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
+                    "Could not convert Type to fully-annotated MoveTypeLayout via NativeContext"
+                        .to_string(),
+                ),
+            ),
         }
     }
 
@@ -229,8 +257,9 @@ mod testing {
                 let buf = MoveValue::vec_to_vec_u8(bytes).map_err(to_vec_u8_type_err)?;
 
                 let str = String::from_utf8(buf).map_err(|e| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message("Could not parse UTF8 bytes: ".to_string() + e.to_string().as_str())
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
+                        "Could not parse UTF8 bytes: ".to_string() + e.to_string().as_str(),
+                    )
                 })?;
 
                 // We need to escape displayed double quotes " as \" and, as a result, also escape
@@ -332,7 +361,15 @@ mod testing {
                     // vector<T> to a MoveValue and print it.
                     _ => {
                         let mv = val.as_move_value(&ty_layout);
-                        print_move_value(out, mv, move_std_addr, depth, canonicalize, single_line, include_int_types)?;
+                        print_move_value(
+                            out,
+                            mv,
+                            move_std_addr,
+                            depth,
+                            canonicalize,
+                            single_line,
+                            include_int_types,
+                        )?;
                     }
                 };
             }
@@ -428,7 +465,8 @@ mod testing {
                 // Note that when `include_int_types` is enabled, the boolean `true` and `false`
                 // values unambiguously encode their type, since they are different than any integer
                 // type value, address value, signer value, vector value and struct value.
-                write!(out, "{}", if b { "true" } else { "false" }).map_err(fmt_error_to_partial_vm_error)?;
+                write!(out, "{}", if b { "true" } else { "false" })
+                    .map_err(fmt_error_to_partial_vm_error)?;
             }
             MoveValue::Address(a) => {
                 let str = if canonicalize {
@@ -450,9 +488,11 @@ mod testing {
                 // If this is a vector<u8> we print it in hex (as most users would expect us to)
                 if is_non_empty_vector_u8(&vec) {
                     let bytes = MoveValue::vec_to_vec_u8(vec).map_err(to_vec_u8_type_err)?;
-                    write!(out, "0x{}", hex::encode(&bytes)).map_err(fmt_error_to_partial_vm_error)?;
+                    write!(out, "0x{}", hex::encode(&bytes))
+                        .map_err(fmt_error_to_partial_vm_error)?;
                 } else {
-                    let is_complex_inner_type = vec.last().map_or(false, is_vector_or_struct_move_value);
+                    let is_complex_inner_type =
+                        vec.last().map_or(false, is_vector_or_struct_move_value);
                     print_non_u8_vector(
                         out,
                         move_std_addr,
@@ -473,16 +513,20 @@ mod testing {
                     // Check if struct is an std::string::String
                     if !canonicalize && type_.is_std_string(move_std_addr) {
                         if fields.len() != 1 {
-                            return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
-                                "Expected std::string::String struct to have just one field".to_string(),
-                            ));
+                            return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                                .with_message(
+                                    "Expected std::string::String struct to have just one field"
+                                        .to_string(),
+                                ));
                         }
 
                         let (id, val) = fields.pop().unwrap();
                         if id.into_string() != "bytes" {
-                            return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
-                                "Expected std::string::String struct to have a `bytes` field".to_string(),
-                            ));
+                            return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                                .with_message(
+                                    "Expected std::string::String struct to have a `bytes` field"
+                                        .to_string(),
+                                ));
                         }
 
                         let str = move_value_as_escaped_string(val)?;
@@ -490,14 +534,19 @@ mod testing {
                     } else if !canonicalize && type_.is_ascii_string(move_std_addr) {
                         if fields.len() != 1 {
                             return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                                .with_message("Expected std::ascii::String struct to have just one field".to_string()));
+                                .with_message(
+                                    "Expected std::ascii::String struct to have just one field"
+                                        .to_string(),
+                                ));
                         }
 
                         let (id, val) = fields.pop().unwrap();
                         if id.into_string() != "bytes" {
-                            return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
-                                "Expected std::ascii::String struct to have a `bytes` field".to_string(),
-                            ));
+                            return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                                .with_message(
+                                    "Expected std::ascii::String struct to have a `bytes` field"
+                                        .to_string(),
+                                ));
                         }
 
                         let str = move_value_as_escaped_string(val)?;
@@ -515,7 +564,8 @@ mod testing {
                                 print_padding_at_depth(out, depth + 1)?;
                             }
 
-                            write!(out, "{}: ", field_name.into_string()).map_err(fmt_error_to_partial_vm_error)?;
+                            write!(out, "{}: ", field_name.into_string())
+                                .map_err(fmt_error_to_partial_vm_error)?;
                             print_move_value(
                                 out,
                                 field_value,
@@ -527,7 +577,8 @@ mod testing {
                             )?;
 
                             for (field_name, field_value) in iter {
-                                write!(out, "{}", VECTOR_OR_STRUCT_SEP).map_err(fmt_error_to_partial_vm_error)?;
+                                write!(out, "{}", VECTOR_OR_STRUCT_SEP)
+                                    .map_err(fmt_error_to_partial_vm_error)?;
 
                                 if !single_line {
                                     writeln!(out).map_err(fmt_error_to_partial_vm_error)?;
@@ -535,7 +586,8 @@ mod testing {
                                 } else {
                                     write!(out, " ").map_err(fmt_error_to_partial_vm_error)?;
                                 }
-                                write!(out, "{}: ", field_name.into_string()).map_err(fmt_error_to_partial_vm_error)?;
+                                write!(out, "{}: ", field_name.into_string())
+                                    .map_err(fmt_error_to_partial_vm_error)?;
                                 print_move_value(
                                     out,
                                     field_value,
@@ -574,7 +626,15 @@ mod testing {
         single_line: bool,
         include_int_types: bool,
         vec: Vec<ValType>,
-        print_inner_value: impl Fn(&mut String, ValType, &AccountAddress, usize, bool, bool, bool) -> PartialVMResult<()>,
+        print_inner_value: impl Fn(
+            &mut String,
+            ValType,
+            &AccountAddress,
+            usize,
+            bool,
+            bool,
+            bool,
+        ) -> PartialVMResult<()>,
         is_complex_inner_type: bool,
     ) -> PartialVMResult<()> {
         write!(out, "{}", VECTOR_BEGIN).map_err(fmt_error_to_partial_vm_error)?;
@@ -592,7 +652,15 @@ mod testing {
                 write!(out, " ").map_err(fmt_error_to_partial_vm_error)?;
             }
 
-            print_inner_value(out, first_elem, move_std_addr, depth + 1, canonicalize, single_line, include_int_types)?;
+            print_inner_value(
+                out,
+                first_elem,
+                move_std_addr,
+                depth + 1,
+                canonicalize,
+                single_line,
+                include_int_types,
+            )?;
 
             for elem in iter {
                 write!(out, "{}", VECTOR_OR_STRUCT_SEP).map_err(fmt_error_to_partial_vm_error)?;
@@ -604,7 +672,15 @@ mod testing {
                 } else {
                     write!(out, " ").map_err(fmt_error_to_partial_vm_error)?;
                 }
-                print_inner_value(out, elem, move_std_addr, depth + 1, canonicalize, single_line, include_int_types)?;
+                print_inner_value(
+                    out,
+                    elem,
+                    move_std_addr,
+                    depth + 1,
+                    canonicalize,
+                    single_line,
+                    include_int_types,
+                )?;
             }
         }
 

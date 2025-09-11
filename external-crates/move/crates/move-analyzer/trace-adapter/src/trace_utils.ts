@@ -1,15 +1,46 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+
+/**
+ * This code supports two types of traces, one being a superset of the other:
+ * - a trace representing execution of a single top-level Move functtion
+ * - a trace containing traces representing external events in addtion to
+ *   traces of multiple top-level Move functions.
+ *
+ * The second, more general trace type, can interleave external events (represented
+ * in the JSON schema by `JSONTraceExt` interface) with those representing events
+ * related to Move function execution (represented in the JSON schema by
+ * `JSONTraceOpenFrame`, `JSONTraceInstruction`, `JSONTraceEffect`, and
+ * `JSONTraceCloseFrame` interfaces). In this trace, events related to
+ * Move function execution are demarcated by Move call start and end events.
+ * The first trace type will only contain events related Move function execution,
+ * with no special demarcation.
+ */
+
+
 import * as fs from 'fs';
 import { FRAME_LIFETIME, ModuleInfo } from './utils';
 import {
     IRuntimeCompoundValue,
     RuntimeValueType,
     IRuntimeVariableLoc,
-    IRuntimeRefValue
+    IRuntimeGlobalLoc,
+    IRuntimeLoc,
+    IRuntimeRefValue,
+    ExtEventKind as ExtEventKind,
+    ExtEventSummary,
+    IMoveCallInfo
 } from './runtime';
-import { ISourceMap, IFileLoc, IFileInfo, ILoc, ISourceMapFunction } from './source_map_utils';
+import {
+    IDebugInfo,
+    ILocalInfo,
+    IFileLoc,
+    IFileInfo,
+    ILoc,
+    IDebugInfoFunction
+} from './debug_info_utils';
+import { decompress } from 'fzstd';
 
 
 // Data types corresponding to trace file JSON schema.
@@ -23,7 +54,7 @@ interface JSONStructTypeDescription {
     address: string;
     module: string;
     name: string;
-    type_args: string[];
+    type_args: JSONBaseType[];
 }
 
 interface JSONStructType {
@@ -34,7 +65,7 @@ interface JSONVectorType {
     vector: JSONBaseType;
 }
 
-type JSONBaseType = string | JSONStructType | JSONVectorType;
+type JSONBaseType = string | JSONStructType | JSONVectorType | JSONStructTypeDescription;
 
 enum JSONTraceRefType {
     Mut = 'Mut',
@@ -46,11 +77,12 @@ interface JSONTraceType {
     ref_type?: JSONTraceRefType
 }
 
-type JSONTraceRuntimeValueType = boolean | number | string | JSONTraceRuntimeValueType[] | JSONTraceCompound;
+type JSONTraceMoveValue = {
+    type: JSONBaseType;
+    value: boolean | number | string | JSONTraceMoveValue[] | JSONTraceCompound
+};
 
-interface JSONTraceFields {
-    [key: string]: JSONTraceRuntimeValueType;
-}
+type JSONTraceFields = [string, JSONTraceMoveValue][];
 
 interface JSONTraceCompound {
     fields: JSONTraceFields;
@@ -61,7 +93,7 @@ interface JSONTraceCompound {
 
 interface JSONTraceRefValueContent {
     location: JSONTraceLocation;
-    snapshot: JSONTraceRuntimeValueType;
+    snapshot: JSONTraceMoveValue;
 }
 
 interface JSONTraceMutRefValue {
@@ -73,7 +105,7 @@ interface JSONTraceImmRefValue {
 }
 
 interface JSONTraceRuntimeValueContent {
-    value: JSONTraceRuntimeValueType;
+    value: JSONTraceMoveValue;
 }
 
 interface JSONTraceRuntimeValue {
@@ -91,6 +123,7 @@ interface JSONTraceFrame {
     is_native: boolean;
     locals_types: JSONTraceType[];
     module: JSONTraceModule;
+    version_id?: string; // introduced in trace v3
     parameters: JSONTraceValue[];
     return_types: JSONTraceType[];
     type_instantiation: string[];
@@ -116,17 +149,22 @@ interface JSONTraceIndexedLocation {
     Indexed: [JSONTraceLocalLocation, number];
 }
 
-type JSONTraceLocation = JSONTraceLocalLocation | JSONTraceIndexedLocation;
+interface JSONTraceGlobalLocation {
+    Global: number;
+}
+
+
+type JSONTraceLocation = JSONTraceLocalLocation | JSONTraceIndexedLocation | JSONTraceGlobalLocation;
 
 interface JSONTraceWriteEffect {
     location: JSONTraceLocation;
-    root_value_after_write: JSONTraceRuntimeValue;
+    root_value_after_write: JSONTraceValue;
 }
 
 interface JSONTraceReadEffect {
     location: JSONTraceLocation;
     moved: boolean;
-    root_value_read: JSONTraceRuntimeValue;
+    root_value_read: JSONTraceValue;
 }
 
 interface JSONTracePushEffect {
@@ -145,11 +183,18 @@ interface JSONTracePopEffect {
     };
 }
 
+interface JSONDataLoadEffect {
+    ref_type: JSONTraceRefType;
+    location: JSONTraceLocation;
+    snapshot: JSONTraceMoveValue;
+}
+
 interface JSONTraceEffect {
     Push?: JSONTracePushEffect;
     Pop?: JSONTracePopEffect;
     Write?: JSONTraceWriteEffect;
     Read?: JSONTraceReadEffect;
+    DataLoad?: JSONDataLoadEffect;
     ExecutionError?: string;
 
 }
@@ -160,11 +205,57 @@ interface JSONTraceCloseFrame {
     return_: JSONTraceRuntimeValueContent[];
 }
 
+interface JSONExtMoveCallSummary {
+    MoveCall: IMoveCallInfo
+}
+
+interface JSONExtSummary {
+    ExternalEvent: String
+}
+
+interface JSONTraceExtMoveValueInfo {
+    type_: JSONTraceType;
+    value: JSONTraceMoveValue;
+}
+
+interface JSONTraceExtMoveValueSingle {
+    name: string;
+    info: JSONTraceExtMoveValueInfo;
+}
+
+interface JSONTraceExtMoveValueVector {
+    name: string;
+    type_: JSONTraceType;
+    value: JSONTraceMoveValue[];
+}
+
+interface JSONTraceExtMoveValue {
+    Single: JSONTraceExtMoveValueSingle;
+    Vector: JSONTraceExtMoveValueVector
+}
+
+interface JSONTraceSummaryEvent {
+    name: string;
+    events: [JSONExtMoveCallSummary | JSONExtSummary][]
+}
+
+interface JSONTraceExtEvent {
+    description: string;
+    name: string;
+    values: JSONTraceExtMoveValue[];
+}
+
+type JSONTraceExt =
+    | { Summary: JSONTraceSummaryEvent }
+    | { ExternalEvent: JSONTraceExtEvent }
+    | string;
+
 interface JSONTraceEvent {
     OpenFrame?: JSONTraceOpenFrame;
     Instruction?: JSONTraceInstruction;
     Effect?: JSONTraceEffect;
     CloseFrame?: JSONTraceCloseFrame;
+    External?: JSONTraceExt;
 }
 
 interface JSONTraceRootObject {
@@ -206,7 +297,9 @@ export enum TraceEventKind {
     OpenFrame,
     CloseFrame,
     Instruction,
-    Effect
+    Effect,
+    ExternalSummary,
+    ExternalEvent
 }
 
 /**
@@ -222,22 +315,55 @@ export type TraceEvent =
         type: TraceEventKind.OpenFrame,
         id: number,
         name: string,
-        fileHash: string
+        srcFileHash: string
+        bcodeFileHash?: string,
         isNative: boolean,
         localsTypes: string[],
-        localsNames: string[],
+        localsNames: ILocalInfo[],
         paramValues: RuntimeValueType[]
-        optimizedLines: number[]
+        optimizedSrcLines: number[]
+        optimizedBcodeLines?: number[]
     }
     | { type: TraceEventKind.CloseFrame, id: number }
-    | { type: TraceEventKind.Instruction, pc: number, loc: ILoc, kind: TraceInstructionKind }
-    | { type: TraceEventKind.Effect, effect: EventEffect };
+    | {
+        type: TraceEventKind.Instruction,
+        pc: number,
+        srcLoc: ILoc,
+        bcodeLoc?: ILoc,
+        kind: TraceInstructionKind
+    }
+    | { type: TraceEventKind.Effect, effect: EventEffect }
+    | {
+        type: TraceEventKind.ExternalSummary,
+        id: number,
+        name: string,
+        summary: ExtEventSummary[]
+    }
+    | { type: TraceEventKind.ExternalEvent, event: ExternalEventInfo };
+
+export type ExternalEventInfo =
+    | {
+        kind: ExtEventKind.MoveCallStart
+    } | {
+        kind: ExtEventKind.MoveCallEnd
+    } | {
+        kind: ExtEventKind.ExtEventStart
+        id: number
+        description: string
+        name: string
+        localsTypes: string[]
+        localsNames: string[]
+        localsValues: RuntimeValueType[]
+    } | {
+        kind: ExtEventKind.ExtEventEnd
+    };
 
 /**
  * Kind of an effect of an instruction.
  */
 export enum TraceEffectKind {
     Write = 'Write',
+    DataLoad = 'DataLoad',
     ExecutionError = 'ExecutionError'
     // TODO: other effect types
 }
@@ -246,7 +372,7 @@ export enum TraceEffectKind {
  * Effect of an instruction.
  */
 export type EventEffect =
-    | { type: TraceEffectKind.Write, loc: IRuntimeVariableLoc, value: RuntimeValueType }
+    | { type: TraceEffectKind.Write, indexedLoc: IRuntimeLoc, value: RuntimeValueType }
     | { type: TraceEffectKind.ExecutionError, msg: string };
 
 /**
@@ -264,9 +390,15 @@ interface ITrace {
 
     /**
      * Maps file path to the lines of code present in the trace instructions
-     * in functions defined in the file.
+     * in functions defined in the source files.
      */
-    tracedLines: Map<string, Set<number>>;
+    tracedSrcLines: Map<string, Set<number>>;
+
+    /**
+     * Maps file path to the lines of code present in the trace instructions
+     * in functions defined in the disassembled bytecode files.
+     */
+    tracedBcodeLines: Map<string, Set<number>>;
 }
 
 /**
@@ -278,58 +410,127 @@ interface ITraceGenFrameInfo {
      */
     ID: number;
     /**
-     * PC locations traced in the frame
+     * Path to a source  file containing function represented by the frame.
      */
-    pcLocs: IFileLoc[];
+    srcFilePath: string;
     /**
-     * Path to a file containing function represented by the frame.
+     * Path to a disassembled bytecode file containing function represented by the frame.
      */
-    filePath: string;
+    bcodeFilePath?: string;
     /**
-     * Hash of a file containing function represented by the frame.
+     * Hash of a source file containing function represented by the frame.
      */
-    fileHash: string;
+    srcFileHash: string;
     /**
-     * Code ines in a given file that have been optimized away.
+     * Hash of a disassembled bytecode file containing function represented by the frame.
      */
-    optimizedLines: number[];
+    bcodeFileHash?: string;
+    /**
+     * Code lines in a given source file that have been optimized away.
+     */
+    optimizedSrcLines: number[];
+    /**
+     * Code lines in a given disassembled bytecode file that have been optimized away.
+     */
+    optimizedBcodeLines?: number[];
     /**
      * Name of the function represented by the frame.
      */
     funName: string;
     /**
-     * Source map information for a given function.
-     */
-    funEntry: ISourceMapFunction;
+    * Information for a given function in a source file.
+    */
+    srcFunEntry: IDebugInfoFunction;
+    /**
+    * Information for a given function in a disassembled byc file.
+    */
+    bcodeFunEntry?: IDebugInfoFunction;
 }
 
 /**
  * An ID of a virtual frame representing a macro defined in the same file
  * where it is inlined.
  */
-const INLINED_FRAME_ID_SAME_FILE = -1;
+export const INLINED_FRAME_ID_SAME_FILE = Number.MAX_SAFE_INTEGER - 1;
+
 /**
  * An ID of a virtual frame representing a macro defined in a different file
  * than file where it is inlined.
  */
-const INLINED_FRAME_ID_DIFFERENT_FILE = -2;
+export const INLINED_FRAME_ID_DIFFERENT_FILE = Number.MAX_SAFE_INTEGER - 2;
+
+/**
+ * An ID of a virtual frame representing external events summary.
+ */
+export const EXT_SUMMARY_FRAME_ID = Number.MAX_SAFE_INTEGER - 3;
+
+/**
+ * An ID of a virtual frame representing external event.
+ */
+export const EXT_EVENT_FRAME_ID = Number.MAX_SAFE_INTEGER - 4;
+
+
+/**
+ * Splits decompressed trace file data into lines without creating a large intermediate string.
+ * This avoids hitting JavaScript's maximum string length limit for large trace files.
+ *
+ * @param decompressed the decompressed buffer containing trace data
+ * @returns array of strings representing lines from the trace file
+ */
+function splitTraceFileLines(decompressed: Uint8Array): string[] {
+    const NEWLINE_BYTE = 0x0A;
+    const decoder = new TextDecoder();
+    const lines: string[] = [];
+
+    let lineStart = 0;
+
+    for (let i = 0; i <= decompressed.length; i++) {
+        if (i === decompressed.length || decompressed[i] === NEWLINE_BYTE) {
+            // end of the buffer or a new line
+            if (i > lineStart) {
+                const lineBytes = decompressed.slice(lineStart, i);
+                const line = decoder.decode(lineBytes).trimEnd();
+                lines.push(line);
+            }
+            lineStart = i + 1;
+        }
+    }
+
+    return lines;
+}
 
 /**
  * Reads a Move VM execution trace from a JSON file.
  *
  * @param traceFilePath path to the trace JSON file.
- * @param sourceMapsModMap a map from stringified module info to a source map.
- * @param sourceMapsHashMap a map from file hash to a source map.
+ * @param srcDebugInfosHashMap a map from file hash to debug info.
+ * @param srcDebugInfosModMap a map from stringified module info to debug info.
+ * @param bcodeDebugInfosModMap a map from stringified module info to debug info.
+ * @param filesMap a map from file hash to file info (for both source files
+ * and disassembled bytecode files).
  * @returns execution trace.
  * @throws Error with a descriptive error message if reading trace has failed.
  */
-export function readTrace(
+export async function readTrace(
     traceFilePath: string,
-    sourceMapsModMap: Map<string, ISourceMap>,
-    sourceMapsHashMap: Map<string, ISourceMap>,
-    filesMap: Map<string, IFileInfo>
-): ITrace {
-    const traceJSON: JSONTraceRootObject = JSON.parse(fs.readFileSync(traceFilePath, 'utf8'));
+    srcDebugInfosHashMap: Map<string, IDebugInfo>,
+    srcDebugInfosModMap: Map<string, IDebugInfo>,
+    bcodeDebugInfosModMap: Map<string, IDebugInfo>,
+    filesMap: Map<string, IFileInfo>,
+): Promise<ITrace> {
+    const buf = Buffer.from(fs.readFileSync(traceFilePath));
+    const decompressed = await decompress(buf);
+    const lines = splitTraceFileLines(decompressed);
+    const [header, ...rest] = lines;
+    const jsonVersion: number = JSON.parse(header).version;
+    const jsonEvents: JSONTraceEvent[] = rest.map((line) => {
+        return JSON.parse(line);
+    });
+
+    const traceJSON: JSONTraceRootObject = {
+        events: jsonEvents,
+        version: jsonVersion,
+    };
     if (traceJSON.events.length === 0) {
         throw new Error('Trace contains no events');
     }
@@ -354,7 +555,8 @@ export function readTrace(
     // the loop
     const localLifetimeEnds = new Map<number, number[]>();
     const localLifetimeEndsMax = new Map<number, number[]>();
-    const tracedLines = new Map<string, Set<number>>();
+    const tracedSrcLines = new Map<string, Set<number>>();
+    const tracedBcodeLines = new Map<string, Set<number>>();
     // stack of frame infos OpenFrame and popped on CloseFrame
     const frameInfoStack: ITraceGenFrameInfo[] = [];
     for (const event of traceJSON.events) {
@@ -380,48 +582,81 @@ export function readTrace(
                 }
             }
             localLifetimeEnds.set(frame.frame_id, lifetimeEnds);
+            // Trace v3 introduces `version_id` field in frame, which represents
+            // address of the on-chain package version that contains the function.
+            // It is different from `frame.module.address` if the package has been
+            // upgraded.
+            const addr = frame.version_id ? frame.version_id : frame.module.address;
             const modInfo = {
-                addr: frame.module.address,
+                addr: addr,
                 name: frame.module.name
             };
-            const sourceMap = sourceMapsModMap.get(JSON.stringify(modInfo));
-            if (!sourceMap) {
-                throw new Error('Source map for module '
+            const debugInfo = srcDebugInfosModMap.get(JSON.stringify(modInfo));
+            if (!debugInfo) {
+                throw new Error('Debug info for module '
                     + modInfo.name
                     + ' in package '
                     + modInfo.addr
                     + ' not found');
             }
-            const funEntry = sourceMap.functions.get(frame.function_name);
-            if (!funEntry) {
-                throw new Error('Cannot find function entry in source map for function '
+            const srcFunEntry = debugInfo.functions.get(frame.function_name);
+            if (!srcFunEntry) {
+                throw new Error('Cannot find function entry in debug info for function '
                     + frame.function_name
+                    + ' in module '
+                    + modInfo.name
+                    + ' in package '
+                    + modInfo.addr
                     + ' when processing OpenFrame event');
+            }
+
+            const srcFileHash = debugInfo.fileHash;
+            const optimizedSrcLines = debugInfo.optimizedLines;
+            // there may be no disassembly info
+            let bcodeFileHash = undefined;
+            let optimizedBcodeLines = undefined;
+            let bcodeFunEntry = undefined;
+            let bcodeFilePath = undefined;
+            const bcodeMap = bcodeDebugInfosModMap.get(JSON.stringify(modInfo));
+            if (bcodeMap) {
+                bcodeFileHash = bcodeMap.fileHash;
+                optimizedBcodeLines = bcodeMap.optimizedLines;
+                bcodeFunEntry = bcodeMap.functions.get(frame.function_name);
+                const currentBCodeFile = filesMap.get(bcodeMap.fileHash);
+                if (currentBCodeFile) {
+                    bcodeFilePath = currentBCodeFile.path;
+                }
+
             }
             events.push({
                 type: TraceEventKind.OpenFrame,
                 id: frame.frame_id,
                 name: frame.function_name,
-                fileHash: sourceMap.fileHash,
+                srcFileHash,
+                bcodeFileHash,
                 isNative: frame.is_native,
                 localsTypes,
-                localsNames: funEntry.localsNames,
+                localsNames: srcFunEntry.localsInfo,
                 paramValues,
-                optimizedLines: sourceMap.optimizedLines
+                optimizedSrcLines,
+                optimizedBcodeLines
             });
-            const currentFile = filesMap.get(sourceMap.fileHash);
+            const currentSrcFile = filesMap.get(debugInfo.fileHash);
 
-            if (!currentFile) {
-                throw new Error(`Cannot find file with hash: ${sourceMap.fileHash}`);
+            if (!currentSrcFile) {
+                throw new Error(`Cannot find file with hash: ${debugInfo.fileHash}`);
             }
             frameInfoStack.push({
                 ID: frame.frame_id,
-                pcLocs: funEntry.pcLocs,
-                filePath: currentFile.path,
-                fileHash: sourceMap.fileHash,
-                optimizedLines: sourceMap.optimizedLines,
+                srcFilePath: currentSrcFile.path,
+                bcodeFilePath,
+                srcFileHash,
+                bcodeFileHash,
+                optimizedSrcLines,
+                optimizedBcodeLines: optimizedBcodeLines,
                 funName: frame.function_name,
-                funEntry
+                srcFunEntry,
+                bcodeFunEntry
             });
         } else if (event.CloseFrame) {
             events.push({
@@ -432,27 +667,26 @@ export function readTrace(
         } else if (event.Instruction) {
             const name = event.Instruction.instruction;
             let frameInfo = frameInfoStack[frameInfoStack.length - 1];
-            const fid = frameInfo.ID;
-            const pcLocs = frameInfo.pcLocs;
+            const srcPCLocs = frameInfo.srcFunEntry.pcLocs;
             // if map does not contain an entry for a PC that can be found in the trace file,
             // it means that the position of the last PC in the source map should be used
-            let instLoc = event.Instruction.pc >= pcLocs.length
-                ? pcLocs[pcLocs.length - 1]
-                : pcLocs[event.Instruction.pc];
-
-            if (!instLoc) {
-                throw new Error('Cannot find location for PC: '
-                    + event.Instruction.pc
-                    + ' in frame: '
-                    + fid);
+            const instSrcFileLoc = event.Instruction.pc >= srcPCLocs.length
+                ? srcPCLocs[srcPCLocs.length - 1]
+                : srcPCLocs[event.Instruction.pc];
+            let instBcodeFileLoc = undefined;
+            if (frameInfo.bcodeFunEntry?.pcLocs) {
+                const bcodePCLocs = frameInfo.bcodeFunEntry.pcLocs;
+                instBcodeFileLoc = event.Instruction.pc >= bcodePCLocs.length
+                    ? bcodePCLocs[bcodePCLocs.length - 1]
+                    : bcodePCLocs[event.Instruction.pc];
             }
 
             const differentFileVirtualFramePop = processInstructionIfMacro(
-                sourceMapsHashMap,
+                srcDebugInfosHashMap,
                 events,
                 frameInfoStack,
                 event.Instruction.pc,
-                instLoc
+                instSrcFileLoc
             );
 
             if (differentFileVirtualFramePop) {
@@ -460,42 +694,49 @@ export function readTrace(
                 // we may still land in a macro defined in the same file, in which case
                 // we need to push another virtual frame for this instruction right away
                 processInstructionIfMacro(
-                    sourceMapsHashMap,
+                    srcDebugInfosHashMap,
                     events,
                     frameInfoStack,
                     event.Instruction.pc,
-                    instLoc
+                    instSrcFileLoc
                 );
             }
 
-
-            // re-read frame info as it may have changed as a result of processing
-            // and inlined call
-            frameInfo = frameInfoStack[frameInfoStack.length - 1];
-            const filePath = frameInfo.filePath;
-            const lines = tracedLines.get(filePath) || new Set<number>();
-            // floc is still good as the pc_locs used for its computation
-            // do not change as a result of processing inlined frames
-            lines.add(instLoc.loc.line);
-            tracedLines.set(filePath, lines);
+            recordTracedLine(filesMap, tracedSrcLines, instSrcFileLoc);
+            if (instBcodeFileLoc) {
+                recordTracedLine(filesMap, tracedBcodeLines, instBcodeFileLoc);
+            }
             events.push({
                 type: TraceEventKind.Instruction,
                 pc: event.Instruction.pc,
-                loc: instLoc.loc,
+                srcLoc: instSrcFileLoc.loc,
+                bcodeLoc: instBcodeFileLoc?.loc,
                 kind: name in TraceInstructionKind
                     ? TraceInstructionKind[name as keyof typeof TraceInstructionKind]
                     : TraceInstructionKind.UNKNOWN
             });
+            // re-read frame info as it may have changed as a result of processing
+            // and inlined call
+            frameInfo = frameInfoStack[frameInfoStack.length - 1];
 
             // Set end of lifetime for all locals to the max instruction PC ever seen
-            // for a given local (if they are live after this instructions, they will
+            // for a given local (if they are alive after this instructions, they will
             // be reset to FRAME_LIFETIME when processing subsequent effects).
             // All instructions in a given function, regardless of whether they are
             // in the inlined portion of the code or not, reset variable lifetimes.
-            const nonInlinedFrameID = frameInfo.ID !== INLINED_FRAME_ID_SAME_FILE &&
-                frameInfo.ID !== INLINED_FRAME_ID_DIFFERENT_FILE
-                ? frameInfo.ID
-                : frameInfoStack[frameInfoStack.length - 2].ID;
+            let nonInlinedFrameID = frameInfo.ID;
+            if (frameInfo.ID === INLINED_FRAME_ID_SAME_FILE || frameInfo.ID === INLINED_FRAME_ID_DIFFERENT_FILE) {
+                // Search from the top of the stack to find the first non-inlined frame.
+                // It's guaranteed that there is at least one non-inlined frame on the stack.
+                for (let i = frameInfoStack.length - 1; i >= 0; i--) {
+                    const currentFrame = frameInfoStack[i];
+                    if (currentFrame.ID !== INLINED_FRAME_ID_SAME_FILE &&
+                        currentFrame.ID !== INLINED_FRAME_ID_DIFFERENT_FILE) {
+                        nonInlinedFrameID = currentFrame.ID;
+                        break;
+                    }
+                }
+            }
             const lifetimeEnds = localLifetimeEnds.get(nonInlinedFrameID) || [];
             const lifetimeEndsMax = localLifetimeEndsMax.get(nonInlinedFrameID) || [];
             for (let i = 0; i < lifetimeEnds.length; i++) {
@@ -513,24 +754,47 @@ export function readTrace(
             localLifetimeEndsMax.set(nonInlinedFrameID, lifetimeEndsMax);
         } else if (event.Effect) {
             const effect = event.Effect;
-            if (effect.Write || effect.Read) {
-                // if a local is read or written, set its end of lifetime
-                // to infinite (end of frame)
-                const location = effect.Write ? effect.Write.location : effect.Read!.location;
-                const loc = processJSONLocalLocation(location, localLifetimeEnds);
+            if (effect.Write || effect.Read || effect.DataLoad) {
+                const location = effect.Write
+                    ? effect.Write.location
+                    : (effect.Read
+                        ? effect.Read.location
+                        : effect.DataLoad!.location);
+                const runtimeLoc = processJSONLocation(location, [], localLifetimeEnds);
                 if (effect.Write) {
-                    if (!loc) {
-                        throw new Error('Unsupported location type in Write effect');
-                    }
-                    // process a write only if the location is supported
+                    // DataLoad is essentially a form of a write
                     const value = 'RuntimeValue' in effect.Write.root_value_after_write
                         ? traceRuntimeValueFromJSON(effect.Write.root_value_after_write.RuntimeValue.value)
-                        : traceRefValueFromJSON(effect.Write.root_value_after_write);
+                        : 'globalIndex' in runtimeLoc.loc
+                            // We are writing to a global value here. Global values are
+                            // effectively references that appear "out of thin air" (e.g.,
+                            // are passed as parameters to top level functions). Unlike regular
+                            // references, for the global ones there isn't a natural end to the
+                            // the reference chain ending in a "regular" value - we need to
+                            // create one. When processing the trace, when writing to a global,
+                            // we need the actual value, so that the runtime has a chance to
+                            // store (and update) it accordingly. Failing to do so may result
+                            // in infinite recursion when trying to assign a global (reference)
+                            // to (potentially indexed) self.
+                            ? derefTraceRefValueFromJSON(effect.Write.root_value_after_write)
+                            : traceRefValueFromJSON(effect.Write.root_value_after_write);
+
                     events.push({
                         type: TraceEventKind.Effect,
                         effect: {
                             type: TraceEffectKind.Write,
-                            loc,
+                            indexedLoc: runtimeLoc,
+                            value
+                        }
+                    });
+                }
+                else if (effect.DataLoad) {
+                    const value = traceRuntimeValueFromJSON(effect.DataLoad.snapshot);
+                    events.push({
+                        type: TraceEventKind.Effect,
+                        effect: {
+                            type: TraceEffectKind.Write,
+                            indexedLoc: runtimeLoc,
                             value
                         }
                     });
@@ -545,9 +809,116 @@ export function readTrace(
                     }
                 });
             }
+        } else if (event.External) {
+            const external = event.External;
+            if (typeof external === 'string') {
+                if (external === ExtEventKind.MoveCallStart) {
+                    events.push({
+                        type: TraceEventKind.ExternalEvent,
+                        event: {
+                            kind: ExtEventKind.MoveCallStart
+                        }
+                    });
+                } else if (external === ExtEventKind.MoveCallEnd) {
+                    events.push({
+                        type: TraceEventKind.ExternalEvent,
+                        event: {
+                            kind: ExtEventKind.MoveCallEnd
+                        }
+                    });
+                }
+            } else if ('Summary' in external) {
+                const summary: ExtEventSummary[] = external.Summary.events.map((s) => {
+                    if (typeof s === 'object' && 'MoveCall' in s &&
+                        s.MoveCall && typeof s.MoveCall === 'object' &&
+                        'pkg' in s.MoveCall && 'module' in s.MoveCall && 'function' in s.MoveCall) {
+
+                        const info: IMoveCallInfo = {
+                            pkg: s.MoveCall.pkg as string,
+                            module: s.MoveCall.module as string,
+                            function: s.MoveCall.function as string
+                        };
+                        return info;
+                    } else if (typeof s === 'object' && 'ExternalEvent' in s && s.ExternalEvent) {
+                        return s.ExternalEvent.toString();
+                    } else {
+                        throw new Error('Unexpected external summary event: ' + JSON.stringify(s));
+                    }
+                });
+                events.push({
+                    type: TraceEventKind.ExternalSummary,
+                    id: EXT_SUMMARY_FRAME_ID,
+                    name: external.Summary.name,
+                    summary
+                });
+
+            } else if ('ExternalEvent' in external) {
+                const localsTypes: string[] = [];
+                const localsNames: string[] = [];
+                const localsValues: RuntimeValueType = [];
+                for (const v of external.ExternalEvent.values) {
+                    if (v.Single) {
+                        const type_ = v.Single.info.type_;
+                        localsTypes.push(JSONTraceTypeToString(type_.type_, type_.ref_type));
+                        localsNames.push(v.Single.name);
+                        localsValues.push(traceRuntimeValueFromJSON(v.Single.info.value));
+                    } else if (v.Vector) {
+                        const type_ = v.Vector.type_;
+                        localsTypes.push(`vector<${JSONTraceTypeToString(type_.type_, type_.ref_type)}>`);
+
+                        localsNames.push(v.Vector.name);
+                        localsValues.push(v.Vector.value.map((v) => {
+                            return traceRuntimeValueFromJSON(v);
+                        }));
+                    }
+                }
+                events.push({
+                    type: TraceEventKind.ExternalEvent,
+                    event: {
+                        kind: ExtEventKind.ExtEventStart,
+                        id: EXT_EVENT_FRAME_ID,
+                        description: external.ExternalEvent.description,
+                        name: external.ExternalEvent.name,
+                        localsTypes,
+                        localsNames,
+                        localsValues
+                    }
+                });
+                // Additional marker to make stepping through event frames easier
+                events.push({
+                    type: TraceEventKind.ExternalEvent,
+                    event: {
+                        kind: ExtEventKind.ExtEventEnd
+                    }
+                });
+            }
         }
     }
-    return { events, localLifetimeEnds, tracedLines };
+    return { events, localLifetimeEnds, tracedSrcLines, tracedBcodeLines };
+}
+
+/**
+ * Records a line of code traced in a given file.
+ *
+ * @param filesMap map from file hash to file info.
+ * @param tracedLines map from file path to a set of traced lines.
+ * @param loc traced file location
+ * @throws Error with a descriptive error message if line cannot be recorded.
+ */
+function recordTracedLine(
+    filesMap: Map<string, IFileInfo>,
+    tracedLines: Map<string, Set<number>>,
+    floc: IFileLoc
+) {
+    const file = filesMap.get(floc.fileHash);
+    if (!file) {
+        throw new Error('Cannot find file with hash: '
+            + floc.fileHash
+            + ' when recording traced line');
+    }
+    const lines = tracedLines.get(file.path) || new Set<number>();
+    lines.add(floc.loc.line);
+    tracedLines.set(file.path, lines);
 }
 
 /**
@@ -559,20 +930,20 @@ export function readTrace(
  * @param events trace events.
  * @param frameInfoStack stack of frame infos used during trace generation.
  * @param instPC PC of the instruction.
- * @param instLoc location of the instruction.
+ * @param instSrcFileLoc location of the instruction in the source file.
  * @returns `true` if this instruction caused a pop of a virtual frame for
  * an inlined macro defined in a different file, `false` otherwise.
  */
 function processInstructionIfMacro(
-    sourceMapsHashMap: Map<string, ISourceMap>,
+    sourceMapsHashMap: Map<string, IDebugInfo>,
     events: TraceEvent[],
     frameInfoStack: ITraceGenFrameInfo[],
     instPC: number,
-    instLoc: IFileLoc
+    instSrcFileLoc: IFileLoc
 ): boolean {
     let frameInfo = frameInfoStack[frameInfoStack.length - 1];
     const fid = frameInfo.ID;
-    if (instLoc.fileHash !== frameInfo.fileHash) {
+    if (instSrcFileLoc.fileHash !== frameInfo.srcFileHash) {
         // This indicates that we are going to an instruction in the same function
         // but in a different file, which can happen due to macro inlining.
         // One could think of "outlining" the inlined code to create separate
@@ -612,7 +983,7 @@ function processInstructionIfMacro(
         // a macro in a different file. In this case, we will have two inlined
         // frames on the stack.
         if (frameInfoStack.length > 1 &&
-            frameInfoStack[frameInfoStack.length - 2].fileHash === instLoc.fileHash
+            frameInfoStack[frameInfoStack.length - 2].srcFileHash === instSrcFileLoc.fileHash
         ) {
             frameInfoStack.pop();
             events.push({
@@ -621,10 +992,10 @@ function processInstructionIfMacro(
             });
             return true;
         } else {
-            const sourceMap = sourceMapsHashMap.get(instLoc.fileHash);
+            const sourceMap = sourceMapsHashMap.get(instSrcFileLoc.fileHash);
             if (!sourceMap) {
                 throw new Error('Cannot find source map for file with hash: '
-                    + instLoc.fileHash
+                    + instSrcFileLoc.fileHash
                     + ' when frame switching within frame '
                     + fid
                     + ' at PC '
@@ -633,7 +1004,7 @@ function processInstructionIfMacro(
             if (frameInfo.ID === INLINED_FRAME_ID_DIFFERENT_FILE) {
                 events.push({
                     type: TraceEventKind.ReplaceInlinedFrame,
-                    fileHash: instLoc.fileHash,
+                    fileHash: instSrcFileLoc.fileHash,
                     optimizedLines: sourceMap.optimizedLines
                 });
                 // pop the current inlined frame so that it can
@@ -644,24 +1015,31 @@ function processInstructionIfMacro(
                     type: TraceEventKind.OpenFrame,
                     id: INLINED_FRAME_ID_DIFFERENT_FILE,
                     name: '__inlined__',
-                    fileHash: instLoc.fileHash,
+                    srcFileHash: instSrcFileLoc.fileHash,
+                    // bytecode file hash stays the same for inlined frames
+                    bcodeFileHash: frameInfo.bcodeFileHash,
                     isNative: false,
                     localsTypes: [],
                     localsNames: [],
                     paramValues: [],
-                    optimizedLines: sourceMap.optimizedLines
+                    optimizedSrcLines: sourceMap.optimizedLines,
+                    // optimized bytecode lines stay the same for inlined frames
+                    optimizedBcodeLines: frameInfo.optimizedBcodeLines,
                 });
             }
             frameInfoStack.push({
                 ID: INLINED_FRAME_ID_DIFFERENT_FILE,
                 // same pcLocs as before since we are in the same function
-                pcLocs: frameInfo.pcLocs,
-                filePath: sourceMap.filePath,
-                fileHash: sourceMap.fileHash,
-                optimizedLines: sourceMap.optimizedLines,
+                srcFilePath: sourceMap.filePath,
+                bcodeFilePath: frameInfo.bcodeFilePath,
+                srcFileHash: sourceMap.fileHash,
+                bcodeFileHash: frameInfo.bcodeFileHash,
+                optimizedSrcLines: sourceMap.optimizedLines,
+                optimizedBcodeLines: frameInfo.optimizedBcodeLines,
                 // same function name and source map as before since we are in the same function
                 funName: frameInfo.funName,
-                funEntry: frameInfo.funEntry
+                srcFunEntry: frameInfo.srcFunEntry,
+                bcodeFunEntry: frameInfo.bcodeFunEntry
             });
         }
     } else if (frameInfo.ID !== INLINED_FRAME_ID_DIFFERENT_FILE) {
@@ -683,12 +1061,12 @@ function processInstructionIfMacro(
         // - if the instruction is in the function:
         //   - if we are in an inlined frame, we need to pop it
         //   - if we are not in an inlined frame, we don't need to do anything
-        if (instLoc.loc.line < frameInfo.funEntry.startLoc.line ||
-            instLoc.loc.line > frameInfo.funEntry.endLoc.line ||
-            (instLoc.loc.line === frameInfo.funEntry.startLoc.line &&
-                instLoc.loc.column < frameInfo.funEntry.startLoc.column) ||
-            (instLoc.loc.line === frameInfo.funEntry.endLoc.line &&
-                instLoc.loc.column > frameInfo.funEntry.endLoc.column)) {
+        if (instSrcFileLoc.loc.line < frameInfo.srcFunEntry.startLoc.line ||
+            instSrcFileLoc.loc.line > frameInfo.srcFunEntry.endLoc.line ||
+            (instSrcFileLoc.loc.line === frameInfo.srcFunEntry.startLoc.line &&
+                instSrcFileLoc.loc.column < frameInfo.srcFunEntry.startLoc.column) ||
+            (instSrcFileLoc.loc.line === frameInfo.srcFunEntry.endLoc.line &&
+                instSrcFileLoc.loc.column > frameInfo.srcFunEntry.endLoc.column)) {
             // the instruction is outside of the function
             // (belongs to inlined macro)
             if (frameInfo.ID !== INLINED_FRAME_ID_SAME_FILE) {
@@ -697,23 +1075,28 @@ function processInstructionIfMacro(
                     type: TraceEventKind.OpenFrame,
                     id: INLINED_FRAME_ID_SAME_FILE,
                     name: '__inlined__',
-                    fileHash: instLoc.fileHash,
+                    srcFileHash: instSrcFileLoc.fileHash,
+                    bcodeFileHash: frameInfo.bcodeFileHash,
                     isNative: false,
                     localsTypes: [],
                     localsNames: [],
                     paramValues: [],
-                    optimizedLines: frameInfo.optimizedLines
+                    optimizedSrcLines: frameInfo.optimizedSrcLines,
+                    optimizedBcodeLines: frameInfo.optimizedBcodeLines
                 });
                 // we get a lot of data for the new frame info from the current on
                 // since we are still in the same function
                 frameInfoStack.push({
                     ID: INLINED_FRAME_ID_SAME_FILE,
-                    pcLocs: frameInfo.pcLocs,
-                    filePath: frameInfo.filePath,
-                    fileHash: instLoc.fileHash,
-                    optimizedLines: frameInfo.optimizedLines,
+                    srcFilePath: frameInfo.srcFilePath,
+                    bcodeFilePath: frameInfo.bcodeFilePath,
+                    srcFileHash: instSrcFileLoc.fileHash,
+                    bcodeFileHash: frameInfo.bcodeFileHash,
+                    optimizedSrcLines: frameInfo.optimizedSrcLines,
+                    optimizedBcodeLines: frameInfo.optimizedBcodeLines,
                     funName: frameInfo.funName,
-                    funEntry: frameInfo.funEntry
+                    srcFunEntry: frameInfo.srcFunEntry,
+                    bcodeFunEntry: frameInfo.bcodeFunEntry
                 });
             } // else we are already in an inlined frame, so we don't need to do anything
         } else {
@@ -739,10 +1122,38 @@ function processInstructionIfMacro(
 }
 
 
-
+/**
+ * Converts a JSON trace compound type to a string representation.
+ * @param refPrefix prefix for the reference type.
+ * @param address address of the package.
+ * @param module name of the module.
+ * @param name name of the type.
+ * @param typeArgs type arguments of the compound type.
+ * @returns string representation of the compound type.
+ * */
+function JSONCompoundTypeToString(
+    refPrefix: string,
+    address: string,
+    module: string,
+    name: string,
+    typeArgs: JSONBaseType[]
+): string {
+    return refPrefix
+        + JSONTraceAddressToHexString(address)
+        + '::'
+        + module
+        + '::'
+        + name
+        + (typeArgs.length === 0
+            ? ''
+            : '<' + typeArgs.map((t) => JSONTraceTypeToString(t)).join(',') + '>');
+}
 
 /**
  * Converts a JSON trace type to a string representation.
+ * @param baseType base type.
+ * @param refType reference type.
+ * @returns string representation of the type.
  */
 function JSONTraceTypeToString(baseType: JSONBaseType, refType?: JSONTraceRefType): string {
     const refPrefix = refType === JSONTraceRefType.Mut
@@ -754,13 +1165,18 @@ function JSONTraceTypeToString(baseType: JSONBaseType, refType?: JSONTraceRefTyp
         return refPrefix + baseType;
     } else if ('vector' in baseType) {
         return refPrefix + `vector<${JSONTraceTypeToString(baseType.vector)}>`;
+    } else if ('struct' in baseType) {
+        return JSONCompoundTypeToString(refPrefix,
+            baseType.struct.address,
+            baseType.struct.module,
+            baseType.struct.name,
+            baseType.struct.type_args);
     } else {
-        return refPrefix
-            + JSONTraceAddressToHexString(baseType.struct.address)
-            + "::"
-            + baseType.struct.module
-            + "::"
-            + baseType.struct.name;
+        return JSONCompoundTypeToString(refPrefix,
+            baseType.address,
+            baseType.module,
+            baseType.name,
+            baseType.type_args);
     }
 }
 
@@ -781,17 +1197,20 @@ function JSONTraceAddressToHexString(address: string): string {
 }
 
 /**
- * Processes a location of a local variable in a JSON trace: sets the end of its lifetime
- * when requested and returns its location
+ * Processes a location of a value in a JSON trace: returns the location
+ * and, if dealing with a local variable, sets the end of its lifetime.
  * @param traceLocation location in the trace.
+ * @param indexPath a path to actual value for compound types (e.g, [1, 7] means
+ * first field/vector element and then seventh field/vector element)
  * @param localLifetimeEnds map of local variable lifetimes (defined if local variable
  * lifetime should happen).
- * @returns variable location.
+ * @returns location.
  */
-function processJSONLocalLocation(
+function processJSONLocation(
     traceLocation: JSONTraceLocation,
+    indexPath: number[],
     localLifetimeEnds?: Map<number, number[]>,
-): IRuntimeVariableLoc | undefined {
+): IRuntimeLoc {
     if ('Local' in traceLocation) {
         const frameID = traceLocation.Local[0];
         const localIndex = traceLocation.Local[1];
@@ -800,19 +1219,17 @@ function processJSONLocalLocation(
             lifetimeEnds[localIndex] = FRAME_LIFETIME;
             localLifetimeEnds.set(frameID, lifetimeEnds);
         }
-        return { frameID, localIndex };
+        const loc: IRuntimeVariableLoc = { frameID, localIndex };
+        return { loc, indexPath };
+    } else if ('Global' in traceLocation) {
+        const globalIndex = traceLocation.Global;
+        const loc: IRuntimeGlobalLoc = { globalIndex };
+        return { loc, indexPath };
     } else if ('Indexed' in traceLocation) {
-        return processJSONLocalLocation(traceLocation.Indexed[0], localLifetimeEnds);
+        indexPath.push(traceLocation.Indexed[1]);
+        return processJSONLocation(traceLocation.Indexed[0], indexPath, localLifetimeEnds);
     } else {
-        // Currently, there is nothing that needs to be done for 'Global' locations,
-        // neither with respect to lifetime nor with respect to location itself.
-        // This is because `Global` locations currently only represent read-only
-        // reference values returned from native functions. If there ever was
-        // a native function that would return a mutable reference, we should
-        // consider how to handle value changes via such reference, but it's unlikely
-        // that such a function would ever be added to either Move stdlib or
-        // the Sui framework.
-        return undefined;
+        throw new Error('Unsupported location type');
     }
 }
 
@@ -823,47 +1240,82 @@ function processJSONLocalLocation(
  * @returns runtime value.
  * @throws Error with a descriptive error message if conversion has failed.
  */
-function traceRefValueFromJSON(value: JSONTraceRefValue): RuntimeValueType {
+function traceRefValueFromJSON(value: JSONTraceRefValue): IRuntimeRefValue {
     if ('MutRef' in value) {
-        const loc = processJSONLocalLocation(value.MutRef.location);
+        const loc = processJSONLocation(value.MutRef.location, []);
         if (!loc) {
             throw new Error('Unsupported location type in MutRef');
         }
-        const ret: IRuntimeRefValue = { mutable: true, loc };
+        const ret: IRuntimeRefValue = { mutable: true, indexedLoc: loc };
         return ret;
     } else {
-        const loc = processJSONLocalLocation(value.ImmRef.location);
+        const loc = processJSONLocation(value.ImmRef.location, []);
         if (!loc) {
             throw new Error('Unsupported location type in ImmRef');
         }
-        const ret: IRuntimeRefValue = { mutable: false, loc };
+        const ret: IRuntimeRefValue = { mutable: false, indexedLoc: loc };
         return ret;
+    }
+}
+
+/**
+ * Converts a JSON trace reference value to a runtime value
+ * representing the value this reference value is referring to.
+ *
+ * @param value JSON trace reference value.
+ * @returns runtime value representing the value this reference value is referring to.
+ * @throws Error with a descriptive error message if conversion has failed.
+ */
+function derefTraceRefValueFromJSON(value: JSONTraceRefValue): RuntimeValueType {
+    if ('MutRef' in value) {
+        return traceRuntimeValueFromJSON(value.MutRef.snapshot);
+    } else {
+        return traceRuntimeValueFromJSON(value.ImmRef.snapshot);
     }
 }
 
 /**
  * Converts a JSON trace runtime value to a runtime trace value.
  *
- * @param value JSON trace runtime value.
+ * @param moveValue JSON trace runtime value.
  * @returns runtime trace value.
  */
-function traceRuntimeValueFromJSON(value: JSONTraceRuntimeValueType): RuntimeValueType {
-    if (typeof value === 'boolean'
-        || typeof value === 'number'
-        || typeof value === 'string') {
-        return String(value);
-    } else if (Array.isArray(value)) {
-        return value.map(item => traceRuntimeValueFromJSON(item));
-    } else {
+function traceRuntimeValueFromJSON(moveValue: JSONTraceMoveValue): RuntimeValueType {
+    if (
+        moveValue.type === 'U8' ||
+        moveValue.type === 'U16' ||
+        moveValue.type === 'U32' ||
+        moveValue.type === 'U64' ||
+        moveValue.type === 'U128' ||
+        moveValue.type === 'Bool' ||
+        moveValue.type === 'Address') {
+        return String(moveValue.value);
+    } else if (moveValue.type === 'U256' && Array.isArray(moveValue.value)) {
+        let result = 0n;
+        const arr: string[] = moveValue.value as unknown as string[];
+        for (let i = 0; i < arr.length; i++) {
+            const word = BigInt(arr[i]);
+            result += word << BigInt(64 * i);
+        }
+        return String(result);
+    } else if (moveValue.type === 'Vector' && Array.isArray(moveValue.value)) {
+        return moveValue.value.map(item => traceRuntimeValueFromJSON(item));
+    } else if (Array.isArray(moveValue.value)) {
+        throw new Error("Impossible");
+    } else if ((moveValue.type === 'Struct' || moveValue.type === 'Variant') && typeof moveValue.value === 'object' && 'type_' in moveValue.value) {
         const fields: [string, RuntimeValueType][] =
-            Object.entries(value.fields).map(([key, value]) => [key, traceRuntimeValueFromJSON(value)]);
+            moveValue.value.fields.map(([key, value]) =>
+                [key, traceRuntimeValueFromJSON(value)]
+            );
         const compoundValue: IRuntimeCompoundValue = {
             fields,
-            type: value.type,
-            variantName: value.variant_name,
-            variantTag: value.variant_tag
+            type: JSONTraceTypeToString(moveValue.value.type_ as JSONBaseType),
+            variantName: moveValue.value.variant_name,
+            variantTag: moveValue.value.variant_tag,
         };
         return compoundValue;
+    } else {
+        throw new Error("Impossible");
     }
 }
 
@@ -901,10 +1353,29 @@ function eventToString(event: TraceEvent): string {
                 + instructionKindToString(event.kind)
                 + ' at PC '
                 + event.pc
-                + ', line '
-                + event.loc.line;
+                + ', source line '
+                + event.srcLoc.line
+                + ', bytecode line'
+                + event.bcodeLoc;
         case TraceEventKind.Effect:
             return `Effect ${effectToString(event.effect)}`;
+        case TraceEventKind.ExternalSummary:
+            let events = '';
+            for (const c of event.summary) {
+                if (typeof c === 'object' && 'pkg' in c && 'module ' in c && 'function' in c) {
+                    events += (c.pkg
+                        + '::'
+                        + c.module
+                        + '::'
+                        + c.function);
+                } else {
+                    events += c.toString();
+                }
+                events += '\n';
+            }
+            return events;
+        case TraceEventKind.ExternalEvent:
+            return event.event.kind;
     }
 }
 
@@ -926,6 +1397,22 @@ function instructionKindToString(kind: TraceInstructionKind): string {
 }
 
 /**
+ * Converts a location to string representation.
+ *
+ * @param indexedLoc indexed location.
+ * @returns string representing the location.
+ */
+function locToString(indexedLoc: IRuntimeLoc): string {
+    if ('globalIndex' in indexedLoc.loc) {
+        return `global at ${indexedLoc.loc.globalIndex}`;
+    } else if ('frameID' in indexedLoc.loc && 'localIndex' in indexedLoc.loc) {
+        return `local at ${indexedLoc.loc.localIndex} in frame ${indexedLoc.loc.frameID}`;
+    } else {
+        return 'unsupported location';
+    }
+}
+
+/**
  * Converts an effect of an instruction to a string representation.
  *
  * @param effect effect.
@@ -934,7 +1421,7 @@ function instructionKindToString(kind: TraceInstructionKind): string {
 function effectToString(effect: EventEffect): string {
     switch (effect.type) {
         case TraceEffectKind.Write:
-            return `Write at idx ${effect.loc.localIndex} in frame ${effect.loc.frameID}`;
+            return 'Write ' + locToString(effect.indexedLoc);
         case TraceEffectKind.ExecutionError:
             return `ExecutionError ${effect.msg}`;
     }

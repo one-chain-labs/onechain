@@ -1,17 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    replay::{ExecutionSandboxState, LocalExec},
-    types::ReplayEngineError,
-};
-use futures::{future::join_all, FutureExt};
+use crate::replay::{ExecutionSandboxState, LocalExec};
+use crate::types::ReplayEngineError;
+use futures::future::join_all;
+use futures::FutureExt;
 use parking_lot::Mutex;
-use std::{
-    collections::VecDeque,
-    path::PathBuf,
-    sync::{atomic::AtomicUsize, Arc},
-};
+use std::collections::VecDeque;
+use std::path::PathBuf;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use sui_config::node::ExpensiveSafetyCheckConfig;
 use sui_types::base_types::TransactionDigest;
 use tokio::time::Instant;
@@ -50,7 +48,11 @@ pub async fn batch_replay(
         ));
     }
     let all_failed_transactions: Vec<_> = join_all(tasks).await.into_iter().flatten().collect();
-    info!("Finished replaying {} transactions, took {:?}", provider.get_executed_count(), cur_time.elapsed());
+    info!(
+        "Finished replaying {} transactions, took {:?}",
+        provider.get_executed_count(),
+        cur_time.elapsed()
+    );
     if all_failed_transactions.is_empty() {
         info!("All transactions passed");
     } else {
@@ -68,7 +70,11 @@ impl TransactionDigestProvider {
     pub fn new(digests: impl Iterator<Item = TransactionDigest>) -> Self {
         let digests: VecDeque<_> = digests.collect();
         let total_count = digests.len();
-        Self { digests: Mutex::new(digests), total_count, executed_count: AtomicUsize::new(0) }
+        Self {
+            digests: Mutex::new(digests),
+            total_count,
+            executed_count: AtomicUsize::new(0),
+        }
     }
 
     pub fn get_total_count(&self) -> usize {
@@ -76,14 +82,17 @@ impl TransactionDigestProvider {
     }
 
     pub fn get_executed_count(&self) -> usize {
-        self.executed_count.load(std::sync::atomic::Ordering::Relaxed)
+        self.executed_count
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Returns the index and digest of the next transaction, if any.
     pub fn next_digest(&self) -> Option<(usize, TransactionDigest)> {
         let next_digest = self.digests.lock().pop_front();
         next_digest.map(|digest| {
-            let executed_count = self.executed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let executed_count = self
+                .executed_count
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             (executed_count + 1, digest)
         })
     }
@@ -105,16 +114,27 @@ async fn run_task(
         if cancel.is_cancelled() {
             break;
         }
-        info!("[{}/{}] Replaying transaction {:?}...", index, total_count, digest);
+        info!(
+            "[{}/{}] Replaying transaction {:?}...",
+            index, total_count, digest
+        );
         let sandbox_persist_path = persist_path.map(|path| path.join(format!("{}.json", digest,)));
         if let Some(p) = sandbox_persist_path.as_ref() {
             if p.exists() {
-                info!("Skipping transaction {:?} as it has been replayed before", digest);
+                info!(
+                    "Skipping transaction {:?} as it has been replayed before",
+                    digest
+                );
                 continue;
             }
         }
-        let async_func =
-            execute_transaction(&mut executor, &digest, expensive_safety_check_config.clone(), use_authority).fuse();
+        let async_func = execute_transaction(
+            &mut executor,
+            &digest,
+            expensive_safety_check_config.clone(),
+            use_authority,
+        )
+        .fuse();
         let result = tokio::select! {
             result = async_func => result,
             _ = cancel.cancelled() => {
@@ -159,7 +179,15 @@ async fn execute_transaction(
     };
     let sandbox_state = loop {
         let result = executor
-            .execute_transaction(digest, expensive_safety_check_config.clone(), use_authority, None, None, None, None)
+            .execute_transaction(
+                digest,
+                expensive_safety_check_config.clone(),
+                use_authority,
+                None,
+                None,
+                None,
+                None,
+            )
             .await;
         match result {
             Ok(sandbox_state) => break sandbox_state,

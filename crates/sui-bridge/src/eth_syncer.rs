@@ -6,21 +6,18 @@
 //! only query from that block number onwards. The syncer also keeps track of the last finalized
 //! block on Ethereum and will only query for events up to that block number.
 
-use crate::{
-    error::BridgeResult,
-    eth_client::EthClient,
-    metrics::BridgeMetrics,
-    retry_with_max_elapsed_time,
-    types::EthLog,
-};
+use crate::error::BridgeResult;
+use crate::eth_client::EthClient;
+use crate::metrics::BridgeMetrics;
+use crate::retry_with_max_elapsed_time;
+use crate::types::EthLog;
 use ethers::types::Address as EthAddress;
 use mysten_metrics::spawn_logged_monitored_task;
-use std::{collections::HashMap, sync::Arc};
-use tokio::{
-    sync::watch,
-    task::JoinHandle,
-    time::{self, Duration, Instant},
-};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::watch;
+use tokio::task::JoinHandle;
+use tokio::time::{self, Duration, Instant};
 use tracing::error;
 
 const ETH_LOG_QUERY_MAX_BLOCK_RANGE: u64 = 1000;
@@ -41,7 +38,10 @@ where
     P: ethers::providers::JsonRpcClient + 'static,
 {
     pub fn new(eth_client: Arc<EthClient<P>>, contract_addresses: EthTargetAddresses) -> Self {
-        Self { eth_client, contract_addresses }
+        Self {
+            eth_client,
+            contract_addresses,
+        }
     }
 
     pub async fn run(
@@ -54,31 +54,39 @@ where
     )> {
         let (eth_evnets_tx, eth_events_rx) = mysten_metrics::metered_channel::channel(
             ETH_EVENTS_CHANNEL_SIZE,
-            &mysten_metrics::get_metrics().unwrap().channel_inflight.with_label_values(&["eth_events_queue"]),
+            &mysten_metrics::get_metrics()
+                .unwrap()
+                .channel_inflight
+                .with_label_values(&["eth_events_queue"]),
         );
         let last_finalized_block = self.eth_client.get_last_finalized_block_id().await?;
-        let (last_finalized_block_tx, last_finalized_block_rx) = watch::channel(last_finalized_block);
+        let (last_finalized_block_tx, last_finalized_block_rx) =
+            watch::channel(last_finalized_block);
         let mut task_handles = vec![];
         let eth_client_clone = self.eth_client.clone();
         let metrics_clone = metrics.clone();
-        task_handles.push(spawn_logged_monitored_task!(Self::run_finalized_block_refresh_task(
-            last_finalized_block_tx,
-            eth_client_clone,
-            metrics_clone
-        )));
+        task_handles.push(spawn_logged_monitored_task!(
+            Self::run_finalized_block_refresh_task(
+                last_finalized_block_tx,
+                eth_client_clone,
+                metrics_clone
+            )
+        ));
         for (contract_address, start_block) in self.contract_addresses {
             let eth_evnets_tx_clone = eth_evnets_tx.clone();
             let last_finalized_block_rx_clone = last_finalized_block_rx.clone();
             let eth_client_clone = self.eth_client.clone();
             let metrics_clone = metrics.clone();
-            task_handles.push(spawn_logged_monitored_task!(Self::run_event_listening_task(
-                contract_address,
-                start_block,
-                last_finalized_block_rx_clone,
-                eth_evnets_tx_clone,
-                eth_client_clone,
-                metrics_clone,
-            )));
+            task_handles.push(spawn_logged_monitored_task!(
+                Self::run_event_listening_task(
+                    contract_address,
+                    start_block,
+                    last_finalized_block_rx_clone,
+                    eth_evnets_tx_clone,
+                    eth_client_clone,
+                    metrics_clone,
+                )
+            ));
         }
         Ok((task_handles, eth_events_rx, last_finalized_block_rx))
     }
@@ -95,9 +103,10 @@ where
         loop {
             interval.tick().await;
             // TODO: allow to pass custom initial interval
-            let Ok(Ok(new_value)) =
-                retry_with_max_elapsed_time!(eth_client.get_last_finalized_block_id(), time::Duration::from_secs(600))
-            else {
+            let Ok(Ok(new_value)) = retry_with_max_elapsed_time!(
+                eth_client.get_last_finalized_block_id(),
+                time::Duration::from_secs(600)
+            ) else {
                 error!("Failed to get last finalized block from eth client after retry");
                 continue;
             };
@@ -105,7 +114,9 @@ where
             metrics.last_finalized_eth_block.set(new_value as i64);
 
             if new_value > last_block_number {
-                last_finalized_block_sender.send(new_value).expect("last_finalized_block channel receiver is closed");
+                last_finalized_block_sender
+                    .send(new_value)
+                    .expect("last_finalized_block channel receiver is closed");
                 tracing::info!("Observed new finalized eth block: {}", new_value);
                 last_block_number = new_value;
             }
@@ -128,7 +139,10 @@ where
         loop {
             // If no more known blocks, wait for the next finalized block.
             if !more_blocks {
-                last_finalized_block_receiver.changed().await.expect("last_finalized_block channel sender is closed");
+                last_finalized_block_receiver
+                    .changed()
+                    .await
+                    .expect("last_finalized_block channel sender is closed");
             }
             let new_finalized_block = *last_finalized_block_receiver.borrow();
             if new_finalized_block < start_block {
@@ -141,7 +155,10 @@ where
                 continue;
             }
             // Each query does at most ETH_LOG_QUERY_MAX_BLOCK_RANGE blocks.
-            let end_block = std::cmp::min(start_block + ETH_LOG_QUERY_MAX_BLOCK_RANGE - 1, new_finalized_block);
+            let end_block = std::cmp::min(
+                start_block + ETH_LOG_QUERY_MAX_BLOCK_RANGE - 1,
+                new_finalized_block,
+            );
             more_blocks = end_block < new_finalized_block;
             let timer = Instant::now();
             let Ok(Ok(events)) = retry_with_max_elapsed_time!(
@@ -151,7 +168,13 @@ where
                 error!("Failed to get events from eth client after retry");
                 continue;
             };
-            tracing::debug!(?contract_address, start_block, end_block, "Querying eth events took {:?}", timer.elapsed());
+            tracing::debug!(
+                ?contract_address,
+                start_block,
+                end_block,
+                "Querying eth events took {:?}",
+                timer.elapsed()
+            );
             let len = events.len();
             let last_block = events.last().map(|e| e.block_number);
 
@@ -166,7 +189,12 @@ where
                 .await
                 .expect("All Eth event channel receivers are closed");
             if len != 0 {
-                tracing::info!(?contract_address, start_block, end_block, "Observed {len} new Eth events",);
+                tracing::info!(
+                    ?contract_address,
+                    start_block,
+                    end_block,
+                    "Observed {len} new Eth events",
+                );
             }
             metrics
                 .last_synced_eth_blocks
@@ -200,7 +228,10 @@ mod tests {
         mysten_metrics::init_metrics(&registry);
         let mock_provider = EthMockProvider::new();
         mock_last_finalized_block(&mock_provider, 777);
-        let client = EthClient::new_mocked(mock_provider.clone(), HashSet::from_iter(vec![EthAddress::zero()]));
+        let client = EthClient::new_mocked(
+            mock_provider.clone(),
+            HashSet::from_iter(vec![EthAddress::zero()]),
+        );
         let result = client.get_last_finalized_block_id().await.unwrap();
         assert_eq!(result, 777);
 
@@ -212,11 +243,24 @@ mod tests {
             log_index: Some(U256::from(3)),
             ..Default::default()
         };
-        let eth_log =
-            EthLog { block_number: 777, tx_hash: log.transaction_hash.unwrap(), log_index_in_tx: 0, log: log.clone() };
-        mock_get_logs(&mock_provider, EthAddress::zero(), 100, 777, vec![log.clone()]);
+        let eth_log = EthLog {
+            block_number: 777,
+            tx_hash: log.transaction_hash.unwrap(),
+            log_index_in_tx: 0,
+            log: log.clone(),
+        };
+        mock_get_logs(
+            &mock_provider,
+            EthAddress::zero(),
+            100,
+            777,
+            vec![log.clone()],
+        );
         let (_handles, mut logs_rx, mut finalized_block_rx) =
-            EthSyncer::new(Arc::new(client), addresses).run(Arc::new(BridgeMetrics::new_for_testing())).await.unwrap();
+            EthSyncer::new(Arc::new(client), addresses)
+                .run(Arc::new(BridgeMetrics::new_for_testing()))
+                .await
+                .unwrap();
 
         // The latest finalized block stays at 777, event listener should not query again.
         finalized_block_rx.changed().await.unwrap();
@@ -227,7 +271,13 @@ mod tests {
         assert_eq!(received_logs, vec![eth_log.clone()]);
         assert_eq!(logs_rx.try_recv().unwrap_err(), TryRecvError::Empty);
 
-        mock_get_logs(&mock_provider, EthAddress::zero(), 778, 888, vec![log.clone()]);
+        mock_get_logs(
+            &mock_provider,
+            EthAddress::zero(),
+            778,
+            888,
+            vec![log.clone()],
+        );
         // The latest finalized block is updated to 888, event listener should query again.
         mock_last_finalized_block(&mock_provider, 888);
         finalized_block_rx.changed().await.unwrap();
@@ -250,8 +300,12 @@ mod tests {
         let mock_provider = EthMockProvider::new();
         mock_last_finalized_block(&mock_provider, 198);
 
-        let another_address = EthAddress::from_str("0x00000000219ab540356cbb839cbe05303d7705fa").unwrap();
-        let client = EthClient::new_mocked(mock_provider.clone(), HashSet::from_iter(vec![another_address]));
+        let another_address =
+            EthAddress::from_str("0x00000000219ab540356cbb839cbe05303d7705fa").unwrap();
+        let client = EthClient::new_mocked(
+            mock_provider.clone(),
+            HashSet::from_iter(vec![another_address]),
+        );
 
         let addresses = HashMap::from_iter(vec![(EthAddress::zero(), 100), (another_address, 200)]);
 
@@ -268,7 +322,13 @@ mod tests {
             log_index_in_tx: 0,
             log: log1.clone(),
         };
-        mock_get_logs(&mock_provider, EthAddress::zero(), 100, 198, vec![log1.clone()]);
+        mock_get_logs(
+            &mock_provider,
+            EthAddress::zero(),
+            100,
+            198,
+            vec![log1.clone()],
+        );
         let log2 = Log {
             address: another_address,
             transaction_hash: Some(TxHash::random()),
@@ -278,10 +338,19 @@ mod tests {
         };
         // Mock logs for another_address although it shouldn't be queried. We don't expect to
         // see log2 in the logs channel later on.
-        mock_get_logs(&mock_provider, another_address, 200, 198, vec![log2.clone()]);
+        mock_get_logs(
+            &mock_provider,
+            another_address,
+            200,
+            198,
+            vec![log2.clone()],
+        );
 
         let (_handles, mut logs_rx, mut finalized_block_rx) =
-            EthSyncer::new(Arc::new(client), addresses).run(Arc::new(BridgeMetrics::new_for_testing())).await.unwrap();
+            EthSyncer::new(Arc::new(client), addresses)
+                .run(Arc::new(BridgeMetrics::new_for_testing()))
+                .await
+                .unwrap();
 
         // The latest finalized block stays at 198.
         finalized_block_rx.changed().await.unwrap();
@@ -305,7 +374,13 @@ mod tests {
             log_index_in_tx: 0,
             log: log1.clone(),
         };
-        mock_get_logs(&mock_provider, EthAddress::zero(), 199, 400, vec![log1.clone()]);
+        mock_get_logs(
+            &mock_provider,
+            EthAddress::zero(),
+            199,
+            400,
+            vec![log1.clone()],
+        );
         let log2 = Log {
             address: another_address,
             transaction_hash: Some(TxHash::random()),
@@ -319,7 +394,13 @@ mod tests {
             log_index_in_tx: 0,
             log: log2.clone(),
         };
-        mock_get_logs(&mock_provider, another_address, 200, 400, vec![log2.clone()]);
+        mock_get_logs(
+            &mock_provider,
+            another_address,
+            200,
+            400,
+            vec![log2.clone()],
+        );
         mock_last_finalized_block(&mock_provider, 400);
 
         finalized_block_rx.changed().await.unwrap();
@@ -331,7 +412,10 @@ mod tests {
         logs_rx.recv().await.unwrap().2.into_iter().for_each(|log| {
             logs_set.insert(format!("{:?}", log));
         });
-        assert_eq!(logs_set, HashSet::from_iter(vec![format!("{:?}", eth_log1), format!("{:?}", eth_log2)]));
+        assert_eq!(
+            logs_set,
+            HashSet::from_iter(vec![format!("{:?}", eth_log1), format!("{:?}", eth_log2)])
+        );
         // No more finalized block change, no more logs.
         assert_eq!(logs_rx.try_recv().unwrap_err(), TryRecvError::Empty);
         Ok(())
@@ -348,7 +432,10 @@ mod tests {
         // range too big, we need two queries
         let last_finalized_block = start_block + ETH_LOG_QUERY_MAX_BLOCK_RANGE + 1;
         mock_last_finalized_block(&mock_provider, last_finalized_block);
-        let client = EthClient::new_mocked(mock_provider.clone(), HashSet::from_iter(vec![EthAddress::zero()]));
+        let client = EthClient::new_mocked(
+            mock_provider.clone(),
+            HashSet::from_iter(vec![EthAddress::zero()]),
+        );
         let result = client.get_last_finalized_block_id().await.unwrap();
         assert_eq!(result, last_finalized_block);
 
@@ -397,7 +484,10 @@ mod tests {
         );
 
         let (_handles, mut logs_rx, mut finalized_block_rx) =
-            EthSyncer::new(Arc::new(client), addresses).run(Arc::new(BridgeMetrics::new_for_testing())).await.unwrap();
+            EthSyncer::new(Arc::new(client), addresses)
+                .run(Arc::new(BridgeMetrics::new_for_testing()))
+                .await
+                .unwrap();
 
         finalized_block_rx.changed().await.unwrap();
         assert_eq!(*finalized_block_rx.borrow(), last_finalized_block);

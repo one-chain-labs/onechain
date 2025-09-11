@@ -60,9 +60,11 @@ fn native_check_utf8(
 }
 
 pub fn make_native_check_utf8(gas_params: CheckUtf8GasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_check_utf8(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_check_utf8(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -98,9 +100,11 @@ fn native_is_char_boundary(
 }
 
 pub fn make_native_is_char_boundary(gas_params: IsCharBoundaryGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_is_char_boundary(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_is_char_boundary(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -146,9 +150,11 @@ fn native_sub_string(
 }
 
 pub fn make_native_sub_string(gas_params: SubStringGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_sub_string(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_sub_string(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -179,7 +185,10 @@ fn native_index_of(
     let r_ref = r_arg.as_bytes_ref();
     let r_str = unsafe { std::str::from_utf8_unchecked(r_ref.as_slice()) };
     // Charge pattern fee
-    native_charge_gas_early_exit!(context, gas_params.per_byte_pattern * NumBytes::new(r_str.len() as u64));
+    native_charge_gas_early_exit!(
+        context,
+        gas_params.per_byte_pattern * NumBytes::new(r_str.len() as u64)
+    );
 
     let s_arg = pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
@@ -191,14 +200,19 @@ fn native_index_of(
     // TODO(Gas): What is the algorithm used for the search?
     //            Ideally it should be something like KMP with O(n) time complexity...
     // Charge search fee
-    native_charge_gas_early_exit!(context, gas_params.per_byte_searched * NumBytes::new(pos as u64));
+    native_charge_gas_early_exit!(
+        context,
+        gas_params.per_byte_searched * NumBytes::new(pos as u64)
+    );
     NativeResult::map_partial_vm_result_one(context.gas_used(), Ok(Value::u64(pos as u64)))
 }
 
 pub fn make_native_index_of(gas_params: IndexOfGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_index_of(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_index_of(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -214,10 +228,22 @@ pub struct GasParameters {
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("internal_check_utf8", make_native_check_utf8(gas_params.check_utf8)),
-        ("internal_is_char_boundary", make_native_is_char_boundary(gas_params.is_char_boundary)),
-        ("internal_sub_string", make_native_sub_string(gas_params.sub_string)),
-        ("internal_index_of", make_native_index_of(gas_params.index_of)),
+        (
+            "internal_check_utf8",
+            make_native_check_utf8(gas_params.check_utf8),
+        ),
+        (
+            "internal_is_char_boundary",
+            make_native_is_char_boundary(gas_params.is_char_boundary),
+        ),
+        (
+            "internal_sub_string",
+            make_native_sub_string(gas_params.sub_string),
+        ),
+        (
+            "internal_index_of",
+            make_native_index_of(gas_params.index_of),
+        ),
     ];
 
     make_module_natives(natives)

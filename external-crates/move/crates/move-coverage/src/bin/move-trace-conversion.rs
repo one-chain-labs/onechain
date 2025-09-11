@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use clap::Parser;
-use move_coverage::coverage_map::{output_map_to_file, CoverageMap, TraceMap};
+use move_coverage::coverage_map::{CoverageMap, TraceMap, output_map_to_file};
 use std::path::Path;
 
 #[derive(Debug, Parser)]
@@ -44,7 +44,8 @@ fn main() {
             CoverageMap::from_trace_file(input_path)
         };
 
-        output_map_to_file(output_path, &coverage_map).expect("Unable to serialize coverage map to output file")
+        output_map_to_file(output_path, &coverage_map)
+            .expect("Unable to serialize coverage map to output file")
     } else {
         let trace_map = if let Some(old_trace_path) = &args.update {
             let path = Path::new(&old_trace_path);
@@ -54,6 +55,7 @@ fn main() {
             TraceMap::from_trace_file(input_path)
         };
 
-        output_map_to_file(output_path, &trace_map).expect("Unable to serialize trace map to output file")
+        output_map_to_file(output_path, &trace_map)
+            .expect("Unable to serialize trace map to output file")
     }
 }

@@ -38,12 +38,12 @@
 /// - `kiosk_extension` is a friend module to `kiosk` and has access to its
 /// internal functions (such as `place_internal` and `lock_internal` to
 /// implement custom authorization scheme for `place` and `lock` respectively).
-module one::kiosk_extension;
+module oct::kiosk_extension;
 
-use one::bag::{Self, Bag};
-use one::dynamic_field as df;
-use one::kiosk::{Kiosk, KioskOwnerCap};
-use one::transfer_policy::TransferPolicy;
+use sui::bag::{Self, Bag};
+use sui::dynamic_field as df;
+use sui::kiosk::{Kiosk, KioskOwnerCap};
+use sui::transfer_policy::TransferPolicy;
 
 /// Trying to add an extension while not being the owner of the Kiosk.
 const ENotOwner: u64 = 0;
@@ -93,7 +93,7 @@ public struct Extension has store {
 /// The `ExtensionKey` is a typed dynamic field key used to store the
 /// extension configuration and data. `Ext` is a phantom type that is used
 /// to identify the extension witness.
-public struct ExtensionKey<phantom Ext> has store, copy, drop {}
+public struct ExtensionKey<phantom Ext> has copy, drop, store {}
 
 // === Management ===
 

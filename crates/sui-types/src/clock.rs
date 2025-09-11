@@ -3,7 +3,9 @@
 
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use move_bytecode_utils::resolve_struct;
-use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::StructTag};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::StructTag,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{id::UID, SUI_FRAMEWORK_ADDRESS};
@@ -12,7 +14,8 @@ pub const CLOCK_MODULE_NAME: &IdentStr = ident_str!("clock");
 pub const CLOCK_STRUCT_NAME: &IdentStr = ident_str!("Clock");
 pub const RESOLVED_SUI_CLOCK: (&AccountAddress, &IdentStr, &IdentStr) =
     (&SUI_FRAMEWORK_ADDRESS, CLOCK_MODULE_NAME, CLOCK_STRUCT_NAME);
-pub const CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME: &IdentStr = ident_str!("consensus_commit_prologue");
+pub const CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME: &IdentStr =
+    ident_str!("consensus_commit_prologue");
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Clock {

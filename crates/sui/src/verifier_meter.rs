@@ -53,7 +53,12 @@ impl AccumulatingMeter {
 
 impl Accumulator {
     fn new(name: &str, scope: Scope) -> Self {
-        Self { name: name.to_string(), scope, ticks: 0, children: vec![] }
+        Self {
+            name: name.to_string(),
+            scope,
+            ticks: 0,
+            children: vec![],
+        }
     }
 
     /// Find the max ticks spent verifying `scope`s within this scope (including itself).

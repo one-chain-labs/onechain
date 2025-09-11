@@ -7,10 +7,10 @@
 //
 // This module is not currently accessible from user contracts, and is used only to record the JWK
 // state to the chain for auditability + restore from snapshot purposes.
-module one::authenticator_state;
+module oct::authenticator_state;
 
 use std::string::{Self, String, utf8};
-use one::dynamic_field;
+use sui::dynamic_field;
 
 /// Sender is not @0x0 the system address.
 const ENotSystemAddress: u64 = 0;
@@ -35,7 +35,7 @@ public struct AuthenticatorStateInner has store {
 
 #[allow(unused_field)]
 /// Must match the JWK struct in fastcrypto-zkp
-public struct JWK has store, drop, copy {
+public struct JWK has copy, drop, store {
     kty: String,
     e: String,
     n: String,
@@ -44,13 +44,13 @@ public struct JWK has store, drop, copy {
 
 #[allow(unused_field)]
 /// Must match the JwkId struct in fastcrypto-zkp
-public struct JwkId has store, drop, copy {
+public struct JwkId has copy, drop, store {
     iss: String,
     kid: String,
 }
 
 #[allow(unused_field)]
-public struct ActiveJwk has store, drop, copy {
+public struct ActiveJwk has copy, drop, store {
     jwk_id: JwkId,
     jwk: JWK,
     epoch: u64,

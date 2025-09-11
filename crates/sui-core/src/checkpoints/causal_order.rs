@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use sui_types::{
-    base_types::TransactionDigest,
-    effects::{InputSharedObject, TransactionEffects, TransactionEffectsAPI},
-    storage::ObjectKey,
-};
+use sui_types::base_types::TransactionDigest;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::effects::{InputSharedObject, TransactionEffects};
+use sui_types::storage::ObjectKey;
 use tracing::trace;
 
 pub struct CausalOrder {
@@ -33,8 +32,10 @@ impl CausalOrder {
 
     fn from_vec(effects: Vec<TransactionEffects>) -> Self {
         let rwlock_builder = RWLockDependencyBuilder::from_effects(&effects);
-        let dependencies: Vec<_> =
-            effects.into_iter().map(|e| TransactionDependencies::from_effects(e, &rwlock_builder)).collect();
+        let dependencies: Vec<_> = effects
+            .into_iter()
+            .map(|e| TransactionDependencies::from_effects(e, &rwlock_builder))
+            .collect();
         let output = Vec::with_capacity(dependencies.len() * 2);
         let not_seen = dependencies.into_iter().map(|e| (e.digest, e)).collect();
         Self { not_seen, output }
@@ -78,7 +79,11 @@ impl TransactionDependencies {
     fn from_effects(effects: TransactionEffects, rwlock_builder: &RWLockDependencyBuilder) -> Self {
         let mut dependencies: BTreeSet<_> = effects.dependencies().iter().cloned().collect();
         rwlock_builder.add_dependencies_for(*effects.transaction_digest(), &mut dependencies);
-        Self { digest: *effects.transaction_digest(), dependencies, effects }
+        Self {
+            digest: *effects.transaction_digest(),
+            dependencies,
+            effects,
+        }
     }
 }
 
@@ -120,27 +125,44 @@ impl RWLockDependencyBuilder {
                     InputSharedObject::ReadOnly(obj_ref) => {
                         let obj_key = obj_ref.into();
                         // Read only transaction
-                        read_version.entry(obj_key).or_default().push(*effect.transaction_digest());
+                        read_version
+                            .entry(obj_key)
+                            .or_default()
+                            .push(*effect.transaction_digest());
                     }
                     InputSharedObject::Mutate(obj_ref) => {
                         let obj_key = obj_ref.into();
                         // write transaction
-                        overwrite_versions.entry(*effect.transaction_digest()).or_default().push(obj_key);
+                        overwrite_versions
+                            .entry(*effect.transaction_digest())
+                            .or_default()
+                            .push(obj_key);
                     }
-                    InputSharedObject::ReadDeleted(oid, version) => {
-                        read_version.entry(ObjectKey(oid, version)).or_default().push(*effect.transaction_digest())
+                    InputSharedObject::ReadConsensusStreamEnded(oid, version) => read_version
+                        .entry(ObjectKey(oid, version))
+                        .or_default()
+                        .push(*effect.transaction_digest()),
+                    InputSharedObject::MutateConsensusStreamEnded(oid, version) => {
+                        overwrite_versions
+                            .entry(*effect.transaction_digest())
+                            .or_default()
+                            .push(ObjectKey(oid, version))
                     }
-                    InputSharedObject::MutateDeleted(oid, version) => {
-                        overwrite_versions.entry(*effect.transaction_digest()).or_default().push(ObjectKey(oid, version))
-                    }
-                    InputSharedObject::Cancelled(..) => (), // TODO: confirm that consensus_commit_prologue is always at the beginning of the checkpoint, so that cancelled txn don't need to worry about dependency.
+                    InputSharedObject::Cancelled(..) => (),
                 }
             }
         }
-        Self { read_version, overwrite_versions }
+        Self {
+            read_version,
+            overwrite_versions,
+        }
     }
 
-    pub fn add_dependencies_for(&self, digest: TransactionDigest, v: &mut BTreeSet<TransactionDigest>) {
+    pub fn add_dependencies_for(
+        &self,
+        digest: TransactionDigest,
+        v: &mut BTreeSet<TransactionDigest>,
+    ) {
         let Some(overwrites) = self.overwrite_versions.get(&digest) else {
             return;
         };
@@ -149,7 +171,11 @@ impl RWLockDependencyBuilder {
                 continue;
             };
             for dep in reads {
-                trace!("Assuming additional dependency when constructing checkpoint {:?} -> {:?}", digest, *dep);
+                trace!(
+                    "Assuming additional dependency when constructing checkpoint {:?} -> {:?}",
+                    digest,
+                    *dep
+                );
                 v.insert(*dep);
             }
         }
@@ -163,7 +189,10 @@ struct InsertState {
 
 impl InsertState {
     pub fn new(transaction: TransactionDependencies) -> Self {
-        Self { dependencies: transaction.dependencies.iter().cloned().collect(), transaction: Some(transaction) }
+        Self {
+            dependencies: transaction.dependencies.iter().cloned().collect(),
+            transaction: Some(transaction),
+        }
     }
 
     pub fn process(&mut self, causal_order: &mut CausalOrder) -> Option<InsertState> {
@@ -172,7 +201,10 @@ impl InsertState {
                 return Some(InsertState::new(dep_transaction));
             }
         }
-        let transaction = self.transaction.take().expect("Can't use InsertState after it is finished");
+        let transaction = self
+            .transaction
+            .take()
+            .expect("Can't use InsertState after it is finished");
         causal_order.output.push(transaction.effects);
         None
     }
@@ -181,10 +213,9 @@ impl InsertState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sui_types::{
-        base_types::{ObjectDigest, ObjectID, SequenceNumber},
-        effects::TransactionEffects,
-    };
+    use sui_types::base_types::ObjectDigest;
+    use sui_types::base_types::{ObjectID, SequenceNumber};
+    use sui_types::effects::TransactionEffects;
 
     #[test]
     pub fn test_causal_order() {
@@ -193,7 +224,12 @@ mod tests {
         let e3 = e(d(3), vec![]);
         let e4 = e(d(4), vec![]);
 
-        let r = extract(CausalOrder::causal_sort(vec![e1.clone(), e2, e3, e4.clone()]));
+        let r = extract(CausalOrder::causal_sort(vec![
+            e1.clone(),
+            e2,
+            e3,
+            e4.clone(),
+        ]));
         assert_eq!(r, vec![3, 4, 2, 1]);
 
         // e1 and e4 are not (directly) causally dependent - ordered lexicographically
@@ -234,7 +270,9 @@ mod tests {
     }
 
     fn extract(e: Vec<TransactionEffects>) -> Vec<u8> {
-        e.into_iter().map(|e| e.transaction_digest().inner()[0]).collect()
+        e.into_iter()
+            .map(|e| e.transaction_digest().inner()[0])
+            .collect()
     }
 
     fn d(i: u8) -> TransactionDigest {
@@ -249,7 +287,10 @@ mod tests {
         ObjectID::new(bytes)
     }
 
-    fn e(transaction_digest: TransactionDigest, dependencies: Vec<TransactionDigest>) -> TransactionEffects {
+    fn e(
+        transaction_digest: TransactionDigest,
+        dependencies: Vec<TransactionDigest>,
+    ) -> TransactionEffects {
         let mut effects = TransactionEffects::default();
         *effects.transaction_digest_mut_for_testing() = transaction_digest;
         *effects.dependencies_mut_for_testing() = dependencies;
