@@ -41,7 +41,7 @@ jobs:
           version: 11.3.1
       - name: Authorize against Teleport
         id: auth
-        uses: teleport-actions/auth@9091dad16a564f3c5b9c2ec520b234a4872b6879 # pin@v1
+        uses: teleport-actions/auth@35812f1569e4061152f876cd0b43f5baa39a6235 # pin@v1
         with:
           # Specify the publically accessible address of your Teleport proxy.
           proxy: proxy.mysten-int.com:443
