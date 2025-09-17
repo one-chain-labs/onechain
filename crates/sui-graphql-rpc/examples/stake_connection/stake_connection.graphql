@@ -10,7 +10,7 @@
       }
       totalBalance
     }
-    stakedSuis {
+    stakedOcts {
       nodes {
         status
         principal

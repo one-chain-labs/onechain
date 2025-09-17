@@ -734,7 +734,7 @@ impl<'env, 'pc, 'vm, 'state, 'linkage, 'gas> Context<'env, 'pc, 'vm, 'state, 'li
         modules: &[CompiledModule],
         linkage: &RootedLinkage,
     ) -> Result<(), ExecutionError> {
-        // TODO(https://github.com/MystenLabs/sui/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
+        // TODO(https://github.com/one-chain-labs/onechain/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
         let binary_version = self.env.protocol_config.move_binary_format_version();
         let new_module_bytes: Vec<_> = modules
             .iter()

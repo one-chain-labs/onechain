@@ -826,7 +826,7 @@ mod checked {
         package_id: ObjectID,
         modules: &[CompiledModule],
     ) -> Result<(), ExecutionError> {
-        // TODO(https://github.com/MystenLabs/sui/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
+        // TODO(https://github.com/one-chain-labs/onechain/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
         let new_module_bytes: Vec<_> = modules
             .iter()
             .map(|m| {

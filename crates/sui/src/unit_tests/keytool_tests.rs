@@ -160,7 +160,7 @@ async fn test_sui_operations_config() {
     let temp_dir = TempDir::new().unwrap();
     let path = temp_dir.path().join("one.keystore");
     let path1 = path.clone();
-    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/one.keystore
+    // This is the hardcoded keystore in sui-operation: https://github.com/one-chain-labs/onechain-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/one.keystore
     // If this test fails, address hardcoded in sui-operations is likely needed be updated.
     let kp = SuiKeyPair::decode_base64("ANRj4Rx5FZRehqwrctiLgZDPrY/3tI5+uJLCdaXPCj6C").unwrap();
     let contents = vec![kp.encode_base64()];
@@ -174,7 +174,7 @@ async fn test_sui_operations_config() {
         read.unwrap().addresses()[0]
     );
 
-    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/one-benchmark.keystore
+    // This is the hardcoded keystore in sui-operation: https://github.com/one-chain-labs/onechain-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/one-benchmark.keystore
     // If this test fails, address hardcoded in sui-operations is likely needed be updated.
     let path2 = temp_dir.path().join("one-benchmark.keystore");
     let path3 = path2.clone();

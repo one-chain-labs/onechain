@@ -355,7 +355,7 @@ fn verify_bytecode(package: &MoveCompiledPackage, fn_info: &FnInfoMap) -> SuiRes
         })?;
         sui_bytecode_verifier::sui_verify_module_unmetered(m, fn_info, &verifier_config)?;
     }
-    // TODO(https://github.com/MystenLabs/sui/issues/69): Run Move linker
+    // TODO(https://github.com/one-chain-labs/onechain/issues/69): Run Move linker
 
     Ok(())
 }

@@ -14,15 +14,15 @@ DVX-953 meant that in this case, we would get the following errors:
 ```
 Failed to build Move modules: When resolving dependencies for package A, conflicting dependencies found:
 At C
-        Bridge = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/bridge" }
+        Bridge = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/bridge" }
         D = { local = "../D" }
-        MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/move-stdlib" }
-        Sui = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/sui-framework" }
-        OneSystem = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/sui-system" }
+        MoveStdlib = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/move-stdlib" }
+        Sui = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-framework" }
+        OneSystem = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-system" }
 At B -> C
-        Bridge = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/bridge" }
+        Bridge = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/bridge" }
         D = { local = "../D" }
-        MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/move-stdlib" }
-        Sui = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/sui-framework" }
-        OneSystem = { git = "https://github.com/MystenLabs/sui.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/sui-system" }.
+        MoveStdlib = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/move-stdlib" }
+        Sui = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-framework" }
+        OneSystem = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-system" }.
 ```

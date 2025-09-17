@@ -39,19 +39,19 @@ Run the command in this section using the same branch of the repository for each
     ```
 1.  Download the docker-compose.yaml file:
     ```sh
-    $ wget https://github.com/MystenLabs/sui/blob/branch-name/docker/fullnode/docker-compose.yaml
+    $ wget https://github.com/one-chain-labs/onechain/blob/branch-name/docker/fullnode/docker-compose.yaml
     ```
 1.  Download the fullnode-template.yaml file:
     ```sh
-    $ wget https://github.com/MystenLabs/sui/raw/branch-name/crates/sui-config/data/fullnode-template.yaml
+    $ wget https://github.com/one-chain-labs/onechain/raw/branch-name/crates/sui-config/data/fullnode-template.yaml
     ```
 1.  Download the genesis.blob file:
     ```sh
-    $ wget https://github.com/MystenLabs/sui-genesis/blob/main/mainnet/genesis.blob
+    $ wget https://github.com/one-chain-labs/onechain-genesis/blob/main/mainnet/genesis.blob
     ```
     :::info
     
-    Replace `mainnet` in the URL with the desired target branch if necessary. For example, `https://github.com/MystenLabs/sui-genesis/blob/main/testnet/genesis.blob` for Testnet.
+    Replace `mainnet` in the URL with the desired target branch if necessary. For example, `https://github.com/one-chain-labs/onechain-genesis/blob/main/testnet/genesis.blob` for Testnet.
 
     :::
 1.  Start the Full node. The -d switch starts it in the background (detached mode).
@@ -66,7 +66,7 @@ Use the steps in this section to install and configure a Sui Full node directly 
 1.  Install prerequisites for Sui.
 1.  Clone the Sui repository:
     ```sh
-    $ git clone https://github.com/MystenLabs/sui.git -b branch-name
+    $ git clone https://github.com/one-chain-labs/onechain.git -b branch-name
     ```
     Replace `branch-name` with the branch to use. You should use the same branch for all commands.
 1.  Change directories to /sui:
@@ -79,7 +79,7 @@ Use the steps in this section to install and configure a Sui Full node directly 
     ```
 1.  Download the genesis.blob file:
     ```sh
-    $ wget https://github.com/MystenLabs/sui-genesis/blob/main/mainnet/genesis.blob
+    $ wget https://github.com/one-chain-labs/onechain-genesis/blob/main/mainnet/genesis.blob
     ```
     Change `mainnet` in the URL to the same branch you used for previous commands, if needed.
 1.  Optionally, if you installed Sui to a path other than the default, modify the fullnode.yaml file to use the path you used. Update the path to the folder where you installed sui-fullnode for the `db-path` and `genesis-file-location` as appropriate:
@@ -256,7 +256,7 @@ The total voting power in the Sui Network is always 10,000. The voting power of 
 
 ## Staking functions {#staking-functions}
 
-Sui supports the following API operations related to staking. You can find the source code in the [sui_system](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/sui_system.move) module.
+Sui supports the following API operations related to staking. You can find the source code in the [sui_system](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-system/sources/sui_system.move) module.
 
 - `request_add_stake`
   Add user stake to a validator's staking pool.

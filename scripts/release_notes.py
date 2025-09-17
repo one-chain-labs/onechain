@@ -220,7 +220,7 @@ def extract_protocol_version(commit):
 
 def print_changelog(pr, log):
     if pr:
-        print(f"https://github.com/MystenLabs/sui/pull/{pr}:")
+        print(f"https://github.com/one-chain-labs/onechain/pull/{pr}:")
     print(log)
 
 

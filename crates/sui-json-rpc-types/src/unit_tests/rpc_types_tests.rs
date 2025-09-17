@@ -60,7 +60,7 @@ fn test_move_value_to_string() {
 
 #[test]
 fn test_option() {
-    // bugfix for https://github.com/MystenLabs/sui/issues/4995
+    // bugfix for https://github.com/one-chain-labs/onechain/issues/4995
     let option = MoveValue::Struct(MoveStruct {
         type_: StructTag {
             address: MOVE_STDLIB_ADDRESS,

@@ -375,7 +375,7 @@ pub(crate) struct ConsensusOutputCache {
 
 impl ConsensusOutputCache {
     pub(crate) fn new(
-        _epoch_start_configuration: &EpochStartConfiguration,
+        __epoch_start_configuration: &EpochStartConfiguration,
         tables: &AuthorityEpochTables,
     ) -> Self {
         let deferred_transactions = tables

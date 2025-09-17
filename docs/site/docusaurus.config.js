@@ -113,7 +113,7 @@ const config = {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
           // the double docs below is a fix for having the path set to ../content
-          editUrl: "https://github.com/MystenLabs/sui/tree/main/docs/docs",
+          editUrl: "https://github.com/one-chain-labs/onechain/tree/main/docs/docs",
           /*disableVersioning: true,
           lastVersion: "current",
           versions: {
@@ -227,7 +227,7 @@ const config = {
           href: "https://sui.io",
         },
         style: "dark",
-        copyright: `© ${new Date().getFullYear()} Sui Foundation | Documentation distributed under <a href="https://github.com/MystenLabs/sui/blob/main/docs/site/LICENSE">CC BY 4.0</a>`,
+        copyright: `© ${new Date().getFullYear()} Sui Foundation | Documentation distributed under <a href="https://github.com/one-chain-labs/onechain/blob/main/docs/site/LICENSE">CC BY 4.0</a>`,
       },
       prism: {
         theme: themes.github,

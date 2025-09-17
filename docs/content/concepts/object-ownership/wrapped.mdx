@@ -151,9 +151,9 @@ After this call, the two objects are swapped and the service provider takes the 
 
 Since the contract defined only one way to deal with `SwapRequest` - `execute_swap` - there is no other way the service operator can interact with `SwapRequest` despite its ownership.
 
-Find the full source code in the [trusted_swap](https://github.com/MystenLabs/sui/blob/main/examples/move/trusted_swap) example.
+Find the full source code in the [trusted_swap](https://github.com/one-chain-labs/onechain/blob/main/examples/move/trusted_swap) example.
 
-To view a more complex example of how to use direct wrapping, see the [escrow](https://github.com/MystenLabs/sui/tree/main/examples/move/escrow) example.
+To view a more complex example of how to use direct wrapping, see the [escrow](https://github.com/one-chain-labs/onechain/tree/main/examples/move/escrow) example.
 
 ### Wrapping through `Option`
 
@@ -212,9 +212,9 @@ The function in the preceding example passes a `warrior` as a mutable reference 
 
 Note that because `Sword` is a Sui object type without `drop` ability, if the warrior already has a sword equipped, the warrior can't drop that sword. If you call `option::fill` without first checking and taking out the existing sword, an error occurs. In `equip_sword`, first check whether there is already a sword equipped. If so, remove it out and send it back to the sender. To a player, this returns an equipped sword to their inventory when they equip the new sword.
 
-Find the source code in the [simple_warrior](https://github.com/MystenLabs/sui/tree/main/examples/move/simple_warrior) example.
+Find the source code in the [simple_warrior](https://github.com/one-chain-labs/onechain/tree/main/examples/move/simple_warrior) example.
 
-To view a more complex example, see [hero](https://github.com/MystenLabs/sui/tree/main/examples/move/hero).
+To view a more complex example, see [hero](https://github.com/one-chain-labs/onechain/tree/main/examples/move/hero).
 
 ### Wrapping through `vector`
 

@@ -52,7 +52,7 @@ You can also build the documentation locally. To do so,
 
 ## Rust SDK examples
 
-The [examples](https://github.com/MystenLabs/sui/tree/main/crates/sui-sdk/examples) folder provides both basic and advanced examples.
+The [examples](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk/examples) folder provides both basic and advanced examples.
 
 There are serveral files ending in `_api.rs` which provide code examples of the corresponding APIs and their methods. These showcase how to use the Sui Rust SDK, and can be run against the Sui testnet. Below are instructions on the prerequisites and how to run these examples.
 
@@ -137,26 +137,26 @@ async fn main() -> Result<(), anyhow::Error> {
 
 ## Advanced examples
 
-See the programmable transactions [example](https://github.com/MystenLabs/sui/blob/main/crates/sui-sdk/examples/programmable_transactions_api.rs).
+See the programmable transactions [example](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-sdk/examples/programmable_transactions_api.rs).
 
 ## Games examples
 
 ### Tic Tac Toe quick start
 
 1. Prepare the environment
-   1. Install `sui` binary following the [Sui installation](https://github.com/MystenLabs/sui/blob/main/docs/content/guides/developer/getting-started/sui-install.mdx) docs.
-   1. [Connect to Sui Devnet](https://github.com/MystenLabs/sui/blob/main/docs/content/guides/developer/getting-started/connect.mdx).
-   1. [Make sure you have two addresses with gas](https://github.com/MystenLabs/sui/blob/main/docs/content/guides/developer/getting-started/get-address.mdx) by using the `new-address` command to create new addresses:
+   1. Install `sui` binary following the [Sui installation](https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/getting-started/sui-install.mdx) docs.
+   1. [Connect to Sui Devnet](https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/getting-started/connect.mdx).
+   1. [Make sure you have two addresses with gas](https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/getting-started/get-address.mdx) by using the `new-address` command to create new addresses:
       ```shell
       sui client new-address ed25519
       ```
       You must specify the key scheme, one of `ed25519` or `secp256k1` or `secp256r1`.
       You can skip this step if you are going to play with a friend. :)
-   1. [Request Sui tokens](https://github.com/MystenLabs/sui/blob/main/docs/content/guides/developer/getting-started/get-coins.mdx) for all addresses that will be used to join the game.
+   1. [Request Sui tokens](https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/getting-started/get-coins.mdx) for all addresses that will be used to join the game.
 
 2. Publish the move contract
-   1. [Download the Sui source code](https://github.com/MystenLabs/sui/blob/main/docs/content/guides/developer/getting-started/sui-install.mdx).
-   1. Publish the [`tic-tac-toe` package](https://github.com/MystenLabs/sui/tree/main/examples/tic-tac-toe/move)
+   1. [Download the Sui source code](https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/getting-started/sui-install.mdx).
+   1. Publish the [`tic-tac-toe` package](https://github.com/one-chain-labs/onechain/tree/main/examples/tic-tac-toe/move)
       using the Sui client:
       ```shell
       sui client publish --path /path-to-sui-source-code/examples/tic-tac-toe/move
@@ -164,7 +164,7 @@ See the programmable transactions [example](https://github.com/MystenLabs/sui/bl
    1. Record the package object ID.
 
 3. Create a new tic-tac-toe game
-   1. Run the following command in the [`tic-tac-toe/cli` directory](https://github.com/MystenLabs/sui/tree/main/examples/tic-tac-toe/cli) to start a new game, replacing the game package objects ID with the one you recorded:
+   1. Run the following command in the [`tic-tac-toe/cli` directory](https://github.com/one-chain-labs/onechain/tree/main/examples/tic-tac-toe/cli) to start a new game, replacing the game package objects ID with the one you recorded:
       ```shell
       cargo run -- new --package-id <<tic-tac-toe package object ID>> <<player O address>>
       ```
@@ -173,11 +173,11 @@ See the programmable transactions [example](https://github.com/MystenLabs/sui/bl
 
 4. Making a move
 
-   Run the following command in the [`tic-tac-toe/cli` directory](https://github.com/MystenLabs/sui/tree/main/examples/tic-tac-toe/cli) to make a move in an existing game, as the active address in the CLI, replacing the game ID and address accordingly:
+   Run the following command in the [`tic-tac-toe/cli` directory](https://github.com/one-chain-labs/onechain/tree/main/examples/tic-tac-toe/cli) to make a move in an existing game, as the active address in the CLI, replacing the game ID and address accordingly:
    ```shell
    cargo run -- move --package-id <<tic-tac-toe package object ID>> --row $R --col $C <<game ID>>
    ```
 
 ## License
 
-[SPDX-License-Identifier: Apache-2.0](https://github.com/MystenLabs/sui/blob/main/LICENSE)
+[SPDX-License-Identifier: Apache-2.0](https://github.com/one-chain-labs/onechain/blob/main/LICENSE)

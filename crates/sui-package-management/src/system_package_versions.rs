@@ -16,7 +16,7 @@ static VERSION_TABLE: LazyLock<BTreeMap<ProtocolVersion, SystemPackagesVersion>>
         )))
     });
 
-pub const SYSTEM_GIT_REPO: &str = "https://github.com/MystenLabs/sui.git";
+pub const SYSTEM_GIT_REPO: &str = "https://github.com/one-chain-labs/onechain.git";
 
 #[derive(Debug)]
 pub struct SystemPackagesVersion {
@@ -30,7 +30,7 @@ pub struct SystemPackage {
     pub package_name: String,
 
     /// The path to the package in the sui monorepo
-    /// e.g. "crates/sui-framework/packages/sui-framework"
+    /// e.g. "crates/sui-framework/packages/one-framework"
     pub repo_path: String,
 }
 

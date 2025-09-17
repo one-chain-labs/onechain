@@ -11,7 +11,7 @@ To access a prompt timestamp, you must pass a read-only reference of `sui::clock
 
 Use the `timestamp_ms` function from the `sui::clock` module to extract a unix timestamp in milliseconds.
 
-{@inject: crates/sui-framework/packages/sui-framework/sources/clock.move#fun=timestamp_ms noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/clock.move#fun=timestamp_ms noComments}
 
 The example below demonstrates an entry function that emits an event containing a timestamp from the `Clock`:
 
@@ -35,21 +35,21 @@ Transactions that use the clock must accept it as an **immutable reference** (no
 
 The following functions test `Clock`-dependent code by manually creating a `Clock` object and manipulating its timestamp. This is possible only in test code:
 
-{@inject: crates/sui-framework/packages/sui-framework/sources/clock.move#fun=create_for_testing,share_for_testing,increment_for_testing,set_for_testing,destroy_for_testing noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/clock.move#fun=create_for_testing,share_for_testing,increment_for_testing,set_for_testing,destroy_for_testing noComments}
 
 The next example presents a basic test that creates a Clock, increments it, and then checks its value:
 
-{@inject: crates/sui-framework/packages/sui-framework/tests/clock_tests.move#module=sui::clock_tests noComments}
+{@inject: crates/sui-framework/packages/one-framework/tests/clock_tests.move#module=sui::clock_tests noComments}
 
 ## Epoch timestamps
 
 Use the following function from the `sui::tx_context` module to access the timestamp for the start of the current epoch for all transactions (including ones that do not go through consensus):
 
-{@inject: crates/sui-framework/packages/sui-framework/sources/tx_context.move#fun=epoch_timestamp_ms noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/tx_context.move#fun=epoch_timestamp_ms noComments}
 
 The preceding function returns the point in time when the current epoch started, as a millisecond granularity unix timestamp in a `u64`. This value changes roughly **once every 24 hours**, when the epoch changes.
 
 Tests based on `sui::test_scenario` can use `later_epoch` (following code), to exercise time-sensitive code that uses `epoch_timestamp_ms` (previous code):
-{@inject: crates/sui-framework/packages/sui-framework/sources/test/test_scenario.move#fun=later_epoch noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/test/test_scenario.move#fun=later_epoch noComments}
 
 `later_epoch` behaves like `sui::test_scenario::next_epoch` (finishes the current transaction and epoch in the test scenario), but also increments the timestamp by `delta_ms` milliseconds to simulate the progress of time.

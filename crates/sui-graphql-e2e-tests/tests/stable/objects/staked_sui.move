@@ -19,7 +19,7 @@
   }
 
   address(address: "@{C}") {
-    stakedSuis {
+    stakedOcts {
       edges {
         cursor
         node {
@@ -57,7 +57,7 @@
   }
 
   address(address: "@{C}") {
-    stakedSuis {
+    stakedOcts {
       edges {
         cursor
         node {

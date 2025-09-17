@@ -502,17 +502,17 @@ impl Default for Limits {
             // This default was picked as the sum of pre- and post- quorum timeouts from
             // [`sui_core::authority_aggregator::TimeoutConfig`], with a 10% buffer.
             //
-            // <https://github.com/MystenLabs/sui/blob/eaf05fe5d293c06e3a2dfc22c87ba2aef419d8ea/crates/sui-core/src/authority_aggregator.rs#L84-L85>
+            // <https://github.com/one-chain-labs/onechain/blob/eaf05fe5d293c06e3a2dfc22c87ba2aef419d8ea/crates/sui-core/src/authority_aggregator.rs#L84-L85>
             mutation_timeout_ms: 74_000,
             request_timeout_ms: 40_000,
             // The following limits reflect the max values set in ProtocolConfig, at time of writing.
-            // <https://github.com/MystenLabs/sui/blob/333f87061f0656607b1928aba423fa14ca16899e/crates/sui-protocol-config/src/lib.rs#L1580>
+            // <https://github.com/one-chain-labs/onechain/blob/333f87061f0656607b1928aba423fa14ca16899e/crates/sui-protocol-config/src/lib.rs#L1580>
             max_type_argument_depth: 16,
-            // <https://github.com/MystenLabs/sui/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1618>
+            // <https://github.com/one-chain-labs/onechain/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1618>
             max_type_argument_width: 32,
-            // <https://github.com/MystenLabs/sui/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1622>
+            // <https://github.com/one-chain-labs/onechain/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1622>
             max_type_nodes: 256,
-            // <https://github.com/MystenLabs/sui/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1988>
+            // <https://github.com/one-chain-labs/onechain/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1988>
             max_move_value_depth: 128,
             // Filter-specific limits, such as the number of transaction ids that can be specified
             // for the `TransactionBlockFilter`.
@@ -522,7 +522,7 @@ impl Default for Limits {
             // This value is set to be the size of the max transaction bytes allowed + base64
             // overhead (roughly 1/3 of the original string). This is rounded up.
             //
-            // <https://github.com/MystenLabs/sui/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1578>
+            // <https://github.com/one-chain-labs/onechain/blob/4b934f87acae862cecbcbefb3da34cabb79805aa/crates/sui-protocol-config/src/lib.rs#L1578>
             max_tx_payload_size: (128u32 * 1024u32 * 4u32).div_ceil(3),
         }
     }

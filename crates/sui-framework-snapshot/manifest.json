@@ -9,12 +9,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       }
     ]
@@ -29,12 +29,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       }
     ]
@@ -49,12 +49,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -74,12 +74,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -99,12 +99,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -124,12 +124,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -149,12 +149,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -174,12 +174,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -199,12 +199,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -224,12 +224,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -249,12 +249,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -274,12 +274,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -299,12 +299,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -324,12 +324,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -349,12 +349,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -374,12 +374,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -399,12 +399,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -424,12 +424,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -449,12 +449,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -474,12 +474,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -499,12 +499,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -524,12 +524,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -549,12 +549,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -574,12 +574,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -599,12 +599,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -624,12 +624,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -649,12 +649,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -674,12 +674,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -699,12 +699,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -724,12 +724,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -749,12 +749,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -774,12 +774,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -799,12 +799,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -824,12 +824,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -849,12 +849,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -874,12 +874,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -899,12 +899,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -924,12 +924,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -949,12 +949,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -974,12 +974,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -999,12 +999,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1029,12 +1029,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1059,12 +1059,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1089,12 +1089,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1119,12 +1119,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1149,12 +1149,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1179,12 +1179,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1209,12 +1209,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1239,12 +1239,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1269,12 +1269,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1299,12 +1299,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1329,12 +1329,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1359,12 +1359,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1389,12 +1389,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1419,12 +1419,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1449,12 +1449,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1479,12 +1479,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1509,12 +1509,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1539,12 +1539,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1569,12 +1569,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1599,12 +1599,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1629,12 +1629,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1659,12 +1659,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1689,12 +1689,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1719,12 +1719,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1749,12 +1749,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1779,12 +1779,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1809,12 +1809,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1839,12 +1839,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1869,12 +1869,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1899,12 +1899,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1929,12 +1929,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1959,12 +1959,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -1989,12 +1989,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {
@@ -2019,12 +2019,12 @@
       },
       {
         "name": "Oct",
-        "path": "crates/sui-framework/packages/sui-framework",
+        "path": "crates/sui-framework/packages/one-framework",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
       },
       {
         "name": "OneSystem",
-        "path": "crates/sui-framework/packages/sui-system",
+        "path": "crates/sui-framework/packages/one-system",
         "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
       },
       {

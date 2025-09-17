@@ -2795,7 +2795,7 @@ async fn test_native_transfer() -> Result<(), anyhow::Error> {
 }
 
 #[test]
-// Test for issue https://github.com/MystenLabs/sui/issues/1078
+// Test for issue https://github.com/one-chain-labs/onechain/issues/1078
 fn test_bug_1078() {
     let read = SuiClientCommandResult::Object(SuiObjectResponse::new_with_error(
         SuiObjectResponseError::NotExists {

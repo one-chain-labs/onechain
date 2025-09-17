@@ -37,7 +37,7 @@ archive_store_config:
   object-store-connection-limit: 20
 ```
 
-The genesis blob for the Sui mainnet can be found here: https://github.com/MystenLabs/sui-genesis/blob/main/mainnet/genesis.blob. Download and place it inside the checkpoint summary directory. 
+The genesis blob for the Sui mainnet can be found here: https://github.com/one-chain-labs/onechain-genesis/blob/main/mainnet/genesis.blob. Download and place it inside the checkpoint summary directory. 
 
 We provide `mainnet.yaml` and `testnet.yaml` for your convenience.
 

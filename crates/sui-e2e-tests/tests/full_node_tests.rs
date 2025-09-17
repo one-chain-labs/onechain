@@ -57,7 +57,7 @@ async fn test_full_node_follows_txes() -> Result<(), anyhow::Error> {
 
     let context = &mut test_cluster.wallet;
 
-    // TODO: test fails on CI due to flakiness without this. Once https://github.com/MystenLabs/sui/pull/7056 is
+    // TODO: test fails on CI due to flakiness without this. Once https://github.com/one-chain-labs/onechain/pull/7056 is
     // merged we should be able to root out the flakiness.
     sleep(Duration::from_millis(10)).await;
 

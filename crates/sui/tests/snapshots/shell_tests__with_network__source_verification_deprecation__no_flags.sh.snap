@@ -9,7 +9,7 @@ description: tests/shell_tests/with_network/source_verification_deprecation/no_f
 # check that we get a deprecation warning when upgrading without any dependency verification flags
 
 echo "=== munge Move.toml files ===" | tee /dev/stderr
-FRAMEWORK_DIR=$(echo $CARGO_MANIFEST_DIR | sed 's#/crates/sui#/crates/sui-framework/packages/sui-framework#g')
+FRAMEWORK_DIR=$(echo $CARGO_MANIFEST_DIR | sed 's#/crates/sui#/crates/sui-framework/packages/one-framework#g')
 for i in dependency/Move.toml example/Move.toml
 do
   cat $i | sed "s#FRAMEWORK_DIR#$FRAMEWORK_DIR#g" > Move.toml \

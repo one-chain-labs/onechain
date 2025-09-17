@@ -12,7 +12,7 @@
 	"main": "./src/extension.js",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/MystenLabs/sui.git",
+		"url": "https://github.com/one-chain-labs/onechain.git",
 		"directory": "external-crates/move/tooling/prettier-extension"
 	},
 	"engines": {

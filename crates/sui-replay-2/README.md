@@ -30,7 +30,7 @@ the default in time but it's off for convenience.<br>
 
 You can install the replay tool by executing the following command which will result in depositing the tool's binary into the `~/.cargo/bin` directory:
 ```bash
-cargo install --git https://github.com/MystenLabs/sui sui-replay-2
+cargo install --git https://github.com/one-chain-labs/onechain sui-replay-2
 ```
 
 If you want to enable the ability to trace transaction execution during replay, build the tool with this additional flag: `--features tracing`

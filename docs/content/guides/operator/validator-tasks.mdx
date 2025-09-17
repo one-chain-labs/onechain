@@ -32,7 +32,7 @@ $ curl https://releases.sui.io/$SUI_SHA/sui-node -o sui-node
 To build directly from source:
 
 ```sh
-$ git clone https://github.com/MystenLabs/sui.git && cd sui
+$ git clone https://github.com/one-chain-labs/onechain.git && cd sui
 ```
 ```sh
 $ git checkout [SHA|BRANCH|TAG]
@@ -43,9 +43,9 @@ $ cargo build --release --bin sui-node
 
 Configuration and guides are available for the following deployment options:
 
-- [Systemd](https://github.com/MystenLabs/sui/blob/main/nre/systemd/README.md)
-- [Ansible](https://github.com/MystenLabs/sui/blob/main/nre/ansible/README.md)
-- [Docker Compose](https://github.com/MystenLabs/sui/blob/main/nre/docker/README.md)
+- [Systemd](https://github.com/one-chain-labs/onechain/blob/main/nre/systemd/README.md)
+- [Ansible](https://github.com/one-chain-labs/onechain/blob/main/nre/ansible/README.md)
+- [Docker Compose](https://github.com/one-chain-labs/onechain/blob/main/nre/docker/README.md)
 
 ## Configuration
 
@@ -53,7 +53,7 @@ Sui node runs with a single configuration file provided as an argument, example:
 
 `./sui-node --config-path /opt/sui/config/validator.yaml`.
 
-See [Validator](https://github.com/MystenLabs/sui/blob/main/nre/config/validator.yaml) for configuration templates.
+See [Validator](https://github.com/one-chain-labs/onechain/blob/main/nre/config/validator.yaml) for configuration templates.
 
 ## Connectivity
 
@@ -192,9 +192,9 @@ The `RUST_LOG_JSON=1` environment variable can optionally be set to enable loggi
 
 Depending on your deployment method, these are configured in the following places:
 
-- [Ansible](https://github.com/MystenLabs/sui/blob/main/nre/ansible/roles/sui-node/files/sui-node.service)
-- [Native systemd](https://github.com/MystenLabs/sui/blob/main/nre/systemd/sui-node.service)
-- [Docker Compose](https://github.com/MystenLabs/sui/blob/main/nre/docker/docker-compose.yaml)
+- [Ansible](https://github.com/one-chain-labs/onechain/blob/main/nre/ansible/roles/sui-node/files/sui-node.service)
+- [Native systemd](https://github.com/one-chain-labs/onechain/blob/main/nre/systemd/sui-node.service)
+- [Docker Compose](https://github.com/one-chain-labs/onechain/blob/main/nre/docker/docker-compose.yaml)
 
 To view and follow the Sui node logs:
 
@@ -208,7 +208,7 @@ To search for a particular match
 $ journalctl -u sui-node -g <SEARCH_TERM>
 ```
 
-- If using Docker Compose, look at the examples in the [README](https://github.com/MystenLabs/sui/blob/main/nre/docker/README.md#logs).
+- If using Docker Compose, look at the examples in the [README](https://github.com/one-chain-labs/onechain/blob/main/nre/docker/README.md#logs).
 
 It is possible to change the logging configuration while a node is running using the admin interface.
 
@@ -234,8 +234,8 @@ Public dashboard for network wide visibility:
 
 When an update is required to the Sui node software the following process can be used. Follow the relevant Systemd or Docker Compose runbook depending on your deployment type. It is highly unlikely that you will want to restart with a clean database.
 
-- [Systemd](https://github.com/MystenLabs/sui/blob/main/nre/systemd/README.md#updates)
-- [Docker Compose](https://github.com/MystenLabs/sui/blob/main/nre/docker/README.md#updates)
+- [Systemd](https://github.com/one-chain-labs/onechain/blob/main/nre/systemd/README.md#updates)
+- [Docker Compose](https://github.com/one-chain-labs/onechain/blob/main/nre/docker/README.md#updates)
 
 ## State sync
 
@@ -280,7 +280,7 @@ It is recommended and often required that the `sui` binary release/version match
 
 ### Updating on-chain metadata
 
-You can leverage [Validator Tool](https://github.com/MystenLabs/sui/blob/main/nre/validator_tool.md) to perform majority of the following tasks.
+You can leverage [Validator Tool](https://github.com/one-chain-labs/onechain/blob/main/nre/validator_tool.md) to perform majority of the following tasks.
 
 An active/pending validator can update its on-chain metadata by submitting a transaction. Some metadata changes take effect immediately, including:
 
@@ -307,7 +307,7 @@ $ sui client call --package 0x3 --module sui_system --function update_validator_
 $ sui client call --package 0x3 --module sui_system --function update_validator_next_epoch_p2p_address --args 0x5 "[4, 192, 168, 1, 1]" --gas-budget 10000
 ```
 
-See the [full list of metadata update functions here](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/sui_system.move#L267-L444).
+See the [full list of metadata update functions here](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-system/sources/sui_system.move#L267-L444).
 
 ### Operation cap
 

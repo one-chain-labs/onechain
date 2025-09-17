@@ -67,7 +67,7 @@ export default function CodeBlockString({
       const githubRepoName = parts[1];
       sourceLink = `${GITHUB}/${githubOrgName}/${githubRepoName}/${GITHUB_BLOB}/${parts.slice(2).join("/")}`;
     } else {
-      sourceLink = `https://github.com/MystenLabs/sui/tree/main/${title}`;
+      sourceLink = `https://github.com/one-chain-labs/onechain/tree/main/${title}`;
     }
   }
 

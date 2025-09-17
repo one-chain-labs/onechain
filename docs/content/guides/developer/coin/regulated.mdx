@@ -87,31 +87,31 @@ The TypeScript and Rust clients handle the call to the `coin` package's `mint` f
 
 </Tabs>
 
-For all `Coin` functions available, see the Sui framework [`coin` module documentation](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/docs/sui/coin.md). The following functions are the most common. 
+For all `Coin` functions available, see the Sui framework [`coin` module documentation](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui/coin.md). The following functions are the most common. 
 
 <details>
 <summary>
   `coin::mint<T>`
 </summary>
-{@inject: crates/sui-framework/packages/sui-framework/sources/coin.move#fun=mint}
+{@inject: crates/sui-framework/packages/one-framework/sources/coin.move#fun=mint}
 </details>
 <details>
 <summary>
   `coin::mint_balance<T>`
 </summary>
-{@inject: crates/sui-framework/packages/sui-framework/sources/coin.move#fun=mint_balance}
+{@inject: crates/sui-framework/packages/one-framework/sources/coin.move#fun=mint_balance}
 </details>
 <details>
 <summary>
   `coin::mint_and_transfer<T>`
 </summary>
-{@inject: crates/sui-framework/packages/sui-framework/sources/coin.move#fun=mint_and_transfer}
+{@inject: crates/sui-framework/packages/one-framework/sources/coin.move#fun=mint_and_transfer}
 </details>
 <details>
 <summary>
   `coin::burn<T>`
 </summary>
-{@inject: crates/sui-framework/packages/sui-framework/sources/coin.move#fun=burn}
+{@inject: crates/sui-framework/packages/one-framework/sources/coin.move#fun=burn}
 </details>
 
 ### Manage deny list
@@ -137,6 +137,6 @@ To use these functions, you pass the address you want to either add or remove. T
 ## Related links
 
 - [Closed Loop Token standard](../../../standards/closed-loop-token.mdx): Details for the standard used to create tokens on Sui.
-- [Source code](https://github.com/MystenLabs/sui/tree/main/examples/regulated-coin): The source code in GitHub for this example.
+- [Source code](https://github.com/one-chain-labs/onechain/tree/main/examples/regulated-coin): The source code in GitHub for this example.
 - [In-Game Tokens](./in-game-token.mdx): Example of how to create tokens for use as in-game currency.
 - [Loyalty Tokens](./loyalty.mdx): Example of how to create tokens that reward brand or service loyalty on the Sui network.

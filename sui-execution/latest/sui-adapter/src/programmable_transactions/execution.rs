@@ -1045,7 +1045,7 @@ mod checked {
         package_id: ObjectID,
         modules: &[CompiledModule],
     ) -> Result<(), ExecutionError> {
-        // TODO(https://github.com/MystenLabs/sui/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
+        // TODO(https://github.com/one-chain-labs/onechain/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
         let binary_version = context.protocol_config.move_binary_format_version();
         let new_module_bytes: Vec<_> = modules
             .iter()

@@ -12,11 +12,11 @@ To set up and run a Bridge Node, you need to install `sui` and `sui-bridge-cli`.
 
 Install from tip of `main`:
 ```sh
-$ cargo install --locked --git "https://github.com/MystenLabs/sui.git" sui sui-bridge-cli
+$ cargo install --locked --git "https://github.com/one-chain-labs/onechain.git" sui sui-bridge-cli
 ```
 Install with a commit sha:
 ```sh
-$ cargo install --locked --git "https://github.com/MystenLabs/sui.git" --rev {SHA} sui sui-bridge-cli
+$ cargo install --locked --git "https://github.com/one-chain-labs/onechain.git" --rev {SHA} sui sui-bridge-cli
 ```
 
 ## Committee registration
@@ -196,15 +196,15 @@ Build or install Bridge Node in one of the following ways:
 
 - Use `cargo install`.
     ```sh
-    $ cargo install --locked --git "https://github.com/MystenLabs/sui.git" --branch {BRANCH-NAME} sui-bridge
+    $ cargo install --locked --git "https://github.com/one-chain-labs/onechain.git" --branch {BRANCH-NAME} sui-bridge
     ```
     Or
     ```sh
-    $ cargo install --locked --git "https://github.com/MystenLabs/sui.git" --rev {SHA-NAME} sui-bridge
+    $ cargo install --locked --git "https://github.com/one-chain-labs/onechain.git" --rev {SHA-NAME} sui-bridge
     ```
 - Compile from source code
     ```sh
-    $ git clone https://github.com/MystenLabs/sui.git
+    $ git clone https://github.com/one-chain-labs/onechain.git
     ```
     ```sh
     $ cd sui
@@ -247,7 +247,7 @@ $ curl -v {YOUR_BRIDGE_URL}
 
 Use `uptime` to check if the node is running.
 
-You can find a full list of Bridge Node metrics and their descriptions in the [`sui-bridge` crate](https://github.com/MystenLabs/sui/blob/main/crates/sui-bridge/src/metrics.rs).
+You can find a full list of Bridge Node metrics and their descriptions in the [`sui-bridge` crate](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-bridge/src/metrics.rs).
 
 #### When `run-client: false`
 

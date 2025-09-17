@@ -500,7 +500,7 @@ this command records all the Move function invocations and the gas cost breakdow
 To enable the profiler, you must either install or build the Sui Client binary locally with the `--features tracing` flag if it has not already been built with that feature enabled.
 
 ```sh
-$ cargo install --locked --git https://github.com/MystenLabs/sui.git --branch <BRANCH-NAME> --features tracing sui
+$ cargo install --locked --git https://github.com/one-chain-labs/onechain.git --branch <BRANCH-NAME> --features tracing sui
 ```
 
 The command outputs a profile to the current working directory in the format `gas_profile_{tx_digest}_{unix_timestamp}.json`.
@@ -538,7 +538,7 @@ your published smart contract, and finally run the profiler on the transaction t
 
 ## Publish a Move package
 
-One of the main uses of the `sui client` command is to publish smart contracts on the Sui network. This example switches the current environment to the Devnet network, then builds, tests, and publishes one of the existing Move examples available in the Sui repository: [sui/examples/move](https://github.com/MystenLabs/sui/tree/main/examples/move)
+One of the main uses of the `sui client` command is to publish smart contracts on the Sui network. This example switches the current environment to the Devnet network, then builds, tests, and publishes one of the existing Move examples available in the Sui repository: [sui/examples/move](https://github.com/one-chain-labs/onechain/tree/main/examples/move)
 
 This example also makes use of `sui move` commands. To learn more about those commands, see [Sui Move CLI](./move.mdx).
 

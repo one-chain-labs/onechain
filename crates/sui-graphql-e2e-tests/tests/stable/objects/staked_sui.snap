@@ -25,7 +25,7 @@ Response: {
       ]
     },
     "address": {
-      "stakedSuis": {
+      "stakedOcts": {
         "edges": []
       }
     }
@@ -98,7 +98,7 @@ Response: {
       ]
     },
     "address": {
-      "stakedSuis": {
+      "stakedOcts": {
         "edges": [
           {
             "cursor": "IIfCdVF/ksapbQZhjXV6RV32ZC1RPOn4asTmI03lIcvOAgAAAAAAAAA=",

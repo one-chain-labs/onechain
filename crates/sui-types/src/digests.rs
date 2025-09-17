@@ -541,7 +541,7 @@ impl TransactionDigest {
     /// ie. for an object there is no parent digest.
     /// Note that this is not the same as the digest of the genesis transaction,
     /// which cannot be known ahead of time.
-    // TODO(https://github.com/MystenLabs/sui/issues/65): we can pick anything here
+    // TODO(https://github.com/one-chain-labs/onechain/issues/65): we can pick anything here
     pub const fn genesis_marker() -> Self {
         Self::ZERO
     }

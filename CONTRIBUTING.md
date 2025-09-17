@@ -13,7 +13,7 @@ We appreciate contributions, but **simple typo fixes (e.g., minor spelling error
 
 Found a small error or typo in the main documentation? Each page on the [docs.sui.io](https://docs.sui.io/) site includes an **Edit this page** link at the bottom that you can use to edit the page in GitHub. The content is located in the docs/content directory of the Sui repo, so you can make a PR if you prefer. 
 
-For larger documentation issues, you can [create an issue](https://github.com/MystenLabs/sui/issues/new/choose) in GitHub. To fix the problem yourself, follow the [documentation contribution](./docs/content/references/contribute/contribution-process.mdx) guidelines.
+For larger documentation issues, you can [create an issue](https://github.com/one-chain-labs/onechain/issues/new/choose) in GitHub. To fix the problem yourself, follow the [documentation contribution](./docs/content/references/contribute/contribution-process.mdx) guidelines.
 
 If you change functionality, update the relevant documentation.
 
@@ -31,7 +31,7 @@ If you want to contribute code that creates a feature on Sui, start with a [Sui 
 
 ## New Sui Framework Contributions
 
-Want to contribute to the Sui framework? See [CONTRIBUTING.md](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/CONTRIBUTING.md) for information related to `sui-framework` crate contributions.
+Want to contribute to the Sui framework? See [CONTRIBUTING.md](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/CONTRIBUTING.md) for information related to `sui-framework` crate contributions.
 
 ## Proposing Code Changes
 

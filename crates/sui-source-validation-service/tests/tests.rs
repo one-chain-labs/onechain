@@ -406,8 +406,8 @@ branch = "framework/mainnet"
 paths = [
   { path = "crates/sui-framework/packages/deepbook", watch = "0xdee9" },
   { path = "crates/sui-framework/packages/move-stdlib", watch = "0x1" },
-  { path = "crates/sui-framework/packages/sui-framework", watch = "0x2" },
-  { path = "crates/sui-framework/packages/sui-system", watch = "0x3" }
+  { path = "crates/sui-framework/packages/one-framework", watch = "0x2" },
+  { path = "crates/sui-framework/packages/one-system", watch = "0x3" }
 ]
 
     [[packages]]
@@ -446,13 +446,13 @@ paths = [
                                         ),
                                     },
                                     Package {
-                                        path: "crates/sui-framework/packages/sui-framework",
+                                        path: "crates/sui-framework/packages/one-framework",
                                         watch: Some(
                                             0x0000000000000000000000000000000000000000000000000000000000000002,
                                         ),
                                     },
                                     Package {
-                                        path: "crates/sui-framework/packages/sui-system",
+                                        path: "crates/sui-framework/packages/one-system",
                                         watch: Some(
                                             0x0000000000000000000000000000000000000000000000000000000000000003,
                                         ),

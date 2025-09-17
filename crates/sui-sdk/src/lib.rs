@@ -4,7 +4,7 @@
 //! The Sui Rust SDK
 //!
 //! It aims at providing a similar SDK functionality like the one existing for
-//! [TypeScript](https://github.com/MystenLabs/sui/tree/main/sdk/typescript/).
+//! [TypeScript](https://github.com/one-chain-labs/onechain/tree/main/sdk/typescript/).
 //! Sui Rust SDK builds on top of the [JSON RPC API](https://docs.sui.io/sui-jsonrpc)
 //! and therefore many of the return types are the ones specified in [sui_types].
 //!
@@ -68,7 +68,7 @@
 //! ## Examples
 //!
 //! For detailed examples, please check the APIs docs and the examples folder
-//! in the [main repository](https://github.com/MystenLabs/sui/tree/main/crates/sui-sdk/examples).
+//! in the [main repository](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk/examples).
 
 use std::collections::HashMap;
 use std::fmt::Debug;

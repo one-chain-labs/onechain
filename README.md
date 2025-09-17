@@ -4,8 +4,8 @@
 
 # Welcome to Sui
 
-[![Github release](https://img.shields.io/github/v/tag/MystenLabs/sui.svg?sort=semver)](https://github.com/MystenLabs/sui/releases/latest)
-[![License](https://img.shields.io/github/license/MystenLabs/sui)](https://github.com/MystenLabs/sui/blob/main/LICENSE)
+[![Github release](https://img.shields.io/github/v/tag/MystenLabs/sui.svg?sort=semver)](https://github.com/one-chain-labs/onechain/releases/latest)
+[![License](https://img.shields.io/github/license/MystenLabs/sui)](https://github.com/one-chain-labs/onechain/blob/main/LICENSE)
 
 [Sui](https://sui.io) is a next-generation smart contract platform with high throughput, low latency, and an asset-oriented programming model powered by the [Move programming language](https://github.com/MystenLabs/awesome-move).
 
@@ -49,7 +49,7 @@ Sui is written in [Rust](https://www.rust-lang.org) and supports smart contracts
 
 Sui has a native token called SUI, with a fixed supply. The OCT token is used to pay for gas, and is also used as [delegated stake on authorities](https://learn.bybit.com/blockchain/delegated-proof-of-stake-dpos/) within an epoch. The voting power of authorities within this epoch is a function of this delegated stake. Authorities are periodically reconfigured according to the stake delegated to them. In any epoch, the set of authorities is [Byzantine fault tolerant](https://pmg.csail.mit.edu/papers/osdi99.pdf). At the end of the epoch, fees collected through all transactions processed are distributed to authorities according to their contribution to the operation of the system. Authorities can in turn share some of the fees as rewards to users that delegated stakes to them.
 
-Sui is supported by several cutting-edge [peer-reviewed studies](https://github.com/MystenLabs/sui/blob/main/docs/content/concepts/research-papers.mdx) and extensive years of open-source development.
+Sui is supported by several cutting-edge [peer-reviewed studies](https://github.com/one-chain-labs/onechain/blob/main/docs/content/concepts/research-papers.mdx) and extensive years of open-source development.
 
 ## More About Sui
 

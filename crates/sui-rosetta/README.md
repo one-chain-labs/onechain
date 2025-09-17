@@ -13,7 +13,7 @@ read and write transactions to the Sui network.
 
 ### Build from source
 #### 0. Checkout and build Sui
-Checkout the [Sui source code](https://github.com/MystenLabs/sui) and compile using `cargo build --release`, the binaries will be located in `target/release` directory.
+Checkout the [Sui source code](https://github.com/one-chain-labs/onechain) and compile using `cargo build --release`, the binaries will be located in `target/release` directory.
 
 #### 1. Genesis
 

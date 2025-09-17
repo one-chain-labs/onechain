@@ -96,7 +96,7 @@ type Address implements IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this address.
 	"""
@@ -529,7 +529,7 @@ type Coin implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -707,7 +707,7 @@ type CoinMetadata implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -1608,7 +1608,7 @@ interface IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -2075,7 +2075,7 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2274,7 +2274,7 @@ type MovePackage implements IObject & IOwner {
 	Note that objects owned by a package are inaccessible, because packages are immutable and
 	cannot be owned by an address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2685,7 +2685,7 @@ type Object implements IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -3033,7 +3033,7 @@ type Owner implements IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -3802,7 +3802,7 @@ type StakedOct implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -4030,7 +4030,7 @@ type SuinsRegistration implements IMoveObject & IObject & IOwner {
 	"""
 	The `0x3::staking_pool::StakedOct` objects owned by this object.
 	"""
-	stakedSuis(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""

@@ -7,11 +7,11 @@ RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 FROM chef AS builder
-RUN git clone https://github.com/MystenLabs/sui .
+RUN git clone https://github.com/one-chain-labs/onechain .
 RUN git checkout devnet
 
 RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
-RUN curl -fLJO https://github.com/MystenLabs/sui-genesis/raw/main/devnet/genesis.blob
+RUN curl -fLJO https://github.com/one-chain-labs/onechain-genesis/raw/main/devnet/genesis.blob
 RUN cargo build --release --bin sui --bin sui-rosetta --bin sui-node
 
 # Production Image

@@ -473,7 +473,7 @@ async fn fuzz_dynamic_committee() {
         .fold(0, |acc, v| acc + v.staking_pool_oct_balance);
 
     // Use the formula for voting_power from Sui System to check if the voting power is correctly
-    // set. See `crates/sui-framework/packages/sui-system/sources/voting_power.move`.
+    // set. See `crates/sui-framework/packages/one-system/sources/voting_power.move`.
     // Validator voting power in a larger setup cannot exceed 1000.
     // The remaining voting power is redistributed to the remaining validators.
     //

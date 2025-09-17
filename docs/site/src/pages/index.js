@@ -100,13 +100,13 @@ export default function Home() {
             </Link>
             <Link
               className={styles.cardLink}
-              to="https://github.com/MystenLabs/sui/tree/main/crates/sui-framework/docs"
+              to="https://github.com/one-chain-labs/onechain/tree/main/crates/sui-framework/docs"
             >
               Sui framework (GitHub)
             </Link>
             <Link
               className={styles.cardLink}
-              to="https://github.com/MystenLabs/sui/tree/main/crates/sui-sdk"
+              to="https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk"
             >
               Rust SDK (GitHub)
             </Link>

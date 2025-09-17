@@ -1001,7 +1001,7 @@ mod sim_only_tests {
             .build()
             .await;
         // TODO: Replace the path with the new framework path when we test it for real.
-        override_sui_system_modules("../../../sui-framework/packages/sui-system");
+        override_sui_system_modules("../../../sui-framework/packages/one-system");
         // Wait for the upgrade to finish. After the upgrade, the new framework will be installed,
         // but the system state object hasn't been upgraded yet.
         let system_state = test_cluster.wait_for_epoch(Some(1)).await;

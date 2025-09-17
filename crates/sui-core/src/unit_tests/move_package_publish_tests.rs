@@ -240,7 +240,7 @@ async fn test_generate_lock_file() {
 
         [[move.package]]
         id = "Sui"
-        source = { local = "../../../../../sui-framework/packages/sui-framework" }
+        source = { local = "../../../../../sui-framework/packages/one-framework" }
 
         dependencies = [
           { id = "MoveStdlib", name = "MoveStdlib" },

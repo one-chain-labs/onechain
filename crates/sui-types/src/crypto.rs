@@ -1238,7 +1238,7 @@ impl TryFrom<&SuiAuthorityStrongQuorumSignInfo> for AuthorityStrongQuorumSignInf
 // maintain the invariant that valid certificates with distinct signatures are equivalent, but yet-unchecked
 // certificates that differ on signers aren't.
 //
-// see also https://github.com/MystenLabs/sui/issues/266
+// see also https://github.com/one-chain-labs/onechain/issues/266
 static_assertions::assert_not_impl_any!(AuthorityStrongQuorumSignInfo: Hash, Eq, PartialEq);
 
 impl<const STRONG_THRESHOLD: bool> AuthoritySignInfoTrait

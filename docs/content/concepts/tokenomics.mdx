@@ -105,7 +105,7 @@ Each Sui validator maintains its own staking pool to track the amount of stake a
 When SUI is deposited to the staking pool in epoch `E`, those SUI are converted into liquidity tokens at the epoch `E` exchange rate. As the staking pool earns rewards, the exchange rate appreciates. At epoch `E'`, those liquidity tokens are worth more and translate into more SUI.
 The only difference between Sui staking pools and typical liquidity pools is that in Sui the liquidity tokens do not exist. Rather, the global exchange rate table is used to track the accounting. Because all OCT tokens in the staking pool are treated the same, regardless of whether they were originally deposited as new stake or as stake rewards, all OCT tokens immediately count as stake and thus compound rewards immediately.
 
-The staking pool is implemented in a system-level smart contract ([staking_pool.move](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/staking_pool.move)) and is part of the Sui framework.
+The staking pool is implemented in a system-level smart contract ([staking_pool.move](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-system/sources/staking_pool.move)) and is part of the Sui framework.
 
 ### Validator pool exchange rate 
 

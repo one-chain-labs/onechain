@@ -19,9 +19,9 @@ Sui's local fee market algorithm runs every time a new batch of sequenced transa
 
 1. Sorts all transactions in order of gas price, from highest to lowest.
 
-1. Estimates each transaction's execution cost using the [`ExecutionTimeEstimate`](https://github.com/MystenLabs/sui/blob/main/crates/sui-core/src/authority/execution_time_estimator.rs) heuristic.
+1. Estimates each transaction's execution cost using the [`ExecutionTimeEstimate`](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-core/src/authority/execution_time_estimator.rs) heuristic.
 
-1. The [`SharedObjectCongestionTracker`](https://github.com/MystenLabs/sui/blob/main/crates/sui-core/src/authority/shared_object_congestion_tracker.rs) keeps a running tally of how much per-object congestion budget is used. If all shared objects used by the transaction have enough budget left, the transaction is scheduled. In that case, it consumes budget for the mutable shared objects that it uses. Keep in mind that immutable shared objects don't consume any budget, because multiple immutable uses of a shared object can execute in parallel. If the transaction cannot be scheduled, it is deferred until the next commit.
+1. The [`SharedObjectCongestionTracker`](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-core/src/authority/shared_object_congestion_tracker.rs) keeps a running tally of how much per-object congestion budget is used. If all shared objects used by the transaction have enough budget left, the transaction is scheduled. In that case, it consumes budget for the mutable shared objects that it uses. Keep in mind that immutable shared objects don't consume any budget, because multiple immutable uses of a shared object can execute in parallel. If the transaction cannot be scheduled, it is deferred until the next commit.
 
 ### Priority ordering of transactions
 

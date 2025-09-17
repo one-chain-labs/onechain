@@ -6,7 +6,7 @@ Supplementary technical documentation for some key types is available alongside 
 ## Cryptography-related structs and methods
 
 Currently, three files are equipped with signature and hashing functionality (`crypto.rs`, `signature_seed` and
-`messages.rs`). See [Sui Signatures](https://github.com/MystenLabs/sui/blob/main/docs/content/concepts/cryptography/transaction-auth/signatures.mdx) for supported signature schemes and its requirments for user and authority signatures. See [fastcrypto](https://github.com/MystenLabs/fastcrypto) for concrete implementation of various cryptography libraries.
+`messages.rs`). See [Sui Signatures](https://github.com/one-chain-labs/onechain/blob/main/docs/content/concepts/cryptography/transaction-auth/signatures.mdx) for supported signature schemes and its requirments for user and authority signatures. See [fastcrypto](https://github.com/MystenLabs/fastcrypto) for concrete implementation of various cryptography libraries.
 
 ### Quick links
 

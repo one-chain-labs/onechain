@@ -22,7 +22,7 @@ Refer to [when to use gRPC vs GraphQL](../guides/developer/getting-started/data-
 
 ## gRPC on Sui
 
-Protocol buffers define the gRPC interface. You can find the relevant **beta** `.proto` files at [sui-apis on Github](https://github.com/MystenLabs/sui-apis/tree/main/proto), which apart from the gRPC messages (request and response payloads) include the following services:
+Protocol buffers define the gRPC interface. You can find the relevant **beta** `.proto` files at [sui-apis on Github](https://github.com/one-chain-labs/onechain-apis/tree/main/proto), which apart from the gRPC messages (request and response payloads) include the following services:
 
 | Service | Proto | Purpose |
 | --- | --- | --- |
@@ -286,7 +286,7 @@ npm i -D tsx
 ├── package.json
 ```
 
-Download all the `sui/rpc/v2beta` proto files from [Github v2beta](https://github.com/MystenLabs/sui/tree/main/crates/sui-rpc-api/proto) in the same folder.
+Download all the `sui/rpc/v2beta` proto files from [Github v2beta](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-rpc-api/proto) in the same folder.
 
 **Sample client.ts to get `events` and `effects` details of a particular transaction**
 
@@ -379,7 +379,7 @@ require (
 
 **Generate Golang code from proto files**
 
-Assuming you have the proto files from [Github v2beta](https://github.com/MystenLabs/sui/tree/main/crates/sui-rpc-api/proto), run:
+Assuming you have the proto files from [Github v2beta](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-rpc-api/proto), run:
 
 ```shell
 protoc --proto_path=./protos --go_out=. --go-grpc_out=. protos/sui/rpc/v2beta/ledger_service.proto
@@ -476,7 +476,7 @@ pip install grpcio grpcio-tools protobuf
 
 **Generate Python code from proto files**
 
-Assuming you have the proto files from [Github v2beta](https://github.com/MystenLabs/sui/tree/main/crates/sui-rpc-api/proto), run:
+Assuming you have the proto files from [Github v2beta](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-rpc-api/proto), run:
 
 ```shell
 python -m grpc_tools.protoc -I./protos --python_out=. --grpc_python_out=. ./protos/sui/rpc/v2beta/ledger_service.proto
@@ -536,7 +536,7 @@ python client.py
 - Always use [field masks](#field-masks) when applicable to reduce response size and latency, especially for large resources.
 - Use `TLS (port 443)` for production traffic to ensure encrypted transport and prevent downgrade attacks.
 - Use [streaming subscriptions](#subscriptions-for-streaming-data) for real-time use cases instead of polling repeatedly.
-- Generate client code from the official `.proto` definitions in [sui-rpc-api](https://github.com/MystenLabs/sui-apis/tree/main/proto) to ensure compatibility and type safety.
+- Generate client code from the official `.proto` definitions in [sui-rpc-api](https://github.com/one-chain-labs/onechain-apis/tree/main/proto) to ensure compatibility and type safety.
 - [Paginate](#pagination) carefully — always check `next_page_token` and do not assume all data is returned at once.
 - Retry transient failures with [exponential backoff](https://en.wikipedia.org/wiki/Exponential_backoff), especially for streaming APIs or busy public nodes.
 - Validate all input data, including encodings and message formats, to prevent hard-to-debug API rejections.
