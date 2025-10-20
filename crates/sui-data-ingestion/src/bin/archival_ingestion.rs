@@ -5,7 +5,9 @@ use anyhow::Result;
 use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use sui_data_ingestion::{ArchivalConfig, ArchivalReducer, ArchivalWorker};
-use sui_data_ingestion_core::{DataIngestionMetrics, IndexerExecutor, ReaderOptions, ShimProgressStore, WorkerPool};
+use sui_data_ingestion_core::{
+    DataIngestionMetrics, IndexerExecutor, ReaderOptions, ShimProgressStore, WorkerPool,
+};
 use tokio::sync::oneshot;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,11 +44,22 @@ async fn main() -> Result<()> {
     let (_exit_sender, exit_receiver) = oneshot::channel();
     let reducer = ArchivalReducer::new(archival_config).await?;
     let progress_store = ShimProgressStore(reducer.get_watermark().await?);
-    let mut executor = IndexerExecutor::new(progress_store, 1, DataIngestionMetrics::new(&Registry::new()));
-    let worker_pool = WorkerPool::new_with_reducer(ArchivalWorker, "archival".to_string(), 1, Box::new(reducer));
+    let mut executor = IndexerExecutor::new(
+        progress_store,
+        1,
+        DataIngestionMetrics::new(&Registry::new()),
+    );
+    let worker_pool =
+        WorkerPool::new_with_reducer(ArchivalWorker, "archival".to_string(), 1, Box::new(reducer));
     executor.register(worker_pool).await?;
     executor
-        .run(tempfile::tempdir()?.keep(), Some(config.remote_store_url), vec![], ReaderOptions::default(), exit_receiver)
+        .run(
+            tempfile::tempdir()?.into_path(),
+            Some(config.remote_store_url),
+            vec![],
+            ReaderOptions::default(),
+            exit_receiver,
+        )
         .await?;
     Ok(())
 }

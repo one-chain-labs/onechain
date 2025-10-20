@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::time::Duration;
 use sui_config::Config;
 use sui_types::base_types::ObjectID;
 

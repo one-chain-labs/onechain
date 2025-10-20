@@ -2,26 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use invalid_mutations::{
-    bounds::{ApplyCodeUnitBoundsContext, ApplyOutOfBoundsContext, CodeUnitBoundsMutation, OutOfBoundsMutation},
+    bounds::{
+        ApplyCodeUnitBoundsContext, ApplyOutOfBoundsContext, CodeUnitBoundsMutation,
+        OutOfBoundsMutation,
+    },
     signature::{FieldRefMutation, SignatureRefMutation},
 };
 use move_binary_format::{
-    check_bounds::BoundsChecker,
-    file_format::CompiledModule,
+    check_bounds::BoundsChecker, file_format::CompiledModule,
     proptest_types::CompiledModuleStrategyGen,
 };
 use move_bytecode_verifier::{
-    ability_cache::AbilityCache,
-    ability_field_requirements,
-    constants,
-    instantiation_loops::InstantiationLoopChecker,
-    DuplicationChecker,
-    InstructionConsistency,
-    RecursiveDataDefChecker,
-    SignatureChecker,
+    ability_cache::AbilityCache, ability_field_requirements, constants,
+    instantiation_loops::InstantiationLoopChecker, DuplicationChecker, InstructionConsistency,
+    RecursiveDataDefChecker, SignatureChecker,
 };
 use move_bytecode_verifier_meter::dummy::DummyMeter;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+};
 use proptest::{collection::vec, prelude::*, sample::Index as PropIndex};
 
 proptest! {

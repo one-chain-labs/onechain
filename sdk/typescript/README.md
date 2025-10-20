@@ -5,7 +5,7 @@ For more complete docs, visit the [Sui TypeScript SDK docs](https://sdk.mystenla
 # Sui TypeScript SDK
 
 This is the Sui TypeScript SDK built on the Sui
-[JSON RPC API](https://github.com/MystenLabs/sui/blob/main/docs/content/references/sui-api.mdx). It
+[JSON RPC API](https://github.com/one-chain-labs/onechain/blob/main/docs/content/references/sui-api.mdx). It
 provides utility classes and functions for applications to sign transactions and interact with the
 Sui network.
 
@@ -15,30 +15,30 @@ upcoming TestNet launch.
 
 ## Working with Devnet
 
-The SDK will be published to [npm registry](https://www.npmjs.com/package/hocjs) with the same
+The SDK will be published to [npm registry](https://www.npmjs.com/package/@mysten/sui) with the same
 bi-weekly release cycle as the Devnet validators and
-[RPC Server](https://github.com/MystenLabs/sui/blob/main/docs/content/references/sui-api.mdx). To
+[RPC Server](https://github.com/one-chain-labs/onechain/blob/main/docs/content/references/sui-api.mdx). To
 use the SDK in your project, you can do:
 
 ```bash
-$ npm install hocjs
+$ npm install @mysten/sui
 ```
 
 You can also use your preferred npm client, such as yarn or pnpm.
 
 ## Working with local network
 
-Note that the `latest` tag for the [published SDK](https://www.npmjs.com/package/hocjs) might
+Note that the `latest` tag for the [published SDK](https://www.npmjs.com/package/@mysten/sui) might
 go out of sync with the RPC server on the `main` branch until the next release. If you're developing
 against a local network, we recommend using the `experimental`-tagged packages, which contain the
 latest changes from `main`.
 
 ```bash
-npm install hocjs@experimental
+npm install @mysten/sui@experimental
 ```
 
 Refer to the
-[JSON RPC](https://github.com/MystenLabs/sui/blob/main/docs/content/references/sui-api.mdx) topic
+[JSON RPC](https://github.com/one-chain-labs/onechain/blob/main/docs/content/references/sui-api.mdx) topic
 for instructions about how to start a local network and local RPC server.
 
 ## Building Locally
@@ -61,7 +61,7 @@ $ pnpm sdk build
 ## Type Doc
 
 You can view the generated [Type Doc](https://typedoc.org/) for the
-[current release of the SDK](https://www.npmjs.com/package/hocjs) at
+[current release of the SDK](https://www.npmjs.com/package/@mysten/sui) at
 http://typescript-sdk-docs.s3-website-us-east-1.amazonaws.com/.
 
 For the latest docs for the `main` branch, run `pnpm doc` and open the
@@ -72,16 +72,16 @@ For the latest docs for the `main` branch, run `pnpm doc` and open the
 To run unit tests
 
 ```
-pnpm --filter hocjs test:unit
+pnpm --filter @mysten/sui test:unit
 ```
 
 To run E2E tests against local network
 
 ```
-pnpm --filter hocjs prepare:e2e
+pnpm --filter @mysten/sui prepare:e2e
 
 // This will run all e2e tests
-pnpm --filter hocjs test:e2e
+pnpm --filter @mysten/sui test:e2e
 
 // Alternatively you can choose to run only one test file
 npx vitest txn-builder.test.ts
@@ -100,7 +100,7 @@ https://stackoverflow.com/questions/52676244/node-version-not-updating-after-nvm
 To run E2E tests against Devnet
 
 ```
-VITE_FAUCET_URL='https://faucet-devnet.onelabs.cc:443/gas' VITE_FULLNODE_URL='https://fullnode.devnet.sui.io' pnpm --filter hocjs exec vitest e2e
+VITE_FAUCET_URL='https://faucet.devnet.sui.io:443/gas' VITE_FULLNODE_URL='https://fullnode.devnet.sui.io' pnpm --filter @mysten/sui exec vitest e2e
 ```
 
 ## Connecting to Sui Network
@@ -112,7 +112,7 @@ read-only operations. The default URLs to connect with the RPC server are:
 - Devnet: https://fullnode.devnet.sui.io
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 // create a client connected to devnet
 const client = new SuiClient({ url: getFullnodeUrl('devnet') });
@@ -128,7 +128,7 @@ local network with a local validator, a fullnode, and a faucet server. Refer to
 [this guide](https://docs.sui.io/build/sui-local-network) for more information.
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 // create a client connected to devnet
 const client = new SuiClient({ url: getFullnodeUrl('localnet') });
@@ -142,7 +142,7 @@ await client.getCoins({
 You can also construct your own in custom connections, with the URL for your own fullnode
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 // create a client connected to devnet
 const client = new SuiClient({
@@ -160,7 +160,7 @@ await client.getCoins({
 You can request sui from the faucet when running against devnet, testnet, or localnet
 
 ```typescript
-import { getFaucetHost, requestSuiFromFaucetV0 } from 'hocjs/faucet';
+import { getFaucetHost, requestSuiFromFaucetV0 } from '@mysten/sui/faucet';
 
 await requestSuiFromFaucetV0({
 	host: getFaucetHost('testnet'),
@@ -176,9 +176,9 @@ For a primer for building transactions, refer to
 ### Transfer Object
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
-import { Ed25519Keypair } from 'hocjs/keypairs/ed25519';
-import { Transaction } from 'hocjs/transactions';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
@@ -203,9 +203,9 @@ console.log({ result });
 To transfer `1000` MIST to another address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
-import { Ed25519Keypair } from 'hocjs/keypairs/ed25519';
-import { Transaction } from 'hocjs/transactions';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
@@ -226,9 +226,9 @@ console.log({ result });
 ### Merge coins
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
-import { Ed25519Keypair } from 'hocjs/keypairs/ed25519';
-import { Transaction } from 'hocjs/transactions';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
@@ -250,9 +250,9 @@ console.log({ result });
 ### Move Call
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
-import { Ed25519Keypair } from 'hocjs/keypairs/ed25519';
-import { Transaction } from 'hocjs/transactions';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
@@ -277,9 +277,9 @@ console.log({ result });
 To publish a package:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
-import { Ed25519Keypair } from 'hocjs/keypairs/ed25519';
-import { Transaction } from 'hocjs/transactions';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
 
 const { execSync } = require('child_process');
 // Generate a new Ed25519 Keypair
@@ -313,7 +313,7 @@ Fetch objects owned by the address
 `0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231`
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),
@@ -329,7 +329,7 @@ Fetch object details for the object with id
 `0xe19739da1a701eadc21683c5b127e62b553e833e8a15a4f292f4f48b4afea3f2`
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),
@@ -355,7 +355,7 @@ const txns = await client.multiGetObjects({
 Fetch transaction details from transaction digests:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),
@@ -423,7 +423,7 @@ Fetch coins of type `0x65b0553a591d7b13376e03a408e112c706dc0909a79080c810b93b06f
 owned by an address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),
@@ -437,7 +437,7 @@ const coins = await client.getCoins({
 Fetch all coin objects owned by an address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),
@@ -450,7 +450,7 @@ const allCoins = await client.getAllCoins({
 Fetch the total coin balance for one coin type, owned by an address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),
@@ -468,7 +468,7 @@ Querying events created by transactions sent by account
 `0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231`
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'hocjs/client';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),

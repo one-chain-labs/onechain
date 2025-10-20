@@ -5,17 +5,12 @@ use anyhow::bail;
 use fastcrypto::traits::ToFromBytes;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sui_types::{
-    base_types::SuiAddress,
-    crypto::{
-        verify_proof_of_possession,
-        AuthorityPublicKey,
-        AuthorityPublicKeyBytes,
-        AuthoritySignature,
-        NetworkPublicKey,
-    },
-    multiaddr::Multiaddr,
+use sui_types::base_types::SuiAddress;
+use sui_types::crypto::{
+    verify_proof_of_possession, AuthorityPublicKey, AuthorityPublicKeyBytes, AuthoritySignature,
+    NetworkPublicKey,
 };
+use sui_types::multiaddr::Multiaddr;
 
 const MAX_VALIDATOR_METADATA_LENGTH: usize = 256;
 
@@ -26,7 +21,6 @@ const MAX_VALIDATOR_METADATA_LENGTH: usize = 256;
 pub struct ValidatorInfo {
     pub name: String,
     pub account_address: SuiAddress,
-    pub revenue_receiving_address: SuiAddress,
     pub protocol_key: AuthorityPublicKeyBytes,
     pub worker_key: NetworkPublicKey,
     pub network_key: NetworkPublicKey,
@@ -48,10 +42,6 @@ impl ValidatorInfo {
 
     pub fn sui_address(&self) -> SuiAddress {
         self.account_address
-    }
-
-    pub fn revenue_receiving_address(&self) -> SuiAddress {
-        self.revenue_receiving_address
     }
 
     pub fn protocol_key(&self) -> AuthorityPublicKeyBytes {
@@ -165,9 +155,11 @@ impl GenesisValidatorInfo {
         }
 
         let protocol_pubkey = AuthorityPublicKey::from_bytes(self.info.protocol_key.as_ref())?;
-        if let Err(e) =
-            verify_proof_of_possession(&self.proof_of_possession, &protocol_pubkey, self.info.account_address)
-        {
+        if let Err(e) = verify_proof_of_possession(
+            &self.proof_of_possession,
+            &protocol_pubkey,
+            self.info.account_address,
+        ) {
             bail!("proof of possession is incorrect: {e}");
         }
 
@@ -176,14 +168,18 @@ impl GenesisValidatorInfo {
 }
 
 impl From<GenesisValidatorInfo> for GenesisValidatorMetadata {
-    fn from(GenesisValidatorInfo { info, proof_of_possession }: GenesisValidatorInfo) -> Self {
+    fn from(
+        GenesisValidatorInfo {
+            info,
+            proof_of_possession,
+        }: GenesisValidatorInfo,
+    ) -> Self {
         Self {
             name: info.name,
             description: info.description,
             image_url: info.image_url,
             project_url: info.project_url,
             sui_address: info.account_address,
-            revenue_receiving_address: info.revenue_receiving_address,
             gas_price: info.gas_price,
             commission_rate: info.commission_rate,
             protocol_public_key: info.protocol_key.as_bytes().to_vec(),
@@ -207,7 +203,6 @@ pub struct GenesisValidatorMetadata {
     pub project_url: String,
 
     pub sui_address: SuiAddress,
-    pub revenue_receiving_address: SuiAddress,
 
     pub gas_price: u64,
     pub commission_rate: u64,

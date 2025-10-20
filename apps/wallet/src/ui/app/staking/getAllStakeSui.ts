@@ -3,7 +3,7 @@
 
 import { type DelegatedStake } from '@mysten/sui/client';
 
-// Get staked Oct
+// Get staked Sui
 export const getAllStakeSui = (allDelegation: DelegatedStake[]) => {
 	return (
 		allDelegation.reduce(

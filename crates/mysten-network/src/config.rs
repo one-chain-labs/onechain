@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use crate::metrics::{DefaultMetricsCallbackProvider, MetricsCallbackProvider};
 use crate::{
     client::{connect_lazy_with_config, connect_with_config},
-    metrics::{DefaultMetricsCallbackProvider, MetricsCallbackProvider},
     server::ServerBuilder,
     Multiaddr,
 };
@@ -91,11 +91,19 @@ impl Config {
         ServerBuilder::from_config(self, metrics_provider)
     }
 
-    pub async fn connect(&self, addr: &Multiaddr, tls_config: Option<ClientConfig>) -> Result<Channel> {
+    pub async fn connect(
+        &self,
+        addr: &Multiaddr,
+        tls_config: Option<ClientConfig>,
+    ) -> Result<Channel> {
         connect_with_config(addr, tls_config, self).await
     }
 
-    pub fn connect_lazy(&self, addr: &Multiaddr, tls_config: Option<ClientConfig>) -> Result<Channel> {
+    pub fn connect_lazy(
+        &self,
+        addr: &Multiaddr,
+        tls_config: Option<ClientConfig>,
+    ) -> Result<Channel> {
         connect_lazy_with_config(addr, tls_config, self)
     }
 }

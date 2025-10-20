@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::url_tests {
-    use one::url;
+module oct::url_tests {
+    use sui::url;
 
     const EUrlStringMismatch: u64 = 1;
 

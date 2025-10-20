@@ -5,23 +5,25 @@ use std::sync::Arc;
 
 use anyhow::{Ok, Result};
 use diesel_async::RunQueryDsl;
-use sui_indexer_alt_framework::{
-    db,
-    pipeline::{concurrent::Handler, Processor},
-};
-use sui_types::{full_checkpoint_content::CheckpointData, transaction::TransactionDataAPI};
-
-use crate::{models::transactions::StoredTxCalls, schema::tx_calls};
+use sui_indexer_alt_framework::pipeline::{concurrent::Handler, Processor};
+use sui_indexer_alt_schema::{schema::tx_calls, transactions::StoredTxCalls};
+use sui_pg_db as db;
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::transaction::TransactionDataAPI;
 
 pub(crate) struct TxCalls;
 
 impl Processor for TxCalls {
-    type Value = StoredTxCalls;
-
     const NAME: &'static str = "tx_calls";
 
+    type Value = StoredTxCalls;
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData { transactions, checkpoint_summary, .. } = checkpoint.as_ref();
+        let CheckpointData {
+            transactions,
+            checkpoint_summary,
+            ..
+        } = checkpoint.as_ref();
 
         let first_tx = checkpoint_summary.network_total_transactions as usize - transactions.len();
 
@@ -50,10 +52,14 @@ impl Processor for TxCalls {
 
 #[async_trait::async_trait]
 impl Handler for TxCalls {
-    const MAX_PENDING_ROWS: usize = 10000;
     const MIN_EAGER_ROWS: usize = 100;
+    const MAX_PENDING_ROWS: usize = 10000;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(tx_calls::table).values(values).on_conflict_do_nothing().execute(conn).await?)
+        Ok(diesel::insert_into(tx_calls::table)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?)
     }
 }

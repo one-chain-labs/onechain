@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::test_scenario_tests {
-    use one::test_scenario;
+module oct::test_scenario_tests {
+    use sui::test_scenario;
 
     public struct Object has key, store {
         id: UID,
@@ -979,8 +979,8 @@ module one::test_scenario_tests {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
         let mut parent = scenario.new_object();
-        one::dynamic_field::add(&mut parent, b"", 10);
-        let r = one::dynamic_field::borrow<vector<u8>, u64>(&parent, b"");
+        sui::dynamic_field::add(&mut parent, b"", 10);
+        let r = sui::dynamic_field::borrow<vector<u8>, u64>(&parent, b"");
         scenario.end();
         assert!(*r == 10);
         parent.delete();
@@ -992,8 +992,8 @@ module one::test_scenario_tests {
         let mut scenario = test_scenario::begin(sender);
         let mut parent = scenario.new_object();
         let id = scenario.new_object();
-        one::dynamic_object_field::add(&mut parent, b"", Object { id, value: 10});
-        let obj = one::dynamic_object_field::borrow<vector<u8>, Object>(&parent, b"");
+        sui::dynamic_object_field::add(&mut parent, b"", Object { id, value: 10});
+        let obj = sui::dynamic_object_field::borrow<vector<u8>, Object>(&parent, b"");
         scenario.end();
         assert!(obj.value == 10);
         parent.delete();
@@ -1013,7 +1013,7 @@ module one::test_scenario_tests {
         let obj = scenario.take_from_sender<Object>();
         assert!(object::id(&obj) == id);
         assert!(!test_scenario::has_most_recent_for_address<Object>(sender));
-        one::dynamic_object_field::add(&mut parent, b"", obj);
+        sui::dynamic_object_field::add(&mut parent, b"", obj);
         scenario.next_tx(sender);
         assert!(!test_scenario::has_most_recent_for_address<Object>(sender));
         scenario.end();
@@ -1034,7 +1034,7 @@ module one::test_scenario_tests {
         let obj = scenario.take_shared<Object>();
         assert!(object::id(&obj) == id);
         // wraps the object
-        one::dynamic_field::add(&mut parent, b"", obj);
+        sui::dynamic_field::add(&mut parent, b"", obj);
         scenario.next_tx(sender);
         abort 42
     }
@@ -1053,7 +1053,7 @@ module one::test_scenario_tests {
         let obj = scenario.take_immutable<Object>();
         assert!(object::id(&obj) == id);
         // wraps the object
-        one::dynamic_field::add(&mut parent, b"", obj);
+        sui::dynamic_field::add(&mut parent, b"", obj);
         scenario.next_tx(sender);
         abort 42
     }
@@ -1071,7 +1071,7 @@ module one::test_scenario_tests {
         scenario.next_tx(sender);
         let obj = scenario.take_shared<Object>();
         assert!(object::id(&obj) == id);
-        one::dynamic_object_field::add(&mut parent, b"", obj);
+        sui::dynamic_object_field::add(&mut parent, b"", obj);
         scenario.next_tx(sender);
         abort 42
     }
@@ -1089,7 +1089,7 @@ module one::test_scenario_tests {
         scenario.next_tx(sender);
         let obj = scenario.take_immutable<Object>();
         assert!(object::id(&obj) == id);
-        one::dynamic_object_field::add(&mut parent, b"", obj);
+        sui::dynamic_object_field::add(&mut parent, b"", obj);
         scenario.next_tx(sender);
         abort 42
     }
@@ -1098,8 +1098,8 @@ module one::test_scenario_tests {
 
     #[test]
     fun test_events() {
-        use one::event;
-        use one::test_utils::assert_eq;
+        use sui::event;
+        use sui::test_utils::assert_eq;
 
         // calling test_scenario::end should dump events emitted during previous txes
         let sender = @0x0;

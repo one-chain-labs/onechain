@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one_system::stake_tests {
-    use one::coin;
-    use one::test_scenario;
+module oct_system::stake_tests {
+    use sui::coin;
+    use sui::test_scenario;
     use one_system::one_system::SuiSystemState;
     use one_system::staking_pool::{Self, StakedOct, PoolTokenExchangeRate};
-    use one::test_utils::assert_eq;
+    use sui::test_utils::assert_eq;
     use one_system::validator_set;
-    use one::test_utils;
-    use one::table::Table;
+    use sui::test_utils;
+    use sui::table::Table;
 
     use one_system::governance_test_utils::{
         add_validator,
@@ -23,7 +23,7 @@ module one_system::stake_tests {
         stake_with,
         remove_validator,
         remove_validator_candidate,
-        total_sui_balance,
+        total_oct_balance,
         unstake,
     };
 
@@ -62,7 +62,7 @@ module one_system::stake_tests {
         scenario.next_tx(STAKER_ADDR_1);
         {
             let staked_oct_ids = scenario.ids_for_sender<StakedOct>();
-            assert!(staked_oct_ids.length() == 2); // staked oct split to 2 coins
+            assert!(staked_oct_ids.length() == 2); // staked sui split to 2 coins
 
             let mut part1 = scenario.take_from_sender_by_id<StakedOct>(staked_oct_ids[0]);
             let part2 = scenario.take_from_sender_by_id<StakedOct>(staked_oct_ids[1]);
@@ -86,7 +86,7 @@ module one_system::stake_tests {
         set_up_sui_system_state();
         let mut scenario_val = test_scenario::begin(STAKER_ADDR_1);
         let scenario = &mut scenario_val;
-        // Create two instances of staked oct w/ different epoch activations
+        // Create two instances of staked sui w/ different epoch activations
         stake_with(STAKER_ADDR_1, VALIDATOR_ADDR_1, 60, scenario);
         advance_epoch(scenario);
         stake_with(STAKER_ADDR_1, VALIDATOR_ADDR_1, 60, scenario);
@@ -256,23 +256,23 @@ module one_system::stake_tests {
             assert_eq(staked_oct.amount(), 100 * MIST_PER_OCT);
 
             // Unstake from VALIDATOR_ADDR_1
-            assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 0);
+            assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 0);
             let ctx = scenario.ctx();
             system_state_mut_ref.request_withdraw_stake(staked_oct, ctx);
 
             // Make sure they have all of their stake.
-            assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt);
+            assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt);
 
             test_scenario::return_shared(system_state);
         };
 
         // Validator unstakes now.
-        assert_eq(total_sui_balance(VALIDATOR_ADDR_1, scenario), 0);
+        assert_eq(total_oct_balance(VALIDATOR_ADDR_1, scenario), 0);
         unstake(VALIDATOR_ADDR_1, 0, scenario);
         if (should_distribute_rewards) unstake(VALIDATOR_ADDR_1, 0, scenario);
 
         // Make sure have all of their stake. NB there is no epoch change. This is immediate.
-        assert_eq(total_sui_balance(VALIDATOR_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt + validator_reward_amt);
+        assert_eq(total_oct_balance(VALIDATOR_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt + validator_reward_amt);
 
         scenario_val.end();
     }
@@ -308,23 +308,23 @@ module one_system::stake_tests {
             assert_eq(staked_oct.amount(), 100 * MIST_PER_OCT);
 
             // Unstake from VALIDATOR_ADDR_1
-            assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 0);
+            assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 0);
             let ctx = scenario.ctx();
             system_state_mut_ref.request_withdraw_stake(staked_oct, ctx);
 
             // Make sure they have all of their stake.
-            assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt);
+            assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt);
 
             test_scenario::return_shared(system_state);
         };
 
         // Validator unstakes now.
-        assert_eq(total_sui_balance(VALIDATOR_ADDR_1, scenario), 0);
+        assert_eq(total_oct_balance(VALIDATOR_ADDR_1, scenario), 0);
         unstake(VALIDATOR_ADDR_1, 0, scenario);
         unstake(VALIDATOR_ADDR_1, 0, scenario);
 
         // Make sure have all of their stake. NB there is no epoch change. This is immediate.
-        assert_eq(total_sui_balance(VALIDATOR_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt + validator_reward_amt);
+        assert_eq(total_oct_balance(VALIDATOR_ADDR_1, scenario), 100 * MIST_PER_OCT + reward_amt + validator_reward_amt);
 
         scenario_val.end();
     }
@@ -378,7 +378,7 @@ module one_system::stake_tests {
 
         // Unstake from the preactive validator. There should be no rewards earned.
         unstake(STAKER_ADDR_1, 0, scenario);
-        assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT);
+        assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT);
 
         scenario_val.end();
     }
@@ -432,15 +432,15 @@ module one_system::stake_tests {
         // in the same epoch because the validator was preactive when they staked.
         // So they will both get slightly more than 110 SUI in total balance.
         unstake(STAKER_ADDR_1, 0, scenario);
-        assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 110002000000);
+        assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 110002000000);
         unstake(STAKER_ADDR_3, 0, scenario);
-        assert_eq(total_sui_balance(STAKER_ADDR_3, scenario), 110002000000);
+        assert_eq(total_oct_balance(STAKER_ADDR_3, scenario), 110002000000);
 
         advance_epoch_with_reward_amounts(0, 85, scenario);
         unstake(STAKER_ADDR_2, 0, scenario);
         // staker 2 earns about 5 SUI from the previous epoch and 24-ish from this one
         // so in total she has about 50 + 5 + 24 = 79 SUI.
-        assert_eq(total_sui_balance(STAKER_ADDR_2, scenario), 78862939078);
+        assert_eq(total_oct_balance(STAKER_ADDR_2, scenario), 78862939078);
 
         scenario_val.end();
     }
@@ -470,7 +470,7 @@ module one_system::stake_tests {
         advance_epoch(scenario);
 
         unstake(STAKER_ADDR_1, 0, scenario);
-        assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 130006000000);
+        assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 130006000000);
 
         scenario_val.end();
     }
@@ -499,7 +499,7 @@ module one_system::stake_tests {
 
         // Unstake now and the staker should get no rewards.
         unstake(STAKER_ADDR_1, 0, scenario);
-        assert_eq(total_sui_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT);
+        assert_eq(total_oct_balance(STAKER_ADDR_1, scenario), 100 * MIST_PER_OCT);
 
         scenario_val.end();
     }

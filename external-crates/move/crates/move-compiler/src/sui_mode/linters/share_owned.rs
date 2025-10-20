@@ -10,37 +10,20 @@ use crate::{
         absint::JoinResult,
         cfg::ImmForwardCFG,
         visitor::{
-            calls_special_function,
-            LocalState,
-            SimpleAbsInt,
-            SimpleAbsIntConstructor,
-            SimpleDomain,
-            SimpleExecutionContext,
+            calls_special_function, LocalState, SimpleAbsInt, SimpleAbsIntConstructor,
+            SimpleDomain, SimpleExecutionContext,
         },
         CFGContext,
     },
     diag,
     diagnostics::{
         codes::{custom, DiagnosticInfo, Severity},
-        Diagnostic,
-        Diagnostics,
+        Diagnostic, Diagnostics,
     },
     expansion::ast::ModuleIdent,
     hlir::ast::{
-        BaseType,
-        BaseType_,
-        Exp,
-        LValue,
-        LValue_,
-        Label,
-        ModuleCall,
-        SingleType,
-        SingleType_,
-        Type,
-        TypeName_,
-        Type_,
-        UnannotatedExp_,
-        Var,
+        BaseType, BaseType_, Exp, LValue, LValue_, Label, ModuleCall, SingleType, SingleType_,
+        Type, TypeName_, Type_, UnannotatedExp_, Var,
     },
     naming::ast::BuiltinTypeName_,
     parser::ast::{Ability_, DatatypeName},
@@ -51,17 +34,10 @@ use crate::{
     sui_mode::{
         info::{SuiInfo, TransferKind},
         linters::{
-            type_abilities,
-            LinterDiagnosticCategory,
-            LinterDiagnosticCode,
-            LINT_WARNING_PREFIX,
-            PUBLIC_SHARE_FUN,
-            SHARE_FUN,
-            TRANSFER_MOD_NAME,
+            type_abilities, LinterDiagnosticCategory, LinterDiagnosticCode, LINT_WARNING_PREFIX,
+            PUBLIC_SHARE_FUN, SHARE_FUN, TRANSFER_MOD_NAME,
         },
-        SUI_ADDR_VALUE,
-        TX_CONTEXT_MODULE_NAME,
-        TX_CONTEXT_TYPE_NAME,
+        SUI_ADDR_VALUE, TX_CONTEXT_MODULE_NAME, TX_CONTEXT_TYPE_NAME,
     },
 };
 use move_core_types::account_address::AccountAddress;
@@ -69,8 +45,10 @@ use move_ir_types::location::*;
 use move_proc_macros::growing_stack;
 use std::collections::BTreeMap;
 
-const SHARE_FUNCTIONS: &[(AccountAddress, &str, &str)] =
-    &[(SUI_ADDR_VALUE, TRANSFER_MOD_NAME, PUBLIC_SHARE_FUN), (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, SHARE_FUN)];
+const SHARE_FUNCTIONS: &[(AccountAddress, &str, &str)] = &[
+    (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, PUBLIC_SHARE_FUN),
+    (SUI_ADDR_VALUE, TRANSFER_MOD_NAME, SHARE_FUN),
+];
 
 const SHARE_OWNED_DIAG: DiagnosticInfo = custom(
     LINT_WARNING_PREFIX,
@@ -122,7 +100,11 @@ impl SimpleAbsIntConstructor for ShareOwnedVerifier {
         _init_state: &mut <Self::AI<'a> as SimpleAbsInt>::State,
     ) -> Option<Self::AI<'a>> {
         if context.attributes.is_test_or_test_only()
-            || context.info.module(&context.module).attributes.is_test_or_test_only()
+            || context
+                .info
+                .module(&context.module)
+                .attributes
+                .is_test_or_test_only()
         {
             return None;
         }
@@ -134,15 +116,17 @@ impl SimpleAbsIntConstructor for ShareOwnedVerifier {
 }
 
 impl<'a> SimpleAbsInt for ShareOwnedVerifierAI<'a> {
-    type ExecutionContext = ExecutionContext;
     type State = State;
+    type ExecutionContext = ExecutionContext;
 
     fn finish(&mut self, _final_states: BTreeMap<Label, State>, diags: Diagnostics) -> Diagnostics {
         diags
     }
 
     fn start_command(&self, _: &mut State) -> ExecutionContext {
-        ExecutionContext { diags: Diagnostics::new() }
+        ExecutionContext {
+            diags: Diagnostics::new(),
+        }
     }
 
     fn finish_command(&self, context: ExecutionContext, _state: &mut State) -> Diagnostics {
@@ -150,7 +134,12 @@ impl<'a> SimpleAbsInt for ShareOwnedVerifierAI<'a> {
         diags
     }
 
-    fn exp_custom(&self, context: &mut ExecutionContext, state: &mut State, e: &Exp) -> Option<Vec<Value>> {
+    fn exp_custom(
+        &self,
+        context: &mut ExecutionContext,
+        state: &mut State,
+        e: &Exp,
+    ) -> Option<Vec<Value>> {
         use UnannotatedExp_ as E;
 
         if let E::Pack(_, _, fields) = &e.exp.value {
@@ -172,7 +161,9 @@ impl<'a> SimpleAbsInt for ShareOwnedVerifierAI<'a> {
         f: &ModuleCall,
         args: Vec<Value>,
     ) -> Option<Vec<Value>> {
-        if SHARE_FUNCTIONS.iter().any(|(addr, module, fun)| f.is(addr, module, fun))
+        if SHARE_FUNCTIONS
+            .iter()
+            .any(|(addr, module, fun)| f.is(addr, module, fun))
             && args.first().is_some_and(|v| v != &Value::FreshObj)
         {
             self.maybe_warn_share_owned(context, loc, f, args)
@@ -181,23 +172,43 @@ impl<'a> SimpleAbsInt for ShareOwnedVerifierAI<'a> {
         Some(match &return_ty.value {
             Type_::Unit => vec![],
             Type_::Single(t) => {
-                let v = if all_args_pure || !is_obj_type(t) { Value::Other } else { Value::NotFreshObj(t.loc) };
+                let v = if all_args_pure || !is_obj_type(t) {
+                    Value::Other
+                } else {
+                    Value::NotFreshObj(t.loc)
+                };
                 vec![v]
             }
             Type_::Multiple(types) => types
                 .iter()
-                .map(|t| if all_args_pure || !is_obj_type(t) { Value::Other } else { Value::NotFreshObj(t.loc) })
+                .map(|t| {
+                    if all_args_pure || !is_obj_type(t) {
+                        Value::Other
+                    } else {
+                        Value::NotFreshObj(t.loc)
+                    }
+                })
                 .collect(),
         })
     }
 
-    fn lvalue_custom(&self, context: &mut ExecutionContext, state: &mut State, l: &LValue, _value: &Value) -> bool {
+    fn lvalue_custom(
+        &self,
+        context: &mut ExecutionContext,
+        state: &mut State,
+        l: &LValue,
+        _value: &Value,
+    ) -> bool {
         use LValue_ as L;
 
         let sp!(_, l_) = l;
         if let L::Unpack(_, _, fields) = l_ {
             for (f, l) in fields {
-                let v = if is_obj(l) { Value::NotFreshObj(f.loc()) } else { Value::default() };
+                let v = if is_obj(l) {
+                    Value::NotFreshObj(f.loc())
+                } else {
+                    Value::default()
+                };
                 self.lvalue(context, state, l, v)
             }
             return true;
@@ -226,14 +237,20 @@ impl<'a> ShareOwnedVerifierAI<'a> {
         match bt_ {
             // special case TxContext as not holding an object
             BaseType_::Apply(_, sp!(_, tn), _)
-                if tn.is(&SUI_ADDR_VALUE, TX_CONTEXT_MODULE_NAME, TX_CONTEXT_TYPE_NAME) =>
+                if tn.is(
+                    &SUI_ADDR_VALUE,
+                    TX_CONTEXT_MODULE_NAME,
+                    TX_CONTEXT_TYPE_NAME,
+                ) =>
             {
                 false
             }
             // vector in value might have an object
-            BaseType_::Apply(_, sp!(_, TypeName_::Builtin(sp!(_, BuiltinTypeName_::Vector))), bs) => {
-                bs.iter().any(|b| self.can_hold_obj_base(b))
-            }
+            BaseType_::Apply(
+                _,
+                sp!(_, TypeName_::Builtin(sp!(_, BuiltinTypeName_::Vector))),
+                bs,
+            ) => bs.iter().any(|b| self.can_hold_obj_base(b)),
             // builtins cannot hold objects
             BaseType_::Apply(_, sp!(_, TypeName_::Builtin(_)), _) => false,
 
@@ -256,11 +273,21 @@ impl<'a> ShareOwnedVerifierAI<'a> {
         }
     }
 
-    fn maybe_warn_share_owned(&self, context: &mut ExecutionContext, loc: &Loc, f: &ModuleCall, args: Vec<Value>) {
+    fn maybe_warn_share_owned(
+        &self,
+        context: &mut ExecutionContext,
+        loc: &Loc,
+        f: &ModuleCall,
+        args: Vec<Value>,
+    ) {
         let Value::NotFreshObj(not_fresh_loc) = &args[0] else {
             return;
         };
-        let Some(tn) = f.type_arguments.first().and_then(|t| t.value.type_name()).and_then(|n| n.value.datatype_name())
+        let Some(tn) = f
+            .type_arguments
+            .first()
+            .and_then(|t| t.value.type_name())
+            .and_then(|n| n.value.datatype_name())
         else {
             return;
         };
@@ -268,14 +295,16 @@ impl<'a> ShareOwnedVerifierAI<'a> {
             return;
         };
 
-        let msg = "Potential abort from a (potentially) owned object created by a different transaction.";
+        let msg =
+            "Potential abort from a (potentially) owned object created by a different transaction.";
         let uid_msg = "Creating a fresh object and sharing it within the same function will \
             ensure this does not abort.";
         let not_fresh_msg = "A potentially owned object coming from here";
         let (tloc, tmsg) = match transferred_kind {
-            TransferKind::PublicTransfer(store_loc) => {
-                (store_loc, "Potentially an owned object because 'store' grants access to public transfers")
-            }
+            TransferKind::PublicTransfer(store_loc) => (
+                store_loc,
+                "Potentially an owned object because 'store' grants access to public transfers",
+            ),
             TransferKind::PrivateTransfer(loc) => (loc, "Transferred as an owned object here"),
         };
         let d = diag!(
@@ -308,7 +337,11 @@ fn is_obj_type(st_: &SingleType) -> bool {
     abilities.has_ability_(Ability_::Key)
 }
 
-fn phantom_positions(info: &TypingProgramInfo, m: &ModuleIdent, n: &DatatypeName) -> Vec</* is_phantom */ bool> {
+fn phantom_positions(
+    info: &TypingProgramInfo,
+    m: &ModuleIdent,
+    n: &DatatypeName,
+) -> Vec</* is_phantom */ bool> {
     let ty_params = match info.datatype_kind(m, n) {
         DatatypeKind::Struct => &info.struct_definition(m, n).type_parameters,
         DatatypeKind::Enum => &info.enum_definition(m, n).type_parameters,

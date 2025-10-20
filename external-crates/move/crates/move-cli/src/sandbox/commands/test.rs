@@ -56,15 +56,23 @@ const DEFAULT_TRACE_FILE: &str = "trace";
 /// The prefix for the stack trace that we want to remove from the stderr output if present.
 const STACK_TRACE_PREFIX: &str = "\nStack backtrace:";
 
-fn collect_coverage(trace_file: &Path, build_dir: &Path) -> anyhow::Result<ExecCoverageMapWithModules> {
+fn collect_coverage(
+    trace_file: &Path,
+    build_dir: &Path,
+) -> anyhow::Result<ExecCoverageMapWithModules> {
     let canonical_build = build_dir.canonicalize().unwrap();
-    let package_name = parse_move_manifest_from_file(&SourcePackageLayout::try_find_root(&canonical_build).unwrap())?
-        .package
-        .name
-        .to_string();
-    let pkg =
-        OnDiskCompiledPackage::from_path(&build_dir.join(package_name).join(CompiledPackageLayout::BuildInfo.path()))?
-            .into_compiled_package()?;
+    let package_name = parse_move_manifest_from_file(
+        &SourcePackageLayout::try_find_root(&canonical_build).unwrap(),
+    )?
+    .package
+    .name
+    .to_string();
+    let pkg = OnDiskCompiledPackage::from_path(
+        &build_dir
+            .join(package_name)
+            .join(CompiledPackageLayout::BuildInfo.path()),
+    )?
+    .into_compiled_package()?;
     let src_modules = pkg
         .all_modules()
         .map(|unit| {
@@ -84,16 +92,23 @@ fn collect_coverage(trace_file: &Path, build_dir: &Path) -> anyhow::Result<ExecC
     }
 
     // collect filtered trace
-    let coverage_map =
-        CoverageMap::from_trace_file(trace_file).to_unified_exec_map().into_coverage_map_with_modules(filter);
+    let coverage_map = CoverageMap::from_trace_file(trace_file)
+        .to_unified_exec_map()
+        .into_coverage_map_with_modules(filter);
 
     Ok(coverage_map)
 }
 
-fn determine_package_nest_depth(resolution_graph: &ResolvedGraph, pkg_dir: &Path) -> anyhow::Result<usize> {
+fn determine_package_nest_depth(
+    resolution_graph: &ResolvedGraph,
+    pkg_dir: &Path,
+) -> anyhow::Result<usize> {
     let mut depth = 0;
     for (_, dep) in resolution_graph.package_table.iter() {
-        depth = std::cmp::max(depth, dep.package_path.strip_prefix(pkg_dir)?.components().count() + 1);
+        depth = std::cmp::max(
+            depth,
+            dep.package_path.strip_prefix(pkg_dir)?.components().count() + 1,
+        );
     }
     Ok(depth)
 }
@@ -116,11 +131,12 @@ fn copy_deps(tmp_dir: &Path, pkg_dir: &Path) -> anyhow::Result<PathBuf> {
     // Sometimes we run a test that isn't a package for metatests so if there isn't a package we
     // don't need to nest at all. Resolution graph diagnostics are only needed for CLI commands so
     // ignore them by passing a vector as the writer.
-    let package_resolution = match (BuildConfig { dev_mode: true, ..Default::default() }).resolution_graph_for_package(
-        pkg_dir,
-        None,
-        &mut Vec::new(),
-    ) {
+    let package_resolution = match (BuildConfig {
+        dev_mode: true,
+        ..Default::default()
+    })
+    .resolution_graph_for_package(pkg_dir, None, &mut Vec::new())
+    {
         Ok(pkg) => pkg,
         Err(_) => return Ok(tmp_dir.to_path_buf()),
     };
@@ -176,7 +192,9 @@ pub fn run_one(
     let wks_dir = temp_dir.as_ref().map_or(exe_dir, |t| &t.1);
 
     let storage_dir = wks_dir.join(DEFAULT_STORAGE_DIR);
-    let build_output = wks_dir.join(DEFAULT_BUILD_DIR).join(CompiledPackageLayout::Root.path());
+    let build_output = wks_dir
+        .join(DEFAULT_BUILD_DIR)
+        .join(CompiledPackageLayout::Root.path());
 
     // template for preparing a cli command
     let cli_command_template = || {
@@ -191,12 +209,19 @@ pub fn run_one(
 
     if storage_dir.exists() || build_output.exists() {
         // need to clean before testing
-        cli_command_template().arg("sandbox").arg("clean").output()?;
+        cli_command_template()
+            .arg("sandbox")
+            .arg("clean")
+            .output()?;
     }
     let mut output = "".to_string();
 
     // always use the absolute path for the trace file as we may change dirs in the process
-    let trace_file = if track_cov { Some(wks_dir.canonicalize()?.join(DEFAULT_TRACE_FILE)) } else { None };
+    let trace_file = if track_cov {
+        Some(wks_dir.canonicalize()?.join(DEFAULT_TRACE_FILE))
+    } else {
+        None
+    };
 
     // Disable colors in error reporting from the Move compiler
     env::set_var(COLOR_MODE_ENV_VAR, "NONE");
@@ -279,11 +304,22 @@ pub fn run_one(
     let run_move_clean = !read_bool_env_var(NO_MOVE_CLEAN);
     if run_move_clean {
         // run the clean command to ensure that temporary state is cleaned up
-        cli_command_template().arg("sandbox").arg("clean").output()?;
+        cli_command_template()
+            .arg("sandbox")
+            .arg("clean")
+            .output()?;
 
         // check that build and storage was deleted
-        assert!(!storage_dir.exists(), "`move clean` failed to eliminate {} directory", DEFAULT_STORAGE_DIR);
-        assert!(!build_output.exists(), "`move clean` failed to eliminate {} directory", DEFAULT_BUILD_DIR);
+        assert!(
+            !storage_dir.exists(),
+            "`move clean` failed to eliminate {} directory",
+            DEFAULT_STORAGE_DIR
+        );
+        assert!(
+            !build_output.exists(),
+            "`move clean` failed to eliminate {} directory",
+            DEFAULT_BUILD_DIR
+        );
 
         // clean the trace file as well if it exists
         if let Some(trace_path) = &trace_file {
@@ -308,14 +344,22 @@ pub fn run_one(
 
     let expected_output = fs::read_to_string(exp_path).unwrap_or_else(|_| "".to_string());
     if expected_output != output {
-        let msg = format!("Expected output differs from actual output:\n{}", format_diff(expected_output, output));
+        let msg = format!(
+            "Expected output differs from actual output:\n{}",
+            format_diff(expected_output, output)
+        );
         anyhow::bail!(add_update_baseline_fix(msg))
     } else {
         Ok(cov_info)
     }
 }
 
-pub fn run_all(args_path: &Path, cli_binary: &Path, use_temp_dir: bool, track_cov: bool) -> anyhow::Result<()> {
+pub fn run_all(
+    args_path: &Path,
+    cli_binary: &Path,
+    use_temp_dir: bool,
+    track_cov: bool,
+) -> anyhow::Result<()> {
     let mut test_total: u64 = 0;
     let mut test_passed: u64 = 0;
     let mut cov_info = ExecCoverageMapWithModules::empty();

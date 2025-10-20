@@ -6,7 +6,9 @@ use std::net::{TcpListener, TcpStream};
 use mysten_network::Multiaddr;
 use rand::{rngs::StdRng, SeedableRng as _};
 
-use crate::{Authority, AuthorityKeyPair, Committee, Epoch, NetworkKeyPair, ProtocolKeyPair, Stake};
+use crate::{
+    Authority, AuthorityKeyPair, Committee, Epoch, NetworkKeyPair, ProtocolKeyPair, Stake,
+};
 
 /// Creates a committee for local testing, and the corresponding key pairs for the authorities.
 pub fn local_committee_and_keys(

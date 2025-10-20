@@ -72,7 +72,8 @@ pub type AbstractMemorySize = GasQuantity<AbstractMemoryUnit>;
 
 pub type InternalGasPerByte = GasQuantity<UnitDiv<InternalGasUnit, Byte>>;
 
-pub type InternalGasPerAbstractMemoryUnit = GasQuantity<UnitDiv<InternalGasUnit, AbstractMemoryUnit>>;
+pub type InternalGasPerAbstractMemoryUnit =
+    GasQuantity<UnitDiv<InternalGasUnit, AbstractMemoryUnit>>;
 
 pub type InternalGasPerArg = GasQuantity<UnitDiv<InternalGasUnit, Arg>>;
 
@@ -89,7 +90,10 @@ pub const ENUM_BASE_ABSTRACT_SIZE: AbstractMemorySize = AbstractMemorySize::new(
  **************************************************************************************************/
 impl<U> GasQuantity<U> {
     pub const fn new(val: u64) -> Self {
-        Self { val, phantom: PhantomData }
+        Self {
+            val,
+            phantom: PhantomData,
+        }
     }
 
     pub const fn zero() -> Self {
@@ -297,7 +301,11 @@ impl<U> GasQuantity<U> {
     where
         U: ToUnitFractional<T>,
     {
-        GasQuantity::new(apply_ratio_round_down(self.val, U::NOMINATOR, U::DENOMINATOR))
+        GasQuantity::new(apply_ratio_round_down(
+            self.val,
+            U::NOMINATOR,
+            U::DENOMINATOR,
+        ))
     }
 
     /// Convert the quantity to another unit, with the resulting scalar value being rounded up.
@@ -335,33 +343,33 @@ impl ToUnit<MebiByte> for GibiByte {
 }
 
 impl ToUnitFractional<KibiByte> for Byte {
-    const DENOMINATOR: u64 = 1024;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1024;
 }
 
 impl ToUnitFractional<MebiByte> for KibiByte {
-    const DENOMINATOR: u64 = 1024;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1024;
 }
 
 impl ToUnitFractional<MebiByte> for Byte {
-    const DENOMINATOR: u64 = 1024 * 1024;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1024 * 1024;
 }
 
 impl ToUnitFractional<GibiByte> for MebiByte {
-    const DENOMINATOR: u64 = 1024;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1024;
 }
 
 impl ToUnitFractional<GibiByte> for KibiByte {
-    const DENOMINATOR: u64 = 1024 * 1024;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1024 * 1024;
 }
 
 impl ToUnitFractional<GibiByte> for Byte {
-    const DENOMINATOR: u64 = 1024 * 1024 * 1024;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1024 * 1024 * 1024;
 }
 
 /***************************************************************************************************
@@ -387,7 +395,10 @@ pub trait ToUnitFractionalWithParams<U> {
 impl<U> GasQuantity<U> {
     /// Convert the quantity to another unit.
     /// An integral multiplier must have been defined via the `ToUnitWithParams` trait.
-    pub fn to_unit_with_params<T>(self, params: &<U as ToUnitWithParams<T>>::Params) -> GasQuantity<T>
+    pub fn to_unit_with_params<T>(
+        self,
+        params: &<U as ToUnitWithParams<T>>::Params,
+    ) -> GasQuantity<T>
     where
         U: ToUnitWithParams<T>,
     {
@@ -411,7 +422,10 @@ impl<U> GasQuantity<U> {
 
     /// Convert the quantity to another unit, with the resulting scalar value being rounded up.
     /// A ratio must have been defined via the `ToUnitFractionalWithParams` trait.
-    pub fn to_unit_round_up_with_params<T>(self, params: &<U as ToUnitFractionalWithParams<T>>::Params) -> GasQuantity<T>
+    pub fn to_unit_round_up_with_params<T>(
+        self,
+        params: &<U as ToUnitFractionalWithParams<T>>::Params,
+    ) -> GasQuantity<T>
     where
         U: ToUnitFractionalWithParams<T>,
     {

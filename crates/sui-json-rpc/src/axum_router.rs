@@ -1,46 +1,32 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::SystemTime,
-};
+use std::net::IpAddr;
+use std::time::SystemTime;
+use std::{net::SocketAddr, sync::Arc};
 use sui_types::traffic_control::RemoteFirewallConfig;
 
-use axum::{
-    extract::{ConnectInfo, Json, State},
-    response::Response,
-};
+use axum::extract::{ConnectInfo, Json, State};
+use axum::response::Response;
 use futures::StreamExt;
-use hyper::{header::HeaderValue, HeaderMap};
-use jsonrpsee::{
-    core::server::{
-        helpers::{BoundedSubscriptions, MethodResponse, MethodSink},
-        rpc_module::{MethodKind, Methods},
-    },
-    server::{
-        logger::{self, Logger, TransportProtocol},
-        RandomIntegerIdProvider,
-    },
-    types::{
-        error::{ErrorCode, BATCHES_NOT_SUPPORTED_CODE, BATCHES_NOT_SUPPORTED_MSG},
-        ErrorObject,
-        Id,
-        InvalidRequest,
-        Params,
-        Request,
-    },
-};
+use hyper::header::HeaderValue;
+use hyper::HeaderMap;
+use jsonrpsee::core::server::helpers::BoundedSubscriptions;
+use jsonrpsee::core::server::helpers::MethodResponse;
+use jsonrpsee::core::server::helpers::MethodSink;
+use jsonrpsee::core::server::rpc_module::MethodKind;
+use jsonrpsee::server::logger::{self, TransportProtocol};
+use jsonrpsee::server::RandomIntegerIdProvider;
+use jsonrpsee::types::error::{ErrorCode, BATCHES_NOT_SUPPORTED_CODE, BATCHES_NOT_SUPPORTED_MSG};
+use jsonrpsee::types::{ErrorObject, Id, InvalidRequest, Params, Request};
+use jsonrpsee::{core::server::rpc_module::Methods, server::logger::Logger};
 use serde_json::value::RawValue;
 use sui_core::traffic_controller::{
-    metrics::TrafficControllerMetrics,
-    parse_ip,
-    policies::TrafficTally,
-    TrafficController,
+    metrics::TrafficControllerMetrics, parse_ip, policies::TrafficTally, TrafficController,
 };
 use sui_json_rpc_api::TRANSACTION_EXECUTION_CLIENT_ERROR_CODE;
-use sui_types::traffic_control::{ClientIdSource, PolicyConfig, Weight};
+use sui_types::traffic_control::ClientIdSource;
+use sui_types::traffic_control::{PolicyConfig, Weight};
 use tracing::error;
 
 use crate::routing_layer::RpcRouter;
@@ -76,9 +62,13 @@ impl<L> JsonRpcService<L> {
             rpc_router,
             logger,
             id_provider: Arc::new(RandomIntegerIdProvider),
-            traffic_controller: policy_config
-                .clone()
-                .map(|policy| Arc::new(TrafficController::init(policy, traffic_controller_metrics, remote_fw_config))),
+            traffic_controller: policy_config.clone().map(|policy| {
+                Arc::new(TrafficController::init(
+                    policy,
+                    traffic_controller_metrics,
+                    remote_fw_config,
+                ))
+            }),
             client_id_source: policy_config.map(|policy| policy.client_id_source),
         }
     }
@@ -113,7 +103,11 @@ impl<L: Logger> JsonRpcService<L> {
 }
 
 /// Create a response body.
-fn from_template<S: Into<axum::body::Body>>(status: hyper::StatusCode, body: S, content_type: &'static str) -> Response {
+fn from_template<S: Into<axum::body::Body>>(
+    status: hyper::StatusCode,
+    body: S,
+    content_type: &'static str,
+) -> Response {
     Response::builder()
         .status(status)
         .header(
@@ -140,8 +134,17 @@ pub async fn json_rpc_handler<L: Logger>(
 ) -> impl axum::response::IntoResponse {
     let headers_clone = headers.clone();
     // Get version from header.
-    let api_version = headers.get(CLIENT_TARGET_API_VERSION_HEADER).and_then(|h| h.to_str().ok());
-    let response = process_raw_request(&service, api_version, raw_request.get(), client_addr, headers_clone).await;
+    let api_version = headers
+        .get(CLIENT_TARGET_API_VERSION_HEADER)
+        .and_then(|h| h.to_str().ok());
+    let response = process_raw_request(
+        &service,
+        api_version,
+        raw_request.get(),
+        client_addr,
+        headers_clone,
+    )
+    .await;
 
     ok_response(response.result)
 }
@@ -171,13 +174,13 @@ async fn process_raw_request<L: Logger>(
                     let contents_len = header_contents.len();
                     let Some(client_ip) = header_contents.get(contents_len - num_hops) else {
                         error!(
-                            "x-forwarded-for header value of {:?} contains {} values, but {} hops were specificed. \
+                                "x-forwarded-for header value of {:?} contains {} values, but {} hops were specificed. \
                                 Expected {} values. Skipping traffic controller request handling.",
-                            header_contents,
-                            contents_len,
-                            num_hops,
-                            num_hops + 1,
-                        );
+                                header_contents,
+                                contents_len,
+                                num_hops,
+                                num_hops + 1,
+                            );
                         return None;
                     };
                     parse_ip(client_ip)
@@ -201,7 +204,9 @@ async fn process_raw_request<L: Logger>(
     if let Ok(request) = serde_json::from_str::<Request>(raw_request) {
         // check if either IP is blocked, in which case return early
         if let Some(traffic_controller) = &service.traffic_controller {
-            if let Err(blocked_response) = handle_traffic_req(traffic_controller.clone(), &client).await {
+            if let Err(blocked_response) =
+                handle_traffic_req(traffic_controller.clone(), &client).await
+            {
                 return blocked_response;
             }
         }
@@ -230,14 +235,19 @@ async fn handle_traffic_req(
 ) -> Result<(), MethodResponse> {
     if !traffic_controller.check(client, &None).await {
         // Entity in blocklist
-        let err_obj = ErrorObject::borrowed(ErrorCode::ServerIsBusy.code(), &TOO_MANY_REQUESTS_MSG, None);
+        let err_obj =
+            ErrorObject::borrowed(ErrorCode::ServerIsBusy.code(), &TOO_MANY_REQUESTS_MSG, None);
         Err(MethodResponse::error(Id::Null, err_obj))
     } else {
         Ok(())
     }
 }
 
-fn handle_traffic_resp(traffic_controller: Arc<TrafficController>, client: Option<IpAddr>, response: &MethodResponse) {
+fn handle_traffic_resp(
+    traffic_controller: Arc<TrafficController>,
+    client: Option<IpAddr>,
+    response: &MethodResponse,
+) {
     let error = response.error_code.map(ErrorCode::from);
     traffic_controller.tally(TrafficTally {
         direct: client,
@@ -274,7 +284,13 @@ async fn process_request<L: Logger>(
     api_version: Option<&str>,
     call: CallData<'_, L>,
 ) -> MethodResponse {
-    let CallData { methods, rpc_router, logger, max_response_body_size, request_start } = call;
+    let CallData {
+        methods,
+        rpc_router,
+        logger,
+        max_response_body_size,
+        request_start,
+    } = call;
     let conn_id = 0; // unused
 
     let name = rpc_router.route(&req.method, api_version);
@@ -285,30 +301,56 @@ async fn process_request<L: Logger>(
 
     let response = match methods.method_with_name(name) {
         None => {
-            logger.on_call(name, params.clone(), logger::MethodKind::Unknown, TransportProtocol::Http);
+            logger.on_call(
+                name,
+                params.clone(),
+                logger::MethodKind::Unknown,
+                TransportProtocol::Http,
+            );
             MethodResponse::error(id, ErrorObject::from(ErrorCode::MethodNotFound))
         }
         Some((name, method)) => match method.inner() {
             MethodKind::Sync(callback) => {
-                logger.on_call(name, params.clone(), logger::MethodKind::MethodCall, TransportProtocol::Http);
+                logger.on_call(
+                    name,
+                    params.clone(),
+                    logger::MethodKind::MethodCall,
+                    TransportProtocol::Http,
+                );
                 (callback)(id, params, max_response_body_size as usize)
             }
             MethodKind::Async(callback) => {
-                logger.on_call(name, params.clone(), logger::MethodKind::MethodCall, TransportProtocol::Http);
+                logger.on_call(
+                    name,
+                    params.clone(),
+                    logger::MethodKind::MethodCall,
+                    TransportProtocol::Http,
+                );
 
                 let id = id.into_owned();
                 let params = params.into_owned();
                 (callback)(id, params, conn_id, max_response_body_size as usize, None).await
             }
             MethodKind::Subscription(_) | MethodKind::Unsubscription(_) => {
-                logger.on_call(name, params.clone(), logger::MethodKind::Unknown, TransportProtocol::Http);
+                logger.on_call(
+                    name,
+                    params.clone(),
+                    logger::MethodKind::Unknown,
+                    TransportProtocol::Http,
+                );
                 // Subscriptions not supported on HTTP
                 MethodResponse::error(id, ErrorObject::from(ErrorCode::InternalError))
             }
         },
     };
 
-    logger.on_result(name, response.success, response.error_code, request_start, TransportProtocol::Http);
+    logger.on_result(
+        name,
+        response.success,
+        response.error_code,
+        request_start,
+        TransportProtocol::Http,
+    );
     response
 }
 
@@ -420,7 +462,10 @@ pub mod ws {
         }
     }
 
-    async fn process_request<L: Logger>(req: Request<'_>, call: WsCallData<'_, L>) -> Option<MethodResponse> {
+    async fn process_request<L: Logger>(
+        req: Request<'_>,
+        call: WsCallData<'_, L>,
+    ) -> Option<MethodResponse> {
         let WsCallData {
             methods,
             logger,
@@ -438,31 +483,64 @@ pub mod ws {
 
         let response = match methods.method_with_name(name) {
             None => {
-                logger.on_call(name, params.clone(), logger::MethodKind::Unknown, TransportProtocol::Http);
-                Some(MethodResponse::error(id, ErrorObject::from(ErrorCode::MethodNotFound)))
+                logger.on_call(
+                    name,
+                    params.clone(),
+                    logger::MethodKind::Unknown,
+                    TransportProtocol::Http,
+                );
+                Some(MethodResponse::error(
+                    id,
+                    ErrorObject::from(ErrorCode::MethodNotFound),
+                ))
             }
             Some((name, method)) => match method.inner() {
                 MethodKind::Sync(callback) => {
-                    logger.on_call(name, params.clone(), logger::MethodKind::MethodCall, TransportProtocol::Http);
+                    logger.on_call(
+                        name,
+                        params.clone(),
+                        logger::MethodKind::MethodCall,
+                        TransportProtocol::Http,
+                    );
                     Some((callback)(id, params, max_response_body_size as usize))
                 }
                 MethodKind::Async(callback) => {
-                    logger.on_call(name, params.clone(), logger::MethodKind::MethodCall, TransportProtocol::Http);
+                    logger.on_call(
+                        name,
+                        params.clone(),
+                        logger::MethodKind::MethodCall,
+                        TransportProtocol::Http,
+                    );
 
                     let id = id.into_owned();
                     let params = params.into_owned();
 
-                    Some((callback)(id, params, conn_id, max_response_body_size as usize, None).await)
+                    Some(
+                        (callback)(id, params, conn_id, max_response_body_size as usize, None)
+                            .await,
+                    )
                 }
 
                 MethodKind::Subscription(callback) => {
-                    logger.on_call(name, params.clone(), logger::MethodKind::Subscription, TransportProtocol::WebSocket);
+                    logger.on_call(
+                        name,
+                        params.clone(),
+                        logger::MethodKind::Subscription,
+                        TransportProtocol::WebSocket,
+                    );
                     if let Some(cn) = bounded_subscriptions.acquire() {
-                        let conn_state = ConnState { conn_id, close_notify: cn, id_provider };
+                        let conn_state = ConnState {
+                            conn_id,
+                            close_notify: cn,
+                            id_provider,
+                        };
                         callback(id.clone(), params, sink.clone(), conn_state, None).await;
                         None
                     } else {
-                        Some(MethodResponse::error(id, reject_too_many_subscriptions(bounded_subscriptions.max())))
+                        Some(MethodResponse::error(
+                            id,
+                            reject_too_many_subscriptions(bounded_subscriptions.max()),
+                        ))
                     }
                 }
 
@@ -474,13 +552,24 @@ pub mod ws {
                         TransportProtocol::WebSocket,
                     );
 
-                    Some(callback(id, params, conn_id, max_response_body_size as usize))
+                    Some(callback(
+                        id,
+                        params,
+                        conn_id,
+                        max_response_body_size as usize,
+                    ))
                 }
             },
         };
 
         if let Some(response) = &response {
-            logger.on_result(name, response.success, response.error_code, request_start, TransportProtocol::WebSocket);
+            logger.on_result(
+                name,
+                response.success,
+                response.error_code,
+                request_start,
+                TransportProtocol::WebSocket,
+            );
         }
         response
     }

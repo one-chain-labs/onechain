@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module hero::hero {
-    use one::tx_context::{TxContext};
-    use one::object::{Self, UID};
-    use one::package;
+    use sui::tx_context::{TxContext};
+    use sui::object::{Self, UID};
+    use sui::package;
 
     public struct Hero has key, store {
         id: UID,

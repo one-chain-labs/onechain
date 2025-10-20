@@ -21,9 +21,15 @@ impl MetricsPushClient {
             sui_tls::SUI_VALIDATOR_SERVER_NAME,
         ));
         let identity = certificate.reqwest_identity();
-        let client = reqwest::Client::builder().identity(identity).build().unwrap();
+        let client = reqwest::Client::builder()
+            .identity(identity)
+            .build()
+            .unwrap();
 
-        Self { certificate, client }
+        Self {
+            certificate,
+            client,
+        }
     }
 
     pub fn certificate(&self) -> &sui_tls::SelfSignedCertificate {
@@ -43,7 +49,10 @@ pub async fn push_metrics(
     info!(push_url =% url, "pushing metrics to remote");
 
     // now represents a collection timestamp for all of the metrics we send to the proxy
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
 
     let mut metric_families = registry.gather_all();
     for mf in metric_families.iter_mut() {
@@ -78,7 +87,11 @@ pub async fn push_metrics(
             Ok(body) => body,
             Err(error) => format!("couldn't decode response body; {error}"),
         };
-        return Err(anyhow::anyhow!("metrics push failed: [{}]:{}", status, body));
+        return Err(anyhow::anyhow!(
+            "metrics push failed: [{}]:{}",
+            status,
+            body
+        ));
     }
 
     debug!("successfully pushed metrics to {url}");

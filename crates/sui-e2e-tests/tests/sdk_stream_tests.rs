@@ -88,12 +88,18 @@ async fn test_coins_stream() -> Result<(), anyhow::Error> {
     let rpc_url = test_cluster.rpc_url();
 
     let client = SuiClientBuilder::default().build(rpc_url).await?;
-    let coins =
-        client.coin_read_api().get_coins_stream(address, Some(SUI_COIN_TYPE.to_string())).collect::<Vec<_>>().await;
+    let coins = client
+        .coin_read_api()
+        .get_coins_stream(address, Some(SUI_COIN_TYPE.to_string()))
+        .collect::<Vec<_>>()
+        .await;
 
     assert_eq!(5, coins.len());
 
-    let page = client.coin_read_api().get_coins(address, Some(SUI_COIN_TYPE.to_string()), None, None).await?;
+    let page = client
+        .coin_read_api()
+        .get_coins(address, Some(SUI_COIN_TYPE.to_string()), None, None)
+        .await?;
 
     for (coin1, coin2) in coins.into_iter().zip(page.data) {
         assert_eq!(coin1.coin_object_id, coin2.coin_object_id);
@@ -105,7 +111,10 @@ async fn test_coins_stream() -> Result<(), anyhow::Error> {
         .fold(0u128, |acc, coin| async move { acc + coin.balance as u128 })
         .await;
 
-    assert_eq!((DEFAULT_NUMBER_OF_OBJECT_PER_ACCOUNT as u64 * DEFAULT_GAS_AMOUNT) as u128, amount);
+    assert_eq!(
+        (DEFAULT_NUMBER_OF_OBJECT_PER_ACCOUNT as u64 * DEFAULT_GAS_AMOUNT) as u128,
+        amount
+    );
 
     let mut total = 0u128;
 

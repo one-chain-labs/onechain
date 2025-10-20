@@ -9,7 +9,13 @@ use rand::Rng;
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Parser, Debug)]
-#[command(name = "anemo-benchmark", about = "Benchmarking tool for Anemo", rename_all = "kebab-case", author, version)]
+#[command(
+    name = "anemo-benchmark",
+    about = "Benchmarking tool for Anemo",
+    rename_all = "kebab-case",
+    author,
+    version
+)]
 struct Args {
     /// Remote peer addresses to connect to.
     #[arg(long)]
@@ -55,14 +61,21 @@ pub fn random_key() -> [u8; 32] {
     bytes
 }
 
-async fn start_server(config: anemo::Config, port: u16, addrs: Vec<String>) -> (anemo::Network, Vec<anemo::Peer>) {
+async fn start_server(
+    config: anemo::Config,
+    port: u16,
+    addrs: Vec<String>,
+) -> (anemo::Network, Vec<anemo::Peer>) {
     let routes = anemo::Router::new().add_rpc_service(BenchmarkServer::new(Server));
-    let network = anemo::Network::bind(anemo::types::Address::HostAndPort { host: "0.0.0.0".into(), port })
-        .config(config)
-        .private_key(random_key())
-        .server_name("anemo_benchmark")
-        .start(routes)
-        .unwrap();
+    let network = anemo::Network::bind(anemo::types::Address::HostAndPort {
+        host: "0.0.0.0".into(),
+        port,
+    })
+    .config(config)
+    .private_key(random_key())
+    .server_name("anemo_benchmark")
+    .start(routes)
+    .unwrap();
 
     let mut peers = Vec::new();
     for addr in addrs {
@@ -76,7 +89,11 @@ async fn start_server(config: anemo::Config, port: u16, addrs: Vec<String>) -> (
             affinity: anemo::types::PeerAffinity::High,
             address: vec![addr.into()],
         });
-        peers.push(network.peer(peer_id).expect("network has peer we just connected to"));
+        peers.push(
+            network
+                .peer(peer_id)
+                .expect("network has peer we just connected to"),
+        );
     }
 
     (network, peers)
@@ -90,7 +107,10 @@ async fn upload_to_peer(
     let peer_id = peer.peer_id();
     let mut client = BenchmarkClient::new(peer);
     loop {
-        let result = client.send_bytes(anemo::Request::new(bytes.clone())).await.map(|_| peer_id);
+        let result = client
+            .send_bytes(anemo::Request::new(bytes.clone()))
+            .await
+            .map(|_| peer_id);
         notify.send((peer_id, result.err())).unwrap();
     }
 }
@@ -112,7 +132,9 @@ async fn download_from_peer(
 #[allow(clippy::disallowed_methods)] // unbounded_channel is ok for benchmark reporting
 async fn main() {
     let args: Args = Args::parse();
-    let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new()
+        .with_env()
+        .init();
 
     let mut config = anemo::Config::default();
     let mut quic_config = anemo::QuicConfig::default();
@@ -123,7 +145,10 @@ async fn main() {
     let (_network, peers) = start_server(config, args.port, args.addrs.clone()).await;
 
     let rng = rand::thread_rng();
-    let send_bytes: Vec<_> = rng.sample_iter(rand::distributions::Standard).take(args.size_up as usize).collect();
+    let send_bytes: Vec<_> = rng
+        .sample_iter(rand::distributions::Standard)
+        .take(args.size_up as usize)
+        .collect();
 
     let mut tasks = tokio::task::JoinSet::new();
     let (upload_notify_tx, mut upload_notify) = tokio::sync::mpsc::unbounded_channel();
@@ -131,12 +156,20 @@ async fn main() {
 
     for _ in 0..args.requests_up {
         for peer in peers.iter().cloned() {
-            tasks.spawn(upload_to_peer(peer, send_bytes.clone(), upload_notify_tx.clone()));
+            tasks.spawn(upload_to_peer(
+                peer,
+                send_bytes.clone(),
+                upload_notify_tx.clone(),
+            ));
         }
     }
     for _ in 0..args.requests_down {
         for peer in peers.iter().cloned() {
-            tasks.spawn(download_from_peer(peer, args.size_down, download_notify_tx.clone()));
+            tasks.spawn(download_from_peer(
+                peer,
+                args.size_down,
+                download_notify_tx.clone(),
+            ));
         }
     }
 

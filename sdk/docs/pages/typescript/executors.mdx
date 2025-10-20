@@ -13,7 +13,7 @@ The `SerialTransactionExecutor` is designed for use in wallet implementations, a
 objects owned by the address executing transactions are unlikely to be changed by transactions not
 executed through the executor.
 
-To fund transactions, the `SerialTransactionExecutor` will select all of the senders SUI coins for
+To fund transactions, the `SerialTransactionExecutor` will select all of the senders OCT coins for
 the first transaction, which will result in a single coin that will then be used as the gas payment
 on all subsequent transactions. This allows executing multiple transactions, without needing to
 re-query for gas coins, or wait for the RPC node to index the previous transactions.

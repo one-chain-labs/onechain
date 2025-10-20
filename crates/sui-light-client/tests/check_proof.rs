@@ -3,10 +3,8 @@
 
 use anyhow::anyhow;
 
-use sui_light_client::{
-    construct::construct_proof,
-    proof::{verify_proof, Proof, ProofTarget},
-};
+use sui_light_client::construct::construct_proof;
+use sui_light_client::proof::{verify_proof, Proof, ProofTarget};
 
 use sui_types::event::{Event, EventID};
 
@@ -14,7 +12,8 @@ use sui_types::{committee::Committee, effects::TransactionEffectsAPI, object::Ob
 
 use sui_rpc_api::CheckpointData;
 
-use std::{fs, io::Read, path::PathBuf};
+use std::io::Read;
+use std::{fs, path::PathBuf};
 
 async fn read_full_checkpoint(checkpoint_path: &PathBuf) -> anyhow::Result<CheckpointData> {
     println!("Reading checkpoint from {:?}", checkpoint_path);
@@ -44,8 +43,14 @@ async fn read_data(committee_seq: u64, seq: u64) -> (Committee, CheckpointData) 
         .collect();
 
     // Make a committee object using this
-    let committee =
-        Committee::new(committee_checkpoint.checkpoint_summary.epoch().checked_add(1).unwrap(), prev_committee);
+    let committee = Committee::new(
+        committee_checkpoint
+            .checkpoint_summary
+            .epoch()
+            .checked_add(1)
+            .unwrap(),
+        prev_committee,
+    );
 
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push(format!("example_config/{}.chk", seq));
@@ -58,7 +63,10 @@ async fn read_data(committee_seq: u64, seq: u64) -> (Committee, CheckpointData) 
 #[tokio::test]
 async fn check_can_read_test_data() {
     let (_committee, full_checkpoint) = read_data(15918264, 16005062).await;
-    assert!(full_checkpoint.checkpoint_summary.end_of_epoch_data.is_some());
+    assert!(full_checkpoint
+        .checkpoint_summary
+        .end_of_epoch_data
+        .is_some());
 }
 
 #[tokio::test]
@@ -77,8 +85,14 @@ async fn test_new_committee() {
         .collect();
 
     // Make a committee object using this
-    let new_committee =
-        Committee::new(full_checkpoint.checkpoint_summary.epoch().checked_add(1).unwrap(), new_committee_data);
+    let new_committee = Committee::new(
+        full_checkpoint
+            .checkpoint_summary
+            .epoch()
+            .checked_add(1)
+            .unwrap(),
+        new_committee_data,
+    );
 
     let committee_proof = Proof {
         checkpoint_summary: full_checkpoint.checkpoint_summary.clone(),
@@ -120,8 +134,14 @@ async fn test_fail_incorrect_cert() {
         .collect();
 
     // Make a committee object using this
-    let new_committee =
-        Committee::new(full_checkpoint.checkpoint_summary.epoch().checked_add(1).unwrap(), new_committee_data);
+    let new_committee = Committee::new(
+        full_checkpoint
+            .checkpoint_summary
+            .epoch()
+            .checked_add(1)
+            .unwrap(),
+        new_committee_data,
+    );
 
     let committee_proof = Proof {
         checkpoint_summary: full_checkpoint.checkpoint_summary.clone(),
@@ -190,8 +210,16 @@ async fn test_object_target_fail_wrong_object() {
 async fn test_event_target_fail_no_data() {
     let (committee, full_checkpoint) = read_data(15918264, 16005062).await;
 
-    let sample_event: Event = full_checkpoint.transactions[1].events.as_ref().unwrap().data[0].clone();
-    let sample_eid = EventID::from((*full_checkpoint.transactions[1].effects.transaction_digest(), 0));
+    let sample_event: Event = full_checkpoint.transactions[1]
+        .events
+        .as_ref()
+        .unwrap()
+        .data[0]
+        .clone();
+    let sample_eid = EventID::from((
+        *full_checkpoint.transactions[1].effects.transaction_digest(),
+        0,
+    ));
 
     let bad_proof = Proof {
         checkpoint_summary: full_checkpoint.checkpoint_summary.clone(),
@@ -206,8 +234,16 @@ async fn test_event_target_fail_no_data() {
 async fn test_event_target_success() {
     let (committee, full_checkpoint) = read_data(15918264, 16005062).await;
 
-    let sample_event: Event = full_checkpoint.transactions[1].events.as_ref().unwrap().data[0].clone();
-    let sample_eid = EventID::from((*full_checkpoint.transactions[1].effects.transaction_digest(), 0));
+    let sample_event: Event = full_checkpoint.transactions[1]
+        .events
+        .as_ref()
+        .unwrap()
+        .data[0]
+        .clone();
+    let sample_eid = EventID::from((
+        *full_checkpoint.transactions[1].effects.transaction_digest(),
+        0,
+    ));
 
     let target = ProofTarget::new().add_event(sample_eid, sample_event);
     let event_proof = construct_proof(target, &full_checkpoint).unwrap();
@@ -219,7 +255,12 @@ async fn test_event_target_success() {
 async fn test_event_target_fail_bad_event() {
     let (committee, full_checkpoint) = read_data(15918264, 16005062).await;
 
-    let sample_event: Event = full_checkpoint.transactions[1].events.as_ref().unwrap().data[0].clone();
+    let sample_event: Event = full_checkpoint.transactions[1]
+        .events
+        .as_ref()
+        .unwrap()
+        .data[0]
+        .clone();
     let sample_eid = EventID::from((
         *full_checkpoint.transactions[1].effects.transaction_digest(),
         1, // WRONG

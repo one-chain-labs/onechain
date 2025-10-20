@@ -1,38 +1,38 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{env, net::SocketAddr, str::FromStr};
+use std::env;
+use std::net::SocketAddr;
+use std::str::FromStr;
 
 use axum::body::Body;
-use hyper::{
-    header::{HeaderName, HeaderValue},
-    Method,
-    Request,
-};
+use hyper::header::HeaderName;
+use hyper::header::HeaderValue;
+use hyper::Method;
+use hyper::Request;
 use jsonrpsee::RpcModule;
 use prometheus::Registry;
 use sui_core::traffic_controller::metrics::TrafficControllerMetrics;
-use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
+use sui_types::traffic_control::PolicyConfig;
+use sui_types::traffic_control::RemoteFirewallConfig;
 use tokio::runtime::Handle;
 use tokio_util::sync::CancellationToken;
-use tower_http::{
-    cors::{AllowOrigin, CorsLayer},
-    trace::TraceLayer,
-};
+use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::trace::TraceLayer;
 use tracing::info;
 
 pub use balance_changes::*;
 pub use object_changes::*;
 pub use sui_config::node::ServerType;
 use sui_json_rpc_api::{
-    CLIENT_REQUEST_METHOD_HEADER,
-    CLIENT_SDK_TYPE_HEADER,
-    CLIENT_SDK_VERSION_HEADER,
+    CLIENT_REQUEST_METHOD_HEADER, CLIENT_SDK_TYPE_HEADER, CLIENT_SDK_VERSION_HEADER,
     CLIENT_TARGET_API_VERSION_HEADER,
 };
 use sui_open_rpc::{Module, Project};
 
-use crate::{error::Error, metrics::MetricsLogger, routing_layer::RpcRouter};
+use crate::error::Error;
+use crate::metrics::MetricsLogger;
+use crate::routing_layer::RpcRouter;
 
 pub mod authority_state;
 pub mod axum_router;
@@ -67,13 +67,13 @@ pub struct JsonRpcServerBuilder {
 pub fn sui_rpc_doc(version: &str) -> Project {
     Project::new(
         version,
-        "OneChain JSON-RPC",
-        "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
-        "OneChain Labs",
-        "https://onelabs.cc",
-        "build@onelabs.cc",
+        "Sui JSON-RPC",
+        "Sui JSON-RPC API for interaction with Sui Full node. Make RPC calls using https://fullnode.NETWORK.sui.io:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
+        "Mysten Labs",
+        "https://mystenlabs.com",
+        "build@mystenlabs.com",
         "Apache-2.0",
-        "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE",
+        "https://raw.githubusercontent.com/MystenLabs/sui/main/LICENSE",
     )
 }
 
@@ -101,7 +101,10 @@ impl JsonRpcServerBuilder {
     fn cors() -> Result<CorsLayer, Error> {
         let acl = match env::var("ACCESS_CONTROL_ALLOW_ORIGIN") {
             Ok(value) => {
-                let allow_hosts = value.split(',').map(HeaderValue::from_str).collect::<Result<Vec<_>, _>>()?;
+                let allow_hosts = value
+                    .split(',')
+                    .map(HeaderValue::from_str)
+                    .collect::<Result<Vec<_>, _>>()?;
                 AllowOrigin::list(allow_hosts)
             }
             _ => AllowOrigin::any(),
@@ -135,12 +138,23 @@ impl JsonRpcServerBuilder {
     > {
         TraceLayer::new_for_http()
             .make_span_with(|request: &Request<Body>| {
-                let request_id =
-                    request.headers().get("x-req-id").and_then(|v| v.to_str().ok()).map(tracing::field::display);
+                let request_id = request
+                    .headers()
+                    .get("x-req-id")
+                    .and_then(|v| v.to_str().ok())
+                    .map(tracing::field::display);
 
-                let origin = request.headers().get("origin").and_then(|v| v.to_str().ok()).map(tracing::field::display);
+                let origin = request
+                    .headers()
+                    .get("origin")
+                    .and_then(|v| v.to_str().ok())
+                    .map(tracing::field::display);
 
-                tracing::info_span!("json-rpc-request", "x-req-id" = request_id, "origin" = origin)
+                tracing::info_span!(
+                    "json-rpc-request",
+                    "x-req-id" = request_id,
+                    "origin" = origin
+                )
             })
             .on_request(())
             .on_response(())
@@ -152,9 +166,18 @@ impl JsonRpcServerBuilder {
     pub async fn to_router(&self, server_type: ServerType) -> Result<axum::Router, Error> {
         let routing = self.rpc_doc.method_routing.clone();
 
-        let disable_routing =
-            env::var("DISABLE_BACKWARD_COMPATIBILITY").ok().and_then(|v| bool::from_str(&v).ok()).unwrap_or_default();
-        info!("Compatibility method routing {}.", if disable_routing { "disabled" } else { "enabled" });
+        let disable_routing = env::var("DISABLE_BACKWARD_COMPATIBILITY")
+            .ok()
+            .and_then(|v| bool::from_str(&v).ok())
+            .unwrap_or_default();
+        info!(
+            "Compatibility method routing {}.",
+            if disable_routing {
+                "disabled"
+            } else {
+                "enabled"
+            }
+        );
         let rpc_router = RpcRouter::new(routing, disable_routing);
 
         let rpc_docs = self.rpc_doc.clone();
@@ -165,7 +188,9 @@ impl JsonRpcServerBuilder {
         let metrics_logger = MetricsLogger::new(&self.registry, &methods_names);
         let traffic_controller_metrics = TrafficControllerMetrics::new(&self.registry);
 
-        let middleware = tower::ServiceBuilder::new().layer(Self::trace_layer()).layer(Self::cors()?);
+        let middleware = tower::ServiceBuilder::new()
+            .layer(Self::trace_layer())
+            .layer(Self::cors()?);
 
         let service = crate::axum_router::JsonRpcService::new(
             module.into(),
@@ -181,22 +206,52 @@ impl JsonRpcServerBuilder {
         match server_type {
             ServerType::WebSocket => {
                 router = router
-                    .route("/", axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade))
-                    .route("/subscribe", axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade));
+                    .route(
+                        "/",
+                        axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade),
+                    )
+                    .route(
+                        "/subscribe",
+                        axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade),
+                    );
             }
             ServerType::Http => {
                 router = router
-                    .route("/", axum::routing::post(crate::axum_router::json_rpc_handler))
-                    .route("/json-rpc", axum::routing::post(crate::axum_router::json_rpc_handler))
-                    .route("/public", axum::routing::post(crate::axum_router::json_rpc_handler));
+                    .route(
+                        "/",
+                        axum::routing::post(crate::axum_router::json_rpc_handler),
+                    )
+                    .route(
+                        "/json-rpc",
+                        axum::routing::post(crate::axum_router::json_rpc_handler),
+                    )
+                    .route(
+                        "/public",
+                        axum::routing::post(crate::axum_router::json_rpc_handler),
+                    );
             }
             ServerType::Both => {
                 router = router
-                    .route("/", axum::routing::post(crate::axum_router::json_rpc_handler))
-                    .route("/", axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade))
-                    .route("/subscribe", axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade))
-                    .route("/json-rpc", axum::routing::post(crate::axum_router::json_rpc_handler))
-                    .route("/public", axum::routing::post(crate::axum_router::json_rpc_handler));
+                    .route(
+                        "/",
+                        axum::routing::post(crate::axum_router::json_rpc_handler),
+                    )
+                    .route(
+                        "/",
+                        axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade),
+                    )
+                    .route(
+                        "/subscribe",
+                        axum::routing::get(crate::axum_router::ws::ws_json_rpc_upgrade),
+                    )
+                    .route(
+                        "/json-rpc",
+                        axum::routing::post(crate::axum_router::json_rpc_handler),
+                    )
+                    .route(
+                        "/public",
+                        axum::routing::post(crate::axum_router::json_rpc_handler),
+                    );
             }
         }
 
@@ -216,18 +271,27 @@ impl JsonRpcServerBuilder {
     ) -> Result<ServerHandle, Error> {
         let app = self.to_router(server_type).await?;
 
-        let listener = tokio::net::TcpListener::bind(&listen_address).await.unwrap();
+        let listener = tokio::net::TcpListener::bind(&listen_address)
+            .await
+            .unwrap();
         let addr = listener.local_addr().unwrap();
 
         let handle = tokio::spawn(async move {
-            axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
+            .unwrap();
             if let Some(cancel) = cancel {
                 // Signal that the server is shutting down, so other tasks can clean-up.
                 cancel.cancel();
             }
         });
 
-        let handle = ServerHandle { handle: ServerHandleInner::Axum(handle) };
+        let handle = ServerHandle {
+            handle: ServerHandleInner::Axum(handle),
+        };
         info!(local_addr =? addr, "Sui JSON-RPC server listening on {addr}");
         Ok(handle)
     }

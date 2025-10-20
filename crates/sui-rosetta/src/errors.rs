@@ -4,13 +4,12 @@
 use axum::extract::rejection::JsonRejection;
 use std::fmt::Debug;
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    Json,
-};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
 use fastcrypto::error::FastCryptoError;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
+use serde::Serializer;
 use serde_json::{json, Value};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -19,14 +18,19 @@ use sui_types::error::SuiError;
 
 use crate::types::{BlockHash, OperationType, PublicKey, SuiEnv};
 use strum::EnumProperty;
-use strum_macros::{Display, EnumDiscriminants};
+use strum_macros::Display;
+use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 use typed_store::TypedStoreError;
 
 /// Sui-Rosetta specific error types.
 /// This contains all the errors returns by the sui-rosetta server.
 #[derive(Debug, Error, EnumDiscriminants, EnumProperty)]
-#[strum_discriminants(name(ErrorType), derive(Display, EnumIter), strum(serialize_all = "kebab-case"))]
+#[strum_discriminants(
+    name(ErrorType),
+    derive(Display, EnumIter),
+    strum(serialize_all = "kebab-case")
+)]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[error("Unsupported blockchain: {0}")]
@@ -46,7 +50,10 @@ pub enum Error {
     #[error("Data error: {0}")]
     DataError(String),
     #[error("Block not found, index: {index:?}, hash: {hash:?}")]
-    BlockNotFound { index: Option<u64>, hash: Option<BlockHash> },
+    BlockNotFound {
+        index: Option<u64>,
+        hash: Option<BlockHash>,
+    },
     #[error("Public key deserialization error: {0:?}")]
     PublicKeyDeserializationError(PublicKey),
 

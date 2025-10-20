@@ -1,7 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use prometheus::{register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge, Registry};
+use prometheus::{
+    register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge,
+    Registry,
+};
 use std::sync::Arc;
 use sui_types::{committee::EpochId, crypto::RandomnessRound};
 use tap::Pipe;
@@ -34,7 +37,9 @@ impl Metrics {
 
     pub fn record_completed_round(&self, round: RandomnessRound) {
         if let Some(inner) = &self.0 {
-            inner.highest_round_generated.set(inner.highest_round_generated.get().max(round.0 as i64));
+            inner
+                .highest_round_generated
+                .set(inner.highest_round_generated.get().max(round.0 as i64));
         }
     }
 
@@ -53,7 +58,9 @@ impl Metrics {
     }
 
     pub fn round_observation_latency_metric(&self) -> Option<&Histogram> {
-        self.0.as_ref().map(|inner| &inner.round_observation_latency)
+        self.0
+            .as_ref()
+            .map(|inner| &inner.round_observation_latency)
     }
 
     pub fn inc_num_ignored_byzantine_peers(&self) {
@@ -73,9 +80,9 @@ struct Inner {
 }
 
 const LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0,
-    3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10., 12.5, 15., 17.5, 20., 25., 30., 60., 90.,
-    120., 180., 300.,
+    0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4,
+    1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.,
+    12.5, 15., 17.5, 20., 25., 30., 60., 90., 120., 180., 300.,
 ];
 
 impl Inner {

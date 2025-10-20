@@ -3,12 +3,11 @@
 
 use std::collections::BTreeMap;
 
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use jsonrpsee::core::RpcResult;
+use jsonrpsee::proc_macros::rpc;
 
 use sui_json_rpc_types::{
-    MoveFunctionArgType,
-    SuiMoveNormalizedFunction,
-    SuiMoveNormalizedModule,
+    MoveFunctionArgType, SuiMoveNormalizedFunction, SuiMoveNormalizedModule,
     SuiMoveNormalizedStruct,
 };
 use sui_open_rpc_macros::open_rpc;

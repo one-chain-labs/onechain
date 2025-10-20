@@ -7,10 +7,10 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use async_graphql::dataloader::{DataLoader, Loader};
 use serde::{Deserialize, Serialize};
 
+use crate::metrics::Metrics;
 use crate::{
     config::MoveRegistryConfig,
     error::Error,
-    metrics::Metrics,
     types::{
         base64::Base64,
         move_registry::{
@@ -21,7 +21,8 @@ use crate::{
 };
 
 /// GraphQL fragment to query the values of the dynamic fields.
-const QUERY_FRAGMENT: &str = "fragment RECORD_VALUES on DynamicField { value { ... on MoveValue { bcs } } }";
+const QUERY_FRAGMENT: &str =
+    "fragment RECORD_VALUES on DynamicField { value { ... on MoveValue { bcs } } }";
 
 pub(crate) struct ExternalNamesLoader {
     client: reqwest::Client,
@@ -35,7 +36,11 @@ pub(crate) struct MoveRegistryDataLoader(pub Arc<DataLoader<ExternalNamesLoader>
 
 impl ExternalNamesLoader {
     pub(crate) fn new(config: MoveRegistryConfig, metrics: Metrics) -> Self {
-        Self { client: reqwest::Client::new(), config, metrics }
+        Self {
+            client: reqwest::Client::new(),
+            config,
+            metrics,
+        }
     }
 
     /// Constructs the GraphQL Query to query the names on an external graphql endpoint.
@@ -58,8 +63,7 @@ impl ExternalNamesLoader {
                 fetch_key(&index),
                 self.config.package_address,
                 bcs_base64
-            )
-            .unwrap();
+            ).unwrap();
         }
 
         result.push_str("}} ");
@@ -72,16 +76,16 @@ impl ExternalNamesLoader {
 impl MoveRegistryDataLoader {
     pub(crate) fn new(config: MoveRegistryConfig, metrics: Metrics) -> Self {
         let batch_size = config.page_limit as usize;
-        let data_loader =
-            DataLoader::new(ExternalNamesLoader::new(config, metrics), tokio::spawn).max_batch_size(batch_size);
+        let data_loader = DataLoader::new(ExternalNamesLoader::new(config, metrics), tokio::spawn)
+            .max_batch_size(batch_size);
         Self(Arc::new(data_loader))
     }
 }
 
 #[async_trait::async_trait]
 impl Loader<Name> for ExternalNamesLoader {
-    type Error = Error;
     type Value = AppRecord;
+    type Error = Error;
 
     /// This function queries the external API to fetch the app records for the requested names.
     /// This is part of the data loader, so all queries are bulked-up to the maximum of {config.page_limit}.
@@ -89,35 +93,51 @@ impl Loader<Name> for ExternalNamesLoader {
     /// a successful one.
     async fn load(&self, keys: &[Name]) -> Result<HashMap<Name, AppRecord>, Error> {
         let Some(api_url) = self.config.external_api_url.as_ref() else {
-            return Err(Error::MoveNameRegistry(MoveRegistryError::ExternalApiUrlUnavailable));
+            return Err(Error::MoveNameRegistry(
+                MoveRegistryError::ExternalApiUrlUnavailable,
+            ));
         };
 
         let (query, mapping) = self.construct_names_graphql_query(keys);
 
-        let request_body = GraphQLRequest { query, variables: serde_json::Value::Null };
+        let request_body = GraphQLRequest {
+            query,
+            variables: serde_json::Value::Null,
+        };
 
         let res = {
-            let _timer_guard = self.metrics.app_metrics.external_mvr_resolution_latency.start_timer();
+            let _timer_guard = self
+                .metrics
+                .app_metrics
+                .external_mvr_resolution_latency
+                .start_timer();
 
             self.client
                 .post(api_url)
                 .json(&request_body)
                 .send()
                 .await
-                .map_err(|e| Error::MoveNameRegistry(MoveRegistryError::FailedToQueryExternalApi(e.to_string())))?
+                .map_err(|e| {
+                    Error::MoveNameRegistry(MoveRegistryError::FailedToQueryExternalApi(
+                        e.to_string(),
+                    ))
+                })?
         };
 
         if !res.status().is_success() {
-            return Err(Error::MoveNameRegistry(MoveRegistryError::FailedToQueryExternalApi(format!(
-                "Status code: {}",
-                res.status()
-            ))));
+            return Err(Error::MoveNameRegistry(
+                MoveRegistryError::FailedToQueryExternalApi(format!(
+                    "Status code: {}",
+                    res.status()
+                )),
+            ));
         }
 
-        let response_json: GraphQLResponse<Owner> = res
-            .json()
-            .await
-            .map_err(|e| Error::MoveNameRegistry(MoveRegistryError::FailedToParseExternalResponse(e.to_string())))?;
+        let response_json: GraphQLResponse<Owner> = res.json().await.map_err(|e| {
+            Error::MoveNameRegistry(MoveRegistryError::FailedToParseExternalResponse(
+                e.to_string(),
+            ))
+        })?;
 
         let names = response_json.data.owner.names;
 

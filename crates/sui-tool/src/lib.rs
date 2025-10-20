@@ -4,44 +4,38 @@
 
 use anyhow::Result;
 use fastcrypto::traits::ToFromBytes;
-use futures::future::{join_all, AbortHandle};
+use futures::future::join_all;
+use futures::future::AbortHandle;
 use itertools::Itertools;
-use std::{
-    collections::BTreeMap,
-    fmt::Write,
-    fs,
-    io,
-    num::NonZeroUsize,
-    ops::Range,
-    path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::collections::BTreeMap;
+use std::fmt::Write;
+use std::num::NonZeroUsize;
+use std::ops::Range;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use std::{fs, io};
 use sui_config::{genesis::Genesis, NodeConfig};
-use sui_core::{
-    authority_client::{AuthorityAPI, NetworkAuthorityClient},
-    execution_cache::build_execution_cache_from_env,
-};
+use sui_core::authority_client::{AuthorityAPI, NetworkAuthorityClient};
+use sui_core::execution_cache::build_execution_cache_from_env;
 use sui_network::default_mysten_network_config;
 use sui_protocol_config::Chain;
-use sui_sdk::{SuiClient, SuiClientBuilder};
-use sui_storage::object_store::{
-    http::HttpDownloaderBuilder,
-    util::{Manifest, PerEpochManifest, MANIFEST_FILENAME},
-};
-use sui_types::{
-    accumulator::Accumulator,
-    base_types::*,
-    committee::QUORUM_THRESHOLD,
-    crypto::AuthorityPublicKeyBytes,
-    messages_grpc::LayoutGenerationOption,
-    multiaddr::Multiaddr,
-    object::Owner,
-};
-use tokio::{sync::mpsc, task::JoinHandle, time::Instant};
+use sui_sdk::SuiClient;
+use sui_sdk::SuiClientBuilder;
+use sui_storage::object_store::http::HttpDownloaderBuilder;
+use sui_storage::object_store::util::Manifest;
+use sui_storage::object_store::util::PerEpochManifest;
+use sui_storage::object_store::util::MANIFEST_FILENAME;
+use sui_types::accumulator::Accumulator;
+use sui_types::committee::QUORUM_THRESHOLD;
+use sui_types::crypto::AuthorityPublicKeyBytes;
+use sui_types::messages_grpc::LayoutGenerationOption;
+use sui_types::multiaddr::Multiaddr;
+use sui_types::{base_types::*, object::Owner};
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 use anyhow::anyhow;
 use clap::ValueEnum;
@@ -51,38 +45,24 @@ use futures::{StreamExt, TryStreamExt};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use prometheus::Registry;
 use serde::{Deserialize, Serialize};
-use sui_archival::{
-    reader::{ArchiveReader, ArchiveReaderMetrics},
-    verify_archive_with_checksums,
-    verify_archive_with_genesis_config,
-};
-use sui_config::{
-    node::ArchiveReaderConfig,
-    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
-};
-use sui_core::{
-    authority::{authority_store_tables::AuthorityPerpetualTables, AuthorityStore},
-    checkpoints::CheckpointStore,
-    epoch::committee_store::CommitteeStore,
-    storage::RocksDbStore,
-};
-use sui_snapshot::{reader::StateSnapshotReaderV1, setup_db_state};
-use sui_storage::{
-    object_store::{
-        util::{copy_file, exists, get_path},
-        ObjectStoreGetExt,
-    },
-    verify_checkpoint_range,
-};
-use sui_types::{
-    messages_checkpoint::{CheckpointCommitment, ECMHLiveObjectSetDigest},
-    messages_grpc::{
-        ObjectInfoRequest,
-        ObjectInfoRequestKind,
-        ObjectInfoResponse,
-        TransactionInfoRequest,
-        TransactionStatus,
-    },
+use sui_archival::reader::{ArchiveReader, ArchiveReaderMetrics};
+use sui_archival::{verify_archive_with_checksums, verify_archive_with_genesis_config};
+use sui_config::node::ArchiveReaderConfig;
+use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
+use sui_core::authority::authority_store_tables::AuthorityPerpetualTables;
+use sui_core::authority::AuthorityStore;
+use sui_core::checkpoints::CheckpointStore;
+use sui_core::epoch::committee_store::CommitteeStore;
+use sui_core::storage::RocksDbStore;
+use sui_snapshot::reader::StateSnapshotReaderV1;
+use sui_snapshot::setup_db_state;
+use sui_storage::object_store::util::{copy_file, exists, get_path};
+use sui_storage::object_store::ObjectStoreGetExt;
+use sui_storage::verify_checkpoint_range;
+use sui_types::messages_checkpoint::{CheckpointCommitment, ECMHLiveObjectSetDigest};
+use sui_types::messages_grpc::{
+    ObjectInfoRequest, ObjectInfoRequestKind, ObjectInfoResponse, TransactionInfoRequest,
+    TransactionStatus,
 };
 
 use sui_types::storage::{ReadStore, SharedInMemoryStore};
@@ -92,7 +72,9 @@ use typed_store::rocks::MetricConf;
 pub mod commands;
 pub mod db_tool;
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Copy, PartialOrd, Ord, Eq, ValueEnum, Default)]
+#[derive(
+    Clone, Serialize, Deserialize, Debug, PartialEq, Copy, PartialOrd, Ord, Eq, ValueEnum, Default,
+)]
 pub enum SnapshotVerifyMode {
     /// verification of both db state and downloaded checkpoints are skipped.
     /// This is the fastest mode, but is unsafe, and thus should only be used
@@ -116,7 +98,11 @@ async fn make_clients(
     net_config.connect_timeout = Some(Duration::from_secs(5));
     let mut authority_clients = BTreeMap::new();
 
-    let active_validators = sui_client.governance_api().get_latest_sui_system_state().await?.active_validators;
+    let active_validators = sui_client
+        .governance_api()
+        .get_latest_sui_system_state()
+        .await?
+        .active_validators;
 
     for validator in active_validators {
         let net_addr = Multiaddr::try_from(validator.net_address).unwrap();
@@ -126,9 +112,12 @@ async fn make_clients(
         //     sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
         //     None,
         // );
-        let channel = net_config.connect_lazy(&net_addr, None).map_err(|err| anyhow!(err.to_string()))?;
+        let channel = net_config
+            .connect_lazy(&net_addr, None)
+            .map_err(|err| anyhow!(err.to_string()))?;
         let client = NetworkAuthorityClient::new(channel);
-        let public_key_bytes = AuthorityPublicKeyBytes::from_bytes(&validator.protocol_pubkey_bytes)?;
+        let public_key_bytes =
+            AuthorityPublicKeyBytes::from_bytes(&validator.protocol_pubkey_bytes)?;
         authority_clients.insert(public_key_bytes, (net_addr.clone(), client));
     }
 
@@ -160,17 +149,34 @@ where
 #[allow(clippy::type_complexity)]
 pub struct GroupedObjectOutput {
     pub grouped_results: BTreeMap<
-        Option<(Option<SequenceNumber>, ObjectDigest, TransactionDigest, Owner, Option<TransactionDigest>)>,
+        Option<(
+            Option<SequenceNumber>,
+            ObjectDigest,
+            TransactionDigest,
+            Owner,
+            Option<TransactionDigest>,
+        )>,
         Vec<AuthorityName>,
     >,
-    pub voting_power:
-        Vec<(Option<(Option<SequenceNumber>, ObjectDigest, TransactionDigest, Owner, Option<TransactionDigest>)>, u64)>,
+    pub voting_power: Vec<(
+        Option<(
+            Option<SequenceNumber>,
+            ObjectDigest,
+            TransactionDigest,
+            Owner,
+            Option<TransactionDigest>,
+        )>,
+        u64,
+    )>,
     pub available_voting_power: u64,
     pub fully_locked: bool,
 }
 
 impl GroupedObjectOutput {
-    pub fn new(object_data: ObjectData, committee: Arc<BTreeMap<AuthorityPublicKeyBytes, u64>>) -> Self {
+    pub fn new(
+        object_data: ObjectData,
+        committee: Arc<BTreeMap<AuthorityPublicKeyBytes, u64>>,
+    ) -> Self {
         let mut grouped_results = BTreeMap::new();
         let mut voting_power = BTreeMap::new();
         let mut available_voting_power = 0;
@@ -194,12 +200,22 @@ impl GroupedObjectOutput {
             let entry: &mut u64 = voting_power.entry(key).or_default();
             *entry += stake;
         }
-        let voting_power = voting_power.into_iter().sorted_by(|(_, v1), (_, v2)| Ord::cmp(v2, v1)).collect::<Vec<_>>();
+        let voting_power = voting_power
+            .into_iter()
+            .sorted_by(|(_, v1), (_, v2)| Ord::cmp(v2, v1))
+            .collect::<Vec<_>>();
         let mut fully_locked = false;
-        if !voting_power.is_empty() && voting_power.first().unwrap().1 + available_voting_power < QUORUM_THRESHOLD {
+        if !voting_power.is_empty()
+            && voting_power.first().unwrap().1 + available_voting_power < QUORUM_THRESHOLD
+        {
             fully_locked = true;
         }
-        Self { grouped_results, voting_power, available_voting_power, fully_locked }
+        Self {
+            grouped_results,
+            voting_power,
+            available_voting_power,
+            fully_locked,
+        }
     }
 }
 
@@ -240,14 +256,22 @@ struct ConciseObjectOutput(ObjectData);
 
 impl ConciseObjectOutput {
     fn header() -> String {
-        format!("{:<20} {:<8} {:<66} {:<45} {}", "validator", "version", "digest", "parent_cert", "owner")
+        format!(
+            "{:<20} {:<8} {:<66} {:<45} {}",
+            "validator", "version", "digest", "parent_cert", "owner"
+        )
     }
 }
 
 impl std::fmt::Display for ConciseObjectOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (name, _multi_addr, (version, resp, _time_elapsed)) in &self.0.responses {
-            write!(f, "{:<20} {:<8}", format!("{:?}", name.concise()), version.map(|s| s.value()).opt_debug("-"))?;
+            write!(
+                f,
+                "{:<20} {:<8}",
+                format!("{:?}", name.concise()),
+                version.map(|s| s.value()).opt_debug("-")
+            )?;
             match resp {
                 Err(_) => writeln!(
                     f,
@@ -275,23 +299,41 @@ impl std::fmt::Display for VerboseObjectOutput {
 
         for (name, multiaddr, (version, resp, timespent)) in &self.0.responses {
             writeln!(f, "validator: {:?}, addr: {:?}", name.concise(), multiaddr)?;
-            writeln!(f, "-- version: {} ({:.3}s)", version.opt_debug("<version not available>"), timespent,)?;
+            writeln!(
+                f,
+                "-- version: {} ({:.3}s)",
+                version.opt_debug("<version not available>"),
+                timespent,
+            )?;
 
             match resp {
                 Err(e) => writeln!(f, "Error fetching object: {}", e)?,
                 Ok(resp) => {
-                    writeln!(f, "  -- object digest: {}", resp.object.compute_object_reference().2)?;
+                    writeln!(
+                        f,
+                        "  -- object digest: {}",
+                        resp.object.compute_object_reference().2
+                    )?;
                     if resp.object.is_package() {
                         writeln!(f, "  -- object: <Move Package>")?;
                     } else if let Some(layout) = &resp.layout {
                         writeln!(
                             f,
                             "  -- object: Move Object: {}",
-                            resp.object.data.try_as_move().unwrap().to_move_struct(layout).unwrap()
+                            resp.object
+                                .data
+                                .try_as_move()
+                                .unwrap()
+                                .to_move_struct(layout)
+                                .unwrap()
                         )?;
                     }
                     writeln!(f, "  -- owner: {}", resp.object.owner)?;
-                    writeln!(f, "  -- locked by: {}", resp.lock_for_debugging.opt_debug("<not locked>"))?;
+                    writeln!(
+                        f,
+                        "  -- locked by: {}",
+                        resp.lock_for_debugging.opt_debug("<not locked>")
+                    )?;
                 }
             }
         }
@@ -305,16 +347,27 @@ pub async fn get_object(
     validator: Option<AuthorityName>,
     clients: Arc<BTreeMap<AuthorityName, (Multiaddr, NetworkAuthorityClient)>>,
 ) -> Result<ObjectData> {
-    let responses =
-        join_all(clients.iter().filter(|(name, _)| if let Some(v) = validator { v == **name } else { true }).map(
-            |(name, (address, client))| async {
+    let responses = join_all(
+        clients
+            .iter()
+            .filter(|(name, _)| {
+                if let Some(v) = validator {
+                    v == **name
+                } else {
+                    true
+                }
+            })
+            .map(|(name, (address, client))| async {
                 let object_version = get_object_impl(client, obj_id, version).await;
                 (*name, address.clone(), object_version)
-            },
-        ))
-        .await;
+            }),
+    )
+    .await;
 
-    Ok(ObjectData { requested_id: obj_id, responses })
+    Ok(ObjectData {
+        requested_id: obj_id,
+        responses,
+    })
 }
 
 pub async fn get_transaction_block(
@@ -326,9 +379,17 @@ pub async fn get_transaction_block(
     let clients = make_clients(&sui_client).await?;
     let timer = Instant::now();
     let responses = join_all(clients.iter().map(|(name, (address, client))| async {
-        let result =
-            client.handle_transaction_info_request(TransactionInfoRequest { transaction_digest: tx_digest }).await;
-        (*name, address.clone(), result, timer.elapsed().as_secs_f64())
+        let result = client
+            .handle_transaction_info_request(TransactionInfoRequest {
+                transaction_digest: tx_digest,
+            })
+            .await;
+        (
+            *name,
+            address.clone(),
+            result,
+            timer.elapsed().as_secs_f64(),
+        )
     }))
     .await;
 
@@ -348,40 +409,46 @@ pub async fn get_transaction_block(
             let err = r.2.as_ref().err();
             (key, err, r)
         })
-        .sorted_by(|(k1, err1, _), (k2, err2, _)| Ord::cmp(k1, k2).then_with(|| Ord::cmp(err1, err2)))
+        .sorted_by(|(k1, err1, _), (k2, err2, _)| {
+            Ord::cmp(k1, k2).then_with(|| Ord::cmp(err1, err2))
+        })
         .chunk_by(|(_, _err, r)| {
             r.2.as_ref().map(|ok_result| match &ok_result.status {
                 TransactionStatus::Signed(_) => None,
-                TransactionStatus::Executed(_, effects, _) => {
-                    Some((ok_result.transaction.transaction_data(), effects.data(), effects.digest()))
-                }
+                TransactionStatus::Executed(_, effects, _) => Some((
+                    ok_result.transaction.transaction_data(),
+                    effects.data(),
+                    effects.digest(),
+                )),
             })
         });
     let mut s = String::new();
     for (i, (key, group)) in responses.into_iter().enumerate() {
         match key {
             Ok(Some((tx, effects, effects_digest))) => {
-                writeln!(&mut s, "#{:<2} tx_digest: {:<68?} effects_digest: {:?}", i, tx_digest, effects_digest,)?;
+                writeln!(
+                    &mut s,
+                    "#{:<2} tx_digest: {:<68?} effects_digest: {:?}",
+                    i, tx_digest, effects_digest,
+                )?;
                 writeln!(&mut s, "{:#?}", effects)?;
                 if show_input_tx {
                     writeln!(&mut s, "{:#?}", tx)?;
                 }
             }
             Ok(None) => {
-                writeln!(&mut s, "#{:<2} tx_digest: {:<68?} Signed but not executed", i, tx_digest)?;
+                writeln!(
+                    &mut s,
+                    "#{:<2} tx_digest: {:<68?} Signed but not executed",
+                    i, tx_digest
+                )?;
                 if show_input_tx {
                     // In this case, we expect at least one validator knows about this tx
                     let validator_aware_of_tx = validator_aware_of_tx.unwrap();
                     let client = &clients.get(&validator_aware_of_tx.0).unwrap().1;
-                    let tx_info = client
-                        .handle_transaction_info_request(TransactionInfoRequest { transaction_digest: tx_digest })
-                        .await
-                        .unwrap_or_else(|e| {
-                            panic!(
-                                "Validator {:?} should have known about tx_digest: {:?}, got error: {:?}",
-                                validator_aware_of_tx.0, tx_digest, e
-                            )
-                        });
+                    let tx_info = client.handle_transaction_info_request(TransactionInfoRequest {
+                        transaction_digest: tx_digest,
+                    }).await.unwrap_or_else(|e| panic!("Validator {:?} should have known about tx_digest: {:?}, got error: {:?}", validator_aware_of_tx.0, tx_digest, e));
                     writeln!(&mut s, "{:#?}", tx_info)?;
                 }
             }
@@ -390,7 +457,14 @@ pub async fn get_transaction_block(
             }
         }
         for (j, (_, _, res)) in group.enumerate() {
-            writeln!(&mut s, "        {:<4} {:<20} {:<56} ({:.3}s)", j, res.0.concise(), format!("{}", res.1), res.3)?;
+            writeln!(
+                &mut s,
+                "        {:<4} {:<20} {:<56} ({:.3}s)",
+                j,
+                res.0.concise(),
+                format!("{}", res.1),
+                res.3
+            )?;
         }
         writeln!(&mut s, "{:<100}\n", "-".repeat(100))?;
     }
@@ -421,7 +495,8 @@ async fn get_object_impl(
 }
 
 pub(crate) fn make_anemo_config() -> anemo_cli::Config {
-    use sui_network::{discovery::*, state_sync::*};
+    use sui_network::discovery::*;
+    use sui_network::state_sync::*;
 
     // TODO: implement `ServiceInfo` generation in anemo-build and use here.
     anemo_cli::Config::new()
@@ -468,7 +543,11 @@ pub(crate) fn make_anemo_config() -> anemo_cli::Config {
         )
 }
 
-fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, skip: Vec<PathBuf>) -> io::Result<()> {
+fn copy_dir_all(
+    src: impl AsRef<Path>,
+    dst: impl AsRef<Path>,
+    skip: Vec<PathBuf>,
+) -> io::Result<()> {
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
@@ -477,7 +556,11 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, skip: Vec<PathBuf>
             continue;
         }
         if ty.is_dir() {
-            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()), skip.clone())?;
+            copy_dir_all(
+                entry.path(),
+                dst.as_ref().join(entry.file_name()),
+                skip.clone(),
+            )?;
         } else {
             fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
         }
@@ -485,7 +568,10 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>, skip: Vec<PathBuf>
     Ok(())
 }
 
-pub async fn restore_from_db_checkpoint(config: &NodeConfig, db_checkpoint_path: &Path) -> Result<(), anyhow::Error> {
+pub async fn restore_from_db_checkpoint(
+    config: &NodeConfig,
+    db_checkpoint_path: &Path,
+) -> Result<(), anyhow::Error> {
     copy_dir_all(db_checkpoint_path, config.db_path(), vec![])?;
     Ok(())
 }
@@ -504,11 +590,17 @@ fn start_summary_sync(
 ) -> JoinHandle<Result<(), anyhow::Error>> {
     tokio::spawn(async move {
         info!("Starting summary sync");
-        let store = AuthorityStore::open_no_genesis(perpetual_db, usize::MAX, false, &Registry::default())?;
+        let store =
+            AuthorityStore::open_no_genesis(perpetual_db, usize::MAX, false, &Registry::default())?;
         let cache_traits = build_execution_cache_from_env(&Registry::default(), &store);
-        let state_sync_store = RocksDbStore::new(cache_traits, committee_store, checkpoint_store.clone());
+        let state_sync_store =
+            RocksDbStore::new(cache_traits, committee_store, checkpoint_store.clone());
         // Only insert the genesis checkpoint if the DB is empty and doesn't have it already
-        if checkpoint_store.get_checkpoint_by_digest(genesis.checkpoint().digest()).unwrap().is_none() {
+        if checkpoint_store
+            .get_checkpoint_by_digest(genesis.checkpoint().digest())
+            .unwrap()
+            .is_none()
+        {
             checkpoint_store.insert_checkpoint_contents(genesis.checkpoint_contents().clone())?;
             checkpoint_store.insert_verified_checkpoint(&genesis.checkpoint())?;
             checkpoint_store.update_highest_synced_checkpoint(&genesis.checkpoint())?;
@@ -524,22 +616,34 @@ fn start_summary_sync(
         archive_reader.sync_manifest_once().await?;
         let manifest = archive_reader.get_manifest().await?;
 
-        let end_of_epoch_checkpoint_seq_nums =
-            (0..=epoch).map(|e| manifest.next_checkpoint_after_epoch(e) - 1).collect::<Vec<_>>();
-        let last_checkpoint = end_of_epoch_checkpoint_seq_nums.last().expect("Expected at least one checkpoint");
+        let end_of_epoch_checkpoint_seq_nums = (0..=epoch)
+            .map(|e| manifest.next_checkpoint_after_epoch(e) - 1)
+            .collect::<Vec<_>>();
+        let last_checkpoint = end_of_epoch_checkpoint_seq_nums
+            .last()
+            .expect("Expected at least one checkpoint");
 
-        let num_to_sync = if all_checkpoints { *last_checkpoint } else { end_of_epoch_checkpoint_seq_nums.len() as u64 };
-        let sync_progress_bar = m
-            .add(ProgressBar::new(num_to_sync).with_style(
-                ProgressStyle::with_template("[{elapsed_precise}] {wide_bar} {pos}/{len} ({msg})").unwrap(),
-            ));
+        let num_to_sync = if all_checkpoints {
+            *last_checkpoint
+        } else {
+            end_of_epoch_checkpoint_seq_nums.len() as u64
+        };
+        let sync_progress_bar = m.add(
+            ProgressBar::new(num_to_sync).with_style(
+                ProgressStyle::with_template("[{elapsed_precise}] {wide_bar} {pos}/{len} ({msg})")
+                    .unwrap(),
+            ),
+        );
 
         let cloned_progress_bar = sync_progress_bar.clone();
         let sync_checkpoint_counter = Arc::new(AtomicU64::new(0));
         let s_instant = Instant::now();
 
         let cloned_counter = sync_checkpoint_counter.clone();
-        let latest_synced = checkpoint_store.get_highest_synced_checkpoint()?.map(|c| c.sequence_number).unwrap_or(0);
+        let latest_synced = checkpoint_store
+            .get_highest_synced_checkpoint()?
+            .map(|c| c.sequence_number)
+            .unwrap_or(0);
         let s_start = latest_synced
             .checked_add(1)
             .context("Checkpoint overflow")
@@ -550,9 +654,13 @@ fn start_summary_sync(
                     break;
                 }
                 let num_summaries = cloned_counter.load(Ordering::Relaxed);
-                let total_checkpoints_per_sec = num_summaries as f64 / s_instant.elapsed().as_secs_f64();
+                let total_checkpoints_per_sec =
+                    num_summaries as f64 / s_instant.elapsed().as_secs_f64();
                 cloned_progress_bar.set_position(s_start + num_summaries);
-                cloned_progress_bar.set_message(format!("checkpoints synced per sec: {}", total_checkpoints_per_sec));
+                cloned_progress_bar.set_message(format!(
+                    "checkpoints synced per sec: {}",
+                    total_checkpoints_per_sec
+                ));
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         });
@@ -580,9 +688,14 @@ fn start_summary_sync(
             .get_checkpoint_by_sequence_number(*last_checkpoint)?
             .ok_or(anyhow!("Failed to read last checkpoint"))?;
         if verify {
-            let verify_progress_bar = m.add(ProgressBar::new(num_to_sync).with_style(
-                ProgressStyle::with_template("[{elapsed_precise}] {wide_bar} {pos}/{len} ({msg})").unwrap(),
-            ));
+            let verify_progress_bar = m.add(
+                ProgressBar::new(num_to_sync).with_style(
+                    ProgressStyle::with_template(
+                        "[{elapsed_precise}] {wide_bar} {pos}/{len} ({msg})",
+                    )
+                    .unwrap(),
+                ),
+            );
             let cloned_verify_progress_bar = verify_progress_bar.clone();
             let verify_checkpoint_counter = Arc::new(AtomicU64::new(0));
             let cloned_verify_counter = verify_checkpoint_counter.clone();
@@ -595,10 +708,13 @@ fn start_summary_sync(
                         break;
                     }
                     let num_summaries = cloned_verify_counter.load(Ordering::Relaxed);
-                    let total_checkpoints_per_sec = num_summaries as f64 / v_instant.elapsed().as_secs_f64();
+                    let total_checkpoints_per_sec =
+                        num_summaries as f64 / v_instant.elapsed().as_secs_f64();
                     cloned_verify_progress_bar.set_position(v_start + num_summaries);
-                    cloned_verify_progress_bar
-                        .set_message(format!("checkpoints verified per sec: {}", total_checkpoints_per_sec));
+                    cloned_verify_progress_bar.set_message(format!(
+                        "checkpoints verified per sec: {}",
+                        total_checkpoints_per_sec
+                    ));
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             });
@@ -627,14 +743,18 @@ fn start_summary_sync(
             } else {
                 // in this case we only need to verify the end of epoch checkpoints by checking
                 // signatures against the corresponding epoch committee.
-                for (cp_epoch, epoch_last_cp_seq_num) in end_of_epoch_checkpoint_seq_nums.iter().enumerate() {
+                for (cp_epoch, epoch_last_cp_seq_num) in
+                    end_of_epoch_checkpoint_seq_nums.iter().enumerate()
+                {
                     let epoch_last_checkpoint = checkpoint_store
                         .get_checkpoint_by_sequence_number(*epoch_last_cp_seq_num)?
                         .ok_or(anyhow!("Failed to read checkpoint"))?;
-                    let committee = state_sync_store
-                        .get_committee(cp_epoch as u64)
-                        .expect("Expected committee to exist after syncing all end of epoch checkpoints");
-                    epoch_last_checkpoint.verify_authority_signatures(&committee).expect("Failed to verify checkpoint");
+                    let committee = state_sync_store.get_committee(cp_epoch as u64).expect(
+                        "Expected committee to exist after syncing all end of epoch checkpoints",
+                    );
+                    epoch_last_checkpoint
+                        .verify_authority_signatures(&committee)
+                        .expect("Failed to verify checkpoint");
                     verify_checkpoint_counter.fetch_add(1, Ordering::Relaxed);
                 }
             }
@@ -650,16 +770,24 @@ fn start_summary_sync(
     })
 }
 
-pub async fn get_latest_available_epoch(snapshot_store_config: &ObjectStoreConfig) -> Result<u64, anyhow::Error> {
+pub async fn get_latest_available_epoch(
+    snapshot_store_config: &ObjectStoreConfig,
+) -> Result<u64, anyhow::Error> {
     let remote_object_store = if snapshot_store_config.no_sign_request {
         snapshot_store_config.make_http()?
     } else {
         snapshot_store_config.make().map(Arc::new)?
     };
-    let manifest_contents = remote_object_store.get_bytes(&get_path(MANIFEST_FILENAME)).await?;
+    let manifest_contents = remote_object_store
+        .get_bytes(&get_path(MANIFEST_FILENAME))
+        .await?;
     let root_manifest: Manifest = serde_json::from_slice(&manifest_contents)
         .map_err(|err| anyhow!("Error parsing MANIFEST from bytes: {}", err))?;
-    let epoch = root_manifest.available_epochs.iter().max().ok_or(anyhow!("No snapshot found in manifest"))?;
+    let epoch = root_manifest
+        .available_epochs
+        .iter()
+        .max()
+        .ok_or(anyhow!("No snapshot found in manifest"))?;
     Ok(*epoch)
 }
 
@@ -678,10 +806,12 @@ pub async fn check_completed_snapshot(
     } else {
         Err(anyhow!(
             "missing success marker at {}/{}",
-            snapshot_store_config
-                .bucket
-                .as_ref()
-                .unwrap_or(&snapshot_store_config.clone().aws_endpoint.unwrap_or("unknown_bucket".to_string())),
+            snapshot_store_config.bucket.as_ref().unwrap_or(
+                &snapshot_store_config
+                    .clone()
+                    .aws_endpoint
+                    .unwrap_or("unknown_bucket".to_string())
+            ),
             success_marker
         ))
     }
@@ -710,9 +840,17 @@ pub async fn download_formal_snapshot(
     let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&path.join("store"), None));
     let genesis = Genesis::load(genesis).unwrap();
     let genesis_committee = genesis.committee()?;
-    let committee_store = Arc::new(CommitteeStore::new(path.join("epochs"), &genesis_committee, None));
-    let checkpoint_store =
-        Arc::new(CheckpointStore::open_tables_read_write(path.join("checkpoints"), MetricConf::default(), None, None));
+    let committee_store = Arc::new(CommitteeStore::new(
+        path.join("epochs"),
+        &genesis_committee,
+        None,
+    ));
+    let checkpoint_store = Arc::new(CheckpointStore::open_tables_read_write(
+        path.join("checkpoints"),
+        MetricConf::default(),
+        None,
+        None,
+    ));
 
     let summaries_handle = start_summary_sync(
         perpetual_db.clone(),
@@ -752,6 +890,7 @@ pub async fn download_formal_snapshot(
             usize::MAX,
             NonZeroUsize::new(num_parallel_downloads).unwrap(),
             m_clone,
+            false, // skip_reset_local_store
         )
         .await
         .unwrap_or_else(|err| panic!("Failed to create reader: {}", err));
@@ -767,10 +906,14 @@ pub async fn download_formal_snapshot(
         num_live_objects += num_objects;
         root_accumulator.union(&partial_acc);
     }
-    summaries_handle.await.expect("Task join failed").expect("Summaries task failed");
+    summaries_handle
+        .await
+        .expect("Task join failed")
+        .expect("Summaries task failed");
 
-    let last_checkpoint =
-        checkpoint_store.get_highest_verified_checkpoint()?.expect("Expected nonempty checkpoint store");
+    let last_checkpoint = checkpoint_store
+        .get_highest_verified_checkpoint()?
+        .expect("Expected nonempty checkpoint store");
 
     // Perform snapshot state verification
     if verify != SnapshotVerifyMode::None {
@@ -822,7 +965,10 @@ pub async fn download_formal_snapshot(
         )?;
     }
 
-    snapshot_handle.await.expect("Task join failed").expect("Snapshot restore task failed");
+    snapshot_handle
+        .await
+        .expect("Task join failed")
+        .expect("Snapshot restore task failed");
 
     // TODO we should ensure this map is being updated for all end of epoch
     // checkpoints during summary sync. This happens in `insert_{verified|certified}_checkpoint`
@@ -848,7 +994,10 @@ pub async fn download_formal_snapshot(
     }
     fs::rename(&path, &new_path)?;
     fs::remove_dir_all(snapshot_dir.clone())?;
-    println!("Successfully restored state from snapshot at end of epoch {}", epoch);
+    println!(
+        "Successfully restored state from snapshot at end of epoch {}",
+        epoch
+    );
 
     Ok(())
 }
@@ -872,17 +1021,22 @@ pub async fn download_db_snapshot(
         .map_err(|err| anyhow!("Error parsing MANIFEST from bytes: {}", err))?;
 
     if !root_manifest.epoch_exists(epoch) {
-        return Err(anyhow!("Epoch dir {} doesn't exist on the remote store", epoch));
+        return Err(anyhow!(
+            "Epoch dir {} doesn't exist on the remote store",
+            epoch
+        ));
     }
 
     let epoch_path = format!("epoch_{}", epoch);
     let epoch_dir = get_path(&epoch_path);
 
     let manifest_file = epoch_dir.child(MANIFEST_FILENAME);
-    let epoch_manifest_contents = String::from_utf8(remote_store.get_bytes(&manifest_file).await?.to_vec())
-        .map_err(|err| anyhow!("Error parsing {}/MANIFEST from bytes: {}", epoch_path, err))?;
+    let epoch_manifest_contents =
+        String::from_utf8(remote_store.get_bytes(&manifest_file).await?.to_vec())
+            .map_err(|err| anyhow!("Error parsing {}/MANIFEST from bytes: {}", epoch_path, err))?;
 
-    let epoch_manifest = PerEpochManifest::deserialize_from_newline_delimited(&epoch_manifest_contents);
+    let epoch_manifest =
+        PerEpochManifest::deserialize_from_newline_delimited(&epoch_manifest_contents);
 
     let mut files: Vec<String> = vec![];
     files.extend(epoch_manifest.filter_by_prefix("store/perpetual").lines);
@@ -902,8 +1056,10 @@ pub async fn download_db_snapshot(
     let snapshot_handle = tokio::spawn(async move {
         let progress_bar = m.add(
             ProgressBar::new(files.len() as u64).with_style(
-                ProgressStyle::with_template("[{elapsed_precise}] {wide_bar} {pos} out of {len} files done ({msg})")
-                    .unwrap(),
+                ProgressStyle::with_template(
+                    "[{elapsed_precise}] {wide_bar} {pos} out of {len} files done ({msg})",
+                )
+                .unwrap(),
             ),
         );
         let cloned_progress_bar = progress_bar.clone();
@@ -962,7 +1118,8 @@ pub async fn verify_archive(
     concurrency: usize,
     interactive: bool,
 ) -> Result<()> {
-    verify_archive_with_genesis_config(genesis, remote_store_config, concurrency, interactive, 10).await
+    verify_archive_with_genesis_config(genesis, remote_store_config, concurrency, interactive, 10)
+        .await
 }
 
 pub async fn dump_checkpoints_from_archive(
@@ -985,21 +1142,38 @@ pub async fn dump_checkpoints_from_archive(
     archive_reader
         .read(
             store.clone(),
-            Range { start: start_checkpoint, end: end_checkpoint },
+            Range {
+                start: start_checkpoint,
+                end: end_checkpoint,
+            },
             txn_counter,
             checkpoint_counter,
             false,
         )
         .await?;
-    for key in store.inner().checkpoints().values().sorted_by(|a, b| a.sequence_number().cmp(&b.sequence_number)) {
-        let mut content =
-            serde_json::to_string(&store.get_full_checkpoint_contents_by_sequence_number(key.sequence_number).unwrap())?;
+    for key in store
+        .inner()
+        .checkpoints()
+        .values()
+        .sorted_by(|a, b| a.sequence_number().cmp(&b.sequence_number))
+    {
+        let mut content = serde_json::to_string(
+            &store
+                .get_full_checkpoint_contents_by_sequence_number(key.sequence_number)
+                .unwrap(),
+        )?;
         content.truncate(max_content_length);
-        info!("{}:{}:{:?}", key.sequence_number, key.content_digest, content);
+        info!(
+            "{}:{}:{:?}",
+            key.sequence_number, key.content_digest, content
+        );
     }
     Ok(())
 }
 
-pub async fn verify_archive_by_checksum(remote_store_config: ObjectStoreConfig, concurrency: usize) -> Result<()> {
+pub async fn verify_archive_by_checksum(
+    remote_store_config: ObjectStoreConfig,
+    concurrency: usize,
+) -> Result<()> {
     verify_archive_with_checksums(remote_store_config, concurrency).await
 }

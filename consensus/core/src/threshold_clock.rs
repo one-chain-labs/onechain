@@ -20,7 +20,12 @@ pub(crate) struct ThresholdClock {
 
 impl ThresholdClock {
     pub(crate) fn new(round: Round, context: Arc<Context>) -> Self {
-        Self { aggregator: StakeAggregator::new(), round, quorum_ts: Instant::now(), context }
+        Self {
+            aggregator: StakeAggregator::new(),
+            round,
+            quorum_ts: Instant::now(),
+            context,
+        }
     }
 
     /// Add the block references that have been successfully processed and advance the round accordingly. If the round
@@ -82,21 +87,53 @@ mod tests {
         let context = Arc::new(Context::new_for_test(4).0);
         let mut aggregator = ThresholdClock::new(0, context);
 
-        aggregator.add_block(BlockRef::new(0, AuthorityIndex::new_for_test(0), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            0,
+            AuthorityIndex::new_for_test(0),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 0);
-        aggregator.add_block(BlockRef::new(0, AuthorityIndex::new_for_test(1), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            0,
+            AuthorityIndex::new_for_test(1),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 0);
-        aggregator.add_block(BlockRef::new(0, AuthorityIndex::new_for_test(2), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            0,
+            AuthorityIndex::new_for_test(2),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 1);
-        aggregator.add_block(BlockRef::new(1, AuthorityIndex::new_for_test(0), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            1,
+            AuthorityIndex::new_for_test(0),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 1);
-        aggregator.add_block(BlockRef::new(1, AuthorityIndex::new_for_test(3), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            1,
+            AuthorityIndex::new_for_test(3),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 1);
-        aggregator.add_block(BlockRef::new(2, AuthorityIndex::new_for_test(1), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            2,
+            AuthorityIndex::new_for_test(1),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 2);
-        aggregator.add_block(BlockRef::new(1, AuthorityIndex::new_for_test(1), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            1,
+            AuthorityIndex::new_for_test(1),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 2);
-        aggregator.add_block(BlockRef::new(5, AuthorityIndex::new_for_test(2), BlockDigest::default()));
+        aggregator.add_block(BlockRef::new(
+            5,
+            AuthorityIndex::new_for_test(2),
+            BlockDigest::default(),
+        ));
         assert_eq!(aggregator.get_round(), 5);
     }
 

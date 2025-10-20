@@ -4,7 +4,7 @@
 module base_addr::new_module {
 
     public struct MyObject has key, store {
-        id: one::object::UID,
+        id: sui::object::UID,
         data: u64
     }
 

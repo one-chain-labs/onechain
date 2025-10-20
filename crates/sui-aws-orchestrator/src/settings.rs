@@ -108,7 +108,10 @@ impl Settings {
             Ok(settings)
         };
 
-        reader().map_err(|e| SettingsError::InvalidSettings { file: path.to_string(), message: e.to_string() })
+        reader().map_err(|e| SettingsError::InvalidSettings {
+            file: path.to_string(),
+            message: e.to_string(),
+        })
     }
 
     /// Get the name of the repository (from its url).
@@ -154,7 +157,8 @@ impl Settings {
     /// Check whether the input instance matches the criteria described in the settings.
     pub fn filter_instances(&self, instance: &Instance) -> bool {
         self.regions.contains(&instance.region)
-            && instance.specs.to_lowercase().replace('.', "") == self.specs.to_lowercase().replace('.', "")
+            && instance.specs.to_lowercase().replace('.', "")
+                == self.specs.to_lowercase().replace('.', "")
     }
 
     /// The number of regions specified in the settings.
@@ -167,7 +171,7 @@ impl Settings {
     #[cfg(test)]
     pub fn new_for_test() -> Self {
         // Create a temporary public key file.
-        let mut path = tempfile::tempdir().unwrap().keep();
+        let mut path = tempfile::tempdir().unwrap().into_path();
         path.push("test_public_key.pub");
         let public_key = "This is a fake public key for tests";
         fs::write(&path, public_key).unwrap();

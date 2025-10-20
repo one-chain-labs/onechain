@@ -3,20 +3,11 @@
 
 use std::sync::Arc;
 
-use sui_sdk_types::types::{
-    CheckpointSequenceNumber,
-    EpochId,
-    Object,
-    ObjectId,
-    SignedTransaction,
-    ValidatorCommittee,
-    Version,
-};
-use sui_types::storage::{
-    error::{Error as StorageError, Result},
-    ObjectStore,
-    RpcStateReader,
-};
+use sui_sdk_types::{CheckpointSequenceNumber, EpochId, SignedTransaction, ValidatorCommittee};
+use sui_sdk_types::{Object, ObjectId, Version};
+use sui_types::storage::error::{Error as StorageError, Result};
+use sui_types::storage::ObjectStore;
+use sui_types::storage::RpcStateReader;
 use tap::Pipe;
 
 use crate::Direction;
@@ -36,10 +27,18 @@ impl StateReader {
     }
 
     pub fn get_object(&self, object_id: ObjectId) -> crate::Result<Option<Object>> {
-        self.inner.get_object(&object_id.into()).map(TryInto::try_into).transpose().map_err(Into::into)
+        self.inner
+            .get_object(&object_id.into())
+            .map(TryInto::try_into)
+            .transpose()
+            .map_err(Into::into)
     }
 
-    pub fn get_object_with_version(&self, object_id: ObjectId, version: Version) -> crate::Result<Option<Object>> {
+    pub fn get_object_with_version(
+        &self,
+        object_id: ObjectId,
+        version: Version,
+    ) -> crate::Result<Option<Object>> {
         self.inner
             .get_object_by_key(&object_id.into(), version.into())
             .map(TryInto::try_into)
@@ -48,14 +47,16 @@ impl StateReader {
     }
 
     pub fn get_committee(&self, epoch: EpochId) -> Option<ValidatorCommittee> {
-        self.inner.get_committee(epoch).map(|committee| (*committee).clone().into())
+        self.inner
+            .get_committee(epoch)
+            .map(|committee| (*committee).clone().into())
     }
 
     pub fn get_system_state_summary(&self) -> Result<super::rest::system::SystemStateSummary> {
         use sui_types::sui_system_state::SuiSystemStateTrait;
 
-        let system_state =
-            sui_types::sui_system_state::get_sui_system_state(self.inner()).map_err(StorageError::custom)?;
+        let system_state = sui_types::sui_system_state::get_sui_system_state(self.inner())
+            .map_err(StorageError::custom)?;
         let summary = system_state.into_sui_system_state_summary().into();
 
         Ok(summary)
@@ -63,48 +64,71 @@ impl StateReader {
 
     pub fn get_transaction(
         &self,
-        digest: sui_sdk_types::types::TransactionDigest,
+        digest: sui_sdk_types::TransactionDigest,
     ) -> crate::Result<(
-        sui_sdk_types::types::SignedTransaction,
-        sui_sdk_types::types::TransactionEffects,
-        Option<sui_sdk_types::types::TransactionEvents>,
+        sui_sdk_types::SignedTransaction,
+        sui_sdk_types::TransactionEffects,
+        Option<sui_sdk_types::TransactionEvents>,
     )> {
         use super::rest::transactions::TransactionNotFoundError;
         use sui_types::effects::TransactionEffectsAPI;
 
         let transaction_digest = digest.into();
 
-        let transaction =
-            (*self.inner().get_transaction(&transaction_digest).ok_or(TransactionNotFoundError(digest))?)
-                .clone()
-                .into_inner();
-        let effects =
-            self.inner().get_transaction_effects(&transaction_digest).ok_or(TransactionNotFoundError(digest))?;
+        let transaction = (*self
+            .inner()
+            .get_transaction(&transaction_digest)
+            .ok_or(TransactionNotFoundError(digest))?)
+        .clone()
+        .into_inner();
+        let effects = self
+            .inner()
+            .get_transaction_effects(&transaction_digest)
+            .ok_or(TransactionNotFoundError(digest))?;
         let events = if let Some(event_digest) = effects.events_digest() {
-            self.inner().get_events(event_digest).ok_or(TransactionNotFoundError(digest))?.pipe(Some)
+            self.inner()
+                .get_events(event_digest)
+                .ok_or(TransactionNotFoundError(digest))?
+                .pipe(Some)
         } else {
             None
         };
 
-        Ok((transaction.try_into()?, effects.try_into()?, events.map(TryInto::try_into).transpose()?))
+        Ok((
+            transaction.try_into()?,
+            effects.try_into()?,
+            events.map(TryInto::try_into).transpose()?,
+        ))
     }
 
     pub fn get_transaction_checkpoint(
         &self,
         digest: &sui_types::digests::TransactionDigest,
     ) -> Option<CheckpointSequenceNumber> {
-        self.inner().indexes()?.get_transaction_checkpoint(digest).ok()?
+        self.inner()
+            .indexes()?
+            .get_transaction_checkpoint(digest)
+            .ok()?
     }
 
     pub fn get_transaction_read(
         &self,
-        digest: sui_sdk_types::types::TransactionDigest,
+        digest: sui_sdk_types::TransactionDigest,
     ) -> crate::Result<TransactionRead> {
-        let (SignedTransaction { transaction, signatures }, effects, events) = self.get_transaction(digest)?;
+        let (
+            SignedTransaction {
+                transaction,
+                signatures,
+            },
+            effects,
+            events,
+        ) = self.get_transaction(digest)?;
 
         let checkpoint = self.get_transaction_checkpoint(&(digest.into()));
         let timestamp_ms = if let Some(checkpoint) = checkpoint {
-            self.inner().get_checkpoint_by_sequence_number(checkpoint).map(|checkpoint| checkpoint.timestamp_ms)
+            self.inner()
+                .get_checkpoint_by_sequence_number(checkpoint)
+                .map(|checkpoint| checkpoint.timestamp_ms)
         } else {
             None
         };
@@ -120,7 +144,11 @@ impl StateReader {
         })
     }
 
-    pub fn checkpoint_iter(&self, direction: Direction, start: CheckpointSequenceNumber) -> CheckpointIter {
+    pub fn checkpoint_iter(
+        &self,
+        direction: Direction,
+        start: CheckpointSequenceNumber,
+    ) -> CheckpointIter {
         CheckpointIter::new(self.clone(), direction, start)
     }
 
@@ -135,11 +163,11 @@ impl StateReader {
 
 #[derive(Debug)]
 pub struct TransactionRead {
-    pub digest: sui_sdk_types::types::TransactionDigest,
-    pub transaction: sui_sdk_types::types::Transaction,
-    pub signatures: Vec<sui_sdk_types::types::UserSignature>,
-    pub effects: sui_sdk_types::types::TransactionEffects,
-    pub events: Option<sui_sdk_types::types::TransactionEvents>,
+    pub digest: sui_sdk_types::TransactionDigest,
+    pub transaction: sui_sdk_types::Transaction,
+    pub signatures: Vec<sui_sdk_types::UserSignature>,
+    pub effects: sui_sdk_types::TransactionEffects,
+    pub events: Option<sui_sdk_types::TransactionEvents>,
     pub checkpoint: Option<u64>,
     pub timestamp_ms: Option<u64>,
 }
@@ -149,13 +177,24 @@ pub struct CheckpointTransactionsIter {
     direction: Direction,
 
     next_cursor: Option<(CheckpointSequenceNumber, Option<usize>)>,
-    checkpoint:
-        Option<(sui_types::messages_checkpoint::CheckpointSummary, sui_types::messages_checkpoint::CheckpointContents)>,
+    checkpoint: Option<(
+        sui_types::messages_checkpoint::CheckpointSummary,
+        sui_types::messages_checkpoint::CheckpointContents,
+    )>,
 }
 
 impl CheckpointTransactionsIter {
-    pub fn new(reader: StateReader, direction: Direction, start: (CheckpointSequenceNumber, Option<usize>)) -> Self {
-        Self { reader, direction, next_cursor: Some(start), checkpoint: None }
+    pub fn new(
+        reader: StateReader,
+        direction: Direction,
+        start: (CheckpointSequenceNumber, Option<usize>),
+    ) -> Self {
+        Self {
+            reader,
+            direction,
+            next_cursor: Some(start),
+            checkpoint: None,
+        }
     }
 }
 
@@ -174,26 +213,33 @@ impl Iterator for CheckpointTransactionsIter {
                     checkpoint
                 }
             } else {
-                let checkpoint = match self.reader.inner().get_checkpoint_by_sequence_number(current_checkpoint) {
+                let checkpoint = match self
+                    .reader
+                    .inner()
+                    .get_checkpoint_by_sequence_number(current_checkpoint)
+                {
                     Some(checkpoint) => checkpoint,
                     None => return None,
                 };
-                let contents =
-                    match self.reader.inner().get_checkpoint_contents_by_sequence_number(checkpoint.sequence_number) {
-                        Some(contents) => contents,
-                        None => return None,
-                    };
+                let contents = match self
+                    .reader
+                    .inner()
+                    .get_checkpoint_contents_by_sequence_number(checkpoint.sequence_number)
+                {
+                    Some(contents) => contents,
+                    None => return None,
+                };
 
                 self.checkpoint = Some((checkpoint.into_inner().into_data(), contents));
                 self.checkpoint.as_ref().unwrap()
             };
 
-            let index = transaction_index.map(|idx| idx.clamp(0, contents.size().saturating_sub(1))).unwrap_or_else(
-                || match self.direction {
+            let index = transaction_index
+                .map(|idx| idx.clamp(0, contents.size().saturating_sub(1)))
+                .unwrap_or_else(|| match self.direction {
                     Direction::Ascending => 0,
                     Direction::Descending => contents.size().saturating_sub(1),
-                },
-            );
+                });
 
             self.next_cursor = {
                 let next_index = match self.direction {
@@ -257,7 +303,11 @@ pub struct CheckpointIter {
 
 impl CheckpointIter {
     pub fn new(reader: StateReader, direction: Direction, start: CheckpointSequenceNumber) -> Self {
-        Self { reader, direction, next_cursor: Some(start) }
+        Self {
+            reader,
+            direction,
+            next_cursor: Some(start),
+        }
     }
 }
 
@@ -270,12 +320,20 @@ impl Iterator for CheckpointIter {
     fn next(&mut self) -> Option<Self::Item> {
         let current_checkpoint = self.next_cursor?;
 
-        let checkpoint = match self.reader.inner().get_checkpoint_by_sequence_number(current_checkpoint) {
+        let checkpoint = match self
+            .reader
+            .inner()
+            .get_checkpoint_by_sequence_number(current_checkpoint)
+        {
             Some(checkpoint) => checkpoint,
             None => return None,
         }
         .into_inner();
-        let contents = match self.reader.inner().get_checkpoint_contents_by_sequence_number(checkpoint.sequence_number) {
+        let contents = match self
+            .reader
+            .inner()
+            .get_checkpoint_contents_by_sequence_number(checkpoint.sequence_number)
+        {
             Some(contents) => contents,
             None => return None,
         };

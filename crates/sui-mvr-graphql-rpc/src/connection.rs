@@ -1,26 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{borrow::Cow, marker::PhantomData};
+use std::borrow::Cow;
+use std::marker::PhantomData;
 
-use async_graphql::{
-    connection::{
-        ConnectionNameType,
-        CursorType,
-        DefaultConnectionName,
-        DefaultEdgeName,
-        Edge,
-        EdgeNameType,
-        EmptyFields,
-        EnableNodesField,
-        NodesFieldSwitcherSealed,
-        PageInfo,
-    },
-    Object,
-    ObjectType,
-    OutputType,
-    TypeName,
+use async_graphql::connection::{
+    ConnectionNameType, CursorType, DefaultConnectionName, DefaultEdgeName, Edge, EdgeNameType,
+    EmptyFields, EnableNodesField, NodesFieldSwitcherSealed, PageInfo,
 };
+use async_graphql::{Object, ObjectType, OutputType, TypeName};
 
 /// Mirrors the `Connection` type from async-graphql, with the exception that if `start_cursor` and/
 /// or `end_cursor` is set on the struct, then when `page_info` is called, it will use those values
@@ -55,7 +43,8 @@ pub(crate) struct ScanConnection<
 }
 
 #[Object(name_type)]
-impl<Cursor, Node, EdgeFields, Name, EdgeName> ScanConnection<Cursor, Node, EdgeFields, Name, EdgeName, EnableNodesField>
+impl<Cursor, Node, EdgeFields, Name, EdgeName>
+    ScanConnection<Cursor, Node, EdgeFields, Name, EdgeName, EnableNodesField>
 where
     Cursor: CursorType + Send + Sync,
     Node: OutputType,
@@ -74,7 +63,10 @@ where
                 .start_cursor
                 .clone()
                 .or_else(|| self.edges.first().map(|edge| edge.cursor.encode_cursor())),
-            end_cursor: self.end_cursor.clone().or_else(|| self.edges.last().map(|edge| edge.cursor.encode_cursor())),
+            end_cursor: self
+                .end_cursor
+                .clone()
+                .or_else(|| self.edges.last().map(|edge| edge.cursor.encode_cursor())),
         }
     }
 

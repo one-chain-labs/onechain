@@ -642,7 +642,7 @@ MoveObjectType_:
     1:
       GasCoin: UNIT
     2:
-      StakedOct: UNIT
+      StakedSui: UNIT
     3:
       Coin:
         NEWTYPE:

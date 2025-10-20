@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_config::node::ExpensiveSafetyCheckConfig;
-use sui_types::{digests::TransactionDigest, execution_status::ExecutionFailureStatus, transaction::TransactionKind};
+use sui_types::{
+    digests::TransactionDigest, execution_status::ExecutionFailureStatus,
+    transaction::TransactionKind,
+};
 use thiserror::Error;
 use tracing::{error, info};
 
@@ -42,7 +45,10 @@ pub trait TransactionKindMutator {
 
 impl ReplayFuzzer {
     pub async fn new(rpc_url: String, config: ReplayFuzzerConfig) -> Result<Self, anyhow::Error> {
-        let local_exec = LocalExec::new_from_fn_url(&rpc_url).await?.init_for_execution().await?;
+        let local_exec = LocalExec::new_from_fn_url(&rpc_url)
+            .await?
+            .init_for_execution()
+            .await?;
 
         let mut tx_provider = TransactionProvider::new(&rpc_url, config.tx_source.clone()).await?;
 
@@ -55,10 +61,12 @@ impl ReplayFuzzer {
         transaction_provider: &mut TransactionProvider,
     ) -> Result<Self, anyhow::Error> {
         // Seed with the first transaction
-        let base_transaction = transaction_provider
-            .next()
-            .await?
-            .unwrap_or_else(|| panic!("No transactions found at source: {:?}", transaction_provider.source));
+        let base_transaction = transaction_provider.next().await?.unwrap_or_else(|| {
+            panic!(
+                "No transactions found at source: {:?}",
+                transaction_provider.source
+            )
+        });
         let sandbox_state = local_exec
             .execute_transaction(
                 &base_transaction,
@@ -71,13 +79,24 @@ impl ReplayFuzzer {
             )
             .await?;
 
-        Ok(Self { local_exec, sandbox_state, config, transaction_provider: transaction_provider.clone() })
+        Ok(Self {
+            local_exec,
+            sandbox_state,
+            config,
+            transaction_provider: transaction_provider.clone(),
+        })
     }
 
     pub async fn re_init(mut self) -> Result<Self, anyhow::Error> {
-        let local_executor = self.local_exec.reset_for_new_execution_with_client().await?;
-        self.config.mutator.reset(self.config.num_mutations_per_base);
-        Self::new_with_local_executor(local_executor, self.config, &mut self.transaction_provider).await
+        let local_executor = self
+            .local_exec
+            .reset_for_new_execution_with_client()
+            .await?;
+        self.config
+            .mutator
+            .reset(self.config.num_mutations_per_base);
+        Self::new_with_local_executor(local_executor, self.config, &mut self.transaction_provider)
+            .await
     }
 
     pub async fn execute_tx(
@@ -101,7 +120,8 @@ impl ReplayFuzzer {
         if let Some(Err(e)) = &sandbox_state.local_exec_status {
             let stat = e.to_execution_status().0;
             match &stat {
-                ExecutionFailureStatus::InvariantViolation | ExecutionFailureStatus::VMInvariantViolation => {
+                ExecutionFailureStatus::InvariantViolation
+                | ExecutionFailureStatus::VMInvariantViolation => {
                     return Err(ReplayFuzzError::InvariantViolation {
                         tx_digest: sandbox_state.transaction_info.tx_digest,
                         kind: transaction_kind.clone(),
@@ -138,7 +158,8 @@ impl ReplayFuzzer {
                     Err(e) => {
                         error!(
                             "Error executing transaction: base tx: {}, mutation: {:?} with error{:?}",
-                            self.sandbox_state.transaction_info.tx_digest, mutation, e
+                            self.sandbox_state.transaction_info.tx_digest,
+                            mutation, e
                         );
                         if self.config.fail_over_on_err {
                             return Err(e);
@@ -146,8 +167,15 @@ impl ReplayFuzzer {
                     }
                 }
             }
-            info!("Ended fuzz with for base TX {}\n", self.sandbox_state.transaction_info.tx_digest);
-            self = self.re_init().await.map_err(ReplayEngineError::from).map_err(ReplayFuzzError::from)?;
+            info!(
+                "Ended fuzz with for base TX {}\n",
+                self.sandbox_state.transaction_info.tx_digest
+            );
+            self = self
+                .re_init()
+                .await
+                .map_err(ReplayEngineError::from)
+                .map_err(ReplayFuzzError::from)?;
             num_base_tx -= 1;
         }
 
@@ -158,10 +186,20 @@ impl ReplayFuzzer {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Error, Clone)]
 pub enum ReplayFuzzError {
-    #[error("InvariantViolation: digest: {tx_digest}, kind: {kind}, status: {:?}", exec_status)]
-    InvariantViolation { tx_digest: TransactionDigest, kind: TransactionKind, exec_status: ExecutionFailureStatus },
+    #[error(
+        "InvariantViolation: digest: {tx_digest}, kind: {kind}, status: {:?}",
+        exec_status
+    )]
+    InvariantViolation {
+        tx_digest: TransactionDigest,
+        kind: TransactionKind,
+        exec_status: ExecutionFailureStatus,
+    },
 
-    #[error("LocalExecError: exec system error which may/not be related to fuzzing: {:?}.", err)]
+    #[error(
+        "LocalExecError: exec system error which may/not be related to fuzzing: {:?}.",
+        err
+    )]
     LocalExecError { err: ReplayEngineError },
     // TODO: how exactly do we catch this?
     //Panic(TransactionDigest, TransactionKind),

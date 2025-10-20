@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::prover_tests {
+module oct::prover_tests {
 
     public struct Obj has key, store {
         id: UID
@@ -13,15 +13,15 @@ module one::prover_tests {
     // ====================================================================
 
     public fun simple_transfer(o: Obj, recipient: address) {
-        one::transfer::public_transfer(o, recipient);
+        sui::transfer::public_transfer(o, recipient);
     }
 
     public fun simple_share(o: Obj) {
-        one::transfer::public_share_object(o)
+        sui::transfer::public_share_object(o)
     }
 
     public fun simple_freeze(o: Obj) {
-        one::transfer::public_freeze_object(o)
+        sui::transfer::public_freeze_object(o)
     }
 
     public fun simple_delete(o: Obj) {
@@ -34,12 +34,12 @@ module one::prover_tests {
     // ====================================================================
 
     public fun simple_field_add(o: &mut Obj, n1: u64, v1: u8, n2: u8, v2: u64) {
-        one::dynamic_field::add(&mut o.id, n1, v1);
-        one::dynamic_field::add(&mut o.id, n2, v2);
+        sui::dynamic_field::add(&mut o.id, n1, v1);
+        sui::dynamic_field::add(&mut o.id, n2, v2);
     }
 
     public fun simple_field_remove(o: &mut Obj, n1: u64, n2: u8) {
-        one::dynamic_field::remove<u64,u8>(&mut o.id, n1);
-        one::dynamic_field::remove<u8,u64>(&mut o.id, n2);
+        sui::dynamic_field::remove<u64,u8>(&mut o.id, n1);
+        sui::dynamic_field::remove<u8,u64>(&mut o.id, n2);
     }
 }

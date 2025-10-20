@@ -48,7 +48,13 @@ impl Liveness {
 impl TransferFunctions for Liveness {
     type State = LivenessState;
 
-    fn execute(&mut self, state: &mut Self::State, label: Label, idx: usize, cmd: &Command) -> Diagnostics {
+    fn execute(
+        &mut self,
+        state: &mut Self::State,
+        label: Label,
+        idx: usize,
+        cmd: &Command,
+    ) -> Diagnostics {
         command(state, cmd);
         // set current [label][command_idx] data with the new liveness data
         let cur_label_states = self.states.get_mut(&label).unwrap();
@@ -63,7 +69,10 @@ impl AbstractInterpreter for Liveness {}
 // Analysis
 //**************************************************************************************************
 
-fn analyze(cfg: &mut MutForwardCFG, infinite_loop_starts: &BTreeSet<Label>) -> (FinalInvariants, PerCommandStates) {
+fn analyze(
+    cfg: &mut MutForwardCFG,
+    infinite_loop_starts: &BTreeSet<Label>,
+) -> (FinalInvariants, PerCommandStates) {
     let reverse = &mut ReverseCFG::new(cfg, infinite_loop_starts);
     let initial_state = LivenessState::initial();
     let mut liveness = Liveness::new(reverse);
@@ -107,7 +116,9 @@ fn lvalue(state: &mut LivenessState, sp!(_, l_): &LValue) {
             state.0.remove(var);
         }
         L::Unpack(_, _, fields) => fields.iter().for_each(|(_, l)| lvalue(state, l)),
-        L::UnpackVariant(_, _, _, _, _, fields) => fields.iter().for_each(|(_, l)| lvalue(state, l)),
+        L::UnpackVariant(_, _, _, _, _, fields) => {
+            fields.iter().for_each(|(_, l)| lvalue(state, l))
+        }
     }
 }
 
@@ -115,7 +126,11 @@ fn lvalue(state: &mut LivenessState, sp!(_, l_): &LValue) {
 fn exp(state: &mut LivenessState, parent_e: &Exp) {
     use UnannotatedExp_ as E;
     match &parent_e.exp.value {
-        E::Unit { .. } | E::Value(_) | E::Constant(_) | E::UnresolvedError | E::ErrorConstant { .. } => (),
+        E::Unit { .. }
+        | E::Value(_)
+        | E::Constant(_)
+        | E::UnresolvedError
+        | E::ErrorConstant { .. } => (),
 
         E::BorrowLocal(_, var) | E::Copy { var, .. } | E::Move { var, .. } => {
             state.0.insert(*var);
@@ -123,7 +138,11 @@ fn exp(state: &mut LivenessState, parent_e: &Exp) {
 
         E::ModuleCall(mcall) => mcall.arguments.iter().for_each(|e| exp(state, e)),
         E::Vector(_, _, _, args) => args.iter().for_each(|e| exp(state, e)),
-        E::Freeze(e) | E::Dereference(e) | E::UnaryExp(_, e) | E::Borrow(_, e, _, _) | E::Cast(e, _) => exp(state, e),
+        E::Freeze(e)
+        | E::Dereference(e)
+        | E::UnaryExp(_, e)
+        | E::Borrow(_, e, _, _)
+        | E::Cast(e, _) => exp(state, e),
 
         E::BinopExp(e1, _, e2) => {
             exp(state, e1);
@@ -150,10 +169,15 @@ fn exp(state: &mut LivenessState, parent_e: &Exp) {
 ///   Switches it to an `Ignore` if it has the drop ability (helps with error messages for borrows)
 
 pub fn last_usage(context: &super::CFGContext, cfg: &mut MutForwardCFG) {
-    let super::CFGContext { infinite_loop_starts, .. } = context;
+    let super::CFGContext {
+        infinite_loop_starts,
+        ..
+    } = context;
     let (final_invariants, per_command_states) = analyze(cfg, infinite_loop_starts);
     for (lbl, block) in cfg.blocks_mut() {
-        let final_invariant = final_invariants.get(lbl).unwrap_or_else(|| panic!("ICE no liveness states for {}", lbl));
+        let final_invariant = final_invariants
+            .get(lbl)
+            .unwrap_or_else(|| panic!("ICE no liveness states for {}", lbl));
         let command_states = per_command_states.get(lbl).unwrap();
         last_usage::block(context, final_invariant, command_states, block)
     }
@@ -179,8 +203,16 @@ mod last_usage {
     }
 
     impl<'a, 'b> Context<'a, 'b> {
-        fn new(outer: &'a CFGContext<'a>, next_live: &'b BTreeSet<Var>, dropped_live: BTreeSet<Var>) -> Self {
-            Context { outer, next_live, dropped_live }
+        fn new(
+            outer: &'a CFGContext<'a>,
+            next_live: &'b BTreeSet<Var>,
+            dropped_live: BTreeSet<Var>,
+        ) -> Self {
+            Context {
+                outer,
+                next_live,
+                dropped_live,
+            }
         }
     }
 
@@ -192,7 +224,10 @@ mod last_usage {
     ) {
         let len = block.len();
         let last_cmd = block.get(len - 1).unwrap();
-        assert!(last_cmd.value.is_terminal(), "ICE malformed block. missing jump");
+        assert!(
+            last_cmd.value.is_terminal(),
+            "ICE malformed block. missing jump"
+        );
         for idx in 0..len {
             let cmd = block.get_mut(idx).unwrap();
             let cur_data = &command_states.get(idx).unwrap().0;
@@ -201,7 +236,10 @@ mod last_usage {
                 None => &final_invariant.0,
             };
 
-            let dropped_live = cur_data.difference(next_data).cloned().collect::<BTreeSet<_>>();
+            let dropped_live = cur_data
+                .difference(next_data)
+                .cloned()
+                .collect::<BTreeSet<_>>();
             command(&mut Context::new(context, next_data, dropped_live), cmd)
         }
     }
@@ -237,7 +275,11 @@ mod last_usage {
         use LValue_ as L;
         match &mut l.value {
             L::Ignore => (),
-            L::Var { var: v, unused_assignment, .. } => {
+            L::Var {
+                var: v,
+                unused_assignment,
+                ..
+            } => {
                 context.dropped_live.insert(*v);
                 if !*unused_assignment && !context.next_live.contains(v) {
                     match display_var(v.value()) {
@@ -249,7 +291,9 @@ mod last_usage {
                                      removing, replacing with '_', or prefixing with '_' (e.g., \
                                      '_{vstr}')",
                                 );
-                                context.outer.add_diag(diag!(UnusedItem::Assignment, (l.loc, msg)));
+                                context
+                                    .outer
+                                    .add_diag(diag!(UnusedItem::Assignment, (l.loc, msg)));
                             }
                             *unused_assignment = true;
                         }
@@ -257,7 +301,9 @@ mod last_usage {
                 }
             }
             L::Unpack(_, _, fields) => fields.iter_mut().for_each(|(_, l)| lvalue(context, l)),
-            L::UnpackVariant(_, _, _, _, _, fields) => fields.iter_mut().for_each(|(_, l)| lvalue(context, l)),
+            L::UnpackVariant(_, _, _, _, _, fields) => {
+                fields.iter_mut().for_each(|(_, l)| lvalue(context, l))
+            }
         }
     }
 
@@ -265,7 +311,11 @@ mod last_usage {
     fn exp(context: &mut Context, parent_e: &mut Exp) {
         use UnannotatedExp_ as E;
         match &mut parent_e.exp.value {
-            E::Unit { .. } | E::Value(_) | E::Constant(_) | E::UnresolvedError | E::ErrorConstant { .. } => (),
+            E::Unit { .. }
+            | E::Value(_)
+            | E::Constant(_)
+            | E::UnresolvedError
+            | E::ErrorConstant { .. } => (),
 
             E::BorrowLocal(_, var) | E::Move { var, .. } => {
                 // remove it from context to prevent accidental dropping in previous usages
@@ -279,24 +329,39 @@ mod last_usage {
                 // Non-references might still be borrowed, but that error will be caught in borrow
                 // checking with a specific tip/message
                 if var_is_dead && !*from_user {
-                    parent_e.exp.value = E::Move { var: *var, annotation: MoveOpAnnotation::InferredLastUsage }
+                    parent_e.exp.value = E::Move {
+                        var: *var,
+                        annotation: MoveOpAnnotation::InferredLastUsage,
+                    }
                 }
             }
 
-            E::ModuleCall(mcall) => mcall.arguments.iter_mut().rev().for_each(|arg| exp(context, arg)),
+            E::ModuleCall(mcall) => mcall
+                .arguments
+                .iter_mut()
+                .rev()
+                .for_each(|arg| exp(context, arg)),
             E::Vector(_, _, _, args) => args.iter_mut().rev().for_each(|arg| exp(context, arg)),
-            E::Freeze(e) | E::Dereference(e) | E::UnaryExp(_, e) | E::Borrow(_, e, _, _) | E::Cast(e, _) => {
-                exp(context, e)
-            }
+            E::Freeze(e)
+            | E::Dereference(e)
+            | E::UnaryExp(_, e)
+            | E::Borrow(_, e, _, _)
+            | E::Cast(e, _) => exp(context, e),
 
             E::BinopExp(e1, _, e2) => {
                 exp(context, e2);
                 exp(context, e1)
             }
 
-            E::Pack(_, _, fields) => fields.iter_mut().rev().for_each(|(_, _, e)| exp(context, e)),
+            E::Pack(_, _, fields) => fields
+                .iter_mut()
+                .rev()
+                .for_each(|(_, _, e)| exp(context, e)),
 
-            E::PackVariant(_, _, _, fields) => fields.iter_mut().rev().for_each(|(_, _, e)| exp(context, e)),
+            E::PackVariant(_, _, _, fields) => fields
+                .iter_mut()
+                .rev()
+                .for_each(|(_, _, e)| exp(context, e)),
 
             E::Multiple(es) => es.iter_mut().rev().for_each(|e| exp(context, e)),
 
@@ -332,24 +397,42 @@ pub fn release_dead_refs(
     locals_pre_states: &BTreeMap<Label, locals::state::LocalStates>,
     cfg: &mut MutForwardCFG,
 ) {
-    let super::CFGContext { locals, infinite_loop_starts, .. } = context;
+    let super::CFGContext {
+        locals,
+        infinite_loop_starts,
+        ..
+    } = context;
     let (liveness_pre_states, _per_command_states) = analyze(cfg, infinite_loop_starts);
     let forward_intersections = build_forward_intersections(cfg, &liveness_pre_states);
     for (lbl, block) in cfg.blocks_mut() {
         let locals_pre_state = locals_pre_states.get(lbl).unwrap();
         let liveness_pre_state = liveness_pre_states.get(lbl).unwrap();
         let forward_intersection = forward_intersections.get(lbl).unwrap();
-        release_dead_refs_block(locals, locals_pre_state, liveness_pre_state, forward_intersection, block)
+        release_dead_refs_block(
+            locals,
+            locals_pre_state,
+            liveness_pre_state,
+            forward_intersection,
+            block,
+        )
     }
 }
 
-fn build_forward_intersections(cfg: &MutForwardCFG, final_invariants: &FinalInvariants) -> ForwardIntersections {
+fn build_forward_intersections(
+    cfg: &MutForwardCFG,
+    final_invariants: &FinalInvariants,
+) -> ForwardIntersections {
     cfg.blocks()
         .keys()
         .map(|lbl| {
-            let mut states = cfg.predecessors(*lbl).iter().map(|pred| &final_invariants.get(pred).unwrap().0);
-            let intersection =
-                states.next().map(|init| states.fold(init.clone(), |acc, s| &acc & s)).unwrap_or_else(BTreeSet::new);
+            let mut states = cfg
+                .predecessors(*lbl)
+                .iter()
+                .map(|pred| &final_invariants.get(pred).unwrap().0);
+            let intersection = states
+                .next()
+                .map(|init| states.fold(init.clone(), |acc, s| &acc & s))
+                .unwrap_or_else(BTreeSet::new);
             (*lbl, intersection)
         })
         .collect()
@@ -396,8 +479,14 @@ fn is_ref((_local, (_, sp!(_, local_ty_))): &(&Var, &(Mutability, SingleType))) 
 fn pop_ref(loc: Loc, var: Var, ty: SingleType) -> Command {
     use Command_ as C;
     use UnannotatedExp_ as E;
-    let move_e_ = E::Move { annotation: MoveOpAnnotation::InferredLastUsage, var };
+    let move_e_ = E::Move {
+        annotation: MoveOpAnnotation::InferredLastUsage,
+        var,
+    };
     let move_e = H::exp(Type_::single(ty), sp(loc, move_e_));
-    let pop_ = C::IgnoreAndPop { pop_num: 1, exp: move_e };
+    let pop_ = C::IgnoreAndPop {
+        pop_num: 1,
+        exp: move_e,
+    };
     sp(loc, pop_)
 }

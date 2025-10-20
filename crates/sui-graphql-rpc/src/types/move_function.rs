@@ -35,7 +35,9 @@ impl MoveFunction {
     /// The module this function was defined in.
     async fn module(&self, ctx: &Context<'_>) -> Result<MoveModule> {
         let Some(module) =
-            MoveModule::query(ctx, self.package, &self.module, self.checkpoint_viewed_at).await.extend()?
+            MoveModule::query(ctx, self.package, &self.module, self.checkpoint_viewed_at)
+                .await
+                .extend()?
         else {
             return Err(Error::Internal(format!(
                 "Failed to load module for function: {}::{}::{}",
@@ -95,7 +97,9 @@ impl MoveFunction {
         let type_parameters = def
             .type_params
             .into_iter()
-            .map(|constraints| MoveFunctionTypeParameter { constraints: abilities(constraints) })
+            .map(|constraints| MoveFunctionTypeParameter {
+                constraints: abilities(constraints),
+            })
             .collect();
 
         let parameters = def.parameters.into_iter().map(OpenMoveType::from).collect();
@@ -121,7 +125,8 @@ impl MoveFunction {
         function: &str,
         checkpoint_viewed_at: u64,
     ) -> Result<Option<Self>, Error> {
-        let Some(module) = MoveModule::query(ctx, address, module, checkpoint_viewed_at).await? else {
+        let Some(module) = MoveModule::query(ctx, address, module, checkpoint_viewed_at).await?
+        else {
             return Ok(None);
         };
 

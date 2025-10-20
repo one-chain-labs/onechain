@@ -38,8 +38,14 @@ impl<'a> ProcessPayload<'a, &'a GetObject> for RpcCommandProcessor {
 }
 
 // TODO: should organize these into an api_calls.rs
-pub(crate) async fn get_object(client: &SuiClient, object_id: ObjectID) -> Result<SuiObjectResponse> {
-    let result =
-        client.read_api().get_object_with_options(object_id, SuiObjectDataOptions::full_content()).await.unwrap();
+pub(crate) async fn get_object(
+    client: &SuiClient,
+    object_id: ObjectID,
+) -> Result<SuiObjectResponse> {
+    let result = client
+        .read_api()
+        .get_object_with_options(object_id, SuiObjectDataOptions::full_content())
+        .await
+        .unwrap();
     Ok(result)
 }

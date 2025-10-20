@@ -15,7 +15,7 @@ import { Heading } from '../../shared/heading';
 import { createUnstakeTransaction } from './utils/transaction';
 
 export type StakeFromProps = {
-	stakedOctId: string;
+	stakedSuiId: string;
 	coinBalance: bigint;
 	coinType: string;
 	stakingReward?: string;
@@ -23,7 +23,7 @@ export type StakeFromProps = {
 };
 
 export function UnStakeForm({
-	stakedOctId,
+	stakedSuiId,
 	coinBalance,
 	coinType,
 	stakingReward,
@@ -33,7 +33,7 @@ export function UnStakeForm({
 	const [totalSui] = useFormatCoin(BigInt(stakingReward || 0) + coinBalance, SUI_TYPE_ARG);
 	const [tokenBalance] = useFormatCoin(coinBalance, coinType);
 
-	const transaction = useMemo(() => createUnstakeTransaction(stakedOctId), [stakedOctId]);
+	const transaction = useMemo(() => createUnstakeTransaction(stakedSuiId), [stakedSuiId]);
 	const activeAddress = useActiveAddress();
 	const { data: gasBudget } = useTransactionGasBudget(activeAddress, transaction);
 
@@ -68,7 +68,7 @@ export function UnStakeForm({
 				footer={
 					<div className="flex gap-0.5 justify-between w-full">
 						<Text variant="pBodySmall" weight="medium" color="steel-darker">
-							Total unstaked OCT
+							Total unstaked SUI
 						</Text>
 						<div className="flex gap-0.5 ml-auto">
 							<Heading variant="heading4" weight="semibold" color="steel-darker" leading="none">

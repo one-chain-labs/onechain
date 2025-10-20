@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[allow(unused_const)]
-module one::transfer;
+module oct::transfer;
 
 /// This represents the ability to `receive` an object of type `T`.
 /// This type is ephemeral per-transaction and cannot be stored on-chain.

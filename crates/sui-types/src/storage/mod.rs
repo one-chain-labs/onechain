@@ -7,43 +7,47 @@ mod read_store;
 mod shared_in_memory_store;
 mod write_store;
 
+use crate::base_types::{TransactionDigest, VersionNumber};
+use crate::committee::EpochId;
+use crate::error::{ExecutionError, SuiError};
+use crate::execution::{DynamicallyLoadedObjectMetadata, ExecutionResults};
+use crate::move_package::MovePackage;
+use crate::transaction::{SenderSignedData, TransactionDataAPI, TransactionKey};
 use crate::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, TransactionDigest, VersionNumber},
-    committee::EpochId,
-    error::{ExecutionError, SuiError, SuiResult},
-    execution::{DynamicallyLoadedObjectMetadata, ExecutionResults},
-    move_package::MovePackage,
+    base_types::{ObjectID, ObjectRef, SequenceNumber},
+    error::SuiResult,
     object::Object,
-    transaction::{SenderSignedData, TransactionDataAPI, TransactionKey},
 };
 use itertools::Itertools;
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
 pub use object_store_trait::ObjectStore;
-pub use read_store::{
-    AccountOwnedObjectInfo,
-    CoinInfo,
-    DynamicFieldIndexInfo,
-    DynamicFieldKey,
-    ReadStore,
-    RpcIndexes,
-    RpcStateReader,
-};
+pub use read_store::AccountOwnedObjectInfo;
+pub use read_store::CoinInfo;
+pub use read_store::DynamicFieldIndexInfo;
+pub use read_store::DynamicFieldKey;
+pub use read_store::ReadStore;
+pub use read_store::RpcIndexes;
+pub use read_store::RpcStateReader;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-pub use shared_in_memory_store::{SharedInMemoryStore, SingleCheckpointSharedInMemoryStore};
-use std::{
-    collections::BTreeMap,
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
+pub use shared_in_memory_store::SharedInMemoryStore;
+pub use shared_in_memory_store::SingleCheckpointSharedInMemoryStore;
+use std::collections::BTreeMap;
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 pub use write_store::WriteStore;
 
 /// A potential input to a transaction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum InputKey {
-    VersionedObject { id: ObjectID, version: SequenceNumber },
-    Package { id: ObjectID },
+    VersionedObject {
+        id: ObjectID,
+        version: SequenceNumber,
+    },
+    Package {
+        id: ObjectID,
+    },
 }
 
 impl InputKey {
@@ -74,7 +78,10 @@ impl From<&Object> for InputKey {
         if obj.is_package() {
             InputKey::Package { id: obj.id() }
         } else {
-            InputKey::VersionedObject { id: obj.id(), version: obj.version() }
+            InputKey::VersionedObject {
+                id: obj.id(),
+                version: obj.version(),
+            }
         }
     }
 }
@@ -141,9 +148,8 @@ impl DeleteKindWithOldVersion {
     pub fn to_delete_kind(&self) -> DeleteKind {
         match self {
             DeleteKindWithOldVersion::Normal(_) => DeleteKind::Normal,
-            DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) | DeleteKindWithOldVersion::UnwrapThenDelete => {
-                DeleteKind::UnwrapThenDelete
-            }
+            DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_)
+            | DeleteKindWithOldVersion::UnwrapThenDelete => DeleteKind::UnwrapThenDelete,
             DeleteKindWithOldVersion::Wrap(_) => DeleteKind::Wrap,
         }
     }
@@ -205,7 +211,10 @@ pub trait Storage {
         loaded_runtime_objects: BTreeMap<ObjectID, DynamicallyLoadedObjectMetadata>,
     );
 
-    fn save_wrapped_object_containers(&mut self, wrapped_object_containers: BTreeMap<ObjectID, ObjectID>);
+    fn save_wrapped_object_containers(
+        &mut self,
+        wrapped_object_containers: BTreeMap<ObjectID, ObjectID>,
+    );
 
     /// Check coin denylist during execution,
     /// and the number of non-gas-coin owners.
@@ -274,9 +283,12 @@ pub fn load_package_object_from_object_store(
 ) -> SuiResult<Option<PackageObject>> {
     let package = store.get_object(package_id);
     if let Some(obj) = &package {
-        fp_ensure!(obj.is_package(), SuiError::BadObjectType {
-            error: format!("Package expected, Move object found: {package_id}")
-        });
+        fp_ensure!(
+            obj.is_package(),
+            SuiError::BadObjectType {
+                error: format!("Package expected, Move object found: {package_id}"),
+            }
+        );
     }
     Ok(package.map(PackageObject::new))
 }
@@ -305,17 +317,27 @@ pub fn get_package_objects<'a>(
     }
 }
 
-pub fn get_module(store: impl BackingPackageStore, module_id: &ModuleId) -> Result<Option<Vec<u8>>, SuiError> {
+pub fn get_module(
+    store: impl BackingPackageStore,
+    module_id: &ModuleId,
+) -> Result<Option<Vec<u8>>, SuiError> {
     Ok(store
         .get_package_object(&ObjectID::from(*module_id.address()))?
-        .and_then(|package| package.move_package().serialized_module_map().get(module_id.name().as_str()).cloned()))
+        .and_then(|package| {
+            package
+                .move_package()
+                .serialized_module_map()
+                .get(module_id.name().as_str())
+                .cloned()
+        }))
 }
 
 pub fn get_module_by_id<S: BackingPackageStore>(
     store: &S,
     id: &ModuleId,
 ) -> anyhow::Result<Option<CompiledModule>, SuiError> {
-    Ok(get_module(store, id)?.map(|bytes| CompiledModule::deserialize_with_defaults(&bytes).unwrap()))
+    Ok(get_module(store, id)?
+        .map(|bytes| CompiledModule::deserialize_with_defaults(&bytes).unwrap()))
 }
 
 /// A `BackingPackageStore` that resolves packages from a backing store, but also includes any
@@ -328,13 +350,25 @@ pub struct PostExecutionPackageResolver {
 }
 
 impl PostExecutionPackageResolver {
-    pub fn new(backing_store: Arc<dyn BackingPackageStore>, output_objects: &Option<Vec<Object>>) -> Self {
+    pub fn new(
+        backing_store: Arc<dyn BackingPackageStore>,
+        output_objects: &Option<Vec<Object>>,
+    ) -> Self {
         let new_packages = output_objects
             .iter()
             .flatten()
-            .filter_map(|o| if o.is_package() { Some((o.id(), PackageObject::new(o.clone()))) } else { None })
+            .filter_map(|o| {
+                if o.is_package() {
+                    Some((o.id(), PackageObject::new(o.clone())))
+                } else {
+                    None
+                }
+            })
             .collect();
-        Self { backing_store, new_packages }
+        Self {
+            backing_store,
+            new_packages,
+        }
     }
 }
 
@@ -379,9 +413,13 @@ impl<S: ChildObjectResolver> ChildObjectResolver for std::sync::Arc<S> {
         child: &ObjectID,
         child_version_upper_bound: SequenceNumber,
     ) -> SuiResult<Option<Object>> {
-        ChildObjectResolver::read_child_object(self.as_ref(), parent, child, child_version_upper_bound)
+        ChildObjectResolver::read_child_object(
+            self.as_ref(),
+            parent,
+            child,
+            child_version_upper_bound,
+        )
     }
-
     fn get_object_received_at_version(
         &self,
         owner: &ObjectID,
@@ -408,7 +446,6 @@ impl<S: ChildObjectResolver> ChildObjectResolver for &S {
     ) -> SuiResult<Option<Object>> {
         ChildObjectResolver::read_child_object(*self, parent, child, child_version_upper_bound)
     }
-
     fn get_object_received_at_version(
         &self,
         owner: &ObjectID,
@@ -435,7 +472,6 @@ impl<S: ChildObjectResolver> ChildObjectResolver for &mut S {
     ) -> SuiResult<Option<Object>> {
         ChildObjectResolver::read_child_object(*self, parent, child, child_version_upper_bound)
     }
-
     fn get_object_received_at_version(
         &self,
         owner: &ObjectID,
@@ -505,7 +541,9 @@ impl From<Object> for ObjectOrTombstone {
 
 /// Fetch the `ObjectKey`s (IDs and versions) for non-shared input objects.  Includes owned,
 /// and immutable objects as well as the gas objects, but not move packages or shared objects.
-pub fn transaction_non_shared_input_object_keys(tx: &SenderSignedData) -> SuiResult<Vec<ObjectKey>> {
+pub fn transaction_non_shared_input_object_keys(
+    tx: &SenderSignedData,
+) -> SuiResult<Vec<ObjectKey>> {
     use crate::transaction::InputObjectKind as I;
     Ok(tx
         .intent_message()
@@ -520,7 +558,12 @@ pub fn transaction_non_shared_input_object_keys(tx: &SenderSignedData) -> SuiRes
 }
 
 pub fn transaction_receiving_object_keys(tx: &SenderSignedData) -> Vec<ObjectKey> {
-    tx.intent_message().value.receiving_objects().into_iter().map(|oref| oref.into()).collect()
+    tx.intent_message()
+        .value
+        .receiving_objects()
+        .into_iter()
+        .map(|oref| oref.into())
+        .collect()
 }
 
 impl Display for DeleteKind {
@@ -533,7 +576,9 @@ impl Display for DeleteKind {
     }
 }
 
-pub trait BackingStore: BackingPackageStore + ChildObjectResolver + ObjectStore + ParentSync {
+pub trait BackingStore:
+    BackingPackageStore + ChildObjectResolver + ObjectStore + ParentSync
+{
     fn as_object_store(&self) -> &dyn ObjectStore;
 }
 
@@ -550,5 +595,8 @@ where
 }
 
 pub trait GetSharedLocks: Send + Sync {
-    fn get_shared_locks(&self, key: &TransactionKey) -> SuiResult<Option<Vec<(ObjectID, SequenceNumber)>>>;
+    fn get_shared_locks(
+        &self,
+        key: &TransactionKey,
+    ) -> SuiResult<Option<Vec<(ObjectID, SequenceNumber)>>>;
 }

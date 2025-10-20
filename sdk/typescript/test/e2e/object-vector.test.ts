@@ -76,7 +76,7 @@ describe('Test Move call with a vector of objects as input', () => {
 		});
 		tx.moveCall({
 			target: `${SUI_FRAMEWORK_ADDRESS}::pay::join_vec`,
-			typeArguments: ['0x2::oct::OCT'],
+			typeArguments: ['0x2::sui::SUI'],
 			arguments: [tx.object(coinIDs[0]), vec],
 		});
 		tx.setGasPayment([{ objectId: coin.coinObjectId, digest: coin.digest, version: coin.version }]);

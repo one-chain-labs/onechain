@@ -1,14 +1,14 @@
-// Protobuf definitions of public Sui core types
+// Protobuf definitions of public Oct core types
 //
 // This file contains a complete set of protobuf definitions for all of the
-// public sui core types. All sui types are intended to have a 1:1 mapping to a
+// public oct core types. All oct types are intended to have a 1:1 mapping to a
 // protobuf message defined in this file and be able to roundtrip to/from their
 // rust and protobuf definitions assuming a sufficiently up-to-date version of
 // both these definitions.
 
 syntax = "proto3";
 
-package sui.types;
+package oct.types;
 
 import "google/protobuf/empty.proto";
 
@@ -204,7 +204,7 @@ message GasCostSummary {
 // Move {{{
 
 message Identifier {
-  optional bytes identifier = 1;
+  optional string identifier = 1;
 }
 
 message StructTag {
@@ -216,15 +216,15 @@ message StructTag {
 
 message TypeTag {
   oneof tag {
-    google.protobuf.Empty U8 = 1;
-    google.protobuf.Empty U16 = 2;
-    google.protobuf.Empty U32 = 3;
-    google.protobuf.Empty U64 = 4;
-    google.protobuf.Empty U128 = 5;
-    google.protobuf.Empty U256 = 6;
-    google.protobuf.Empty Bool = 7;
-    google.protobuf.Empty Address = 8;
-    google.protobuf.Empty Signer = 9;
+    google.protobuf.Empty u8 = 1;
+    google.protobuf.Empty u16 = 2;
+    google.protobuf.Empty u32 = 3;
+    google.protobuf.Empty u64 = 4;
+    google.protobuf.Empty u128 = 5;
+    google.protobuf.Empty u256 = 6;
+    google.protobuf.Empty bool = 7;
+    google.protobuf.Empty address = 8;
+    google.protobuf.Empty signer = 9;
     TypeTag vector = 10;
     StructTag struct = 11;
   }
@@ -482,19 +482,19 @@ message ActiveJwk {
 }
 
 message JwkId {
-  optional bytes iss = 1;
-  optional bytes kid = 2;
+  optional string iss = 1;
+  optional string kid = 2;
 }
 
 message Jwk {
   // Key type parameter, <https://datatracker.ietf.org/doc/html/rfc7517#section-4.1>
-  optional bytes kty = 1;
+  optional string kty = 1;
   // RSA public exponent, <https://datatracker.ietf.org/doc/html/rfc7517#section-9.3>
-  optional bytes e = 2;
+  optional string e = 2;
   // RSA modulus, <https://datatracker.ietf.org/doc/html/rfc7517#section-9.3>
-  optional bytes n = 3;
+  optional string n = 3;
   // Algorithm parameter, <https://datatracker.ietf.org/doc/html/rfc7517#section-4.4>
-  optional bytes alg = 4;
+  optional string alg = 4;
 }
 
 message EndOfEpochTransaction {
@@ -723,8 +723,8 @@ message FailureStatus {
     /// The modules in the package must have their self-addresses set to zero.
     google.protobuf.Empty publish_error_non_zero_address = 11;
 
-    /// Sui Move Bytecode Verification Error.
-    google.protobuf.Empty sui_move_verification_error = 12;
+    /// Oct Move Bytecode Verification Error.
+    google.protobuf.Empty oct_move_verification_error = 12;
 
     //
     // MoveVm Errors
@@ -790,8 +790,8 @@ message FailureStatus {
     /// Certificate is on the deny list
     google.protobuf.Empty certificate_denied = 31;
 
-    /// Sui Move Bytecode verification timed out.
-    google.protobuf.Empty sui_move_verification_timedout = 32;
+    /// Oct Move Bytecode verification timed out.
+    google.protobuf.Empty oct_move_verification_timedout = 32;
 
     /// The requested shared object operation is not allowed
     google.protobuf.Empty shared_object_operation_not_allowed = 33;
@@ -925,7 +925,7 @@ message SimpleSignature {
 }
 
 message ZkLoginPublicIdentifier {
-  optional bytes iss = 1;
+  optional string iss = 1;
   optional Bn254FieldElement address_seed = 2;
 }
 
@@ -973,7 +973,7 @@ message ZkLoginAuthenticator {
 message ZkLoginInputs {
   optional ZkLoginProof proof_points = 1;
   optional ZkLoginClaim iss_base64_details = 2;
-  optional bytes header_base64 = 3;
+  optional string header_base64 = 3;
   optional Bn254FieldElement address_seed = 4;
 }
 
@@ -984,7 +984,7 @@ message ZkLoginProof {
 }
 
 message ZkLoginClaim {
-  optional bytes value = 1;
+  optional string value = 1;
   optional uint32 index_mod_4 = 2;
 }
 
@@ -1011,7 +1011,7 @@ message Bn254FieldElement {
 
 message PasskeyAuthenticator {
   optional bytes authenticator_data = 1;
-  optional bytes client_data_json = 2;
+  optional string client_data_json = 2;
   optional SimpleSignature signature = 3;
 }
 

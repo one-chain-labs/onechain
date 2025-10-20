@@ -11,7 +11,7 @@ use parking_lot::RwLock;
 use sui_macros::fail_point_async;
 use tokio::{sync::broadcast, time::sleep};
 use tokio_util::sync::ReusableBoxFuture;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     block::{BlockAPI as _, BlockRef, SignedBlock, VerifiedBlock, GENESIS_ROUND},
@@ -26,8 +26,7 @@ use crate::{
     stake_aggregator::{QuorumThreshold, StakeAggregator},
     storage::Store,
     synchronizer::SynchronizerHandle,
-    CommitIndex,
-    Round,
+    CommitIndex, Round,
 };
 
 pub(crate) const COMMIT_LAG_MULTIPLIER: u32 = 5;
@@ -56,7 +55,10 @@ impl<C: CoreThreadDispatcher> AuthorityService<C> {
         dag_state: Arc<RwLock<DagState>>,
         store: Arc<dyn Store>,
     ) -> Self {
-        let subscription_counter = Arc::new(SubscriptionCounter::new(context.clone(), core_dispatcher.clone()));
+        let subscription_counter = Arc::new(SubscriptionCounter::new(
+            context.clone(),
+            core_dispatcher.clone(),
+        ));
         Self {
             context,
             block_verifier,
@@ -73,13 +75,18 @@ impl<C: CoreThreadDispatcher> AuthorityService<C> {
 
 #[async_trait]
 impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
-    async fn handle_send_block(&self, peer: AuthorityIndex, serialized_block: Bytes) -> ConsensusResult<()> {
+    async fn handle_send_block(
+        &self,
+        peer: AuthorityIndex,
+        serialized_block: Bytes,
+    ) -> ConsensusResult<()> {
         fail_point_async!("consensus-rpc-response");
 
         let peer_hostname = &self.context.committee.authority(peer).hostname;
 
         // TODO: dedup block verifications, here and with fetched blocks.
-        let signed_block: SignedBlock = bcs::from_bytes(&serialized_block).map_err(ConsensusError::MalformedBlock)?;
+        let signed_block: SignedBlock =
+            bcs::from_bytes(&serialized_block).map_err(ConsensusError::MalformedBlock)?;
 
         // Reject blocks not produced by the peer.
         if peer != signed_block.author() {
@@ -107,23 +114,33 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             return Err(e);
         }
         let verified_block = VerifiedBlock::new_verified(signed_block, serialized_block);
-
-        trace!("Received block {verified_block} via send block.");
+        let block_ref = verified_block.reference();
+        debug!("Received block {} via send block.", block_ref);
 
         // Reject block with timestamp too far in the future.
         let now = self.context.clock.timestamp_utc_ms();
-        let forward_time_drift = Duration::from_millis(verified_block.timestamp_ms().saturating_sub(now));
+        let forward_time_drift =
+            Duration::from_millis(verified_block.timestamp_ms().saturating_sub(now));
         if forward_time_drift > self.context.parameters.max_forward_time_drift {
-            self.context.metrics.node_metrics.rejected_future_blocks.with_label_values(&[peer_hostname]).inc();
+            self.context
+                .metrics
+                .node_metrics
+                .rejected_future_blocks
+                .with_label_values(&[peer_hostname])
+                .inc();
             debug!(
                 "Block {:?} timestamp ({} > {}) is too far in the future, rejected.",
-                verified_block.reference(),
+                block_ref,
                 verified_block.timestamp_ms(),
                 now,
             );
             return Err(ConsensusError::BlockRejected {
-                block_ref: verified_block.reference(),
-                reason: format!("Block timestamp is too far in the future: {} > {}", verified_block.timestamp_ms(), now),
+                block_ref,
+                reason: format!(
+                    "Block timestamp is too far in the future: {} > {}",
+                    verified_block.timestamp_ms(),
+                    now
+                ),
             });
         }
 
@@ -137,7 +154,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
                 .inc_by(forward_time_drift.as_millis() as u64);
             debug!(
                 "Block {:?} timestamp ({} > {}) is in the future, waiting for {}ms",
-                verified_block.reference(),
+                block_ref,
                 verified_block.timestamp_ms(),
                 now,
                 forward_time_drift.as_millis(),
@@ -160,18 +177,24 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         let quorum_commit_index = self.commit_vote_monitor.quorum_commit_index();
         // The threshold to ignore block should be larger than commit_sync_batch_size,
         // to avoid excessive block rejections and synchronizations.
-        if last_commit_index + self.context.parameters.commit_sync_batch_size * COMMIT_LAG_MULTIPLIER
+        if last_commit_index
+            + self.context.parameters.commit_sync_batch_size * COMMIT_LAG_MULTIPLIER
             < quorum_commit_index
         {
-            self.context.metrics.node_metrics.rejected_blocks.with_label_values(&["commit_lagging"]).inc();
+            self.context
+                .metrics
+                .node_metrics
+                .rejected_blocks
+                .with_label_values(&["commit_lagging"])
+                .inc();
             debug!(
                 "Block {:?} is rejected because last commit index is lagging quorum commit index too much ({} < {})",
-                verified_block.reference(),
+                block_ref,
                 last_commit_index,
                 quorum_commit_index,
             );
             return Err(ConsensusError::BlockRejected {
-                block_ref: verified_block.reference(),
+                block_ref,
                 reason: format!(
                     "Last commit index is lagging quorum commit index too much ({} < {})",
                     last_commit_index, quorum_commit_index,
@@ -179,13 +202,25 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             });
         }
 
-        self.context.metrics.node_metrics.verified_blocks.with_label_values(&[peer_hostname]).inc();
+        self.context
+            .metrics
+            .node_metrics
+            .verified_blocks
+            .with_label_values(&[peer_hostname])
+            .inc();
 
-        let missing_ancestors =
-            self.core_dispatcher.add_blocks(vec![verified_block]).await.map_err(|_| ConsensusError::Shutdown)?;
+        let missing_ancestors = self
+            .core_dispatcher
+            .add_blocks(vec![verified_block])
+            .await
+            .map_err(|_| ConsensusError::Shutdown)?;
         if !missing_ancestors.is_empty() {
             // schedule the fetching of them from this peer
-            if let Err(err) = self.synchronizer.fetch_blocks(missing_ancestors, peer).await {
+            if let Err(err) = self
+                .synchronizer
+                .fetch_blocks(missing_ancestors, peer)
+                .await
+            {
                 warn!("Errored while trying to fetch missing ancestors via synchronizer: {err}");
             }
         }
@@ -193,7 +228,11 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         Ok(())
     }
 
-    async fn handle_subscribe_blocks(&self, peer: AuthorityIndex, last_received: Round) -> ConsensusResult<BlockStream> {
+    async fn handle_subscribe_blocks(
+        &self,
+        peer: AuthorityIndex,
+        last_received: Round,
+    ) -> ConsensusResult<BlockStream> {
         fail_point_async!("consensus-rpc-response");
 
         let dag_state = self.dag_state.read();
@@ -214,7 +253,9 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         );
 
         // Return a stream of blocks that first yields missed blocks as requested, then new blocks.
-        Ok(Box::pin(missed_blocks.chain(broadcasted_blocks.map(|block| block.serialized().clone()))))
+        Ok(Box::pin(missed_blocks.chain(
+            broadcasted_blocks.map(|block| block.serialized().clone()),
+        )))
     }
 
     async fn handle_fetch_blocks(
@@ -230,7 +271,9 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             return Err(ConsensusError::TooManyFetchBlocksRequested(peer));
         }
 
-        if !highest_accepted_rounds.is_empty() && highest_accepted_rounds.len() != self.context.committee.size() {
+        if !highest_accepted_rounds.is_empty()
+            && highest_accepted_rounds.len() != self.context.committee.size()
+        {
             return Err(ConsensusError::InvalidSizeOfHighestAcceptedRounds(
                 highest_accepted_rounds.len(),
                 self.context.committee.size(),
@@ -289,10 +332,13 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         fail_point_async!("consensus-rpc-response");
 
         // Compute an inclusive end index and bound the maximum number of commits scanned.
-        let inclusive_end = commit_range
-            .end()
-            .min(commit_range.start() + self.context.parameters.commit_sync_batch_size as CommitIndex - 1);
-        let mut commits = self.store.scan_commits((commit_range.start()..=inclusive_end).into())?;
+        let inclusive_end = commit_range.end().min(
+            commit_range.start() + self.context.parameters.commit_sync_batch_size as CommitIndex
+                - 1,
+        );
+        let mut commits = self
+            .store
+            .scan_commits((commit_range.start()..=inclusive_end).into())?;
         let mut certifier_block_refs = vec![];
         'commit: while let Some(c) = commits.last() {
             let index = c.index();
@@ -308,7 +354,12 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
                 commits.pop();
             }
         }
-        let certifier_blocks = self.store.read_blocks(&certifier_block_refs)?.into_iter().flatten().collect();
+        let certifier_blocks = self
+            .store
+            .read_blocks(&certifier_block_refs)?
+            .into_iter()
+            .flatten()
+            .collect();
         Ok((commits, certifier_blocks))
     }
 
@@ -350,21 +401,34 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         }
 
         // Return the serialised blocks
-        let result = blocks.into_iter().map(|block| block.serialized().clone()).collect::<Vec<_>>();
+        let result = blocks
+            .into_iter()
+            .map(|block| block.serialized().clone())
+            .collect::<Vec<_>>();
 
         Ok(result)
     }
 
-    async fn handle_get_latest_rounds(&self, _peer: AuthorityIndex) -> ConsensusResult<(Vec<Round>, Vec<Round>)> {
+    async fn handle_get_latest_rounds(
+        &self,
+        _peer: AuthorityIndex,
+    ) -> ConsensusResult<(Vec<Round>, Vec<Round>)> {
         fail_point_async!("consensus-rpc-response");
 
         let mut highest_received_rounds = self.core_dispatcher.highest_received_rounds();
 
-        let blocks = self.dag_state.read().get_last_cached_block_per_authority(Round::MAX);
-        let highest_accepted_rounds = blocks.into_iter().map(|block| block.round()).collect::<Vec<_>>();
+        let blocks = self
+            .dag_state
+            .read()
+            .get_last_cached_block_per_authority(Round::MAX);
+        let highest_accepted_rounds = blocks
+            .into_iter()
+            .map(|block| block.round())
+            .collect::<Vec<_>>();
 
         // Own blocks do not go through the core dispatcher, so they need to be set separately.
-        highest_received_rounds[self.context.own_index] = highest_accepted_rounds[self.context.own_index];
+        highest_received_rounds[self.context.own_index] =
+            highest_accepted_rounds[self.context.own_index];
 
         Ok((highest_received_rounds, highest_accepted_rounds))
     }
@@ -387,7 +451,12 @@ impl SubscriptionCounter {
     fn new(context: Arc<Context>, dispatcher: Arc<dyn CoreThreadDispatcher>) -> Self {
         // Set the subscribed peers by default to 0
         for (_, authority) in context.committee.authorities() {
-            context.metrics.node_metrics.subscribed_by.with_label_values(&[authority.hostname.as_str()]).set(0);
+            context
+                .metrics
+                .node_metrics
+                .subscribed_by
+                .with_label_values(&[authority.hostname.as_str()])
+                .set(0);
         }
 
         Self {
@@ -406,10 +475,17 @@ impl SubscriptionCounter {
         counter.subscriptions_by_authority[peer] += 1;
 
         let peer_hostname = &self.context.committee.authority(peer).hostname;
-        self.context.metrics.node_metrics.subscribed_by.with_label_values(&[peer_hostname]).set(1);
+        self.context
+            .metrics
+            .node_metrics
+            .subscribed_by
+            .with_label_values(&[peer_hostname])
+            .set(1);
 
         if counter.count == 1 {
-            self.dispatcher.set_subscriber_exists(true).map_err(|_| ConsensusError::Shutdown)?;
+            self.dispatcher
+                .set_subscriber_exists(true)
+                .map_err(|_| ConsensusError::Shutdown)?;
         }
         Ok(())
     }
@@ -421,11 +497,18 @@ impl SubscriptionCounter {
 
         if counter.subscriptions_by_authority[peer] == 0 {
             let peer_hostname = &self.context.committee.authority(peer).hostname;
-            self.context.metrics.node_metrics.subscribed_by.with_label_values(&[peer_hostname]).set(0);
+            self.context
+                .metrics
+                .node_metrics
+                .subscribed_by
+                .with_label_values(&[peer_hostname])
+                .set(0);
         }
 
         if counter.count == 0 {
-            self.dispatcher.set_subscriber_exists(false).map_err(|_| ConsensusError::Shutdown)?;
+            self.dispatcher
+                .set_subscriber_exists(false)
+                .map_err(|_| ConsensusError::Shutdown)?;
         }
         Ok(())
     }
@@ -440,7 +523,13 @@ type BroadcastedBlockStream = BroadcastStream<VerifiedBlock>;
 struct BroadcastStream<T> {
     peer: AuthorityIndex,
     // Stores the receiver across poll_next() calls.
-    inner: ReusableBoxFuture<'static, (Result<T, broadcast::error::RecvError>, broadcast::Receiver<T>)>,
+    inner: ReusableBoxFuture<
+        'static,
+        (
+            Result<T, broadcast::error::RecvError>,
+            broadcast::Receiver<T>,
+        ),
+    >,
     // Counts total subscriptions / active BroadcastStreams.
     subscription_counter: Arc<SubscriptionCounter>,
 }
@@ -457,14 +546,21 @@ impl<T: 'static + Clone + Send> BroadcastStream<T> {
                 _ => panic!("Unexpected error: {err}"),
             }
         }
-        Self { peer, inner: ReusableBoxFuture::new(make_recv_future(rx)), subscription_counter }
+        Self {
+            peer,
+            inner: ReusableBoxFuture::new(make_recv_future(rx)),
+            subscription_counter,
+        }
     }
 }
 
 impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
     type Item = T;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Option<Self::Item>> {
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+    ) -> task::Poll<Option<Self::Item>> {
         let peer = self.peer;
         let maybe_item = loop {
             let (result, rx) = ready!(self.inner.poll(cx));
@@ -477,7 +573,10 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
                     break None;
                 }
                 Err(broadcast::error::RecvError::Lagged(n)) => {
-                    warn!("Block BroadcastedBlockStream {} lagged by {} messages", peer, n);
+                    warn!(
+                        "Block BroadcastedBlockStream {} lagged by {} messages",
+                        peer, n
+                    );
                     continue;
                 }
             }
@@ -499,7 +598,10 @@ impl<T> Drop for BroadcastStream<T> {
 
 async fn make_recv_future<T: Clone>(
     mut rx: broadcast::Receiver<T>,
-) -> (Result<T, broadcast::error::RecvError>, broadcast::Receiver<T>) {
+) -> (
+    Result<T, broadcast::error::RecvError>,
+    broadcast::Receiver<T>,
+) {
     let result = rx.recv().await;
     (result, rx)
 }
@@ -510,7 +612,8 @@ async fn make_recv_future<T: Clone>(
 mod tests {
     use crate::{
         authority_service::AuthorityService,
-        block::{BlockAPI, BlockRef, SignedBlock, TestBlock, VerifiedBlock},
+        block::BlockAPI,
+        block::{BlockRef, SignedBlock, TestBlock, VerifiedBlock},
         commit::CommitRange,
         commit_vote_monitor::CommitVoteMonitor,
         context::Context,
@@ -528,8 +631,11 @@ mod tests {
     use bytes::Bytes;
     use consensus_config::AuthorityIndex;
     use parking_lot::{Mutex, RwLock};
-    use std::{collections::BTreeSet, sync::Arc, time::Duration};
-    use tokio::{sync::broadcast, time::sleep};
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::sync::broadcast;
+    use tokio::time::sleep;
 
     struct FakeCoreThreadDispatcher {
         blocks: Mutex<Vec<VerifiedBlock>>,
@@ -537,7 +643,9 @@ mod tests {
 
     impl FakeCoreThreadDispatcher {
         fn new() -> Self {
-            Self { blocks: Mutex::new(vec![]) }
+            Self {
+                blocks: Mutex::new(vec![]),
+            }
         }
 
         fn get_blocks(&self) -> Vec<VerifiedBlock> {
@@ -547,7 +655,10 @@ mod tests {
 
     #[async_trait]
     impl CoreThreadDispatcher for FakeCoreThreadDispatcher {
-        async fn add_blocks(&self, blocks: Vec<VerifiedBlock>) -> Result<BTreeSet<BlockRef>, CoreError> {
+        async fn add_blocks(
+            &self,
+            blocks: Vec<VerifiedBlock>,
+        ) -> Result<BTreeSet<BlockRef>, CoreError> {
             let block_refs = blocks.iter().map(|b| b.reference()).collect();
             self.blocks.lock().extend(blocks);
             Ok(block_refs)
@@ -680,13 +791,18 @@ mod tests {
         let now = context.clock.timestamp_utc_ms();
         let max_drift = context.parameters.max_forward_time_drift;
         let input_block = VerifiedBlock::new_for_test(
-            TestBlock::new(9, 0).set_timestamp_ms(now + max_drift.as_millis() as u64).build(),
+            TestBlock::new(9, 0)
+                .set_timestamp_ms(now + max_drift.as_millis() as u64)
+                .build(),
         );
 
         let service = authority_service.clone();
         let serialized = input_block.serialized().clone();
         tokio::spawn(async move {
-            service.handle_send_block(context.committee.to_authority_index(0).unwrap(), serialized).await.unwrap();
+            service
+                .handle_send_block(context.committee.to_authority_index(0).unwrap(), serialized)
+                .await
+                .unwrap();
         });
 
         sleep(max_drift / 2).await;
@@ -740,14 +856,19 @@ mod tests {
             .persist_layers(dag_state);
 
         // WHEN
-        let authorities_to_request = vec![AuthorityIndex::new_for_test(1), AuthorityIndex::new_for_test(2)];
-        let results =
-            authority_service.handle_fetch_latest_blocks(AuthorityIndex::new_for_test(1), authorities_to_request).await;
+        let authorities_to_request = vec![
+            AuthorityIndex::new_for_test(1),
+            AuthorityIndex::new_for_test(2),
+        ];
+        let results = authority_service
+            .handle_fetch_latest_blocks(AuthorityIndex::new_for_test(1), authorities_to_request)
+            .await;
 
         // THEN
         let serialised_blocks = results.unwrap();
         for serialised_block in serialised_blocks {
-            let signed_block: SignedBlock = bcs::from_bytes(&serialised_block).expect("Error while deserialising block");
+            let signed_block: SignedBlock =
+                bcs::from_bytes(&serialised_block).expect("Error while deserialising block");
             let verified_block = VerifiedBlock::new_verified(signed_block, serialised_block);
 
             assert_eq!(verified_block.round(), 10);

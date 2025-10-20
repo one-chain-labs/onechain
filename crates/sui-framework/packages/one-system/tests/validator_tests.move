@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one_system::validator_tests {
-    use one::bag;
-    use one::balance;
-    use one::coin::{Self, Coin};
-    use one::oct::OCT;
-    use one::test_scenario;
-    use one::test_utils;
-    use one::url;
+module oct_system::validator_tests {
+    use sui::bag;
+    use sui::balance;
+    use sui::coin::{Self, Coin};
+    use sui::oct::OCT;
+    use sui::test_scenario;
+    use sui::test_utils;
+    use sui::url;
     use one_system::staking_pool::StakedOct;
     use one_system::validator::{Self, Validator};
 
@@ -35,7 +35,6 @@ module one_system::validator_tests {
         let init_stake = coin::mint_for_testing(10_000_000_000, ctx).into_balance();
         let mut validator = validator::new(
             VALID_ADDRESS,
-            VALID_ADDRESS,
             VALID_PUBKEY,
             VALID_NET_PUBKEY,
             VALID_WORKER_PUBKEY,
@@ -53,11 +52,9 @@ module one_system::validator_tests {
             ctx
         );
 
-        validator.set_only_validator_staking(false);
         validator.request_add_stake_at_genesis(
             init_stake,
             VALID_ADDRESS,
-            false,
             ctx
         );
 
@@ -103,7 +100,7 @@ module one_system::validator_tests {
         {
             let ctx = scenario.ctx();
             let new_stake = coin::mint_for_testing(30_000_000_000, ctx).into_balance();
-            let stake = validator.request_add_stake(new_stake, sender,false, ctx);
+            let stake = validator.request_add_stake(new_stake, sender, ctx);
             transfer::public_transfer(stake, sender);
 
             assert!(validator.total_stake() == 10_000_000_000);
@@ -115,8 +112,7 @@ module one_system::validator_tests {
             let coin_ids = scenario.ids_for_sender<StakedOct>();
             let stake = scenario.take_from_sender_by_id<StakedOct>(coin_ids[0]);
             let ctx = scenario.ctx();
-            let (withdrawn_balance,coin_vesting) = validator.request_withdraw_stake(stake, ctx);
-            coin_vesting.destroy_none();
+            let withdrawn_balance = validator.request_withdraw_stake(stake, ctx);
             transfer::public_transfer(withdrawn_balance.into_coin(ctx), sender);
 
             assert!(validator.total_stake() == 10_000_000_000);

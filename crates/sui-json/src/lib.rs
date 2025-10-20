@@ -1,53 +1,39 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{BTreeMap, VecDeque},
-    fmt::{self, Debug, Formatter},
-    str::FromStr,
-};
+use std::collections::{BTreeMap, VecDeque};
+use std::fmt::{self, Debug, Formatter};
+use std::str::FromStr;
 
 use anyhow::{anyhow, bail};
 use fastcrypto::encoding::{Encoding, Hex};
-use move_binary_format::{binary_config::BinaryConfig, file_format::SignatureToken, CompiledModule};
+use move_binary_format::CompiledModule;
+use move_binary_format::{binary_config::BinaryConfig, file_format::SignatureToken};
 use move_bytecode_utils::resolve_struct;
 pub use move_core_types::annotated_value::MoveTypeLayout;
+use move_core_types::annotated_value::{MoveFieldLayout, MoveVariant};
+use move_core_types::u256::U256;
 use move_core_types::{
-    annotated_value::{MoveFieldLayout, MoveStruct, MoveValue, MoveVariant},
+    annotated_value::{MoveStruct, MoveValue},
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     runtime_value as R,
-    u256::U256,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Number, Value as JsonValue};
 
-use sui_types::{
-    base_types::{
-        is_primitive_type_tag,
-        move_ascii_str_layout,
-        move_utf8_str_layout,
-        ObjectID,
-        SuiAddress,
-        TxContext,
-        TxContextKind,
-        RESOLVED_ASCII_STR,
-        RESOLVED_STD_OPTION,
-        RESOLVED_UTF8_STR,
-        STD_ASCII_MODULE_NAME,
-        STD_ASCII_STRUCT_NAME,
-        STD_OPTION_MODULE_NAME,
-        STD_OPTION_STRUCT_NAME,
-        STD_UTF8_MODULE_NAME,
-        STD_UTF8_STRUCT_NAME,
-    },
-    id::{self, ID, RESOLVED_SUI_ID},
-    move_package::MovePackage,
-    object::bounded_visitor::BoundedVisitor,
-    transfer::RESOLVED_RECEIVING_STRUCT,
-    MOVE_STDLIB_ADDRESS,
+use sui_types::base_types::{
+    is_primitive_type_tag, move_ascii_str_layout, move_utf8_str_layout, ObjectID, SuiAddress,
+    TxContext, TxContextKind, RESOLVED_ASCII_STR, RESOLVED_STD_OPTION, RESOLVED_UTF8_STR,
+    STD_ASCII_MODULE_NAME, STD_ASCII_STRUCT_NAME, STD_OPTION_MODULE_NAME, STD_OPTION_STRUCT_NAME,
+    STD_UTF8_MODULE_NAME, STD_UTF8_STRUCT_NAME,
 };
+use sui_types::id::{self, ID, RESOLVED_SUI_ID};
+use sui_types::move_package::MovePackage;
+use sui_types::object::bounded_visitor::BoundedVisitor;
+use sui_types::transfer::RESOLVED_RECEIVING_STRUCT;
+use sui_types::MOVE_STDLIB_ADDRESS;
 
 const HEX_PREFIX: &str = "0x";
 
@@ -72,7 +58,10 @@ pub struct SuiJsonValueError {
 
 impl SuiJsonValueError {
     pub fn new(val: &JsonValue, kind: SuiJsonValueErrorKind) -> Self {
-        Self { kind, val: val.clone() }
+        Self {
+            kind,
+            val: val.clone(),
+        }
     }
 }
 
@@ -115,7 +104,9 @@ impl SuiJsonValue {
             JsonValue::Number(n) => {
                 // Must be castable to u64
                 if !n.is_u64() {
-                    return Err(anyhow!("{n} not allowed. Number must be unsigned integer of at most u32"));
+                    return Err(anyhow!(
+                        "{n} not allowed. Number must be unsigned integer of at most u32"
+                    ));
                 }
             }
             // Must be homogeneous
@@ -143,7 +134,10 @@ impl SuiJsonValue {
             .ok_or_else(|| anyhow!("Unable to serialize {:?}. Expected {}", move_value, ty))
     }
 
-    pub fn from_bcs_bytes(layout: Option<&MoveTypeLayout>, bytes: &[u8]) -> Result<Self, anyhow::Error> {
+    pub fn from_bcs_bytes(
+        layout: Option<&MoveTypeLayout>,
+        bytes: &[u8],
+    ) -> Result<Self, anyhow::Error> {
         let json = if let Some(layout) = layout {
             // Try to convert Vec<u8> inputs into string
             fn try_parse_string(layout: &MoveTypeLayout, bytes: &[u8]) -> Option<String> {
@@ -160,12 +154,22 @@ impl SuiJsonValue {
                 let result = BoundedVisitor::deserialize_value(bytes, layout).map_or_else(
                     |_| {
                         // fallback to array[u8] if fail to convert to json.
-                        JsonValue::Array(bytes.iter().map(|b| JsonValue::Number(Number::from(*b))).collect())
+                        JsonValue::Array(
+                            bytes
+                                .iter()
+                                .map(|b| JsonValue::Number(Number::from(*b)))
+                                .collect(),
+                        )
                     },
                     |move_value| {
                         move_value_to_json(&move_value).unwrap_or_else(|| {
                             // fallback to array[u8] if fail to convert to json.
-                            JsonValue::Array(bytes.iter().map(|b| JsonValue::Number(Number::from(*b))).collect())
+                            JsonValue::Array(
+                                bytes
+                                    .iter()
+                                    .map(|b| JsonValue::Number(Number::from(*b)))
+                                    .collect(),
+                            )
                         })
                     },
                 );
@@ -205,13 +209,12 @@ impl SuiJsonValue {
 
         match &inner_vec[0].layout {
             MoveTypeLayout::Vector(inner) => match **inner {
-                MoveTypeLayout::U8 => Ok(R::MoveValue::Struct(R::MoveStruct(vec![Self::to_move_value(
-                    val,
-                    &inner_vec[0].layout.clone(),
-                )?]))),
-                MoveTypeLayout::Address => {
-                    Ok(R::MoveValue::Struct(R::MoveStruct(vec![Self::to_move_value(val, &MoveTypeLayout::Address)?])))
-                }
+                MoveTypeLayout::U8 => Ok(R::MoveValue::Struct(R::MoveStruct(vec![
+                    Self::to_move_value(val, &inner_vec[0].layout.clone())?,
+                ]))),
+                MoveTypeLayout::Address => Ok(R::MoveValue::Struct(R::MoveStruct(vec![
+                    Self::to_move_value(val, &MoveTypeLayout::Address)?,
+                ]))),
                 _ => bail!(
                     "Cannot convert string arg {s} to {ty} \
                              which is expected to be a struct \
@@ -219,7 +222,9 @@ impl SuiJsonValue {
                 ),
             },
             MoveTypeLayout::Struct(struct_layout) if struct_layout.type_ == ID::type_() => {
-                Ok(R::MoveValue::Struct(R::MoveStruct(vec![Self::to_move_value(val, &inner_vec[0].layout.clone())?])))
+                Ok(R::MoveValue::Struct(R::MoveStruct(vec![
+                    Self::to_move_value(val, &inner_vec[0].layout.clone())?,
+                ])))
             }
             _ => bail!(
                 "Cannot convert string arg {s} to {ty} which is expected \
@@ -228,7 +233,10 @@ impl SuiJsonValue {
         }
     }
 
-    pub fn to_move_value(val: &JsonValue, ty: &MoveTypeLayout) -> Result<R::MoveValue, anyhow::Error> {
+    pub fn to_move_value(
+        val: &JsonValue,
+        ty: &MoveTypeLayout,
+    ) -> Result<R::MoveValue, anyhow::Error> {
         Ok(match (val, ty) {
             // Bool to Bool is simple
             (JsonValue::Bool(b), MoveTypeLayout::Bool) => R::MoveValue::Bool(*b),
@@ -263,7 +271,9 @@ impl SuiJsonValue {
             (JsonValue::String(s), MoveTypeLayout::U128) => {
                 R::MoveValue::U128(u128::try_from(convert_string_to_u256(s.as_str())?)?)
             }
-            (JsonValue::String(s), MoveTypeLayout::U256) => R::MoveValue::U256(convert_string_to_u256(s.as_str())?),
+            (JsonValue::String(s), MoveTypeLayout::U256) => {
+                R::MoveValue::U256(convert_string_to_u256(s.as_str())?)
+            }
             // For ascii and utf8 strings
             (JsonValue::String(s), MoveTypeLayout::Struct(struct_layout))
                 if is_move_string_type(&struct_layout.type_) =>
@@ -271,11 +281,12 @@ impl SuiJsonValue {
                 R::MoveValue::Vector(s.as_bytes().iter().copied().map(R::MoveValue::U8).collect())
             }
             // For ID
-            (JsonValue::String(s), MoveTypeLayout::Struct(struct_layout)) if struct_layout.type_ == ID::type_() => {
+            (JsonValue::String(s), MoveTypeLayout::Struct(struct_layout))
+                if struct_layout.type_ == ID::type_() =>
+            {
                 if struct_layout.fields.len() != 1 {
                     bail!(
-                        "Cannot convert string arg {s} to {} which is expected to be a struct with one field",
-                        struct_layout.type_
+                        "Cannot convert string arg {s} to {} which is expected to be a struct with one field", struct_layout.type_
                     );
                 };
                 let addr = SuiAddress::from_str(s)?;
@@ -326,7 +337,11 @@ impl SuiJsonValue {
             // We have already checked that the array is homogeneous in the constructor
             (JsonValue::Array(a), MoveTypeLayout::Vector(inner)) => {
                 // Recursively build an IntermediateValue array
-                R::MoveValue::Vector(a.iter().map(|i| Self::to_move_value(i, inner)).collect::<Result<Vec<_>, _>>()?)
+                R::MoveValue::Vector(
+                    a.iter()
+                        .map(|i| Self::to_move_value(i, inner))
+                        .collect::<Result<Vec<_>, _>>()?,
+                )
             }
 
             (v, MoveTypeLayout::Address) => {
@@ -377,7 +392,12 @@ fn json_value_to_sui_address(value: &JsonValue) -> anyhow::Result<SuiAddress> {
 
 fn move_value_to_json(move_value: &MoveValue) -> Option<JsonValue> {
     Some(match move_value {
-        MoveValue::Vector(values) => JsonValue::Array(values.iter().map(move_value_to_json).collect::<Option<_>>()?),
+        MoveValue::Vector(values) => JsonValue::Array(
+            values
+                .iter()
+                .map(move_value_to_json)
+                .collect::<Option<_>>()?,
+        ),
         MoveValue::Bool(v) => json!(v),
         MoveValue::Signer(v) | MoveValue::Address(v) => json!(SuiAddress::from(*v).to_string()),
         MoveValue::U8(v) => json!(v),
@@ -413,14 +433,24 @@ fn move_value_to_json(move_value: &MoveValue) -> Option<JsonValue> {
             }
             // We only care about values here, assuming struct type information is known at the client side.
             MoveStruct { fields, .. } => {
-                let fields =
-                    fields.iter().map(|(key, value)| (key, move_value_to_json(value))).collect::<BTreeMap<_, _>>();
+                let fields = fields
+                    .iter()
+                    .map(|(key, value)| (key, move_value_to_json(value)))
+                    .collect::<BTreeMap<_, _>>();
                 json!(fields)
             }
         },
         // Don't return the type assuming type information is known at the client side.
-        MoveValue::Variant(MoveVariant { type_: _, tag: _, variant_name, fields }) => {
-            let fields = fields.iter().map(|(key, value)| (key, move_value_to_json(value))).collect::<BTreeMap<_, _>>();
+        MoveValue::Variant(MoveVariant {
+            type_: _,
+            tag: _,
+            variant_name,
+            fields,
+        }) => {
+            let fields = fields
+                .iter()
+                .map(|(key, value)| (key, move_value_to_json(value)))
+                .collect::<BTreeMap<_, _>>();
             json!({
                 "variant": variant_name.to_string(),
                 "fields": fields,
@@ -445,7 +475,6 @@ fn is_move_option_type(tag: &StructTag) -> bool {
 
 impl FromStr for SuiJsonValue {
     type Err = anyhow::Error;
-
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         fn try_escape_array(s: &str) -> JsonValue {
             let s = s.trim();
@@ -503,7 +532,12 @@ fn check_valid_homogeneous_rec(curr_q: &mut VecDeque<&JsonValue>) -> Result<(), 
                 ValidJsonType::Array
             }
             // Not valid
-            _ => return Err(SuiJsonValueError::new(v, SuiJsonValueErrorKind::ValueTypeNotAllowed)),
+            _ => {
+                return Err(SuiJsonValueError::new(
+                    v,
+                    SuiJsonValueErrorKind::ValueTypeNotAllowed,
+                ))
+            }
         };
 
         if level_type == ValidJsonType::Any {
@@ -511,7 +545,10 @@ fn check_valid_homogeneous_rec(curr_q: &mut VecDeque<&JsonValue>) -> Result<(), 
             level_type = curr;
         } else if level_type != curr {
             // Mismatch in the level
-            return Err(SuiJsonValueError::new(v, SuiJsonValueErrorKind::ArrayNotHomogeneous));
+            return Err(SuiJsonValueError::new(
+                v,
+                SuiJsonValueErrorKind::ArrayNotHomogeneous,
+            ));
         }
     }
     // Process the next level
@@ -523,7 +560,11 @@ fn check_valid_homogeneous_rec(curr_q: &mut VecDeque<&JsonValue>) -> Result<(), 
 /// SignatureToken represents a primitive and an Option representing MoveTypeLayout is that there
 /// can be signature tokens that represent primitives but that do not have corresponding
 /// MoveTypeLayout (e.g., SignatureToken::DatatypeInstantiation).
-pub fn primitive_type(view: &CompiledModule, type_args: &[TypeTag], param: &SignatureToken) -> Option<MoveTypeLayout> {
+pub fn primitive_type(
+    view: &CompiledModule,
+    type_args: &[TypeTag],
+    param: &SignatureToken,
+) -> Option<MoveTypeLayout> {
     Some(match param {
         SignatureToken::Bool => MoveTypeLayout::Bool,
         SignatureToken::U8 => MoveTypeLayout::U8,
@@ -533,7 +574,9 @@ pub fn primitive_type(view: &CompiledModule, type_args: &[TypeTag], param: &Sign
         SignatureToken::U128 => MoveTypeLayout::U128,
         SignatureToken::U256 => MoveTypeLayout::U256,
         SignatureToken::Address => MoveTypeLayout::Address,
-        SignatureToken::Vector(inner) => MoveTypeLayout::Vector(Box::new(primitive_type(view, type_args, inner)?)),
+        SignatureToken::Vector(inner) => {
+            MoveTypeLayout::Vector(Box::new(primitive_type(view, type_args, inner)?))
+        }
         SignatureToken::Datatype(struct_handle_idx) => {
             let resolved_struct = resolve_struct(view, *struct_handle_idx);
             if resolved_struct == RESOLVED_ASCII_STR {
@@ -558,8 +601,12 @@ pub fn primitive_type(view: &CompiledModule, type_args: &[TypeTag], param: &Sign
                 return None;
             }
         }
-        SignatureToken::TypeParameter(idx) => layout_of_primitive_typetag(type_args.get(*idx as usize)?)?,
-        SignatureToken::Signer | SignatureToken::Reference(_) | SignatureToken::MutableReference(_) => return None,
+        SignatureToken::TypeParameter(idx) => {
+            layout_of_primitive_typetag(type_args.get(*idx as usize)?)?
+        }
+        SignatureToken::Signer
+        | SignatureToken::Reference(_)
+        | SignatureToken::MutableReference(_) => return None,
     })
 }
 
@@ -581,7 +628,12 @@ fn layout_of_primitive_typetag(tag: &TypeTag) -> Option<MoveTypeLayout> {
         TypeTag::Signer => return None,
         TypeTag::Vector(tag) => MTL::Vector(Box::new(layout_of_primitive_typetag(tag)?)),
         TypeTag::Struct(stag) => {
-            let StructTag { address, module, name, type_params: type_args } = &**stag;
+            let StructTag {
+                address,
+                module,
+                name,
+                type_params: type_args,
+            } = &**stag;
             let resolved_struct = (address, module.as_ident_str(), name.as_ident_str());
             // is id or..
             if resolved_struct == RESOLVED_SUI_ID {
@@ -594,7 +646,9 @@ fn layout_of_primitive_typetag(tag: &TypeTag) -> Option<MoveTypeLayout> {
                 && type_args.len() == 1
                 && is_primitive_type_tag(&type_args[0])
             {
-                MTL::Vector(Box::new(layout_of_primitive_typetag(&type_args[0]).unwrap()))
+                MTL::Vector(Box::new(
+                    layout_of_primitive_typetag(&type_args[0]).unwrap(),
+                ))
             } else {
                 return None;
             }
@@ -663,9 +717,17 @@ fn resolve_call_arg(
     param: &SignatureToken,
 ) -> Result<ResolvedCallArg, anyhow::Error> {
     if let Some(layout) = primitive_type(view, type_args, param) {
-        return Ok(ResolvedCallArg::Pure(arg.to_bcs_bytes(&layout).map_err(|e| {
-            anyhow!("Could not serialize argument of type {:?} at {} into {}. Got error: {:?}", param, idx, layout, e)
-        })?));
+        return Ok(ResolvedCallArg::Pure(arg.to_bcs_bytes(&layout).map_err(
+            |e| {
+                anyhow!(
+                    "Could not serialize argument of type {:?} at {} into {}. Got error: {:?}",
+                    param,
+                    idx,
+                    layout,
+                    e
+                )
+            },
+        )?));
     }
 
     // in terms of non-primitives we only currently support objects and "flat" (depth == 1) vectors
@@ -675,18 +737,29 @@ fn resolve_call_arg(
         | SignatureToken::DatatypeInstantiation(_)
         | SignatureToken::TypeParameter(_)
         | SignatureToken::Reference(_)
-        | SignatureToken::MutableReference(_) => {
-            Ok(ResolvedCallArg::Object(resolve_object_arg(idx, &arg.to_json_value())?))
-        }
+        | SignatureToken::MutableReference(_) => Ok(ResolvedCallArg::Object(resolve_object_arg(
+            idx,
+            &arg.to_json_value(),
+        )?)),
         SignatureToken::Vector(inner) => match &**inner {
             SignatureToken::Datatype(_) | SignatureToken::DatatypeInstantiation(_) => {
                 Ok(ResolvedCallArg::ObjVec(resolve_object_vec_arg(idx, arg)?))
             }
             _ => {
-                bail!("Unexpected non-primitive vector arg {:?} at {} with value {:?}", param, idx, arg);
+                bail!(
+                    "Unexpected non-primitive vector arg {:?} at {} with value {:?}",
+                    param,
+                    idx,
+                    arg
+                );
             }
         },
-        _ => bail!("Unexpected non-primitive arg {:?} at {} with value {:?}", param, idx, arg),
+        _ => bail!(
+            "Unexpected non-primitive arg {:?} at {} with value {:?}",
+            param,
+            idx,
+            arg
+        ),
     }
 }
 
@@ -735,18 +808,32 @@ pub fn resolve_move_function_args(
     let fdef = module
         .function_defs
         .iter()
-        .find(|fdef| module.identifier_at(module.function_handle_at(fdef.function).name) == function_str)
-        .ok_or_else(|| anyhow!("Could not resolve function {} in module {}", function, module_ident))?;
+        .find(|fdef| {
+            module.identifier_at(module.function_handle_at(fdef.function).name) == function_str
+        })
+        .ok_or_else(|| {
+            anyhow!(
+                "Could not resolve function {} in module {}",
+                function,
+                module_ident
+            )
+        })?;
     let function_signature = module.function_handle_at(fdef.function);
     let parameters = &module.signature_at(function_signature.parameters).0;
 
     // Lengths have to match, less one, due to TxContext
     let expected_len = match parameters.last() {
-        Some(param) if TxContext::kind(&module, param) != TxContextKind::None => parameters.len() - 1,
+        Some(param) if TxContext::kind(&module, param) != TxContextKind::None => {
+            parameters.len() - 1
+        }
         _ => parameters.len(),
     };
     if combined_args_json.len() != expected_len {
-        bail!("Expected {} args, found {}", expected_len, combined_args_json.len());
+        bail!(
+            "Expected {} args, found {}",
+            expected_len,
+            combined_args_json.len()
+        );
     }
     // Check that the args are valid and convert to the correct format
     let call_args = resolve_call_args(&module, type_args, &combined_args_json, parameters)?;
@@ -812,7 +899,10 @@ macro_rules! call_arg {
         }
         impl SuiJsonArg for u64 {
             fn to_sui_json(&self) -> anyhow::Result<SuiJsonValue> {
-                SuiJsonValue::from_bcs_bytes(Some(&sui_json::MoveTypeLayout::U64), &bcs::to_bytes(self)?)
+                SuiJsonValue::from_bcs_bytes(
+                    Some(&sui_json::MoveTypeLayout::U64),
+                    &bcs::to_bytes(self)?,
+                )
             }
         }
         impl SuiJsonArg for Vec<u8> {

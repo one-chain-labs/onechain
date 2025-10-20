@@ -155,11 +155,11 @@ public fun return_to_sender<T: key + store>(obj: Escrow<T>) {
 
 // === Tests ===
 #[test_only]
-use one::coin::{Self, Coin};
+use sui::coin::{Self, Coin};
 #[test_only]
-use one::oct::OCT;
+use sui::oct::OCT;
 #[test_only]
-use one::test_scenario::{Self as ts, Scenario};
+use sui::test_scenario::{Self as ts, Scenario};
 
 #[test_only]
 use escrow::lock;
@@ -175,7 +175,7 @@ const DIANE: address = @0xD;
 
 #[test_only]
 fun test_coin(ts: &mut Scenario): Coin<OCT> {
-    coin::mint_for_testing<OCT>(42, ts::ctx(ts))
+    coin::mint_for_testing<SUI>(42, ts::ctx(ts))
 }
 
 #[test]

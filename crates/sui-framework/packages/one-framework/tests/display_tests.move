@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::display_tests {
-    use one::test_scenario as test;
+module oct::display_tests {
+    use sui::test_scenario as test;
     use std::string::String;
-    use one::package;
-    use one::display;
+    use sui::package;
+    use sui::display;
 
     #[allow(unused_field)]
     /// An example object.

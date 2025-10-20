@@ -1,5 +1,5 @@
 module a::no_trigger_lint_cases {
-    use one::object::UID;
+    use sui::object::UID;
 
     // This should not trigger the linter warning (true negative)
     struct HasKeyAbility has key {
@@ -7,7 +7,7 @@ module a::no_trigger_lint_cases {
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

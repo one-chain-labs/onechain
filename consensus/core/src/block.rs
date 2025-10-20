@@ -10,13 +10,8 @@ use std::{
 
 use bytes::Bytes;
 use consensus_config::{
-    AuthorityIndex,
-    DefaultHashFunction,
-    Epoch,
-    ProtocolKeyPair,
-    ProtocolKeySignature,
-    ProtocolPublicKey,
-    DIGEST_LENGTH,
+    AuthorityIndex, DefaultHashFunction, Epoch, ProtocolKeyPair, ProtocolKeySignature,
+    ProtocolPublicKey, DIGEST_LENGTH,
 };
 use enum_dispatch::enum_dispatch;
 use fastcrypto::hash::{Digest, HashFunction};
@@ -24,10 +19,7 @@ use serde::{Deserialize, Serialize};
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
 
 use crate::{
-    commit::CommitVote,
-    context::Context,
-    ensure,
-    error::{ConsensusError, ConsensusResult},
+    commit::CommitVote, context::Context, ensure, error::ConsensusError, error::ConsensusResult,
 };
 
 /// Round number of a block.
@@ -120,7 +112,16 @@ impl BlockV1 {
         commit_votes: Vec<CommitVote>,
         misbehavior_reports: Vec<MisbehaviorReport>,
     ) -> BlockV1 {
-        Self { epoch, round, author, timestamp_ms, ancestors, transactions, commit_votes, misbehavior_reports }
+        Self {
+            epoch,
+            round,
+            author,
+            timestamp_ms,
+            ancestors,
+            transactions,
+            commit_votes,
+            misbehavior_reports,
+        }
     }
 
     fn genesis_block(epoch: Epoch, author: AuthorityIndex) -> Self {
@@ -285,11 +286,24 @@ pub struct BlockRef {
 }
 
 impl BlockRef {
-    pub const MAX: Self = Self { round: u32::MAX, author: AuthorityIndex::MAX, digest: BlockDigest::MAX };
-    pub const MIN: Self = Self { round: 0, author: AuthorityIndex::MIN, digest: BlockDigest::MIN };
+    pub const MIN: Self = Self {
+        round: 0,
+        author: AuthorityIndex::MIN,
+        digest: BlockDigest::MIN,
+    };
+
+    pub const MAX: Self = Self {
+        round: u32::MAX,
+        author: AuthorityIndex::MAX,
+        digest: BlockDigest::MAX,
+    };
 
     pub fn new(round: Round, author: AuthorityIndex, digest: BlockDigest) -> Self {
-        Self { round, author, digest }
+        Self {
+            round,
+            author,
+            digest,
+        }
     }
 }
 
@@ -321,9 +335,9 @@ impl Hash for BlockRef {
 pub struct BlockDigest([u8; consensus_config::DIGEST_LENGTH]);
 
 impl BlockDigest {
-    pub const MAX: Self = Self([u8::MAX; consensus_config::DIGEST_LENGTH]);
     /// Lexicographic min & max digest.
     pub const MIN: Self = Self([u8::MIN; consensus_config::DIGEST_LENGTH]);
+    pub const MAX: Self = Self([u8::MAX; consensus_config::DIGEST_LENGTH]);
 }
 
 impl Hash for BlockDigest {
@@ -343,14 +357,20 @@ impl fmt::Display for BlockDigest {
         write!(
             f,
             "{}",
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0).get(0..4).ok_or(fmt::Error)?
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0)
+                .get(0..4)
+                .ok_or(fmt::Error)?
         )
     }
 }
 
 impl fmt::Debug for BlockDigest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{}", base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0))
+        write!(
+            f,
+            "{}",
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0)
+        )
     }
 }
 
@@ -375,7 +395,10 @@ impl Slot {
 
     #[cfg(test)]
     pub fn new_for_test(round: Round, authority: u32) -> Self {
-        Self { round, authority: AuthorityIndex::new_for_test(authority) }
+        Self {
+            round,
+            authority: AuthorityIndex::new_for_test(authority),
+        }
     }
 }
 
@@ -411,12 +434,18 @@ pub(crate) struct SignedBlock {
 impl SignedBlock {
     /// Should only be used when constructing the genesis blocks
     pub(crate) fn new_genesis(block: Block) -> Self {
-        Self { inner: block, signature: Bytes::default() }
+        Self {
+            inner: block,
+            signature: Bytes::default(),
+        }
     }
 
     pub(crate) fn new(block: Block, protocol_keypair: &ProtocolKeyPair) -> ConsensusResult<Self> {
         let signature = compute_block_signature(&block, protocol_keypair)?;
-        Ok(Self { inner: block, signature: Bytes::copy_from_slice(signature.to_bytes()) })
+        Ok(Self {
+            inner: block,
+            signature: Bytes::copy_from_slice(signature.to_bytes()),
+        })
     }
 
     pub(crate) fn signature(&self) -> &Bytes {
@@ -428,10 +457,13 @@ impl SignedBlock {
     pub(crate) fn verify_signature(&self, context: &Context) -> ConsensusResult<()> {
         let block = &self.inner;
         let committee = &context.committee;
-        ensure!(committee.is_valid_index(block.author()), ConsensusError::InvalidAuthorityIndex {
-            index: block.author(),
-            max: committee.size() - 1
-        });
+        ensure!(
+            committee.is_valid_index(block.author()),
+            ConsensusError::InvalidAuthorityIndex {
+                index: block.author(),
+                max: committee.size() - 1
+            }
+        );
         let authority = committee.authority(block.author());
         verify_block_signature(block, self.signature(), &authority.protocol_key)
     }
@@ -471,16 +503,28 @@ fn to_consensus_block_intent(digest: InnerBlockDigest) -> IntentMessage<InnerBlo
 /// 1. Compute the digest of `Block`.
 /// 2. Wrap the digest in `IntentMessage`.
 /// 3. Sign the serialized `IntentMessage`, or verify signature against it.
-fn compute_block_signature(block: &Block, protocol_keypair: &ProtocolKeyPair) -> ConsensusResult<ProtocolKeySignature> {
+fn compute_block_signature(
+    block: &Block,
+    protocol_keypair: &ProtocolKeyPair,
+) -> ConsensusResult<ProtocolKeySignature> {
     let digest = compute_inner_block_digest(block)?;
-    let message = bcs::to_bytes(&to_consensus_block_intent(digest)).map_err(ConsensusError::SerializationFailure)?;
+    let message = bcs::to_bytes(&to_consensus_block_intent(digest))
+        .map_err(ConsensusError::SerializationFailure)?;
     Ok(protocol_keypair.sign(&message))
 }
-fn verify_block_signature(block: &Block, signature: &[u8], protocol_pubkey: &ProtocolPublicKey) -> ConsensusResult<()> {
+fn verify_block_signature(
+    block: &Block,
+    signature: &[u8],
+    protocol_pubkey: &ProtocolPublicKey,
+) -> ConsensusResult<()> {
     let digest = compute_inner_block_digest(block)?;
-    let message = bcs::to_bytes(&to_consensus_block_intent(digest)).map_err(ConsensusError::SerializationFailure)?;
-    let sig = ProtocolKeySignature::from_bytes(signature).map_err(ConsensusError::MalformedSignature)?;
-    protocol_pubkey.verify(&message, &sig).map_err(ConsensusError::SignatureVerificationFailure)
+    let message = bcs::to_bytes(&to_consensus_block_intent(digest))
+        .map_err(ConsensusError::SerializationFailure)?;
+    let sig =
+        ProtocolKeySignature::from_bytes(signature).map_err(ConsensusError::MalformedSignature)?;
+    protocol_pubkey
+        .verify(&message, &sig)
+        .map_err(ConsensusError::SignatureVerificationFailure)
 }
 
 /// Allow quick access on the underlying Block without having to always refer to the inner block ref.
@@ -507,21 +551,38 @@ impl VerifiedBlock {
     /// Creates VerifiedBlock from a verified SignedBlock and its serialized bytes.
     pub(crate) fn new_verified(signed_block: SignedBlock, serialized: Bytes) -> Self {
         let digest = Self::compute_digest(&serialized);
-        VerifiedBlock { block: Arc::new(signed_block), digest, serialized }
+        VerifiedBlock {
+            block: Arc::new(signed_block),
+            digest,
+            serialized,
+        }
     }
 
     /// This method is public for testing in other crates.
     pub fn new_for_test(block: Block) -> Self {
         // Use empty signature in test.
-        let signed_block = SignedBlock { inner: block, signature: Default::default() };
-        let serialized: Bytes = bcs::to_bytes(&signed_block).expect("Serialization should not fail").into();
+        let signed_block = SignedBlock {
+            inner: block,
+            signature: Default::default(),
+        };
+        let serialized: Bytes = bcs::to_bytes(&signed_block)
+            .expect("Serialization should not fail")
+            .into();
         let digest = Self::compute_digest(&serialized);
-        VerifiedBlock { block: Arc::new(signed_block), digest, serialized }
+        VerifiedBlock {
+            block: Arc::new(signed_block),
+            digest,
+            serialized,
+        }
     }
 
     /// Returns reference to the block.
     pub fn reference(&self) -> BlockRef {
-        BlockRef { round: self.round(), author: self.author(), digest: self.digest() }
+        BlockRef {
+            round: self.round(),
+            author: self.author(),
+            digest: self.digest(),
+        }
     }
 
     pub(crate) fn digest(&self) -> BlockDigest {
@@ -584,9 +645,13 @@ pub(crate) fn genesis_blocks(context: Arc<Context>) -> Vec<VerifiedBlock> {
         .committee
         .authorities()
         .map(|(authority_index, _)| {
-            let signed_block =
-                SignedBlock::new_genesis(Block::V1(BlockV1::genesis_block(context.committee.epoch(), authority_index)));
-            let serialized = signed_block.serialize().expect("Genesis block serialization failed.");
+            let signed_block = SignedBlock::new_genesis(Block::V1(BlockV1::genesis_block(
+                context.committee.epoch(),
+                authority_index,
+            )));
+            let serialized = signed_block
+                .serialize()
+                .expect("Genesis block serialization failed.");
             // Unnecessary to verify genesis blocks.
             VerifiedBlock::new_verified(signed_block, serialized)
         })
@@ -602,7 +667,13 @@ pub struct TestBlock {
 
 impl TestBlock {
     pub fn new(round: Round, author: u32) -> Self {
-        Self { block: BlockV1 { round, author: AuthorityIndex::new_for_test(author), ..Default::default() } }
+        Self {
+            block: BlockV1 {
+                round,
+                author: AuthorityIndex::new_for_test(author),
+                ..Default::default()
+            },
+        }
     }
 
     pub fn set_epoch(mut self, epoch: Epoch) -> Self {

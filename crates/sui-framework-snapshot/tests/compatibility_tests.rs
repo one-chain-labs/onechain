@@ -13,11 +13,14 @@ mod compatibility_tests {
         // This test checks that the current framework is compatible with all previous framework
         // bytecode snapshots.
         for (version, _snapshots) in load_bytecode_snapshot_manifest() {
-            let config = ProtocolConfig::get_for_version(ProtocolVersion::new(version), Chain::Unknown);
+            let config =
+                ProtocolConfig::get_for_version(ProtocolVersion::new(version), Chain::Unknown);
             let binary_config = to_binary_config(&config);
             let framework = load_bytecode_snapshot(version).unwrap();
-            let old_framework_store: BTreeMap<_, _> =
-                framework.into_iter().map(|package| (*package.id(), package.genesis_object())).collect();
+            let old_framework_store: BTreeMap<_, _> = framework
+                .into_iter()
+                .map(|package| (*package.id(), package.genesis_object()))
+                .collect();
             for cur_package in BuiltInFramework::iter_system_packages() {
                 if compare_system_package(
                     &old_framework_store,
@@ -52,12 +55,16 @@ mod compatibility_tests {
         }
         let latest_snapshot = load_bytecode_snapshot(*snapshots.keys().max().unwrap()).unwrap();
         // Turn them into BTreeMap for deterministic comparison.
-        let latest_snapshot_ref: BTreeMap<_, _> = latest_snapshot.iter().map(|p| (p.id(), p)).collect();
-        let current_framework: BTreeMap<_, _> = BuiltInFramework::iter_system_packages().map(|p| (p.id(), p)).collect();
+        let latest_snapshot_ref: BTreeMap<_, _> =
+            latest_snapshot.iter().map(|p| (p.id(), p)).collect();
+        let current_framework: BTreeMap<_, _> = BuiltInFramework::iter_system_packages()
+            .map(|p| (p.id(), p))
+            .collect();
         assert_eq!(
-            latest_snapshot_ref, current_framework,
-            "The current framework differs the latest bytecode snapshot. Did you forget to upgrade protocol version?"
-        );
+                latest_snapshot_ref,
+                current_framework,
+                "The current framework differs the latest bytecode snapshot. Did you forget to upgrade protocol version?"
+            );
     }
 
     #[test]

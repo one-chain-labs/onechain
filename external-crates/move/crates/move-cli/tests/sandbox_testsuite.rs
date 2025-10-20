@@ -9,7 +9,12 @@ use std::path::{Path, PathBuf};
 fn run_all(args_path: &Path) -> datatest_stable::Result<()> {
     let cli_exe = env!("CARGO_BIN_EXE_move");
     let use_temp_dir = !args_path.parent().unwrap().join("NO_TEMPDIR").exists();
-    test::run_one(args_path, &PathBuf::from(cli_exe), /* use_temp_dir */ use_temp_dir, /* track_cov */ false)?;
+    test::run_one(
+        args_path,
+        &PathBuf::from(cli_exe),
+        /* use_temp_dir */ use_temp_dir,
+        /* track_cov */ false,
+    )?;
     Ok(())
 }
 

@@ -5,7 +5,7 @@
 
 module prettier::group_imports;
 
-use one::{
+use sui::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,

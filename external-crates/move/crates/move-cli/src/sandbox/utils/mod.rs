@@ -9,8 +9,7 @@ use move_binary_format::{
     compatibility::Compatibility,
     errors::{Location, VMError},
     file_format::{AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken},
-    normalized,
-    IndexKind,
+    normalized, IndexKind,
 };
 use move_bytecode_utils::Modules;
 use move_command_line_common::files::{FileHash, MOVE_COMPILED_EXTENSION};
@@ -67,20 +66,29 @@ pub(crate) fn explain_publish_changeset(changeset: &ChangeSet) {
                 let bytes_written = addr.len() + name.len() + module_bytes.len();
                 total_bytes_written += bytes_written;
                 let module_id = ModuleId::new(addr, name.clone());
-                println!("Publishing a new module {} (wrote {:?} bytes)", module_id, bytes_written);
+                println!(
+                    "Publishing a new module {} (wrote {:?} bytes)",
+                    module_id, bytes_written
+                );
             }
             Op::Modify(module_bytes) => {
                 let bytes_written = addr.len() + name.len() + module_bytes.len();
                 total_bytes_written += bytes_written;
                 let module_id = ModuleId::new(addr, name.clone());
-                println!("Updating an existing module {} (wrote {:?} bytes)", module_id, bytes_written);
+                println!(
+                    "Updating an existing module {} (wrote {:?} bytes)",
+                    module_id, bytes_written
+                );
             }
             Op::Delete => {
                 panic!("Deleting a module is not supported")
             }
         }
     }
-    println!("Wrote {:?} bytes of module ID's and code", total_bytes_written)
+    println!(
+        "Wrote {:?} bytes of module ID's and code",
+        total_bytes_written
+    )
 }
 
 pub(crate) fn explain_type_error(
@@ -132,7 +140,13 @@ pub(crate) fn explain_publish_error(
     let mut files = HashMap::new();
     let file_contents = std::fs::read_to_string(&unit.source_path)?;
     let file_hash = FileHash::new(&file_contents);
-    files.insert(file_hash, (FileName::from(unit.source_path.to_string_lossy()), Arc::from(file_contents)));
+    files.insert(
+        file_hash,
+        (
+            FileName::from(unit.source_path.to_string_lossy()),
+            Arc::from(file_contents),
+        ),
+    );
 
     let module = &unit.unit.module;
     let module_id = module.self_id();
@@ -142,9 +156,7 @@ pub(crate) fn explain_publish_error(
             println!("Module {} exists already.", module_id);
         }
         BACKWARD_INCOMPATIBLE_MODULE_UPDATE => {
-            println!(
-                "Breaking change detected--publishing aborted. Re-run with --ignore-breaking-changes to publish anyway."
-            );
+            println!("Breaking change detected--publishing aborted. Re-run with --ignore-breaking-changes to publish anyway.");
 
             let old_module = state.get_module_by_id(&module_id)?.unwrap();
             let old_api = normalized::Module::new(&old_module);
@@ -160,10 +172,7 @@ pub(crate) fn explain_publish_error(
             {
                 // TODO: we could choose to make this more precise by walking the global state and looking for published
                 // structs of this type. but probably a bad idea
-                println!(
-                    "Layout API for structs of module {} has changed. Need to do a data migration of published structs",
-                    module_id
-                )
+                println!("Layout API for structs of module {} has changed. Need to do a data migration of published structs", module_id)
             } else if (Compatibility {
                 check_datatype_layout: false,
                 check_private_entry_linking: true,
@@ -178,7 +187,10 @@ pub(crate) fn explain_publish_error(
             }
         }
         CYCLIC_MODULE_DEPENDENCY => {
-            println!("Publishing module {} introduces cyclic dependencies.", module_id);
+            println!(
+                "Publishing module {} introduces cyclic dependencies.",
+                module_id
+            );
             // find all cycles with an iterative DFS
             let all_modules = state.get_all_modules()?;
             let code_cache = Modules::new(&all_modules);
@@ -228,8 +240,10 @@ pub(crate) fn explain_publish_error(
                     let native_function = &(module.function_defs())[*table_ind as usize];
                     let fh = module.function_handle_at(native_function.function);
                     let mh = module.module_handle_at(fh.module);
-                    let function_source_map =
-                        unit.unit.source_map().get_function_source_map(FunctionDefinitionIndex(*table_ind));
+                    let function_source_map = unit
+                        .unit
+                        .source_map()
+                        .get_function_source_map(FunctionDefinitionIndex(*table_ind));
                     if let Ok(map) = function_source_map {
                         let err_string = format!(
                             "Missing implementation for the native function {}::{}",
@@ -269,7 +283,10 @@ pub(crate) fn explain_execution_error(
     use StatusCode::*;
     match (error.location(), error.major_status(), error.sub_status()) {
         (Location::Module(module_id), StatusCode::ABORTED, Some(abort_code)) => {
-            println!("Execution aborted with code {} in module {}.", abort_code, module_id);
+            println!(
+                "Execution aborted with code {} in module {}.",
+                abort_code, module_id
+            );
         }
         (location, status_code, _) if error.status_type() == StatusType::Execution => {
             let (function, code_offset) = error.offsets()[0];
@@ -301,7 +318,11 @@ pub(crate) fn explain_execution_error(
             // TODO: map to source code location
             let location_explanation = match location {
                 Location::Module(id) => {
-                    format!("{}::{}", id, state.resolve_function(id, function.0)?.unwrap())
+                    format!(
+                        "{}::{}",
+                        id,
+                        state.resolve_function(id, function.0)?.unwrap()
+                    )
                 }
                 Location::Undefined => "UNDEFINED".to_owned(),
             };
@@ -335,7 +356,8 @@ pub(crate) fn explain_execution_error(
 
 /// Return `true` if `path` is a Move bytecode file based on its extension
 pub(crate) fn is_bytecode_file(path: &Path) -> bool {
-    path.extension().map_or(false, |ext| ext == MOVE_COMPILED_EXTENSION)
+    path.extension()
+        .map_or(false, |ext| ext == MOVE_COMPILED_EXTENSION)
 }
 
 /// Return `true` if path contains a valid Move bytecode module

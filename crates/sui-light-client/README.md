@@ -28,7 +28,7 @@ checkpoint_summary_dir: "checkpoints_dir"
 genesis_filename: "genesis.blob"
 ```
 
-The genesis blob for the Sui mainnet can be found here: https://github.com/MystenLabs/sui-genesis/blob/main/mainnet/genesis.blob
+The genesis blob for the Sui mainnet can be found here: https://github.com/one-chain-labs/onechain-genesis/blob/main/mainnet/genesis.blob
 
 ## Sync 
 

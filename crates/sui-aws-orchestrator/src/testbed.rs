@@ -34,7 +34,11 @@ impl<C: ServerProviderClient> Testbed<C> {
         client.register_ssh_public_key(public_key).await?;
         let instances = client.list_instances().await?;
 
-        Ok(Self { settings, client, instances })
+        Ok(Self {
+            settings,
+            client,
+            instances,
+        })
     }
 
     /// Return the username to connect to the instances through ssh.
@@ -44,22 +48,40 @@ impl<C: ServerProviderClient> Testbed<C> {
 
     /// Return the list of instances of the testbed.
     pub fn instances(&self) -> Vec<Instance> {
-        self.instances.iter().filter(|x| self.settings.filter_instances(x)).cloned().collect()
+        self.instances
+            .iter()
+            .filter(|x| self.settings.filter_instances(x))
+            .cloned()
+            .collect()
     }
 
     /// Return the list of provider-specific instance setup commands.
     pub async fn setup_commands(&self) -> TestbedResult<Vec<String>> {
-        self.client.instance_setup_commands().await.map_err(TestbedError::from)
+        self.client
+            .instance_setup_commands()
+            .await
+            .map_err(TestbedError::from)
     }
 
     /// Print the current status of the testbed.
     pub fn status(&self) {
-        let filtered = self.instances.iter().filter(|instance| self.settings.filter_instances(instance));
+        let filtered = self
+            .instances
+            .iter()
+            .filter(|instance| self.settings.filter_instances(instance));
         let sorted: Vec<(_, Vec<_>)> = self
             .settings
             .regions
             .iter()
-            .map(|region| (region, filtered.clone().filter(|instance| &instance.region == region).collect()))
+            .map(|region| {
+                (
+                    region,
+                    filtered
+                        .clone()
+                        .filter(|instance| &instance.region == region)
+                        .collect(),
+                )
+            })
             .collect();
 
         let mut table = Table::new();
@@ -107,14 +129,13 @@ impl<C: ServerProviderClient> Testbed<C> {
         display::action(format!("Deploying instances ({quantity} per region)"));
 
         let instances = match region {
-            Some(x) => try_join_all((0..quantity).map(|_| self.client.create_instance(x.clone()))).await?,
+            Some(x) => {
+                try_join_all((0..quantity).map(|_| self.client.create_instance(x.clone()))).await?
+            }
             None => {
-                try_join_all(
-                    self.settings
-                        .regions
-                        .iter()
-                        .flat_map(|region| (0..quantity).map(|_| self.client.create_instance(region.clone()))),
-                )
+                try_join_all(self.settings.regions.iter().flat_map(|region| {
+                    (0..quantity).map(|_| self.client.create_instance(region.clone()))
+                }))
                 .await?
             }
         };
@@ -133,7 +154,12 @@ impl<C: ServerProviderClient> Testbed<C> {
     pub async fn destroy(&mut self) -> TestbedResult<()> {
         display::action("Destroying testbed");
 
-        try_join_all(self.instances.drain(..).map(|instance| self.client.delete_instance(instance))).await?;
+        try_join_all(
+            self.instances
+                .drain(..)
+                .map(|instance| self.client.delete_instance(instance)),
+        )
+        .await?;
 
         display::done();
         Ok(())
@@ -150,7 +176,9 @@ impl<C: ServerProviderClient> Testbed<C> {
             available.extend(
                 self.instances
                     .iter()
-                    .filter(|x| x.is_inactive() && &x.region == region && self.settings.filter_instances(x))
+                    .filter(|x| {
+                        x.is_inactive() && &x.region == region && self.settings.filter_instances(x)
+                    })
                     .take(quantity)
                     .cloned()
                     .collect::<Vec<_>>(),
@@ -175,7 +203,9 @@ impl<C: ServerProviderClient> Testbed<C> {
         display::action("Stopping instances");
 
         // Stop all instances.
-        self.client.stop_instances(self.instances.iter().filter(|i| i.is_active())).await?;
+        self.client
+            .stop_instances(self.instances.iter().filter(|i| i.is_active()))
+            .await?;
 
         // Wait until the instances are stopped.
         loop {
@@ -207,10 +237,19 @@ impl<C: ServerProviderClient> Testbed<C> {
             display::status(format!("{elapsed}s"));
 
             let instances = self.client.list_instances().await?;
-            let futures = instances.iter().filter(|x| instances_ids.contains(&x.id)).map(|instance| {
-                let private_key_file = self.settings.ssh_private_key_file.clone();
-                SshConnection::new(instance.ssh_address(), C::USERNAME, private_key_file, None, None)
-            });
+            let futures = instances
+                .iter()
+                .filter(|x| instances_ids.contains(&x.id))
+                .map(|instance| {
+                    let private_key_file = self.settings.ssh_private_key_file.clone();
+                    SshConnection::new(
+                        instance.ssh_address(),
+                        C::USERNAME,
+                        private_key_file,
+                        None,
+                        None,
+                    )
+                });
             if try_join_all(futures).await.is_ok() {
                 break;
             }
@@ -231,7 +270,10 @@ mod test {
 
         testbed.deploy(5, None).await.unwrap();
 
-        assert_eq!(testbed.instances.len(), 5 * testbed.settings.number_of_regions());
+        assert_eq!(
+            testbed.instances.len(),
+            5 * testbed.settings.number_of_regions()
+        );
         for (i, instance) in testbed.instances.iter().enumerate() {
             assert_eq!(i.to_string(), instance.id);
         }
@@ -260,10 +302,18 @@ mod test {
 
         assert!(result.is_ok());
         for region in &testbed.settings.regions {
-            let active = testbed.instances.iter().filter(|x| x.is_active() && &x.region == region).count();
+            let active = testbed
+                .instances
+                .iter()
+                .filter(|x| x.is_active() && &x.region == region)
+                .count();
             assert_eq!(active, 2);
 
-            let inactive = testbed.instances.iter().filter(|x| x.is_inactive() && &x.region == region).count();
+            let inactive = testbed
+                .instances
+                .iter()
+                .filter(|x| x.is_inactive() && &x.region == region)
+                .count();
             assert_eq!(inactive, 3);
         }
     }

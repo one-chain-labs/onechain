@@ -7,8 +7,7 @@ use move_compiler::editions::Edition;
 use move_package::{BuildConfig as MoveBuildConfig, LintFlag};
 use std::{
     collections::BTreeMap,
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
 };
 use sui_move_build::{BuildConfig, SuiPackageHooks};
@@ -24,7 +23,7 @@ fn build_system_packages() {
     let tempdir = tempfile::tempdir().unwrap();
     let out_dir = if std::env::var_os("UPDATE").is_some() {
         let crate_root = Path::new(CRATE_ROOT);
-        // let _ = std::fs::remove_dir_all(crate_root.join(COMPILED_PACKAGES_DIR));
+        let _ = std::fs::remove_dir_all(crate_root.join(COMPILED_PACKAGES_DIR));
         let _ = std::fs::remove_dir_all(crate_root.join(DOCS_DIR));
         let _ = std::fs::remove_file(crate_root.join(PUBLISHED_API_FILE));
         crate_root
@@ -39,11 +38,18 @@ fn build_system_packages() {
 
     let bridge_path = packages_path.join("bridge");
     let deepbook_path = packages_path.join("deepbook");
-    let sui_system_path = packages_path.join("one-system");
-    let sui_framework_path = packages_path.join("one-framework");
+    let sui_system_path = packages_path.join("sui-system");
+    let sui_framework_path = packages_path.join("sui-framework");
     let move_stdlib_path = packages_path.join("move-stdlib");
 
-    build_packages(&bridge_path, &deepbook_path, &sui_system_path, &sui_framework_path, &move_stdlib_path, out_dir);
+    build_packages(
+        &bridge_path,
+        &deepbook_path,
+        &sui_system_path,
+        &sui_framework_path,
+        &move_stdlib_path,
+        out_dir,
+    );
 
     check_diff(Path::new(CRATE_ROOT), out_dir)
 }
@@ -58,7 +64,8 @@ fn check_diff(checked_in: &Path, built: &Path) {
             .output()
             .unwrap();
         if !output.status.success() {
-            let header = "Generated and checked-in sui-framework packages and/or docs do not match.\n\
+            let header =
+                "Generated and checked-in sui-framework packages and/or docs do not match.\n\
                  Re-run with `UPDATE=1` to update checked-in packages and docs. e.g.\n\n\
                  UPDATE=1 cargo test -p sui-framework --test build-system-packages";
 
@@ -97,8 +104,8 @@ fn build_packages(
         out_dir,
         "bridge",
         "deepbook",
-        "one-system",
-        "one-framework",
+        "sui-system",
+        "sui-framework",
         "move-stdlib",
         config,
     );
@@ -167,20 +174,41 @@ fn build_packages_with_move_config(
 
     let compiled_packages_dir = out_dir.join(COMPILED_PACKAGES_DIR);
 
-    let sui_system_members = serialize_modules_to_file(sui_system, &compiled_packages_dir.join(system_dir)).unwrap();
+    let sui_system_members =
+        serialize_modules_to_file(sui_system, &compiled_packages_dir.join(system_dir)).unwrap();
     let sui_framework_members =
-        serialize_modules_to_file(sui_framework, &compiled_packages_dir.join(framework_dir)).unwrap();
-    let deepbook_members = serialize_modules_to_file(deepbook, &compiled_packages_dir.join(deepbook_dir)).unwrap();
-    let bridge_members = serialize_modules_to_file(bridge, &compiled_packages_dir.join(bridge_dir)).unwrap();
-    let stdlib_members = serialize_modules_to_file(move_stdlib, &compiled_packages_dir.join(stdlib_dir)).unwrap();
+        serialize_modules_to_file(sui_framework, &compiled_packages_dir.join(framework_dir))
+            .unwrap();
+    let deepbook_members =
+        serialize_modules_to_file(deepbook, &compiled_packages_dir.join(deepbook_dir)).unwrap();
+    let bridge_members =
+        serialize_modules_to_file(bridge, &compiled_packages_dir.join(bridge_dir)).unwrap();
+    let stdlib_members =
+        serialize_modules_to_file(move_stdlib, &compiled_packages_dir.join(stdlib_dir)).unwrap();
 
     // write out generated docs
     let docs_dir = out_dir.join(DOCS_DIR);
     let mut files_to_write = BTreeMap::new();
-    relocate_docs(deepbook_dir, &deepbook_pkg.package.compiled_docs.unwrap(), &mut files_to_write);
-    relocate_docs(system_dir, &system_pkg.package.compiled_docs.unwrap(), &mut files_to_write);
-    relocate_docs(framework_dir, &framework_pkg.package.compiled_docs.unwrap(), &mut files_to_write);
-    relocate_docs(bridge_dir, &bridge_pkg.package.compiled_docs.unwrap(), &mut files_to_write);
+    relocate_docs(
+        deepbook_dir,
+        &deepbook_pkg.package.compiled_docs.unwrap(),
+        &mut files_to_write,
+    );
+    relocate_docs(
+        system_dir,
+        &system_pkg.package.compiled_docs.unwrap(),
+        &mut files_to_write,
+    );
+    relocate_docs(
+        framework_dir,
+        &framework_pkg.package.compiled_docs.unwrap(),
+        &mut files_to_write,
+    );
+    relocate_docs(
+        bridge_dir,
+        &bridge_pkg.package.compiled_docs.unwrap(),
+        &mut files_to_write,
+    );
     for (fname, doc) in files_to_write {
         let dst_path = docs_dir.join(fname);
         fs::create_dir_all(dst_path.parent().unwrap()).unwrap();
@@ -232,7 +260,9 @@ fn relocate_docs(prefix: &str, files: &[(String, String)], output: &mut BTreeMap
         };
         output.entry(file_name).or_insert_with(|| {
             re.replace_all(
-                &file_content.replace("../../dependencies/", "../").replace("dependencies/", "../"),
+                &file_content
+                    .replace("../../dependencies/", "../")
+                    .replace("dependencies/", "../"),
                 "---\ntitle: $1\n---\n",
             )
             .to_string()
@@ -240,7 +270,10 @@ fn relocate_docs(prefix: &str, files: &[(String, String)], output: &mut BTreeMap
     }
 }
 
-fn serialize_modules_to_file<'a>(modules: impl Iterator<Item = &'a CompiledModule>, file: &Path) -> Result<Vec<String>> {
+fn serialize_modules_to_file<'a>(
+    modules: impl Iterator<Item = &'a CompiledModule>,
+    file: &Path,
+) -> Result<Vec<String>> {
     let mut serialized_modules = Vec::new();
     let mut members = vec![];
     for module in modules {
@@ -273,7 +306,10 @@ fn serialize_modules_to_file<'a>(modules: impl Iterator<Item = &'a CompiledModul
         module.serialize_with_version(module.version, &mut buf)?;
         serialized_modules.push(buf);
     }
-    assert!(!serialized_modules.is_empty(), "Failed to find system or framework or stdlib modules");
+    assert!(
+        !serialized_modules.is_empty(),
+        "Failed to find system or framework or stdlib modules"
+    );
 
     let binary = bcs::to_bytes(&serialized_modules)?;
 

@@ -1,24 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{authority_state::StateReadError, name_service::NameServiceError};
+use crate::authority_state::StateReadError;
+use crate::name_service::NameServiceError;
 use fastcrypto::error::FastCryptoError;
 use hyper::header::InvalidHeaderValue;
 use itertools::Itertools;
-use jsonrpsee::{
-    core::Error as RpcError,
-    types::{
-        error::{CallError, INTERNAL_ERROR_CODE},
-        ErrorObject,
-    },
-};
+use jsonrpsee::core::Error as RpcError;
+use jsonrpsee::types::error::{CallError, INTERNAL_ERROR_CODE};
+use jsonrpsee::types::ErrorObject;
 use std::collections::BTreeMap;
 use sui_json_rpc_api::{TRANSACTION_EXECUTION_CLIENT_ERROR_CODE, TRANSIENT_ERROR_CODE};
-use sui_types::{
-    committee::{QUORUM_THRESHOLD, TOTAL_VOTING_POWER},
-    error::{SuiError, SuiObjectResponseError, UserInputError},
-    quorum_driver_types::QuorumDriverError,
-};
+use sui_types::committee::{QUORUM_THRESHOLD, TOTAL_VOTING_POWER};
+use sui_types::error::{SuiError, SuiObjectResponseError, UserInputError};
+use sui_types::quorum_driver_types::QuorumDriverError;
 use thiserror::Error;
 use tokio::task::JoinError;
 
@@ -81,9 +76,9 @@ impl From<SuiError> for Error {
             SuiError::UserInputError { error } => Self::UserInputError(error),
             SuiError::SuiObjectResponseError { error } => Self::SuiObjectResponseError(error),
             SuiError::UnsupportedFeatureError { error } => Self::UnsupportedFeature(error),
-            SuiError::IndexStoreNotAvailable => {
-                Self::UnsupportedFeature("Required indexes are not available on this node".to_string())
-            }
+            SuiError::IndexStoreNotAvailable => Self::UnsupportedFeature(
+                "Required indexes are not available on this node".to_string(),
+            ),
             other => Self::SuiError(other),
         }
     }
@@ -99,7 +94,9 @@ impl From<Error> for RpcError {
                 SuiObjectResponseError::NotExists { .. }
                 | SuiObjectResponseError::DynamicFieldNotFound { .. }
                 | SuiObjectResponseError::Deleted { .. }
-                | SuiObjectResponseError::DisplayError { .. } => RpcError::Call(CallError::InvalidParams(err.into())),
+                | SuiObjectResponseError::DisplayError { .. } => {
+                    RpcError::Call(CallError::InvalidParams(err.into()))
+                }
                 _ => RpcError::Call(CallError::Failed(err.into())),
             },
             Error::NameServiceError(err) => match err {
@@ -108,7 +105,9 @@ impl From<Error> for RpcError {
                 | NameServiceError::InvalidLength { .. }
                 | NameServiceError::InvalidUnderscore { .. }
                 | NameServiceError::LabelsEmpty { .. }
-                | NameServiceError::InvalidSeparator { .. } => RpcError::Call(CallError::InvalidParams(err.into())),
+                | NameServiceError::InvalidSeparator { .. } => {
+                    RpcError::Call(CallError::InvalidParams(err.into()))
+                }
                 _ => RpcError::Call(CallError::Failed(err.into())),
             },
             Error::SuiRpcInputError(err) => RpcError::Call(CallError::InvalidParams(err.into())),
@@ -123,8 +122,11 @@ impl From<Error> for RpcError {
             Error::StateReadError(err) => match err {
                 StateReadError::Client(_) => RpcError::Call(CallError::InvalidParams(err.into())),
                 _ => {
-                    let error_object =
-                        ErrorObject::owned(jsonrpsee::types::error::INTERNAL_ERROR_CODE, err.to_string(), None::<()>);
+                    let error_object = ErrorObject::owned(
+                        jsonrpsee::types::error::INTERNAL_ERROR_CODE,
+                        err.to_string(),
+                        None::<()>,
+                    );
                     RpcError::Call(CallError::Custom(error_object))
                 }
             },
@@ -148,11 +150,16 @@ impl From<Error> for RpcError {
                     }
                     QuorumDriverError::TimeoutBeforeFinality
                     | QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts { .. } => {
-                        let error_object = ErrorObject::owned(TRANSIENT_ERROR_CODE, err.to_string(), None::<()>);
+                        let error_object =
+                            ErrorObject::owned(TRANSIENT_ERROR_CODE, err.to_string(), None::<()>);
                         RpcError::Call(CallError::Custom(error_object))
                     }
-                    QuorumDriverError::ObjectsDoubleUsed { conflicting_txes, retried_tx_status } => {
-                        let weights: Vec<u64> = conflicting_txes.values().map(|(_, stake)| *stake).collect();
+                    QuorumDriverError::ObjectsDoubleUsed {
+                        conflicting_txes,
+                        retried_tx_status,
+                    } => {
+                        let weights: Vec<u64> =
+                            conflicting_txes.values().map(|(_, stake)| *stake).collect();
                         let remaining: u64 = TOTAL_VOTING_POWER - weights.iter().sum::<u64>();
 
                         // better version of above
@@ -166,8 +173,7 @@ impl From<Error> for RpcError {
                             Some((digest, success)) => {
                                 format!(
                                     "Retried transaction {} ({}) because it was able to gather the necessary votes.",
-                                    digest,
-                                    if success { "succeeded" } else { "failed" }
+                                    digest, if success { "succeeded" } else { "failed" }
                                 )
                             }
                             None => "".to_string(),
@@ -192,12 +198,18 @@ impl From<Error> for RpcError {
                         let new_map = conflicting_txes
                             .into_iter()
                             .map(|(digest, (pairs, _))| {
-                                (digest, pairs.into_iter().map(|(_, obj_ref)| obj_ref).collect())
+                                (
+                                    digest,
+                                    pairs.into_iter().map(|(_, obj_ref)| obj_ref).collect(),
+                                )
                             })
                             .collect::<BTreeMap<_, Vec<_>>>();
 
-                        let error_object =
-                            ErrorObject::owned(TRANSACTION_EXECUTION_CLIENT_ERROR_CODE, error_message, Some(new_map));
+                        let error_object = ErrorObject::owned(
+                            TRANSACTION_EXECUTION_CLIENT_ERROR_CODE,
+                            error_message,
+                            Some(new_map),
+                        );
                         RpcError::Call(CallError::Custom(error_object))
                     }
                     QuorumDriverError::NonRecoverableTransactionError { errors } => {
@@ -242,8 +254,11 @@ impl From<Error> for RpcError {
 
                         let error_msg = format!("Transaction validator signing failed due to issues with transaction inputs, please review the errors and try again:\n{}", error_list.join("\n"));
 
-                        let error_object =
-                            ErrorObject::owned(TRANSACTION_EXECUTION_CLIENT_ERROR_CODE, error_msg, None::<()>);
+                        let error_object = ErrorObject::owned(
+                            TRANSACTION_EXECUTION_CLIENT_ERROR_CODE,
+                            error_msg,
+                            None::<()>,
+                        );
                         RpcError::Call(CallError::Custom(error_object))
                     }
                     QuorumDriverError::QuorumDriverInternalError(_) => {
@@ -254,8 +269,10 @@ impl From<Error> for RpcError {
                         );
                         RpcError::Call(CallError::Custom(error_object))
                     }
-                    QuorumDriverError::SystemOverload { .. } | QuorumDriverError::SystemOverloadRetryAfter { .. } => {
-                        let error_object = ErrorObject::owned(TRANSIENT_ERROR_CODE, err.to_string(), None::<()>);
+                    QuorumDriverError::SystemOverload { .. }
+                    | QuorumDriverError::SystemOverloadRetryAfter { .. } => {
+                        let error_object =
+                            ErrorObject::owned(TRANSIENT_ERROR_CODE, err.to_string(), None::<()>);
                         RpcError::Call(CallError::Custom(error_object))
                     }
                 }
@@ -315,15 +332,22 @@ mod tests {
     use super::*;
     use expect_test::expect;
     use jsonrpsee::types::ErrorObjectOwned;
-    use sui_types::{
-        base_types::{AuthorityName, ObjectID, ObjectRef, SequenceNumber},
-        committee::StakeUnit,
-        crypto::{AuthorityPublicKey, AuthorityPublicKeyBytes},
-        digests::{ObjectDigest, TransactionDigest},
-    };
+    use sui_types::base_types::AuthorityName;
+    use sui_types::base_types::ObjectID;
+    use sui_types::base_types::ObjectRef;
+    use sui_types::base_types::SequenceNumber;
+    use sui_types::committee::StakeUnit;
+    use sui_types::crypto::AuthorityPublicKey;
+    use sui_types::crypto::AuthorityPublicKeyBytes;
+    use sui_types::digests::ObjectDigest;
+    use sui_types::digests::TransactionDigest;
 
     fn test_object_ref() -> ObjectRef {
-        (ObjectID::ZERO, SequenceNumber::from_u64(0), ObjectDigest::new([0; 32]))
+        (
+            ObjectID::ZERO,
+            SequenceNumber::from_u64(0),
+            ObjectDigest::new([0; 32]),
+        )
     }
 
     mod match_quorum_driver_error_tests {
@@ -331,17 +355,19 @@ mod tests {
 
         #[test]
         fn test_invalid_user_signature() {
-            let quorum_driver_error = QuorumDriverError::InvalidUserSignature(SuiError::InvalidSignature {
-                error: "Test inner invalid signature".to_string(),
-            });
+            let quorum_driver_error =
+                QuorumDriverError::InvalidUserSignature(SuiError::InvalidSignature {
+                    error: "Test inner invalid signature".to_string(),
+                });
 
             let rpc_error: RpcError = Error::QuorumDriverError(quorum_driver_error).into();
 
             let error_object: ErrorObjectOwned = rpc_error.into();
             let expected_code = expect!["-32002"];
             expected_code.assert_eq(&error_object.code().to_string());
-            let expected_message =
-                expect!["Invalid user signature: Signature is not valid: Test inner invalid signature"];
+            let expected_message = expect![
+                "Invalid user signature: Signature is not valid: Test inner invalid signature"
+            ];
             expected_message.assert_eq(error_object.message());
         }
 
@@ -361,23 +387,28 @@ mod tests {
         #[test]
         fn test_failed_with_transient_error_after_maximum_attempts() {
             let quorum_driver_error =
-                QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts { total_attempts: 10 };
+                QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts {
+                    total_attempts: 10,
+                };
 
             let rpc_error: RpcError = Error::QuorumDriverError(quorum_driver_error).into();
 
             let error_object: ErrorObjectOwned = rpc_error.into();
             let expected_code = expect!["-32050"];
             expected_code.assert_eq(&error_object.code().to_string());
-            let expected_message =
-                expect!["Transaction failed to reach finality with transient error after 10 attempts."];
+            let expected_message = expect![
+                "Transaction failed to reach finality with transient error after 10 attempts."
+            ];
             expected_message.assert_eq(error_object.message());
         }
 
         #[test]
         fn test_objects_double_used() {
             use sui_types::crypto::VerifyingKey;
-            let mut conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)> =
-                BTreeMap::new();
+            let mut conflicting_txes: BTreeMap<
+                TransactionDigest,
+                (Vec<(AuthorityName, ObjectRef)>, StakeUnit),
+            > = BTreeMap::new();
             let tx_digest = TransactionDigest::from([1; 32]);
             let object_ref = test_object_ref();
 
@@ -414,8 +445,10 @@ mod tests {
         #[test]
         fn test_objects_double_used_equivocated() {
             use sui_types::crypto::VerifyingKey;
-            let mut conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)> =
-                BTreeMap::new();
+            let mut conflicting_txes: BTreeMap<
+                TransactionDigest,
+                (Vec<(AuthorityName, ObjectRef)>, StakeUnit),
+            > = BTreeMap::new();
             let tx_digest = TransactionDigest::from([1; 32]);
             let object_ref = test_object_ref();
 
@@ -456,7 +489,10 @@ mod tests {
                 errors: vec![
                     (
                         SuiError::UserInputError {
-                            error: UserInputError::GasBalanceTooLow { gas_balance: 10, needed_gas_amount: 100 },
+                            error: UserInputError::GasBalanceTooLow {
+                                gas_balance: 10,
+                                needed_gas_amount: 100,
+                            },
                         },
                         0,
                         vec![],
@@ -490,12 +526,19 @@ mod tests {
                 errors: vec![
                     (
                         SuiError::UserInputError {
-                            error: UserInputError::ObjectNotFound { object_id: test_object_ref().0, version: None },
+                            error: UserInputError::ObjectNotFound {
+                                object_id: test_object_ref().0,
+                                version: None,
+                            },
                         },
                         0,
                         vec![],
                     ),
-                    (SuiError::RpcError("Hello".to_string(), "Testing".to_string()), 0, vec![]),
+                    (
+                        SuiError::RpcError("Hello".to_string(), "Testing".to_string()),
+                        0,
+                        vec![],
+                    ),
                 ],
             };
 
@@ -511,8 +554,9 @@ mod tests {
 
         #[test]
         fn test_quorum_driver_internal_error() {
-            let quorum_driver_error =
-                QuorumDriverError::QuorumDriverInternalError(SuiError::UnexpectedMessage("test".to_string()));
+            let quorum_driver_error = QuorumDriverError::QuorumDriverInternalError(
+                SuiError::UnexpectedMessage("test".to_string()),
+            );
 
             let rpc_error: RpcError = Error::QuorumDriverError(quorum_driver_error).into();
 

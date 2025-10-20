@@ -4,17 +4,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input,
-    Attribute,
-    Data,
-    DataStruct,
-    DeriveInput,
-    Fields,
-    FieldsNamed,
-    Meta,
-    MetaList,
-    MetaNameValue,
-    NestedMeta,
+    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, FieldsNamed, Meta,
+    MetaList, MetaNameValue, NestedMeta,
 };
 
 /// Attribute macro to be applied to config-based structs. It ensures that the struct derives serde
@@ -25,13 +16,28 @@ use syn::{
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
 pub fn DefaultConfig(_attr: TokenStream, input: TokenStream) -> TokenStream {
-    let DeriveInput { attrs, vis, ident, generics, data } = parse_macro_input!(input as DeriveInput);
+    let DeriveInput {
+        attrs,
+        vis,
+        ident,
+        generics,
+        data,
+    } = parse_macro_input!(input as DeriveInput);
 
-    let Data::Struct(DataStruct { struct_token, fields, semi_token }) = data else {
+    let Data::Struct(DataStruct {
+        struct_token,
+        fields,
+        semi_token,
+    }) = data
+    else {
         panic!("Default configs must be structs.");
     };
 
-    let Fields::Named(FieldsNamed { brace_token: _, named }) = fields else {
+    let Fields::Named(FieldsNamed {
+        brace_token: _,
+        named,
+    }) = fields
+    else {
         panic!("Default configs must have named fields.");
     };
 

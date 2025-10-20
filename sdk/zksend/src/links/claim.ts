@@ -37,7 +37,7 @@ const DEFAULT_ZK_SEND_LINK_OPTIONS = {
 };
 
 const SUI_COIN_TYPE = normalizeStructTag(SUI_TYPE_ARG);
-const SUI_COIN_OBJECT_TYPE = normalizeStructTag('0x2::coin::Coin<0x2::oct::OCT>');
+const SUI_COIN_OBJECT_TYPE = normalizeStructTag('0x2::coin::Coin<0x2::sui::SUI>');
 
 export type ZkSendLinkOptions = {
 	claimApi?: string;

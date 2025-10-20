@@ -3,12 +3,14 @@
 
 #[cfg(msim)]
 mod sim_only_tests {
-    use std::{path::PathBuf, time::Duration};
+    use std::path::PathBuf;
+    use std::time::Duration;
     use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
     use sui_macros::sim_test;
-    use sui_node::SuiNode;
+    use one_node::SuiNode;
     use sui_test_transaction_builder::publish_package;
-    use sui_types::{base_types::ObjectID, digests::TransactionDigest, messages_checkpoint::CheckpointSequenceNumber};
+    use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+    use sui_types::{base_types::ObjectID, digests::TransactionDigest};
     use test_cluster::{TestCluster, TestClusterBuilder};
     use tokio::time::timeout;
 
@@ -24,49 +26,78 @@ mod sim_only_tests {
         // Create a root object and a child object. Wrap the child object inside the root object.
         let (package_id, object_id) = publish_package_and_create_parent_object(&test_cluster).await;
         let child_id = create_owned_child(&test_cluster, package_id).await;
-        let wrap_child_txn_digest =
-            wrap_child(&test_cluster, package_id, object_id, child_id).await.transaction_digest().clone();
+        let wrap_child_txn_digest = wrap_child(&test_cluster, package_id, object_id, child_id)
+            .await
+            .transaction_digest()
+            .clone();
 
         fullnode
             .with_async(|node| async {
                 // Wait until the wrapping transaction is included in checkpoint.
-                let checkpoint =
-                    timeout(Duration::from_secs(60), wait_until_txn_in_checkpoint(node, &wrap_child_txn_digest))
-                        .await
-                        .unwrap();
+                let checkpoint = timeout(
+                    Duration::from_secs(60),
+                    wait_until_txn_in_checkpoint(node, &wrap_child_txn_digest),
+                )
+                .await
+                .unwrap();
 
                 // Wait until the above checkpoint is pruned.
-                let _ = timeout(Duration::from_secs(60), wait_until_checkpoint_pruned(node, checkpoint)).await.unwrap();
+                let _ = timeout(
+                    Duration::from_secs(60),
+                    wait_until_checkpoint_pruned(node, checkpoint),
+                )
+                .await
+                .unwrap();
 
                 let state = node.state();
                 let checkpoint_store = state.get_checkpoint_store();
 
                 // Manually initiating a pruning and compaction job to make sure that deleted objects are gong from object store.
-                state.database_for_testing().prune_objects_and_compact_for_testing(checkpoint_store, None).await;
+                state
+                    .database_for_testing()
+                    .prune_objects_and_compact_for_testing(checkpoint_store, None)
+                    .await;
 
                 // Check that no object with `child_id` exists in object store.
-                assert_eq!(state.database_for_testing().count_object_versions(child_id), 0);
-                assert!(state.database_for_testing().count_object_versions(object_id) > 0);
+                assert_eq!(
+                    state.database_for_testing().count_object_versions(child_id),
+                    0
+                );
+                assert!(
+                    state
+                        .database_for_testing()
+                        .count_object_versions(object_id)
+                        > 0
+                );
             })
             .await;
 
         // Next, we unwrap and delete the child object, as well as delete the root object.
         let unwrap_delete_txn_digest =
-            unwrap_and_delete_child(&test_cluster, package_id, object_id).await.transaction_digest().clone();
-        let delete_root_obj_txn_digest =
-            delete_object(&test_cluster, package_id, object_id).await.transaction_digest().clone();
+            unwrap_and_delete_child(&test_cluster, package_id, object_id)
+                .await
+                .transaction_digest()
+                .clone();
+        let delete_root_obj_txn_digest = delete_object(&test_cluster, package_id, object_id)
+            .await
+            .transaction_digest()
+            .clone();
 
         fullnode
             .with_async(|node| async {
                 // Wait for both transactions to be included in checkpoint.
-                let checkpoint1 =
-                    timeout(Duration::from_secs(60), wait_until_txn_in_checkpoint(node, &unwrap_delete_txn_digest))
-                        .await
-                        .unwrap();
-                let checkpoint2 =
-                    timeout(Duration::from_secs(60), wait_until_txn_in_checkpoint(node, &delete_root_obj_txn_digest))
-                        .await
-                        .unwrap();
+                let checkpoint1 = timeout(
+                    Duration::from_secs(60),
+                    wait_until_txn_in_checkpoint(node, &unwrap_delete_txn_digest),
+                )
+                .await
+                .unwrap();
+                let checkpoint2 = timeout(
+                    Duration::from_secs(60),
+                    wait_until_txn_in_checkpoint(node, &delete_root_obj_txn_digest),
+                )
+                .await
+                .unwrap();
 
                 let _ = timeout(
                     Duration::from_secs(60),
@@ -78,19 +109,33 @@ mod sim_only_tests {
                 let state = node.state();
                 let checkpoit_store = state.get_checkpoint_store();
                 // Manually initiating a pruning and compaction job to make sure that deleted objects are gong from object store.
-                state.database_for_testing().prune_objects_and_compact_for_testing(checkpoit_store, None).await;
+                state
+                    .database_for_testing()
+                    .prune_objects_and_compact_for_testing(checkpoit_store, None)
+                    .await;
 
                 // Check that both root and child objects are gone from object store.
-                assert_eq!(state.database_for_testing().count_object_versions(child_id), 0);
-                assert_eq!(state.database_for_testing().count_object_versions(object_id), 0);
+                assert_eq!(
+                    state.database_for_testing().count_object_versions(child_id),
+                    0
+                );
+                assert_eq!(
+                    state
+                        .database_for_testing()
+                        .count_object_versions(object_id),
+                    0
+                );
             })
             .await;
     }
 
-    async fn publish_package_and_create_parent_object(test_cluster: &TestCluster) -> (ObjectID, ObjectID) {
+    async fn publish_package_and_create_parent_object(
+        test_cluster: &TestCluster,
+    ) -> (ObjectID, ObjectID) {
         let package_id = publish_package(
             &test_cluster.wallet,
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sui-surfer/tests/move_building_blocks"),
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../sui-surfer/tests/move_building_blocks"),
         )
         .await
         .0;
@@ -144,14 +189,23 @@ mod sim_only_tests {
                 &test_cluster
                     .test_transaction_builder()
                     .await
-                    .move_call(package_id, "objects", "wrap_child", vec![object.into(), child.into(), true.into()])
+                    .move_call(
+                        package_id,
+                        "objects",
+                        "wrap_child",
+                        vec![object.into(), child.into(), true.into()],
+                    )
                     .build(),
             )
             .await
             .effects
             .unwrap();
         assert_eq!(effects.wrapped().len(), 1);
-        assert!(test_cluster.get_object_or_tombstone_from_fullnode_store(child_id).await.2.is_wrapped());
+        assert!(test_cluster
+            .get_object_or_tombstone_from_fullnode_store(child_id)
+            .await
+            .2
+            .is_wrapped());
         effects
     }
 
@@ -166,7 +220,12 @@ mod sim_only_tests {
                 &test_cluster
                     .test_transaction_builder()
                     .await
-                    .move_call(package_id, "objects", "unwrap_and_delete_child", vec![object.into()])
+                    .move_call(
+                        package_id,
+                        "objects",
+                        "unwrap_and_delete_child",
+                        vec![object.into()],
+                    )
                     .build(),
             )
             .await
@@ -197,9 +256,17 @@ mod sim_only_tests {
         effects
     }
 
-    async fn wait_until_txn_in_checkpoint(node: &SuiNode, digest: &TransactionDigest) -> CheckpointSequenceNumber {
+    async fn wait_until_txn_in_checkpoint(
+        node: &SuiNode,
+        digest: &TransactionDigest,
+    ) -> CheckpointSequenceNumber {
         loop {
-            if let Some(seq) = node.state().epoch_store_for_testing().get_transaction_checkpoint(&digest).unwrap() {
+            if let Some(seq) = node
+                .state()
+                .epoch_store_for_testing()
+                .get_transaction_checkpoint(&digest)
+                .unwrap()
+            {
                 return seq;
             }
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -208,7 +275,12 @@ mod sim_only_tests {
 
     async fn wait_until_checkpoint_pruned(node: &SuiNode, checkpoint: CheckpointSequenceNumber) {
         loop {
-            if node.state().get_highest_pruned_checkpoint_for_testing().unwrap() >= checkpoint {
+            if node
+                .state()
+                .get_highest_pruned_checkpoint_for_testing()
+                .unwrap()
+                >= checkpoint
+            {
                 return;
             }
             tokio::time::sleep(Duration::from_secs(1)).await;

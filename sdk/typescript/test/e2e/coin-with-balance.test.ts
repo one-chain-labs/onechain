@@ -168,7 +168,7 @@ describe('coinWithBalance', () => {
 			),
 		).toEqual({
 			amount: '12345',
-			coinType: '0x2::oct::OCT',
+			coinType: '0x2::sui::SUI',
 			owner: {
 				AddressOwner: receiver.toSuiAddress(),
 			},
@@ -720,7 +720,7 @@ describe('coinWithBalance', () => {
 		).toEqual([
 			{
 				amount: '7',
-				coinType: '0x2::oct::OCT',
+				coinType: '0x2::sui::SUI',
 				owner: {
 					AddressOwner: receiver.toSuiAddress(),
 				},

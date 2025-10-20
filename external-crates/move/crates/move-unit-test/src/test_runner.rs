@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    extensions,
-    format_module_id,
-    test_reporter::{FailureReason, MoveError, TestFailure, TestResults, TestRunInfo, TestStatistics},
+    extensions, format_module_id,
+    test_reporter::{
+        FailureReason, MoveError, TestFailure, TestResults, TestRunInfo, TestStatistics,
+    },
 };
 use anyhow::Result;
 use colored::*;
@@ -93,8 +94,10 @@ fn convert_clever_move_abort_error(
             let module = test_info.get(module_id)?;
             let name_constant_index = bitset.identifier_index()?;
             let name_string = std::str::from_utf8(
-                &bcs::from_bytes::<Vec<u8>>(&module.module.constant_pool[name_constant_index as usize].data)
-                    .expect("Invalid UTF-8 constant name -- this is impossible"),
+                &bcs::from_bytes::<Vec<u8>>(
+                    &module.module.constant_pool[name_constant_index as usize].data,
+                )
+                .expect("Invalid UTF-8 constant name -- this is impossible"),
             )
             .expect("Invalid UTF-8 constant name -- this is impossible")
             .to_string();
@@ -130,7 +133,8 @@ impl TestRunner {
         };
 
         let modules = tests.module_info.values().map(|info| &info.module);
-        let starting_storage_state = setup_test_storage(modules, tests.bytecode_deps_modules.iter())?;
+        let starting_storage_state =
+            setup_test_storage(modules, tests.bytecode_deps_modules.iter())?;
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib_natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -161,16 +165,26 @@ impl TestRunner {
     }
 
     pub fn run<W: Write + Send>(self, writer: &Mutex<W>) -> Result<TestResults> {
-        rayon::ThreadPoolBuilder::new().num_threads(self.num_threads).build().unwrap().install(|| {
-            let final_statistics = self
-                .tests
-                .module_tests
-                .par_iter()
-                .map(|(_, test_plan)| self.testing_config.exec_module_tests(test_plan, &self.tests.module_info, writer))
-                .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .unwrap()
+            .install(|| {
+                let final_statistics = self
+                    .tests
+                    .module_tests
+                    .par_iter()
+                    .map(|(_, test_plan)| {
+                        self.testing_config.exec_module_tests(
+                            test_plan,
+                            &self.tests.module_info,
+                            writer,
+                        )
+                    })
+                    .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
 
-            Ok(TestResults::new(final_statistics, self.tests))
-        })
+                Ok(TestResults::new(final_statistics, self.tests))
+            })
     }
 
     pub fn filter(&mut self, test_name_slice: &str) {
@@ -182,7 +196,8 @@ impl TestRunner {
                 module_test.tests = tests
                     .into_iter()
                     .filter(|(test_name, _)| {
-                        let full_name = format!("{}::{}", module_id.name().as_str(), test_name.as_str());
+                        let full_name =
+                            format!("{}::{}", module_id.name().as_str(), test_name.as_str());
                         full_name.contains(test_name_slice)
                     })
                     .collect();
@@ -239,14 +254,24 @@ impl SharedTestingConfig {
         test_plan: &ModuleTestPlan,
         function_name: &str,
         arguments: Vec<MoveValue>,
-    ) -> (VMResult<ChangeSet>, VMResult<NativeContextExtensions>, VMResult<Vec<Vec<u8>>>, TestRunInfo) {
+    ) -> (
+        VMResult<ChangeSet>,
+        VMResult<NativeContextExtensions>,
+        VMResult<Vec<Vec<u8>>>,
+        TestRunInfo,
+    ) {
         let move_vm = MoveVM::new(self.native_function_table.clone()).unwrap();
         let extensions = extensions::new_extensions();
 
         let mut move_tracer = MoveTraceBuilder::new();
-        let tracer = if self.trace_location.is_some() { Some(&mut move_tracer) } else { None };
+        let tracer = if self.trace_location.is_some() {
+            Some(&mut move_tracer)
+        } else {
+            None
+        };
 
-        let mut session = move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
+        let mut session =
+            move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
         let mut gas_meter = GasStatus::new(&self.cost_table, Gas::new(self.execution_bound));
         move_vm_profiler::tracing_feature_enabled! {
             use move_vm_profiler::GasProfiler;
@@ -259,27 +284,39 @@ impl SharedTestingConfig {
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
         let now = Instant::now();
-        let serialized_return_values_result = session.execute_function_bypass_visibility_with_tracer_if_enabled(
-            &test_plan.module_id,
-            IdentStr::new(function_name).unwrap(),
-            vec![], // no ty args, at least for now
-            serialize_values(arguments.iter()),
-            &mut gas_meter,
-            tracer,
-        );
-        let mut return_result = serialized_return_values_result
-            .map(|res| res.return_values.into_iter().map(|(bytes, _layout)| bytes).collect());
+        let serialized_return_values_result = session
+            .execute_function_bypass_visibility_with_tracer_if_enabled(
+                &test_plan.module_id,
+                IdentStr::new(function_name).unwrap(),
+                vec![], // no ty args, at least for now
+                serialize_values(arguments.iter()),
+                &mut gas_meter,
+                tracer,
+            );
+        let mut return_result = serialized_return_values_result.map(|res| {
+            res.return_values
+                .into_iter()
+                .map(|(bytes, _layout)| bytes)
+                .collect()
+        });
         if !self.report_stacktrace_on_abort {
             if let Err(err) = &mut return_result {
                 err.remove_exec_state();
             }
         }
-        let trace = if self.trace_location.is_some() { Some(move_tracer.into_trace()) } else { None };
+        let trace = if self.trace_location.is_some() {
+            Some(move_tracer.into_trace())
+        } else {
+            None
+        };
         let test_run_info = TestRunInfo::new(
             now.elapsed(),
             // TODO(Gas): This doesn't look quite right...
             //            We're not computing the number of instructions executed even with a unit gas schedule.
-            Gas::new(self.execution_bound).checked_sub(gas_meter.remaining_gas()).unwrap().into(),
+            Gas::new(self.execution_bound)
+                .checked_sub(gas_meter.remaining_gas())
+                .unwrap()
+                .into(),
             trace,
         );
         match session.finish_with_extensions().0 {
@@ -297,7 +334,11 @@ impl SharedTestingConfig {
         let mut stats = TestStatistics::new();
 
         for (function_name, test_info) in &test_plan.tests {
-            let arguments = if test_info.arguments.iter().all(|arg| matches!(arg, TestArgument::Value(_))) {
+            let arguments = if test_info
+                .arguments
+                .iter()
+                .all(|arg| matches!(arg, TestArgument::Value(_)))
+            {
                 let test_arguments = test_info
                     .arguments
                     .iter()
@@ -323,7 +364,10 @@ impl SharedTestingConfig {
                         match arg {
                             TestArgument::Value(v) => iter_args.push(v.clone()),
                             TestArgument::Generate { generated_type } => {
-                                iter_args.push(Self::generate_value_for_typetag(&mut rng, generated_type));
+                                iter_args.push(Self::generate_value_for_typetag(
+                                    &mut rng,
+                                    generated_type,
+                                ));
                             }
                         }
                     }
@@ -354,7 +398,9 @@ impl SharedTestingConfig {
 
     fn generate_value_for_typetag(rng: &mut StdRng, ty: &TypeTag) -> MoveValue {
         match ty {
-            TypeTag::Address => MoveValue::Address(AccountAddress::from_bytes(rng.gen::<[u8; 32]>()).unwrap()),
+            TypeTag::Address => {
+                MoveValue::Address(AccountAddress::from_bytes(rng.gen::<[u8; 32]>()).unwrap())
+            }
             TypeTag::U8 => MoveValue::U8(rng.gen::<u8>()),
             TypeTag::U16 => MoveValue::U16(rng.gen::<u16>()),
             TypeTag::U32 => MoveValue::U32(rng.gen::<u32>()),
@@ -363,7 +409,9 @@ impl SharedTestingConfig {
             TypeTag::U256 => MoveValue::U256(rng.gen::<U256>()),
             TypeTag::Vector(ty) => {
                 let len = rng.gen_range(0..1024);
-                let values = (0..len).map(|_| Self::generate_value_for_typetag(rng, ty)).collect();
+                let values = (0..len)
+                    .map(|_| Self::generate_value_for_typetag(rng, ty))
+                    .collect();
                 MoveValue::Vector(values)
             }
             TypeTag::Bool => MoveValue::Bool(rng.gen::<bool>()),
@@ -397,7 +445,11 @@ impl SharedTestingConfig {
                 location,
                 format_module_id(output.test_info, &output.test_plan.module_id).replace("::", "__"),
                 function_name,
-                if let Some(seed) = prng_seed { format!("_seed_{}", seed) } else { "".to_string() }
+                if let Some(seed) = prng_seed {
+                    format!("_seed_{}", seed)
+                } else {
+                    "".to_string()
+                }
             );
             if let Err(e) = test_run_info.save_trace(&trace_file_location) {
                 eprintln!("Unable to save trace to {trace_file_location} -- {:?}", e);
@@ -406,9 +458,9 @@ impl SharedTestingConfig {
 
         match exec_result {
             Err(err) => {
-                let sub_status = err
-                    .sub_status()
-                    .and_then(|status| convert_clever_move_abort_error(status, err.location(), global_test_context));
+                let sub_status = err.sub_status().and_then(|status| {
+                    convert_clever_move_abort_error(status, err.location(), global_test_context)
+                });
                 let actual_err = MoveError(err.major_status(), sub_status, err.location().clone());
                 assert!(err.major_status() != StatusCode::EXECUTED);
                 match test_info.expected_failure.as_ref() {
@@ -418,7 +470,9 @@ impl SharedTestingConfig {
                         }
                         stats.test_success(function_name.to_string(), test_run_info, test_plan)
                     }
-                    Some(ExpectedFailure::ExpectedWithError(expected_err)) if expected_err == &actual_err => {
+                    Some(ExpectedFailure::ExpectedWithError(expected_err))
+                        if expected_err == &actual_err =>
+                    {
                         if is_last_execution_of_test {
                             output.pass(function_name);
                         }
@@ -453,7 +507,10 @@ impl SharedTestingConfig {
                         stats.test_failure(
                             function_name.to_string(),
                             TestFailure::new(
-                                FailureReason::wrong_abort_deprecated(expected_code.clone(), actual_err),
+                                FailureReason::wrong_abort_deprecated(
+                                    expected_code.clone(),
+                                    actual_err,
+                                ),
                                 test_run_info,
                                 Some(err),
                                 prng_seed,
@@ -466,7 +523,12 @@ impl SharedTestingConfig {
                         output.timeout(function_name);
                         stats.test_failure(
                             function_name.to_string(),
-                            TestFailure::new(FailureReason::timeout(), test_run_info, Some(err), prng_seed),
+                            TestFailure::new(
+                                FailureReason::timeout(),
+                                test_run_info,
+                                Some(err),
+                                prng_seed,
+                            ),
                             test_plan,
                         )
                     }
@@ -513,7 +575,11 @@ impl SharedTestingConfig {
         test_info: &BTreeMap<ModuleId, NamedCompiledModule>,
         writer: &Mutex<impl Write>,
     ) -> TestStatistics {
-        let output = TestOutput { test_plan, writer, test_info };
+        let output = TestOutput {
+            test_plan,
+            writer,
+            test_info,
+        };
 
         self.exec_module_tests_with_move_vm(test_plan, test_info, &output)
     }

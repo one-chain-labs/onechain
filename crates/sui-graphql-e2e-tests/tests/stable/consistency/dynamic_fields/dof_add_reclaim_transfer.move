@@ -18,7 +18,7 @@
 
 //# publish
 module Test::M1 {
-    use one::dynamic_object_field as ofield;
+    use sui::dynamic_object_field as ofield;
 
     public struct Parent has key, store {
         id: UID,

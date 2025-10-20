@@ -1,14 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anemo::{
-    types::{PeerEvent, PeerInfo},
-    Network,
-    Peer,
-    PeerId,
-    Request,
-    Response,
-};
+use anemo::types::PeerInfo;
+use anemo::{types::PeerEvent, Network, Peer, PeerId, Request, Response};
 use fastcrypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
 use futures::StreamExt;
 use mysten_common::debug_fatal;
@@ -20,15 +14,15 @@ use std::{
     time::Duration,
 };
 use sui_config::p2p::{AccessType, DiscoveryConfig, P2pConfig, SeedPeer};
-use sui_types::{
-    crypto::{NetworkKeyPair, Signer, ToFromBytes, VerifyingKey},
-    digests::Digest,
-    message_envelope::{Envelope, Message, VerifiedEnvelope},
-    multiaddr::Multiaddr,
-};
+use sui_types::crypto::{NetworkKeyPair, Signer, ToFromBytes, VerifyingKey};
+use sui_types::digests::Digest;
+use sui_types::message_envelope::{Envelope, Message, VerifiedEnvelope};
+use sui_types::multiaddr::Multiaddr;
 use tap::{Pipe, TapFallible};
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::watch;
 use tokio::{
-    sync::{broadcast::error::RecvError, oneshot, watch},
+    sync::oneshot,
     task::{AbortHandle, JoinSet},
 };
 use tracing::{debug, info, trace};
@@ -105,7 +99,6 @@ impl NodeInfoDigest {
 
 impl Message for NodeInfo {
     type DigestType = NodeInfoDigest;
-
     const SCOPE: IntentScope = IntentScope::DiscoveryPeers;
 
     fn digest(&self) -> Self::DigestType {
@@ -208,13 +201,15 @@ impl DiscoveryEventLoop {
     }
 
     fn configure_preferred_peers(&mut self) {
-        for (peer_id, address) in
-            self.discovery_config.allowlisted_peers.iter().map(|sp| (sp.peer_id, sp.address.clone())).chain(
-                self.config
-                    .seed_peers
-                    .iter()
-                    .filter_map(|ap| ap.peer_id.map(|peer_id| (peer_id, Some(ap.address.clone())))),
-            )
+        for (peer_id, address) in self
+            .discovery_config
+            .allowlisted_peers
+            .iter()
+            .map(|sp| (sp.peer_id, sp.address.clone()))
+            .chain(self.config.seed_peers.iter().filter_map(|ap| {
+                ap.peer_id
+                    .map(|peer_id| (peer_id, Some(ap.address.clone())))
+            }))
         {
             let anemo_address = if let Some(address) = address {
                 let Ok(address) = address.to_anemo_address() else {
@@ -249,7 +244,10 @@ impl DiscoveryEventLoop {
 
     // TODO: we don't boot out old committee member yets, however we may want to do this
     // in the future along with other network management work.
-    fn handle_trusted_peer_change_event(&mut self, trusted_peer_change_event: TrustedPeerChangeEvent) {
+    fn handle_trusted_peer_change_event(
+        &mut self,
+        trusted_peer_change_event: TrustedPeerChangeEvent,
+    ) {
         for peer_info in trusted_peer_change_event.new_peers {
             debug!(?peer_info, "Add committee member as preferred peer.");
             self.network.known_peers().insert(peer_info);
@@ -260,7 +258,11 @@ impl DiscoveryEventLoop {
         match peer_event {
             Ok(PeerEvent::NewPeer(peer_id)) => {
                 if let Some(peer) = self.network.peer(peer_id) {
-                    self.state.write().unwrap().connected_peers.insert(peer_id, ());
+                    self.state
+                        .write()
+                        .unwrap()
+                        .connected_peers
+                        .insert(peer_id, ());
 
                     // Query the new node for any peers
                     self.tasks.spawn(query_peer_for_their_known_peers(
@@ -288,13 +290,14 @@ impl DiscoveryEventLoop {
     fn handle_tick(&mut self, _now: std::time::Instant, now_unix: u64) {
         self.update_our_info_timestamp(now_unix);
 
-        self.tasks.spawn(query_connected_peers_for_their_known_peers(
-            self.network.clone(),
-            self.discovery_config.clone(),
-            self.state.clone(),
-            self.metrics.clone(),
-            self.allowlisted_peers.clone(),
-        ));
+        self.tasks
+            .spawn(query_connected_peers_for_their_known_peers(
+                self.network.clone(),
+                self.discovery_config.clone(),
+                self.state.clone(),
+                self.metrics.clone(),
+                self.allowlisted_peers.clone(),
+            ));
 
         // Cull old peers older than a day
         self.state
@@ -329,14 +332,21 @@ impl DiscoveryEventLoop {
         let number_of_connections = state.connected_peers.len();
         let number_to_dial = std::cmp::min(
             eligible.len(),
-            self.discovery_config.target_concurrent_connections().saturating_sub(number_of_connections),
+            self.discovery_config
+                .target_concurrent_connections()
+                .saturating_sub(number_of_connections),
         );
 
         // randomize the order
-        for (peer_id, info) in
-            rand::seq::SliceRandom::choose_multiple(eligible.as_slice(), &mut rand::thread_rng(), number_to_dial)
-        {
-            let abort_handle = self.tasks.spawn(try_to_connect_to_peer(self.network.clone(), info.data().to_owned()));
+        for (peer_id, info) in rand::seq::SliceRandom::choose_multiple(
+            eligible.as_slice(),
+            &mut rand::thread_rng(),
+            number_to_dial,
+        ) {
+            let abort_handle = self.tasks.spawn(try_to_connect_to_peer(
+                self.network.clone(),
+                info.data().to_owned(),
+            ));
             self.pending_dials.insert(*peer_id, abort_handle);
         }
 
@@ -366,7 +376,13 @@ async fn try_to_connect_to_peer(network: Network, info: NodeInfo) {
             if network
                 .connect_with_peer_id(address, info.peer_id)
                 .await
-                .tap_err(|e| debug!("error dialing {} at address '{}': {e}", info.peer_id.short_display(4), multiaddr))
+                .tap_err(|e| {
+                    debug!(
+                        "error dialing {} at address '{}': {e}",
+                        info.peer_id.short_display(4),
+                        multiaddr
+                    )
+                })
                 .is_ok()
             {
                 return;
@@ -375,22 +391,32 @@ async fn try_to_connect_to_peer(network: Network, info: NodeInfo) {
     }
 }
 
-async fn try_to_connect_to_seed_peers(network: Network, config: Arc<DiscoveryConfig>, seed_peers: Vec<SeedPeer>) {
+async fn try_to_connect_to_seed_peers(
+    network: Network,
+    config: Arc<DiscoveryConfig>,
+    seed_peers: Vec<SeedPeer>,
+) {
     debug!(?seed_peers, "Connecting to seed peers");
     let network = &network;
 
-    futures::stream::iter(
-        seed_peers.into_iter().filter_map(|seed| seed.address.to_anemo_address().ok().map(|address| (seed, address))),
+    futures::stream::iter(seed_peers.into_iter().filter_map(|seed| {
+        seed.address
+            .to_anemo_address()
+            .ok()
+            .map(|address| (seed, address))
+    }))
+    .for_each_concurrent(
+        config.target_concurrent_connections(),
+        |(seed, address)| async move {
+            // Ignore the result and just log the error  if there is one
+            let _ = if let Some(peer_id) = seed.peer_id {
+                network.connect_with_peer_id(address, peer_id).await
+            } else {
+                network.connect(address).await
+            }
+            .tap_err(|e| debug!("error dialing multiaddr '{}': {e}", seed.address));
+        },
     )
-    .for_each_concurrent(config.target_concurrent_connections(), |(seed, address)| async move {
-        // Ignore the result and just log the error  if there is one
-        let _ = if let Some(peer_id) = seed.peer_id {
-            network.connect_with_peer_id(address, peer_id).await
-        } else {
-            network.connect(address).await
-        }
-        .tap_err(|e| debug!("error dialing multiaddr '{}': {e}", seed.address));
-    })
     .await;
 }
 
@@ -403,14 +429,22 @@ async fn query_peer_for_their_known_peers(
     let mut client = DiscoveryClient::new(peer);
 
     let request = Request::new(()).with_timeout(TIMEOUT);
-    let found_peers = client.get_known_peers_v2(request).await.ok().map(Response::into_inner).map(
-        |GetKnownPeersResponseV2 { own_info, mut known_peers }| {
-            if !own_info.addresses.is_empty() {
-                known_peers.push(own_info)
-            }
-            known_peers
-        },
-    );
+    let found_peers = client
+        .get_known_peers_v2(request)
+        .await
+        .ok()
+        .map(Response::into_inner)
+        .map(
+            |GetKnownPeersResponseV2 {
+                 own_info,
+                 mut known_peers,
+             }| {
+                if !own_info.addresses.is_empty() {
+                    known_peers.push(own_info)
+                }
+                known_peers
+            },
+        );
     if let Some(found_peers) = found_peers {
         update_known_peers(state, metrics, found_peers, allowlisted_peers);
     }
@@ -436,14 +470,22 @@ async fn query_connected_peers_for_their_known_peers(
         .map(DiscoveryClient::new)
         .map(|mut client| async move {
             let request = Request::new(()).with_timeout(TIMEOUT);
-            client.get_known_peers_v2(request).await.ok().map(Response::into_inner).map(
-                |GetKnownPeersResponseV2 { own_info, mut known_peers }| {
-                    if !own_info.addresses.is_empty() {
-                        known_peers.push(own_info)
-                    }
-                    known_peers
-                },
-            )
+            client
+                .get_known_peers_v2(request)
+                .await
+                .ok()
+                .map(Response::into_inner)
+                .map(
+                    |GetKnownPeersResponseV2 {
+                         own_info,
+                         mut known_peers,
+                     }| {
+                        if !own_info.addresses.is_empty() {
+                            known_peers.push(own_info)
+                        }
+                        known_peers
+                    },
+                )
         })
         .pipe(futures::stream::iter)
         .buffer_unordered(config.peers_to_query())
@@ -481,7 +523,9 @@ fn update_known_peers(
         }
 
         // If Peer is Private, and not in our allowlist, skip it.
-        if peer_info.access_type == AccessType::Private && !allowlisted_peers.contains_key(&peer_info.peer_id) {
+        if peer_info.access_type == AccessType::Private
+            && !allowlisted_peers.contains_key(&peer_info.peer_id)
+        {
             continue;
         }
 
@@ -491,7 +535,11 @@ fn update_known_peers(
         }
 
         // verify that all addresses provided are valid anemo addresses
-        if !peer_info.addresses.iter().all(|addr| addr.len() < MAX_ADDRESS_LENGTH && addr.to_anemo_address().is_ok()) {
+        if !peer_info
+            .addresses
+            .iter()
+            .all(|addr| addr.len() < MAX_ADDRESS_LENGTH && addr.to_anemo_address().is_ok())
+        {
             continue;
         }
         let Ok(public_key) = Ed25519PublicKey::from_bytes(&peer_info.peer_id.0) else {
@@ -504,7 +552,10 @@ fn update_known_peers(
         };
         let msg = bcs::to_bytes(peer_info.data()).expect("BCS serialization should not fail");
         if let Err(e) = public_key.verify(&msg, peer_info.auth_sig()) {
-            info!("Discovery failed to verify signature for NodeInfo for peer {:?}: {e:?}", peer_info.peer_id);
+            info!(
+                "Discovery failed to verify signature for NodeInfo for peer {:?}: {e:?}",
+                peer_info.peer_id
+            );
             // TODO: consider denylisting the source of bad NodeInfo from future requests.
             continue;
         }
@@ -535,5 +586,8 @@ fn update_known_peers(
 fn now_unix() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }

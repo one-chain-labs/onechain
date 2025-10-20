@@ -4,26 +4,20 @@
 use std::sync::Arc;
 
 use prometheus::{
-    register_int_counter_vec_with_registry,
-    register_int_gauge_vec_with_registry,
-    IntCounterVec,
-    IntGaugeVec,
-    Registry,
+    register_int_counter_vec_with_registry, register_int_gauge_vec_with_registry, IntCounterVec,
+    IntGaugeVec, Registry,
 };
 use tokio_stream::Stream;
 use tracing::{error, instrument, trace};
 
 use crate::streamer::Streamer;
 use sui_json_rpc_types::{
-    EffectsWithInput,
-    EventFilter,
-    SuiEvent,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockEvents,
+    EffectsWithInput, EventFilter, SuiTransactionBlockEffects, SuiTransactionBlockEvents,
     TransactionFilter,
 };
-use sui_types::{error::SuiResult, transaction::TransactionData};
+use sui_json_rpc_types::{SuiEvent, SuiTransactionBlockEffectsAPI};
+use sui_types::error::SuiResult;
+use sui_types::transaction::TransactionData;
 
 #[cfg(test)]
 #[path = "unit_tests/subscription_handler_tests.rs"]
@@ -94,8 +88,13 @@ impl SubscriptionHandler {
             "Processing tx/event subscription"
         );
 
-        if let Err(e) =
-            self.transaction_streamer.send(EffectsWithInput { input: input.clone(), effects: effects.clone() }).await
+        if let Err(e) = self
+            .transaction_streamer
+            .send(EffectsWithInput {
+                input: input.clone(),
+                effects: effects.clone(),
+            })
+            .await
         {
             error!(error =? e, "Failed to send transaction to dispatch");
         }
@@ -113,7 +112,10 @@ impl SubscriptionHandler {
         self.event_streamer.subscribe(filter)
     }
 
-    pub fn subscribe_transactions(&self, filter: TransactionFilter) -> impl Stream<Item = SuiTransactionBlockEffects> {
+    pub fn subscribe_transactions(
+        &self,
+        filter: TransactionFilter,
+    ) -> impl Stream<Item = SuiTransactionBlockEffects> {
         self.transaction_streamer.subscribe(filter)
     }
 }

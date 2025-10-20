@@ -5,10 +5,12 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{Context, Result};
 use diesel_async::RunQueryDsl;
-use sui_indexer_alt_framework::{
-    db,
-    pipeline::{concurrent::Handler, Processor},
+use sui_indexer_alt_framework::pipeline::{concurrent::Handler, Processor};
+use sui_indexer_alt_schema::{
+    schema::tx_balance_changes,
+    transactions::{BalanceChange, StoredTxBalanceChange},
 };
+use sui_pg_db as db;
 use sui_types::{
     coin::Coin,
     effects::TransactionEffectsAPI,
@@ -16,33 +18,34 @@ use sui_types::{
     gas_coin::GAS,
 };
 
-use crate::{
-    models::transactions::{BalanceChange, StoredTxBalanceChange},
-    schema::tx_balance_changes,
-};
-
 pub(crate) struct TxBalanceChanges;
 
 impl Processor for TxBalanceChanges {
-    type Value = StoredTxBalanceChange;
-
     const NAME: &'static str = "tx_balance_changes";
 
+    type Value = StoredTxBalanceChange;
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData { transactions, checkpoint_summary, .. } = checkpoint.as_ref();
+        let CheckpointData {
+            transactions,
+            checkpoint_summary,
+            ..
+        } = checkpoint.as_ref();
 
         let mut values = Vec::new();
         let first_tx = checkpoint_summary.network_total_transactions as usize - transactions.len();
 
         for (i, tx) in transactions.iter().enumerate() {
             let tx_sequence_number = (first_tx + i) as i64;
-            let balance_changes = balance_changes(tx)
-                .with_context(|| format!("Calculating balance changes for transaction {tx_sequence_number}"))?;
+            let balance_changes = balance_changes(tx).with_context(|| {
+                format!("Calculating balance changes for transaction {tx_sequence_number}")
+            })?;
 
             values.push(StoredTxBalanceChange {
                 tx_sequence_number,
-                balance_changes: bcs::to_bytes(&balance_changes)
-                    .with_context(|| format!("Serializing balance changes for transaction {tx_sequence_number}"))?,
+                balance_changes: bcs::to_bytes(&balance_changes).with_context(|| {
+                    format!("Serializing balance changes for transaction {tx_sequence_number}")
+                })?,
             });
         }
 
@@ -52,11 +55,15 @@ impl Processor for TxBalanceChanges {
 
 #[async_trait::async_trait]
 impl Handler for TxBalanceChanges {
-    const MAX_PENDING_ROWS: usize = 10000;
     const MIN_EAGER_ROWS: usize = 100;
+    const MAX_PENDING_ROWS: usize = 10000;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(tx_balance_changes::table).values(values).on_conflict_do_nothing().execute(conn).await?)
+        Ok(diesel::insert_into(tx_balance_changes::table)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?)
     }
 }
 

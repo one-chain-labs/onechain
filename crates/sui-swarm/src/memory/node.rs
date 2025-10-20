@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
-use one_node::SuiNodeHandle;
-use std::sync::{Mutex, MutexGuard};
+use anyhow::anyhow;
+use anyhow::Result;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
 use sui_config::NodeConfig;
-use sui_types::{
-    base_types::{AuthorityName, ConciseableName},
-    crypto::KeypairTraits,
-};
+use one_node::SuiNodeHandle;
+use sui_types::base_types::AuthorityName;
+use sui_types::base_types::ConciseableName;
+use sui_types::crypto::KeypairTraits;
 use tap::TapFallible;
 use tracing::{error, info};
 
@@ -35,7 +36,11 @@ impl Node {
     ///
     /// [`NodeConfig`]: sui_config::NodeConfig
     pub fn new(config: NodeConfig) -> Self {
-        Self { container: Default::default(), config: config.into(), runtime_type: RuntimeType::SingleThreaded }
+        Self {
+            container: Default::default(),
+            config: config.into(),
+            runtime_type: RuntimeType::SingleThreaded,
+        }
     }
 
     /// Return the `name` of this Node
@@ -73,11 +78,19 @@ impl Node {
 
     /// If this Node is currently running
     pub fn is_running(&self) -> bool {
-        self.container.lock().unwrap().as_ref().map_or(false, |c| c.is_alive())
+        self.container
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map_or(false, |c| c.is_alive())
     }
 
     pub fn get_node_handle(&self) -> Option<SuiNodeHandle> {
-        self.container.lock().unwrap().as_ref().and_then(|c| c.get_node_handle())
+        self.container
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|c| c.get_node_handle())
     }
 
     /// Perform a health check on this Node by:
@@ -110,7 +123,12 @@ impl Node {
                 .check(tonic_health::pb::HealthCheckRequest::default())
                 .await
                 .map_err(|e| HealthCheckError::Failure(e.into()))
-                .tap_err(|e| error!("error performing health check on {}: {e}", self.name().concise()))?;
+                .tap_err(|e| {
+                    error!(
+                        "error performing health check on {}: {e}",
+                        self.name().concise()
+                    )
+                })?;
         }
 
         Ok(())

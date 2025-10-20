@@ -11,14 +11,20 @@ use mysten_metrics::{RegistryID, RegistryService};
 use prometheus::Registry;
 use sui_config::NodeConfig;
 use sui_protocol_config::ConsensusNetwork;
-use sui_types::{committee::EpochId, sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait};
+use sui_types::{
+    committee::EpochId, sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait,
+};
 use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::{
     authority::authority_per_epoch_store::AuthorityPerEpochStore,
-    consensus_handler::{ConsensusHandlerInitializer, ConsensusTransactionHandler, MysticetiConsensusHandler},
-    consensus_manager::{ConsensusManagerMetrics, ConsensusManagerTrait, Running, RunningLockGuard},
+    consensus_handler::{
+        ConsensusHandlerInitializer, ConsensusTransactionHandler, MysticetiConsensusHandler,
+    },
+    consensus_manager::{
+        ConsensusManagerMetrics, ConsensusManagerTrait, Running, RunningLockGuard,
+    },
     consensus_validator::SuiTxValidator,
     mysticeti_adapter::LazyMysticetiClient,
 };
@@ -109,13 +115,20 @@ impl ConsensusManagerTrait for MysticetiManager {
         let protocol_config = epoch_store.protocol_config();
         let network_type = self.pick_network(&epoch_store);
 
-        let Some(_guard) =
-            RunningLockGuard::acquire_start(&self.metrics, &self.running, epoch, protocol_config.version).await
+        let Some(_guard) = RunningLockGuard::acquire_start(
+            &self.metrics,
+            &self.running,
+            epoch,
+            protocol_config.version,
+        )
+        .await
         else {
             return;
         };
 
-        let consensus_config = config.consensus_config().expect("consensus_config should exist");
+        let consensus_config = config
+            .consensus_config()
+            .expect("consensus_config should exist");
 
         let parameters = Parameters {
             db_path: self.get_store_path(epoch),
@@ -153,7 +166,10 @@ impl ConsensusManagerTrait for MysticetiManager {
         if participated_on_previous_run {
             *boot_counter += 1;
         } else {
-            info!("Node has not participated in previous run. Boot counter will not increment {}", *boot_counter);
+            info!(
+                "Node has not participated in previous epoch consensus. Boot counter ({}) will not increment.",
+                *boot_counter
+            );
         }
 
         let authority = ConsensusAuthority::start(
@@ -184,6 +200,7 @@ impl ConsensusManagerTrait for MysticetiManager {
         let consensus_transaction_handler = ConsensusTransactionHandler::new(
             epoch_store.clone(),
             consensus_handler.transaction_manager_sender().clone(),
+            consensus_handler_initializer.backpressure_subscriber(),
             consensus_handler_initializer.metrics().clone(),
         );
         let handler = MysticetiConsensusHandler::new(
@@ -202,7 +219,8 @@ impl ConsensusManagerTrait for MysticetiManager {
     }
 
     async fn shutdown(&self) {
-        let Some(_guard) = RunningLockGuard::acquire_shutdown(&self.metrics, &self.running).await else {
+        let Some(_guard) = RunningLockGuard::acquire_shutdown(&self.metrics, &self.running).await
+        else {
             return;
         };
 

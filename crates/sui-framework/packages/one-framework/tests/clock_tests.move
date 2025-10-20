@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::clock_tests {
-    use one::clock;
+module oct::clock_tests {
+    use sui::clock;
 
     #[test]
     fun creating_a_clock_and_incrementing_it() {

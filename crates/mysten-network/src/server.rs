@@ -1,28 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use crate::metrics::{
+    DefaultMetricsCallbackProvider, MetricsCallbackProvider, MetricsHandler,
+    GRPC_ENDPOINT_PATH_HEADER,
+};
 use crate::{
     config::Config,
-    metrics::{DefaultMetricsCallbackProvider, MetricsCallbackProvider, MetricsHandler, GRPC_ENDPOINT_PATH_HEADER},
     multiaddr::{parse_dns, parse_ip4, parse_ip6, Multiaddr, Protocol},
 };
 use eyre::{eyre, Result};
-use futures::{stream::FuturesUnordered, FutureExt, Stream, StreamExt};
-use std::{
-    convert::Infallible,
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::{TcpListener, TcpStream, ToSocketAddrs},
-};
-use tokio_rustls::{rustls::ServerConfig, server::TlsStream, TlsAcceptor};
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, Stream, StreamExt};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::{convert::Infallible, net::SocketAddr};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::{server::TlsStream, TlsAcceptor};
+use tonic::codegen::http::HeaderValue;
 use tonic::{
     body::BoxBody,
     codegen::{
-        http::{HeaderValue, Request, Response},
+        http::{Request, Response},
         BoxFuture,
     },
     server::NamedService,
@@ -33,16 +34,12 @@ use tower::{
     limit::GlobalConcurrencyLimitLayer,
     load_shed::LoadShedLayer,
     util::Either,
-    Layer,
-    Service,
-    ServiceBuilder,
+    Layer, Service, ServiceBuilder,
 };
-use tower_http::{
-    classify::{GrpcErrorsAsFailures, SharedClassifier},
-    propagate_header::PropagateHeaderLayer,
-    set_header::SetRequestHeaderLayer,
-    trace::{DefaultMakeSpan, DefaultOnBodyChunk, DefaultOnEos, TraceLayer},
-};
+use tower_http::classify::{GrpcErrorsAsFailures, SharedClassifier};
+use tower_http::propagate_header::PropagateHeaderLayer;
+use tower_http::set_header::SetRequestHeaderLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnBodyChunk, DefaultOnEos, TraceLayer};
 use tracing::debug;
 
 pub struct ServerBuilder<M: MetricsCallbackProvider = DefaultMetricsCallbackProvider> {
@@ -96,15 +93,21 @@ impl<M: MetricsCallbackProvider> ServerBuilder<M> {
             builder = builder.tcp_nodelay(tcp_nodelay);
         }
 
-        let load_shed = config.load_shed.unwrap_or_default().then_some(tower::load_shed::LoadShedLayer::new());
+        let load_shed = config
+            .load_shed
+            .unwrap_or_default()
+            .then_some(tower::load_shed::LoadShedLayer::new());
 
         let metrics = MetricsHandler::new(metrics_provider.clone());
 
-        let request_metrics =
-            TraceLayer::new_for_grpc().on_request(metrics.clone()).on_response(metrics.clone()).on_failure(metrics);
+        let request_metrics = TraceLayer::new_for_grpc()
+            .on_request(metrics.clone())
+            .on_response(metrics.clone())
+            .on_failure(metrics);
 
-        let global_concurrency_limit =
-            config.global_concurrency_limit.map(tower::limit::GlobalConcurrencyLimitLayer::new);
+        let global_concurrency_limit = config
+            .global_concurrency_limit
+            .map(tower::limit::GlobalConcurrencyLimitLayer::new);
 
         fn add_path_to_request_header(request: &Request<BoxBody>) -> Option<HeaderValue> {
             let path = request.uri().path();
@@ -134,7 +137,10 @@ impl<M: MetricsCallbackProvider> ServerBuilder<M> {
             .layer(layer)
             .add_service(health_service);
 
-        Self { router, health_reporter }
+        Self {
+            router,
+            health_reporter,
+        }
     }
 
     pub fn health_reporter(&self) -> tonic_health::server::HealthReporter {
@@ -160,31 +166,50 @@ impl<M: MetricsCallbackProvider> ServerBuilder<M> {
 
         let (tx_cancellation, rx_cancellation) = tokio::sync::oneshot::channel();
         let rx_cancellation = rx_cancellation.map(|_| ());
-        let (local_addr, server): (Multiaddr, BoxFuture<(), tonic::transport::Error>) =
-            match iter.next().ok_or_else(|| eyre!("malformed addr"))? {
-                Protocol::Dns(_) => {
-                    let (dns_name, tcp_port, _http_or_https) = parse_dns(addr)?;
-                    let (local_addr, incoming) =
-                        listen_and_update_multiaddr(addr, (dns_name.to_string(), tcp_port), tls_config).await?;
-                    let server = Box::pin(self.router.serve_with_incoming_shutdown(incoming, rx_cancellation));
-                    (local_addr, server)
-                }
-                Protocol::Ip4(_) => {
-                    let (socket_addr, _http_or_https) = parse_ip4(addr)?;
-                    let (local_addr, incoming) = listen_and_update_multiaddr(addr, socket_addr, tls_config).await?;
-                    let server = Box::pin(self.router.serve_with_incoming_shutdown(incoming, rx_cancellation));
-                    (local_addr, server)
-                }
-                Protocol::Ip6(_) => {
-                    let (socket_addr, _http_or_https) = parse_ip6(addr)?;
-                    let (local_addr, incoming) = listen_and_update_multiaddr(addr, socket_addr, tls_config).await?;
-                    let server = Box::pin(self.router.serve_with_incoming_shutdown(incoming, rx_cancellation));
-                    (local_addr, server)
-                }
-                unsupported => return Err(eyre!("unsupported protocol {unsupported}")),
-            };
+        let (local_addr, server): (Multiaddr, BoxFuture<(), tonic::transport::Error>) = match iter
+            .next()
+            .ok_or_else(|| eyre!("malformed addr"))?
+        {
+            Protocol::Dns(_) => {
+                let (dns_name, tcp_port, _http_or_https) = parse_dns(addr)?;
+                let (local_addr, incoming) =
+                    listen_and_update_multiaddr(addr, (dns_name.to_string(), tcp_port), tls_config)
+                        .await?;
+                let server = Box::pin(
+                    self.router
+                        .serve_with_incoming_shutdown(incoming, rx_cancellation),
+                );
+                (local_addr, server)
+            }
+            Protocol::Ip4(_) => {
+                let (socket_addr, _http_or_https) = parse_ip4(addr)?;
+                let (local_addr, incoming) =
+                    listen_and_update_multiaddr(addr, socket_addr, tls_config).await?;
+                let server = Box::pin(
+                    self.router
+                        .serve_with_incoming_shutdown(incoming, rx_cancellation),
+                );
+                (local_addr, server)
+            }
+            Protocol::Ip6(_) => {
+                let (socket_addr, _http_or_https) = parse_ip6(addr)?;
+                let (local_addr, incoming) =
+                    listen_and_update_multiaddr(addr, socket_addr, tls_config).await?;
+                let server = Box::pin(
+                    self.router
+                        .serve_with_incoming_shutdown(incoming, rx_cancellation),
+                );
+                (local_addr, server)
+            }
+            unsupported => return Err(eyre!("unsupported protocol {unsupported}")),
+        };
 
-        Ok(Server { server, cancel_handle: Some(tx_cancellation), local_addr, health_reporter: self.health_reporter })
+        Ok(Server {
+            server,
+            cancel_handle: Some(tx_cancellation),
+            local_addr,
+            health_reporter: self.health_reporter,
+        })
     }
 }
 
@@ -192,7 +217,10 @@ async fn listen_and_update_multiaddr<T: ToSocketAddrs>(
     address: &Multiaddr,
     socket_addr: T,
     tls_config: Option<ServerConfig>,
-) -> Result<(Multiaddr, impl Stream<Item = std::io::Result<TcpOrTlsStream>>)> {
+) -> Result<(
+    Multiaddr,
+    impl Stream<Item = std::io::Result<TcpOrTlsStream>>,
+)> {
     let listener = TcpListener::bind(socket_addr).await?;
     let local_addr = listener.local_addr()?;
     let local_addr = update_tcp_port_in_multiaddr(address, local_addr.port());
@@ -228,14 +256,21 @@ pub struct TcpOrTlsListener {
 
 impl TcpOrTlsListener {
     fn new(listener: TcpListener, tls_acceptor: Option<TlsAcceptor>) -> Self {
-        Self { listener, tls_acceptor }
+        Self {
+            listener,
+            tls_acceptor,
+        }
     }
 
     async fn accept_raw(&self) -> std::io::Result<(TcpStream, SocketAddr)> {
         self.listener.accept().await
     }
 
-    async fn maybe_upgrade(&self, stream: TcpStream, addr: SocketAddr) -> std::io::Result<TcpOrTlsStream> {
+    async fn maybe_upgrade(
+        &self,
+        stream: TcpStream,
+        addr: SocketAddr,
+    ) -> std::io::Result<TcpOrTlsStream> {
         if self.tls_acceptor.is_none() {
             return Ok(TcpOrTlsStream::Tcp(stream, addr));
         }
@@ -263,7 +298,11 @@ pub enum TcpOrTlsStream {
 }
 
 impl AsyncRead for TcpOrTlsStream {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut tokio::io::ReadBuf) -> Poll<std::io::Result<()>> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf,
+    ) -> Poll<std::io::Result<()>> {
         match self.get_mut() {
             TcpOrTlsStream::Tcp(stream, _) => Pin::new(stream).poll_read(cx, buf),
             TcpOrTlsStream::Tls(stream, _) => Pin::new(stream).poll_read(cx, buf),
@@ -283,14 +322,20 @@ impl AsyncWrite for TcpOrTlsStream {
         }
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), std::io::Error>> {
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), std::io::Error>> {
         match self.get_mut() {
             TcpOrTlsStream::Tcp(stream, _) => Pin::new(stream).poll_flush(cx),
             TcpOrTlsStream::Tls(stream, _) => Pin::new(stream).poll_flush(cx),
         }
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), std::io::Error>> {
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), std::io::Error>> {
         match self.get_mut() {
             TcpOrTlsStream::Tcp(stream, _) => Pin::new(stream).poll_shutdown(cx),
             TcpOrTlsStream::Tls(stream, _) => Pin::new(stream).poll_shutdown(cx),
@@ -303,12 +348,14 @@ impl tonic::transport::server::Connected for TcpOrTlsStream {
 
     fn connect_info(&self) -> Self::ConnectInfo {
         match self {
-            TcpOrTlsStream::Tcp(stream, addr) => {
-                Self::ConnectInfo { local_addr: stream.local_addr().ok(), remote_addr: Some(*addr) }
-            }
-            TcpOrTlsStream::Tls(stream, addr) => {
-                Self::ConnectInfo { local_addr: stream.get_ref().0.local_addr().ok(), remote_addr: Some(*addr) }
-            }
+            TcpOrTlsStream::Tcp(stream, addr) => Self::ConnectInfo {
+                local_addr: stream.local_addr().ok(),
+                remote_addr: Some(*addr),
+            },
+            TcpOrTlsStream::Tls(stream, addr) => Self::ConnectInfo {
+                local_addr: stream.get_ref().0.local_addr().ok(),
+                remote_addr: Some(*addr),
+            },
         }
     }
 }
@@ -354,14 +401,15 @@ fn update_tcp_port_in_multiaddr(addr: &Multiaddr, port: u16) -> Multiaddr {
 
 #[cfg(test)]
 mod test {
-    use crate::{config::Config, metrics::MetricsCallbackProvider, Multiaddr};
-    use std::{
-        ops::Deref,
-        sync::{Arc, Mutex},
-        time::Duration,
-    };
+    use crate::config::Config;
+    use crate::metrics::MetricsCallbackProvider;
+    use crate::Multiaddr;
+    use std::ops::Deref;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
     use tonic::Code;
-    use tonic_health::pb::{health_client::HealthClient, HealthCheckRequest};
+    use tonic_health::pb::health_client::HealthClient;
+    use tonic_health::pb::HealthCheckRequest;
 
     #[test]
     fn document_multiaddr_limitation_for_unix_protocol() {
@@ -388,7 +436,13 @@ mod test {
                 assert_eq!(path, "/grpc.health.v1.Health/Check");
             }
 
-            fn on_response(&self, path: String, _latency: Duration, status: u16, grpc_status_code: Code) {
+            fn on_response(
+                &self,
+                path: String,
+                _latency: Duration,
+                status: u16,
+                grpc_status_code: Code,
+            ) {
                 assert_eq!(path, "/grpc.health.v1.Health/Check");
                 assert_eq!(status, 200);
                 assert_eq!(grpc_status_code, Code::Ok);
@@ -397,12 +451,18 @@ mod test {
             }
         }
 
-        let metrics = Metrics { metrics_called: Arc::new(Mutex::new(false)) };
+        let metrics = Metrics {
+            metrics_called: Arc::new(Mutex::new(false)),
+        };
 
         let address: Multiaddr = "/ip4/127.0.0.1/tcp/0/http".parse().unwrap();
         let config = Config::new();
 
-        let mut server = config.server_builder_with_metrics(metrics.clone()).bind(&address, None).await.unwrap();
+        let mut server = config
+            .server_builder_with_metrics(metrics.clone())
+            .bind(&address, None)
+            .await
+            .unwrap();
 
         let address = server.local_addr().to_owned();
         let cancel_handle = server.take_cancel_handle().unwrap();
@@ -410,7 +470,12 @@ mod test {
         let channel = config.connect(&address, None).await.unwrap();
         let mut client = HealthClient::new(channel);
 
-        client.check(HealthCheckRequest { service: "".to_owned() }).await.unwrap();
+        client
+            .check(HealthCheckRequest {
+                service: "".to_owned(),
+            })
+            .await
+            .unwrap();
 
         cancel_handle.send(()).unwrap();
         server_handle.await.unwrap().unwrap();
@@ -432,7 +497,13 @@ mod test {
                 assert_eq!(path, "/grpc.health.v1.Health/Check");
             }
 
-            fn on_response(&self, path: String, _latency: Duration, status: u16, grpc_status_code: Code) {
+            fn on_response(
+                &self,
+                path: String,
+                _latency: Duration,
+                status: u16,
+                grpc_status_code: Code,
+            ) {
                 assert_eq!(path, "/grpc.health.v1.Health/Check");
                 assert_eq!(status, 200);
                 // According to https://github.com/grpc/grpc/blob/master/doc/statuscodes.md#status-codes-and-their-use-in-grpc
@@ -443,12 +514,18 @@ mod test {
             }
         }
 
-        let metrics = Metrics { metrics_called: Arc::new(Mutex::new(false)) };
+        let metrics = Metrics {
+            metrics_called: Arc::new(Mutex::new(false)),
+        };
 
         let address: Multiaddr = "/ip4/127.0.0.1/tcp/0/http".parse().unwrap();
         let config = Config::new();
 
-        let mut server = config.server_builder_with_metrics(metrics.clone()).bind(&address, None).await.unwrap();
+        let mut server = config
+            .server_builder_with_metrics(metrics.clone())
+            .bind(&address, None)
+            .await
+            .unwrap();
 
         let address = server.local_addr().to_owned();
         let cancel_handle = server.take_cancel_handle().unwrap();
@@ -459,7 +536,11 @@ mod test {
         // Call the healthcheck for a service that doesn't exist
         // that should give us back an error with code 5 (not_found)
         // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md#status-codes-and-their-use-in-grpc
-        let _ = client.check(HealthCheckRequest { service: "non-existing-service".to_owned() }).await;
+        let _ = client
+            .check(HealthCheckRequest {
+                service: "non-existing-service".to_owned(),
+            })
+            .await;
 
         cancel_handle.send(()).unwrap();
         server_handle.await.unwrap().unwrap();
@@ -476,7 +557,12 @@ mod test {
         let channel = config.connect(&address, None).await.unwrap();
         let mut client = HealthClient::new(channel);
 
-        client.check(HealthCheckRequest { service: "".to_owned() }).await.unwrap();
+        client
+            .check(HealthCheckRequest {
+                service: "".to_owned(),
+            })
+            .await
+            .unwrap();
 
         cancel_handle.send(()).unwrap();
         server_handle.await.unwrap().unwrap();
@@ -510,7 +596,11 @@ impl<M: MetricsCallbackProvider, S> Layer<S> for RequestLifetimeLayer<M> {
     type Service = RequestLifetime<M, S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        RequestLifetime { inner, metrics_provider: self.metrics_provider.clone(), path: None }
+        RequestLifetime {
+            inner,
+            metrics_provider: self.metrics_provider.clone(),
+            path: None,
+        }
     }
 }
 
@@ -521,13 +611,14 @@ struct RequestLifetime<M: MetricsCallbackProvider, S> {
     path: Option<String>,
 }
 
-impl<M: MetricsCallbackProvider, S, RequestBody> Service<Request<RequestBody>> for RequestLifetime<M, S>
+impl<M: MetricsCallbackProvider, S, RequestBody> Service<Request<RequestBody>>
+    for RequestLifetime<M, S>
 where
     S: Service<Request<RequestBody>>,
 {
+    type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
-    type Response = S::Response;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)

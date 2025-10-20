@@ -39,13 +39,13 @@ By default, this command also verify all the transactions in the checkpoint, spe
 
 **Note** you must put `--num-threads ` after the urls, otherwise the command will not be parsed correctly
 
-### Example 2: (WIP) Execute PaySui Transaction
+### Example 2: (WIP) Execute PayOct Transaction
 
 ```bash
-cargo run --bin sui-rpc-loadgen -- --urls "http://127.0.0.1:9000" --num-threads 1 pay-sui --repeat 100
+cargo run --bin sui-rpc-loadgen -- --urls "http://127.0.0.1:9000" --num-threads 1 pay-oct --repeat 100
 ```
 
-**NOTE**: right now `pay-sui` only supports 1 thread but multi-threading support can be added pretty easily by assigning different gas coins to different threads
+**NOTE**: right now `pay-oct` only supports 1 thread but multi-threading support can be added pretty easily by assigning different gas coins to different threads
 
 ### Example 3: Query Transaction Blocks
 

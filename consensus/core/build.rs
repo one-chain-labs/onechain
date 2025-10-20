@@ -86,7 +86,9 @@ fn build_tonic_services(out_dir: &Path) {
         )
         .build();
 
-    tonic_build::manual::Builder::new().out_dir(out_dir).compile(&[service]);
+    tonic_build::manual::Builder::new()
+        .out_dir(out_dir)
+        .compile(&[service]);
 }
 
 fn build_anemo_services(out_dir: &Path) {
@@ -146,5 +148,7 @@ fn build_anemo_services(out_dir: &Path) {
         )
         .build();
 
-    anemo_build::manual::Builder::new().out_dir(out_dir).compile(&[service]);
+    anemo_build::manual::Builder::new()
+        .out_dir(out_dir)
+        .compile(&[service]);
 }

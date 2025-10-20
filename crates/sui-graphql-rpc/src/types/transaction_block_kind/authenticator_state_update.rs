@@ -41,7 +41,9 @@ struct ActiveJwk {
 impl AuthenticatorStateUpdateTransaction {
     /// Epoch of the authenticator state update transaction.
     async fn epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at).await.extend()
+        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at)
+            .await
+            .extend()
     }
 
     /// Consensus round of the authenticator state update.
@@ -61,8 +63,10 @@ impl AuthenticatorStateUpdateTransaction {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
         let mut connection = Connection::new(false, false);
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(self.native.new_active_jwks.len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, _, cs)) = page.paginate_consistent_indices(
+            self.native.new_active_jwks.len(),
+            self.checkpoint_viewed_at,
+        )?
         else {
             return Ok(connection);
         };
@@ -71,8 +75,13 @@ impl AuthenticatorStateUpdateTransaction {
         connection.has_next_page = next;
 
         for c in cs {
-            let active_jwk = ActiveJwk { native: self.native.new_active_jwks[c.ix].clone(), checkpoint_viewed_at: c.c };
-            connection.edges.push(Edge::new(c.encode_cursor(), active_jwk));
+            let active_jwk = ActiveJwk {
+                native: self.native.new_active_jwks[c.ix].clone(),
+                checkpoint_viewed_at: c.c,
+            };
+            connection
+                .edges
+                .push(Edge::new(c.encode_cursor(), active_jwk));
         }
 
         Ok(connection)
@@ -80,7 +89,10 @@ impl AuthenticatorStateUpdateTransaction {
 
     /// The initial version of the authenticator object that it was shared at.
     async fn authenticator_obj_initial_shared_version(&self) -> UInt53 {
-        self.native.authenticator_obj_initial_shared_version.value().into()
+        self.native
+            .authenticator_obj_initial_shared_version
+            .value()
+            .into()
     }
 }
 
@@ -118,6 +130,8 @@ impl ActiveJwk {
 
     /// The most recent epoch in which the JWK was validated.
     async fn epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at).await.extend()
+        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at)
+            .await
+            .extend()
     }
 }

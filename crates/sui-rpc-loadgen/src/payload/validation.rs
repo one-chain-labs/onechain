@@ -3,17 +3,16 @@
 
 use futures::future::join_all;
 use itertools::Itertools;
-use std::{collections::HashSet, fmt::Debug};
+use std::collections::HashSet;
+use std::fmt::Debug;
 use sui_json_rpc_types::{
-    SuiObjectDataOptions,
-    SuiObjectResponse,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
-    SuiTransactionBlockResponseOptions,
+    SuiObjectDataOptions, SuiObjectResponse, SuiTransactionBlockEffectsAPI,
+    SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
 };
 use sui_sdk::SuiClient;
 use sui_types::base_types::{ObjectID, TransactionDigest};
-use tracing::{error, log::warn};
+use tracing::error;
+use tracing::log::warn;
 
 const LOADGEN_QUERY_MAX_RESULT_LIMIT: usize = 25;
 
@@ -29,11 +28,7 @@ where
     if let Some((vec_index, v)) = entities.iter().enumerate().find(|(_, v)| v.len() != length) {
         error!(
             "Entity: {} lengths do not match at index {}: first vec has length {} vs vec {} has length {}",
-            entity_name,
-            vec_index,
-            length,
-            vec_index,
-            v.len()
+            entity_name, vec_index, length, vec_index, v.len()
         );
         return;
     }
@@ -68,26 +63,30 @@ pub(crate) async fn check_transactions(
     cross_validate: bool,
     verify_objects: bool,
 ) -> Vec<Vec<SuiTransactionBlockResponse>> {
-    let transactions: Vec<Vec<SuiTransactionBlockResponse>> = join_all(clients.iter().map(|client| async move {
-        client
-            .read_api()
-            .multi_get_transactions_with_options(
-                digests.to_vec(),
-                SuiTransactionBlockResponseOptions::full_content(), // todo(Will) support options for this
-            )
-            .await
-    }))
-    .await
-    .into_iter()
-    .enumerate()
-    .filter_map(|(i, result)| match result {
-        Ok(transactions) => Some(transactions),
-        Err(err) => {
-            warn!("Failed to fetch transactions for vec {i}: {:?}. Logging digests, {:?}", err, digests);
-            None
-        }
-    })
-    .collect();
+    let transactions: Vec<Vec<SuiTransactionBlockResponse>> =
+        join_all(clients.iter().map(|client| async move {
+            client
+                .read_api()
+                .multi_get_transactions_with_options(
+                    digests.to_vec(),
+                    SuiTransactionBlockResponseOptions::full_content(), // todo(Will) support options for this
+                )
+                .await
+        }))
+        .await
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, result)| match result {
+            Ok(transactions) => Some(transactions),
+            Err(err) => {
+                warn!(
+                    "Failed to fetch transactions for vec {i}: {:?}. Logging digests, {:?}",
+                    err, digests
+                );
+                None
+            }
+        })
+        .collect();
 
     if cross_validate {
         cross_validate_entities(&transactions, "Transactions");
@@ -112,11 +111,17 @@ pub(crate) fn get_all_object_ids(response: &SuiTransactionBlockResponse) -> Vec<
         // TODO: handle deleted and wrapped objects
         Some(effects) => effects.all_changed_objects(),
         None => {
-            error!("Effects for transaction digest {} should not be empty", response.digest);
+            error!(
+                "Effects for transaction digest {} should not be empty",
+                response.digest
+            );
             vec![]
         }
     };
-    objects.iter().map(|(owned_object_ref, _)| owned_object_ref.object_id()).collect::<Vec<_>>()
+    objects
+        .iter()
+        .map(|(owned_object_ref, _)| owned_object_ref.object_id())
+        .collect::<Vec<_>>()
 }
 
 pub(crate) fn chunk_entities<U>(entities: &[U], chunk_size: Option<usize>) -> Vec<Vec<U>>
@@ -124,10 +129,20 @@ where
     U: Clone + PartialEq + Debug,
 {
     let chunk_size = chunk_size.unwrap_or(LOADGEN_QUERY_MAX_RESULT_LIMIT);
-    entities.iter().cloned().chunks(chunk_size).into_iter().map(|chunk| chunk.collect()).collect()
+    entities
+        .iter()
+        .cloned()
+        .chunks(chunk_size)
+        .into_iter()
+        .map(|chunk| chunk.collect())
+        .collect()
 }
 
-pub(crate) async fn check_objects(clients: &[SuiClient], object_ids: &[ObjectID], cross_validate: bool) {
+pub(crate) async fn check_objects(
+    clients: &[SuiClient],
+    object_ids: &[ObjectID],
+    cross_validate: bool,
+) {
     let chunks = chunk_entities(object_ids, None);
     let results = join_all(chunks.iter().map(|chunk| multi_get_object(clients, chunk))).await;
 
@@ -138,7 +153,10 @@ pub(crate) async fn check_objects(clients: &[SuiClient], object_ids: &[ObjectID]
     }
 }
 
-pub(crate) async fn multi_get_object(clients: &[SuiClient], object_ids: &[ObjectID]) -> Vec<Vec<SuiObjectResponse>> {
+pub(crate) async fn multi_get_object(
+    clients: &[SuiClient],
+    object_ids: &[ObjectID],
+) -> Vec<Vec<SuiObjectResponse>> {
     let objects: Vec<Vec<SuiObjectResponse>> = join_all(clients.iter().map(|client| async move {
         let object_ids = if object_ids.len() > LOADGEN_QUERY_MAX_RESULT_LIMIT {
             warn!(
@@ -165,7 +183,10 @@ pub(crate) async fn multi_get_object(clients: &[SuiClient], object_ids: &[Object
     .filter_map(|(i, result)| match result {
         Ok(obj_vec) => Some(obj_vec),
         Err(err) => {
-            error!("Failed to fetch objects for vec {i}: {:?}. Logging objectIDs, {:?}", err, object_ids);
+            error!(
+                "Failed to fetch objects for vec {i}: {:?}. Logging objectIDs, {:?}",
+                err, object_ids
+            );
             None
         }
     })

@@ -53,9 +53,7 @@
 use super::{Cursor, TransactionBlockFilter};
 use crate::{
     data::{pg::bytea_literal, Conn, DbConnection},
-    filter,
-    inner_join,
-    query,
+    filter, inner_join, query,
     raw_query::RawQuery,
     types::{
         cursor::{End, Page},
@@ -228,7 +226,11 @@ impl TxBounds {
     /// filters and the cursor, but not scan limits. For the purposes of scanning records in the
     /// DB, cursors are treated inclusively, even though they are exclusive bounds.
     fn db_hi(&self) -> u64 {
-        min_option([self.cursor_hi.map(|h| h.saturating_add(1)), Some(self.tx_hi)]).unwrap()
+        min_option([
+            self.cursor_hi.map(|h| h.saturating_add(1)),
+            Some(self.tx_hi),
+        ])
+        .unwrap()
     }
 
     /// Whether the cursor lowerbound restricts the transaction range.
@@ -311,9 +313,14 @@ pub(crate) fn subqueries(filter: &TransactionBlockFilter, tx_bounds: TxBounds) -
         subqueries.push(match f {
             FqNameFilter::ByModule(filter) => match filter {
                 ModuleFilter::ByPackage(p) => ("tx_calls_pkg", select_pkg(p, sender, tx_bounds)),
-                ModuleFilter::ByModule(p, m) => ("tx_calls_mod", select_mod(p, m.clone(), sender, tx_bounds)),
+                ModuleFilter::ByModule(p, m) => {
+                    ("tx_calls_mod", select_mod(p, m.clone(), sender, tx_bounds))
+                }
             },
-            FqNameFilter::ByFqName(p, m, n) => ("tx_calls_fun", select_fun(p, m.clone(), n.clone(), sender, tx_bounds)),
+            FqNameFilter::ByFqName(p, m, n) => (
+                "tx_calls_fun",
+                select_fun(p, m.clone(), n.clone(), sender, tx_bounds),
+            ),
         });
     }
 
@@ -322,12 +329,18 @@ pub(crate) fn subqueries(filter: &TransactionBlockFilter, tx_bounds: TxBounds) -
     }
 
     if let Some(affected) = &filter.affected_address {
-        subqueries.push(("tx_affected_addresses", select_affected_address(affected, sender, tx_bounds)));
+        subqueries.push((
+            "tx_affected_addresses",
+            select_affected_address(affected, sender, tx_bounds),
+        ));
     }
 
     #[cfg(feature = "staging")]
     if let Some(affected) = &filter.affected_object {
-        subqueries.push(("tx_affected_objects", select_affected_object(affected, sender, tx_bounds)));
+        subqueries.push((
+            "tx_affected_objects",
+            select_affected_object(affected, sender, tx_bounds),
+        ));
     }
 
     if let Some(input) = &filter.input_object {
@@ -335,11 +348,17 @@ pub(crate) fn subqueries(filter: &TransactionBlockFilter, tx_bounds: TxBounds) -
     }
 
     if let Some(changed) = &filter.changed_object {
-        subqueries.push(("tx_changed_objects", select_changed(changed, sender, tx_bounds)));
+        subqueries.push((
+            "tx_changed_objects",
+            select_changed(changed, sender, tx_bounds),
+        ));
     }
 
     if let Some(sender) = &filter.explicit_sender() {
-        subqueries.push(("tx_affected_addresses", select_affected_address(sender, Some(*sender), tx_bounds)));
+        subqueries.push((
+            "tx_affected_addresses",
+            select_affected_address(sender, Some(*sender), tx_bounds),
+        ));
     }
 
     if let Some(txs) = &filter.transaction_ids {
@@ -361,32 +380,59 @@ pub(crate) fn subqueries(filter: &TransactionBlockFilter, tx_bounds: TxBounds) -
 fn select_tx(sender: Option<SuiAddress>, bound: TxBounds, from: &str) -> RawQuery {
     let mut query = filter!(
         query!(format!("SELECT tx_sequence_number FROM {from}")),
-        format!("{} <= tx_sequence_number AND tx_sequence_number < {}", bound.scan_lo(), bound.scan_hi())
+        format!(
+            "{} <= tx_sequence_number AND tx_sequence_number < {}",
+            bound.scan_lo(),
+            bound.scan_hi()
+        )
     );
 
     if let Some(sender) = sender {
-        query = filter!(query, format!("sender = {}", bytea_literal(sender.as_slice())));
+        query = filter!(
+            query,
+            format!("sender = {}", bytea_literal(sender.as_slice()))
+        );
     }
 
     query
 }
 
 fn select_pkg(pkg: &SuiAddress, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
-    filter!(select_tx(sender, bound, "tx_calls_pkg"), format!("package = {}", bytea_literal(pkg.as_slice())))
+    filter!(
+        select_tx(sender, bound, "tx_calls_pkg"),
+        format!("package = {}", bytea_literal(pkg.as_slice()))
+    )
 }
 
-fn select_mod(pkg: &SuiAddress, mod_: String, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
+fn select_mod(
+    pkg: &SuiAddress,
+    mod_: String,
+    sender: Option<SuiAddress>,
+    bound: TxBounds,
+) -> RawQuery {
     filter!(
         select_tx(sender, bound, "tx_calls_mod"),
-        format!("package = {} and module = {{}}", bytea_literal(pkg.as_slice())),
+        format!(
+            "package = {} and module = {{}}",
+            bytea_literal(pkg.as_slice())
+        ),
         mod_
     )
 }
 
-fn select_fun(pkg: &SuiAddress, mod_: String, fun: String, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
+fn select_fun(
+    pkg: &SuiAddress,
+    mod_: String,
+    fun: String,
+    sender: Option<SuiAddress>,
+    bound: TxBounds,
+) -> RawQuery {
     filter!(
         select_tx(sender, bound, "tx_calls_fun"),
-        format!("package = {} AND module = {{}} AND func = {{}}", bytea_literal(pkg.as_slice()),),
+        format!(
+            "package = {} AND module = {{}} AND func = {{}}",
+            bytea_literal(pkg.as_slice()),
+        ),
         mod_,
         fun
     )
@@ -398,7 +444,11 @@ fn select_fun(pkg: &SuiAddress, mod_: String, fun: String, sender: Option<SuiAdd
 /// combinations, in particular when kind is SystemTx and sender is specified and not 0x0, are
 /// inconsistent and will not produce any results. These inconsistent cases are expected to be
 /// checked for before this is called.
-fn select_kind(kind: TransactionBlockKindInput, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
+fn select_kind(
+    kind: TransactionBlockKindInput,
+    sender: Option<SuiAddress>,
+    bound: TxBounds,
+) -> RawQuery {
     match (kind, sender) {
         // We can simplify the query to just the `tx_affected_addresses` table if ProgrammableTX
         // and sender is specified.
@@ -406,11 +456,18 @@ fn select_kind(kind: TransactionBlockKindInput, sender: Option<SuiAddress>, boun
             select_affected_address(&sender, Some(sender), bound)
         }
         // Otherwise, we can ignore the sender always, and just query the `tx_kinds` table.
-        _ => filter!(select_tx(None, bound, "tx_kinds"), format!("tx_kind = {}", kind as i16)),
+        _ => filter!(
+            select_tx(None, bound, "tx_kinds"),
+            format!("tx_kind = {}", kind as i16)
+        ),
     }
 }
 
-fn select_affected_address(affected: &SuiAddress, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
+fn select_affected_address(
+    affected: &SuiAddress,
+    sender: Option<SuiAddress>,
+    bound: TxBounds,
+) -> RawQuery {
     filter!(
         select_tx(sender, bound, "tx_affected_addresses"),
         format!("affected = {}", bytea_literal(affected.as_slice()))
@@ -418,7 +475,11 @@ fn select_affected_address(affected: &SuiAddress, sender: Option<SuiAddress>, bo
 }
 
 #[cfg(feature = "staging")]
-fn select_affected_object(affected: &SuiAddress, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
+fn select_affected_object(
+    affected: &SuiAddress,
+    sender: Option<SuiAddress>,
+    bound: TxBounds,
+) -> RawQuery {
     filter!(
         select_tx(sender, bound, "tx_affected_objects"),
         format!("affected = {}", bytea_literal(affected.as_slice()))
@@ -426,11 +487,17 @@ fn select_affected_object(affected: &SuiAddress, sender: Option<SuiAddress>, bou
 }
 
 fn select_input(input: &SuiAddress, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
-    filter!(select_tx(sender, bound, "tx_input_objects"), format!("object_id = {}", bytea_literal(input.as_slice())))
+    filter!(
+        select_tx(sender, bound, "tx_input_objects"),
+        format!("object_id = {}", bytea_literal(input.as_slice()))
+    )
 }
 
 fn select_changed(changed: &SuiAddress, sender: Option<SuiAddress>, bound: TxBounds) -> RawQuery {
-    filter!(select_tx(sender, bound, "tx_changed_objects"), format!("object_id = {}", bytea_literal(changed.as_slice())))
+    filter!(
+        select_tx(sender, bound, "tx_changed_objects"),
+        format!("object_id = {}", bytea_literal(changed.as_slice()))
+    )
 }
 
 fn select_ids(ids: &Vec<Digest>, bound: TxBounds) -> RawQuery {

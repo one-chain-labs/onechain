@@ -10,7 +10,11 @@ use async_trait::async_trait;
 
 #[async_trait]
 impl<'a> ProcessPayload<'a, &'a GetReferenceGasPrice> for RpcCommandProcessor {
-    async fn process(&'a self, op: &'a GetReferenceGasPrice, _signer_info: &Option<SignerInfo>) -> Result<()> {
+    async fn process(
+        &'a self,
+        op: &'a GetReferenceGasPrice,
+        _signer_info: &Option<SignerInfo>,
+    ) -> Result<()> {
         let clients = self.get_clients().await?;
 
         let futures = (0..op.num_repeats).map(|_| {
@@ -27,6 +31,10 @@ impl<'a> ProcessPayload<'a, &'a GetReferenceGasPrice> for RpcCommandProcessor {
 }
 
 async fn get_reference_gas_price(client: &SuiClient) -> Result<u64> {
-    let results = client.governance_api().get_reference_gas_price().await.unwrap();
+    let results = client
+        .governance_api()
+        .get_reference_gas_price()
+        .await
+        .unwrap();
     Ok(results)
 }

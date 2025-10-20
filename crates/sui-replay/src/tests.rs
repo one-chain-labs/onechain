@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    config::ReplayableNetworkConfigSet,
-    types::{ReplayEngineError, MAX_CONCURRENT_REQUESTS, RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD},
-    LocalExec,
-};
+use crate::config::ReplayableNetworkConfigSet;
+use crate::types::ReplayEngineError;
+use crate::types::{MAX_CONCURRENT_REQUESTS, RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD};
+use crate::LocalExec;
 use sui_config::node::ExpensiveSafetyCheckConfig;
 use sui_json_rpc_api::QUERY_MAX_RESULT_LIMIT;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_sdk::{SuiClient, SuiClientBuilder};
-use sui_types::{base_types::SuiAddress, digests::TransactionDigest};
+use sui_types::base_types::SuiAddress;
+use sui_types::digests::TransactionDigest;
 
 /// Keep searching for non-system TXs in the checkppints for this long
 /// Very unlikely to take this long, but we want to be sure we find one
@@ -43,19 +43,31 @@ async fn verify_latest_tx_replay_impl() {
                     .await
                     .unwrap();
 
-                let chain_id = rpc_client.read_api().get_chain_identifier().await.unwrap();
+                    let chain_id = rpc_client.read_api().get_chain_identifier().await.unwrap();
 
-                let mut subject_checkpoint =
-                    rpc_client.read_api().get_latest_checkpoint_sequence_number().await.unwrap();
-                let txs = rpc_client.read_api().get_checkpoint(subject_checkpoint.into()).await.unwrap().transactions;
+                let mut subject_checkpoint = rpc_client
+                    .read_api()
+                    .get_latest_checkpoint_sequence_number()
+                    .await
+                    .unwrap();
+                let txs = rpc_client
+                    .read_api()
+                    .get_checkpoint(subject_checkpoint.into())
+                    .await
+                    .unwrap()
+                    .transactions;
 
-                let mut non_system_txs = extract_one_system_tx(&rpc_client, txs).await;
+                    let mut non_system_txs = extract_one_system_tx(&rpc_client, txs).await;
                 num_checkpoint_trials_left -= 1;
                 while non_system_txs.is_none() && num_checkpoint_trials_left > 0 {
                     num_checkpoint_trials_left -= 1;
                     subject_checkpoint -= 1;
-                    let txs =
-                        rpc_client.read_api().get_checkpoint(subject_checkpoint.into()).await.unwrap().transactions;
+                    let txs = rpc_client
+                        .read_api()
+                        .get_checkpoint(subject_checkpoint.into())
+                        .await
+                        .unwrap()
+                        .transactions;
                     non_system_txs = extract_one_system_tx(&rpc_client, txs).await;
                 }
 
@@ -66,13 +78,18 @@ async fn verify_latest_tx_replay_impl() {
                     );
                 }
                 let tx: TransactionDigest = non_system_txs.unwrap();
-                (url.clone(), execute_replay(&url, &tx).await)
+                (url.clone(), execute_replay(&url, &tx)
+                    .await
+            )
             }
         }));
     }
 
-    let rets =
-        futures::future::join_all(handles).await.into_iter().collect::<Result<Vec<_>, _>>().expect("Join all failed");
+    let rets = futures::future::join_all(handles)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .expect("Join all failed");
 
     for (url, ret) in rets {
         if let Err(e) = ret {
@@ -81,7 +98,10 @@ async fn verify_latest_tx_replay_impl() {
     }
 }
 
-async fn extract_one_system_tx(rpc_client: &SuiClient, mut txs: Vec<TransactionDigest>) -> Option<TransactionDigest> {
+async fn extract_one_system_tx(
+    rpc_client: &SuiClient,
+    mut txs: Vec<TransactionDigest>,
+) -> Option<TransactionDigest> {
     let opts = SuiTransactionBlockResponseOptions::full_content();
     txs.retain(|q| *q != TransactionDigest::genesis_marker());
 
@@ -121,7 +141,15 @@ async fn execute_replay(url: &str, tx: &TransactionDigest) -> Result<(), ReplayE
         .await?
         .init_for_execution()
         .await?
-        .execute_transaction(tx, ExpensiveSafetyCheckConfig::default(), true, None, None, None, None)
+        .execute_transaction(
+            tx,
+            ExpensiveSafetyCheckConfig::default(),
+            true,
+            None,
+            None,
+            None,
+            None,
+        )
         .await?
         .check_effects()?;
     tokio::task::yield_now().await;
@@ -129,7 +157,15 @@ async fn execute_replay(url: &str, tx: &TransactionDigest) -> Result<(), ReplayE
         .await?
         .init_for_execution()
         .await?
-        .execute_transaction(tx, ExpensiveSafetyCheckConfig::default(), false, None, None, None, None)
+        .execute_transaction(
+            tx,
+            ExpensiveSafetyCheckConfig::default(),
+            false,
+            None,
+            None,
+            None,
+            None,
+        )
         .await?
         .check_effects()?;
     tokio::task::yield_now().await;

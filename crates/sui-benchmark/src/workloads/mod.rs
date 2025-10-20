@@ -6,6 +6,7 @@ pub mod batch_payment;
 pub mod delegation;
 pub mod expected_failure;
 pub mod payload;
+pub mod randomized_transaction;
 pub mod randomness;
 pub mod shared_counter;
 pub mod shared_object_deletion;
@@ -15,11 +16,10 @@ pub mod workload_configuration;
 
 use std::sync::Arc;
 
-use crate::{drivers::Interval, workloads::payload::Payload};
-use sui_types::{
-    base_types::{ObjectRef, SuiAddress},
-    crypto::AccountKeyPair,
-};
+use crate::drivers::Interval;
+use crate::workloads::payload::Payload;
+use sui_types::base_types::{ObjectRef, SuiAddress};
+use sui_types::crypto::AccountKeyPair;
 use workload::*;
 
 pub type GroupID = u32;

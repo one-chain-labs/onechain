@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only, allow(deprecated_usage)]
-module one::math_tests {
-    use one::math;
+module oct::math_tests {
+    use sui::math;
 
     #[test]
     fun test_max() {

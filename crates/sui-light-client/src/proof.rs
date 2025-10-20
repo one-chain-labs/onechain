@@ -102,7 +102,10 @@ pub struct Proof {
 pub fn verify_proof(committee: &Committee, proof: &Proof) -> anyhow::Result<()> {
     // Get checkpoint summary and optional contents
     let summary = &proof.checkpoint_summary;
-    let contents_ref = proof.contents_proof.as_ref().map(|x| &x.checkpoint_contents);
+    let contents_ref = proof
+        .contents_proof
+        .as_ref()
+        .map(|x| &x.checkpoint_contents);
 
     // Verify the checkpoint summary using the committee
     summary.verify_with_contents(committee, contents_ref)?;
@@ -113,17 +116,25 @@ pub fn verify_proof(committee: &Committee, proof: &Proof) -> anyhow::Result<()> 
     // If the proof target is the next committee check it
     if let Some(committee) = &proof.targets.committee {
         match &summary.end_of_epoch_data {
-            Some(EndOfEpochData { next_epoch_committee, .. }) => {
+            Some(EndOfEpochData {
+                next_epoch_committee,
+                ..
+            }) => {
                 // Extract the end of epoch committee
                 let next_committee_data = next_epoch_committee.iter().cloned().collect();
-                let new_committee = Committee::new(summary.epoch().checked_add(1).unwrap(), next_committee_data);
+                let new_committee =
+                    Committee::new(summary.epoch().checked_add(1).unwrap(), next_committee_data);
 
                 if new_committee != *committee {
-                    return Err(anyhow!("Given committee does not match the end of epoch committee"));
+                    return Err(anyhow!(
+                        "Given committee does not match the end of epoch committee"
+                    ));
                 }
             }
             None => {
-                return Err(anyhow!("No end of epoch committee in the checkpoint summary"));
+                return Err(anyhow!(
+                    "No end of epoch committee in the checkpoint summary"
+                ));
             }
         }
     }
@@ -133,7 +144,9 @@ pub fn verify_proof(committee: &Committee, proof: &Proof) -> anyhow::Result<()> 
     // Non empty object or event targets require the optional contents proof
     // If it is not present return an error
 
-    if (!proof.targets.objects.is_empty() || !proof.targets.events.is_empty()) && proof.contents_proof.is_none() {
+    if (!proof.targets.objects.is_empty() || !proof.targets.events.is_empty())
+        && proof.contents_proof.is_none()
+    {
         return Err(anyhow!("Contents proof is missing"));
     }
 
@@ -143,18 +156,28 @@ pub fn verify_proof(committee: &Committee, proof: &Proof) -> anyhow::Result<()> 
         // Extract Transaction Digests and check they are in contents
         let digests = contents_proof.effects.execution_digests();
         if contents_proof.transaction.digest() != &digests.transaction {
-            return Err(anyhow!("Transaction digest does not match the execution digest"));
+            return Err(anyhow!(
+                "Transaction digest does not match the execution digest"
+            ));
         }
 
         // Ensure the digests are in the checkpoint contents
-        if !contents_proof.checkpoint_contents.enumerate_transactions(summary).any(|x| x.1 == &digests) {
+        if !contents_proof
+            .checkpoint_contents
+            .enumerate_transactions(summary)
+            .any(|x| x.1 == &digests)
+        {
             // Could not find the digest in the checkpoint contents
-            return Err(anyhow!("Transaction digest not found in the checkpoint contents"));
+            return Err(anyhow!(
+                "Transaction digest not found in the checkpoint contents"
+            ));
         }
 
         // MILESTONE 4: Transaction & Effect correct and in contents
 
-        if contents_proof.effects.events_digest() != contents_proof.events.as_ref().map(|e| e.digest()).as_ref() {
+        if contents_proof.effects.events_digest()
+            != contents_proof.events.as_ref().map(|e| e.digest()).as_ref()
+        {
             return Err(anyhow!("Events digest does not match the execution digest"));
         }
 

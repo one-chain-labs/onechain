@@ -29,7 +29,11 @@ pub fn verify_or_update_baseline(baseline_file_name: &Path, text: &str) -> anyho
         Ok(())
     } else {
         // Read the baseline and diff it.
-        let contents = if baseline_file_name.exists() { fs::read_to_string(baseline_file_name)? } else { String::new() };
+        let contents = if baseline_file_name.exists() {
+            fs::read_to_string(baseline_file_name)?
+        } else {
+            String::new()
+        };
         diff(clean_for_baseline(text).as_ref(), &contents)
     }
 }

@@ -122,11 +122,11 @@ describe('GraphQL SuiClient compatibility', () => {
 
 	test('getCoinMetadata', async () => {
 		const rpcMetadata = await toolbox.client.getCoinMetadata({
-			coinType: '0x02::oct::OCT',
+			coinType: '0x02::sui::SUI',
 		});
 
 		const graphQLMetadata = await graphQLClient!.getCoinMetadata({
-			coinType: '0x02::oct::OCT',
+			coinType: '0x02::sui::SUI',
 		});
 
 		expect(graphQLMetadata).toEqual(rpcMetadata);
@@ -134,11 +134,11 @@ describe('GraphQL SuiClient compatibility', () => {
 
 	test('getTotalSupply', async () => {
 		const rpcSupply = await toolbox.client.getTotalSupply({
-			coinType: '0x02::oct::OCT',
+			coinType: '0x02::sui::SUI',
 		});
 
 		const graphQLgetTotalSupply = await graphQLClient!.getTotalSupply({
-			coinType: '0x02::oct::OCT',
+			coinType: '0x02::sui::SUI',
 		});
 
 		expect(graphQLgetTotalSupply).toEqual(rpcSupply);
@@ -477,10 +477,10 @@ describe('GraphQL SuiClient compatibility', () => {
 			owner: toolbox.address(),
 		});
 		const rpc = await toolbox.client.getStakesByIds({
-			stakedOctIds: [stakes[0].stakes[0].stakedOctId],
+			stakedSuiIds: [stakes[0].stakes[0].stakedSuiId],
 		});
 		const graphql = await graphQLClient!.getStakesByIds({
-			stakedOctIds: [stakes[0].stakes[0].stakedOctId],
+			stakedSuiIds: [stakes[0].stakes[0].stakedSuiId],
 		});
 
 		expect(graphql).toEqual(rpc);

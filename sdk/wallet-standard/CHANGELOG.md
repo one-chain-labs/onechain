@@ -1,5 +1,38 @@
 # @mysten/wallet-standard
 
+## 0.13.20
+
+### Patch Changes
+
+- Updated dependencies [4f012b9]
+- Updated dependencies [85bd9e4]
+- Updated dependencies [5e3709d]
+- Updated dependencies [b2928a9]
+- Updated dependencies [dc0e21e]
+- Updated dependencies [85bd9e4]
+- Updated dependencies [a872b97]
+  - @mysten/sui@1.18.0
+
+## 0.13.19
+
+### Patch Changes
+
+- Updated dependencies [20af12d]
+  - @mysten/sui@1.17.0
+
+## 0.13.18
+
+### Patch Changes
+
+- Updated dependencies [100207f]
+  - @mysten/sui@1.16.2
+
+## 0.13.17
+
+### Patch Changes
+
+- @mysten/sui@1.16.1
+
 ## 0.13.16
 
 ### Patch Changes
@@ -655,7 +688,7 @@
   (`stake_amount`, `pending_stake`, and `pending_withdraw`) and renamed `delegation_staking_pool` to
   `staking_pool`. Additionally removed the `validator_stake` and `delegated_stake` fields in the
   `ValidatorSet` type and replaced them with a `total_stake` field.
-- 5c3b00cde: Add object id to staking pool and pool id to staked oct.
+- 5c3b00cde: Add object id to staking pool and pool id to staked sui.
 - 3d9a04648: Adds `deactivation_epoch` to staking pool object, and adds `inactive_pools` to the
   validator set object.
 - da72e73a9: Change the address of Move package for staking and validator related Move modules.

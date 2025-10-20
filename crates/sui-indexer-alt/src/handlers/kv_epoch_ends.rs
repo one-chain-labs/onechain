@@ -5,27 +5,28 @@ use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
 use diesel_async::RunQueryDsl;
-use sui_indexer_alt_framework::{
-    db,
-    pipeline::{concurrent::Handler, Processor},
-};
+use sui_indexer_alt_framework::pipeline::{concurrent::Handler, Processor};
+use sui_indexer_alt_schema::{epochs::StoredEpochEnd, schema::kv_epoch_ends};
+use sui_pg_db as db;
 use sui_types::{
     event::SystemEpochInfoEvent,
     full_checkpoint_content::CheckpointData,
     transaction::{TransactionDataAPI, TransactionKind},
 };
 
-use crate::{models::epochs::StoredEpochEnd, schema::kv_epoch_ends};
-
 pub(crate) struct KvEpochEnds;
 
 impl Processor for KvEpochEnds {
-    type Value = StoredEpochEnd;
-
     const NAME: &'static str = "kv_epoch_ends";
 
+    type Value = StoredEpochEnd;
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData { checkpoint_summary, transactions, .. } = checkpoint.as_ref();
+        let CheckpointData {
+            checkpoint_summary,
+            transactions,
+            ..
+        } = checkpoint.as_ref();
 
         let Some(end_of_epoch) = checkpoint_summary.end_of_epoch_data.as_ref() else {
             return Ok(vec![]);
@@ -58,7 +59,11 @@ impl Processor for KvEpochEnds {
             .events
             .iter()
             .flat_map(|events| &events.data)
-            .find_map(|event| event.is_system_epoch_info_event().then(|| bcs::from_bytes(&event.contents)))
+            .find_map(|event| {
+                event
+                    .is_system_epoch_info_event()
+                    .then(|| bcs::from_bytes(&event.contents))
+            })
             .transpose()
             .context("Failed to deserialize SystemEpochInfoEvent")?
         {
@@ -114,6 +119,10 @@ impl Handler for KvEpochEnds {
     const MIN_EAGER_ROWS: usize = 1;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(kv_epoch_ends::table).values(values).on_conflict_do_nothing().execute(conn).await?)
+        Ok(diesel::insert_into(kv_epoch_ends::table)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?)
     }
 }

@@ -3,19 +3,9 @@
 
 use crate::{
     symbols::{
-        add_member_use_def,
-        ignored_function,
-        parsed_address,
-        parsing_leading_and_mod_names_to_map_key,
-        parsing_mod_def_to_map_key,
-        CallInfo,
-        CursorContext,
-        CursorDefinition,
-        CursorPosition,
-        DefMap,
-        ModuleDefs,
-        References,
-        UseDef,
+        add_member_use_def, ignored_function, parsed_address,
+        parsing_leading_and_mod_names_to_map_key, parsing_mod_def_to_map_key, CallInfo,
+        CursorContext, CursorDefinition, CursorPosition, DefMap, ModuleDefs, References, UseDef,
         UseDefMap,
     },
     utils::loc_start_to_lsp_position_opt,
@@ -83,12 +73,22 @@ impl<'a> ParsingAnalysisContext<'a> {
         mod_use_defs: &mut BTreeMap<String, UseDefMap>,
         mod_to_alias_lengths: &mut BTreeMap<String, BTreeMap<Position, usize>>,
     ) {
-        prog.source_definitions
-            .iter()
-            .for_each(|pkg_def| self.pkg_symbols(&prog.named_address_maps, pkg_def, mod_use_defs, mod_to_alias_lengths));
-        prog.lib_definitions
-            .iter()
-            .for_each(|pkg_def| self.pkg_symbols(&prog.named_address_maps, pkg_def, mod_use_defs, mod_to_alias_lengths));
+        prog.source_definitions.iter().for_each(|pkg_def| {
+            self.pkg_symbols(
+                &prog.named_address_maps,
+                pkg_def,
+                mod_use_defs,
+                mod_to_alias_lengths,
+            )
+        });
+        prog.lib_definitions.iter().for_each(|pkg_def| {
+            self.pkg_symbols(
+                &prog.named_address_maps,
+                pkg_def,
+                mod_use_defs,
+                mod_to_alias_lengths,
+            )
+        });
     }
 
     /// Get symbols for the whole package
@@ -115,7 +115,9 @@ impl<'a> ParsingAnalysisContext<'a> {
             A::Assigned(_, v) => {
                 update_cursor!(self.cursor, *v, Attribute);
             }
-            A::Parameterized(_, sp!(_, attributes)) => attributes.iter().for_each(|a| self.attr_symbols(a.clone())),
+            A::Parameterized(_, sp!(_, attributes)) => {
+                attributes.iter().for_each(|a| self.attr_symbols(a.clone()))
+            }
         }
     }
 
@@ -138,7 +140,10 @@ impl<'a> ParsingAnalysisContext<'a> {
         let alias_lengths: BTreeMap<Position, usize> = BTreeMap::new();
         let old_alias_lengths = std::mem::replace(&mut self.alias_lengths, alias_lengths);
 
-        mod_def.attributes.iter().for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
+        mod_def
+            .attributes
+            .iter()
+            .for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
 
         for m in &mod_def.members {
             use P::ModuleMember as MM;
@@ -164,9 +169,9 @@ impl<'a> ParsingAnalysisContext<'a> {
                         }
                     };
 
-                    fun.attributes
-                        .iter()
-                        .for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
+                    fun.attributes.iter().for_each(|sp!(_, attrs)| {
+                        attrs.iter().for_each(|a| self.attr_symbols(a.clone()))
+                    });
 
                     for (_, x, t) in fun.signature.parameters.iter() {
                         update_cursor!(IDENT, self.cursor, x, Parameter);
@@ -196,16 +201,18 @@ impl<'a> ParsingAnalysisContext<'a> {
                         }
                     };
 
-                    sdef.attributes
-                        .iter()
-                        .for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
+                    sdef.attributes.iter().for_each(|sp!(_, attrs)| {
+                        attrs.iter().for_each(|a| self.attr_symbols(a.clone()))
+                    });
 
                     match &sdef.fields {
                         P::StructFields::Named(v) => v.iter().for_each(|(x, t)| {
                             self.field_defn(x);
                             self.type_symbols(t)
                         }),
-                        P::StructFields::Positional(v) => v.iter().for_each(|t| self.type_symbols(t)),
+                        P::StructFields::Positional(v) => {
+                            v.iter().for_each(|t| self.type_symbols(t))
+                        }
                         P::StructFields::Native(_) => (),
                     }
                 }
@@ -222,9 +229,9 @@ impl<'a> ParsingAnalysisContext<'a> {
                         }
                     };
 
-                    edef.attributes
-                        .iter()
-                        .for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
+                    edef.attributes.iter().for_each(|sp!(_, attrs)| {
+                        attrs.iter().for_each(|a| self.attr_symbols(a.clone()))
+                    });
 
                     let P::EnumDefinition { variants, .. } = edef;
                     for variant in variants {
@@ -234,7 +241,9 @@ impl<'a> ParsingAnalysisContext<'a> {
                                 self.field_defn(x);
                                 self.type_symbols(t)
                             }),
-                            P::VariantFields::Positional(v) => v.iter().for_each(|t| self.type_symbols(t)),
+                            P::VariantFields::Positional(v) => {
+                                v.iter().for_each(|t| self.type_symbols(t))
+                            }
                             P::VariantFields::Empty => (),
                         }
                     }
@@ -254,9 +263,9 @@ impl<'a> ParsingAnalysisContext<'a> {
                         }
                     };
 
-                    c.attributes
-                        .iter()
-                        .for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
+                    c.attributes.iter().for_each(|sp!(_, attrs)| {
+                        attrs.iter().for_each(|a| self.attr_symbols(a.clone()))
+                    });
 
                     self.type_symbols(&c.signature);
                     self.exp_symbols(&c.value);
@@ -282,13 +291,17 @@ impl<'a> ParsingAnalysisContext<'a> {
         match &seq_item.value {
             I::Seq(e) => self.exp_symbols(e),
             I::Declare(v, to) => {
-                v.value.iter().for_each(|bind| self.bind_symbols(bind, to.is_some()));
+                v.value
+                    .iter()
+                    .for_each(|bind| self.bind_symbols(bind, to.is_some()));
                 if let Some(t) = to {
                     self.type_symbols(t);
                 }
             }
             I::Bind(v, to, e) => {
-                v.value.iter().for_each(|bind| self.bind_symbols(bind, to.is_some()));
+                v.value
+                    .iter()
+                    .for_each(|bind| self.bind_symbols(bind, to.is_some()));
                 if let Some(t) = to {
                     self.type_symbols(t);
                 }
@@ -298,14 +311,22 @@ impl<'a> ParsingAnalysisContext<'a> {
     }
 
     fn path_entry_symbols(&mut self, path: &P::PathEntry) {
-        let P::PathEntry { name: _, tyargs, is_macro: _ } = path;
+        let P::PathEntry {
+            name: _,
+            tyargs,
+            is_macro: _,
+        } = path;
         if let Some(sp!(_, tyargs)) = tyargs {
             tyargs.iter().for_each(|t| self.type_symbols(t));
         }
     }
 
     fn root_path_entry_symbols(&mut self, path: &P::RootPathEntry) {
-        let P::RootPathEntry { name: _, tyargs, is_macro: _ } = path;
+        let P::RootPathEntry {
+            name: _,
+            tyargs,
+            is_macro: _,
+        } = path;
         if let Some(sp!(_, tyargs)) = tyargs {
             tyargs.iter().for_each(|t| self.type_symbols(t));
         }
@@ -340,10 +361,14 @@ impl<'a> ParsingAnalysisContext<'a> {
                 self.chain_symbols(chain);
                 v.value.iter().for_each(|e| self.exp_symbols(e));
                 assert!(self.current_mod_ident_str.is_some());
-                if let Some(mod_defs) = self.mod_outer_defs.get_mut(&self.current_mod_ident_str.clone().unwrap()) {
-                    mod_defs
-                        .call_infos
-                        .insert(last_chain_symbol_loc(chain), CallInfo::new(/* do_call */ false, &v.value));
+                if let Some(mod_defs) = self
+                    .mod_outer_defs
+                    .get_mut(&self.current_mod_ident_str.clone().unwrap())
+                {
+                    mod_defs.call_infos.insert(
+                        last_chain_symbol_loc(chain),
+                        CallInfo::new(/* do_call */ false, &v.value),
+                    );
                 };
             }
             E::Pack(chain, v) => {
@@ -385,7 +410,8 @@ impl<'a> ParsingAnalysisContext<'a> {
                     if let Some(bt) = bto {
                         self.type_symbols(bt);
                     }
-                    v.iter().for_each(|bind| self.bind_symbols(bind, to.is_some()));
+                    v.iter()
+                        .for_each(|bind| self.bind_symbols(bind, to.is_some()));
                 }
                 if let Some(t) = to {
                     self.type_symbols(t);
@@ -428,8 +454,13 @@ impl<'a> ParsingAnalysisContext<'a> {
                 }
                 v.value.iter().for_each(|e| self.exp_symbols(e));
                 assert!(self.current_mod_ident_str.is_some());
-                if let Some(mod_defs) = self.mod_outer_defs.get_mut(&self.current_mod_ident_str.clone().unwrap()) {
-                    mod_defs.call_infos.insert(name.loc, CallInfo::new(/* do_call */ true, &v.value));
+                if let Some(mod_defs) = self
+                    .mod_outer_defs
+                    .get_mut(&self.current_mod_ident_str.clone().unwrap())
+                {
+                    mod_defs
+                        .call_infos
+                        .insert(name.loc, CallInfo::new(/* do_call */ true, &v.value));
                 };
             }
             E::Index(e, v) => {
@@ -445,7 +476,12 @@ impl<'a> ParsingAnalysisContext<'a> {
                 self.type_symbols(t);
             }
             E::DotUnresolved(_, e) => self.exp_symbols(e),
-            E::Value(_) | E::Quant(..) | E::Unit | E::Continue(_) | E::Spec(_) | E::UnresolvedError => (),
+            E::Value(_)
+            | E::Quant(..)
+            | E::Unit
+            | E::Continue(_)
+            | E::Spec(_)
+            | E::UnresolvedError => (),
         }
     }
 
@@ -475,7 +511,10 @@ impl<'a> ParsingAnalysisContext<'a> {
             MP::Name(_, chain) => {
                 self.chain_symbols(chain);
                 assert!(self.current_mod_ident_str.is_some());
-                if let Some(mod_defs) = self.mod_outer_defs.get_mut(&self.current_mod_ident_str.clone().unwrap()) {
+                if let Some(mod_defs) = self
+                    .mod_outer_defs
+                    .get_mut(&self.current_mod_ident_str.clone().unwrap())
+                {
                     mod_defs.untyped_defs.insert(chain.loc);
                 };
             }
@@ -490,9 +529,13 @@ impl<'a> ParsingAnalysisContext<'a> {
 
     /// Get symbols for a sequence
     fn seq_symbols(&mut self, (use_decls, seq_items, _, oe): &P::Sequence) {
-        use_decls.iter().for_each(|use_decl| self.use_decl_symbols(use_decl));
+        use_decls
+            .iter()
+            .for_each(|use_decl| self.use_decl_symbols(use_decl));
 
-        seq_items.iter().for_each(|seq_item| self.seq_item_symbols(seq_item));
+        seq_items
+            .iter()
+            .for_each(|seq_item| self.seq_item_symbols(seq_item));
         if let Some(e) = oe.as_ref().as_ref() {
             self.exp_symbols(e)
         }
@@ -500,26 +543,38 @@ impl<'a> ParsingAnalysisContext<'a> {
 
     /// Get symbols for a use declaration
     fn use_decl_symbols(&mut self, use_decl: &P::UseDecl) {
-        use_decl.attributes.iter().for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
+        use_decl
+            .attributes
+            .iter()
+            .for_each(|sp!(_, attrs)| attrs.iter().for_each(|a| self.attr_symbols(a.clone())));
 
         update_cursor!(self.cursor, sp(use_decl.loc, use_decl.use_.clone()), Use);
 
         match &use_decl.use_ {
             P::Use::ModuleUse(mod_ident, mod_use) => {
-                let mod_ident_str = parsing_mod_ident_to_map_key(self.pkg_addresses, &mod_ident.value);
+                let mod_ident_str =
+                    parsing_mod_ident_to_map_key(self.pkg_addresses, &mod_ident.value);
                 self.mod_name_symbol(&mod_ident.value.module, &mod_ident_str);
                 self.mod_use_symbols(mod_use, &mod_ident_str);
             }
             P::Use::NestedModuleUses(leading_name, uses) => {
                 for (mod_name, mod_use) in uses {
-                    let mod_ident_str =
-                        parsing_leading_and_mod_names_to_map_key(self.pkg_addresses, *leading_name, *mod_name);
+                    let mod_ident_str = parsing_leading_and_mod_names_to_map_key(
+                        self.pkg_addresses,
+                        *leading_name,
+                        *mod_name,
+                    );
 
                     self.mod_name_symbol(mod_name, &mod_ident_str);
                     self.mod_use_symbols(mod_use, &mod_ident_str);
                 }
             }
-            P::Use::Fun { visibility: _, function, ty, method: _ } => {
+            P::Use::Fun {
+                visibility: _,
+                function,
+                ty,
+                method: _,
+            } => {
                 self.chain_symbols(function);
                 self.chain_symbols(ty);
             }
@@ -532,7 +587,8 @@ impl<'a> ParsingAnalysisContext<'a> {
         let Some(mod_defs) = self.mod_outer_defs.get_mut(mod_ident_str) else {
             return;
         };
-        let Some(mod_name_start) = loc_start_to_lsp_position_opt(self.files, &mod_name.loc()) else {
+        let Some(mod_name_start) = loc_start_to_lsp_position_opt(self.files, &mod_name.loc())
+        else {
             debug_assert!(false);
             return;
         };
@@ -567,7 +623,12 @@ impl<'a> ParsingAnalysisContext<'a> {
     }
 
     /// Get symbols for a module member in the use declaration (can be a struct or a function)
-    fn use_decl_member_symbols(&mut self, mod_ident_str: String, name: &Name, alias_opt: &Option<Name>) {
+    fn use_decl_member_symbols(
+        &mut self,
+        mod_ident_str: String,
+        name: &Name,
+        alias_opt: &Option<Name>,
+    ) {
         let Some(mod_defs) = self.mod_outer_defs.get(&mod_ident_str) else {
             return;
         };
@@ -584,11 +645,17 @@ impl<'a> ParsingAnalysisContext<'a> {
         ) {
             // it's a struct - add it for the alias as well
             if let Some(alias) = alias_opt {
-                let Some(alias_start) = loc_start_to_lsp_position_opt(self.files, &alias.loc) else {
+                let Some(alias_start) = loc_start_to_lsp_position_opt(self.files, &alias.loc)
+                else {
                     debug_assert!(false);
                     return;
                 };
-                ud.rename_use(self.references, alias.value, alias_start, alias.loc.file_hash());
+                ud.rename_use(
+                    self.references,
+                    alias.value,
+                    alias_start,
+                    alias.loc.file_hash(),
+                );
                 self.use_defs.insert(alias_start.line, ud);
             }
             return;
@@ -606,11 +673,17 @@ impl<'a> ParsingAnalysisContext<'a> {
         ) {
             // it's a function - add it for the alias as well
             if let Some(alias) = alias_opt {
-                let Some(alias_start) = loc_start_to_lsp_position_opt(self.files, &alias.loc) else {
+                let Some(alias_start) = loc_start_to_lsp_position_opt(self.files, &alias.loc)
+                else {
                     debug_assert!(false);
                     return;
                 };
-                ud.rename_use(self.references, alias.value, alias_start, alias.loc.file_hash());
+                ud.rename_use(
+                    self.references,
+                    alias.value,
+                    alias_start,
+                    alias.loc.file_hash(),
+                );
                 self.use_defs.insert(alias_start.line, ud);
             }
         }
@@ -672,7 +745,10 @@ impl<'a> ParsingAnalysisContext<'a> {
             B::Var(_, var) => {
                 if !explicitly_typed {
                     assert!(self.current_mod_ident_str.is_some());
-                    if let Some(mod_defs) = self.mod_outer_defs.get_mut(&self.current_mod_ident_str.clone().unwrap()) {
+                    if let Some(mod_defs) = self
+                        .mod_outer_defs
+                        .get_mut(&self.current_mod_ident_str.clone().unwrap())
+                    {
                         mod_defs.untyped_defs.insert(var.loc());
                     };
                 }
@@ -695,7 +771,11 @@ impl<'a> ParsingAnalysisContext<'a> {
                 };
             }
             NA::Path(path) => {
-                let P::NamePath { root, entries, is_incomplete: _ } = path;
+                let P::NamePath {
+                    root,
+                    entries,
+                    is_incomplete: _,
+                } = path;
                 self.root_path_entry_symbols(root);
                 if let Some(root_loc) = loc_start_to_lsp_position_opt(self.files, &root.name.loc) {
                     if let P::LeadingNameAccess_::Name(n) = root.name.value {
@@ -720,6 +800,14 @@ impl<'a> ParsingAnalysisContext<'a> {
 
 /// Produces module ident string of the form pkg::module to be used as a map key.
 /// It's important that these are consistent between parsing AST and typed AST,
-fn parsing_mod_ident_to_map_key(pkg_addresses: &NamedAddressMap, mod_ident: &P::ModuleIdent_) -> String {
-    format!("{}::{}", parsed_address(mod_ident.address, pkg_addresses), mod_ident.module).to_string()
+fn parsing_mod_ident_to_map_key(
+    pkg_addresses: &NamedAddressMap,
+    mod_ident: &P::ModuleIdent_,
+) -> String {
+    format!(
+        "{}::{}",
+        parsed_address(mod_ident.address, pkg_addresses),
+        mod_ident.module
+    )
+    .to_string()
 }

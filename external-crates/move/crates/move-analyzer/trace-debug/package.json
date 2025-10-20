@@ -5,10 +5,10 @@
   "publisher": "mysten",
   "icon": "images/move.png",
   "license": "Apache-2.0",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "preview": true,
   "repository": {
-    "url": "https://github.com/MystenLabs/sui.git",
+    "url": "https://github.com/one-chain-labs/onechain.git",
     "type": "git"
   },
   "engines": {

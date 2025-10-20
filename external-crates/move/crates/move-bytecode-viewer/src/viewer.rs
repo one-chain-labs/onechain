@@ -22,10 +22,16 @@ pub struct Viewer<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<Bytecode
     bytecode_viewer: BytecodeViewer,
 }
 
-impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>> Viewer<BytecodeViewer, SourceViewer> {
+impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>>
+    Viewer<BytecodeViewer, SourceViewer>
+{
     pub fn new(source_viewer: SourceViewer, bytecode_viewer: BytecodeViewer) -> Self {
         Self {
-            bytecode_text: bytecode_viewer.backing_string().split('\n').map(|x| x.to_string()).collect(),
+            bytecode_text: bytecode_viewer
+                .backing_string()
+                .split('\n')
+                .map(|x| x.to_string())
+                .collect(),
             source_viewer,
             bytecode_viewer,
         }
@@ -41,7 +47,10 @@ impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>> TUII
     fn on_redraw(&mut self, line_number: u16, column_number: u16) -> TUIOutput {
         // Highlight style
         let style: Style = Style::default().bg(Color::Red);
-        let report = match self.bytecode_viewer.get_source_index_for_line(line_number as usize, column_number as usize) {
+        let report = match self
+            .bytecode_viewer
+            .get_source_index_for_line(line_number as usize, column_number as usize)
+        {
             None => {
                 let mut builder = TextBuilder::new();
                 builder.add(self.source_viewer.backing_string(), Style::default());
@@ -59,16 +68,26 @@ impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>> TUII
         };
 
         TUIOutput {
-            left_screen: self.bytecode_text.iter().map(|x| Spans::from(x.clone())).collect(),
+            left_screen: self
+                .bytecode_text
+                .iter()
+                .map(|x| Spans::from(x.clone()))
+                .collect(),
             right_screen: report,
         }
     }
 
     fn bound_line(&self, line_number: u16) -> u16 {
-        std::cmp::min(line_number, self.bytecode_text.len().checked_sub(1).unwrap() as u16)
+        std::cmp::min(
+            line_number,
+            self.bytecode_text.len().checked_sub(1).unwrap() as u16,
+        )
     }
 
     fn bound_column(&self, line_number: u16, column_number: u16) -> u16 {
-        std::cmp::min(column_number, self.bytecode_text[line_number as usize].len() as u16)
+        std::cmp::min(
+            column_number,
+            self.bytecode_text[line_number as usize].len() as u16,
+        )
     }
 }

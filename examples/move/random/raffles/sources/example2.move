@@ -10,7 +10,7 @@
 
 module raffles::example2;
 
-use one::{
+use sui::{
     balance::{Self, Balance},
     clock::Clock,
     coin::{Self, Coin},

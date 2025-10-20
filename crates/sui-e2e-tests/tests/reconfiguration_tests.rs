@@ -2,33 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use futures::future::join_all;
-use one_node::SuiNodeHandle;
 use rand::rngs::OsRng;
-use std::{
-    collections::{BTreeSet, HashSet},
-    sync::Arc,
-    time::Duration,
-};
+use std::collections::{BTreeSet, HashSet};
+use std::sync::Arc;
+use std::time::Duration;
 use sui_core::consensus_adapter::position_submit_certificate;
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_macros::sim_test;
+use one_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolConfig;
 use sui_swarm_config::genesis_config::{ValidatorGenesisConfig, ValidatorGenesisConfigBuilder};
-use sui_test_transaction_builder::{make_transfer_sui_transaction, TestTransactionBuilder};
-use sui_types::{
-    base_types::SuiAddress,
-    effects::TransactionEffectsAPI,
-    error::SuiError,
-    gas::GasCostSummary,
-    governance::MIN_VALIDATOR_JOINING_STAKE_MIST,
-    message_envelope::Message,
-    sui_system_state::{
-        get_validator_from_table,
-        sui_system_state_summary::get_validator_by_pool_id,
-        SuiSystemStateTrait,
-    },
-    transaction::{TransactionDataAPI, TransactionExpiration, VerifiedTransaction},
+use sui_test_transaction_builder::{make_transfer_oct_transaction, TestTransactionBuilder};
+use sui_types::base_types::SuiAddress;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::error::SuiError;
+use sui_types::gas::GasCostSummary;
+use sui_types::governance::MIN_VALIDATOR_JOINING_STAKE_MIST;
+use sui_types::message_envelope::Message;
+use sui_types::sui_system_state::{
+    get_validator_from_table, sui_system_state_summary::get_validator_by_pool_id,
+    SuiSystemStateTrait,
 };
+use sui_types::transaction::{TransactionDataAPI, TransactionExpiration, VerifiedTransaction};
 use test_cluster::{TestCluster, TestClusterBuilder};
 use tokio::time::sleep;
 
@@ -55,13 +50,20 @@ async fn advance_epoch_tx_test() {
                 .unwrap();
             // Check that the validator didn't commit the transaction yet.
             assert!(state
-                .get_signed_effects_and_maybe_resign(effects.transaction_digest(), &state.epoch_store_for_testing())
+                .get_signed_effects_and_maybe_resign(
+                    effects.transaction_digest(),
+                    &state.epoch_store_for_testing()
+                )
                 .unwrap()
                 .is_none());
             effects
         })
         .collect();
-    let results: HashSet<_> = join_all(tasks).await.into_iter().map(|result| result.digest()).collect();
+    let results: HashSet<_> = join_all(tasks)
+        .await
+        .into_iter()
+        .map(|result| result.digest())
+        .collect();
     // Check that all validators have the same result.
     assert_eq!(results.len(), 1);
 }
@@ -79,20 +81,37 @@ async fn test_transaction_expiration() {
     let test_cluster = TestClusterBuilder::new().build().await;
     test_cluster.trigger_reconfiguration().await;
 
-    let (sender, gas) = test_cluster.wallet.get_one_gas_object().await.unwrap().unwrap();
+    let (sender, gas) = test_cluster
+        .wallet
+        .get_one_gas_object()
+        .await
+        .unwrap()
+        .unwrap();
     let rgp = test_cluster.get_reference_gas_price().await;
-    let mut data = TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(Some(1), sender).build();
+    let mut data = TestTransactionBuilder::new(sender, gas, rgp)
+        .transfer_oct(Some(1), sender)
+        .build();
     // Expired transaction returns an error
     let mut expired_data = data.clone();
     *expired_data.expiration_mut_for_testing() = TransactionExpiration::Epoch(0);
     let expired_transaction = test_cluster.wallet.sign_transaction(&expired_data);
-    let result = test_cluster.wallet.execute_transaction_may_fail(expired_transaction).await;
-    assert!(result.unwrap_err().to_string().contains(&SuiError::TransactionExpired.to_string()));
+    let result = test_cluster
+        .wallet
+        .execute_transaction_may_fail(expired_transaction)
+        .await;
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains(&SuiError::TransactionExpired.to_string()));
 
     // Non expired transaction signed without issue
     *data.expiration_mut_for_testing() = TransactionExpiration::Epoch(10);
     let transaction = test_cluster.wallet.sign_transaction(&data);
-    test_cluster.wallet.execute_transaction_may_fail(transaction).await.unwrap();
+    test_cluster
+        .wallet
+        .execute_transaction_may_fail(transaction)
+        .await
+        .unwrap();
 }
 
 // TODO: This test does not guarantee that tx would be reverted, and hence the code path
@@ -106,26 +125,38 @@ async fn reconfig_with_revert_end_to_end_test() {
 
     // gas1 transaction is committed
     let gas1 = gas_objects.pop().unwrap();
-    let tx = test_cluster
-        .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas1, rgp).transfer_oct(None, sender).build());
+    let tx = test_cluster.wallet.sign_transaction(
+        &TestTransactionBuilder::new(sender, gas1, rgp)
+            .transfer_oct(None, sender)
+            .build(),
+    );
     let effects1 = test_cluster.execute_transaction(tx).await;
     assert_eq!(0, effects1.effects.unwrap().executed_epoch());
 
     // gas2 transaction is (most likely) reverted
     let gas2 = gas_objects.pop().unwrap();
-    let tx = test_cluster
-        .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas2, rgp).transfer_oct(None, sender).build());
-    let net = test_cluster.fullnode_handle.sui_node.with(|node| node.clone_authority_aggregator().unwrap());
-    let cert = net.process_transaction(tx.clone(), None).await.unwrap().into_cert_for_testing();
+    let tx = test_cluster.wallet.sign_transaction(
+        &TestTransactionBuilder::new(sender, gas2, rgp)
+            .transfer_oct(None, sender)
+            .build(),
+    );
+    let net = test_cluster
+        .fullnode_handle
+        .sui_node
+        .with(|node| node.clone_authority_aggregator().unwrap());
+    let cert = net
+        .process_transaction(tx.clone(), None)
+        .await
+        .unwrap()
+        .into_cert_for_testing();
 
     // Close epoch on 3 (2f+1) validators.
     let mut reverting_authority_idx = None;
     for (i, handle) in authorities.iter().enumerate() {
         handle
             .with_async(|node| async {
-                if position_submit_certificate(&net.committee, &node.state().name, tx.digest()) < (authorities.len() - 1)
+                if position_submit_certificate(&net.committee, &node.state().name, tx.digest())
+                    < (authorities.len() - 1)
                 {
                     node.close_epoch_for_testing().await.unwrap();
                 } else {
@@ -137,12 +168,24 @@ async fn reconfig_with_revert_end_to_end_test() {
     }
 
     let reverting_authority_idx = reverting_authority_idx.unwrap();
-    let client = net.get_client(&authorities[reverting_authority_idx].with(|node| node.state().name)).unwrap();
-    client.handle_certificate_v2(cert.clone(), None).await.unwrap();
+    let client = net
+        .get_client(&authorities[reverting_authority_idx].with(|node| node.state().name))
+        .unwrap();
+    client
+        .handle_certificate_v2(cert.clone(), None)
+        .await
+        .unwrap();
 
     authorities[reverting_authority_idx]
         .with_async(|node| async {
-            let object = node.state().get_objects(&[gas2.0]).await.into_iter().next().unwrap().unwrap();
+            let object = node
+                .state()
+                .get_objects(&[gas2.0])
+                .await
+                .into_iter()
+                .next()
+                .unwrap()
+                .unwrap();
             // verify that authority 0 advanced object version
             assert_eq!(2, object.version().value());
         })
@@ -168,7 +211,14 @@ async fn reconfig_with_revert_end_to_end_test() {
     for handle in authorities.iter() {
         handle
             .with_async(|node| async {
-                let object = node.state().get_objects(&[gas1.0]).await.into_iter().next().unwrap().unwrap();
+                let object = node
+                    .state()
+                    .get_objects(&[gas1.0])
+                    .await
+                    .into_iter()
+                    .next()
+                    .unwrap()
+                    .unwrap();
                 assert_eq!(2, object.version().value());
                 // Due to race conditions, it's possible that tx2 went in
                 // before 2f+1 validators sent EndOfPublish messages and close
@@ -176,7 +226,14 @@ async fn reconfig_with_revert_end_to_end_test() {
                 // the object version is either 1 or 2, but needs to be
                 // consistent in all validators.
                 // Note that previously test checked that object version == 2 on authority 0
-                let object = node.state().get_objects(&[gas2.0]).await.into_iter().next().unwrap().unwrap();
+                let object = node
+                    .state()
+                    .get_objects(&[gas2.0])
+                    .await
+                    .into_iter()
+                    .next()
+                    .unwrap()
+                    .unwrap();
                 let object_version = object.version().value();
                 if epoch.is_none() {
                     assert!(object_version == 1 || object_version == 2);
@@ -208,56 +265,98 @@ async fn do_test_passive_reconfig() {
     });
     ProtocolConfig::poison_get_for_min_version();
 
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(1000).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(1000)
+        .build()
+        .await;
 
-    let target_epoch: u64 = std::env::var("RECONFIG_TARGET_EPOCH").ok().map(|v| v.parse().unwrap()).unwrap_or(4);
+    let target_epoch: u64 = std::env::var("RECONFIG_TARGET_EPOCH")
+        .ok()
+        .map(|v| v.parse().unwrap())
+        .unwrap_or(4);
 
     test_cluster.wait_for_epoch(Some(target_epoch)).await;
 
-    test_cluster.swarm.validator_nodes().next().unwrap().get_node_handle().unwrap().with(|node| {
-        let commitments = node.state().get_epoch_state_commitments(0).unwrap().unwrap();
-        assert_eq!(commitments.len(), 1);
-    });
+    test_cluster
+        .swarm
+        .validator_nodes()
+        .next()
+        .unwrap()
+        .get_node_handle()
+        .unwrap()
+        .with(|node| {
+            let commitments = node
+                .state()
+                .get_epoch_state_commitments(0)
+                .unwrap()
+                .unwrap();
+            assert_eq!(commitments.len(), 1);
+        });
 }
 
 // Test that transaction locks from previously epochs could be overridden.
 #[sim_test]
 async fn test_expired_locks() {
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(10000).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(10000)
+        .build()
+        .await;
 
     let gas_price = test_cluster.wallet.get_reference_gas_price().await.unwrap();
-    let accounts_and_objs = test_cluster.wallet.get_all_accounts_and_gas_objects().await.unwrap();
+    let accounts_and_objs = test_cluster
+        .wallet
+        .get_all_accounts_and_gas_objects()
+        .await
+        .unwrap();
     let sender = accounts_and_objs[0].0;
     let receiver = accounts_and_objs[1].0;
     let gas_object = accounts_and_objs[0].1[0];
 
-    let transfer_sui = |amount| {
+    let transfer_oct = |amount| {
         test_cluster.wallet.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_oct(Some(amount), receiver).build(),
+            &TestTransactionBuilder::new(sender, gas_object, gas_price)
+                .transfer_oct(Some(amount), receiver)
+                .build(),
         )
     };
 
-    let t1 = transfer_sui(1);
+    let t1 = transfer_oct(1);
     // attempt to equivocate
-    let t2 = transfer_sui(2);
+    let t2 = transfer_oct(2);
 
     for (idx, validator) in test_cluster.all_validator_handles().into_iter().enumerate() {
         let state = validator.state();
         let epoch_store = state.epoch_store_for_testing();
         let t = if idx % 2 == 0 { t1.clone() } else { t2.clone() };
-        validator.state().handle_transaction(&epoch_store, VerifiedTransaction::new_unchecked(t)).await.unwrap();
+        validator
+            .state()
+            .handle_transaction(&epoch_store, VerifiedTransaction::new_unchecked(t))
+            .await
+            .unwrap();
     }
-    test_cluster.create_certificate(t1.clone(), None).await.unwrap_err();
+    test_cluster
+        .create_certificate(t1.clone(), None)
+        .await
+        .unwrap_err();
 
-    test_cluster.create_certificate(t2.clone(), None).await.unwrap_err();
+    test_cluster
+        .create_certificate(t2.clone(), None)
+        .await
+        .unwrap_err();
 
     test_cluster.wait_for_epoch_all_nodes(1).await;
 
     // old locks can be overridden in new epoch
-    test_cluster.create_certificate(t2.clone(), None).await.unwrap();
+    test_cluster
+        .create_certificate(t2.clone(), None)
+        .await
+        .unwrap();
 
     // attempt to equivocate
-    test_cluster.create_certificate(t1.clone(), None).await.unwrap_err();
+    test_cluster
+        .create_certificate(t1.clone(), None)
+        .await
+        .unwrap_err();
 }
 
 // This test just starts up a cluster that reconfigures itself under 0 load.
@@ -289,7 +388,10 @@ async fn test_create_advance_epoch_tx_race() {
                 if cur_node == node {
                     let mut rx = tx.subscribe();
 
-                    info!("waiting for test to send continuation signal for {}", failpoint);
+                    info!(
+                        "waiting for test to send continuation signal for {}",
+                        failpoint
+                    );
                     rx.recv().await.unwrap();
                     info!("continuing {}", failpoint);
                 }
@@ -305,10 +407,17 @@ async fn test_create_advance_epoch_tx_race() {
 
     // Test code runs in node 1 - node 2 is always a validator.
     let target_node = 2;
-    register_wait("change_epoch_tx_delay", target_node, change_epoch_delay_tx.clone());
+    register_wait(
+        "change_epoch_tx_delay",
+        target_node,
+        change_epoch_delay_tx.clone(),
+    );
     register_wait("reconfig_delay", target_node, reconfig_delay_tx.clone());
 
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(1000).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(1000)
+        .build()
+        .await;
 
     test_cluster.wait_for_epoch(None).await;
 
@@ -328,14 +437,28 @@ async fn test_create_advance_epoch_tx_race() {
 async fn test_reconfig_with_failing_validator() {
     sui_protocol_config::ProtocolConfig::poison_get_for_min_version();
 
-    let test_cluster = Arc::new(TestClusterBuilder::new().with_epoch_duration_ms(5000).build().await);
+    let test_cluster = Arc::new(
+        TestClusterBuilder::new()
+            .with_epoch_duration_ms(5000)
+            .build()
+            .await,
+    );
 
-    test_cluster.random_node_restarter().with_kill_interval_secs(2, 4).with_restart_delay_secs(2, 4).run();
+    test_cluster
+        .random_node_restarter()
+        .with_kill_interval_secs(2, 4)
+        .with_restart_delay_secs(2, 4)
+        .run();
 
-    let target_epoch: u64 = std::env::var("RECONFIG_TARGET_EPOCH").ok().map(|v| v.parse().unwrap()).unwrap_or(4);
+    let target_epoch: u64 = std::env::var("RECONFIG_TARGET_EPOCH")
+        .ok()
+        .map(|v| v.parse().unwrap())
+        .unwrap_or(4);
 
     // A longer timeout is required, as restarts can cause reconfiguration to take longer.
-    test_cluster.wait_for_epoch_with_timeout(Some(target_epoch), Duration::from_secs(90)).await;
+    test_cluster
+        .wait_for_epoch_with_timeout(Some(target_epoch), Duration::from_secs(90))
+        .await;
 }
 
 #[sim_test]
@@ -344,13 +467,24 @@ async fn test_validator_resign_effects() {
     // in previous epochs. This allows authority aggregator to form a new effects certificate
     // in the new epoch.
     let test_cluster = TestClusterBuilder::new().build().await;
-    let tx = make_transfer_sui_transaction(&test_cluster.wallet, None, None).await;
-    let effects0 = test_cluster.execute_transaction(tx.clone()).await.effects.unwrap();
+    let tx = make_transfer_oct_transaction(&test_cluster.wallet, None, None).await;
+    let effects0 = test_cluster
+        .execute_transaction(tx.clone())
+        .await
+        .effects
+        .unwrap();
     assert_eq!(effects0.executed_epoch(), 0);
     test_cluster.trigger_reconfiguration().await;
 
-    let net = test_cluster.fullnode_handle.sui_node.with(|node| node.clone_authority_aggregator().unwrap());
-    let effects1 = net.process_transaction(tx, None).await.unwrap().into_effects_for_testing();
+    let net = test_cluster
+        .fullnode_handle
+        .sui_node
+        .with(|node| node.clone_authority_aggregator().unwrap());
+    let effects1 = net
+        .process_transaction(tx, None)
+        .await
+        .unwrap()
+        .into_effects_for_testing();
     // Ensure that we are able to form a new effects cert in the new epoch.
     assert_eq!(effects1.epoch(), 1);
     assert_eq!(effects1.executed_epoch(), 0);
@@ -360,10 +494,16 @@ async fn test_validator_resign_effects() {
 async fn test_validator_candidate_pool_read() {
     let new_validator = ValidatorGenesisConfigBuilder::new().build(&mut OsRng);
     let address: SuiAddress = (&new_validator.account_key_pair.public()).into();
-    let test_cluster = TestClusterBuilder::new().with_validator_candidates([address]).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_validator_candidates([address])
+        .build()
+        .await;
     add_validator_candidate(&test_cluster, &new_validator).await;
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        let system_state = node.state().get_sui_system_state_object_for_testing().unwrap();
+        let system_state = node
+            .state()
+            .get_sui_system_state_object_for_testing()
+            .unwrap();
         let system_state_summary = system_state.clone().into_sui_system_state_summary();
         let staking_pool_id = get_validator_from_table(
             node.state().get_object_store().as_ref(),
@@ -385,7 +525,10 @@ async fn test_validator_candidate_pool_read() {
 
 #[sim_test]
 async fn test_inactive_validator_pool_read() {
-    let test_cluster = TestClusterBuilder::new().with_num_validators(5).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_num_validators(5)
+        .build()
+        .await;
     // Pick the first validator.
     let validator = test_cluster.swarm.validator_node_handles().pop().unwrap();
     let address = validator.with(|node| node.get_config().sui_address());
@@ -401,7 +544,10 @@ async fn test_inactive_validator_pool_read() {
             .staking_pool_id
     });
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        let system_state = node.state().get_sui_system_state_object_for_testing().unwrap();
+        let system_state = node
+            .state()
+            .get_sui_system_state_object_for_testing()
+            .unwrap();
         let system_state_summary = system_state.clone().into_sui_system_state_summary();
         // Validator is active. Check that we can find its summary by staking pool id.
         let validator = get_validator_by_pool_id(
@@ -419,14 +565,25 @@ async fn test_inactive_validator_pool_read() {
 
     // Check that this node is no longer a validator.
     validator.with(|node| {
-        assert!(node.state().is_fullnode(&node.state().epoch_store_for_testing()));
+        assert!(node
+            .state()
+            .is_fullnode(&node.state().epoch_store_for_testing()));
     });
 
     // Check that the validator that just left now shows up in the inactive_validators,
     // and we can still deserialize it and get the inactive staking pool.
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        let system_state = node.state().get_sui_system_state_object_for_testing().unwrap();
-        assert_eq!(system_state.get_current_epoch_committee().committee().num_members(), 4);
+        let system_state = node
+            .state()
+            .get_sui_system_state_object_for_testing()
+            .unwrap();
+        assert_eq!(
+            system_state
+                .get_current_epoch_committee()
+                .committee()
+                .num_members(),
+            4
+        );
         let system_state_summary = system_state.clone().into_sui_system_state_summary();
         let validator = get_validator_by_pool_id(
             node.state().get_object_store().as_ref(),
@@ -446,7 +603,10 @@ async fn test_reconfig_with_committee_change_basic() {
 
     let new_validator = ValidatorGenesisConfigBuilder::new().build(&mut OsRng);
     let address = (&new_validator.account_key_pair.public()).into();
-    let mut test_cluster = TestClusterBuilder::new().with_validator_candidates([address]).build().await;
+    let mut test_cluster = TestClusterBuilder::new()
+        .with_validator_candidates([address])
+        .build()
+        .await;
 
     execute_add_validator_transactions(&test_cluster, &new_validator).await;
 
@@ -454,19 +614,33 @@ async fn test_reconfig_with_committee_change_basic() {
 
     // Check that a new validator has joined the committee.
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        assert_eq!(node.state().epoch_store_for_testing().committee().num_members(), 5);
+        assert_eq!(
+            node.state()
+                .epoch_store_for_testing()
+                .committee()
+                .num_members(),
+            5
+        );
     });
     let new_validator_handle = test_cluster.spawn_new_validator(new_validator).await;
     test_cluster.wait_for_epoch_all_nodes(1).await;
 
     new_validator_handle.with(|node| {
-        assert!(node.state().is_validator(&node.state().epoch_store_for_testing()));
+        assert!(node
+            .state()
+            .is_validator(&node.state().epoch_store_for_testing()));
     });
 
     execute_remove_validator_tx(&test_cluster, &new_validator_handle).await;
     test_cluster.trigger_reconfiguration().await;
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        assert_eq!(node.state().epoch_store_for_testing().committee().num_members(), 4);
+        assert_eq!(
+            node.state()
+                .epoch_store_for_testing()
+                .committee()
+                .num_members(),
+            4
+        );
     });
 }
 
@@ -481,8 +655,13 @@ async fn test_reconfig_with_committee_change_stress_determinism() {
 }
 
 async fn do_test_reconfig_with_committee_change_stress() {
-    let mut candidates = (0..6).map(|_| ValidatorGenesisConfigBuilder::new().build(&mut OsRng)).collect::<Vec<_>>();
-    let addresses = candidates.iter().map(|c| (&c.account_key_pair.public()).into()).collect::<Vec<SuiAddress>>();
+    let mut candidates = (0..6)
+        .map(|_| ValidatorGenesisConfigBuilder::new().build(&mut OsRng))
+        .collect::<Vec<_>>();
+    let addresses = candidates
+        .iter()
+        .map(|c| (&c.account_key_pair.public()).into())
+        .collect::<Vec<SuiAddress>>();
     let mut test_cluster = TestClusterBuilder::new()
         .with_num_validators(7)
         .with_validator_candidates(addresses)
@@ -533,7 +712,9 @@ async fn do_test_reconfig_with_committee_change_stress() {
         assert_eq!(committee.num_members(), 7);
         assert!(committee.authority_exists(&handle1.state().name));
         assert!(committee.authority_exists(&handle2.state().name));
-        removed_validators.iter().all(|v| !committee.authority_exists(v));
+        removed_validators
+            .iter()
+            .all(|v| !committee.authority_exists(v));
     }
 }
 
@@ -541,7 +722,8 @@ async fn do_test_reconfig_with_committee_change_stress() {
 #[sim_test]
 async fn test_epoch_flag_upgrade() {
     use std::sync::Mutex;
-    use sui_core::authority::epoch_start_configuration::{EpochFlag, EpochStartConfigTrait};
+    use sui_core::authority::epoch_start_configuration::EpochFlag;
+    use sui_core::authority::epoch_start_configuration::EpochStartConfigTrait;
     use sui_macros::register_fail_point_arg;
 
     let initial_flags_nodes = Arc::new(Mutex::new(HashSet::new()));
@@ -559,12 +741,21 @@ async fn test_epoch_flag_upgrade() {
         Some(Vec::<EpochFlag>::new())
     });
 
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(30000).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(30000)
+        .build()
+        .await;
 
     let mut any_empty = false;
     for node in test_cluster.all_node_handles() {
         any_empty = any_empty
-            || node.with(|node| node.state().epoch_store_for_testing().epoch_start_config().flags().is_empty());
+            || node.with(|node| {
+                node.state()
+                    .epoch_store_for_testing()
+                    .epoch_start_config()
+                    .flags()
+                    .is_empty()
+            });
     }
     assert!(any_empty);
 
@@ -573,7 +764,13 @@ async fn test_epoch_flag_upgrade() {
     let mut any_empty = false;
     for node in test_cluster.all_node_handles() {
         any_empty = any_empty
-            || node.with(|node| node.state().epoch_store_for_testing().epoch_start_config().flags().is_empty());
+            || node.with(|node| {
+                node.state()
+                    .epoch_store_for_testing()
+                    .epoch_start_config()
+                    .flags()
+                    .is_empty()
+            });
     }
     assert!(!any_empty);
 
@@ -596,9 +793,17 @@ async fn safe_mode_reconfig_test() {
     // Inject failure at epoch change 1 -> 2.
     advance_epoch_result_injection::set_override(Some((2, 3)));
 
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(EPOCH_DURATION).build().await;
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(EPOCH_DURATION)
+        .build()
+        .await;
 
-    let system_state = test_cluster.sui_client().governance_api().get_latest_sui_system_state().await.unwrap();
+    let system_state = test_cluster
+        .sui_client()
+        .governance_api()
+        .get_latest_sui_system_state()
+        .await
+        .unwrap();
 
     // On startup, we should be at V1.
     assert_eq!(system_state.system_state_version, 1);
@@ -623,7 +828,10 @@ async fn safe_mode_reconfig_test() {
     assert!(system_state.epoch_start_timestamp_ms() >= prev_epoch_start_timestamp + EPOCH_DURATION);
 
     // Try a staking transaction.
-    let validator_address = system_state.into_sui_system_state_summary().active_validators[0].sui_address;
+    let validator_address = system_state
+        .into_sui_system_state_summary()
+        .active_validators[0]
+        .sui_address;
     let txn = make_staking_transaction(&test_cluster.wallet, validator_address).await;
     test_cluster.execute_transaction(txn).await;
 
@@ -636,7 +844,10 @@ async fn safe_mode_reconfig_test() {
     assert_eq!(system_state.system_state_version(), 2);
 }
 
-async fn add_validator_candidate(test_cluster: &TestCluster, new_validator: &ValidatorGenesisConfig) {
+async fn add_validator_candidate(
+    test_cluster: &TestCluster,
+    new_validator: &ValidatorGenesisConfig,
+) {
     let cur_validator_candidate_count = test_cluster.fullnode_handle.sui_node.with(|node| {
         node.state()
             .get_sui_system_state_object_for_testing()
@@ -645,24 +856,43 @@ async fn add_validator_candidate(test_cluster: &TestCluster, new_validator: &Val
             .validator_candidates_size
     });
     let address = (&new_validator.account_key_pair.public()).into();
-    let gas = test_cluster.wallet.get_one_gas_object_owned_by_address(address).await.unwrap().unwrap();
+    let gas = test_cluster
+        .wallet
+        .get_one_gas_object_owned_by_address(address)
+        .await
+        .unwrap()
+        .unwrap();
 
-    let tx = TestTransactionBuilder::new(address, gas, test_cluster.get_reference_gas_price().await)
-        .call_request_add_validator_candidate(&new_validator.to_validator_info_with_random_name().into())
-        .build_and_sign(&new_validator.account_key_pair);
+    let tx =
+        TestTransactionBuilder::new(address, gas, test_cluster.get_reference_gas_price().await)
+            .call_request_add_validator_candidate(
+                &new_validator.to_validator_info_with_random_name().into(),
+            )
+            .build_and_sign(&new_validator.account_key_pair);
     test_cluster.execute_transaction(tx).await;
 
     // Check that the candidate can be found in the candidate table now.
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        let system_state = node.state().get_sui_system_state_object_for_testing().unwrap();
+        let system_state = node
+            .state()
+            .get_sui_system_state_object_for_testing()
+            .unwrap();
         let system_state_summary = system_state.into_sui_system_state_summary();
-        assert_eq!(system_state_summary.validator_candidates_size, cur_validator_candidate_count + 1);
+        assert_eq!(
+            system_state_summary.validator_candidates_size,
+            cur_validator_candidate_count + 1
+        );
     });
 }
 
 async fn execute_remove_validator_tx(test_cluster: &TestCluster, handle: &SuiNodeHandle) {
     let address = handle.with(|node| node.get_config().sui_address());
-    let gas = test_cluster.wallet.get_one_gas_object_owned_by_address(address).await.unwrap().unwrap();
+    let gas = test_cluster
+        .wallet
+        .get_one_gas_object_owned_by_address(address)
+        .await
+        .unwrap()
+        .unwrap();
 
     let rgp = test_cluster.get_reference_gas_price().await;
     let tx = handle.with(|node| {
@@ -676,17 +906,30 @@ async fn execute_remove_validator_tx(test_cluster: &TestCluster, handle: &SuiNod
 /// Execute a sequence of transactions to add a validator, including adding candidate, adding stake
 /// and activate the validator.
 /// It does not however trigger reconfiguration yet.
-async fn execute_add_validator_transactions(test_cluster: &TestCluster, new_validator: &ValidatorGenesisConfig) {
+async fn execute_add_validator_transactions(
+    test_cluster: &TestCluster,
+    new_validator: &ValidatorGenesisConfig,
+) {
     let pending_active_count = test_cluster.fullnode_handle.sui_node.with(|node| {
-        let system_state = node.state().get_sui_system_state_object_for_testing().unwrap();
-        system_state.get_pending_active_validators(node.state().get_object_store().as_ref()).unwrap().len()
+        let system_state = node
+            .state()
+            .get_sui_system_state_object_for_testing()
+            .unwrap();
+        system_state
+            .get_pending_active_validators(node.state().get_object_store().as_ref())
+            .unwrap()
+            .len()
     });
     add_validator_candidate(test_cluster, new_validator).await;
 
     let address = (&new_validator.account_key_pair.public()).into();
     let stake_coin = test_cluster
         .wallet
-        .gas_for_owner_budget(address, MIN_VALIDATOR_JOINING_STAKE_MIST, Default::default())
+        .gas_for_owner_budget(
+            address,
+            MIN_VALIDATOR_JOINING_STAKE_MIST,
+            Default::default(),
+        )
         .await
         .unwrap()
         .1
@@ -713,10 +956,17 @@ async fn execute_add_validator_transactions(test_cluster: &TestCluster, new_vali
 
     // Check that we can get the pending validator from 0x5.
     test_cluster.fullnode_handle.sui_node.with(|node| {
-        let system_state = node.state().get_sui_system_state_object_for_testing().unwrap();
-        let pending_active_validators =
-            system_state.get_pending_active_validators(node.state().get_object_store().as_ref()).unwrap();
+        let system_state = node
+            .state()
+            .get_sui_system_state_object_for_testing()
+            .unwrap();
+        let pending_active_validators = system_state
+            .get_pending_active_validators(node.state().get_object_store().as_ref())
+            .unwrap();
         assert_eq!(pending_active_validators.len(), pending_active_count + 1);
-        assert_eq!(pending_active_validators[pending_active_validators.len() - 1].sui_address, address);
+        assert_eq!(
+            pending_active_validators[pending_active_validators.len() - 1].sui_address,
+            address
+        );
     });
 }

@@ -90,7 +90,13 @@ impl CodeWriter {
             .collect();
         data.output_location_map = std::mem::take(&mut data.output_location_map)
             .into_iter()
-            .map(|(i, loc)| if i > index { (i + shift, loc) } else { (i, loc) })
+            .map(|(i, loc)| {
+                if i > index {
+                    (i + shift, loc)
+                } else {
+                    (i, loc)
+                }
+            })
             .collect();
         // Insert text.
         data.output.insert_str(index.0 as usize, s);
@@ -154,9 +160,9 @@ impl CodeWriter {
         self.process_result(|s| {
             let mut fmap = Files::new();
             let id = fmap.add("dummy", s);
-            fmap.line_span(id, line)
-                .ok()
-                .map(|line_span| ByteIndex((line_span.start().to_usize() + column.to_usize()) as u32))
+            fmap.line_span(id, line).ok().map(|line_span| {
+                ByteIndex((line_span.start().to_usize() + column.to_usize()) as u32)
+            })
         })
     }
 
@@ -188,7 +194,11 @@ impl CodeWriter {
     /// Emit a string. The string will be broken down into lines to apply current indentation.
     pub fn emit(&self, s: &str) {
         let rewritten = (*self.0.borrow().emit_hook)(s);
-        let s = if let Some(r) = &rewritten { r.as_str() } else { s };
+        let s = if let Some(r) = &rewritten {
+            r.as_str()
+        } else {
+            s
+        };
         let mut first = true;
         // str::lines ignores trailing newline, so deal with this ad-hoc
         let end_newl = s.ends_with('\n');

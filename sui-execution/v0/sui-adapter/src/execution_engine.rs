@@ -5,57 +5,51 @@ pub use checked::*;
 
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use crate::{
-        execution_mode::{self, ExecutionMode},
-        gas_charger::GasCharger,
-        programmable_transactions,
-        temporary_store::TemporaryStore,
-        type_layout_resolver::TypeLayoutResolver,
-    };
+    use crate::execution_mode::{self, ExecutionMode};
+    use crate::gas_charger::GasCharger;
+    use crate::programmable_transactions;
+    use crate::temporary_store::TemporaryStore;
+    use crate::type_layout_resolver::TypeLayoutResolver;
     use move_binary_format::CompiledModule;
     use move_vm_runtime::move_vm::MoveVM;
     use std::{collections::HashSet, sync::Arc};
     use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
+    use sui_types::balance::{
+        BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME,
+        BALANCE_MODULE_NAME,
+    };
+    use sui_types::clock::{CLOCK_MODULE_NAME, CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME};
+    use sui_types::committee::EpochId;
+    use sui_types::effects::TransactionEffects;
+    use sui_types::error::{ExecutionError, ExecutionErrorKind};
+    use sui_types::execution::is_certificate_denied;
+    use sui_types::execution_config_utils::to_binary_config;
+    use sui_types::execution_status::ExecutionStatus;
+    use sui_types::gas::GasCostSummary;
+    use sui_types::gas::SuiGasStatus;
+    use sui_types::gas_coin::GAS;
+    use sui_types::inner_temporary_store::InnerTemporaryStore;
+    use sui_types::messages_checkpoint::CheckpointTimestamp;
+    use sui_types::metrics::LimitsMetrics;
+    use sui_types::object::OBJECT_START_VERSION;
+    use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+    use sui_types::storage::BackingStore;
+    use sui_types::storage::WriteKind;
     #[cfg(msim)]
     use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result;
-    use sui_types::{
-        balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
-        base_types::{ObjectRef, SuiAddress, TransactionDigest, TxContext},
-        clock::{CLOCK_MODULE_NAME, CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME},
-        committee::EpochId,
-        effects::TransactionEffects,
-        error::{ExecutionError, ExecutionErrorKind},
-        execution::is_certificate_denied,
-        execution_config_utils::to_binary_config,
-        execution_status::ExecutionStatus,
-        gas::{GasCostSummary, SuiGasStatus},
-        gas_coin::GAS,
-        inner_temporary_store::InnerTemporaryStore,
-        messages_checkpoint::CheckpointTimestamp,
-        metrics::LimitsMetrics,
-        object::{Object, ObjectInner, OBJECT_START_VERSION},
-        programmable_transaction_builder::ProgrammableTransactionBuilder,
-        storage::{BackingStore, WriteKind},
-        sui_system_state::{
-            AdvanceEpochParams,
-            ADVANCE_EPOCH_FUNCTION_NAME,
-            ADVANCE_EPOCH_SAFE_MODE_FUNCTION_NAME,
-            SUI_SYSTEM_MODULE_NAME,
-        },
-        transaction::{
-            Argument,
-            CallArg,
-            ChangeEpoch,
-            CheckedInputObjects,
-            Command,
-            GenesisTransaction,
-            ProgrammableTransaction,
-            TransactionKind,
-        },
-        SUI_FRAMEWORK_ADDRESS,
-        SUI_FRAMEWORK_PACKAGE_ID,
-        SUI_SYSTEM_PACKAGE_ID,
+    use sui_types::sui_system_state::{AdvanceEpochParams, ADVANCE_EPOCH_SAFE_MODE_FUNCTION_NAME};
+    use sui_types::transaction::CheckedInputObjects;
+    use sui_types::transaction::{
+        Argument, CallArg, ChangeEpoch, Command, GenesisTransaction, ProgrammableTransaction,
+        TransactionKind,
     };
+    use sui_types::{
+        base_types::{ObjectRef, SuiAddress, TransactionDigest, TxContext},
+        object::{Object, ObjectInner},
+        sui_system_state::{ADVANCE_EPOCH_FUNCTION_NAME, SUI_SYSTEM_MODULE_NAME},
+        SUI_FRAMEWORK_ADDRESS,
+    };
+    use sui_types::{SUI_FRAMEWORK_PACKAGE_ID, SUI_SYSTEM_PACKAGE_ID};
     use tracing::{info, instrument, trace, warn};
 
     #[instrument(name = "tx_execute_to_effects", level = "debug", skip_all)]
@@ -74,15 +68,26 @@ mod checked {
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
         certificate_deny_set: &HashSet<TransactionDigest>,
-    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Mode::ExecutionResults, ExecutionError>) {
+    ) -> (
+        InnerTemporaryStore,
+        SuiGasStatus,
+        TransactionEffects,
+        Result<Mode::ExecutionResults, ExecutionError>,
+    ) {
         let input_objects = input_objects.into_inner();
         let shared_object_refs = input_objects.filter_shared_objects();
         let mut transaction_dependencies = input_objects.transaction_dependencies();
-        let mut temporary_store = TemporaryStore::new(store, input_objects, transaction_digest, protocol_config);
-        let mut gas_charger = GasCharger::new(transaction_digest, gas_coins, gas_status, protocol_config);
+        let mut temporary_store =
+            TemporaryStore::new(store, input_objects, transaction_digest, protocol_config);
+        let mut gas_charger =
+            GasCharger::new(transaction_digest, gas_coins, gas_status, protocol_config);
 
-        let mut tx_ctx =
-            TxContext::new_from_components(&transaction_signer, &transaction_digest, epoch_id, epoch_timestamp_ms);
+        let mut tx_ctx = TxContext::new_from_components(
+            &transaction_signer,
+            &transaction_digest,
+            epoch_id,
+            epoch_timestamp_ms,
+        );
 
         let is_epoch_change = matches!(transaction_kind, TransactionKind::ChangeEpoch(_));
 
@@ -157,7 +162,9 @@ mod checked {
         transaction_dependencies.remove(&TransactionDigest::genesis_marker());
 
         if enable_expensive_checks && !Mode::allow_arbitrary_function_calls() {
-            temporary_store.check_ownership_invariants(&transaction_signer, &mut gas_charger, is_epoch_change).unwrap()
+            temporary_store
+                .check_ownership_invariants(&transaction_signer, &mut gas_charger, is_epoch_change)
+                .unwrap()
         } // else, in dev inspect mode and anything goes--don't check
 
         let (inner, effects) = temporary_store.to_effects(
@@ -169,7 +176,12 @@ mod checked {
             &mut gas_charger,
             *epoch_id,
         );
-        (inner, gas_charger.into_gas_status(), effects, execution_result)
+        (
+            inner,
+            gas_charger.into_gas_status(),
+            effects,
+            execution_result,
+        )
     }
 
     pub fn execute_genesis_state_update(
@@ -182,7 +194,8 @@ mod checked {
         pt: ProgrammableTransaction,
     ) -> Result<InnerTemporaryStore, ExecutionError> {
         let input_objects = input_objects.into_inner();
-        let mut temporary_store = TemporaryStore::new(store, input_objects, tx_context.digest(), protocol_config);
+        let mut temporary_store =
+            TemporaryStore::new(store, input_objects, tx_context.digest(), protocol_config);
         let mut gas_charger = GasCharger::new_unmetered(tx_context.digest());
         programmable_transactions::execution::execute::<execution_mode::Genesis>(
             protocol_config,
@@ -209,11 +222,17 @@ mod checked {
         enable_expensive_checks: bool,
         deny_cert: bool,
         contains_deleted_input: bool,
-    ) -> (GasCostSummary, Result<Mode::ExecutionResults, ExecutionError>) {
+    ) -> (
+        GasCostSummary,
+        Result<Mode::ExecutionResults, ExecutionError>,
+    ) {
         gas_charger.smash_gas(temporary_store);
 
         // At this point no charges have been applied yet
-        debug_assert!(gas_charger.no_charges(), "No gas charges must be applied yet");
+        debug_assert!(
+            gas_charger.no_charges(),
+            "No gas charges must be applied yet"
+        );
         let is_genesis_tx = matches!(transaction_kind, TransactionKind::Genesis(_));
         let advance_epoch_gas_summary = transaction_kind.get_advance_epoch_tx_gas_summary();
 
@@ -222,9 +241,15 @@ mod checked {
         let result = gas_charger.charge_input_objects(temporary_store);
         let mut result = result.and_then(|()| {
             let mut execution_result = if deny_cert {
-                Err(ExecutionError::new(ExecutionErrorKind::CertificateDenied, None))
+                Err(ExecutionError::new(
+                    ExecutionErrorKind::CertificateDenied,
+                    None,
+                ))
             } else if contains_deleted_input {
-                Err(ExecutionError::new(ExecutionErrorKind::InputObjectDeleted, None))
+                Err(ExecutionError::new(
+                    ExecutionErrorKind::InputObjectDeleted,
+                    None,
+                ))
             } else {
                 execution_loop::<Mode>(
                     temporary_store,
@@ -320,7 +345,8 @@ mod checked {
         if !is_genesis_tx && !Mode::allow_arbitrary_values() {
             // ensure that this transaction did not create or destroy SUI, try to recover if the check fails
             let conservation_result = {
-                let mut layout_resolver = TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
+                let mut layout_resolver =
+                    TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
                 temporary_store.check_sui_conserved(
                     &cost_summary,
                     advance_epoch_gas_summary,
@@ -335,7 +361,8 @@ mod checked {
                 gas_charger.reset(temporary_store);
                 gas_charger.charge_gas(temporary_store, &mut result);
                 // check conservation once more more
-                let mut layout_resolver = TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
+                let mut layout_resolver =
+                    TypeLayoutResolver::new(move_vm, Box::new(&*temporary_store));
                 if let Err(recovery_err) = temporary_store.check_sui_conserved(
                     &cost_summary,
                     advance_epoch_gas_summary,
@@ -370,7 +397,15 @@ mod checked {
     ) -> Result<Mode::ExecutionResults, ExecutionError> {
         match transaction_kind {
             TransactionKind::ChangeEpoch(change_epoch) => {
-                advance_epoch(change_epoch, temporary_store, tx_ctx, move_vm, gas_charger, protocol_config, metrics)?;
+                advance_epoch(
+                    change_epoch,
+                    temporary_store,
+                    tx_ctx,
+                    move_vm,
+                    gas_charger,
+                    protocol_config,
+                    metrics,
+                )?;
                 Ok(Mode::empty_results())
             }
             TransactionKind::Genesis(GenesisTransaction { objects }) => {
@@ -381,8 +416,12 @@ mod checked {
                 for genesis_object in objects {
                     match genesis_object {
                         sui_types::transaction::GenesisObject::RawObject { data, owner } => {
-                            let object =
-                                ObjectInner { data, owner, previous_transaction: tx_ctx.digest(), storage_rebate: 0 };
+                            let object = ObjectInner {
+                                data,
+                                owner,
+                                previous_transaction: tx_ctx.digest(),
+                                storage_rebate: 0,
+                            };
                             temporary_store.write_object(object.into(), WriteKind::Create);
                         }
                     }
@@ -428,15 +467,17 @@ mod checked {
                 .expect("ConsensusCommitPrologue cannot fail");
                 Ok(Mode::empty_results())
             }
-            TransactionKind::ProgrammableTransaction(pt) => programmable_transactions::execution::execute::<Mode>(
-                protocol_config,
-                metrics,
-                move_vm,
-                temporary_store,
-                tx_ctx,
-                gas_charger,
-                pt,
-            ),
+            TransactionKind::ProgrammableTransaction(pt) => {
+                programmable_transactions::execution::execute::<Mode>(
+                    protocol_config,
+                    metrics,
+                    move_vm,
+                    temporary_store,
+                    tx_ctx,
+                    gas_charger,
+                    pt,
+                )
+            }
             TransactionKind::AuthenticatorStateUpdate(_) => {
                 panic!("AuthenticatorStateUpdate should not exist in execution layer v0");
             }
@@ -454,7 +495,11 @@ mod checked {
         params: &AdvanceEpochParams,
     ) -> (Argument, Argument) {
         // Create storage rewards.
-        let storage_charge_arg = builder.input(CallArg::Pure(bcs::to_bytes(&params.storage_charge).unwrap())).unwrap();
+        let storage_charge_arg = builder
+            .input(CallArg::Pure(
+                bcs::to_bytes(&params.storage_charge).unwrap(),
+            ))
+            .unwrap();
         let storage_rewards = builder.programmable_move_call(
             SUI_FRAMEWORK_PACKAGE_ID,
             BALANCE_MODULE_NAME.to_owned(),
@@ -464,8 +509,11 @@ mod checked {
         );
 
         // Create computation rewards.
-        let computation_charge_arg =
-            builder.input(CallArg::Pure(bcs::to_bytes(&params.computation_charge).unwrap())).unwrap();
+        let computation_charge_arg = builder
+            .input(CallArg::Pure(
+                bcs::to_bytes(&params.computation_charge).unwrap(),
+            ))
+            .unwrap();
         let computation_rewards = builder.programmable_move_call(
             SUI_FRAMEWORK_PACKAGE_ID,
             BALANCE_MODULE_NAME.to_owned(),
@@ -476,7 +524,9 @@ mod checked {
         (storage_rewards, computation_rewards)
     }
 
-    pub fn construct_advance_epoch_pt(params: &AdvanceEpochParams) -> Result<ProgrammableTransaction, ExecutionError> {
+    pub fn construct_advance_epoch_pt(
+        params: &AdvanceEpochParams,
+    ) -> Result<ProgrammableTransaction, ExecutionError> {
         let mut builder = ProgrammableTransactionBuilder::new();
         // Step 1: Create storage and computation rewards.
         let (storage_rewards, computation_rewards) = mint_epoch_rewards_in_pt(&mut builder, params);
@@ -497,7 +547,10 @@ mod checked {
         .map(|a| builder.input(a))
         .collect::<Result<_, _>>();
 
-        assert_invariant!(call_arg_arguments.is_ok(), "Unable to generate args for advance_epoch transaction!");
+        assert_invariant!(
+            call_arg_arguments.is_ok(),
+            "Unable to generate args for advance_epoch transaction!"
+        );
 
         arguments.append(&mut call_arg_arguments.unwrap());
 
@@ -542,12 +595,20 @@ mod checked {
         ];
 
         if protocol_config.get_advance_epoch_start_time_in_safe_mode() {
-            args.push(CallArg::Pure(bcs::to_bytes(&params.epoch_start_timestamp_ms).unwrap()));
+            args.push(CallArg::Pure(
+                bcs::to_bytes(&params.epoch_start_timestamp_ms).unwrap(),
+            ));
         }
 
-        let call_arg_arguments = args.into_iter().map(|a| builder.input(a)).collect::<Result<_, _>>();
+        let call_arg_arguments = args
+            .into_iter()
+            .map(|a| builder.input(a))
+            .collect::<Result<_, _>>();
 
-        assert_invariant!(call_arg_arguments.is_ok(), "Unable to generate args for advance_epoch transaction!");
+        assert_invariant!(
+            call_arg_arguments.is_ok(),
+            "Unable to generate args for advance_epoch transaction!"
+        );
 
         arguments.append(&mut call_arg_arguments.unwrap());
 
@@ -612,7 +673,8 @@ mod checked {
             if protocol_config.get_advance_epoch_start_time_in_safe_mode() {
                 temporary_store.advance_epoch_safe_mode(&params, protocol_config);
             } else {
-                let advance_epoch_safe_mode_pt = construct_advance_epoch_safe_mode_pt(&params, protocol_config)?;
+                let advance_epoch_safe_mode_pt =
+                    construct_advance_epoch_safe_mode_pt(&params, protocol_config)?;
                 programmable_transactions::execution::execute::<execution_mode::System>(
                     protocol_config,
                     metrics.clone(),
@@ -628,8 +690,10 @@ mod checked {
 
         let binary_config = to_binary_config(protocol_config);
         for (version, modules, dependencies) in change_epoch.system_packages.into_iter() {
-            let deserialized_modules: Vec<_> =
-                modules.iter().map(|m| CompiledModule::deserialize_with_config(m, &binary_config).unwrap()).collect();
+            let deserialized_modules: Vec<_> = modules
+                .iter()
+                .map(|m| CompiledModule::deserialize_with_config(m, &binary_config).unwrap())
+                .collect();
 
             if version == OBJECT_START_VERSION {
                 let package_id = deserialized_modules.first().unwrap().address();
@@ -652,14 +716,25 @@ mod checked {
                 )
                 .expect("System Package Publish must succeed");
             } else {
-                let mut new_package =
-                    Object::new_system_package(&deserialized_modules, version, dependencies, tx_ctx.digest());
+                let mut new_package = Object::new_system_package(
+                    &deserialized_modules,
+                    version,
+                    dependencies,
+                    tx_ctx.digest(),
+                );
 
-                info!("upgraded system package {:?}", new_package.compute_object_reference());
+                info!(
+                    "upgraded system package {:?}",
+                    new_package.compute_object_reference()
+                );
 
                 // Decrement the version before writing the package so that the store can record the
                 // version growing by one in the effects.
-                new_package.data.try_as_package_mut().unwrap().decrement_version();
+                new_package
+                    .data
+                    .try_as_package_mut()
+                    .unwrap()
+                    .decrement_version();
 
                 // upgrade of a previously existing framework module
                 temporary_store.write_object(new_package, WriteKind::Mutate);
@@ -689,9 +764,15 @@ mod checked {
                 CLOCK_MODULE_NAME.to_owned(),
                 CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME.to_owned(),
                 vec![],
-                vec![CallArg::CLOCK_MUT, CallArg::Pure(bcs::to_bytes(&consensus_commit_timestamp_ms).unwrap())],
+                vec![
+                    CallArg::CLOCK_MUT,
+                    CallArg::Pure(bcs::to_bytes(&consensus_commit_timestamp_ms).unwrap()),
+                ],
             );
-            assert_invariant!(res.is_ok(), "Unable to generate consensus_commit_prologue transaction!");
+            assert_invariant!(
+                res.is_ok(),
+                "Unable to generate consensus_commit_prologue transaction!"
+            );
             builder.finish()
         };
         programmable_transactions::execution::execute::<execution_mode::System>(

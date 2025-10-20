@@ -1,24 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::{AuthorityName, VerifiedExecutionData},
-    committee::Committee,
-    crypto::{AuthoritySignInfo, AuthoritySignature, SuiAuthoritySignature},
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    gas::GasCostSummary,
-    messages_checkpoint::{
-        CertifiedCheckpointSummary,
-        CheckpointContents,
-        CheckpointSummary,
-        CheckpointVersionSpecificData,
-        EndOfEpochData,
-        FullCheckpointContents,
-        VerifiedCheckpoint,
-        VerifiedCheckpointContents,
-    },
-    transaction::VerifiedTransaction,
+use crate::base_types::{AuthorityName, VerifiedExecutionData};
+use crate::committee::Committee;
+use crate::crypto::{AuthoritySignInfo, AuthoritySignature, SuiAuthoritySignature};
+use crate::effects::{TransactionEffects, TransactionEffectsAPI};
+use crate::gas::GasCostSummary;
+use crate::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSummary,
+    CheckpointVersionSpecificData, EndOfEpochData, FullCheckpointContents, VerifiedCheckpoint,
+    VerifiedCheckpointContents,
 };
+use crate::transaction::VerifiedTransaction;
 use fastcrypto::traits::Signer;
 use std::mem;
 
@@ -39,7 +32,8 @@ pub struct MockCheckpointBuilder {
 
 impl MockCheckpointBuilder {
     pub fn new(previous_checkpoint: VerifiedCheckpoint) -> Self {
-        let epoch_rolling_gas_cost_summary = previous_checkpoint.epoch_rolling_gas_cost_summary.clone();
+        let epoch_rolling_gas_cost_summary =
+            previous_checkpoint.epoch_rolling_gas_cost_summary.clone();
         let epoch = previous_checkpoint.epoch;
 
         Self {
@@ -58,10 +52,15 @@ impl MockCheckpointBuilder {
         &self.epoch_rolling_gas_cost_summary
     }
 
-    pub fn push_transaction(&mut self, transaction: VerifiedTransaction, effects: TransactionEffects) {
+    pub fn push_transaction(
+        &mut self,
+        transaction: VerifiedTransaction,
+        effects: TransactionEffects,
+    ) {
         self.epoch_rolling_gas_cost_summary += effects.gas_cost_summary();
 
-        self.transactions.push(VerifiedExecutionData::new(transaction, effects))
+        self.transactions
+            .push(VerifiedExecutionData::new(transaction, effects))
     }
 
     /// Override the next checkpoint number to generate.
@@ -86,7 +85,11 @@ impl MockCheckpointBuilder {
         &mut self,
         validator_keys: &impl ValidatorKeypairProvider,
         timestamp_ms: u64,
-    ) -> (VerifiedCheckpoint, CheckpointContents, VerifiedCheckpointContents) {
+    ) -> (
+        VerifiedCheckpoint,
+        CheckpointContents,
+        VerifiedCheckpointContents,
+    ) {
         self.build_internal(validator_keys, timestamp_ms, None)
     }
 
@@ -96,8 +99,16 @@ impl MockCheckpointBuilder {
         timestamp_ms: u64,
         new_epoch: u64,
         end_of_epoch_data: EndOfEpochData,
-    ) -> (VerifiedCheckpoint, CheckpointContents, VerifiedCheckpointContents) {
-        self.build_internal(validator_keys, timestamp_ms, Some((new_epoch, end_of_epoch_data)))
+    ) -> (
+        VerifiedCheckpoint,
+        CheckpointContents,
+        VerifiedCheckpointContents,
+    ) {
+        self.build_internal(
+            validator_keys,
+            timestamp_ms,
+            Some((new_epoch, end_of_epoch_data)),
+        )
     }
 
     fn build_internal(
@@ -105,27 +116,48 @@ impl MockCheckpointBuilder {
         validator_keys: &impl ValidatorKeypairProvider,
         timestamp_ms: u64,
         new_epoch_data: Option<(u64, EndOfEpochData)>,
-    ) -> (VerifiedCheckpoint, CheckpointContents, VerifiedCheckpointContents) {
-        let contents = CheckpointContents::new_with_causally_ordered_execution_data(self.transactions.iter());
-        let full_contents =
-            VerifiedCheckpointContents::new_unchecked(FullCheckpointContents::new_with_causally_ordered_transactions(
-                mem::take(&mut self.transactions).into_iter().map(|e| e.into_inner()),
-            ));
+    ) -> (
+        VerifiedCheckpoint,
+        CheckpointContents,
+        VerifiedCheckpointContents,
+    ) {
+        let contents =
+            CheckpointContents::new_with_causally_ordered_execution_data(self.transactions.iter());
+        let full_contents = VerifiedCheckpointContents::new_unchecked(
+            FullCheckpointContents::new_with_causally_ordered_transactions(
+                mem::take(&mut self.transactions)
+                    .into_iter()
+                    .map(|e| e.into_inner()),
+            ),
+        );
 
         let (epoch, epoch_rolling_gas_cost_summary, end_of_epoch_data) =
             if let Some((next_epoch, end_of_epoch_data)) = new_epoch_data {
                 let epoch = std::mem::replace(&mut self.epoch, next_epoch);
                 assert_eq!(next_epoch, epoch + 1);
-                let epoch_rolling_gas_cost_summary = std::mem::take(&mut self.epoch_rolling_gas_cost_summary);
+                let epoch_rolling_gas_cost_summary =
+                    std::mem::take(&mut self.epoch_rolling_gas_cost_summary);
 
-                (epoch, epoch_rolling_gas_cost_summary, Some(end_of_epoch_data))
+                (
+                    epoch,
+                    epoch_rolling_gas_cost_summary,
+                    Some(end_of_epoch_data),
+                )
             } else {
-                (self.epoch, self.epoch_rolling_gas_cost_summary.clone(), None)
+                (
+                    self.epoch,
+                    self.epoch_rolling_gas_cost_summary.clone(),
+                    None,
+                )
             };
 
         let summary = CheckpointSummary {
             epoch,
-            sequence_number: self.previous_checkpoint.as_ref().map(|c| c.sequence_number + 1).unwrap_or_default(),
+            sequence_number: self
+                .previous_checkpoint
+                .as_ref()
+                .map(|c| c.sequence_number + 1)
+                .unwrap_or_default(),
             network_total_transactions: self
                 .previous_checkpoint
                 .as_ref()
@@ -137,7 +169,8 @@ impl MockCheckpointBuilder {
             epoch_rolling_gas_cost_summary,
             end_of_epoch_data,
             timestamp_ms,
-            version_specific_data: bcs::to_bytes(&CheckpointVersionSpecificData::empty_for_tests()).unwrap(),
+            version_specific_data: bcs::to_bytes(&CheckpointVersionSpecificData::empty_for_tests())
+                .unwrap(),
             checkpoint_commitments: Default::default(),
         };
 
@@ -156,17 +189,24 @@ impl MockCheckpointBuilder {
             .iter()
             .map(|(name, _)| {
                 let intent_msg = shared_crypto::intent::IntentMessage::new(
-                    shared_crypto::intent::Intent::sui_app(shared_crypto::intent::IntentScope::CheckpointSummary),
+                    shared_crypto::intent::Intent::sui_app(
+                        shared_crypto::intent::IntentScope::CheckpointSummary,
+                    ),
                     &checkpoint,
                 );
                 let key = validator_keys.get_validator_key(name);
                 let signature = AuthoritySignature::new_secure(&intent_msg, &checkpoint.epoch, key);
-                AuthoritySignInfo { epoch: checkpoint.epoch, authority: *name, signature }
+                AuthoritySignInfo {
+                    epoch: checkpoint.epoch,
+                    authority: *name,
+                    signature,
+                }
             })
             .collect();
 
         let checkpoint_cert =
-            CertifiedCheckpointSummary::new(checkpoint, signatures, validator_keys.get_committee()).unwrap();
+            CertifiedCheckpointSummary::new(checkpoint, signatures, validator_keys.get_committee())
+                .unwrap();
         VerifiedCheckpoint::new_unchecked(checkpoint_cert)
     }
 }

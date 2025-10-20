@@ -1,5 +1,42 @@
 # @mysten/sui.js
 
+## 1.18.0
+
+### Minor Changes
+
+- 4f012b9: Improve typing for the return type of splitCoins and update the splitCoins result type to
+  have a concrete size
+- 85bd9e4: Add a new `address` options on methods that verify signatures that ensures the signature
+  is valid for the provided address
+- 5e3709d: remove dependency on tweetnacl
+- b2928a9: Update generated openrpc types which removes deprecated/non-functional filters for events
+- 85bd9e4: Add a new `publicKey.verifyAddress` method on PublicKey instances
+- a872b97: Add `latest` as an exported graphql schema
+
+### Patch Changes
+
+- dc0e21e: Remove duplicate applyEffects in serial transaction executor
+
+## 1.17.0
+
+### Minor Changes
+
+- 20af12d: add passkey sdk
+
+## 1.16.2
+
+### Patch Changes
+
+- 100207f: Fixes replacements on `namedPackagesPlugin` to only replace the package target if it is a
+  mvr name.
+
+## 1.16.1
+
+### Patch Changes
+
+- Updated dependencies [ad24b95]
+  - @mysten/bcs@1.2.0
+
 ## 1.16.0
 
 ### Minor Changes
@@ -613,7 +650,7 @@
   to be available in this release (with deprecation warnings). With the large number of deprecations
   there may be functionality that should be moved into the new modular version of the SDK. If you
   find there are features that were deprecated without a suitable replacement, we have created a
-  [Github Discussion thread](https://github.com/MystenLabs/sui/discussions/13150) to track those
+  [Github Discussion thread](https://github.com/one-chain-labs/onechain/discussions/13150) to track those
   use-cases.
 
   #### Migrating imports
@@ -899,14 +936,14 @@
   `SuiTransactionBlockResponse` (e.g., transaction, effects, events, etc). By default, only the
   transaction digest will be included.
 - c82e4b454: Introduce BigInt struct to sui-json-rpc-types to serialize and deserialize amounts
-  to/from string. Change ts-sdk to serialize amounts of PaySui and Pay as string.
+  to/from string. Change ts-sdk to serialize amounts of PayOct and Pay as string.
 - 7a2eaf4a3: Changing the SuiObjectResponse struct to use data/error fields instead of
   details/status
 - 2ef2bb59e: Deprecate getTransactionDigestsInRange. This method will be removed before April 2023,
   please use `getTransactions` instead
 - 9b29bef37: Pass blake2b hash to signer API
 - 8700809b5: Add a new `getCheckpoints` endpoint that returns a paginated list of checkpoints.
-- 5c3b00cde: Add object id to staking pool and pool id to staked oct.
+- 5c3b00cde: Add object id to staking pool and pool id to staked sui.
 - 01272ab7d: Remove deprecated `getCheckpointContents`, `getCheckpointContentsByDigest`,
   `getCheckpointSummary` and `getCheckpointSummaryByDigest` methods.
 - 9822357d6: Add getStakesByIds to get DelegatedStake queried by id
@@ -1209,7 +1246,7 @@
 ### Minor Changes
 
 - 8b4bea5e2: Remove gateway related APIs
-- e45b188a8: Introduce PaySui and PayAllSui native transaction types to TS SDK.
+- e45b188a8: Introduce PayOct and PayAllOct native transaction types to TS SDK.
 
 ### Patch Changes
 
@@ -1218,7 +1255,7 @@
 - ef3571dc8: Fix gas selection bug for a vector of objects
 - cccfe9315: Add deserialization util method to LocalTxnDataSerializer
 - 2dc594ef7: Introduce getCoinDenominationInfo, which returns denomination info of a coin, now only
-  supporting SUI coin.
+  supporting OCT coin.
 - 4f0c611ff: Protocol change to add 'initial shared version' to shared object references.
 
 ## 0.13.0

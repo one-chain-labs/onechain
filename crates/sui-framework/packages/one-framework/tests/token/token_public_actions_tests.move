@@ -3,9 +3,9 @@
 
 #[test_only]
 /// This module tests `join`, `split`, `zero` and `destroy_zero` functions
-module one::token_public_actions_tests {
-    use one::token_test_utils::{Self as test, TEST};
-    use one::token;
+module oct::token_public_actions_tests {
+    use sui::token_test_utils::{Self as test, TEST};
+    use sui::token;
 
     #[test]
     /// Scenario: mint a Token, split it, merge back, then issue a zero and

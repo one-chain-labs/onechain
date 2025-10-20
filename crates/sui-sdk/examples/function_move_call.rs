@@ -28,18 +28,21 @@ use utils::setup_for_write;
 // 5) executes it.
 // For some of these actions it prints some output.
 // Finally, at the end of the program it prints the number of coins for the
-// OneChain address that received the coin.
+// Sui address that received the coin.
 // If you run this program several times, you should see the number of coins
 // for the recipient address increases.
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // 1) get the OneChain client, the sender and recipient that we will use
+    // 1) get the Sui client, the sender and recipient that we will use
     // for the transaction, and find the coin we use as gas
     let (sui, sender, _recipient) = setup_for_write().await?;
 
     // we need to find the coin we will use as gas
-    let coins = sui.coin_read_api().get_coins(sender, None, None, None).await?;
+    let coins = sui
+        .coin_read_api()
+        .get_coins(sender, None, None, None)
+        .await?;
     let coin = coins.data.into_iter().next().unwrap();
 
     // 2) create a programmable transaction builder to add commands and create a PTB
@@ -58,7 +61,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let package = ObjectID::from_hex_literal(pkg_id).map_err(|e| anyhow!(e))?;
     let module = Identifier::new("hello_wolrd").map_err(|e| anyhow!(e))?;
     let function = Identifier::new("hello_world").map_err(|e| anyhow!(e))?;
-    ptb.command(Command::move_call(package, module, function, vec![], vec![Argument::Input(0)]));
+    ptb.command(Command::move_call(
+        package,
+        module,
+        function,
+        vec![],
+        vec![Argument::Input(0)],
+    ));
 
     // build the transaction block by calling finish on the ptb
     let builder = ptb.finish();
@@ -66,7 +75,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let gas_budget = 10_000_000;
     let gas_price = sui.read_api().get_reference_gas_price().await?;
     // create the transaction data that will be sent to the network
-    let tx_data = TransactionData::new_programmable(sender, vec![coin.object_ref()], builder, gas_budget, gas_price);
+    let tx_data = TransactionData::new_programmable(
+        sender,
+        vec![coin.object_ref()],
+        builder,
+        gas_budget,
+        gas_price,
+    );
 
     // 4) sign transaction
     let keystore = FileBasedKeystore::new(&sui_config_dir()?.join(SUI_KEYSTORE_FILENAME))?;

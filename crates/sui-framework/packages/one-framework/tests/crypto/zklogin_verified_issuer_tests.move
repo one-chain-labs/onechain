@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::zklogin_verified_issuer_tests {
-    use one::zklogin_verified_issuer::{check_zklogin_issuer, delete, verify_zklogin_issuer, VerifiedIssuer};
-    use one::test_scenario;
+module oct::zklogin_verified_issuer_tests {
+    use sui::zklogin_verified_issuer::{check_zklogin_issuer, delete, verify_zklogin_issuer, VerifiedIssuer};
+    use sui::test_scenario;
 
     #[test]
     fun test_check_zklogin_issuer() {
@@ -45,7 +45,7 @@ module one::zklogin_verified_issuer_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::zklogin_verified_issuer::EInvalidProof)]
+    #[expected_failure(abort_code = sui::zklogin_verified_issuer::EInvalidProof)]
     fun test_invalid_verified_issuer() {
         let other_address = @0x1;
         let iss = b"https://accounts.google.com".to_string();

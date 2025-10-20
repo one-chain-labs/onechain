@@ -1,40 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    encoding::{
-        BridgeMessageEncoding,
-        ADD_TOKENS_ON_EVM_MESSAGE_VERSION,
-        ASSET_PRICE_UPDATE_MESSAGE_VERSION,
-        COMMITTEE_BLOCKLIST_MESSAGE_VERSION,
-        EMERGENCY_BUTTON_MESSAGE_VERSION,
-        EVM_CONTRACT_UPGRADE_MESSAGE_VERSION,
-        LIMIT_UPDATE_MESSAGE_VERSION,
-        TOKEN_TRANSFER_MESSAGE_VERSION,
-    },
-    error::{BridgeError, BridgeResult},
-    types::{
-        AddTokensOnEvmAction,
-        AssetPriceUpdateAction,
-        BlocklistCommitteeAction,
-        BridgeAction,
-        BridgeActionType,
-        EmergencyAction,
-        EthLog,
-        EthToSuiBridgeAction,
-        EvmContractUpgradeAction,
-        LimitUpdateAction,
-        ParsedTokenTransferMessage,
-        SuiToEthBridgeAction,
-    },
+use crate::encoding::{
+    BridgeMessageEncoding, ADD_TOKENS_ON_EVM_MESSAGE_VERSION, ASSET_PRICE_UPDATE_MESSAGE_VERSION,
+    EVM_CONTRACT_UPGRADE_MESSAGE_VERSION, LIMIT_UPDATE_MESSAGE_VERSION,
 };
+use crate::encoding::{
+    COMMITTEE_BLOCKLIST_MESSAGE_VERSION, EMERGENCY_BUTTON_MESSAGE_VERSION,
+    TOKEN_TRANSFER_MESSAGE_VERSION,
+};
+use crate::error::{BridgeError, BridgeResult};
+use crate::types::ParsedTokenTransferMessage;
+use crate::types::{
+    AddTokensOnEvmAction, AssetPriceUpdateAction, BlocklistCommitteeAction, BridgeAction,
+    BridgeActionType, EmergencyAction, EthLog, EthToSuiBridgeAction, EvmContractUpgradeAction,
+    LimitUpdateAction, SuiToEthBridgeAction,
+};
+use ethers::types::Log;
 use ethers::{
     abi::RawLog,
     contract::{abigen, EthLogDecode},
-    types::{Address as EthAddress, Log},
+    types::Address as EthAddress,
 };
 use serde::{Deserialize, Serialize};
-use sui_types::{base_types::SuiAddress, bridge::BridgeChainId};
+use sui_types::base_types::SuiAddress;
+use sui_types::bridge::BridgeChainId;
 
 macro_rules! gen_eth_events {
     ($($contract:ident, $contract_event:ident, $abi_path:literal),* $(,)?) => {
@@ -98,7 +88,11 @@ gen_eth_events!(
 
 gen_eth_events!(EthBridgeVault, "abi/bridge_vault.json");
 
-abigen!(EthERC20, "abi/erc20.json", event_derives(serde::Deserialize, serde::Serialize));
+abigen!(
+    EthERC20,
+    "abi/erc20.json",
+    event_derives(serde::Deserialize, serde::Serialize)
+);
 
 impl EthBridgeEvent {
     pub fn try_into_bridge_action(
@@ -192,7 +186,6 @@ pub struct EthToSuiTokenBridgeV1 {
 
 impl TryFrom<&TokensDepositedFilter> for EthToSuiTokenBridgeV1 {
     type Error = BridgeError;
-
     fn try_from(event: &TokensDepositedFilter) -> BridgeResult<Self> {
         Ok(Self {
             nonce: event.nonce,
@@ -323,16 +316,22 @@ mod tests {
     fn test_eth_message_conversion_emergency_action_regression() -> anyhow::Result<()> {
         telemetry_subscribers::init_for_testing();
 
-        let action =
-            EmergencyAction { nonce: 2, chain_id: BridgeChainId::EthSepolia, action_type: EmergencyActionType::Pause };
-        let message: eth_sui_bridge::Message = action.into();
-        assert_eq!(message, eth_sui_bridge::Message {
-            message_type: BridgeActionType::EmergencyButton as u8,
-            version: EMERGENCY_BUTTON_MESSAGE_VERSION,
+        let action = EmergencyAction {
             nonce: 2,
-            chain_id: BridgeChainId::EthSepolia as u8,
-            payload: vec![0].into(),
-        });
+            chain_id: BridgeChainId::EthSepolia,
+            action_type: EmergencyActionType::Pause,
+        };
+        let message: eth_sui_bridge::Message = action.into();
+        assert_eq!(
+            message,
+            eth_sui_bridge::Message {
+                message_type: BridgeActionType::EmergencyButton as u8,
+                version: EMERGENCY_BUTTON_MESSAGE_VERSION,
+                nonce: 2,
+                chain_id: BridgeChainId::EthSepolia as u8,
+                payload: vec![0].into(),
+            }
+        );
         Ok(())
     }
 
@@ -340,7 +339,8 @@ mod tests {
     fn test_eth_message_conversion_update_blocklist_action_regression() -> anyhow::Result<()> {
         telemetry_subscribers::init_for_testing();
         let pub_key_bytes = BridgeAuthorityPublicKeyBytes::from_bytes(
-            &Hex::decode("02321ede33d2c2d7a8a152f275a1484edef2098f034121a602cb7d767d38680aa4").unwrap(),
+            &Hex::decode("02321ede33d2c2d7a8a152f275a1484edef2098f034121a602cb7d767d38680aa4")
+                .unwrap(),
         )
         .unwrap();
         let action = BlocklistCommitteeAction {
@@ -350,13 +350,18 @@ mod tests {
             members_to_update: vec![pub_key_bytes],
         };
         let message: eth_bridge_committee::Message = action.into();
-        assert_eq!(message, eth_bridge_committee::Message {
-            message_type: BridgeActionType::UpdateCommitteeBlocklist as u8,
-            version: COMMITTEE_BLOCKLIST_MESSAGE_VERSION,
-            nonce: 0,
-            chain_id: BridgeChainId::EthSepolia as u8,
-            payload: Hex::decode("000168b43fd906c0b8f024a18c56e06744f7c6157c65").unwrap().into(),
-        });
+        assert_eq!(
+            message,
+            eth_bridge_committee::Message {
+                message_type: BridgeActionType::UpdateCommitteeBlocklist as u8,
+                version: COMMITTEE_BLOCKLIST_MESSAGE_VERSION,
+                nonce: 0,
+                chain_id: BridgeChainId::EthSepolia as u8,
+                payload: Hex::decode("000168b43fd906c0b8f024a18c56e06744f7c6157c65")
+                    .unwrap()
+                    .into(),
+            }
+        );
         Ok(())
     }
 
@@ -370,13 +375,16 @@ mod tests {
             new_usd_limit: 4200000,
         };
         let message: eth_bridge_limiter::Message = action.into();
-        assert_eq!(message, eth_bridge_limiter::Message {
-            message_type: BridgeActionType::LimitUpdate as u8,
-            version: LIMIT_UPDATE_MESSAGE_VERSION,
-            nonce: 2,
-            chain_id: BridgeChainId::EthSepolia as u8,
-            payload: Hex::decode("010000000000401640").unwrap().into(),
-        });
+        assert_eq!(
+            message,
+            eth_bridge_limiter::Message {
+                message_type: BridgeActionType::LimitUpdate as u8,
+                version: LIMIT_UPDATE_MESSAGE_VERSION,
+                nonce: 2,
+                chain_id: BridgeChainId::EthSepolia as u8,
+                payload: Hex::decode("010000000000401640").unwrap().into(),
+            }
+        );
         Ok(())
     }
 
@@ -414,13 +422,16 @@ mod tests {
             new_usd_price: 80000000,
         };
         let message: eth_bridge_config::Message = action.into();
-        assert_eq!(message, eth_bridge_config::Message {
-            message_type: BridgeActionType::AssetPriceUpdate as u8,
-            version: ASSET_PRICE_UPDATE_MESSAGE_VERSION,
-            nonce: 2,
-            chain_id: BridgeChainId::EthSepolia as u8,
-            payload: Hex::decode("020000000004c4b400").unwrap().into(),
-        });
+        assert_eq!(
+            message,
+            eth_bridge_config::Message {
+                message_type: BridgeActionType::AssetPriceUpdate as u8,
+                version: ASSET_PRICE_UPDATE_MESSAGE_VERSION,
+                nonce: 2,
+                chain_id: BridgeChainId::EthSepolia as u8,
+                payload: Hex::decode("020000000004c4b400").unwrap().into(),
+            }
+        );
         Ok(())
     }
 
@@ -431,7 +442,11 @@ mod tests {
             chain_id: BridgeChainId::EthCustom,
             native: true,
             token_ids: vec![99, 100, 101],
-            token_addresses: vec![EthAddress::repeat_byte(1), EthAddress::repeat_byte(2), EthAddress::repeat_byte(3)],
+            token_addresses: vec![
+                EthAddress::repeat_byte(1),
+                EthAddress::repeat_byte(2),
+                EthAddress::repeat_byte(3),
+            ],
             token_sui_decimals: vec![5, 6, 7],
             token_prices: vec![1_000_000_000, 2_000_000_000, 3_000_000_000],
         };
@@ -481,43 +496,62 @@ mod tests {
         let event = EthBridgeEvent::try_from_eth_log(&action).unwrap();
         assert_eq!(
             event,
-            EthBridgeEvent::EthSuiBridgeEvents(EthSuiBridgeEvents::TokensDepositedFilter(TokensDepositedFilter {
-                source_chain_id: 12,
-                nonce: 0,
-                destination_chain_id: 2,
-                token_id: 2,
-                sui_adjusted_amount: 4200000000,
-                sender_address: EthAddress::from_str("0x14dc79964da2c08b23698b3d3cc7ca32193d9955").unwrap(),
-                recipient_address: ethers::types::Bytes::from(
-                    Hex::decode("0x3b1eb23133e94d08d0da9303cfd38e7d4f8f6951f235daa62cd64ea5b6d96d77").unwrap(),
-                ),
-            }))
+            EthBridgeEvent::EthSuiBridgeEvents(EthSuiBridgeEvents::TokensDepositedFilter(
+                TokensDepositedFilter {
+                    source_chain_id: 12,
+                    nonce: 0,
+                    destination_chain_id: 2,
+                    token_id: 2,
+                    sui_adjusted_amount: 4200000000,
+                    sender_address: EthAddress::from_str(
+                        "0x14dc79964da2c08b23698b3d3cc7ca32193d9955"
+                    )
+                    .unwrap(),
+                    recipient_address: ethers::types::Bytes::from(
+                        Hex::decode(
+                            "0x3b1eb23133e94d08d0da9303cfd38e7d4f8f6951f235daa62cd64ea5b6d96d77"
+                        )
+                        .unwrap(),
+                    ),
+                }
+            ))
         );
         Ok(())
     }
 
     #[test]
     fn test_0_sui_amount_conversion_for_eth_event() {
-        let e = EthBridgeEvent::EthSuiBridgeEvents(EthSuiBridgeEvents::TokensDepositedFilter(TokensDepositedFilter {
-            source_chain_id: BridgeChainId::EthSepolia as u8,
-            nonce: 0,
-            destination_chain_id: BridgeChainId::SuiTestnet as u8,
-            token_id: 2,
-            sui_adjusted_amount: 1,
-            sender_address: EthAddress::random(),
-            recipient_address: ethers::types::Bytes::from(SuiAddress::random_for_testing_only().to_vec()),
-        }));
-        assert!(e.try_into_bridge_action(TxHash::random(), 0).unwrap().is_some());
+        let e = EthBridgeEvent::EthSuiBridgeEvents(EthSuiBridgeEvents::TokensDepositedFilter(
+            TokensDepositedFilter {
+                source_chain_id: BridgeChainId::EthSepolia as u8,
+                nonce: 0,
+                destination_chain_id: BridgeChainId::SuiTestnet as u8,
+                token_id: 2,
+                sui_adjusted_amount: 1,
+                sender_address: EthAddress::random(),
+                recipient_address: ethers::types::Bytes::from(
+                    SuiAddress::random_for_testing_only().to_vec(),
+                ),
+            },
+        ));
+        assert!(e
+            .try_into_bridge_action(TxHash::random(), 0)
+            .unwrap()
+            .is_some());
 
-        let e = EthBridgeEvent::EthSuiBridgeEvents(EthSuiBridgeEvents::TokensDepositedFilter(TokensDepositedFilter {
-            source_chain_id: BridgeChainId::EthSepolia as u8,
-            nonce: 0,
-            destination_chain_id: BridgeChainId::SuiTestnet as u8,
-            token_id: 2,
-            sui_adjusted_amount: 0, // <------------
-            sender_address: EthAddress::random(),
-            recipient_address: ethers::types::Bytes::from(SuiAddress::random_for_testing_only().to_vec()),
-        }));
+        let e = EthBridgeEvent::EthSuiBridgeEvents(EthSuiBridgeEvents::TokensDepositedFilter(
+            TokensDepositedFilter {
+                source_chain_id: BridgeChainId::EthSepolia as u8,
+                nonce: 0,
+                destination_chain_id: BridgeChainId::SuiTestnet as u8,
+                token_id: 2,
+                sui_adjusted_amount: 0, // <------------
+                sender_address: EthAddress::random(),
+                recipient_address: ethers::types::Bytes::from(
+                    SuiAddress::random_for_testing_only().to_vec(),
+                ),
+            },
+        ));
         match e.try_into_bridge_action(TxHash::random(), 0).unwrap_err() {
             BridgeError::ZeroValueBridgeTransfer(_) => {}
             e => panic!("Unexpected error: {:?}", e),

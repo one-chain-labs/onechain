@@ -114,7 +114,10 @@ pub mod test_client {
 
     impl TestClient {
         pub fn new(settings: Settings) -> Self {
-            Self { settings, instances: Mutex::new(Vec::new()) }
+            Self {
+                settings,
+                instances: Mutex::new(Vec::new()),
+            }
         }
     }
 

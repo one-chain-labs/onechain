@@ -4,7 +4,8 @@ pub type Accumulator = fastcrypto::hash::EllipticCurveMultisetHash;
 
 #[cfg(test)]
 mod tests {
-    use crate::{accumulator::Accumulator, base_types::ObjectDigest};
+    use crate::accumulator::Accumulator;
+    use crate::base_types::ObjectDigest;
     use fastcrypto::hash::MultisetHash;
     use rand::seq::SliceRandom;
 

@@ -5,14 +5,14 @@
 
 module prettier::use_declaration;
 
-use beep::staked_one::StakedOct;
-use one::coin::{
+use beep::staked_oct::StakedOct;
+use sui::coin::{
     Self as c,
     Coin,
     Coin as C,
     very_long_function_name_very_long_function_name as short_name
 };
-use one::transfer_policy::{
+use sui::transfer_policy::{
     Self as policy,
     TransferPolicy,
     TransferPolicyCap,

@@ -58,7 +58,12 @@ impl<F> AppState<F> {
 #[async_trait]
 pub trait Faucet {
     /// Send `Coin<OCT>` of the specified amount to the recipient
-    async fn send(&self, id: Uuid, recipient: SuiAddress, amounts: &[u64]) -> Result<FaucetReceipt, FaucetError>;
+    async fn send(
+        &self,
+        id: Uuid,
+        recipient: SuiAddress,
+        amounts: &[u64],
+    ) -> Result<FaucetReceipt, FaucetError>;
 
     /// Send `Coin<OCT>` of the specified amount to the recipient in a batch request
     async fn batch_send(
@@ -76,7 +81,11 @@ pub const DEFAULT_AMOUNT: u64 = 1_000_000_000;
 pub const DEFAULT_NUM_OF_COINS: usize = 1;
 
 #[derive(Parser, Clone)]
-#[clap(name = "Sui Faucet", about = "Faucet for requesting test tokens on Sui", rename_all = "kebab-case")]
+#[clap(
+    name = "Sui Faucet",
+    about = "Faucet for requesting test tokens on Sui",
+    rename_all = "kebab-case"
+)]
 pub struct FaucetConfig {
     #[clap(long, default_value_t = 5003)]
     pub port: u16,

@@ -40,7 +40,11 @@ pub struct LoopAnnotation {
 
 impl LoopAnnotation {
     fn back_edges_locations(&self) -> BTreeSet<CodeOffset> {
-        self.fat_loops.values().flat_map(|l| l.back_edges.iter()).copied().collect()
+        self.fat_loops
+            .values()
+            .flat_map(|l| l.back_edges.iter())
+            .copied()
+            .collect()
     }
 }
 
@@ -89,13 +93,21 @@ impl LoopAnalysisProcessor {
     /// - For each backedge in this loop:
     ///     - In the source block of the back edge, replace the last statement (must be a jump or
     ///       branch) with the new label of X.
-    fn transform(func_env: &FunctionEnv<'_>, data: FunctionData, loop_annotation: &LoopAnnotation) -> FunctionData {
+    fn transform(
+        func_env: &FunctionEnv<'_>,
+        data: FunctionData,
+        loop_annotation: &LoopAnnotation,
+    ) -> FunctionData {
         let options = ProverOptions::get(func_env.module_env.env);
 
         let back_edge_locs = loop_annotation.back_edges_locations();
-        let mut builder = FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
-            no_fallthrough_jump_removal: true,
-        });
+        let mut builder = FunctionDataBuilder::new_with_options(
+            func_env,
+            data,
+            FunctionDataBuilderOptions {
+                no_fallthrough_jump_removal: true,
+            },
+        );
         let mut goto_fixes = vec![];
         let code = std::mem::take(&mut builder.data.code);
         for (offset, bytecode) in code.into_iter().enumerate() {
@@ -106,31 +118,53 @@ impl LoopAnalysisProcessor {
                     if let Some(loop_info) = loop_annotation.fat_loops.get(&label) {
                         // havoc all loop targets
                         for (idx, havoc_all) in &loop_info.mut_targets {
-                            let havoc_kind = if *havoc_all { HavocKind::MutationAll } else { HavocKind::MutationValue };
+                            let havoc_kind = if *havoc_all {
+                                HavocKind::MutationAll
+                            } else {
+                                HavocKind::MutationValue
+                            };
                             builder.emit_with(|attr_id| {
-                                Bytecode::Call(attr_id, vec![*idx], Operation::Havoc(havoc_kind), vec![], None)
+                                Bytecode::Call(
+                                    attr_id,
+                                    vec![*idx],
+                                    Operation::Havoc(havoc_kind),
+                                    vec![],
+                                    None,
+                                )
                             });
                         }
 
                         // trace implicitly reassigned variables after havocking
-                        let affected_variables: BTreeSet<_> =
-                            loop_info.val_targets.iter().chain(loop_info.mut_targets.keys()).collect();
+                        let affected_variables: BTreeSet<_> = loop_info
+                            .val_targets
+                            .iter()
+                            .chain(loop_info.mut_targets.keys())
+                            .collect();
 
                         // Only emit this for user declared locals, not for ones introduced
                         // by stack elimination.
-                        let affected_non_temporary_variables: BTreeSet<_> =
-                            affected_variables.into_iter().filter(|&idx| !func_env.is_temporary(*idx)).collect();
+                        let affected_non_temporary_variables: BTreeSet<_> = affected_variables
+                            .into_iter()
+                            .filter(|&idx| !func_env.is_temporary(*idx))
+                            .collect();
 
                         if affected_non_temporary_variables.is_empty() {
                             // no user declared local is havocked
                             builder.set_next_debug_comment("info: enter loop".to_owned());
                         } else {
                             // show the havocked locals to user
-                            let affected_non_temporary_variable_names: Vec<_> = affected_non_temporary_variables
-                                .iter()
-                                .map(|&idx| func_env.symbol_pool().string(func_env.get_local_name(*idx)).to_string())
-                                .collect();
-                            let joined_variables_names_str = affected_non_temporary_variable_names.join(", ");
+                            let affected_non_temporary_variable_names: Vec<_> =
+                                affected_non_temporary_variables
+                                    .iter()
+                                    .map(|&idx| {
+                                        func_env
+                                            .symbol_pool()
+                                            .string(func_env.get_local_name(*idx))
+                                            .to_string()
+                                    })
+                                    .collect();
+                            let joined_variables_names_str =
+                                affected_non_temporary_variable_names.join(", ");
                             builder.set_next_debug_comment(format!(
                                 "info: enter loop, variable(s) {} havocked and reassigned",
                                 joined_variables_names_str
@@ -141,13 +175,21 @@ impl LoopAnalysisProcessor {
                         for idx_ in &affected_non_temporary_variables {
                             let idx = *idx_;
                             builder.emit_with(|id| {
-                                Bytecode::Call(id, vec![], Operation::TraceLocal(*idx), vec![*idx], None)
+                                Bytecode::Call(
+                                    id,
+                                    vec![],
+                                    Operation::TraceLocal(*idx),
+                                    vec![*idx],
+                                    None,
+                                )
                             });
                         }
 
                         // after showing the havocked locals and their new values, show the following message
                         if !affected_non_temporary_variables.is_empty() {
-                            builder.set_next_debug_comment("info: loop invariant holds at current state".to_string());
+                            builder.set_next_debug_comment(
+                                "info: loop invariant holds at current state".to_string(),
+                            );
                         }
                     }
                 }
@@ -164,8 +206,11 @@ impl LoopAnalysisProcessor {
         }
 
         // create one invariant-checking block for each fat loop
-        let invariant_checker_labels: BTreeMap<_, _> =
-            loop_annotation.fat_loops.keys().map(|label| (*label, builder.new_label())).collect();
+        let invariant_checker_labels: BTreeMap<_, _> = loop_annotation
+            .fat_loops
+            .keys()
+            .map(|label| (*label, builder.new_label()))
+            .collect();
 
         for label in loop_annotation.fat_loops.keys() {
             let checker_label = invariant_checker_labels.get(label).unwrap();
@@ -194,7 +239,9 @@ impl LoopAnalysisProcessor {
                 }
                 Bytecode::Branch(attr_id, if_label, else_label, idx) => {
                     let new_if_label = *invariant_checker_labels.get(if_label).unwrap_or(if_label);
-                    let new_else_label = *invariant_checker_labels.get(else_label).unwrap_or(else_label);
+                    let new_else_label = *invariant_checker_labels
+                        .get(else_label)
+                        .unwrap_or(else_label);
                     Bytecode::Branch(*attr_id, new_if_label, new_else_label, *idx)
                 }
                 _ => panic!("Expect a branch statement"),
@@ -221,9 +268,16 @@ impl LoopAnalysisProcessor {
         let code = func_target.get_bytecode();
         let mut val_targets = BTreeSet::new();
         let mut mut_targets = BTreeMap::new();
-        let fat_loop_body: BTreeSet<_> = sub_loops.iter().flat_map(|l| l.loop_body.iter()).copied().collect();
+        let fat_loop_body: BTreeSet<_> = sub_loops
+            .iter()
+            .flat_map(|l| l.loop_body.iter())
+            .copied()
+            .collect();
         for block_id in fat_loop_body {
-            for code_offset in cfg.instr_indexes(block_id).expect("A loop body should never contain a dummy block") {
+            for code_offset in cfg
+                .instr_indexes(block_id)
+                .expect("A loop body should never contain a dummy block")
+            {
                 let bytecode = &code[code_offset as usize];
                 let (bc_val_targets, bc_mut_targets) = bytecode.modifies(func_target);
                 val_targets.extend(bc_val_targets);
@@ -281,17 +335,25 @@ impl LoopAnalysisProcessor {
         let nodes = cfg.blocks();
         let edges: Vec<(BlockId, BlockId)> = nodes
             .iter()
-            .flat_map(|x| cfg.successors(*x).iter().map(|y| (*x, *y)).collect::<Vec<(BlockId, BlockId)>>())
+            .flat_map(|x| {
+                cfg.successors(*x)
+                    .iter()
+                    .map(|y| (*x, *y))
+                    .collect::<Vec<(BlockId, BlockId)>>()
+            })
             .collect();
         let graph = Graph::new(entry, nodes, edges);
-        let natural_loops = graph
-            .compute_reducible()
-            .expect("A well-formed Move function is expected to have a reducible control-flow graph");
+        let natural_loops = graph.compute_reducible().expect(
+            "A well-formed Move function is expected to have a reducible control-flow graph",
+        );
 
         // collect shared headers from loops
         let mut fat_headers = BTreeMap::new();
         for single_loop in natural_loops {
-            fat_headers.entry(single_loop.loop_header).or_insert_with(Vec::new).push(single_loop);
+            fat_headers
+                .entry(single_loop.loop_header)
+                .or_insert_with(Vec::new)
+                .push(single_loop);
         }
 
         // build fat loops by label
@@ -306,11 +368,19 @@ impl LoopAnalysisProcessor {
                 },
             };
 
-            let (val_targets, mut_targets) = Self::collect_loop_targets(&cfg, &func_target, &sub_loops);
+            let (val_targets, mut_targets) =
+                Self::collect_loop_targets(&cfg, &func_target, &sub_loops);
             let back_edges = Self::collect_loop_back_edges(code, &cfg, label, &sub_loops);
 
             // done with all information collection.
-            fat_loops.insert(label, FatLoop { val_targets, mut_targets, back_edges });
+            fat_loops.insert(
+                label,
+                FatLoop {
+                    val_targets,
+                    mut_targets,
+                    back_edges,
+                },
+            );
         }
 
         LoopAnnotation { fat_loops }

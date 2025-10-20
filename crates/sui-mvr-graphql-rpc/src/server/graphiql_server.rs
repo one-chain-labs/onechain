@@ -5,17 +5,19 @@ use axum::extract::Path;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
-use crate::{
-    config::{ServerConfig, Version},
-    error::Error,
-    server::builder::ServerBuilder,
-};
+use crate::config::{ServerConfig, Version};
+use crate::error::Error;
+use crate::server::builder::ServerBuilder;
 
 async fn graphiql(
     ide_title: axum::Extension<Option<String>>,
     path: Option<Path<String>>,
 ) -> impl axum::response::IntoResponse {
-    let endpoint = if let Some(Path(path)) = path { format!("/graphql/{}", path) } else { "/graphql".to_string() };
+    let endpoint = if let Some(Path(path)) = path {
+        format!("/graphql/{}", path)
+    } else {
+        "/graphql".to_string()
+    };
     let gq = async_graphql::http::GraphiQLSource::build().endpoint(&endpoint);
     if let axum::Extension(Some(title)) = ide_title {
         axum::response::Html(gq.title(&title).finish())
@@ -38,7 +40,10 @@ pub async fn start_graphiql_server(
     .await
 }
 
-async fn start_graphiql_server_impl(server_builder: ServerBuilder, ide_title: String) -> Result<(), Error> {
+async fn start_graphiql_server_impl(
+    server_builder: ServerBuilder,
+    ide_title: String,
+) -> Result<(), Error> {
     let address = server_builder.address();
 
     // Add GraphiQL IDE handler on GET request to `/`` endpoint

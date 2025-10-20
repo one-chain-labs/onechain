@@ -16,7 +16,7 @@ import type { Transaction } from '../Transaction.js';
 import type { TransactionDataBuilder } from '../TransactionData.js';
 
 const COIN_WITH_BALANCE = 'CoinWithBalance';
-const SUI_TYPE = normalizeStructTag('0x2::oct::OCT');
+const SUI_TYPE = normalizeStructTag('0x2::sui::SUI');
 
 export function coinWithBalance({
 	type = SUI_TYPE,

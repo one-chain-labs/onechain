@@ -2,9 +2,9 @@
 # Copyright (c) Mysten Labs, Inc.
 # SPDX-License-Identifier: Apache-2.0
 #
-# assumes One chain cli installed (cargo build --bin one_chain)
+# assumes sui cli installed (brew install sui or cargo build --bin sui)
 
-cd genesis || exit
+cd genesis
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r requirements.txt

@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::payload::{validation::check_transactions, GetCheckpoints, ProcessPayload, RpcCommandProcessor, SignerInfo};
+use crate::payload::validation::check_transactions;
+use crate::payload::{GetCheckpoints, ProcessPayload, RpcCommandProcessor, SignerInfo};
 use anyhow::Result;
 use async_trait::async_trait;
 use dashmap::DashSet;
@@ -13,11 +14,16 @@ use crate::payload::checkpoint_utils::get_latest_checkpoint_stats;
 use sui_json_rpc_types::CheckpointId;
 use sui_types::base_types::TransactionDigest;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, log::warn};
+use tracing::log::warn;
+use tracing::{debug, error, info};
 
 #[async_trait]
 impl<'a> ProcessPayload<'a, &'a GetCheckpoints> for RpcCommandProcessor {
-    async fn process(&'a self, op: &'a GetCheckpoints, _signer_info: &Option<SignerInfo>) -> Result<()> {
+    async fn process(
+        &'a self,
+        op: &'a GetCheckpoints,
+        _signer_info: &Option<SignerInfo>,
+    ) -> Result<()> {
         let clients = self.get_clients().await?;
 
         let checkpoint_stats = get_latest_checkpoint_stats(&clients, op.end).await;
@@ -28,7 +34,8 @@ impl<'a> ProcessPayload<'a, &'a GetCheckpoints> for RpcCommandProcessor {
         let cross_validate = true;
 
         for seq in op.start..=max_checkpoint {
-            let transaction_digests: Arc<Mutex<DashSet<TransactionDigest>>> = Arc::new(Mutex::new(DashSet::new()));
+            let transaction_digests: Arc<Mutex<DashSet<TransactionDigest>>> =
+                Arc::new(Mutex::new(DashSet::new()));
             let checkpoints = join_all(clients.iter().enumerate().map(|(i, client)| {
                 let transaction_digests = transaction_digests.clone();
                 let end_checkpoint_for_clients = checkpoint_stats.latest_checkpoints.clone();
@@ -65,14 +72,23 @@ impl<'a> ProcessPayload<'a, &'a GetCheckpoints> for RpcCommandProcessor {
             }))
                 .await;
 
-            let transaction_digests = transaction_digests.lock().await.iter().map(|digest| *digest).collect::<Vec<_>>();
+            let transaction_digests = transaction_digests
+                .lock()
+                .await
+                .iter()
+                .map(|digest| *digest)
+                .collect::<Vec<_>>();
 
             if op.verify_transactions {
-                let transaction_responses =
-                    check_transactions(&clients, &transaction_digests, cross_validate, op.verify_objects)
-                        .await
-                        .into_iter()
-                        .concat();
+                let transaction_responses = check_transactions(
+                    &clients,
+                    &transaction_digests,
+                    cross_validate,
+                    op.verify_objects,
+                )
+                .await
+                .into_iter()
+                .concat();
 
                 if op.record {
                     debug!("adding addresses and object ids from response");

@@ -5,16 +5,11 @@ use async_graphql::connection::CursorType;
 use serde::{Deserialize, Serialize};
 use sui_indexer::models::objects::StoredHistoryObject;
 
-use crate::{
-    filter,
-    query,
-    raw_query::RawQuery,
-    types::{
-        available_range::AvailableRange,
-        cursor::{JsonCursor, Page, ScanLimited},
-        object::Cursor,
-    },
-};
+use crate::raw_query::RawQuery;
+use crate::types::available_range::AvailableRange;
+use crate::types::cursor::{JsonCursor, Page, ScanLimited};
+use crate::types::object::Cursor;
+use crate::{filter, query};
 
 #[derive(Copy, Clone)]
 pub(crate) enum View {
@@ -113,7 +108,10 @@ pub(crate) fn build_objects_query(
     // Subquery to be used in `LEFT JOIN` against the inner queries for more recent object versions
     let newer = newer_criteria(filter!(
         query!("SELECT object_id, object_version FROM objects_history"),
-        format!(r#"checkpoint_sequence_number BETWEEN {} AND {}"#, range.first, range.last)
+        format!(
+            r#"checkpoint_sequence_number BETWEEN {} AND {}"#,
+            range.first, range.last
+        )
     ));
 
     let mut snapshot_objs_inner = query!("SELECT * FROM objects_snapshot");
@@ -134,7 +132,10 @@ pub(crate) fn build_objects_query(
         }
         View::Historical => {
             // The cursor pagination logic refers to the table with the `candidates` alias
-            query!("SELECT candidates.* FROM ({}) candidates", snapshot_objs_inner)
+            query!(
+                "SELECT candidates.* FROM ({}) candidates",
+                snapshot_objs_inner
+            )
         }
     };
 
@@ -153,7 +154,10 @@ pub(crate) fn build_objects_query(
             // Additionally bound the inner `objects_history` query by the checkpoint range
             history_objs_inner = filter!(
                 history_objs_inner,
-                format!(r#"checkpoint_sequence_number BETWEEN {} AND {}"#, range.first, range.last)
+                format!(
+                    r#"checkpoint_sequence_number BETWEEN {} AND {}"#,
+                    range.first, range.last
+                )
             );
 
             let mut history_objs = query!(
@@ -168,7 +172,10 @@ pub(crate) fn build_objects_query(
         }
         View::Historical => {
             // The cursor pagination logic refers to the table with the `candidates` alias
-            query!("SELECT candidates.* FROM ({}) candidates", history_objs_inner)
+            query!(
+                "SELECT candidates.* FROM ({}) candidates",
+                history_objs_inner
+            )
         }
     };
 
@@ -180,10 +187,13 @@ pub(crate) fn build_objects_query(
     // Combine the two queries, and select the most recent version of each object. The result set is
     // the most recent version of objects from `objects_snapshot` and `objects_history` that match
     // the filter criteria.
-    let query =
-        query!(r#"SELECT DISTINCT ON (object_id) * FROM (({}) UNION ALL ({})) candidates"#, snapshot_objs, history_objs)
-            .order_by("object_id")
-            .order_by("object_version DESC");
+    let query = query!(
+        r#"SELECT DISTINCT ON (object_id) * FROM (({}) UNION ALL ({})) candidates"#,
+        snapshot_objs,
+        history_objs
+    )
+    .order_by("object_id")
+    .order_by("object_version DESC");
 
     query!("SELECT * FROM ({}) candidates", query)
 }

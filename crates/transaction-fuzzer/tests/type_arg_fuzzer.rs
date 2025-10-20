@@ -1,27 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::{collection::vec, prelude::*};
+use proptest::collection::vec;
+use proptest::prelude::*;
 
 use proptest::strategy::ValueTree;
-use transaction_fuzzer::{
-    account_universe::{AccountCurrent, AccountData},
-    executor::Executor,
-    type_arg_fuzzer::{
-        gen_type_tag,
-        generate_valid_and_invalid_type_factory_tags,
-        generate_valid_type_factory_tags,
-        pt_for_tags,
-        run_pt,
-        type_factory_pt_for_tags,
-    },
-};
+use transaction_fuzzer::account_universe::AccountCurrent;
+use transaction_fuzzer::account_universe::AccountData;
+use transaction_fuzzer::type_arg_fuzzer::generate_valid_and_invalid_type_factory_tags;
+use transaction_fuzzer::type_arg_fuzzer::generate_valid_type_factory_tags;
+use transaction_fuzzer::type_arg_fuzzer::pt_for_tags;
+use transaction_fuzzer::type_arg_fuzzer::run_pt;
+use transaction_fuzzer::type_arg_fuzzer::type_factory_pt_for_tags;
+use transaction_fuzzer::{executor::Executor, type_arg_fuzzer::gen_type_tag};
 
-use sui_types::{base_types::ObjectRef, effects::TransactionEffectsAPI, object::Owner};
+use sui_types::base_types::ObjectRef;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::object::Owner;
 
 fn publish_type_factory(exec: &mut Executor, account: &mut AccountCurrent) -> ObjectRef {
     let effects = exec.publish("type_factory", vec![], account);
-    let package = effects.created().into_iter().find(|(_, owner)| matches!(owner, Owner::Immutable)).unwrap();
+    let package = effects
+        .created()
+        .into_iter()
+        .find(|(_, owner)| matches!(owner, Owner::Immutable))
+        .unwrap();
     package.0
 }
 
@@ -72,7 +75,10 @@ fn interesting_invalid_type_tags_fuzzing() {
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let mut account = AccountCurrent::new(AccountData::new_random());
     let package_id = publish_type_factory(&mut exec, &mut account);
-    let strategy = vec(generate_valid_and_invalid_type_factory_tags(package_id.0), 1..10);
+    let strategy = vec(
+        generate_valid_and_invalid_type_factory_tags(package_id.0),
+        1..10,
+    );
     for _ in 0..500 {
         let tys = strategy.new_tree(&mut runner).unwrap().current();
         let len = tys.len();

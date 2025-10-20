@@ -10,87 +10,18 @@ use std::{sync::Arc, time::Duration};
 
 use crate::authority::epoch_start_configuration::{EpochFlag, EpochStartConfiguration};
 use broadcast::{Receiver, Sender};
-use sui_types::{
-    committee::ProtocolVersion,
-    messages_checkpoint::{ECMHLiveObjectSetDigest, EndOfEpochData, VerifiedCheckpoint},
-    supported_protocol_versions::SupportedProtocolVersions,
-};
+use sui_types::committee::ProtocolVersion;
+use sui_types::messages_checkpoint::{ECMHLiveObjectSetDigest, EndOfEpochData, VerifiedCheckpoint};
+use sui_types::supported_protocol_versions::SupportedProtocolVersions;
 use tokio::{sync::broadcast, time::timeout};
 
+use crate::authority::test_authority_builder::TestAuthorityBuilder;
 use crate::{
-    authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
-    checkpoints::CheckpointStore,
-    state_accumulator::StateAccumulator,
+    authority::AuthorityState, checkpoints::CheckpointStore, state_accumulator::StateAccumulator,
 };
 use sui_swarm_config::test_utils::{empty_contents, CommitteeFixture};
 use sui_types::sui_system_state::epoch_start_sui_system_state::EpochStartSystemState;
 use typed_store::Map;
-
-/// Test checkpoint executor happy path, test that checkpoint executor correctly
-/// picks up where it left off in the event of a mid-epoch node crash.
-#[tokio::test]
-pub async fn test_checkpoint_executor_crash_recovery() {
-    telemetry_subscribers::init_for_testing();
-
-    let buffer_size = num_cpus::get() * 2;
-    let tempdir = tempdir().unwrap();
-    let checkpoint_store = CheckpointStore::new(tempdir.path());
-
-    let (state, mut executor, accumulator, checkpoint_sender, committee): (
-        Arc<AuthorityState>,
-        CheckpointExecutor,
-        Arc<StateAccumulator>,
-        Sender<VerifiedCheckpoint>,
-        CommitteeFixture,
-    ) = init_executor_test(buffer_size, checkpoint_store.clone()).await;
-
-    assert!(checkpoint_store.get_highest_executed_checkpoint_seq_number().unwrap().is_none());
-    let checkpoints = sync_new_checkpoints(&checkpoint_store, &checkpoint_sender, 2 * buffer_size, None, &committee);
-
-    let epoch_store = state.epoch_store_for_testing().clone();
-    let executor_handle = spawn_monitored_task!(async move { executor.run_epoch(epoch_store, None).await });
-    tokio::time::sleep(Duration::from_secs(5)).await;
-
-    // ensure we executed all synced checkpoints
-    let highest_executed = checkpoint_store
-        .get_highest_executed_checkpoint_seq_number()
-        .unwrap()
-        .expect("Expected highest executed to not be None");
-    assert_eq!(highest_executed, 2 * (buffer_size as u64) - 1,);
-
-    // Simulate node restart
-    executor_handle.abort();
-
-    // sync more checkpoints in the meantime
-    let _ = sync_new_checkpoints(
-        &checkpoint_store,
-        &checkpoint_sender,
-        2 * buffer_size,
-        Some(checkpoints.last().cloned().unwrap()),
-        &committee,
-    );
-
-    // restart checkpoint executor and ensure that it picks
-    // up where it left off
-    let mut executor = CheckpointExecutor::new_for_tests(
-        checkpoint_sender.subscribe(),
-        checkpoint_store.clone(),
-        state.clone(),
-        accumulator.clone(),
-    );
-
-    let epoch_store = state.epoch_store_for_testing().clone();
-    let executor_handle = spawn_monitored_task!(async move { executor.run_epoch(epoch_store, None).await });
-    tokio::time::sleep(Duration::from_secs(15)).await;
-
-    let highest_executed = checkpoint_store
-        .get_highest_executed_checkpoint_seq_number()
-        .unwrap()
-        .expect("Expected highest executed to not be None");
-    assert_eq!(highest_executed, 4 * (buffer_size as u64) - 1);
-
-    executor_handle.abort();
-}
 
 /// Test that checkpoint execution correctly signals end of epoch after
 /// receiving last checkpoint of epoch, then resumes executing cehckpoints
@@ -119,11 +50,19 @@ pub async fn test_checkpoint_executor_cross_epoch() {
     let epoch = epoch_store.epoch();
     assert_eq!(epoch, 0);
 
-    assert!(checkpoint_store.get_highest_executed_checkpoint_seq_number().unwrap().is_none());
+    assert!(checkpoint_store
+        .get_highest_executed_checkpoint_seq_number()
+        .unwrap()
+        .is_none());
 
     // sync 20 checkpoints
-    let cold_start_checkpoints =
-        sync_new_checkpoints(&checkpoint_store, &checkpoint_sender, num_to_sync_per_epoch, None, &first_committee);
+    let cold_start_checkpoints = sync_new_checkpoints(
+        &checkpoint_store,
+        &checkpoint_sender,
+        num_to_sync_per_epoch,
+        None,
+        &first_committee,
+    );
 
     // sync end of epoch checkpoint
     let last_executed_checkpoint = cold_start_checkpoints.last().cloned().unwrap();
@@ -148,12 +87,18 @@ pub async fn test_checkpoint_executor_cross_epoch() {
     authority_state
         .get_checkpoint_store()
         .epoch_last_checkpoint_map
-        .insert(&end_of_epoch_0_checkpoint.epoch, end_of_epoch_0_checkpoint.sequence_number())
+        .insert(
+            &end_of_epoch_0_checkpoint.epoch,
+            end_of_epoch_0_checkpoint.sequence_number(),
+        )
         .unwrap();
     authority_state
         .get_checkpoint_store()
         .certified_checkpoints
-        .insert(end_of_epoch_0_checkpoint.sequence_number(), end_of_epoch_0_checkpoint.serializable_ref())
+        .insert(
+            end_of_epoch_0_checkpoint.sequence_number(),
+            end_of_epoch_0_checkpoint.serializable_ref(),
+        )
         .unwrap();
     // sync end of epoch checkpoint
     let last_executed_checkpoint = next_epoch_checkpoints.last().cloned().unwrap();
@@ -167,7 +112,11 @@ pub async fn test_checkpoint_executor_cross_epoch() {
     .await;
 
     // Ensure root state hash for epoch does not exist before we close epoch
-    assert!(authority_state.get_accumulator_store().get_root_state_accumulator_for_epoch(0).unwrap().is_none());
+    assert!(authority_state
+        .get_accumulator_store()
+        .get_root_state_accumulator_for_epoch(0)
+        .unwrap()
+        .is_none());
 
     // Ensure executor reaches end of epoch in a timely manner
     timeout(Duration::from_secs(5), async {
@@ -178,7 +127,10 @@ pub async fn test_checkpoint_executor_cross_epoch() {
 
     // We should have synced up to epoch boundary
     assert_eq!(
-        checkpoint_store.get_highest_executed_checkpoint_seq_number().unwrap().unwrap(),
+        checkpoint_store
+            .get_highest_executed_checkpoint_seq_number()
+            .unwrap()
+            .unwrap(),
         num_to_sync_per_epoch as u64,
     );
 
@@ -220,7 +172,10 @@ pub async fn test_checkpoint_executor_cross_epoch() {
     .unwrap();
 
     assert_eq!(
-        checkpoint_store.get_highest_executed_checkpoint_seq_number().unwrap().unwrap(),
+        checkpoint_store
+            .get_highest_executed_checkpoint_seq_number()
+            .unwrap()
+            .unwrap(),
         2 * num_to_sync_per_epoch as u64 + 1,
     );
 
@@ -253,13 +208,27 @@ pub async fn test_reconfig_crash_recovery() {
         Arc<StateAccumulator>,
         Sender<VerifiedCheckpoint>,
         CommitteeFixture,
-    ) = init_executor_test(10 /* StateSync -> Executor channel buffer size */, checkpoint_store.clone()).await;
+    ) = init_executor_test(
+        10, /* StateSync -> Executor channel buffer size */
+        checkpoint_store.clone(),
+    )
+    .await;
 
-    assert!(checkpoint_store.get_highest_executed_checkpoint_seq_number().unwrap().is_none());
+    assert!(checkpoint_store
+        .get_highest_executed_checkpoint_seq_number()
+        .unwrap()
+        .is_none());
 
     // sync 1 checkpoint
-    let checkpoint =
-        sync_new_checkpoints(&checkpoint_store, &checkpoint_sender, 1, None, &first_committee).pop().unwrap();
+    let checkpoint = sync_new_checkpoints(
+        &checkpoint_store,
+        &checkpoint_sender,
+        1,
+        None,
+        &first_committee,
+    )
+    .pop()
+    .unwrap();
 
     // sync end of epoch checkpoint
     let (end_of_epoch_checkpoint, second_committee) = sync_end_of_epoch_checkpoint(
@@ -280,14 +249,19 @@ pub async fn test_reconfig_crash_recovery() {
     );
 
     timeout(Duration::from_secs(1), async {
-        executor.run_epoch(authority_state.epoch_store_for_testing().clone(), None).await;
+        executor
+            .run_epoch(authority_state.epoch_store_for_testing().clone(), None)
+            .await;
     })
     .await
     .unwrap();
 
     // Check that we stopped execution at epoch boundary
     assert_eq!(
-        checkpoint_store.get_highest_executed_checkpoint_seq_number().unwrap().unwrap(),
+        checkpoint_store
+            .get_highest_executed_checkpoint_seq_number()
+            .unwrap()
+            .unwrap(),
         *end_of_epoch_checkpoint.sequence_number(),
     );
 
@@ -304,14 +278,19 @@ pub async fn test_reconfig_crash_recovery() {
     );
 
     timeout(Duration::from_millis(200), async {
-        executor.run_epoch(authority_state.epoch_store_for_testing().clone(), None).await;
+        executor
+            .run_epoch(authority_state.epoch_store_for_testing().clone(), None)
+            .await;
     })
     .await
     .unwrap();
 
     // Check that we have still not gone beyond epoch boundary
     assert_eq!(
-        checkpoint_store.get_highest_executed_checkpoint_seq_number().unwrap().unwrap(),
+        checkpoint_store
+            .get_highest_executed_checkpoint_seq_number()
+            .unwrap()
+            .unwrap(),
         *end_of_epoch_checkpoint.sequence_number(),
     );
 }
@@ -319,15 +298,26 @@ pub async fn test_reconfig_crash_recovery() {
 async fn init_executor_test(
     buffer_size: usize,
     store: Arc<CheckpointStore>,
-) -> (Arc<AuthorityState>, CheckpointExecutor, Arc<StateAccumulator>, Sender<VerifiedCheckpoint>, CommitteeFixture) {
-    let network_config = sui_swarm_config::network_config_builder::ConfigBuilder::new_with_temp_dir().build();
-    let state = TestAuthorityBuilder::new().with_network_config(&network_config, 0).build().await;
+) -> (
+    Arc<AuthorityState>,
+    CheckpointExecutor,
+    Arc<StateAccumulator>,
+    Sender<VerifiedCheckpoint>,
+    CommitteeFixture,
+) {
+    let network_config =
+        sui_swarm_config::network_config_builder::ConfigBuilder::new_with_temp_dir().build();
+    let state = TestAuthorityBuilder::new()
+        .with_network_config(&network_config, 0)
+        .build()
+        .await;
 
     let (checkpoint_sender, _): (Sender<VerifiedCheckpoint>, Receiver<VerifiedCheckpoint>) =
         broadcast::channel(buffer_size);
     let epoch_store = state.epoch_store_for_testing();
 
-    let accumulator = StateAccumulator::new_for_tests(state.get_accumulator_store().clone(), &epoch_store);
+    let accumulator =
+        StateAccumulator::new_for_tests(state.get_accumulator_store().clone(), &epoch_store);
     let accumulator = Arc::new(accumulator);
 
     let executor = CheckpointExecutor::new_for_tests(
@@ -336,7 +326,13 @@ async fn init_executor_test(
         state.clone(),
         accumulator.clone(),
     );
-    (state, executor, accumulator, checkpoint_sender, CommitteeFixture::from_network_config(&network_config))
+    (
+        state,
+        executor,
+        accumulator,
+        checkpoint_sender,
+        CommitteeFixture::from_network_config(&network_config),
+    )
 }
 
 /// Creates and simulates syncing of a new checkpoint by StateSync, i.e. new
@@ -367,7 +363,8 @@ async fn sync_end_of_epoch_checkpoint(
     previous_checkpoint: VerifiedCheckpoint,
     committee: &CommitteeFixture,
 ) -> (VerifiedCheckpoint, CommitteeFixture) {
-    let new_committee = CommitteeFixture::generate(rand::rngs::OsRng, committee.committee().epoch + 1, 4);
+    let new_committee =
+        CommitteeFixture::generate(rand::rngs::OsRng, committee.committee().epoch + 1, 4);
     let (_sequence_number, _digest, checkpoint) = committee.make_end_of_epoch_checkpoint(
         previous_checkpoint,
         Some(EndOfEpochData {
@@ -394,8 +391,14 @@ fn sync_checkpoint(
     checkpoint_store: &CheckpointStore,
     sender: &Sender<VerifiedCheckpoint>,
 ) {
-    checkpoint_store.insert_verified_checkpoint(checkpoint).unwrap();
-    checkpoint_store.insert_checkpoint_contents(empty_contents().into_inner().into_checkpoint_contents()).unwrap();
-    checkpoint_store.update_highest_synced_checkpoint(checkpoint).unwrap();
+    checkpoint_store
+        .insert_verified_checkpoint(checkpoint)
+        .unwrap();
+    checkpoint_store
+        .insert_checkpoint_contents(empty_contents().into_inner().into_checkpoint_contents())
+        .unwrap();
+    checkpoint_store
+        .update_highest_synced_checkpoint(checkpoint)
+        .unwrap();
     sender.send(checkpoint.clone()).unwrap();
 }

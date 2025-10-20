@@ -6,7 +6,9 @@ use std::{
     ops::{Add, Bound},
 };
 
-use move_core_types::gas_algebra::{GasQuantity, InternalGas, InternalGasUnit, ToUnit, ToUnitFractional};
+use move_core_types::gas_algebra::{
+    GasQuantity, InternalGas, InternalGasUnit, ToUnit, ToUnitFractional,
+};
 use serde::{Deserialize, Serialize};
 
 pub enum GasUnit {}
@@ -18,8 +20,8 @@ impl ToUnit<InternalGasUnit> for GasUnit {
 }
 
 impl ToUnitFractional<GasUnit> for InternalGasUnit {
-    const DENOMINATOR: u64 = 1000;
     const NOMINATOR: u64 = 1;
+    const DENOMINATOR: u64 = 1000;
 }
 
 pub const INSTRUCTION_TIER_DEFAULT: u64 = 1;
@@ -36,9 +38,15 @@ pub struct CostTable {
 }
 
 impl CostTable {
-    fn get_current_and_future_tier(tiers: &BTreeMap<u64, u64>, current: u64, default: u64) -> (u64, Option<u64>) {
-        let current_cost =
-            tiers.get(&current).or_else(|| tiers.range(..current).next_back().map(|(_, v)| v)).unwrap_or(&default);
+    fn get_current_and_future_tier(
+        tiers: &BTreeMap<u64, u64>,
+        current: u64,
+        default: u64,
+    ) -> (u64, Option<u64>) {
+        let current_cost = tiers
+            .get(&current)
+            .or_else(|| tiers.range(..current).next_back().map(|(_, v)| v))
+            .unwrap_or(&default);
         let next_tier_start = tiers
             .range::<u64, _>((Bound::Excluded(current), Bound::Unbounded))
             .next()
@@ -47,15 +55,27 @@ impl CostTable {
     }
 
     pub fn instruction_tier(&self, instr_count: u64) -> (u64, Option<u64>) {
-        Self::get_current_and_future_tier(&self.instruction_tiers, instr_count, INSTRUCTION_TIER_DEFAULT)
+        Self::get_current_and_future_tier(
+            &self.instruction_tiers,
+            instr_count,
+            INSTRUCTION_TIER_DEFAULT,
+        )
     }
 
     pub fn stack_height_tier(&self, stack_height: u64) -> (u64, Option<u64>) {
-        Self::get_current_and_future_tier(&self.stack_height_tiers, stack_height, STACK_HEIGHT_TIER_DEFAULT)
+        Self::get_current_and_future_tier(
+            &self.stack_height_tiers,
+            stack_height,
+            STACK_HEIGHT_TIER_DEFAULT,
+        )
     }
 
     pub fn stack_size_tier(&self, stack_size: u64) -> (u64, Option<u64>) {
-        Self::get_current_and_future_tier(&self.stack_size_tiers, stack_size, STACK_SIZE_TIER_DEFAULT)
+        Self::get_current_and_future_tier(
+            &self.stack_size_tiers,
+            stack_size,
+            STACK_SIZE_TIER_DEFAULT,
+        )
     }
 }
 
@@ -72,17 +92,27 @@ pub struct GasCost {
 
 impl GasCost {
     pub fn new(instruction_gas: u64, memory_gas: u64, stack_height_gas: u64) -> Self {
-        Self { instruction_gas, memory_gas, stack_height_gas }
+        Self {
+            instruction_gas,
+            memory_gas,
+            stack_height_gas,
+        }
     }
 
     /// Convert a GasCost to a total gas charge in `InternalGas`.
     #[inline]
     pub fn total(&self) -> u64 {
-        self.instruction_gas.add(self.memory_gas).add(self.stack_height_gas)
+        self.instruction_gas
+            .add(self.memory_gas)
+            .add(self.stack_height_gas)
     }
 
     #[inline]
     pub fn total_internal(&self) -> InternalGas {
-        GasQuantity::new(self.instruction_gas.add(self.memory_gas).add(self.stack_height_gas))
+        GasQuantity::new(
+            self.instruction_gas
+                .add(self.memory_gas)
+                .add(self.stack_height_gas),
+        )
     }
 }

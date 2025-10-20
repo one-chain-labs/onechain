@@ -3,15 +3,8 @@
 
 use crate::{
     schema::{
-        tx_affected_addresses,
-        tx_affected_objects,
-        tx_calls_fun,
-        tx_calls_mod,
-        tx_calls_pkg,
-        tx_changed_objects,
-        tx_digests,
-        tx_input_objects,
-        tx_kinds,
+        tx_affected_addresses, tx_affected_objects, tx_calls_fun, tx_calls_mod, tx_calls_pkg,
+        tx_changed_objects, tx_digests, tx_input_objects, tx_kinds,
     },
     types::TxIndex,
 };
@@ -136,7 +129,11 @@ impl TxIndex {
         let tx_affected_objects = self
             .affected_objects
             .iter()
-            .map(|o| StoredTxAffectedObjects { tx_sequence_number, affected: o.to_vec(), sender: self.sender.to_vec() })
+            .map(|o| StoredTxAffectedObjects {
+                tx_sequence_number,
+                affected: o.to_vec(),
+                sender: self.sender.to_vec(),
+            })
             .collect();
 
         let tx_input_objects = self
@@ -163,8 +160,10 @@ impl TxIndex {
         let mut packages_modules = Vec::new();
         let mut packages_modules_funcs = Vec::new();
 
-        for (pkg, pkg_mod, pkg_mod_func) in
-            self.move_calls.iter().map(|(p, m, f)| (*p, (*p, m.clone()), (*p, m.clone(), f.clone())))
+        for (pkg, pkg_mod, pkg_mod_func) in self
+            .move_calls
+            .iter()
+            .map(|(p, m, f)| (*p, (*p, m.clone()), (*p, m.clone(), f.clone())))
         {
             packages.push(pkg);
             packages_modules.push(pkg_mod);
@@ -173,7 +172,11 @@ impl TxIndex {
 
         let tx_pkgs = packages
             .iter()
-            .map(|p| StoredTxPkg { tx_sequence_number, package: p.to_vec(), sender: self.sender.to_vec() })
+            .map(|p| StoredTxPkg {
+                tx_sequence_number,
+                package: p.to_vec(),
+                sender: self.sender.to_vec(),
+            })
             .collect();
 
         let tx_mods = packages_modules
@@ -197,10 +200,15 @@ impl TxIndex {
             })
             .collect();
 
-        let stored_tx_digest =
-            StoredTxDigest { tx_digest: self.transaction_digest.into_inner().to_vec(), tx_sequence_number };
+        let stored_tx_digest = StoredTxDigest {
+            tx_digest: self.transaction_digest.into_inner().to_vec(),
+            tx_sequence_number,
+        };
 
-        let tx_kind = StoredTxKind { tx_kind: self.tx_kind as i16, tx_sequence_number };
+        let tx_kind = StoredTxKind {
+            tx_kind: self.tx_kind as i16,
+            tx_sequence_number,
+        };
 
         (
             tx_affected_addresses,

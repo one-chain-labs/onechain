@@ -1,22 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    errors::IndexerError,
-    schema::{epochs, feature_flags, protocol_configs},
-};
-use diesel::{
-    prelude::{AsChangeset, Identifiable},
-    Insertable,
-    Queryable,
-    Selectable,
-};
+use crate::schema::epochs;
+use crate::{errors::IndexerError, schema::feature_flags, schema::protocol_configs};
+use diesel::prelude::{AsChangeset, Identifiable};
+use diesel::{Insertable, Queryable, Selectable};
 use sui_json_rpc_types::{EndOfEpochInfo, EpochInfo};
-use sui_types::{
-    event::SystemEpochInfoEvent,
-    messages_checkpoint::CertifiedCheckpointSummary,
-    sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
-};
+use sui_types::event::SystemEpochInfoEvent;
+use sui_types::messages_checkpoint::CertifiedCheckpointSummary;
+use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary;
 
 #[derive(Queryable, Insertable, Debug, Clone, Default)]
 #[diesel(table_name = epochs)]
@@ -143,16 +135,22 @@ impl EpochStartInfo {
             first_checkpoint_id,
             first_tx_sequence_number,
             total_stake: epoch_event_opt.map(|e| e.total_stake).unwrap_or_default(),
-            storage_fund_balance: epoch_event_opt.map(|e| e.storage_fund_balance).unwrap_or_default(),
+            storage_fund_balance: epoch_event_opt
+                .map(|e| e.storage_fund_balance)
+                .unwrap_or_default(),
         }
     }
 }
 
 impl StartOfEpochUpdate {
-    pub fn new(new_system_state_summary: SuiSystemStateSummary, epoch_start_info: EpochStartInfo) -> Self {
+    pub fn new(
+        new_system_state_summary: SuiSystemStateSummary,
+        epoch_start_info: EpochStartInfo,
+    ) -> Self {
         Self {
             epoch: new_system_state_summary.epoch as i64,
-            system_state_summary_json: serde_json::to_value(new_system_state_summary.clone()).unwrap(),
+            system_state_summary_json: serde_json::to_value(new_system_state_summary.clone())
+                .unwrap(),
             first_checkpoint_id: epoch_start_info.first_checkpoint_id as i64,
             first_tx_sequence_number: epoch_start_info.first_tx_sequence_number as i64,
             epoch_start_timestamp: new_system_state_summary.epoch_start_timestamp_ms as i64,
@@ -197,8 +195,8 @@ impl EndOfEpochUpdate {
     ) -> Self {
         Self {
             epoch: last_checkpoint_summary.epoch as i64,
-            epoch_total_transactions: (last_checkpoint_summary.network_total_transactions - first_tx_sequence_number)
-                as i64,
+            epoch_total_transactions: (last_checkpoint_summary.network_total_transactions
+                - first_tx_sequence_number) as i64,
             last_checkpoint_id: *last_checkpoint_summary.sequence_number() as i64,
             epoch_end_timestamp: last_checkpoint_summary.timestamp_ms as i64,
             storage_fund_reinvestment: epoch_end_info.storage_fund_reinvestment as i64,
@@ -209,7 +207,11 @@ impl EndOfEpochUpdate {
             total_gas_fees: epoch_end_info.total_gas_fees as i64,
             total_stake_rewards_distributed: epoch_end_info.total_stake_rewards_distributed as i64,
             epoch_commitments: bcs::to_bytes(
-                &last_checkpoint_summary.end_of_epoch_data.clone().unwrap().epoch_commitments,
+                &last_checkpoint_summary
+                    .end_of_epoch_data
+                    .clone()
+                    .unwrap()
+                    .epoch_commitments,
             )
             .unwrap(),
         }
@@ -249,7 +251,9 @@ impl From<&StoredEpochInfo> for Option<EndOfEpochInfo> {
             storage_rebate: info.storage_rebate.map(|v| v as u64)?,
             stake_subsidy_amount: info.stake_subsidy_amount.map(|v| v as u64)?,
             total_gas_fees: info.total_gas_fees.map(|v| v as u64)?,
-            total_stake_rewards_distributed: info.total_stake_rewards_distributed.map(|v| v as u64)?,
+            total_stake_rewards_distributed: info
+                .total_stake_rewards_distributed
+                .map(|v| v as u64)?,
             leftover_storage_fund_inflow: info.leftover_storage_fund_inflow.map(|v| v as u64)?,
         })
     }

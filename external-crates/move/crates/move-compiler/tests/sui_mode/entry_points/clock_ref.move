@@ -1,18 +1,18 @@
 // valid, Clock by immutable reference
 
 module a::m {
-    public entry fun yes_clock_ref(_: &one::clock::Clock) {
+    public entry fun yes_clock_ref(_: &sui::clock::Clock) {
         abort 0
     }
 }
 
-module one::clock {
+module oct::clock {
     struct Clock has key {
-        id: one::object::UID,
+        id: sui::object::UID,
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

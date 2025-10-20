@@ -1,7 +1,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account_address::AccountAddress, annotated_value as A, annotated_visitor as AV, language_storage::TypeTag};
+use crate::{
+    account_address::AccountAddress, annotated_value as A, annotated_visitor as AV,
+    language_storage::TypeTag,
+};
 
 /// Elements are components of paths that select values from the sub-structure of other values.
 /// They are split into two categories:
@@ -84,38 +87,58 @@ where
 }
 
 impl<'p, 'v, 'b, 'l, V: AV::Visitor<'b, 'l>> AV::Visitor<'b, 'l> for Extractor<'p, 'v, V> {
-    type Error = V::Error;
     type Value = Option<V::Value>;
+    type Error = V::Error;
 
-    fn visit_u8(&mut self, driver: &AV::ValueDriver<'_, 'b, 'l>, value: u8) -> Result<Self::Value, Self::Error> {
+    fn visit_u8(
+        &mut self,
+        driver: &AV::ValueDriver<'_, 'b, 'l>,
+        value: u8,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(match self.path {
             [] | [Element::Type(&TypeTag::U8)] => Some(self.inner.visit_u8(driver, value)?),
             _ => None,
         })
     }
 
-    fn visit_u16(&mut self, driver: &AV::ValueDriver<'_, 'b, 'l>, value: u16) -> Result<Self::Value, Self::Error> {
+    fn visit_u16(
+        &mut self,
+        driver: &AV::ValueDriver<'_, 'b, 'l>,
+        value: u16,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(match self.path {
             [] | [Element::Type(&TypeTag::U16)] => Some(self.inner.visit_u16(driver, value)?),
             _ => None,
         })
     }
 
-    fn visit_u32(&mut self, driver: &AV::ValueDriver<'_, 'b, 'l>, value: u32) -> Result<Self::Value, Self::Error> {
+    fn visit_u32(
+        &mut self,
+        driver: &AV::ValueDriver<'_, 'b, 'l>,
+        value: u32,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(match self.path {
             [] | [Element::Type(&TypeTag::U32)] => Some(self.inner.visit_u32(driver, value)?),
             _ => None,
         })
     }
 
-    fn visit_u64(&mut self, driver: &AV::ValueDriver<'_, 'b, 'l>, value: u64) -> Result<Self::Value, Self::Error> {
+    fn visit_u64(
+        &mut self,
+        driver: &AV::ValueDriver<'_, 'b, 'l>,
+        value: u64,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(match self.path {
             [] | [Element::Type(&TypeTag::U64)] => Some(self.inner.visit_u64(driver, value)?),
             _ => None,
         })
     }
 
-    fn visit_u128(&mut self, driver: &AV::ValueDriver<'_, 'b, 'l>, value: u128) -> Result<Self::Value, Self::Error> {
+    fn visit_u128(
+        &mut self,
+        driver: &AV::ValueDriver<'_, 'b, 'l>,
+        value: u128,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(match self.path {
             [] | [Element::Type(&TypeTag::U128)] => Some(self.inner.visit_u128(driver, value)?),
             _ => None,
@@ -133,7 +156,11 @@ impl<'p, 'v, 'b, 'l, V: AV::Visitor<'b, 'l>> AV::Visitor<'b, 'l> for Extractor<'
         })
     }
 
-    fn visit_bool(&mut self, driver: &AV::ValueDriver<'_, 'b, 'l>, value: bool) -> Result<Self::Value, Self::Error> {
+    fn visit_bool(
+        &mut self,
+        driver: &AV::ValueDriver<'_, 'b, 'l>,
+        value: bool,
+    ) -> Result<Self::Value, Self::Error> {
         Ok(match self.path {
             [] | [Element::Type(&TypeTag::Bool)] => Some(self.inner.visit_bool(driver, value)?),
             _ => None,
@@ -146,7 +173,9 @@ impl<'p, 'v, 'b, 'l, V: AV::Visitor<'b, 'l>> AV::Visitor<'b, 'l> for Extractor<'
         value: AccountAddress,
     ) -> Result<Self::Value, Self::Error> {
         Ok(match self.path {
-            [] | [Element::Type(&TypeTag::Address)] => Some(self.inner.visit_address(driver, value)?),
+            [] | [Element::Type(&TypeTag::Address)] => {
+                Some(self.inner.visit_address(driver, value)?)
+            }
             _ => None,
         })
     }
@@ -162,7 +191,10 @@ impl<'p, 'v, 'b, 'l, V: AV::Visitor<'b, 'l>> AV::Visitor<'b, 'l> for Extractor<'
         })
     }
 
-    fn visit_vector(&mut self, driver: &mut AV::VecDriver<'_, 'b, 'l>) -> Result<Self::Value, Self::Error> {
+    fn visit_vector(
+        &mut self,
+        driver: &mut AV::VecDriver<'_, 'b, 'l>,
+    ) -> Result<Self::Value, Self::Error> {
         use Element as E;
         use TypeTag as T;
 
@@ -190,10 +222,18 @@ impl<'p, 'v, 'b, 'l, V: AV::Visitor<'b, 'l>> AV::Visitor<'b, 'l> for Extractor<'
 
         // Skip all the elements before the index, and then recurse.
         while driver.off() < *i && driver.skip_element()? {}
-        Ok(driver.next_element(&mut Extractor { inner: self.inner, path })?.flatten())
+        Ok(driver
+            .next_element(&mut Extractor {
+                inner: self.inner,
+                path,
+            })?
+            .flatten())
     }
 
-    fn visit_struct(&mut self, driver: &mut AV::StructDriver<'_, 'b, 'l>) -> Result<Self::Value, Self::Error> {
+    fn visit_struct(
+        &mut self,
+        driver: &mut AV::StructDriver<'_, 'b, 'l>,
+    ) -> Result<Self::Value, Self::Error> {
         use Element as E;
         use TypeTag as T;
 
@@ -228,10 +268,18 @@ impl<'p, 'v, 'b, 'l, V: AV::Visitor<'b, 'l>> AV::Visitor<'b, 'l> for Extractor<'
             _ => return Ok(None),
         }
 
-        Ok(driver.next_field(&mut Extractor { inner: self.inner, path })?.and_then(|(_, v)| v))
+        Ok(driver
+            .next_field(&mut Extractor {
+                inner: self.inner,
+                path,
+            })?
+            .and_then(|(_, v)| v))
     }
 
-    fn visit_variant(&mut self, driver: &mut AV::VariantDriver<'_, 'b, 'l>) -> Result<Self::Value, Self::Error> {
+    fn visit_variant(
+        &mut self,
+        driver: &mut AV::VariantDriver<'_, 'b, 'l>,
+    ) -> Result<Self::Value, Self::Error> {
         use Element as E;
         use TypeTag as T;
 
@@ -276,6 +324,11 @@ impl<'p, 'v, 'b, 'l, V: AV::Visitor<'b, 'l>> AV::Visitor<'b, 'l> for Extractor<'
             _ => return Ok(None),
         }
 
-        Ok(driver.next_field(&mut Extractor { inner: self.inner, path })?.and_then(|(_, v)| v))
+        Ok(driver
+            .next_field(&mut Extractor {
+                inner: self.inner,
+                path,
+            })?
+            .and_then(|(_, v)| v))
     }
 }

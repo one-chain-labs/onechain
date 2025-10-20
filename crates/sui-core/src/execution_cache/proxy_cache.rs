@@ -1,48 +1,38 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::{
-        authority_per_epoch_store::AuthorityPerEpochStore,
-        authority_store::{ExecutionLockWriteGuard, SuiLockResult},
-        epoch_start_configuration::{EpochFlag, EpochStartConfigTrait, EpochStartConfiguration},
-        AuthorityStore,
-    },
-    state_accumulator::AccumulatorStore,
-    transaction_outputs::TransactionOutputs,
-};
+use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
+use crate::authority::authority_store::{ExecutionLockWriteGuard, SuiLockResult};
+use crate::authority::backpressure::BackpressureManager;
+use crate::authority::epoch_start_configuration::EpochStartConfiguration;
+use crate::authority::epoch_start_configuration::{EpochFlag, EpochStartConfigTrait};
+use crate::authority::AuthorityStore;
+use crate::state_accumulator::AccumulatorStore;
+use crate::transaction_outputs::TransactionOutputs;
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use parking_lot::RwLock;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::Duration;
 use sui_protocol_config::ProtocolVersion;
-use sui_types::{
-    accumulator::Accumulator,
-    base_types::{EpochId, ObjectID, ObjectRef, SequenceNumber, VerifiedExecutionData},
-    bridge::Bridge,
-    digests::{TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest},
-    effects::{TransactionEffects, TransactionEvents},
-    error::SuiResult,
-    messages_checkpoint::CheckpointSequenceNumber,
-    object::Object,
-    storage::{MarkerValue, ObjectKey, ObjectOrTombstone, PackageObject},
-    sui_system_state::SuiSystemState,
-    transaction::{VerifiedSignedTransaction, VerifiedTransaction},
-};
+use sui_types::accumulator::Accumulator;
+use sui_types::base_types::VerifiedExecutionData;
+use sui_types::base_types::{EpochId, ObjectID, ObjectRef, SequenceNumber};
+use sui_types::bridge::Bridge;
+use sui_types::digests::{TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest};
+use sui_types::effects::{TransactionEffects, TransactionEvents};
+use sui_types::error::SuiResult;
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use sui_types::object::Object;
+use sui_types::storage::{MarkerValue, ObjectKey, ObjectOrTombstone, PackageObject};
+use sui_types::sui_system_state::SuiSystemState;
+use sui_types::transaction::{VerifiedSignedTransaction, VerifiedTransaction};
 
 use super::{
-    CheckpointCache,
-    ExecutionCacheCommit,
-    ExecutionCacheConfigType,
-    ExecutionCacheMetrics,
-    ExecutionCacheReconfigAPI,
-    ExecutionCacheWrite,
-    ObjectCacheRead,
-    PassthroughCache,
-    StateSyncAPI,
-    TestingAPI,
-    TransactionCacheRead,
-    WritebackCache,
+    CheckpointCache, ExecutionCacheCommit, ExecutionCacheConfigType, ExecutionCacheMetrics,
+    ExecutionCacheReconfigAPI, ExecutionCacheWrite, ObjectCacheRead, PassthroughCache,
+    StateSyncAPI, TestingAPI, TransactionCacheRead, WritebackCache,
 };
 
 macro_rules! delegate_method {
@@ -71,13 +61,23 @@ impl ProxyCache {
         epoch_start_config: &EpochStartConfiguration,
         store: Arc<AuthorityStore>,
         metrics: Arc<ExecutionCacheMetrics>,
+        backpressure_manager: Arc<BackpressureManager>,
     ) -> Self {
         let cache_type = epoch_start_config.execution_cache_type();
         tracing::info!("using cache impl {:?}", cache_type);
         let passthrough_cache = PassthroughCache::new(store.clone(), metrics.clone());
-        let writeback_cache = WritebackCache::new(&Default::default(), store.clone(), metrics.clone());
+        let writeback_cache = WritebackCache::new(
+            &Default::default(),
+            store.clone(),
+            metrics.clone(),
+            backpressure_manager,
+        );
 
-        Self { passthrough_cache, writeback_cache, mode: RwLock::new(cache_type) }
+        Self {
+            passthrough_cache,
+            writeback_cache,
+            mode: RwLock::new(cache_type),
+        }
     }
 
     async fn reconfigure_cache_impl(&self, epoch_start_config: &EpochStartConfiguration) {
@@ -135,11 +135,18 @@ impl ObjectCacheRead for ProxyCache {
         delegate_method!(self.get_latest_object_ref_or_tombstone(object_id))
     }
 
-    fn get_latest_object_or_tombstone(&self, object_id: ObjectID) -> Option<(ObjectKey, ObjectOrTombstone)> {
+    fn get_latest_object_or_tombstone(
+        &self,
+        object_id: ObjectID,
+    ) -> Option<(ObjectKey, ObjectOrTombstone)> {
         delegate_method!(self.get_latest_object_or_tombstone(object_id))
     }
 
-    fn find_object_lt_or_eq_version(&self, object_id: ObjectID, version: SequenceNumber) -> Option<Object> {
+    fn find_object_lt_or_eq_version(
+        &self,
+        object_id: ObjectID,
+        version: SequenceNumber,
+    ) -> Option<Object> {
         delegate_method!(self.find_object_lt_or_eq_version(object_id, version))
     }
 
@@ -163,11 +170,20 @@ impl ObjectCacheRead for ProxyCache {
         delegate_method!(self.get_bridge_object_unsafe())
     }
 
-    fn get_marker_value(&self, object_id: &ObjectID, version: SequenceNumber, epoch_id: EpochId) -> Option<MarkerValue> {
+    fn get_marker_value(
+        &self,
+        object_id: &ObjectID,
+        version: SequenceNumber,
+        epoch_id: EpochId,
+    ) -> Option<MarkerValue> {
         delegate_method!(self.get_marker_value(object_id, version, epoch_id))
     }
 
-    fn get_latest_marker(&self, object_id: &ObjectID, epoch_id: EpochId) -> Option<(SequenceNumber, MarkerValue)> {
+    fn get_latest_marker(
+        &self,
+        object_id: &ObjectID,
+        epoch_id: EpochId,
+    ) -> Option<(SequenceNumber, MarkerValue)> {
         delegate_method!(self.get_latest_marker(object_id, epoch_id))
     }
 
@@ -177,7 +193,10 @@ impl ObjectCacheRead for ProxyCache {
 }
 
 impl TransactionCacheRead for ProxyCache {
-    fn multi_get_transaction_blocks(&self, digests: &[TransactionDigest]) -> Vec<Option<Arc<VerifiedTransaction>>> {
+    fn multi_get_transaction_blocks(
+        &self,
+        digests: &[TransactionDigest],
+    ) -> Vec<Option<Arc<VerifiedTransaction>>> {
         delegate_method!(self.multi_get_transaction_blocks(digests))
     }
 
@@ -188,7 +207,10 @@ impl TransactionCacheRead for ProxyCache {
         delegate_method!(self.multi_get_executed_effects_digests(digests))
     }
 
-    fn multi_get_effects(&self, digests: &[TransactionEffectsDigest]) -> Vec<Option<TransactionEffects>> {
+    fn multi_get_effects(
+        &self,
+        digests: &[TransactionEffectsDigest],
+    ) -> Vec<Option<TransactionEffects>> {
         delegate_method!(self.multi_get_effects(digests))
     }
 
@@ -199,13 +221,20 @@ impl TransactionCacheRead for ProxyCache {
         delegate_method!(self.notify_read_executed_effects_digests(digests))
     }
 
-    fn multi_get_events(&self, event_digests: &[TransactionEventsDigest]) -> Vec<Option<TransactionEvents>> {
+    fn multi_get_events(
+        &self,
+        event_digests: &[TransactionEventsDigest],
+    ) -> Vec<Option<TransactionEvents>> {
         delegate_method!(self.multi_get_events(event_digests))
     }
 }
 
 impl ExecutionCacheWrite for ProxyCache {
-    fn write_transaction_outputs(&self, epoch_id: EpochId, tx_outputs: Arc<TransactionOutputs>) -> BoxFuture<'_, ()> {
+    fn write_transaction_outputs(
+        &self,
+        epoch_id: EpochId,
+        tx_outputs: Arc<TransactionOutputs>,
+    ) -> BoxFuture<'_, ()> {
         delegate_method!(self.write_transaction_outputs(epoch_id, tx_outputs))
     }
 
@@ -216,7 +245,12 @@ impl ExecutionCacheWrite for ProxyCache {
         tx_digest: TransactionDigest,
         signed_transaction: Option<VerifiedSignedTransaction>,
     ) -> BoxFuture<'a, SuiResult> {
-        delegate_method!(self.acquire_transaction_locks(epoch_store, owned_input_objects, tx_digest, signed_transaction))
+        delegate_method!(self.acquire_transaction_locks(
+            epoch_store,
+            owned_input_objects,
+            tx_digest,
+            signed_transaction
+        ))
     }
 }
 
@@ -267,12 +301,20 @@ impl AccumulatorStore for ProxyCache {
 }
 
 impl ExecutionCacheCommit for ProxyCache {
-    fn commit_transaction_outputs<'a>(&'a self, epoch: EpochId, digests: &'a [TransactionDigest]) -> BoxFuture<'a, ()> {
+    fn commit_transaction_outputs<'a>(
+        &'a self,
+        epoch: EpochId,
+        digests: &'a [TransactionDigest],
+    ) -> BoxFuture<'a, ()> {
         delegate_method!(self.commit_transaction_outputs(epoch, digests))
     }
 
     fn persist_transactions<'a>(&'a self, digests: &'a [TransactionDigest]) -> BoxFuture<'a, ()> {
         delegate_method!(self.persist_transactions(digests))
+    }
+
+    fn approximate_pending_transaction_count(&self) -> u64 {
+        delegate_method!(self.approximate_pending_transaction_count())
     }
 }
 
@@ -326,7 +368,10 @@ impl ExecutionCacheReconfigAPI for ProxyCache {
         delegate_method!(self.clear_state_end_of_epoch(execution_guard))
     }
 
-    fn expensive_check_sui_conservation(&self, old_epoch_store: &AuthorityPerEpochStore) -> SuiResult {
+    fn expensive_check_sui_conservation(
+        &self,
+        old_epoch_store: &AuthorityPerEpochStore,
+    ) -> SuiResult {
         delegate_method!(self.expensive_check_sui_conservation(old_epoch_store))
     }
 
@@ -342,7 +387,10 @@ impl ExecutionCacheReconfigAPI for ProxyCache {
         delegate_method!(self.maybe_reaccumulate_state_hash(cur_epoch_store, new_protocol_version))
     }
 
-    fn reconfigure_cache<'a>(&'a self, epoch_start_config: &'a EpochStartConfiguration) -> BoxFuture<'a, ()> {
+    fn reconfigure_cache<'a>(
+        &'a self,
+        epoch_start_config: &'a EpochStartConfiguration,
+    ) -> BoxFuture<'a, ()> {
         self.reconfigure_cache_impl(epoch_start_config).boxed()
     }
 }
@@ -356,7 +404,10 @@ impl StateSyncAPI for ProxyCache {
         delegate_method!(self.insert_transaction_and_effects(transaction, transaction_effects))
     }
 
-    fn multi_insert_transaction_and_effects(&self, transactions_and_effects: &[VerifiedExecutionData]) {
+    fn multi_insert_transaction_and_effects(
+        &self,
+        transactions_and_effects: &[VerifiedExecutionData],
+    ) {
         delegate_method!(self.multi_insert_transaction_and_effects(transactions_and_effects))
     }
 }

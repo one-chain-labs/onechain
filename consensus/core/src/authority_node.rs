@@ -4,6 +4,7 @@
 use std::{sync::Arc, time::Instant};
 
 use consensus_config::{AuthorityIndex, Committee, NetworkKeyPair, Parameters, ProtocolKeyPair};
+use itertools::Itertools;
 use parking_lot::RwLock;
 use prometheus::Registry;
 use sui_protocol_config::{ConsensusNetwork, ProtocolConfig};
@@ -24,14 +25,16 @@ use crate::{
     leader_schedule::LeaderSchedule,
     leader_timeout::{LeaderTimeoutTask, LeaderTimeoutTaskHandle},
     metrics::initialise_metrics,
-    network::{anemo_network::AnemoManager, tonic_network::TonicManager, NetworkClient as _, NetworkManager},
+    network::{
+        anemo_network::AnemoManager, tonic_network::TonicManager, NetworkClient as _,
+        NetworkManager,
+    },
     round_prober::{RoundProber, RoundProberHandle},
     storage::rocksdb_store::RocksDBStore,
     subscriber::Subscriber,
     synchronizer::{Synchronizer, SynchronizerHandle},
     transaction::{TransactionClient, TransactionConsumer, TransactionVerifier},
-    CommitConsumer,
-    CommitConsumerMonitor,
+    CommitConsumer, CommitConsumerMonitor,
 };
 
 /// ConsensusAuthority is used by Sui to manage the lifetime of AuthorityNode.
@@ -174,11 +177,25 @@ where
         registry: Registry,
         boot_counter: u64,
     ) -> Self {
-        info!(
-            "Starting consensus authority {}\n{:#?}\n{:#?}\n{:?}\nBoot counter: {}",
-            own_index, committee, parameters, protocol_config.version, boot_counter
+        assert!(
+            committee.is_valid_index(own_index),
+            "Invalid own index {}",
+            own_index
         );
-        assert!(committee.is_valid_index(own_index));
+        let own_hostname = &committee.authority(own_index).hostname;
+        info!(
+            "Starting consensus authority {} {}, {:?}, boot counter {}",
+            own_index, own_hostname, protocol_config.version, boot_counter
+        );
+        info!(
+            "Consensus authorities: {}",
+            committee
+                .authorities()
+                .map(|(i, a)| format!("{}: {}", i, a.hostname))
+                .join(", ")
+        );
+        info!("Consensus parameters: {:?}", parameters);
+        info!("Consensus committee: {:?}", committee);
         let context = Arc::new(Context::new(
             own_index,
             committee,
@@ -202,7 +219,11 @@ where
         let broadcaster = if N::Client::SUPPORT_STREAMING {
             None
         } else {
-            Some(Broadcaster::new(context.clone(), network_client.clone(), &signals_receivers))
+            Some(Broadcaster::new(
+                context.clone(),
+                network_client.clone(),
+                &signals_receivers,
+            ))
         };
 
         let store_path = context.parameters.db_path.as_path().to_str().unwrap();
@@ -213,17 +234,28 @@ where
 
         let sync_last_known_own_block = boot_counter == 0
             && dag_state.read().highest_accepted_round() == 0
-            && !context.parameters.sync_last_known_own_block_timeout.is_zero();
+            && !context
+                .parameters
+                .sync_last_known_own_block_timeout
+                .is_zero();
         info!("Sync last known own block: {sync_last_known_own_block}");
 
-        let block_verifier = Arc::new(SignedBlockVerifier::new(context.clone(), transaction_verifier));
+        let block_verifier = Arc::new(SignedBlockVerifier::new(
+            context.clone(),
+            transaction_verifier,
+        ));
 
-        let block_manager = BlockManager::new(context.clone(), dag_state.clone(), block_verifier.clone());
+        let block_manager =
+            BlockManager::new(context.clone(), dag_state.clone(), block_verifier.clone());
 
-        let leader_schedule = Arc::new(LeaderSchedule::from_store(context.clone(), dag_state.clone()));
+        let leader_schedule = Arc::new(LeaderSchedule::from_store(
+            context.clone(),
+            dag_state.clone(),
+        ));
 
         let commit_consumer_monitor = commit_consumer.monitor();
-        commit_consumer_monitor.set_highest_observed_commit_at_startup(highest_known_commit_at_startup);
+        commit_consumer_monitor
+            .set_highest_observed_commit_at_startup(highest_known_commit_at_startup);
         let commit_observer = CommitObserver::new(
             context.clone(),
             commit_consumer,
@@ -279,8 +311,13 @@ where
 
         let round_prober_handle = if context.protocol_config.consensus_round_prober() {
             Some(
-                RoundProber::new(context.clone(), core_dispatcher.clone(), dag_state.clone(), network_client.clone())
-                    .start(),
+                RoundProber::new(
+                    context.clone(),
+                    core_dispatcher.clone(),
+                    dag_state.clone(),
+                    network_client.clone(),
+                )
+                .start(),
             )
         } else {
             None
@@ -298,7 +335,12 @@ where
         ));
 
         let subscriber = if N::Client::SUPPORT_STREAMING {
-            let s = Subscriber::new(context.clone(), network_client, network_service.clone(), dag_state);
+            let s = Subscriber::new(
+                context.clone(),
+                network_client,
+                network_service.clone(),
+                dag_state,
+            );
             for (peer, _) in context.committee.authorities() {
                 if peer != context.own_index {
                     s.subscribe(peer);
@@ -311,7 +353,10 @@ where
 
         network_manager.install_service(network_service).await;
 
-        info!("Consensus authority started, took {:?}", start_time.elapsed());
+        info!(
+            "Consensus authority started, took {:?}",
+            start_time.elapsed()
+        );
 
         Self {
             context,
@@ -331,14 +376,20 @@ where
     }
 
     pub(crate) async fn stop(mut self) {
-        info!("Stopping authority. Total run time: {:?}", self.start_time.elapsed());
+        info!(
+            "Stopping authority. Total run time: {:?}",
+            self.start_time.elapsed()
+        );
 
         // First shutdown components calling into Core.
         if let Err(e) = self.synchronizer.stop().await {
             if e.is_panic() {
                 std::panic::resume_unwind(e.into_panic());
             }
-            warn!("Failed to stop synchronizer when shutting down consensus: {:?}", e);
+            warn!(
+                "Failed to stop synchronizer when shutting down consensus: {:?}",
+                e
+            );
         };
         self.commit_syncer_handle.stop().await;
         if let Some(round_prober_handle) = self.round_prober_handle.take() {
@@ -357,7 +408,11 @@ where
         }
         self.network_manager.stop().await;
 
-        self.context.metrics.node_metrics.uptime.observe(self.start_time.elapsed().as_secs_f64());
+        self.context
+            .metrics
+            .node_metrics
+            .uptime
+            .observe(self.start_time.elapsed().as_secs_f64());
     }
 
     pub(crate) fn transaction_client(&self) -> Arc<TransactionClient> {
@@ -373,11 +428,8 @@ where
 mod tests {
     #![allow(non_snake_case)]
 
-    use std::{
-        collections::{BTreeMap, BTreeSet},
-        sync::Arc,
-        time::Duration,
-    };
+    use std::collections::BTreeMap;
+    use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
     use consensus_config::{local_committee_and_keys, Parameters};
     use mysten_metrics::monitored_mpsc::UnboundedReceiver;
@@ -389,11 +441,8 @@ mod tests {
     use typed_store::DBMetrics;
 
     use super::*;
-    use crate::{
-        block::{BlockAPI as _, GENESIS_ROUND},
-        transaction::NoopTransactionVerifier,
-        CommittedSubDag,
-    };
+    use crate::block::GENESIS_ROUND;
+    use crate::{block::BlockAPI as _, transaction::NoopTransactionVerifier, CommittedSubDag};
 
     #[rstest]
     #[tokio::test]
@@ -404,7 +453,10 @@ mod tests {
         let registry = Registry::new();
 
         let temp_dir = TempDir::new().unwrap();
-        let parameters = Parameters { db_path: temp_dir.keep(), ..Default::default() };
+        let parameters = Parameters {
+            db_path: temp_dir.into_path(),
+            ..Default::default()
+        };
         let txn_verifier = NoopTransactionVerifier {};
 
         let own_index = committee.to_authority_index(0).unwrap();
@@ -450,7 +502,9 @@ mod tests {
         let mut protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
         protocol_config.set_consensus_gc_depth_for_testing(gc_depth);
 
-        let temp_dirs = (0..NUM_OF_AUTHORITIES).map(|_| TempDir::new().unwrap()).collect::<Vec<_>>();
+        let temp_dirs = (0..NUM_OF_AUTHORITIES)
+            .map(|_| TempDir::new().unwrap())
+            .collect::<Vec<_>>();
 
         let mut output_receivers = Vec::with_capacity(committee.size());
         let mut authorities = Vec::with_capacity(committee.size());
@@ -477,14 +531,21 @@ mod tests {
         for i in 0..NUM_TRANSACTIONS {
             let txn = vec![i; 16];
             submitted_transactions.insert(txn.clone());
-            authorities[i as usize % authorities.len()].transaction_client().submit(vec![txn]).await.unwrap();
+            authorities[i as usize % authorities.len()]
+                .transaction_client()
+                .submit(vec![txn])
+                .await
+                .unwrap();
         }
 
         for receiver in &mut output_receivers {
             let mut expected_transactions = submitted_transactions.clone();
             loop {
                 let committed_subdag =
-                    tokio::time::timeout(Duration::from_secs(1), receiver.recv()).await.unwrap().unwrap();
+                    tokio::time::timeout(Duration::from_secs(1), receiver.recv())
+                        .await
+                        .unwrap()
+                        .unwrap();
                 for b in committed_subdag.blocks {
                     for txn in b.transactions().iter().map(|t| t.data().to_vec()) {
                         assert!(
@@ -540,7 +601,9 @@ mod tests {
         let (committee, keypairs) = local_committee_and_keys(0, vec![1; num_authorities]);
         let protocol_config: ProtocolConfig = ProtocolConfig::get_for_max_version_UNSAFE();
 
-        let temp_dirs = (0..num_authorities).map(|_| TempDir::new().unwrap()).collect::<Vec<_>>();
+        let temp_dirs = (0..num_authorities)
+            .map(|_| TempDir::new().unwrap())
+            .collect::<Vec<_>>();
 
         let mut output_receivers = Vec::with_capacity(committee.size());
         let mut authorities: Vec<ConsensusAuthority> = Vec::with_capacity(committee.size());
@@ -567,14 +630,21 @@ mod tests {
         for i in 0..NUM_TRANSACTIONS {
             let txn = vec![i; 16];
             submitted_transactions.insert(txn.clone());
-            authorities[i as usize % authorities.len()].transaction_client().submit(vec![txn]).await.unwrap();
+            authorities[i as usize % authorities.len()]
+                .transaction_client()
+                .submit(vec![txn])
+                .await
+                .unwrap();
         }
 
         for receiver in &mut output_receivers {
             let mut expected_transactions = submitted_transactions.clone();
             loop {
                 let committed_subdag =
-                    tokio::time::timeout(Duration::from_secs(1), receiver.recv()).await.unwrap().unwrap();
+                    tokio::time::timeout(Duration::from_secs(1), receiver.recv())
+                        .await
+                        .unwrap()
+                        .unwrap();
                 for b in committed_subdag.blocks {
                     for txn in b.transactions().iter().map(|t| t.data().to_vec()) {
                         assert!(
@@ -661,9 +731,10 @@ mod tests {
         // We wait until we see at least one committed block authored from this authority. That way we'll be 100% sure that
         // at least one block has been proposed and successfully received by a quorum of nodes.
         let index_1 = committee.to_authority_index(1).unwrap();
-        'outer: while let Some(result) = timeout(Duration::from_secs(10), output_receivers[index_1].recv())
-            .await
-            .expect("Timed out while waiting for at least one committed block from authority 1")
+        'outer: while let Some(result) =
+            timeout(Duration::from_secs(10), output_receivers[index_1].recv())
+                .await
+                .expect("Timed out while waiting for at least one committed block from authority 1")
         {
             for block in result.blocks {
                 if block.round() > GENESIS_ROUND && block.author() == index_1 {

@@ -2,13 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    big_int::BigInt,
-    gas::GasCostSummary,
-    safe_mode::SafeMode,
-    stake_subsidy::StakeSubsidy,
-    storage_fund::StorageFund,
-    system_parameters::SystemParameters,
-    uint53::UInt53,
+    big_int::BigInt, gas::GasCostSummary, safe_mode::SafeMode, stake_subsidy::StakeSubsidy,
+    storage_fund::StorageFund, system_parameters::SystemParameters, uint53::UInt53,
 };
 use async_graphql::*;
 use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary as NativeSystemStateSummary;
@@ -26,8 +21,12 @@ impl SystemStateSummary {
     /// This is also used for storage rebates.
     async fn storage_fund(&self) -> Option<StorageFund> {
         Some(StorageFund {
-            total_object_storage_rebates: Some(BigInt::from(self.native.storage_fund_total_object_storage_rebates)),
-            non_refundable_balance: Some(BigInt::from(self.native.storage_fund_non_refundable_balance)),
+            total_object_storage_rebates: Some(BigInt::from(
+                self.native.storage_fund_total_object_storage_rebates,
+            )),
+            non_refundable_balance: Some(BigInt::from(
+                self.native.storage_fund_non_refundable_balance,
+            )),
         })
     }
 
@@ -61,10 +60,18 @@ impl SystemStateSummary {
             // so we decided to wait on it for now.
             min_validator_count: None,
             max_validator_count: Some(self.native.max_validator_count),
-            min_validator_joining_stake: Some(BigInt::from(self.native.min_validator_joining_stake)),
-            validator_low_stake_threshold: Some(BigInt::from(self.native.validator_low_stake_threshold)),
-            validator_very_low_stake_threshold: Some(BigInt::from(self.native.validator_very_low_stake_threshold)),
-            validator_low_stake_grace_period: Some(BigInt::from(self.native.validator_low_stake_grace_period)),
+            min_validator_joining_stake: Some(BigInt::from(
+                self.native.min_validator_joining_stake,
+            )),
+            validator_low_stake_threshold: Some(BigInt::from(
+                self.native.validator_low_stake_threshold,
+            )),
+            validator_very_low_stake_threshold: Some(BigInt::from(
+                self.native.validator_very_low_stake_threshold,
+            )),
+            validator_low_stake_grace_period: Some(BigInt::from(
+                self.native.validator_low_stake_grace_period,
+            )),
         })
     }
 
@@ -73,7 +80,9 @@ impl SystemStateSummary {
         Some(StakeSubsidy {
             balance: Some(BigInt::from(self.native.stake_subsidy_balance)),
             distribution_counter: Some(self.native.stake_subsidy_distribution_counter),
-            current_distribution_amount: Some(BigInt::from(self.native.stake_subsidy_current_distribution_amount)),
+            current_distribution_amount: Some(BigInt::from(
+                self.native.stake_subsidy_current_distribution_amount,
+            )),
             period_length: Some(self.native.stake_subsidy_period_length),
             decrease_rate: Some(self.native.stake_subsidy_decrease_rate as u64),
         })

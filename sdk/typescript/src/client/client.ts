@@ -500,14 +500,14 @@ export class SuiClient {
 	 * Return the delegated stakes queried by id.
 	 */
 	async getStakesByIds(input: GetStakesByIdsParams): Promise<DelegatedStake[]> {
-		input.stakedOctIds.forEach((id) => {
+		input.stakedSuiIds.forEach((id) => {
 			if (!id || !isValidSuiObjectId(normalizeSuiObjectId(id))) {
 				throw new Error(`Invalid Sui Stake id ${id}`);
 			}
 		});
 		return await this.transport.request({
 			method: 'suix_getStakesByIds',
-			params: [input.stakedOctIds],
+			params: [input.stakedSuiIds],
 		});
 	}
 

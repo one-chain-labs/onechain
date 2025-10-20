@@ -3,18 +3,17 @@
 
 use mysten_metrics::spawn_monitored_task;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
+use std::time::Duration;
 use strum_macros;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-use crate::{
-    config::RetentionConfig,
-    errors::IndexerError,
-    metrics::IndexerMetrics,
-    store::{pg_partition_manager::PgPartitionManager, IndexerStore, PgIndexerStore},
-    types::IndexerResult,
-};
+use crate::config::RetentionConfig;
+use crate::errors::IndexerError;
+use crate::store::pg_partition_manager::PgPartitionManager;
+use crate::store::PgIndexerStore;
+use crate::{metrics::IndexerMetrics, store::IndexerStore, types::IndexerResult};
 
 pub struct Pruner {
     pub store: PgIndexerStore,
@@ -114,7 +113,13 @@ impl Pruner {
         let epochs_to_keep = retention_config.epochs_to_keep;
         let retention_policies = retention_config.retention_policies();
 
-        Ok(Self { store, epochs_to_keep, partition_manager, retention_policies, metrics })
+        Ok(Self {
+            store,
+            epochs_to_keep,
+            partition_manager,
+            retention_policies,
+            metrics,
+        })
     }
 
     /// Given a table name, return the number of epochs to keep for that table. Return `None` if the
@@ -131,7 +136,11 @@ impl Pruner {
         let store_clone = self.store.clone();
         let retention_policies = self.retention_policies.clone();
         let cancel_clone = cancel.clone();
-        spawn_monitored_task!(update_watermarks_lower_bounds_task(store_clone, retention_policies, cancel_clone));
+        spawn_monitored_task!(update_watermarks_lower_bounds_task(
+            store_clone,
+            retention_policies,
+            cancel_clone
+        ));
 
         let mut last_seen_max_epoch = 0;
         // The first epoch that has not yet been pruned.
@@ -150,7 +159,11 @@ impl Pruner {
                 .get_table_partitions()
                 .await?
                 .into_iter()
-                .filter(|(table_name, _)| self.partition_manager.get_strategy(table_name).is_epoch_partitioned())
+                .filter(|(table_name, _)| {
+                    self.partition_manager
+                        .get_strategy(table_name)
+                        .is_epoch_partitioned()
+                })
                 .collect();
 
             for (table_name, (min_partition, max_partition)) in &table_partitions {
@@ -162,13 +175,20 @@ impl Pruner {
                         );
                     }
 
-                    for epoch in *min_partition..last_seen_max_epoch.saturating_sub(epochs_to_keep - 1) {
+                    for epoch in
+                        *min_partition..last_seen_max_epoch.saturating_sub(epochs_to_keep - 1)
+                    {
                         if cancel.is_cancelled() {
                             info!("Pruner task cancelled.");
                             return Ok(());
                         }
-                        self.partition_manager.drop_table_partition(table_name.clone(), epoch).await?;
-                        info!("Batch dropped table partition {} epoch {}", table_name, epoch);
+                        self.partition_manager
+                            .drop_table_partition(table_name.clone(), epoch)
+                            .await?;
+                        info!(
+                            "Batch dropped table partition {} epoch {}",
+                            table_name, epoch
+                        );
                     }
                 }
             }
@@ -241,7 +261,10 @@ async fn update_watermarks_lower_bounds(
         };
 
         let Some(epochs_to_keep) = retention_policies.get(&prunable_table) else {
-            error!("No retention policy found for prunable table {}", prunable_table);
+            error!(
+                "No retention policy found for prunable table {}",
+                prunable_table
+            );
             continue;
         };
 
@@ -251,7 +274,9 @@ async fn update_watermarks_lower_bounds(
     }
 
     if !lower_bound_updates.is_empty() {
-        store.update_watermarks_lower_bound(lower_bound_updates).await?;
+        store
+            .update_watermarks_lower_bound(lower_bound_updates)
+            .await?;
         info!("Finished updating lower bounds for watermarks");
     }
 

@@ -37,15 +37,25 @@ pub struct LockFile {
 impl LockFile {
     /// Creates a new lock file in a sub-directory of `install_dir` (the compiled output directory
     /// of a move package).
-    pub fn new(install_dir: PathBuf, manifest_digest: String, deps_digest: String) -> Result<LockFile> {
+    pub fn new(
+        install_dir: PathBuf,
+        manifest_digest: String,
+        deps_digest: String,
+    ) -> Result<LockFile> {
         let mut locks_dir = install_dir;
-        locks_dir.extend([CompiledPackageLayout::Root.path(), CompiledPackageLayout::LockFiles.path()]);
+        locks_dir.extend([
+            CompiledPackageLayout::Root.path(),
+            CompiledPackageLayout::LockFiles.path(),
+        ]);
         fs::create_dir_all(&locks_dir).context("Creating output directory")?;
 
-        let mut lock =
-            tempfile::Builder::new().prefix("Move.lock").tempfile_in(locks_dir).context("Creating lock file")?;
+        let mut lock = tempfile::Builder::new()
+            .prefix("Move.lock")
+            .tempfile_in(locks_dir)
+            .context("Creating lock file")?;
 
-        schema::write_prologue(&mut lock, manifest_digest, deps_digest).context("Initializing lock file")?;
+        schema::write_prologue(&mut lock, manifest_digest, deps_digest)
+            .context("Initializing lock file")?;
 
         Ok(LockFile { file: lock })
     }
@@ -53,11 +63,16 @@ impl LockFile {
     /// Creates a temporary copy of an existing lock file in a sub-directory of `install_dir` and returns the handle.
     pub fn from(install_dir: PathBuf, lock_file: &PathBuf) -> Result<LockFile> {
         let mut locks_dir = install_dir;
-        locks_dir.extend([CompiledPackageLayout::Root.path(), CompiledPackageLayout::LockFiles.path()]);
+        locks_dir.extend([
+            CompiledPackageLayout::Root.path(),
+            CompiledPackageLayout::LockFiles.path(),
+        ]);
         fs::create_dir_all(&locks_dir).context("Creating output directory")?;
 
-        let mut lock =
-            tempfile::Builder::new().prefix("Move.lock").tempfile_in(locks_dir).context("Creating lock file")?;
+        let mut lock = tempfile::Builder::new()
+            .prefix("Move.lock")
+            .tempfile_in(locks_dir)
+            .context("Creating lock file")?;
         let lock_string = std::fs::read_to_string(lock_file)?;
         lock.write_all(lock_string.as_bytes())?;
         lock.seek(SeekFrom::Start(0))?;
@@ -68,7 +83,9 @@ impl LockFile {
     /// Consume the lock file, moving it to its final position at `lock_path`.  NOTE: If this
     /// function is not called, the contents of the lock file will be discarded.
     pub fn commit(self, lock_path: impl AsRef<Path>) -> Result<()> {
-        self.file.persist(lock_path).context("Committing lock file")?;
+        self.file
+            .persist(lock_path)
+            .context("Committing lock file")?;
         Ok(())
     }
 }

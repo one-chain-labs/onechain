@@ -4,10 +4,13 @@
 use anyhow::{anyhow, Context, Result};
 
 use clap::*;
-use object_store::{aws::AmazonS3Builder, ClientOptions, DynObjectStore};
+use object_store::aws::AmazonS3Builder;
+use object_store::{ClientOptions, DynObjectStore};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
-use std::{env, fs, path::PathBuf, sync::Arc};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::{env, fs};
 use tracing::info;
 
 /// Object-store type.
@@ -113,7 +116,10 @@ impl ObjectStoreConfig {
     fn new_local_fs(&self) -> Result<Arc<DynObjectStore>, anyhow::Error> {
         info!(directory=?self.directory, object_store_type="File", "Object Store");
         if let Some(path) = &self.directory {
-            fs::create_dir_all(path).context(anyhow!("Failed to create local directory: {}", path.display()))?;
+            fs::create_dir_all(path).context(anyhow!(
+                "Failed to create local directory: {}",
+                path.display()
+            ))?;
             let store = object_store::local::LocalFileSystem::new_with_prefix(path)
                 .context(anyhow!("Failed to create local object store"))?;
             Ok(Arc::new(store))
@@ -121,13 +127,14 @@ impl ObjectStoreConfig {
             Err(anyhow!("No directory provided for local fs storage"))
         }
     }
-
     fn new_s3(&self) -> Result<Arc<DynObjectStore>, anyhow::Error> {
         use object_store::limit::LimitStore;
 
         info!(bucket=?self.bucket, object_store_type="S3", "Object Store");
 
-        let mut builder = AmazonS3Builder::new().with_client_options(no_timeout_options()).with_imdsv1_fallback();
+        let mut builder = AmazonS3Builder::new()
+            .with_client_options(no_timeout_options())
+            .with_imdsv1_fallback();
 
         if self.aws_virtual_hosted_style_request {
             builder = builder.with_virtual_hosted_style_request(true);
@@ -165,11 +172,14 @@ impl ObjectStoreConfig {
         if let Some(endpoint) = &self.aws_endpoint {
             builder = builder.with_endpoint(endpoint);
         }
-        Ok(Arc::new(LimitStore::new(builder.build().context("Invalid s3 config")?, self.object_store_connection_limit)))
+        Ok(Arc::new(LimitStore::new(
+            builder.build().context("Invalid s3 config")?,
+            self.object_store_connection_limit,
+        )))
     }
-
     fn new_gcs(&self) -> Result<Arc<DynObjectStore>, anyhow::Error> {
-        use object_store::{gcp::GoogleCloudStorageBuilder, limit::LimitStore};
+        use object_store::gcp::GoogleCloudStorageBuilder;
+        use object_store::limit::LimitStore;
 
         info!(bucket=?self.bucket, object_store_type="GCS", "Object Store");
 
@@ -194,11 +204,14 @@ impl ObjectStoreConfig {
         }
         builder = builder.with_client_options(client_options);
 
-        Ok(Arc::new(LimitStore::new(builder.build().context("Invalid gcs config")?, self.object_store_connection_limit)))
+        Ok(Arc::new(LimitStore::new(
+            builder.build().context("Invalid gcs config")?,
+            self.object_store_connection_limit,
+        )))
     }
-
     fn new_azure(&self) -> Result<Arc<DynObjectStore>, anyhow::Error> {
-        use object_store::{azure::MicrosoftAzureBuilder, limit::LimitStore};
+        use object_store::azure::MicrosoftAzureBuilder;
+        use object_store::limit::LimitStore;
 
         info!(bucket=?self.bucket, account=?self.azure_storage_account,
           object_store_type="Azure", "Object Store");
@@ -220,7 +233,6 @@ impl ObjectStoreConfig {
             self.object_store_connection_limit,
         )))
     }
-
     pub fn make(&self) -> Result<Arc<DynObjectStore>, anyhow::Error> {
         match &self.object_store {
             Some(ObjectStoreType::File) => self.new_local_fs(),

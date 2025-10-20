@@ -12,8 +12,7 @@
 //! so will result in a ton of compilation errors, and worse: it will not make sense!
 
 use fastcrypto::{
-    bls12381,
-    ed25519,
+    bls12381, ed25519,
     error::FastCryptoError,
     hash::{Blake2b256, HashFunction},
     traits::{KeyPair as _, Signer as _, ToFromBytes as _, VerifyingKey as _},
@@ -86,7 +85,11 @@ impl ProtocolPublicKey {
         Self(key)
     }
 
-    pub fn verify(&self, message: &[u8], signature: &ProtocolKeySignature) -> Result<(), FastCryptoError> {
+    pub fn verify(
+        &self,
+        message: &[u8],
+        signature: &ProtocolKeySignature,
+    ) -> Result<(), FastCryptoError> {
         self.0.verify(message, &signature.0)
     }
 

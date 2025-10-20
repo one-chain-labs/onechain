@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one_system::governance_test_utils {
-    use one::address;
-    use one::balance;
-    use one::oct::OCT;
-    use one::coin::{Self, Coin};
+module oct_system::governance_test_utils {
+    use sui::address;
+    use sui::balance;
+    use sui::oct::OCT;
+    use sui::coin::{Self, Coin};
     use one_system::staking_pool::{StakedOct, StakingPool};
-    use one::test_utils::assert_eq;
+    use sui::test_utils::assert_eq;
     use one_system::validator::{Self, Validator};
     use one_system::one_system::{Self, SuiSystemState};
     use one_system::sui_system_state_inner;
     use one_system::stake_subsidy;
-    use one::test_scenario::{Self, Scenario};
-    use one::test_utils;
-    use one::balance::Balance;
+    use sui::test_scenario::{Self, Scenario};
+    use sui::test_utils;
+    use sui::balance::Balance;
 
     const MIST_PER_OCT: u64 = 1_000_000_000;
 
@@ -36,7 +36,7 @@ module one_system::governance_test_utils {
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            option::some(balance::create_for_testing<OCT>(init_stake_amount_in_sui * MIST_PER_OCT)),
+            option::some(balance::create_for_testing<SUI>(init_stake_amount_in_sui * MIST_PER_OCT)),
             1,
             0,
             true,
@@ -73,7 +73,7 @@ module one_system::governance_test_utils {
         );
 
         let stake_subsidy = stake_subsidy::create(
-            balance::create_for_testing<OCT>(sui_supply_amount * MIST_PER_OCT), // sui_supply
+            balance::create_for_testing<SUI>(sui_supply_amount * MIST_PER_OCT), // sui_supply
             0,   // stake subsidy initial distribution amount
             10,  // stake_subsidy_period_length
             0,   // stake_subsidy_decrease_rate
@@ -83,7 +83,7 @@ module one_system::governance_test_utils {
         one_system::create(
             object::new(ctx), // it doesn't matter what ID sui system state has in tests
             validators,
-            balance::create_for_testing<OCT>(storage_fund_amount * MIST_PER_OCT), // storage_fund
+            balance::create_for_testing<SUI>(storage_fund_amount * MIST_PER_OCT), // storage_fund
             1,   // protocol version
             0,   // chain_start_timestamp_ms
             system_parameters,
@@ -185,7 +185,6 @@ module one_system::governance_test_utils {
         let mut system_state = scenario.take_shared<SuiSystemState>();
         let ctx = scenario.ctx();
 
-        system_state.execute_update_trusted_validators_action(true, validator);
         system_state.request_add_validator_candidate(
             pubkey,
             vector[171, 2, 39, 3, 139, 105, 166, 171, 153, 151, 102, 197, 151, 186, 140, 116, 114, 90, 213, 225, 20, 167, 60, 69, 203, 12, 180, 198, 9, 217, 117, 38],
@@ -199,14 +198,11 @@ module one_system::governance_test_utils {
             net_addr,
             net_addr,
             net_addr,
-            validator,
             1,
             0,
             ctx
         );
-
-        system_state.execute_update_only_validator_staking_action(validator,false);
-        system_state.request_add_stake(coin::mint_for_testing<OCT>(init_stake_amount * MIST_PER_OCT, ctx), validator, ctx);
+        system_state.request_add_stake(coin::mint_for_testing<SUI>(init_stake_amount * MIST_PER_OCT, ctx), validator, ctx);
         system_state.request_add_validator_for_testing(0, ctx);
         test_scenario::return_shared(system_state);
     }
@@ -216,8 +212,6 @@ module one_system::governance_test_utils {
         let mut system_state = scenario.take_shared<SuiSystemState>();
         let ctx = scenario.ctx();
 
-        system_state.execute_update_trusted_validators_action(true, validator);
-
         system_state.request_add_validator_candidate(
             pubkey,
             vector[171, 2, 39, 3, 139, 105, 166, 171, 153, 151, 102, 197, 151, 186, 140, 116, 114, 90, 213, 225, 20, 167, 60, 69, 203, 12, 180, 198, 9, 217, 117, 38],
@@ -231,13 +225,10 @@ module one_system::governance_test_utils {
             net_addr,
             net_addr,
             net_addr,
-            validator,
             1,
             0,
             ctx
         );
-
-        system_state.execute_update_only_validator_staking_action(validator, false);
         test_scenario::return_shared(system_state);
     }
 
@@ -293,7 +284,7 @@ module one_system::governance_test_utils {
             scenario.next_tx(validator_addr);
             let mut system_state = scenario.take_shared<SuiSystemState>();
             let validator_amount = system_state.validator_stake_amount(validator_addr);
-            assert_eq(validator_amount, amount);
+            assert!(validator_amount == amount, validator_amount);
             test_scenario::return_shared(system_state);
             i = i + 1;
         };
@@ -335,7 +326,7 @@ module one_system::governance_test_utils {
         sum
     }
 
-    public fun total_sui_balance(addr: address, scenario: &mut Scenario): u64 {
+    public fun total_oct_balance(addr: address, scenario: &mut Scenario): u64 {
         let mut sum = 0;
         scenario.next_tx(addr);
         let coin_ids = scenario.ids_for_sender<Coin<OCT>>();

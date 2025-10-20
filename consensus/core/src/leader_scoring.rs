@@ -16,8 +16,7 @@ use crate::{
     commit::{CommitRange, CommittedSubDag},
     context::Context,
     stake_aggregator::{QuorumThreshold, StakeAggregator},
-    Round,
-    VerifiedBlock,
+    Round, VerifiedBlock,
 };
 
 pub(crate) struct ReputationScoreCalculator {
@@ -38,12 +37,19 @@ impl ReputationScoreCalculator {
         let num_authorities = context.committee.size();
         let scores_per_authority = vec![0_u64; num_authorities];
 
-        assert!(!unscored_subdags.is_empty(), "Attempted to calculate scores with no unscored subdags");
+        assert!(
+            !unscored_subdags.is_empty(),
+            "Attempted to calculate scores with no unscored subdags"
+        );
 
         let unscored_subdag = UnscoredSubdag::new(context.clone(), unscored_subdags);
         let commit_range = unscored_subdag.commit_range.clone();
 
-        Self { unscored_subdag, commit_range, scores_per_authority }
+        Self {
+            unscored_subdag,
+            commit_range,
+            scores_per_authority,
+        }
     }
 
     pub(crate) fn calculate(&mut self) -> ReputationScores {
@@ -74,10 +80,7 @@ impl ReputationScoreCalculator {
         let leader_blocks = subdag.get_blocks_at_slot(leader_slot);
 
         if leader_blocks.is_empty() {
-            tracing::trace!(
-                "[{}] No block for leader slot {leader_slot} in this set of unscored committed subdags, skip scoring",
-                subdag.context.own_index
-            );
+            tracing::trace!("[{}] No block for leader slot {leader_slot} in this set of unscored committed subdags, skip scoring", subdag.context.own_index);
             return scores_per_authority;
         }
 
@@ -98,7 +101,10 @@ impl ReputationScoreCalculator {
                     "Found a vote {} for leader {leader_block} from authority {authority}",
                     potential_vote.reference()
                 );
-                tracing::trace!("[{}] scores +1 reputation for {authority}!", subdag.context.own_index);
+                tracing::trace!(
+                    "[{}] scores +1 reputation for {authority}!",
+                    subdag.context.own_index
+                );
                 scores_per_authority[authority] += 1;
             }
         }
@@ -117,7 +123,10 @@ pub(crate) struct ReputationScores {
 
 impl ReputationScores {
     pub(crate) fn new(commit_range: CommitRange, scores_per_authority: Vec<u64>) -> Self {
-        Self { scores_per_authority, commit_range }
+        Self {
+            scores_per_authority,
+            commit_range,
+        }
     }
 
     pub(crate) fn highest_score(&self) -> u64 {
@@ -130,14 +139,23 @@ impl ReputationScores {
             .iter()
             .enumerate()
             .map(|(index, score)| {
-                (context.committee.to_authority_index(index).expect("Should be a valid AuthorityIndex"), *score)
+                (
+                    context
+                        .committee
+                        .to_authority_index(index)
+                        .expect("Should be a valid AuthorityIndex"),
+                    *score,
+                )
             })
             .collect()
     }
 
     pub(crate) fn update_metrics(&self, context: Arc<Context>) {
         for (index, score) in self.scores_per_authority.iter().enumerate() {
-            let authority_index = context.committee.to_authority_index(index).expect("Should be a valid AuthorityIndex");
+            let authority_index = context
+                .committee
+                .to_authority_index(index)
+                .expect("Should be a valid AuthorityIndex");
             let authority = context.committee.authority(authority_index);
             if !authority.hostname.is_empty() {
                 context
@@ -164,14 +182,19 @@ pub(crate) struct ScoringSubdag {
     // TODO: Include skipped leaders as well
     pub(crate) leaders: HashSet<BlockRef>,
     // A map of votes to the stake of strongly linked blocks that include that vote
-    // Note: Inlcuding stake aggregator so that we can quickly check if it exceeds
+    // Note: Including stake aggregator so that we can quickly check if it exceeds
     // quourum threshold and only include those scores for certain scoring strategies.
     pub(crate) votes: BTreeMap<BlockRef, StakeAggregator<QuorumThreshold>>,
 }
 
 impl ScoringSubdag {
     pub(crate) fn new(context: Arc<Context>) -> Self {
-        Self { context, commit_range: None, leaders: HashSet::new(), votes: BTreeMap::new() }
+        Self {
+            context,
+            commit_range: None,
+            leaders: HashSet::new(),
+            votes: BTreeMap::new(),
+        }
     }
 
     pub(crate) fn add_subdags(&mut self, committed_subdags: Vec<CommittedSubDag>) {
@@ -186,7 +209,9 @@ impl ScoringSubdag {
             // If the commit range is not set, then set it to the range of the first
             // committed subdag index.
             if self.commit_range.is_none() {
-                self.commit_range = Some(CommitRange::new(subdag.commit_ref.index..=subdag.commit_ref.index));
+                self.commit_range = Some(CommitRange::new(
+                    subdag.commit_ref.index..=subdag.commit_ref.index,
+                ));
             } else {
                 let commit_range = self.commit_range.as_mut().unwrap();
                 commit_range.extend_to(subdag.commit_ref.index);
@@ -216,16 +241,19 @@ impl ScoringSubdag {
                             block.reference(),
                             block.author()
                         );
-                        assert!(
-                            self.votes.insert(block.reference(), StakeAggregator::new()).is_none(),
-                            "Vote {block} already exists. Duplicate vote found for leader {ancestor}"
-                        );
+                        assert!(self
+                            .votes
+                            .insert(block.reference(), StakeAggregator::new())
+                            .is_none(), "Vote {block} already exists. Duplicate vote found for leader {ancestor}");
                     }
 
                     if let Some(stake) = self.votes.get_mut(ancestor) {
                         // Vote is strongly linked to a future block, so we
                         // consider this a distributed vote.
-                        tracing::trace!("Found a distributed vote {ancestor} from authority {}", ancestor.author);
+                        tracing::trace!(
+                            "Found a distributed vote {ancestor} from authority {}",
+                            ancestor.author
+                        );
                         stake.add(block.author(), &self.context.committee);
                     }
                 }
@@ -240,7 +268,9 @@ impl ScoringSubdag {
 
         // TODO: Normalize scores
         ReputationScores::new(
-            self.commit_range.clone().expect("CommitRange should be set if calculate_scores is called."),
+            self.commit_range
+                .clone()
+                .expect("CommitRange should be set if calculate_scores is called."),
             scores_per_authority,
         )
     }
@@ -264,7 +294,10 @@ impl ScoringSubdag {
         for (vote, stake_agg) in self.votes.iter() {
             let authority = vote.author;
             let stake = stake_agg.stake();
-            tracing::trace!("[{}] scores +{stake} reputation for {authority}!", self.context.own_index,);
+            tracing::trace!(
+                "[{}] scores +{stake} reputation for {authority}!",
+                self.context.own_index,
+            );
             scores_per_authority[authority.value()] += stake;
         }
         scores_per_authority
@@ -331,15 +364,28 @@ impl UnscoredSubdag {
             .collect::<BTreeMap<_, _>>();
 
         // Guaranteed to have a contiguous list of commit indices
-        let commit_range =
-            CommitRange::new(subdags.first().unwrap().commit_ref.index..=subdags.last().unwrap().commit_ref.index);
+        let commit_range = CommitRange::new(
+            subdags.first().unwrap().commit_ref.index..=subdags.last().unwrap().commit_ref.index,
+        );
 
-        assert!(!blocks.is_empty(), "Attempted to create UnscoredSubdag with no blocks");
+        assert!(
+            !blocks.is_empty(),
+            "Attempted to create UnscoredSubdag with no blocks"
+        );
 
-        Self { context, commit_range, committed_leaders, blocks }
+        Self {
+            context,
+            commit_range,
+            committed_leaders,
+            blocks,
+        }
     }
 
-    pub(crate) fn find_supported_leader_block(&self, leader_slot: Slot, from: &VerifiedBlock) -> Option<BlockRef> {
+    pub(crate) fn find_supported_leader_block(
+        &self,
+        leader_slot: Slot,
+        from: &VerifiedBlock,
+    ) -> Option<BlockRef> {
         if from.round() < leader_slot.round {
             return None;
         }
@@ -367,7 +413,11 @@ impl UnscoredSubdag {
         None
     }
 
-    pub(crate) fn is_vote(&self, potential_vote: &VerifiedBlock, leader_block: &VerifiedBlock) -> bool {
+    pub(crate) fn is_vote(
+        &self,
+        potential_vote: &VerifiedBlock,
+        leader_block: &VerifiedBlock,
+    ) -> bool {
         let reference = leader_block.reference();
         let leader_slot = Slot::from(reference);
         self.find_supported_leader_block(leader_slot, potential_vote) == Some(reference)
@@ -388,7 +438,11 @@ impl UnscoredSubdag {
         let mut blocks = vec![];
         for (_block_ref, block) in self.blocks.range((
             Included(BlockRef::new(round, AuthorityIndex::ZERO, BlockDigest::MIN)),
-            Excluded(BlockRef::new(round + 1, AuthorityIndex::ZERO, BlockDigest::MIN)),
+            Excluded(BlockRef::new(
+                round + 1,
+                AuthorityIndex::ZERO,
+                BlockDigest::MIN,
+            )),
         )) {
             blocks.push(block.clone())
         }
@@ -410,12 +464,15 @@ mod tests {
         let context = Arc::new(Context::new_for_test(4).0);
         let scores = ReputationScores::new((1..=300).into(), vec![4, 1, 1, 3]);
         let authorities = scores.authorities_by_score(context);
-        assert_eq!(authorities, vec![
-            (AuthorityIndex::new_for_test(0), 4),
-            (AuthorityIndex::new_for_test(1), 1),
-            (AuthorityIndex::new_for_test(2), 1),
-            (AuthorityIndex::new_for_test(3), 3),
-        ]);
+        assert_eq!(
+            authorities,
+            vec![
+                (AuthorityIndex::new_for_test(0), 4),
+                (AuthorityIndex::new_for_test(1), 1),
+                (AuthorityIndex::new_for_test(2), 1),
+                (AuthorityIndex::new_for_test(3), 3),
+            ]
+        );
     }
 
     #[tokio::test]
@@ -424,10 +481,34 @@ mod tests {
         let scores = ReputationScores::new((1..=300).into(), vec![1, 2, 4, 3]);
         scores.update_metrics(context.clone());
         let metrics = context.metrics.node_metrics.reputation_scores.clone();
-        assert_eq!(metrics.get_metric_with_label_values(&["test_host_0"]).unwrap().get(), 1);
-        assert_eq!(metrics.get_metric_with_label_values(&["test_host_1"]).unwrap().get(), 2);
-        assert_eq!(metrics.get_metric_with_label_values(&["test_host_2"]).unwrap().get(), 4);
-        assert_eq!(metrics.get_metric_with_label_values(&["test_host_3"]).unwrap().get(), 3);
+        assert_eq!(
+            metrics
+                .get_metric_with_label_values(&["test_host_0"])
+                .unwrap()
+                .get(),
+            1
+        );
+        assert_eq!(
+            metrics
+                .get_metric_with_label_values(&["test_host_1"])
+                .unwrap()
+                .get(),
+            2
+        );
+        assert_eq!(
+            metrics
+                .get_metric_with_label_values(&["test_host_2"])
+                .unwrap()
+                .get(),
+            4
+        );
+        assert_eq!(
+            metrics
+                .get_metric_with_label_values(&["test_host_3"])
+                .unwrap()
+                .get(),
+            3
+        );
     }
 
     #[tokio::test]
@@ -529,7 +610,11 @@ mod tests {
         let mut dag_builder = DagBuilder::new(context.clone());
         // Build layer 1 with missing leader block, simulating it was committed
         // as part of another committed subdag.
-        dag_builder.layer(1).authorities(vec![AuthorityIndex::new_for_test(0)]).skip_block().build();
+        dag_builder
+            .layer(1)
+            .authorities(vec![AuthorityIndex::new_for_test(0)])
+            .skip_block()
+            .build();
         // Build fully connected layers 2 ~ 3.
         dag_builder.layers(2..=3).build();
         // Build round 4 but with just the leader block

@@ -4,15 +4,12 @@
 use consensus_config::Epoch;
 use mysten_metrics::spawn_logged_monitored_task;
 use prometheus::{
-    register_int_counter_vec_with_registry,
-    register_int_counter_with_registry,
-    register_int_gauge_with_registry,
-    IntCounter,
-    IntCounterVec,
-    IntGauge,
-    Registry,
+    register_int_counter_vec_with_registry, register_int_counter_with_registry,
+    register_int_gauge_with_registry, IntCounter, IntCounterVec, IntGauge, Registry,
 };
-use std::{fs, path::PathBuf, time::Duration};
+use std::fs;
+use std::path::PathBuf;
+use std::time::Duration;
 use tokio::{
     sync::mpsc,
     time::{sleep, Instant},
@@ -58,7 +55,12 @@ pub struct ConsensusStorePruner {
 }
 
 impl ConsensusStorePruner {
-    pub fn new(base_path: PathBuf, epoch_retention: u64, epoch_prune_period: Duration, registry: &Registry) -> Self {
+    pub fn new(
+        base_path: PathBuf,
+        epoch_retention: u64,
+        epoch_prune_period: Duration,
+        registry: &Registry,
+    ) -> Self {
         let (tx_remove, mut rx_remove) = mpsc::channel(1);
         let metrics = Metrics::new(registry);
 
@@ -96,7 +98,10 @@ impl ConsensusStorePruner {
     pub async fn prune(&self, current_epoch: Epoch) {
         let result = self.tx_remove.send(current_epoch).await;
         if result.is_err() {
-            error!("Error sending message to data removal task for epoch {:?}", current_epoch,);
+            error!(
+                "Error sending message to data removal task for epoch {:?}",
+                current_epoch,
+            );
         }
     }
 
@@ -108,13 +113,19 @@ impl ConsensusStorePruner {
     ) {
         let drop_boundary = current_epoch.saturating_sub(epoch_retention);
 
-        info!("Consensus store prunning for current epoch {}. Will remove epochs < {:?}", current_epoch, drop_boundary);
+        info!(
+            "Consensus store prunning for current epoch {}. Will remove epochs < {:?}",
+            current_epoch, drop_boundary
+        );
 
         // Get all the epoch stores in the base path directory
         let files = match fs::read_dir(storage_base_path) {
             Ok(f) => f,
             Err(e) => {
-                error!("Can not read the files in the storage path directory for epoch cleanup: {:?}", e);
+                error!(
+                    "Can not read the files in the storage path directory for epoch cleanup: {:?}",
+                    e
+                );
                 return;
             }
         };
@@ -124,7 +135,10 @@ impl ConsensusStorePruner {
             let f = match file_res {
                 Ok(f) => f,
                 Err(e) => {
-                    error!("Error while cleaning up storage of previous epochs: {:?}", e);
+                    error!(
+                        "Error while cleaning up storage of previous epochs: {:?}",
+                        e
+                    );
                     continue;
                 }
             };
@@ -154,7 +168,10 @@ impl ConsensusStorePruner {
                         e
                     );
 
-                    metrics.error_pruning_consensus_dbs.with_label_values(&["safe"]).inc();
+                    metrics
+                        .error_pruning_consensus_dbs
+                        .with_label_values(&["safe"])
+                        .inc();
 
                     const WAIT_BEFORE_FORCE_DELETE: Duration = Duration::from_secs(5);
                     sleep(WAIT_BEFORE_FORCE_DELETE).await;
@@ -165,23 +182,39 @@ impl ConsensusStorePruner {
                             f.path(),
                             err
                         );
-                        metrics.error_pruning_consensus_dbs.with_label_values(&["force"]).inc();
+                        metrics
+                            .error_pruning_consensus_dbs
+                            .with_label_values(&["force"])
+                            .inc();
                     } else {
-                        info!("Successfully pruned consensus epoch storage directory with force delete: {:?}", f.path());
+                        info!(
+                            "Successfully pruned consensus epoch storage directory with force delete: {:?}",
+                            f.path()
+                        );
                         let last_epoch = metrics.last_pruned_consensus_db_epoch.get();
-                        metrics.last_pruned_consensus_db_epoch.set(last_epoch.max(file_epoch as i64));
+                        metrics
+                            .last_pruned_consensus_db_epoch
+                            .set(last_epoch.max(file_epoch as i64));
                         metrics.successfully_pruned_consensus_dbs.inc();
                     }
                 } else {
-                    info!("Successfully pruned consensus epoch storage directory: {:?}", f.path());
+                    info!(
+                        "Successfully pruned consensus epoch storage directory: {:?}",
+                        f.path()
+                    );
                     let last_epoch = metrics.last_pruned_consensus_db_epoch.get();
-                    metrics.last_pruned_consensus_db_epoch.set(last_epoch.max(file_epoch as i64));
+                    metrics
+                        .last_pruned_consensus_db_epoch
+                        .set(last_epoch.max(file_epoch as i64));
                     metrics.successfully_pruned_consensus_dbs.inc();
                 }
             }
         }
 
-        info!("Completed old epoch data removal process for epoch {:?}", current_epoch);
+        info!(
+            "Completed old epoch data removal process for epoch {:?}",
+            current_epoch
+        );
     }
 }
 
@@ -202,11 +235,17 @@ mod tests {
             let epoch_retention = 0;
             let current_epoch = 0;
 
-            let base_directory = tempfile::tempdir().unwrap().keep();
+            let base_directory = tempfile::tempdir().unwrap().into_path();
 
             create_epoch_directories(&base_directory, vec!["0", "other"]);
 
-            ConsensusStorePruner::prune_old_epoch_data(&base_directory, current_epoch, epoch_retention, &metrics).await;
+            ConsensusStorePruner::prune_old_epoch_data(
+                &base_directory,
+                current_epoch,
+                epoch_retention,
+                &metrics,
+            )
+            .await;
 
             let epochs_left = read_epoch_directories(&base_directory);
 
@@ -219,11 +258,17 @@ mod tests {
             let epoch_retention = 1;
             let current_epoch = 100;
 
-            let base_directory = tempfile::tempdir().unwrap().keep();
+            let base_directory = tempfile::tempdir().unwrap().into_path();
 
             create_epoch_directories(&base_directory, vec!["97", "98", "99", "100", "other"]);
 
-            ConsensusStorePruner::prune_old_epoch_data(&base_directory, current_epoch, epoch_retention, &metrics).await;
+            ConsensusStorePruner::prune_old_epoch_data(
+                &base_directory,
+                current_epoch,
+                epoch_retention,
+                &metrics,
+            )
+            .await;
 
             let epochs_left = read_epoch_directories(&base_directory);
 
@@ -238,11 +283,17 @@ mod tests {
             let epoch_retention = 0;
             let current_epoch = 100;
 
-            let base_directory = tempfile::tempdir().unwrap().keep();
+            let base_directory = tempfile::tempdir().unwrap().into_path();
 
             create_epoch_directories(&base_directory, vec!["97", "98", "99", "100", "other"]);
 
-            ConsensusStorePruner::prune_old_epoch_data(&base_directory, current_epoch, epoch_retention, &metrics).await;
+            ConsensusStorePruner::prune_old_epoch_data(
+                &base_directory,
+                current_epoch,
+                epoch_retention,
+                &metrics,
+            )
+            .await;
 
             let epochs_left = read_epoch_directories(&base_directory);
 
@@ -256,13 +307,17 @@ mod tests {
         let epoch_retention = 1;
         let epoch_prune_period = std::time::Duration::from_millis(500);
 
-        let base_directory = tempfile::tempdir().unwrap().keep();
+        let base_directory = tempfile::tempdir().unwrap().into_path();
 
         // We create some directories up to epoch 100
         create_epoch_directories(&base_directory, vec!["97", "98", "99", "100", "other"]);
 
-        let pruner =
-            ConsensusStorePruner::new(base_directory.clone(), epoch_retention, epoch_prune_period, &Registry::new());
+        let pruner = ConsensusStorePruner::new(
+            base_directory.clone(),
+            epoch_retention,
+            epoch_prune_period,
+            &Registry::new(),
+        );
 
         // We let the pruner run for a couple of times to prune the old directories. Since the default epoch of 0 is used no dirs should be pruned.
         sleep(3 * epoch_prune_period).await;

@@ -10,8 +10,10 @@
 // TODO: add example usage once constructor macros are implemented.
 // (For now, look at tests for an example.)
 
-use anyhow::{anyhow, Result};
-use prometheus::{core, proto};
+use anyhow::anyhow;
+use anyhow::Result;
+use prometheus::core;
+use prometheus::proto;
 
 /// A Prometheus metric whose value is computed at collection time by the provided closure.
 ///
@@ -30,11 +32,21 @@ where
     F: Fn() -> T + Sync + Send,
     T: core::Number,
 {
-    pub fn new<D: core::Describer>(describer: D, value_type: ValueType, f: F, label_values: &[&str]) -> Result<Self> {
+    pub fn new<D: core::Describer>(
+        describer: D,
+        value_type: ValueType,
+        f: F,
+        label_values: &[&str],
+    ) -> Result<Self> {
         let desc = describer.describe()?;
         let label_pairs = make_label_pairs(&desc, label_values)?;
 
-        Ok(Self { desc, f, value_type, label_pairs })
+        Ok(Self {
+            desc,
+            f,
+            value_type,
+            label_pairs,
+        })
     }
 
     pub fn metric(&self) -> proto::Metric {

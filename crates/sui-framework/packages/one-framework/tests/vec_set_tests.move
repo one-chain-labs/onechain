@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::vec_set_tests {
-    use one::vec_set;
+module oct::vec_set_tests {
+    use sui::vec_set;
 
     #[test]
     #[expected_failure(abort_code = vec_set::EKeyAlreadyExists)]

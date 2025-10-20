@@ -6,19 +6,19 @@
 // `rewards_distribution_tests`.
 
 #[test_only]
-module one_system::sui_system_tests {
-    use one::test_scenario::{Self, Scenario};
-    use one::oct::OCT;
-    use one::coin::Self;
+module oct_system::sui_system_tests {
+    use sui::test_scenario::{Self, Scenario};
+    use sui::oct::OCT;
+    use sui::coin::Self;
     use one_system::governance_test_utils::{add_validator_full_flow, advance_epoch, remove_validator, set_up_sui_system_state, create_sui_system_state_for_testing, stake_with, unstake};
     use one_system::one_system::SuiSystemState;
     use one_system::sui_system_state_inner;
     use one_system::validator::{Self, Validator};
     use one_system::validator_set;
     use one_system::validator_cap::UnverifiedValidatorOperationCap;
-    use one::balance;
-    use one::test_utils::{assert_eq, destroy};
-    use one::url;
+    use sui::balance;
+    use sui::test_utils::{assert_eq, destroy};
+    use sui::url;
 
     #[test]
     fun test_report_validator() {
@@ -201,7 +201,7 @@ module one_system::sui_system_tests {
         let mut system_state = scenario.take_shared<SuiSystemState>();
 
         // Fails here since the commission rate is too high.
-        system_state.request_set_commission_rate(10001, scenario.ctx());
+        system_state.request_set_commission_rate(2001, scenario.ctx());
         test_scenario::return_shared(system_state);
 
         scenario_val.end();
@@ -616,7 +616,7 @@ module one_system::sui_system_tests {
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            option::some(balance::create_for_testing<OCT>(100_000_000_000)),
+            option::some(balance::create_for_testing<SUI>(100_000_000_000)),
             1,
             0,
             true,
@@ -674,7 +674,6 @@ module one_system::sui_system_tests {
         scenario.next_tx(new_validator_addr);
         {
             let ctx = scenario.ctx();
-            system_state.execute_update_trusted_validators_action(true, new_validator_addr);
             system_state.request_add_validator_candidate(
                 new_pubkey,
                 vector[33, 219, 38, 23, 242, 109, 116, 235, 225, 192, 219, 45, 40, 124, 162, 25, 33, 68, 52, 41, 123, 9, 98, 11, 184, 150, 214, 62, 60, 210, 121, 62],
@@ -688,7 +687,6 @@ module one_system::sui_system_tests {
                 b"/ip4/127.0.0.2/udp/80",
                 b"/ip4/127.0.0.1/udp/80",
                 b"/ip4/127.0.0.1/udp/80",
-                ctx.sender(),
                 1,
                 0,
                 ctx,
@@ -867,7 +865,6 @@ module one_system::sui_system_tests {
             b"/ip4/127.0.0.2/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            new_validator_addr,
             1,
             0,
             scenario.ctx(),
@@ -901,7 +898,6 @@ module one_system::sui_system_tests {
             b"/ip4/127.0.0.2/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            new_validator_addr,
             1,
             0,
             scenario.ctx(),
@@ -921,7 +917,6 @@ module one_system::sui_system_tests {
             b"/ip4/127.0.0.2/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            new_validator_addr,
             1,
             0,
             scenario.ctx(),
@@ -962,7 +957,7 @@ module one_system::sui_system_tests {
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            option::some(balance::create_for_testing<OCT>(100_000_000_000)),
+            option::some(balance::create_for_testing<SUI>(100_000_000_000)),
             1,
             0,
             true,
@@ -989,7 +984,6 @@ module one_system::sui_system_tests {
             b"/ip4/127.0.0.2/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            new_addr,
             1,
             0,
             scenario.ctx(),
@@ -1130,7 +1124,7 @@ module one_system::sui_system_tests {
 
         advance_epoch(scenario);
 
-        one::test_utils::destroy(sui);
+        sui::test_utils::destroy(sui);
         scenario_val.end();
     }
 

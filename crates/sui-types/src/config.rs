@@ -16,8 +16,11 @@ pub const CONFIG_MODULE_NAME: &IdentStr = ident_str!("config");
 pub const CONFIG_STRUCT_NAME: &IdentStr = ident_str!("Config");
 pub const SETTING_STRUCT_NAME: &IdentStr = ident_str!("Setting");
 pub const SETTING_DATA_STRUCT_NAME: &IdentStr = ident_str!("SettingData");
-pub const RESOLVED_SUI_CONFIG: (&AccountAddress, &IdentStr, &IdentStr) =
-    (&SUI_FRAMEWORK_ADDRESS, CONFIG_MODULE_NAME, CONFIG_STRUCT_NAME);
+pub const RESOLVED_SUI_CONFIG: (&AccountAddress, &IdentStr, &IdentStr) = (
+    &SUI_FRAMEWORK_ADDRESS,
+    CONFIG_MODULE_NAME,
+    CONFIG_STRUCT_NAME,
+);
 
 /// Rust representation of the Move type 0x2::config::Config.
 #[derive(Debug, Serialize, Deserialize)]
@@ -72,7 +75,12 @@ impl<V: MoveTypeTagTrait> MoveTypeTagTrait for Setting<V> {
 }
 
 pub fn is_setting(tag: &StructTag) -> bool {
-    let StructTag { address, module, name, type_params } = tag;
+    let StructTag {
+        address,
+        module,
+        name,
+        type_params,
+    } = tag;
     *address == SUI_FRAMEWORK_ADDRESS
         && module.as_ident_str() == CONFIG_MODULE_NAME
         && name.as_ident_str() == SETTING_STRUCT_NAME

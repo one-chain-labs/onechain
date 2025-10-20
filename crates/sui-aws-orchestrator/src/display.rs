@@ -11,19 +11,36 @@ use crossterm::{
 use prettytable::format::{self};
 
 pub fn header<S: Display>(message: S) {
-    crossterm::execute!(stdout(), PrintStyledContent(format!("\n{message}\n").green().bold()),).unwrap();
+    crossterm::execute!(
+        stdout(),
+        PrintStyledContent(format!("\n{message}\n").green().bold()),
+    )
+    .unwrap();
 }
 
 pub fn error<S: Display>(message: S) {
-    crossterm::execute!(stdout(), PrintStyledContent(format!("\n{message}\n").red().bold()),).unwrap();
+    crossterm::execute!(
+        stdout(),
+        PrintStyledContent(format!("\n{message}\n").red().bold()),
+    )
+    .unwrap();
 }
 
 pub fn warn<S: Display>(message: S) {
-    crossterm::execute!(stdout(), PrintStyledContent(format!("\n{message}\n").bold()),).unwrap();
+    crossterm::execute!(
+        stdout(),
+        PrintStyledContent(format!("\n{message}\n").bold()),
+    )
+    .unwrap();
 }
 
 pub fn config<N: Display, V: Display>(name: N, value: V) {
-    crossterm::execute!(stdout(), PrintStyledContent(format!("{name}: ").bold()), Print(format!("{value}\n"))).unwrap();
+    crossterm::execute!(
+        stdout(),
+        PrintStyledContent(format!("{name}: ").bold()),
+        Print(format!("{value}\n"))
+    )
+    .unwrap();
 }
 
 pub fn action<S: Display>(message: S) {
@@ -59,7 +76,11 @@ pub fn newline() {
 pub fn default_table_format() -> format::TableFormat {
     format::FormatBuilder::new()
         .separators(
-            &[format::LinePosition::Top, format::LinePosition::Bottom, format::LinePosition::Title],
+            &[
+                format::LinePosition::Top,
+                format::LinePosition::Bottom,
+                format::LinePosition::Title,
+            ],
             format::LineSeparator::new('-', '-', '-', '-'),
         )
         .padding(1, 1)

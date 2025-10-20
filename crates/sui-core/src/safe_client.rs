@@ -2,38 +2,31 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{authority_client::AuthorityAPI, epoch::committee_store::CommitteeStore};
+use crate::authority_client::AuthorityAPI;
+use crate::epoch::committee_store::CommitteeStore;
+use prometheus::core::GenericCounter;
 use prometheus::{
-    core::GenericCounter,
-    register_histogram_vec_with_registry,
-    register_int_counter_vec_with_registry,
-    Histogram,
-    HistogramVec,
-    IntCounterVec,
-    Registry,
+    register_histogram_vec_with_registry, register_int_counter_vec_with_registry, Histogram,
+    HistogramVec, IntCounterVec, Registry,
 };
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use sui_types::crypto::AuthorityPublicKeyBytes;
+use sui_types::effects::{SignedTransactionEffects, TransactionEffectsAPI};
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointRequest, CheckpointResponse, CheckpointSequenceNumber,
+};
+use sui_types::messages_grpc::{
+    HandleCertificateRequestV3, HandleCertificateResponseV2, HandleCertificateResponseV3,
+    ObjectInfoRequest, ObjectInfoResponse, SystemStateRequest, TransactionInfoRequest,
+    TransactionStatus, VerifiedObjectInfoResponse,
+};
+use sui_types::messages_safe_client::PlainTransactionInfoResponse;
+use sui_types::sui_system_state::SuiSystemState;
+use sui_types::{base_types::*, committee::*, fp_ensure};
 use sui_types::{
-    base_types::*,
-    committee::*,
-    crypto::AuthorityPublicKeyBytes,
-    effects::{SignedTransactionEffects, TransactionEffectsAPI},
     error::{SuiError, SuiResult},
-    fp_ensure,
-    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointRequest, CheckpointResponse, CheckpointSequenceNumber},
-    messages_grpc::{
-        HandleCertificateRequestV3,
-        HandleCertificateResponseV2,
-        HandleCertificateResponseV3,
-        ObjectInfoRequest,
-        ObjectInfoResponse,
-        SystemStateRequest,
-        TransactionInfoRequest,
-        TransactionStatus,
-        VerifiedObjectInfoResponse,
-    },
-    messages_safe_client::PlainTransactionInfoResponse,
-    sui_system_state::SuiSystemState,
     transaction::*,
 };
 use tap::TapFallible;
@@ -119,10 +112,18 @@ impl SafeClientMetrics {
             .total_responses_by_address_method
             .with_label_values(&[&validator_address, "handle_object_info_request"]);
 
-        let handle_transaction_latency = metrics_base.latency.with_label_values(&["handle_transaction"]);
-        let handle_certificate_latency = metrics_base.latency.with_label_values(&["handle_certificate"]);
-        let handle_obj_info_latency = metrics_base.latency.with_label_values(&["handle_object_info_request"]);
-        let handle_tx_info_latency = metrics_base.latency.with_label_values(&["handle_transaction_info_request"]);
+        let handle_transaction_latency = metrics_base
+            .latency
+            .with_label_values(&["handle_transaction"]);
+        let handle_certificate_latency = metrics_base
+            .latency
+            .with_label_values(&["handle_certificate"]);
+        let handle_obj_info_latency = metrics_base
+            .latency
+            .with_label_values(&["handle_object_info_request"]);
+        let handle_tx_info_latency = metrics_base
+            .latency
+            .with_label_values(&["handle_transaction_info_request"]);
 
         Self {
             total_requests_handle_transaction_info_request,
@@ -163,7 +164,12 @@ impl<C: Clone> SafeClient<C> {
         address: AuthorityPublicKeyBytes,
         metrics: SafeClientMetrics,
     ) -> Self {
-        Self { authority_client, committee_store, address, metrics }
+        Self {
+            authority_client,
+            committee_store,
+            address,
+            metrics,
+        }
     }
 }
 
@@ -178,7 +184,9 @@ impl<C: Clone> SafeClient<C> {
     }
 
     fn get_committee(&self, epoch_id: &EpochId) -> SuiResult<Arc<Committee>> {
-        self.committee_store.get_committee(epoch_id)?.ok_or(SuiError::MissingCommitteeAtEpoch(*epoch_id))
+        self.committee_store
+            .get_committee(epoch_id)?
+            .ok_or(SuiError::MissingCommitteeAtEpoch(*epoch_id))
     }
 
     fn check_signed_effects_plain(
@@ -188,24 +196,33 @@ impl<C: Clone> SafeClient<C> {
         expected_effects_digest: Option<&TransactionEffectsDigest>,
     ) -> SuiResult<SignedTransactionEffects> {
         // Check it has the right signer
-        fp_ensure!(signed_effects.auth_sig().authority == self.address, SuiError::ByzantineAuthoritySuspicion {
-            authority: self.address,
-            reason: format!(
-                "Unexpected validator address in the signed effects signature: {:?}",
-                signed_effects.auth_sig().authority
-            ),
-        });
+        fp_ensure!(
+            signed_effects.auth_sig().authority == self.address,
+            SuiError::ByzantineAuthoritySuspicion {
+                authority: self.address,
+                reason: format!(
+                    "Unexpected validator address in the signed effects signature: {:?}",
+                    signed_effects.auth_sig().authority
+                ),
+            }
+        );
         // Checks it concerns the right tx
-        fp_ensure!(signed_effects.data().transaction_digest() == digest, SuiError::ByzantineAuthoritySuspicion {
-            authority: self.address,
-            reason: "Unexpected tx digest in the signed effects".to_string()
-        });
+        fp_ensure!(
+            signed_effects.data().transaction_digest() == digest,
+            SuiError::ByzantineAuthoritySuspicion {
+                authority: self.address,
+                reason: "Unexpected tx digest in the signed effects".to_string()
+            }
+        );
         // check that the effects digest is correct.
         if let Some(effects_digest) = expected_effects_digest {
-            fp_ensure!(signed_effects.digest() == effects_digest, SuiError::ByzantineAuthoritySuspicion {
-                authority: self.address,
-                reason: "Effects digest does not match with expected digest".to_string()
-            });
+            fp_ensure!(
+                signed_effects.digest() == effects_digest,
+                SuiError::ByzantineAuthoritySuspicion {
+                    authority: self.address,
+                    reason: "Effects digest does not match with expected digest".to_string()
+                }
+            );
         }
         self.get_committee(&signed_effects.epoch())?;
         Ok(signed_effects)
@@ -217,33 +234,46 @@ impl<C: Clone> SafeClient<C> {
         transaction: Transaction,
         status: TransactionStatus,
     ) -> SuiResult<PlainTransactionInfoResponse> {
-        fp_ensure!(digest == transaction.digest(), SuiError::ByzantineAuthoritySuspicion {
-            authority: self.address,
-            reason: "Signed transaction digest does not match with expected digest".to_string()
-        });
+        fp_ensure!(
+            digest == transaction.digest(),
+            SuiError::ByzantineAuthoritySuspicion {
+                authority: self.address,
+                reason: "Signed transaction digest does not match with expected digest".to_string()
+            }
+        );
         match status {
             TransactionStatus::Signed(signed) => {
                 self.get_committee(&signed.epoch)?;
-                Ok(PlainTransactionInfoResponse::Signed(SignedTransaction::new_from_data_and_sig(
-                    transaction.into_data(),
-                    signed,
-                )))
+                Ok(PlainTransactionInfoResponse::Signed(
+                    SignedTransaction::new_from_data_and_sig(transaction.into_data(), signed),
+                ))
             }
             TransactionStatus::Executed(cert_opt, effects, events) => {
                 let signed_effects = self.check_signed_effects_plain(digest, effects, None)?;
                 match cert_opt {
                     Some(cert) => {
                         let committee = self.get_committee(&cert.epoch)?;
-                        let ct = CertifiedTransaction::new_from_data_and_sig(transaction.into_data(), cert);
+                        let ct = CertifiedTransaction::new_from_data_and_sig(
+                            transaction.into_data(),
+                            cert,
+                        );
                         ct.verify_committee_sigs_only(&committee).map_err(|e| {
                             SuiError::FailedToVerifyTxCertWithExecutedEffects {
                                 validator_name: self.address,
                                 error: e.to_string(),
                             }
                         })?;
-                        Ok(PlainTransactionInfoResponse::ExecutedWithCert(ct, signed_effects, events))
+                        Ok(PlainTransactionInfoResponse::ExecutedWithCert(
+                            ct,
+                            signed_effects,
+                            events,
+                        ))
                     }
-                    None => Ok(PlainTransactionInfoResponse::ExecutedWithoutCert(transaction, signed_effects, events)),
+                    None => Ok(PlainTransactionInfoResponse::ExecutedWithoutCert(
+                        transaction,
+                        signed_effects,
+                        events,
+                    )),
                 }
             }
         }
@@ -254,12 +284,19 @@ impl<C: Clone> SafeClient<C> {
         request: &ObjectInfoRequest,
         response: ObjectInfoResponse,
     ) -> SuiResult<VerifiedObjectInfoResponse> {
-        let ObjectInfoResponse { object, layout: _, lock_for_debugging: _ } = response;
+        let ObjectInfoResponse {
+            object,
+            layout: _,
+            lock_for_debugging: _,
+        } = response;
 
-        fp_ensure!(request.object_id == object.id(), SuiError::ByzantineAuthoritySuspicion {
-            authority: self.address,
-            reason: "Object id mismatch in the response".to_string()
-        });
+        fp_ensure!(
+            request.object_id == object.id(),
+            SuiError::ByzantineAuthoritySuspicion {
+                authority: self.address,
+                reason: "Object id mismatch in the response".to_string()
+            }
+        );
 
         Ok(VerifiedObjectInfoResponse { object })
     }
@@ -281,7 +318,10 @@ where
     ) -> Result<PlainTransactionInfoResponse, SuiError> {
         let _timer = self.metrics.handle_transaction_latency.start_timer();
         let digest = *transaction.digest();
-        let response = self.authority_client.handle_transaction(transaction.clone(), client_addr).await?;
+        let response = self
+            .authority_client
+            .handle_transaction(transaction.clone(), client_addr)
+            .await?;
         let response = check_error!(
             self.address,
             self.check_transaction_info(&digest, transaction, response.status),
@@ -295,7 +335,8 @@ where
         digest: &TransactionDigest,
         response: HandleCertificateResponseV2,
     ) -> SuiResult<HandleCertificateResponseV2> {
-        let signed_effects = self.check_signed_effects_plain(digest, response.signed_effects, None)?;
+        let signed_effects =
+            self.check_signed_effects_plain(digest, response.signed_effects, None)?;
 
         Ok(HandleCertificateResponseV2 {
             signed_effects,
@@ -312,7 +353,10 @@ where
     ) -> Result<HandleCertificateResponseV2, SuiError> {
         let digest = *certificate.digest();
         let _timer = self.metrics.handle_certificate_latency.start_timer();
-        let response = self.authority_client.handle_certificate_v2(certificate, client_addr).await?;
+        let response = self
+            .authority_client
+            .handle_certificate_v2(certificate, client_addr)
+            .await?;
 
         let verified = check_error!(
             self.address,
@@ -342,15 +386,20 @@ where
                 if !events.data.is_empty() {
                     return Err(SuiError::ByzantineAuthoritySuspicion {
                         authority: self.address,
-                        reason: "Returned events but no event digest present in the signed effects".to_string(),
+                        reason: "Returned events but no event digest present in the signed effects"
+                            .to_string(),
                     });
                 }
             }
             (Some(events), Some(events_digest)) => {
-                fp_ensure!(&events.digest() == events_digest, SuiError::ByzantineAuthoritySuspicion {
-                    authority: self.address,
-                    reason: "Returned events don't match events digest in the signed effects".to_string()
-                });
+                fp_ensure!(
+                    &events.digest() == events_digest,
+                    SuiError::ByzantineAuthoritySuspicion {
+                        authority: self.address,
+                        reason: "Returned events don't match events digest in the signed effects"
+                            .to_string()
+                    }
+                );
             }
         }
 
@@ -364,10 +413,14 @@ where
 
             for object in input_objects {
                 let object_ref = object.compute_object_reference();
-                if !expected.get(&object_ref.0).is_some_and(|expect| &object_ref == expect) {
+                if !expected
+                    .get(&object_ref.0)
+                    .is_some_and(|expect| &object_ref == expect)
+                {
                     return Err(SuiError::ByzantineAuthoritySuspicion {
                         authority: self.address,
-                        reason: "Returned input object that wasn't present in the signed effects".to_string(),
+                        reason: "Returned input object that wasn't present in the signed effects"
+                            .to_string(),
                     });
                 }
             }
@@ -375,21 +428,34 @@ where
 
         // Check Output Objects
         if let Some(output_objects) = &output_objects {
-            let expected: HashMap<_, _> =
-                effects.all_changed_objects().into_iter().map(|(object_ref, _, _)| (object_ref.0, object_ref)).collect();
+            let expected: HashMap<_, _> = effects
+                .all_changed_objects()
+                .into_iter()
+                .map(|(object_ref, _, _)| (object_ref.0, object_ref))
+                .collect();
 
             for object in output_objects {
                 let object_ref = object.compute_object_reference();
-                if !expected.get(&object_ref.0).is_some_and(|expect| &object_ref == expect) {
+                if !expected
+                    .get(&object_ref.0)
+                    .is_some_and(|expect| &object_ref == expect)
+                {
                     return Err(SuiError::ByzantineAuthoritySuspicion {
                         authority: self.address,
-                        reason: "Returned output object that wasn't present in the signed effects".to_string(),
+                        reason: "Returned output object that wasn't present in the signed effects"
+                            .to_string(),
                     });
                 }
             }
         }
 
-        Ok(HandleCertificateResponseV3 { effects, events, input_objects, output_objects, auxiliary_data })
+        Ok(HandleCertificateResponseV3 {
+            effects,
+            events,
+            input_objects,
+            output_objects,
+            auxiliary_data,
+        })
     }
 
     /// Execute a certificate.
@@ -400,7 +466,10 @@ where
     ) -> Result<HandleCertificateResponseV3, SuiError> {
         let digest = *request.certificate.digest();
         let _timer = self.metrics.handle_certificate_latency.start_timer();
-        let response = self.authority_client.handle_certificate_v3(request, client_addr).await?;
+        let response = self
+            .authority_client
+            .handle_certificate_v3(request, client_addr)
+            .await?;
 
         let verified = check_error!(
             self.address,
@@ -417,12 +486,17 @@ where
         self.metrics.total_requests_handle_object_info_request.inc();
 
         let _timer = self.metrics.handle_obj_info_latency.start_timer();
-        let response = self.authority_client.handle_object_info_request(request.clone()).await?;
+        let response = self
+            .authority_client
+            .handle_object_info_request(request.clone())
+            .await?;
         let response = self
             .check_object_response(&request, response)
             .tap_err(|err| error!(?err, authority=?self.address, "Client error in handle_object_info_request"))?;
 
-        self.metrics.total_ok_responses_handle_object_info_request.inc();
+        self.metrics
+            .total_ok_responses_handle_object_info_request
+            .inc();
         Ok(response)
     }
 
@@ -432,19 +506,28 @@ where
         &self,
         request: TransactionInfoRequest,
     ) -> Result<PlainTransactionInfoResponse, SuiError> {
-        self.metrics.total_requests_handle_transaction_info_request.inc();
+        self.metrics
+            .total_requests_handle_transaction_info_request
+            .inc();
 
         let _timer = self.metrics.handle_tx_info_latency.start_timer();
 
-        let transaction_info = self.authority_client.handle_transaction_info_request(request.clone()).await?;
+        let transaction_info = self
+            .authority_client
+            .handle_transaction_info_request(request.clone())
+            .await?;
 
         let transaction = Transaction::new(transaction_info.transaction);
-        let transaction_info = self
-            .check_transaction_info(&request.transaction_digest, transaction, transaction_info.status)
-            .tap_err(|err| {
-                error!(?err, authority=?self.address, "Client error in handle_transaction_info_request");
-            })?;
-        self.metrics.total_ok_responses_handle_transaction_info_request.inc();
+        let transaction_info = self.check_transaction_info(
+            &request.transaction_digest,
+            transaction,
+            transaction_info.status,
+        ).tap_err(|err| {
+            error!(?err, authority=?self.address, "Client error in handle_transaction_info_request");
+        })?;
+        self.metrics
+            .total_ok_responses_handle_transaction_info_request
+            .inc();
         Ok(transaction_info)
     }
 
@@ -456,7 +539,10 @@ where
         let observed_seq = checkpoint.as_ref().map(|c| c.sequence_number);
 
         if let (Some(e), Some(o)) = (expected_seq, observed_seq) {
-            fp_ensure!(e == o, SuiError::from("Expected checkpoint number doesn't match with returned"));
+            fp_ensure!(
+                e == o,
+                SuiError::from("Expected checkpoint number doesn't match with returned")
+            );
         }
         Ok(())
     }
@@ -472,16 +558,23 @@ where
             // it's an error.
             // If content is not requested, or checkpoint is None, yet we are still getting content,
             // it's an error.
-            (true, Some(_), None) | (false, _, Some(_)) | (_, None, Some(_)) => {
-                Err(SuiError::from("Checkpoint contents inconsistent with request"))
-            }
+            (true, Some(_), None) | (false, _, Some(_)) | (_, None, Some(_)) => Err(
+                SuiError::from("Checkpoint contents inconsistent with request"),
+            ),
             _ => Ok(()),
         }
     }
 
-    fn verify_checkpoint_response(&self, request: &CheckpointRequest, response: &CheckpointResponse) -> SuiResult {
+    fn verify_checkpoint_response(
+        &self,
+        request: &CheckpointRequest,
+        response: &CheckpointResponse,
+    ) -> SuiResult {
         // Verify response data was correct for request
-        let CheckpointResponse { checkpoint, contents } = &response;
+        let CheckpointResponse {
+            checkpoint,
+            contents,
+        } = &response;
         // Checks that the sequence number is correct.
         self.verify_checkpoint_sequence(request.sequence_number, checkpoint)?;
         self.verify_contents_exist(request.request_content, checkpoint, contents)?;
@@ -496,16 +589,25 @@ where
     }
 
     #[instrument(level = "trace", skip_all, fields(authority = ?self.address.concise()))]
-    pub async fn handle_checkpoint(&self, request: CheckpointRequest) -> Result<CheckpointResponse, SuiError> {
-        let resp = self.authority_client.handle_checkpoint(request.clone()).await?;
-        self.verify_checkpoint_response(&request, &resp).tap_err(|err| {
-            error!(?err, authority=?self.address, "Client error in handle_checkpoint");
-        })?;
+    pub async fn handle_checkpoint(
+        &self,
+        request: CheckpointRequest,
+    ) -> Result<CheckpointResponse, SuiError> {
+        let resp = self
+            .authority_client
+            .handle_checkpoint(request.clone())
+            .await?;
+        self.verify_checkpoint_response(&request, &resp)
+            .tap_err(|err| {
+                error!(?err, authority=?self.address, "Client error in handle_checkpoint");
+            })?;
         Ok(resp)
     }
 
     #[instrument(level = "trace", skip_all, fields(authority = ?self.address.concise()))]
     pub async fn handle_system_state_object(&self) -> Result<SuiSystemState, SuiError> {
-        self.authority_client.handle_system_state_object(SystemStateRequest { _unused: false }).await
+        self.authority_client
+            .handle_system_state_object(SystemStateRequest { _unused: false })
+            .await
     }
 }

@@ -34,7 +34,9 @@ use std::{
 };
 
 use crate::{
-    compilation::{build_plan::BuildPlan, compiled_package::CompiledPackage, model_builder::ModelBuilder},
+    compilation::{
+        build_plan::BuildPlan, compiled_package::CompiledPackage, model_builder::ModelBuilder,
+    },
     lock_file::schema::update_compiler_toolchain,
     package_lock::PackageLock,
 };
@@ -111,10 +113,17 @@ pub struct BuildConfig {
     pub lint_flag: LintFlag,
 }
 
-#[derive(Parser, Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default)]
+#[derive(
+    Parser, Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default,
+)]
 pub struct LintFlag {
     /// If `true`, disable linters
-    #[clap(name = "no-lint", long = "no-lint", global = true, group = "lint-level")]
+    #[clap(
+        name = "no-lint",
+        long = "no-lint",
+        global = true,
+        group = "lint-level"
+    )]
     no_lint: bool,
 
     /// If `true`, enables extra linters
@@ -123,9 +132,18 @@ pub struct LintFlag {
 }
 
 impl LintFlag {
-    pub const LEVEL_ALL: Self = Self { no_lint: false, lint: true };
-    pub const LEVEL_DEFAULT: Self = Self { no_lint: false, lint: false };
-    pub const LEVEL_NONE: Self = Self { no_lint: true, lint: false };
+    pub const LEVEL_NONE: Self = Self {
+        no_lint: true,
+        lint: false,
+    };
+    pub const LEVEL_DEFAULT: Self = Self {
+        no_lint: false,
+        lint: false,
+    };
+    pub const LEVEL_ALL: Self = Self {
+        no_lint: false,
+        lint: true,
+    };
 
     pub fn get(self) -> LintLevel {
         match self {
@@ -194,7 +212,11 @@ impl BuildConfig {
 
     /// Compile the package at `path` or the containing Move package. Do not exit process on warning
     /// or failure.
-    pub fn compile_package_no_exit<W: Write>(self, path: &Path, writer: &mut W) -> Result<CompiledPackage> {
+    pub fn compile_package_no_exit<W: Write>(
+        self,
+        path: &Path,
+        writer: &mut W,
+    ) -> Result<CompiledPackage> {
         let resolved_graph = self.resolution_graph_for_package(path, None, writer)?;
         let _mutx = PackageLock::lock(); // held until function returns
         BuildPlan::create(resolved_graph)?.compile_no_exit(writer)
@@ -202,7 +224,12 @@ impl BuildConfig {
 
     /// Compile the package at `path` or the containing Move package. Exit process on warning or
     /// failure.
-    pub fn migrate_package<W: Write, R: BufRead>(mut self, path: &Path, writer: &mut W, reader: &mut R) -> Result<()> {
+    pub fn migrate_package<W: Write, R: BufRead>(
+        mut self,
+        path: &Path,
+        writer: &mut W,
+        reader: &mut R,
+    ) -> Result<()> {
         // we set test and dev mode to migrate all the code
         self.test_mode = true;
         self.dev_mode = true;
@@ -218,7 +245,11 @@ impl BuildConfig {
     // across all packages and build the Move model from that.
     // TODO: In the future we will need a better way to do this to support renaming in packages
     // where we want to support building a Move model.
-    pub fn move_model_for_package(self, path: &Path, model_config: ModelConfig) -> Result<GlobalEnv> {
+    pub fn move_model_for_package(
+        self,
+        path: &Path,
+        model_config: ModelConfig,
+    ) -> Result<GlobalEnv> {
         // resolution graph diagnostics are only needed for CLI commands so ignore them by passing a
         // vector as the writer
         let resolved_graph = self.resolution_graph_for_package(path, None, &mut Vec::new())?;
@@ -228,7 +259,8 @@ impl BuildConfig {
 
     pub fn download_deps_for_package<W: Write>(&self, path: &Path, writer: &mut W) -> Result<()> {
         let path = SourcePackageLayout::try_find_root(path)?;
-        let manifest_string = std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?;
+        let manifest_string =
+            std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?;
         let lock_string = std::fs::read_to_string(path.join(SourcePackageLayout::Lock.path())).ok();
         let _mutx = PackageLock::lock(); // held until function returns
 
@@ -246,7 +278,8 @@ impl BuildConfig {
             self.dev_mode = true;
         }
         let path = SourcePackageLayout::try_find_root(path)?;
-        let manifest_string = std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?;
+        let manifest_string =
+            std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?;
         let lock_path = path.join(SourcePackageLayout::Lock.path());
         let lock_string = std::fs::read_to_string(lock_path.clone()).ok();
         let _mutx = PackageLock::lock(); // held until function returns
@@ -254,10 +287,17 @@ impl BuildConfig {
         let install_dir_set = self.install_dir.is_some();
         let install_dir = self.install_dir.as_ref().unwrap_or(&path).to_owned();
 
-        let mut dep_graph_builder =
-            DependencyGraphBuilder::new(self.skip_fetch_latest_git_deps, writer, install_dir.clone());
-        let (dependency_graph, modified) =
-            dep_graph_builder.get_graph(&DependencyKind::default(), path, manifest_string, lock_string)?;
+        let mut dep_graph_builder = DependencyGraphBuilder::new(
+            self.skip_fetch_latest_git_deps,
+            writer,
+            install_dir.clone(),
+        );
+        let (dependency_graph, modified) = dep_graph_builder.get_graph(
+            &DependencyKind::default(),
+            path,
+            manifest_string,
+            lock_string,
+        )?;
 
         if modified || install_dir_set {
             // (1) Write the Move.lock file if the existing one is `modified`, or
@@ -268,20 +308,38 @@ impl BuildConfig {
             }
         }
 
-        let DependencyGraphBuilder { mut dependency_cache, progress_output, .. } = dep_graph_builder;
+        let DependencyGraphBuilder {
+            mut dependency_cache,
+            progress_output,
+            ..
+        } = dep_graph_builder;
 
-        ResolvedGraph::resolve(dependency_graph, self, &mut dependency_cache, chain_id, progress_output)
+        ResolvedGraph::resolve(
+            dependency_graph,
+            self,
+            &mut dependency_cache,
+            chain_id,
+            progress_output,
+        )
     }
 
     pub fn compiler_flags(&self) -> Flags {
-        let flags = if self.test_mode { Flags::testing() } else { Flags::empty() };
+        let flags = if self.test_mode {
+            Flags::testing()
+        } else {
+            Flags::empty()
+        };
         flags
             .set_warnings_are_errors(self.warnings_are_errors)
             .set_json_errors(self.json_errors)
             .set_silence_warnings(self.silence_warnings)
     }
 
-    pub fn update_lock_file_toolchain_version(&self, path: &Path, compiler_version: String) -> Result<()> {
+    pub fn update_lock_file_toolchain_version(
+        &self,
+        path: &Path,
+        compiler_version: String,
+    ) -> Result<()> {
         let Some(lock_file) = self.lock_file.as_ref() else {
             return Ok(());
         };
@@ -289,11 +347,20 @@ impl BuildConfig {
             .map_err(|e| anyhow!("Unable to find package root for {}: {e}", path.display()))?;
 
         // Resolve edition and flavor from `Move.toml` or assign defaults.
-        let manifest_string = std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?;
+        let manifest_string =
+            std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?;
         let toml_manifest = parse_move_manifest_string(manifest_string.clone())?;
         let root_manifest = parse_source_manifest(toml_manifest)?;
-        let edition = root_manifest.package.edition.or(self.default_edition).unwrap_or_default();
-        let flavor = root_manifest.package.flavor.or(self.default_flavor).unwrap_or_default();
+        let edition = root_manifest
+            .package
+            .edition
+            .or(self.default_edition)
+            .unwrap_or_default();
+        let flavor = root_manifest
+            .package
+            .flavor
+            .or(self.default_flavor)
+            .unwrap_or_default();
 
         let install_dir = self.install_dir.as_ref().unwrap_or(path).to_owned();
         let mut lock = LockFile::from(install_dir, lock_file)?;

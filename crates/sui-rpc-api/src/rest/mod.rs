@@ -3,14 +3,14 @@
 
 use std::sync::Arc;
 
+use axum::{handler::Handler, http::Method, routing::MethodRouter};
 use axum::{
     response::{Redirect, ResponseParts},
     routing::get,
     Router,
 };
 
-use crate::{reader::StateReader, response, RpcService};
-use openapi::ApiEndpoint;
+use crate::{reader::StateReader, RpcService};
 
 pub mod accept;
 pub mod accounts;
@@ -21,7 +21,6 @@ pub mod content_type;
 pub mod health;
 pub mod info;
 pub mod objects;
-pub mod openapi;
 pub mod system;
 pub mod transactions;
 
@@ -30,17 +29,14 @@ pub const APPLICATION_BCS: &str = "application/bcs";
 pub const APPLICATION_JSON: &str = "application/json";
 
 pub const ENDPOINTS: &[&dyn ApiEndpoint<RpcService>] = &[
-    // stable APIs
     &info::GetNodeInfo,
     &health::HealthCheck,
     &checkpoints::GetCheckpoint,
-    // unstable APIs
     &accounts::ListAccountObjects,
     &objects::GetObject,
     &objects::GetObjectWithVersion,
     &objects::ListDynamicFields,
     &checkpoints::ListCheckpoints,
-    &checkpoints::GetFullCheckpoint,
     &transactions::GetTransaction,
     &transactions::ListTransactions,
     &committee::GetCommittee,
@@ -56,14 +52,21 @@ pub const ENDPOINTS: &[&dyn ApiEndpoint<RpcService>] = &[
 ];
 
 pub fn build_rest_router(service: RpcService) -> axum::Router {
-    let mut api = openapi::Api::new(info(service.software_version()));
+    let mut api = Router::new();
 
-    api.register_endpoints(
-        ENDPOINTS.iter().copied().filter(|endpoint| endpoint.stable() || service.config.enable_unstable_apis()),
-    );
+    for endpoint in ENDPOINTS {
+        let handler = endpoint.handler();
+        assert_eq!(handler.method(), endpoint.method());
+
+        // we need to replace any path parameters wrapped in braces to be prefaced by a colon
+        // until axum updates matchit: https://github.com/tokio-rs/axum/pull/2645
+        let path = endpoint.path().replace('{', ":").replace('}', "");
+
+        api = api.route(&path, handler.handler);
+    }
 
     Router::new()
-        .nest("/v2/", api.to_router().with_state(service))
+        .nest("/v2/", api.with_state(service))
         .route("/v2", get(|| async { Redirect::permanent("/v2/") }))
         // Previously the service used to be hosted at `/rest`. In an effort to migrate folks
         // to the new versioned route, we'll issue redirects from `/rest` -> `/v2`.
@@ -72,18 +75,15 @@ pub fn build_rest_router(service: RpcService) -> axum::Router {
         .route("/rest/", get(|| async { Redirect::permanent("/v2/") }))
 }
 
-#[derive(Debug)]
-pub struct Page<T, C> {
-    pub entries: response::ResponseContent<Vec<T>>,
-    pub cursor: Option<C>,
-}
-
 pub struct PageCursor<C>(pub Option<C>);
 
 impl<C: std::fmt::Display> axum::response::IntoResponseParts for PageCursor<C> {
     type Error = (axum::http::StatusCode, String);
 
-    fn into_response_parts(self, res: ResponseParts) -> std::result::Result<ResponseParts, Self::Error> {
+    fn into_response_parts(
+        self,
+        res: ResponseParts,
+    ) -> std::result::Result<ResponseParts, Self::Error> {
         self.0
             .map(|cursor| [(crate::types::X_SUI_CURSOR, cursor.to_string())])
             .into_response_parts(res)
@@ -100,14 +100,6 @@ impl<C: std::fmt::Display> axum::response::IntoResponse for PageCursor<C> {
 pub const DEFAULT_PAGE_SIZE: usize = 50;
 pub const MAX_PAGE_SIZE: usize = 100;
 
-impl<T: serde::Serialize, C: std::fmt::Display> axum::response::IntoResponse for Page<T, C> {
-    fn into_response(self) -> axum::response::Response {
-        let cursor = self.cursor.map(|cursor| [(crate::types::X_SUI_CURSOR, cursor.to_string())]);
-
-        (cursor, self.entries).into_response()
-    }
-}
-
 // Enable StateReader to be used as axum::extract::State
 impl axum::extract::FromRef<RpcService> for StateReader {
     fn from_ref(input: &RpcService) -> Self {
@@ -116,30 +108,11 @@ impl axum::extract::FromRef<RpcService> for StateReader {
 }
 
 // Enable TransactionExecutor to be used as axum::extract::State
-impl axum::extract::FromRef<RpcService> for Option<Arc<dyn sui_types::transaction_executor::TransactionExecutor>> {
+impl axum::extract::FromRef<RpcService>
+    for Option<Arc<dyn sui_types::transaction_executor::TransactionExecutor>>
+{
     fn from_ref(input: &RpcService) -> Self {
         input.executor.clone()
-    }
-}
-
-pub fn info(version: &'static str) -> openapiv3::v3_1::Info {
-    use openapiv3::v3_1::{Contact, License};
-
-    openapiv3::v3_1::Info {
-        title: "One Node Api".to_owned(),
-        description: Some("REST Api for interacting with the One Blockchain".to_owned()),
-        contact: Some(Contact {
-            name: Some("OneChain Labs".to_owned()),
-            url: Some("https://github.com/one-chain-labs/onechain".to_owned()),
-            ..Default::default()
-        }),
-        license: Some(License {
-            name: "Apache 2.0".to_owned(),
-            url: Some("https://www.apache.org/licenses/LICENSE-2.0.html".to_owned()),
-            ..Default::default()
-        }),
-        version: version.to_owned(),
-        ..Default::default()
     }
 }
 
@@ -147,34 +120,30 @@ async fn redirect(axum::extract::Path(path): axum::extract::Path<String>) -> Red
     Redirect::permanent(&format!("/v2/{path}"))
 }
 
-pub(crate) mod _schemars {
-    use schemars::{
-        schema::{InstanceType, Metadata, SchemaObject},
-        JsonSchema,
-    };
+pub trait ApiEndpoint<S> {
+    fn method(&self) -> Method;
+    fn path(&self) -> &'static str;
+    fn handler(&self) -> RouteHandler<S>;
+}
 
-    pub(crate) struct U64;
+pub struct RouteHandler<S> {
+    method: axum::http::Method,
+    handler: MethodRouter<S>,
+}
 
-    impl JsonSchema for U64 {
-        fn schema_name() -> String {
-            "u64".to_owned()
-        }
+impl<S: Clone> RouteHandler<S> {
+    pub fn new<H, T>(method: axum::http::Method, handler: H) -> Self
+    where
+        H: Handler<T, S>,
+        T: 'static,
+        S: Send + Sync + 'static,
+    {
+        let handler = MethodRouter::new().on(method.clone().try_into().unwrap(), handler);
 
-        fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-            SchemaObject {
-                metadata: Some(Box::new(Metadata {
-                    description: Some("Radix-10 encoded 64-bit unsigned integer".to_owned()),
-                    ..Default::default()
-                })),
-                instance_type: Some(InstanceType::String.into()),
-                format: Some("u64".to_owned()),
-                ..Default::default()
-            }
-            .into()
-        }
+        Self { method, handler }
+    }
 
-        fn is_referenceable() -> bool {
-            false
-        }
+    pub fn method(&self) -> &axum::http::Method {
+        &self.method
     }
 }

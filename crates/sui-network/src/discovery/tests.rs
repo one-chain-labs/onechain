@@ -3,7 +3,8 @@
 
 use super::*;
 use crate::utils::{build_network_and_key, build_network_with_anemo_config};
-use anemo::{types::PeerAffinity, Result};
+use anemo::types::PeerAffinity;
+use anemo::Result;
 use fastcrypto::ed25519::Ed25519PublicKey;
 use futures::stream::FuturesUnordered;
 use std::collections::HashSet;
@@ -13,11 +14,15 @@ use tokio::time::timeout;
 #[tokio::test]
 async fn get_known_peers() -> Result<()> {
     let config = P2pConfig::default();
-    let (UnstartedDiscovery { state, .. }, server) =
-        Builder::new(create_test_channel().1).config(config).build_internal();
+    let (UnstartedDiscovery { state, .. }, server) = Builder::new(create_test_channel().1)
+        .config(config)
+        .build_internal();
 
     // Err when own_info not set
-    server.get_known_peers_v2(Request::new(())).await.unwrap_err();
+    server
+        .get_known_peers_v2(Request::new(()))
+        .await
+        .unwrap_err();
 
     // Normal response with our_info
     let our_info = NodeInfo {
@@ -26,9 +31,15 @@ async fn get_known_peers() -> Result<()> {
         timestamp_ms: now_unix(),
         access_type: AccessType::Public,
     };
-    state.write().unwrap().our_info =
-        Some(SignedNodeInfo::new_from_data_and_sig(our_info.clone(), Ed25519Signature::default()));
-    let response = server.get_known_peers_v2(Request::new(())).await.unwrap().into_inner();
+    state.write().unwrap().our_info = Some(SignedNodeInfo::new_from_data_and_sig(
+        our_info.clone(),
+        Ed25519Signature::default(),
+    ));
+    let response = server
+        .get_known_peers_v2(Request::new(()))
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(response.own_info.data(), &our_info);
     assert!(response.known_peers.is_empty());
 
@@ -46,9 +57,20 @@ async fn get_known_peers() -> Result<()> {
             Ed25519Signature::default(),
         )),
     );
-    let response = server.get_known_peers_v2(Request::new(())).await.unwrap().into_inner();
+    let response = server
+        .get_known_peers_v2(Request::new(()))
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(response.own_info.data(), &our_info);
-    assert_eq!(response.known_peers.into_iter().map(|peer| peer.into_data()).collect::<Vec<_>>(), vec![other_peer]);
+    assert_eq!(
+        response
+            .known_peers
+            .into_iter()
+            .map(|peer| peer.into_data())
+            .collect::<Vec<_>>(),
+        vec![other_peer]
+    );
 
     Ok(())
 }
@@ -56,7 +78,9 @@ async fn get_known_peers() -> Result<()> {
 #[tokio::test]
 async fn make_connection_to_seed_peer() -> Result<()> {
     let mut config = P2pConfig::default();
-    let (builder, server) = Builder::new(create_test_channel().1).config(config.clone()).build();
+    let (builder, server) = Builder::new(create_test_channel().1)
+        .config(config.clone())
+        .build();
     let (network_1, key_1) = build_network_and_key(|router| router.add_rpc_service(server));
     let (_event_loop_1, _handle_1) = builder.build(network_1.clone(), key_1);
 
@@ -73,8 +97,14 @@ async fn make_connection_to_seed_peer() -> Result<()> {
 
     event_loop_2.handle_tick(std::time::Instant::now(), now_unix());
 
-    assert_eq!(subscriber_2.recv().await?, PeerEvent::NewPeer(network_1.peer_id()));
-    assert_eq!(subscriber_1.recv().await?, PeerEvent::NewPeer(network_2.peer_id()));
+    assert_eq!(
+        subscriber_2.recv().await?,
+        PeerEvent::NewPeer(network_1.peer_id())
+    );
+    assert_eq!(
+        subscriber_1.recv().await?,
+        PeerEvent::NewPeer(network_2.peer_id())
+    );
 
     Ok(())
 }
@@ -82,7 +112,9 @@ async fn make_connection_to_seed_peer() -> Result<()> {
 #[tokio::test]
 async fn make_connection_to_seed_peer_with_peer_id() -> Result<()> {
     let mut config = P2pConfig::default();
-    let (builder, server) = Builder::new(create_test_channel().1).config(config.clone()).build();
+    let (builder, server) = Builder::new(create_test_channel().1)
+        .config(config.clone())
+        .build();
     let (network_1, key_1) = build_network_and_key(|router| router.add_rpc_service(server));
     let (_event_loop_1, _handle_1) = builder.build(network_1.clone(), key_1);
 
@@ -99,8 +131,14 @@ async fn make_connection_to_seed_peer_with_peer_id() -> Result<()> {
 
     event_loop_2.handle_tick(std::time::Instant::now(), now_unix());
 
-    assert_eq!(subscriber_2.recv().await?, PeerEvent::NewPeer(network_1.peer_id()));
-    assert_eq!(subscriber_1.recv().await?, PeerEvent::NewPeer(network_2.peer_id()));
+    assert_eq!(
+        subscriber_2.recv().await?,
+        PeerEvent::NewPeer(network_1.peer_id())
+    );
+    assert_eq!(
+        subscriber_1.recv().await?,
+        PeerEvent::NewPeer(network_2.peer_id())
+    );
 
     Ok(())
 }
@@ -109,7 +147,9 @@ async fn make_connection_to_seed_peer_with_peer_id() -> Result<()> {
 async fn three_nodes_can_connect_via_discovery() -> Result<()> {
     // Setup the peer that will be the seed for the other two
     let mut config = P2pConfig::default();
-    let (builder, server) = Builder::new(create_test_channel().1).config(config.clone()).build();
+    let (builder, server) = Builder::new(create_test_channel().1)
+        .config(config.clone())
+        .build();
     let (network_1, key_1) = build_network_and_key(|router| router.add_rpc_service(server));
     let (event_loop_1, _handle_1) = builder.build(network_1.clone(), key_1);
 
@@ -117,7 +157,9 @@ async fn three_nodes_can_connect_via_discovery() -> Result<()> {
         peer_id: Some(network_1.peer_id()),
         address: format!("/dns/localhost/udp/{}", network_1.local_addr().port()).parse()?,
     });
-    let (builder, server) = Builder::new(create_test_channel().1).config(config.clone()).build();
+    let (builder, server) = Builder::new(create_test_channel().1)
+        .config(config.clone())
+        .build();
     let (network_2, key_2) = build_network_and_key(|router| router.add_rpc_service(server));
     let (mut event_loop_2, _handle_2) = builder.build(network_2.clone(), key_2);
     // Set an external_address address for node 2 so that it can share its address
@@ -174,7 +216,9 @@ async fn peers_are_added_from_reconfig_channel() -> Result<()> {
     let (network_1, key_1) = build_network_and_key(|router| router.add_rpc_service(server));
     let (event_loop_1, _handle_1) = builder.build(network_1.clone(), key_1);
 
-    let (builder, server) = Builder::new(create_test_channel().1).config(config.clone()).build();
+    let (builder, server) = Builder::new(create_test_channel().1)
+        .config(config.clone())
+        .build();
     let (network_2, key_2) = build_network_and_key(|router| router.add_rpc_service(server));
     let (event_loop_2, _handle_2) = builder.build(network_2.clone(), key_2);
 
@@ -200,8 +244,11 @@ async fn peers_are_added_from_reconfig_channel() -> Result<()> {
     let (mut subscriber_2, _) = network_2.subscribe()?;
 
     // We send peer 1 a new peer info (peer 2) in the channel.
-    let peer_2_network_pubkey = Ed25519PublicKey(ed25519_consensus::VerificationKey::try_from(peer_id_2.0).unwrap());
-    let peer2_addr: Multiaddr = format!("/dns/localhost/udp/{}", network_2.local_addr().port()).parse().unwrap();
+    let peer_2_network_pubkey =
+        Ed25519PublicKey(ed25519_consensus::VerificationKey::try_from(peer_id_2.0).unwrap());
+    let peer2_addr: Multiaddr = format!("/dns/localhost/udp/{}", network_2.local_addr().port())
+        .parse()
+        .unwrap();
     tx_1.send(TrustedPeerChangeEvent {
         new_peers: vec![PeerInfo {
             peer_id: PeerId(peer_2_network_pubkey.0.to_bytes()),
@@ -255,7 +302,10 @@ async fn test_access_types() {
         interval_period_ms: Some(1000),
         ..Default::default()
     };
-    let default_p2p_config = P2pConfig { discovery: Some(default_discovery_config.clone()), ..Default::default() };
+    let default_p2p_config = P2pConfig {
+        discovery: Some(default_discovery_config.clone()),
+        ..Default::default()
+    };
     let default_private_discovery_config = DiscoveryConfig {
         target_concurrent_connections: Some(100),
         interval_period_ms: Some(1000),
@@ -269,7 +319,9 @@ async fn test_access_types() {
     let mut config = default_p2p_config.clone();
     config.seed_peers.push(SeedPeer {
         peer_id: Some(network_1.peer_id()),
-        address: format!("/dns/localhost/udp/{}", network_1.local_addr().port()).parse().unwrap(),
+        address: format!("/dns/localhost/udp/{}", network_1.local_addr().port())
+            .parse()
+            .unwrap(),
     });
 
     // Node 2, public, seed: Node 1, allowlist: Node 7, Node 8
@@ -295,8 +347,10 @@ async fn test_access_types() {
     // Node 6, private, allowlisted: Node 4
     let (builder_6, network_6, key_6) = {
         let mut private_discovery_config = default_private_discovery_config.clone();
-        private_discovery_config.allowlisted_peers =
-            vec![local_allowlisted_peer(network_4.peer_id(), Some(network_4.local_addr().port()))];
+        private_discovery_config.allowlisted_peers = vec![local_allowlisted_peer(
+            network_4.peer_id(),
+            Some(network_4.local_addr().port()),
+        )];
         set_up_network(P2pConfig::default().set_discovery_config(private_discovery_config))
     };
 
@@ -318,8 +372,9 @@ async fn test_access_types() {
     builder_4.config.discovery = Some(private_discovery_config);
 
     // Node 7, private, allowlisted: Node 2, Node 8
-    let (mut builder_7, network_7, key_7) =
-        set_up_network(P2pConfig::default().set_discovery_config(default_private_discovery_config.clone()));
+    let (mut builder_7, network_7, key_7) = set_up_network(
+        P2pConfig::default().set_discovery_config(default_private_discovery_config.clone()),
+    );
 
     // Node 9, public
     let (builder_9, network_9, key_9) = set_up_network(default_p2p_config.clone());
@@ -340,8 +395,10 @@ async fn test_access_types() {
 
     // Node 2, Add Node 7 and Node 8 to allowlist
     let mut discovery_config = default_discovery_config.clone();
-    discovery_config.allowlisted_peers =
-        vec![local_allowlisted_peer(network_7.peer_id(), None), local_allowlisted_peer(network_8.peer_id(), None)];
+    discovery_config.allowlisted_peers = vec![
+        local_allowlisted_peer(network_7.peer_id(), None),
+        local_allowlisted_peer(network_8.peer_id(), None),
+    ];
     builder_2.config.discovery = Some(discovery_config);
 
     // Node 7: Add Node 2, and Node 8 to allowlist
@@ -357,7 +414,9 @@ async fn test_access_types() {
         let mut p2p_config = default_p2p_config.clone();
         p2p_config.seed_peers.push(SeedPeer {
             peer_id: Some(network_9.peer_id()),
-            address: format!("/dns/localhost/udp/{}", network_9.local_addr().port()).parse().unwrap(),
+            address: format!("/dns/localhost/udp/{}", network_9.local_addr().port())
+                .parse()
+                .unwrap(),
         });
         p2p_config.discovery = Some(default_private_discovery_config.clone());
         set_up_network(p2p_config.clone())
@@ -368,11 +427,15 @@ async fn test_access_types() {
         let mut p2p_config = default_p2p_config.clone();
         p2p_config.seed_peers.push(SeedPeer {
             peer_id: Some(network_1.peer_id()),
-            address: format!("/dns/localhost/udp/{}", network_1.local_addr().port()).parse().unwrap(),
+            address: format!("/dns/localhost/udp/{}", network_1.local_addr().port())
+                .parse()
+                .unwrap(),
         });
         let mut private_discovery_config = default_private_discovery_config.clone();
-        private_discovery_config.allowlisted_peers =
-            vec![local_allowlisted_peer(network_8.peer_id(), None), local_allowlisted_peer(network_7.peer_id(), None)];
+        private_discovery_config.allowlisted_peers = vec![
+            local_allowlisted_peer(network_8.peer_id(), None),
+            local_allowlisted_peer(network_7.peer_id(), None),
+        ];
         p2p_config.discovery = Some(private_discovery_config);
         set_up_network(p2p_config)
     };
@@ -386,8 +449,10 @@ async fn test_access_types() {
     let (event_loop_7, _handle_7, state_7) = start_network(builder_7, network_7.clone(), key_7);
     let (event_loop_8, _handle_8, state_8) = start_network(builder_8, network_8.clone(), key_8);
     let (event_loop_9, _handle_9, state_9) = start_network(builder_9, network_9.clone(), key_9);
-    let (event_loop_10, _handle_10, state_10) = start_network(builder_10, network_10.clone(), key_10);
-    let (event_loop_11, _handle_11, state_11) = start_network(builder_11, network_11.clone(), key_11);
+    let (event_loop_10, _handle_10, state_10) =
+        start_network(builder_10, network_10.clone(), key_10);
+    let (event_loop_11, _handle_11, state_11) =
+        start_network(builder_11, network_11.clone(), key_11);
 
     // Start all the event loops
     tokio::spawn(event_loop_1.start());
@@ -436,13 +501,13 @@ async fn test_access_types() {
         &state_1,
         HashSet::from_iter(vec![]),
         HashSet::from_iter(vec![
-            peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9, peer_id_10,
-            peer_id_11,
+            peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9,
+            peer_id_10, peer_id_11,
         ]),
         HashSet::from_iter(vec![peer_id_2, peer_id_9]),
         HashSet::from_iter(vec![
-            peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9, peer_id_10,
-            peer_id_11,
+            peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9,
+            peer_id_10, peer_id_11,
         ]),
     );
 
@@ -453,13 +518,13 @@ async fn test_access_types() {
         &state_2,
         HashSet::from_iter(vec![peer_id_1, peer_id_7, peer_id_8]),
         HashSet::from_iter(vec![
-            peer_id_1, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9, peer_id_10,
-            peer_id_11,
+            peer_id_1, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9,
+            peer_id_10, peer_id_11,
         ]),
         HashSet::from_iter(vec![peer_id_1, peer_id_7, peer_id_8, peer_id_9]),
         HashSet::from_iter(vec![
-            peer_id_1, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9, peer_id_10,
-            peer_id_11,
+            peer_id_1, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_9,
+            peer_id_10, peer_id_11,
         ]),
     );
 
@@ -478,9 +543,15 @@ async fn test_access_types() {
         &network_4,
         &state_4,
         HashSet::from_iter(vec![peer_id_3, peer_id_5, peer_id_6]),
-        HashSet::from_iter(vec![peer_id_1, peer_id_2, peer_id_3, peer_id_5, peer_id_6, peer_id_9]),
-        HashSet::from_iter(vec![peer_id_1, peer_id_2, peer_id_3, peer_id_5, peer_id_6, peer_id_9]),
-        HashSet::from_iter(vec![peer_id_1, peer_id_2, peer_id_3, peer_id_5, peer_id_6, peer_id_9]),
+        HashSet::from_iter(vec![
+            peer_id_1, peer_id_2, peer_id_3, peer_id_5, peer_id_6, peer_id_9,
+        ]),
+        HashSet::from_iter(vec![
+            peer_id_1, peer_id_2, peer_id_3, peer_id_5, peer_id_6, peer_id_9,
+        ]),
+        HashSet::from_iter(vec![
+            peer_id_1, peer_id_2, peer_id_3, peer_id_5, peer_id_6, peer_id_9,
+        ]),
     );
 
     assert_peers(
@@ -532,13 +603,13 @@ async fn test_access_types() {
         &state_9,
         HashSet::from_iter(vec![]),
         HashSet::from_iter(vec![
-            peer_id_1, peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_10,
-            peer_id_11,
+            peer_id_1, peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8,
+            peer_id_10, peer_id_11,
         ]),
         HashSet::from_iter(vec![peer_id_1, peer_id_2]),
         HashSet::from_iter(vec![
-            peer_id_1, peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8, peer_id_10,
-            peer_id_11,
+            peer_id_1, peer_id_2, peer_id_3, peer_id_4, peer_id_5, peer_id_6, peer_id_7, peer_id_8,
+            peer_id_10, peer_id_11,
         ]),
     );
 
@@ -575,7 +646,12 @@ fn assert_peers(
     expected_discovery_known_peers: HashSet<PeerId>,
     expected_discovery_connected_peers: HashSet<PeerId>,
 ) {
-    let actual = network.known_peers().get_all().iter().map(|pi| pi.peer_id).collect::<HashSet<_>>();
+    let actual = network
+        .known_peers()
+        .get_all()
+        .iter()
+        .map(|pi| pi.peer_id)
+        .collect::<HashSet<_>>();
     assert_eq!(
         actual, expected_network_known_peers,
         "{} network known peers mismatch. Expected: {:#?}, actual: {:#?}",
@@ -587,14 +663,26 @@ fn assert_peers(
         "{} network connected peers mismatch. Expected: {:#?}, actual: {:#?}",
         self_name, expected_network_connected_peers, actual,
     );
-    let actual = state.read().unwrap().known_peers.keys().cloned().collect::<HashSet<_>>();
+    let actual = state
+        .read()
+        .unwrap()
+        .known_peers
+        .keys()
+        .cloned()
+        .collect::<HashSet<_>>();
     assert_eq!(
         actual, expected_discovery_known_peers,
         "{} discovery known peers mismatch. Expected: {:#?}, actual: {:#?}",
         self_name, expected_discovery_known_peers, actual,
     );
 
-    let actual = state.read().unwrap().connected_peers.keys().cloned().collect::<HashSet<_>>();
+    let actual = state
+        .read()
+        .unwrap()
+        .connected_peers
+        .keys()
+        .cloned()
+        .collect::<HashSet<_>>();
     assert_eq!(
         actual, expected_discovery_connected_peers,
         "{} discovery connected peers mismatch. Expected: {:#?}, actual: {:#?}",
@@ -610,13 +698,19 @@ fn unwrap_new_peer_event(event: PeerEvent) -> PeerId {
 }
 
 fn local_allowlisted_peer(peer_id: PeerId, port: Option<u16>) -> AllowlistedPeer {
-    AllowlistedPeer { peer_id, address: port.map(|port| format!("/dns/localhost/udp/{}", port).parse().unwrap()) }
+    AllowlistedPeer {
+        peer_id,
+        address: port.map(|port| format!("/dns/localhost/udp/{}", port).parse().unwrap()),
+    }
 }
 
 fn set_up_network(p2p_config: P2pConfig) -> (UnstartedDiscovery, Network, NetworkKeyPair) {
     let anemo_config = p2p_config.anemo_config.clone().unwrap_or_default();
-    let (builder, server) = Builder::new(create_test_channel().1).config(p2p_config).build();
-    let (network, keypair) = build_network_with_anemo_config(|router| router.add_rpc_service(server), anemo_config);
+    let (builder, server) = Builder::new(create_test_channel().1)
+        .config(p2p_config)
+        .build();
+    let (network, keypair) =
+        build_network_with_anemo_config(|router| router.add_rpc_service(server), anemo_config);
     (builder, network, keypair)
 }
 
@@ -626,13 +720,19 @@ fn start_network(
     keypair: NetworkKeyPair,
 ) -> (DiscoveryEventLoop, Handle, Arc<RwLock<State>>) {
     let (mut event_loop, handle) = builder.build(network.clone(), keypair);
-    event_loop.config.external_address =
-        Some(format!("/dns/localhost/udp/{}", network.local_addr().port()).parse().unwrap());
+    event_loop.config.external_address = Some(
+        format!("/dns/localhost/udp/{}", network.local_addr().port())
+            .parse()
+            .unwrap(),
+    );
     let state = event_loop.state.clone();
     (event_loop, handle, state)
 }
 
-fn create_test_channel() -> (watch::Sender<TrustedPeerChangeEvent>, watch::Receiver<TrustedPeerChangeEvent>) {
+fn create_test_channel() -> (
+    watch::Sender<TrustedPeerChangeEvent>,
+    watch::Receiver<TrustedPeerChangeEvent>,
+) {
     let (tx, rx) = watch::channel(TrustedPeerChangeEvent { new_peers: vec![] });
     (tx, rx)
 }

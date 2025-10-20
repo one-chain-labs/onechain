@@ -3,44 +3,40 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use super::{
-    balance::{self, Balance},
-    base64::Base64,
-    big_int::BigInt,
-    coin::Coin,
-    cursor::{BcsCursor, JsonCursor, Page, RawPaginated, ScanLimited, Target},
-    move_module::MoveModule,
-    move_object::MoveObject,
-    object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
-    owner::OwnerImpl,
-    stake::StakedOct,
-    sui_address::SuiAddress,
-    suins_registration::{DomainFormat, SuinsRegistration},
-    transaction_block::{self, TransactionBlock, TransactionBlockFilter},
-    type_filter::ExactTypeFilter,
-    uint53::UInt53,
-};
-use crate::{
-    connection::ScanConnection,
-    consistency::{Checkpointed, ConsistentNamedCursor},
-    data::{DataLoader, Db, DbConnection, QueryExecutor},
-    error::Error,
-    filter,
-    query,
-    raw_query::RawQuery,
-    types::sui_address::addr,
-};
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    dataloader::Loader,
-    *,
-};
-use diesel::{prelude::QueryableByName, BoolExpressionMethods, ExpressionMethods, JoinOnDsl, QueryDsl, Selectable};
+use super::balance::{self, Balance};
+use super::base64::Base64;
+use super::big_int::BigInt;
+use super::coin::Coin;
+use super::cursor::{BcsCursor, JsonCursor, Page, RawPaginated, ScanLimited, Target};
+use super::move_module::MoveModule;
+use super::move_object::MoveObject;
+use super::object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus};
+use super::owner::OwnerImpl;
+use super::stake::StakedOct;
+use super::sui_address::SuiAddress;
+use super::suins_registration::{DomainFormat, SuinsRegistration};
+use super::transaction_block::{self, TransactionBlock, TransactionBlockFilter};
+use super::type_filter::ExactTypeFilter;
+use super::uint53::UInt53;
+use crate::connection::ScanConnection;
+use crate::consistency::{Checkpointed, ConsistentNamedCursor};
+use crate::data::{DataLoader, Db, DbConnection, QueryExecutor};
+use crate::error::Error;
+use crate::raw_query::RawQuery;
+use crate::types::sui_address::addr;
+use crate::{filter, query};
+use async_graphql::connection::{Connection, CursorType, Edge};
+use async_graphql::dataloader::Loader;
+use async_graphql::*;
+use diesel::prelude::QueryableByName;
+use diesel::{BoolExpressionMethods, ExpressionMethods, JoinOnDsl, QueryDsl, Selectable};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use serde::{Deserialize, Serialize};
-use sui_indexer::{models::objects::StoredFullHistoryObject, schema::packages};
+use sui_indexer::models::objects::StoredFullHistoryObject;
+use sui_indexer::schema::packages;
 use sui_package_resolver::{error::Error as PackageCacheError, Package as ParsedMovePackage};
-use sui_types::{is_system_package, move_package::MovePackage as NativeMovePackage, object::Data};
+use sui_types::is_system_package;
+use sui_types::{move_package::MovePackage as NativeMovePackage, object::Data};
 
 #[derive(Clone)]
 pub(crate) struct MovePackage {
@@ -85,7 +81,10 @@ pub(crate) enum PackageLookup {
 
     /// Get the package whose original ID matches the storage ID of the package at the given
     /// address, but whose version is `version`.
-    Versioned { version: u64, checkpoint_viewed_at: u64 },
+    Versioned {
+        version: u64,
+        checkpoint_viewed_at: u64,
+    },
 
     /// Get the package whose original ID matches the storage ID of the package at the given
     /// address, but that has the max version at the given checkpoint.
@@ -191,7 +190,9 @@ impl MovePackage {
         before: Option<object::Cursor>,
         filter: Option<ObjectFilter>,
     ) -> Result<Connection<String, MoveObject>> {
-        OwnerImpl::from(&self.super_).objects(ctx, first, after, last, before, filter).await
+        OwnerImpl::from(&self.super_)
+            .objects(ctx, first, after, last, before, filter)
+            .await
     }
 
     /// Total balance of all coins with marker type owned by this package. If type is not supplied,
@@ -199,7 +200,11 @@ impl MovePackage {
     ///
     /// Note that coins owned by a package are inaccessible, because packages are immutable and
     /// cannot be owned by an address.
-    pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
+    pub(crate) async fn balance(
+        &self,
+        ctx: &Context<'_>,
+        type_: Option<ExactTypeFilter>,
+    ) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_).balance(ctx, type_).await
     }
 
@@ -215,7 +220,9 @@ impl MovePackage {
         last: Option<u64>,
         before: Option<balance::Cursor>,
     ) -> Result<Connection<String, Balance>> {
-        OwnerImpl::from(&self.super_).balances(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_)
+            .balances(ctx, first, after, last, before)
+            .await
     }
 
     /// The coin objects owned by this package.
@@ -233,7 +240,9 @@ impl MovePackage {
         before: Option<object::Cursor>,
         type_: Option<ExactTypeFilter>,
     ) -> Result<Connection<String, Coin>> {
-        OwnerImpl::from(&self.super_).coins(ctx, first, after, last, before, type_).await
+        OwnerImpl::from(&self.super_)
+            .coins(ctx, first, after, last, before, type_)
+            .await
     }
 
     /// The `0x3::staking_pool::StakedOct` objects owned by this package.
@@ -248,7 +257,9 @@ impl MovePackage {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_).staked_octs(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_)
+            .staked_octs(ctx, first, after, last, before)
+            .await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -257,7 +268,9 @@ impl MovePackage {
         ctx: &Context<'_>,
         format: Option<DomainFormat>,
     ) -> Result<Option<String>> {
-        OwnerImpl::from(&self.super_).default_suins_name(ctx, format).await
+        OwnerImpl::from(&self.super_)
+            .default_suins_name(ctx, format)
+            .await
     }
 
     /// The SuinsRegistration NFTs owned by this package. These grant the owner the capability to
@@ -273,7 +286,9 @@ impl MovePackage {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, SuinsRegistration>> {
-        OwnerImpl::from(&self.super_).suins_registrations(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_)
+            .suins_registrations(ctx, first, after, last, before)
+            .await
     }
 
     pub(crate) async fn version(&self) -> UInt53 {
@@ -303,8 +318,13 @@ impl MovePackage {
     }
 
     /// The transaction block that published or upgraded this package.
-    pub(crate) async fn previous_transaction_block(&self, ctx: &Context<'_>) -> Result<Option<TransactionBlock>> {
-        ObjectImpl(&self.super_).previous_transaction_block(ctx).await
+    pub(crate) async fn previous_transaction_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<TransactionBlock>> {
+        ObjectImpl(&self.super_)
+            .previous_transaction_block(ctx)
+            .await
     }
 
     /// The amount of SUI we would rebate if this object gets deleted or mutated. This number is
@@ -348,7 +368,9 @@ impl MovePackage {
         filter: Option<TransactionBlockFilter>,
         scan_limit: Option<u64>,
     ) -> Result<ScanConnection<String, TransactionBlock>> {
-        ObjectImpl(&self.super_).received_transaction_blocks(ctx, first, after, last, before, filter, scan_limit).await
+        ObjectImpl(&self.super_)
+            .received_transaction_blocks(ctx, first, after, last, before, filter, scan_limit)
+            .await
     }
 
     /// The Base64-encoded BCS serialization of the package's content.
@@ -358,10 +380,18 @@ impl MovePackage {
 
     /// Fetch another version of this package (the package that shares this package's original ID,
     /// but has the specified `version`).
-    async fn package_at_version(&self, ctx: &Context<'_>, version: u64) -> Result<Option<MovePackage>> {
-        MovePackage::query(ctx, self.super_.address, MovePackage::by_version(version, self.checkpoint_viewed_at_impl()))
-            .await
-            .extend()
+    async fn package_at_version(
+        &self,
+        ctx: &Context<'_>,
+        version: u64,
+    ) -> Result<Option<MovePackage>> {
+        MovePackage::query(
+            ctx,
+            self.super_.address,
+            MovePackage::by_version(version, self.checkpoint_viewed_at_impl()),
+        )
+        .await
+        .extend()
     }
 
     /// Fetch all versions of this package (packages that share this package's original ID),
@@ -392,10 +422,14 @@ impl MovePackage {
     /// Fetch the latest version of this package (the package with the highest `version` that shares
     /// this packages's original ID)
     async fn latest_package(&self, ctx: &Context<'_>) -> Result<MovePackage> {
-        Ok(MovePackage::query(ctx, self.super_.address, MovePackage::latest_at(self.checkpoint_viewed_at_impl()))
-            .await
-            .extend()?
-            .ok_or_else(|| Error::Internal("No latest version found".to_string()))?)
+        Ok(MovePackage::query(
+            ctx,
+            self.super_.address,
+            MovePackage::latest_at(self.checkpoint_viewed_at_impl()),
+        )
+        .await
+        .extend()?
+        .ok_or_else(|| Error::Internal("No latest version found".to_string()))?)
     }
 
     /// A representation of the module called `name` in this package, including the
@@ -417,7 +451,8 @@ impl MovePackage {
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
         let cursor_viewed_at = page.validate_cursor_consistency()?;
-        let checkpoint_viewed_at = cursor_viewed_at.unwrap_or_else(|| self.checkpoint_viewed_at_impl());
+        let checkpoint_viewed_at =
+            cursor_viewed_at.unwrap_or_else(|| self.checkpoint_viewed_at_impl());
 
         let parsed = self.parsed_package()?;
         let module_range = parsed.modules().range::<String, _>((
@@ -435,11 +470,19 @@ impl MovePackage {
         };
 
         connection.has_previous_page = modules.first().is_some_and(|(fst, _)| {
-            parsed.modules().range::<String, _>((B::Unbounded, B::Excluded(*fst))).next().is_some()
+            parsed
+                .modules()
+                .range::<String, _>((B::Unbounded, B::Excluded(*fst)))
+                .next()
+                .is_some()
         });
 
         connection.has_next_page = modules.last().is_some_and(|(lst, _)| {
-            parsed.modules().range::<String, _>((B::Excluded(*lst), B::Unbounded)).next().is_some()
+            parsed
+                .modules()
+                .range::<String, _>((B::Excluded(*lst), B::Unbounded))
+                .next()
+                .is_some()
         });
 
         for (name, parsed) in modules {
@@ -450,14 +493,20 @@ impl MovePackage {
                 .extend());
             };
 
-            let cursor =
-                JsonCursor::new(ConsistentNamedCursor { name: name.clone(), c: checkpoint_viewed_at }).encode_cursor();
-            connection.edges.push(Edge::new(cursor, MoveModule {
-                storage_id: self.super_.address,
-                native: native.clone(),
-                parsed: parsed.clone(),
-                checkpoint_viewed_at,
-            }))
+            let cursor = JsonCursor::new(ConsistentNamedCursor {
+                name: name.clone(),
+                c: checkpoint_viewed_at,
+            })
+            .encode_cursor();
+            connection.edges.push(Edge::new(
+                cursor,
+                MoveModule {
+                    storage_id: self.super_.address,
+                    native: native.clone(),
+                    parsed: parsed.clone(),
+                    checkpoint_viewed_at,
+                },
+            ))
         }
 
         if connection.edges.is_empty() {
@@ -502,7 +551,9 @@ impl MovePackage {
     /// BCS representation of the package itself, as a MovePackage.
     async fn package_bcs(&self) -> Result<Option<Base64>> {
         let bcs = bcs::to_bytes(&self.native)
-            .map_err(|_| Error::Internal(format!("Failed to serialize package {}", self.native.id())))
+            .map_err(|_| {
+                Error::Internal(format!("Failed to serialize package {}", self.native.id()))
+            })
             .extend()?;
 
         Ok(Some(bcs.into()))
@@ -512,7 +563,9 @@ impl MovePackage {
     /// name, followed by module bytes), in alphabetic order by module name.
     async fn module_bcs(&self) -> Result<Option<Base64>> {
         let bcs = bcs::to_bytes(self.native.serialized_module_map())
-            .map_err(|_| Error::Internal(format!("Failed to serialize package {}", self.native.id())))
+            .map_err(|_| {
+                Error::Internal(format!("Failed to serialize package {}", self.native.id()))
+            })
             .extend()?;
 
         Ok(Some(bcs.into()))
@@ -533,7 +586,10 @@ impl MovePackage {
 
     pub(crate) fn module_impl(&self, name: &str) -> Result<Option<MoveModule>, Error> {
         use PackageCacheError as E;
-        match (self.native.serialized_module_map().get(name), self.parsed_package()?.module(name)) {
+        match (
+            self.native.serialized_module_map().get(name),
+            self.parsed_package()?.module(name),
+        ) {
             (Some(native), Ok(parsed)) => Ok(Some(MoveModule {
                 storage_id: self.super_.address,
                 native: native.clone(),
@@ -542,26 +598,35 @@ impl MovePackage {
             })),
 
             (None, _) | (_, Err(E::ModuleNotFound(_, _))) => Ok(None),
-            (_, Err(e)) => Err(Error::Internal(format!("Unexpected error fetching module: {e}"))),
+            (_, Err(e)) => Err(Error::Internal(format!(
+                "Unexpected error fetching module: {e}"
+            ))),
         }
     }
 
     /// Look-up the package by its Storage ID, as of a given checkpoint.
     pub(crate) fn by_id_at(checkpoint_viewed_at: u64) -> PackageLookup {
-        PackageLookup::ById { checkpoint_viewed_at }
+        PackageLookup::ById {
+            checkpoint_viewed_at,
+        }
     }
 
     /// Look-up a specific version of the package, identified by the storage ID of any version of
     /// the package, and the desired version (the actual object loaded might be at a different
     /// object ID).
     pub(crate) fn by_version(version: u64, checkpoint_viewed_at: u64) -> PackageLookup {
-        PackageLookup::Versioned { version, checkpoint_viewed_at }
+        PackageLookup::Versioned {
+            version,
+            checkpoint_viewed_at,
+        }
     }
 
     /// Look-up the package that shares the same original ID as the package at `address`, but has
     /// the latest version, as of the given checkpoint.
     pub(crate) fn latest_at(checkpoint_viewed_at: u64) -> PackageLookup {
-        PackageLookup::Latest { checkpoint_viewed_at }
+        PackageLookup::Latest {
+            checkpoint_viewed_at,
+        }
     }
 
     pub(crate) async fn query(
@@ -570,14 +635,22 @@ impl MovePackage {
         key: PackageLookup,
     ) -> Result<Option<Self>, Error> {
         let (address, key) = match key {
-            PackageLookup::ById { checkpoint_viewed_at } => (address, Object::latest_at(checkpoint_viewed_at)),
+            PackageLookup::ById {
+                checkpoint_viewed_at,
+            } => (address, Object::latest_at(checkpoint_viewed_at)),
 
-            PackageLookup::Versioned { version, checkpoint_viewed_at } => {
+            PackageLookup::Versioned {
+                version,
+                checkpoint_viewed_at,
+            } => {
                 if is_system_package(address) {
                     (address, Object::at_version(version, checkpoint_viewed_at))
                 } else {
                     let DataLoader(loader) = &ctx.data_unchecked();
-                    let Some(translation) = loader.load_one(PackageVersionKey { address, version }).await? else {
+                    let Some(translation) = loader
+                        .load_one(PackageVersionKey { address, version })
+                        .await?
+                    else {
                         return Ok(None);
                     };
 
@@ -585,12 +658,20 @@ impl MovePackage {
                 }
             }
 
-            PackageLookup::Latest { checkpoint_viewed_at } => {
+            PackageLookup::Latest {
+                checkpoint_viewed_at,
+            } => {
                 if is_system_package(address) {
                     (address, Object::latest_at(checkpoint_viewed_at))
                 } else {
                     let DataLoader(loader) = &ctx.data_unchecked();
-                    let Some(translation) = loader.load_one(LatestKey { address, checkpoint_viewed_at }).await? else {
+                    let Some(translation) = loader
+                        .load_one(LatestKey {
+                            address,
+                            checkpoint_viewed_at,
+                        })
+                        .await?
+                    else {
                         return Ok(None);
                     };
 
@@ -603,7 +684,9 @@ impl MovePackage {
             return Ok(None);
         };
 
-        Ok(Some(MovePackage::try_from(&object).map_err(|_| Error::Internal(format!("{address} is not a package")))?))
+        Ok(Some(MovePackage::try_from(&object).map_err(|_| {
+            Error::Internal(format!("{address} is not a package"))
+        })?))
     }
 
     /// Query the database for a `page` of Move packages. The Page uses the checkpoint sequence
@@ -626,7 +709,10 @@ impl MovePackage {
         let cursor_viewed_at = page.validate_cursor_consistency()?;
         let checkpoint_viewed_at = cursor_viewed_at.unwrap_or(checkpoint_viewed_at);
 
-        let after_checkpoint: Option<u64> = filter.as_ref().and_then(|f| f.after_checkpoint).map(|v| v.into());
+        let after_checkpoint: Option<u64> = filter
+            .as_ref()
+            .and_then(|f| f.after_checkpoint)
+            .map(|v| v.into());
 
         // Clamp the "before checkpoint" bound by "checkpoint viewed at".
         let before_checkpoint = filter
@@ -655,12 +741,16 @@ impl MovePackage {
                         "#
                     );
 
-                    q = filter!(q, format!("p.checkpoint_sequence_number < {before_checkpoint}"));
+                    q = filter!(
+                        q,
+                        format!("p.checkpoint_sequence_number < {before_checkpoint}")
+                    );
                     if let Some(after) = after_checkpoint {
                         q = filter!(q, format!("{after} < p.checkpoint_sequence_number"));
                     }
 
-                    page.paginate_raw_query::<StoredHistoryPackage>(conn, checkpoint_viewed_at, q).await
+                    page.paginate_raw_query::<StoredHistoryPackage>(conn, checkpoint_viewed_at, q)
+                        .await
                 }
                 .scope_boxed()
             })
@@ -822,27 +912,42 @@ impl ScanLimited for BcsCursor<PackageCursor> {}
 
 #[async_trait::async_trait]
 impl Loader<PackageVersionKey> for Db {
-    type Error = Error;
     type Value = SuiAddress;
+    type Error = Error;
 
-    async fn load(&self, keys: &[PackageVersionKey]) -> Result<HashMap<PackageVersionKey, SuiAddress>, Error> {
+    async fn load(
+        &self,
+        keys: &[PackageVersionKey],
+    ) -> Result<HashMap<PackageVersionKey, SuiAddress>, Error> {
         use packages::dsl;
         let other = diesel::alias!(packages as other);
 
-        let id_versions: BTreeSet<_> = keys.iter().map(|k| (k.address.into_vec(), k.version as i64)).collect();
+        let id_versions: BTreeSet<_> = keys
+            .iter()
+            .map(|k| (k.address.into_vec(), k.version as i64))
+            .collect();
 
         let stored_packages: Vec<(Vec<u8>, i64, Vec<u8>)> = self
             .execute(move |conn| {
                 async move {
                     conn.results(|| {
                         let mut query = dsl::packages
-                            .inner_join(other.on(dsl::original_id.eq(other.field(dsl::original_id))))
-                            .select((dsl::package_id, other.field(dsl::package_version), other.field(dsl::package_id)))
+                            .inner_join(
+                                other.on(dsl::original_id.eq(other.field(dsl::original_id))),
+                            )
+                            .select((
+                                dsl::package_id,
+                                other.field(dsl::package_version),
+                                other.field(dsl::package_id),
+                            ))
                             .into_boxed();
 
                         for (id, version) in id_versions.iter().cloned() {
-                            query = query
-                                .or_filter(dsl::package_id.eq(id).and(other.field(dsl::package_version).eq(version)));
+                            query = query.or_filter(
+                                dsl::package_id
+                                    .eq(id)
+                                    .and(other.field(dsl::package_version).eq(version)),
+                            );
                         }
 
                         query
@@ -856,7 +961,13 @@ impl Loader<PackageVersionKey> for Db {
 
         let mut result = HashMap::new();
         for (id, version, other_id) in stored_packages {
-            result.insert(PackageVersionKey { address: addr(&id)?, version: version as u64 }, addr(&other_id)?);
+            result.insert(
+                PackageVersionKey {
+                    address: addr(&id)?,
+                    version: version as u64,
+                },
+                addr(&other_id)?,
+            );
         }
 
         Ok(result)
@@ -865,8 +976,8 @@ impl Loader<PackageVersionKey> for Db {
 
 #[async_trait::async_trait]
 impl Loader<LatestKey> for Db {
-    type Error = Error;
     type Value = SuiAddress;
+    type Error = Error;
 
     async fn load(&self, keys: &[LatestKey]) -> Result<HashMap<LatestKey, SuiAddress>, Error> {
         use packages::dsl;
@@ -874,38 +985,46 @@ impl Loader<LatestKey> for Db {
 
         let mut ids_by_cursor: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
         for key in keys {
-            ids_by_cursor.entry(key.checkpoint_viewed_at).or_default().insert(key.address.into_vec());
+            ids_by_cursor
+                .entry(key.checkpoint_viewed_at)
+                .or_default()
+                .insert(key.address.into_vec());
         }
 
         // Issue concurrent reads for each group of IDs
-        let futures = ids_by_cursor.into_iter().map(|(checkpoint_viewed_at, ids)| {
-            self.execute(move |conn| {
-                async move {
-                    let results: Vec<(Vec<u8>, Vec<u8>)> = conn
-                        .results(|| {
-                            let o_original_id = other.field(dsl::original_id);
-                            let o_package_id = other.field(dsl::package_id);
-                            let o_cp_seq_num = other.field(dsl::checkpoint_sequence_number);
-                            let o_version = other.field(dsl::package_version);
+        let futures = ids_by_cursor
+            .into_iter()
+            .map(|(checkpoint_viewed_at, ids)| {
+                self.execute(move |conn| {
+                    async move {
+                        let results: Vec<(Vec<u8>, Vec<u8>)> = conn
+                            .results(|| {
+                                let o_original_id = other.field(dsl::original_id);
+                                let o_package_id = other.field(dsl::package_id);
+                                let o_cp_seq_num = other.field(dsl::checkpoint_sequence_number);
+                                let o_version = other.field(dsl::package_version);
 
-                            let query = dsl::packages
-                                .inner_join(other.on(dsl::original_id.eq(o_original_id)))
-                                .select((dsl::package_id, o_package_id))
-                                .filter(dsl::package_id.eq_any(ids.iter().cloned()))
-                                .filter(o_cp_seq_num.le(checkpoint_viewed_at as i64))
-                                .order_by((dsl::package_id, dsl::original_id, o_version.desc()))
-                                .distinct_on((dsl::package_id, dsl::original_id));
-                            query
-                        })
-                        .await?;
+                                let query = dsl::packages
+                                    .inner_join(other.on(dsl::original_id.eq(o_original_id)))
+                                    .select((dsl::package_id, o_package_id))
+                                    .filter(dsl::package_id.eq_any(ids.iter().cloned()))
+                                    .filter(o_cp_seq_num.le(checkpoint_viewed_at as i64))
+                                    .order_by((dsl::package_id, dsl::original_id, o_version.desc()))
+                                    .distinct_on((dsl::package_id, dsl::original_id));
+                                query
+                            })
+                            .await?;
 
-                    Ok::<_, diesel::result::Error>(
-                        results.into_iter().map(|(p, latest)| (checkpoint_viewed_at, p, latest)).collect::<Vec<_>>(),
-                    )
-                }
-                .scope_boxed()
-            })
-        });
+                        Ok::<_, diesel::result::Error>(
+                            results
+                                .into_iter()
+                                .map(|(p, latest)| (checkpoint_viewed_at, p, latest))
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                    .scope_boxed()
+                })
+            });
 
         // Wait for the reads to all finish, and gather them into the result map.
         let groups = futures::future::join_all(futures).await;
@@ -915,7 +1034,13 @@ impl Loader<LatestKey> for Db {
             for (checkpoint_viewed_at, address, latest) in
                 group.map_err(|e| Error::Internal(format!("Failed to fetch packages: {e}")))?
             {
-                results.insert(LatestKey { address: addr(&address)?, checkpoint_viewed_at }, addr(&latest)?);
+                results.insert(
+                    LatestKey {
+                        address: addr(&address)?,
+                        checkpoint_viewed_at,
+                    },
+                    addr(&latest)?,
+                );
             }
         }
 
@@ -932,7 +1057,10 @@ impl TryFrom<&Object> for MovePackage {
         };
 
         if let Data::Package(move_package) = &native.data {
-            Ok(Self { super_: object.clone(), native: move_package.clone() })
+            Ok(Self {
+                super_: object.clone(),
+                native: move_package.clone(),
+            })
         } else {
             Err(MovePackageDowncastError)
         }
@@ -945,7 +1073,10 @@ impl TryFrom<&Object> for MovePackage {
 /// We do this because the `packages` table contains only one entry per package ID. For the system
 /// packages, this is the latest version of the package (for user packages, there is only one entry
 /// per package ID anyway as each version of a package gets its own ID).
-fn system_package_version_query(package: SuiAddress, filter: Option<MovePackageVersionFilter>) -> RawQuery {
+fn system_package_version_query(
+    package: SuiAddress,
+    filter: Option<MovePackageVersionFilter>,
+) -> RawQuery {
     // Query uses a left join to force the query planner to use `objects_version` in the outer loop.
     let mut q = query!(
         r#"
@@ -970,7 +1101,13 @@ fn system_package_version_query(package: SuiAddress, filter: Option<MovePackageV
         "#
     );
 
-    q = filter!(q, format!("original_id = '\\x{}'::bytea", hex::encode(package.into_vec())));
+    q = filter!(
+        q,
+        format!(
+            "original_id = '\\x{}'::bytea",
+            hex::encode(package.into_vec())
+        )
+    );
 
     if let Some(after) = filter.as_ref().and_then(|f| f.after_version) {
         let a: u64 = after.into();
@@ -987,7 +1124,10 @@ fn system_package_version_query(package: SuiAddress, filter: Option<MovePackageV
 
 /// Query for fetching all the versions of a non-system package (assumes that `package` has already
 /// been verified as a system package)
-fn user_package_version_query(package: SuiAddress, filter: Option<MovePackageVersionFilter>) -> RawQuery {
+fn user_package_version_query(
+    package: SuiAddress,
+    filter: Option<MovePackageVersionFilter>,
+) -> RawQuery {
     let mut q = query!(
         r#"
             SELECT
@@ -1007,7 +1147,13 @@ fn user_package_version_query(package: SuiAddress, filter: Option<MovePackageVer
         "#
     );
 
-    q = filter!(q, format!("q.package_id = '\\x{}'::bytea", hex::encode(package.into_vec())));
+    q = filter!(
+        q,
+        format!(
+            "q.package_id = '\\x{}'::bytea",
+            hex::encode(package.into_vec())
+        )
+    );
 
     if let Some(after) = filter.as_ref().and_then(|f| f.after_version) {
         let a: u64 = after.into();

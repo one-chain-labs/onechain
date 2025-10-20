@@ -10,6 +10,7 @@ pub fn main() {
 
     let test_plan = args.build_test_plan();
     if let Some(test_plan) = test_plan {
-        args.run_and_report_unit_tests(test_plan, None, None, std::io::stdout()).unwrap();
+        args.run_and_report_unit_tests(test_plan, None, None, std::io::stdout())
+            .unwrap();
     }
 }

@@ -28,7 +28,10 @@ impl TestStore {
 
 fn new_rocksdb_teststore() -> TestStore {
     let temp_dir = TempDir::new().unwrap();
-    TestStore::RocksDB((RocksDBStore::new(temp_dir.path().to_str().unwrap()), temp_dir))
+    TestStore::RocksDB((
+        RocksDBStore::new(temp_dir.path().to_str().unwrap()),
+        temp_dir,
+    ))
 }
 
 fn new_mem_teststore() -> TestStore {
@@ -37,7 +40,9 @@ fn new_mem_teststore() -> TestStore {
 
 #[rstest]
 #[tokio::test]
-async fn read_and_contain_blocks(#[values(new_rocksdb_teststore(), new_mem_teststore())] test_store: TestStore) {
+async fn read_and_contain_blocks(
+    #[values(new_rocksdb_teststore(), new_mem_teststore())] test_store: TestStore,
+) {
     let store = test_store.store();
 
     let written_blocks: Vec<VerifiedBlock> = vec![
@@ -46,18 +51,28 @@ async fn read_and_contain_blocks(#[values(new_rocksdb_teststore(), new_mem_tests
         VerifiedBlock::new_for_test(TestBlock::new(1, 2).build()),
         VerifiedBlock::new_for_test(TestBlock::new(2, 3).build()),
     ];
-    store.write(WriteBatch::default().blocks(written_blocks.clone())).unwrap();
+    store
+        .write(WriteBatch::default().blocks(written_blocks.clone()))
+        .unwrap();
 
     {
         let refs = vec![written_blocks[0].reference()];
-        let read_blocks = store.read_blocks(&refs).expect("Read blocks should not fail");
+        let read_blocks = store
+            .read_blocks(&refs)
+            .expect("Read blocks should not fail");
         assert_eq!(read_blocks.len(), 1);
         assert_eq!(read_blocks[0].as_ref().unwrap(), &written_blocks[0]);
     }
 
     {
-        let refs = vec![written_blocks[2].reference(), written_blocks[1].reference(), written_blocks[1].reference()];
-        let read_blocks = store.read_blocks(&refs).expect("Read blocks should not fail");
+        let refs = vec![
+            written_blocks[2].reference(),
+            written_blocks[1].reference(),
+            written_blocks[1].reference(),
+        ];
+        let read_blocks = store
+            .read_blocks(&refs)
+            .expect("Read blocks should not fail");
         assert_eq!(read_blocks.len(), 3);
         assert_eq!(read_blocks[0].as_ref().unwrap(), &written_blocks[2]);
         assert_eq!(read_blocks[1].as_ref().unwrap(), &written_blocks[1]);
@@ -70,13 +85,17 @@ async fn read_and_contain_blocks(#[values(new_rocksdb_teststore(), new_mem_tests
             BlockRef::new(1, AuthorityIndex::new_for_test(3), BlockDigest::default()),
             written_blocks[2].reference(),
         ];
-        let read_blocks = store.read_blocks(&refs).expect("Read blocks should not fail");
+        let read_blocks = store
+            .read_blocks(&refs)
+            .expect("Read blocks should not fail");
         assert_eq!(read_blocks.len(), 3);
         assert_eq!(read_blocks[0].as_ref().unwrap(), &written_blocks[3]);
         assert!(read_blocks[1].is_none());
         assert_eq!(read_blocks[2].as_ref().unwrap(), &written_blocks[2]);
 
-        let contain_blocks = store.contains_blocks(&refs).expect("Contain blocks should not fail");
+        let contain_blocks = store
+            .contains_blocks(&refs)
+            .expect("Contain blocks should not fail");
         assert_eq!(contain_blocks.len(), 3);
         assert!(contain_blocks[0]);
         assert!(!contain_blocks[1]);
@@ -85,7 +104,9 @@ async fn read_and_contain_blocks(#[values(new_rocksdb_teststore(), new_mem_tests
 
     {
         for block in &written_blocks {
-            let found = store.contains_block_at_slot(block.slot()).expect("Read blocks should not fail");
+            let found = store
+                .contains_block_at_slot(block.slot())
+                .expect("Read blocks should not fail");
             assert!(found);
         }
 
@@ -98,7 +119,9 @@ async fn read_and_contain_blocks(#[values(new_rocksdb_teststore(), new_mem_tests
 
 #[rstest]
 #[tokio::test]
-async fn scan_blocks(#[values(new_rocksdb_teststore(), new_mem_teststore())] test_store: TestStore) {
+async fn scan_blocks(
+    #[values(new_rocksdb_teststore(), new_mem_teststore())] test_store: TestStore,
+) {
     let store = test_store.store();
 
     let written_blocks = vec![
@@ -111,19 +134,26 @@ async fn scan_blocks(#[values(new_rocksdb_teststore(), new_mem_teststore())] tes
         VerifiedBlock::new_for_test(TestBlock::new(13, 2).build()),
         VerifiedBlock::new_for_test(TestBlock::new(13, 1).build()),
     ];
-    store.write(WriteBatch::default().blocks(written_blocks.clone())).unwrap();
+    store
+        .write(WriteBatch::default().blocks(written_blocks.clone()))
+        .unwrap();
 
     {
-        let scanned_blocks =
-            store.scan_blocks_by_author(AuthorityIndex::new_for_test(1), 20).expect("Scan blocks should not fail");
+        let scanned_blocks = store
+            .scan_blocks_by_author(AuthorityIndex::new_for_test(1), 20)
+            .expect("Scan blocks should not fail");
         assert!(scanned_blocks.is_empty(), "{:?}", scanned_blocks);
     }
 
     {
-        let scanned_blocks =
-            store.scan_blocks_by_author(AuthorityIndex::new_for_test(1), 12).expect("Scan blocks should not fail");
+        let scanned_blocks = store
+            .scan_blocks_by_author(AuthorityIndex::new_for_test(1), 12)
+            .expect("Scan blocks should not fail");
         assert_eq!(scanned_blocks.len(), 2, "{:?}", scanned_blocks);
-        assert_eq!(scanned_blocks, vec![written_blocks[5].clone(), written_blocks[7].clone()]);
+        assert_eq!(
+            scanned_blocks,
+            vec![written_blocks[5].clone(), written_blocks[7].clone()]
+        );
     }
 
     let additional_blocks = vec![
@@ -132,19 +162,25 @@ async fn scan_blocks(#[values(new_rocksdb_teststore(), new_mem_teststore())] tes
         VerifiedBlock::new_for_test(TestBlock::new(15, 1).build()),
         VerifiedBlock::new_for_test(TestBlock::new(16, 3).build()),
     ];
-    store.write(WriteBatch::default().blocks(additional_blocks.clone())).unwrap();
+    store
+        .write(WriteBatch::default().blocks(additional_blocks.clone()))
+        .unwrap();
 
     {
-        let scanned_blocks =
-            store.scan_blocks_by_author(AuthorityIndex::new_for_test(1), 10).expect("Scan blocks should not fail");
+        let scanned_blocks = store
+            .scan_blocks_by_author(AuthorityIndex::new_for_test(1), 10)
+            .expect("Scan blocks should not fail");
         assert_eq!(scanned_blocks.len(), 5, "{:?}", scanned_blocks);
-        assert_eq!(scanned_blocks, vec![
-            written_blocks[2].clone(),
-            written_blocks[3].clone(),
-            written_blocks[5].clone(),
-            written_blocks[7].clone(),
-            additional_blocks[2].clone(),
-        ]);
+        assert_eq!(
+            scanned_blocks,
+            vec![
+                written_blocks[2].clone(),
+                written_blocks[3].clone(),
+                written_blocks[5].clone(),
+                written_blocks[7].clone(),
+                additional_blocks[2].clone(),
+            ]
+        );
     }
 
     {
@@ -152,7 +188,10 @@ async fn scan_blocks(#[values(new_rocksdb_teststore(), new_mem_teststore())] tes
             .scan_last_blocks_by_author(AuthorityIndex::new_for_test(1), 2, None)
             .expect("Scan blocks should not fail");
         assert_eq!(scanned_blocks.len(), 2, "{:?}", scanned_blocks);
-        assert_eq!(scanned_blocks, vec![written_blocks[7].clone(), additional_blocks[2].clone()]);
+        assert_eq!(
+            scanned_blocks,
+            vec![written_blocks[7].clone(), additional_blocks[2].clone()]
+        );
 
         let scanned_blocks = store
             .scan_last_blocks_by_author(AuthorityIndex::new_for_test(1), 0, None)
@@ -163,11 +202,15 @@ async fn scan_blocks(#[values(new_rocksdb_teststore(), new_mem_teststore())] tes
 
 #[rstest]
 #[tokio::test]
-async fn read_and_scan_commits(#[values(new_rocksdb_teststore(), new_mem_teststore())] test_store: TestStore) {
+async fn read_and_scan_commits(
+    #[values(new_rocksdb_teststore(), new_mem_teststore())] test_store: TestStore,
+) {
     let store = test_store.store();
 
     {
-        let last_commit = store.read_last_commit().expect("Read last commit should not fail");
+        let last_commit = store
+            .read_last_commit()
+            .expect("Read last commit should not fail");
         assert!(last_commit.is_none(), "{:?}", last_commit);
     }
 
@@ -201,32 +244,55 @@ async fn read_and_scan_commits(#[values(new_rocksdb_teststore(), new_mem_teststo
             vec![],
         ),
     ];
-    store.write(WriteBatch::default().commits(written_commits.clone())).unwrap();
+    store
+        .write(WriteBatch::default().commits(written_commits.clone()))
+        .unwrap();
 
     {
-        let last_commit = store.read_last_commit().expect("Read last commit should not fail");
-        assert_eq!(last_commit.as_ref(), written_commits.last(), "{:?}", last_commit);
+        let last_commit = store
+            .read_last_commit()
+            .expect("Read last commit should not fail");
+        assert_eq!(
+            last_commit.as_ref(),
+            written_commits.last(),
+            "{:?}",
+            last_commit
+        );
     }
 
     {
-        let scanned_commits = store.scan_commits((20..=24).into()).expect("Scan commits should not fail");
+        let scanned_commits = store
+            .scan_commits((20..=24).into())
+            .expect("Scan commits should not fail");
         assert!(scanned_commits.is_empty(), "{:?}", scanned_commits);
     }
 
     {
-        let scanned_commits = store.scan_commits((3..=4).into()).expect("Scan commits should not fail");
+        let scanned_commits = store
+            .scan_commits((3..=4).into())
+            .expect("Scan commits should not fail");
         assert_eq!(scanned_commits.len(), 2, "{:?}", scanned_commits);
-        assert_eq!(scanned_commits, vec![written_commits[2].clone(), written_commits[3].clone()]);
+        assert_eq!(
+            scanned_commits,
+            vec![written_commits[2].clone(), written_commits[3].clone()]
+        );
     }
 
     {
-        let scanned_commits = store.scan_commits((0..=2).into()).expect("Scan commits should not fail");
+        let scanned_commits = store
+            .scan_commits((0..=2).into())
+            .expect("Scan commits should not fail");
         assert_eq!(scanned_commits.len(), 2, "{:?}", scanned_commits);
-        assert_eq!(scanned_commits, vec![written_commits[0].clone(), written_commits[1].clone()]);
+        assert_eq!(
+            scanned_commits,
+            vec![written_commits[0].clone(), written_commits[1].clone()]
+        );
     }
 
     {
-        let scanned_commits = store.scan_commits((0..=4).into()).expect("Scan commits should not fail");
+        let scanned_commits = store
+            .scan_commits((0..=4).into())
+            .expect("Scan commits should not fail");
         assert_eq!(scanned_commits.len(), 4, "{:?}", scanned_commits);
         assert_eq!(scanned_commits, written_commits,);
     }

@@ -3,7 +3,7 @@
 	"author": "Mysten Labs <build@mystenlabs.com>",
 	"description": "A CLI for creating new Sui dApps",
 	"homepage": "https://sdk.mystenlabs.com",
-	"version": "0.3.41",
+	"version": "0.3.45",
 	"license": "Apache-2.0",
 	"files": [
 		"CHANGELOG.md",
@@ -29,7 +29,7 @@
 		"lint:fix": "pnpm run eslint:fix && pnpm run prettier:fix"
 	},
 	"bugs": {
-		"url": "https://github.com/MystenLabs/sui/issues/new"
+		"url": "https://github.com/one-chain-labs/onechain/issues/new"
 	},
 	"publishConfig": {
 		"access": "public"

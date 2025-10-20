@@ -1,19 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{AnalyticsWriter, FileFormat, FileType, ParquetSchema, ParquetValue};
+use crate::{AnalyticsWriter, FileFormat, FileType};
+use crate::{ParquetSchema, ParquetValue};
 use anyhow::{anyhow, Result};
 use arrow_array::{ArrayRef, BooleanArray, Int64Array, RecordBatch, StringArray, UInt64Array};
 use serde::Serialize;
-use std::{
-    fs::{create_dir_all, remove_file, File},
-    ops::Range,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::fs::File;
+use std::fs::{create_dir_all, remove_file};
+use std::ops::Range;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use sui_types::base_types::EpochId;
 
-use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
+use parquet::arrow::ArrowWriter;
+use parquet::basic::Compression;
+use parquet::file::properties::WriterProperties;
 use sui_storage::object_store::util::path_to_filesystem;
 
 // Save table entries to parquet files.
@@ -26,15 +28,29 @@ pub(crate) struct ParquetWriter {
 }
 
 impl ParquetWriter {
-    pub(crate) fn new(root_dir_path: &Path, file_type: FileType, start_checkpoint_seq_num: u64) -> Result<Self> {
+    pub(crate) fn new(
+        root_dir_path: &Path,
+        file_type: FileType,
+        start_checkpoint_seq_num: u64,
+    ) -> Result<Self> {
         let checkpoint_range = start_checkpoint_seq_num..u64::MAX;
-        Ok(Self { root_dir_path: root_dir_path.to_path_buf(), file_type, epoch: 0, checkpoint_range, data: vec![] })
+        Ok(Self {
+            root_dir_path: root_dir_path.to_path_buf(),
+            file_type,
+            epoch: 0,
+            checkpoint_range,
+            data: vec![],
+        })
     }
 
     fn file(&self) -> Result<File> {
         let file_path = path_to_filesystem(
             self.root_dir_path.clone(),
-            &self.file_type.file_path(FileFormat::PARQUET, self.epoch, self.checkpoint_range.clone()),
+            &self.file_type.file_path(
+                FileFormat::PARQUET,
+                self.epoch,
+                self.checkpoint_range.clone(),
+            ),
         )?;
         create_dir_all(file_path.parent().ok_or(anyhow!("Bad directory path"))?)?;
         if file_path.exists() {
@@ -95,7 +111,9 @@ impl<S: Serialize + ParquetSchema> AnalyticsWriter<S> for ParquetWriter {
         }
         let batch = RecordBatch::try_from_iter(S::schema().iter().zip(batch_data.into_iter()))?;
 
-        let properties = WriterProperties::builder().set_compression(Compression::SNAPPY).build();
+        let properties = WriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .build();
 
         let mut writer = ArrowWriter::try_new(self.file()?, batch.schema(), Some(properties))?;
         writer.write(&batch)?;

@@ -8,7 +8,9 @@ use crate::{
     cfgir::cfg::MutForwardCFG,
     diagnostics::DiagnosticReporter,
     expansion::ast::Mutability,
-    hlir::ast::{Command, Command_, Exp, FunctionSignature, SingleType, UnannotatedExp_, Value, Value_, Var},
+    hlir::ast::{
+        Command, Command_, Exp, FunctionSignature, SingleType, UnannotatedExp_, Value, Value_, Var,
+    },
     parser::ast::ConstantName,
     shared::unique_map::UniqueMap,
 };
@@ -39,9 +41,20 @@ fn optimize_cmd(sp!(_, cmd_): &mut Command) -> bool {
     use UnannotatedExp_ as E;
     use Value_ as V;
     match cmd_ {
-        C::JumpIf { cond: Exp { exp: sp!(_, E::Value(sp!(_, V::Bool(cond)))), .. }, if_true, if_false } => {
+        C::JumpIf {
+            cond:
+                Exp {
+                    exp: sp!(_, E::Value(sp!(_, V::Bool(cond)))),
+                    ..
+                },
+            if_true,
+            if_false,
+        } => {
             let lbl = if *cond { *if_true } else { *if_false };
-            *cmd_ = C::Jump { target: lbl, from_user: false };
+            *cmd_ = C::Jump {
+                target: lbl,
+                from_user: false,
+            };
             true
         }
         _ => false,

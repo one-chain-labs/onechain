@@ -5,11 +5,10 @@ use anyhow::{anyhow, Result};
 use byteorder::ReadBytesExt;
 use integer_encoding::{VarInt, VarIntReader};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    io::{Read, Write},
-    marker::PhantomData,
-};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use std::io::{Read, Write};
+use std::marker::PhantomData;
 
 pub const MAX_VARINT_LENGTH: usize = 10;
 pub const BLOB_ENCODING_BYTES: usize = 1;
@@ -33,7 +32,6 @@ impl Blob {
         };
         Ok(Blob { data, encoding })
     }
-
     pub fn decode<T: DeserializeOwned>(self) -> Result<T> {
         let data = match &self.encoding {
             BlobEncoding::Bcs => self.data,
@@ -41,7 +39,6 @@ impl Blob {
         let res = bcs::from_bytes(&data)?;
         Ok(res)
     }
-
     pub fn read<R: Read>(rbuf: &mut R) -> Result<Blob> {
         let len = rbuf.read_varint::<u64>()? as usize;
         if len == 0 {
@@ -50,10 +47,12 @@ impl Blob {
         let encoding = rbuf.read_u8()?;
         let mut data = vec![0u8; len];
         rbuf.read_exact(&mut data)?;
-        let blob = Blob { data, encoding: BlobEncoding::try_from(encoding)? };
+        let blob = Blob {
+            data,
+            encoding: BlobEncoding::try_from(encoding)?,
+        };
         Ok(blob)
     }
-
     pub fn write<W: Write>(&self, wbuf: &mut W) -> Result<usize> {
         let mut buf = [0u8; MAX_VARINT_LENGTH];
         let mut counter = 0;
@@ -67,21 +66,22 @@ impl Blob {
         counter += self.data.len();
         Ok(counter)
     }
-
     pub fn size(&self) -> usize {
         let mut blob_size = self.data.len().required_space();
         blob_size += BLOB_ENCODING_BYTES;
         blob_size += self.data.len();
         blob_size
     }
-
     pub fn to_bytes(&self) -> Vec<u8> {
         [vec![self.encoding.into()], self.data.clone()].concat()
     }
-
     pub fn from_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
         let (encoding, data) = bytes.split_first().ok_or(anyhow!("empty bytes"))?;
-        Blob { data: data.to_vec(), encoding: BlobEncoding::try_from(*encoding)? }.decode()
+        Blob {
+            data: data.to_vec(),
+            encoding: BlobEncoding::try_from(*encoding)?,
+        }
+        .decode()
     }
 }
 
@@ -93,9 +93,11 @@ pub struct BlobIter<T> {
 
 impl<T: DeserializeOwned> BlobIter<T> {
     pub fn new(reader: Box<dyn Read>) -> Self {
-        Self { reader, _phantom: PhantomData }
+        Self {
+            reader,
+            _phantom: PhantomData,
+        }
     }
-
     fn next_blob(&mut self) -> Result<T> {
         let blob = Blob::read(&mut self.reader)?;
         blob.decode()
@@ -104,7 +106,6 @@ impl<T: DeserializeOwned> BlobIter<T> {
 
 impl<T: DeserializeOwned> Iterator for BlobIter<T> {
     type Item = T;
-
     fn next(&mut self) -> Option<Self::Item> {
         self.next_blob().ok()
     }

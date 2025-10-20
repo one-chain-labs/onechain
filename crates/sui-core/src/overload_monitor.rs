@@ -3,21 +3,17 @@
 
 use crate::authority::AuthorityState;
 use mysten_metrics::monitored_scope;
-use std::{
-    cmp::{max, min},
-    hash::Hasher,
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Weak,
-    },
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::cmp::{max, min};
+use std::hash::Hasher;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Weak;
+use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 use sui_config::node::AuthorityOverloadConfig;
-use sui_types::{
-    digests::TransactionDigest,
-    error::{SuiError, SuiResult},
-    fp_bail,
-};
+use sui_types::digests::TransactionDigest;
+use sui_types::error::SuiError;
+use sui_types::error::SuiResult;
+use sui_types::fp_bail;
 use tokio::time::sleep;
 use tracing::{debug, info};
 use twox_hash::XxHash64;
@@ -34,7 +30,8 @@ pub struct AuthorityOverloadInfo {
 impl AuthorityOverloadInfo {
     pub fn set_overload(&self, load_shedding_percentage: u32) {
         self.is_overload.store(true, Ordering::Relaxed);
-        self.load_shedding_percentage.store(min(load_shedding_percentage, 100), Ordering::Relaxed);
+        self.load_shedding_percentage
+            .store(min(load_shedding_percentage, 100), Ordering::Relaxed);
     }
 
     pub fn clear_overload(&self) {
@@ -52,7 +49,10 @@ const SEED_UPDATE_DURATION_SECS: u64 = 30;
 
 // Monitors the overload signals in `authority_state` periodically, and updates its `overload_info`
 // when the signals indicates overload.
-pub async fn overload_monitor(authority_state: Weak<AuthorityState>, config: AuthorityOverloadConfig) {
+pub async fn overload_monitor(
+    authority_state: Weak<AuthorityState>,
+    config: AuthorityOverloadConfig,
+) {
     info!("Starting system overload monitor.");
 
     loop {
@@ -69,7 +69,10 @@ pub async fn overload_monitor(authority_state: Weak<AuthorityState>, config: Aut
 
 // Checks authority overload signals, and updates authority's `overload_info`.
 // Returns whether the authority state exists.
-fn check_authority_overload(authority_state: &Weak<AuthorityState>, config: &AuthorityOverloadConfig) -> bool {
+fn check_authority_overload(
+    authority_state: &Weak<AuthorityState>,
+    config: &AuthorityOverloadConfig,
+) -> bool {
     let _scope = monitored_scope("OverloadMonitor::check_authority_overload");
     let authority_arc = authority_state.upgrade();
     if authority_arc.is_none() {
@@ -78,7 +81,11 @@ fn check_authority_overload(authority_state: &Weak<AuthorityState>, config: &Aut
     }
 
     let authority = authority_arc.unwrap();
-    let queueing_latency = authority.metrics.execution_queueing_latency.latency().unwrap_or_default();
+    let queueing_latency = authority
+        .metrics
+        .execution_queueing_latency
+        .latency()
+        .unwrap_or_default();
     let txn_ready_rate = authority.metrics.txn_ready_rate_tracker.lock().rate();
     let execution_rate = authority.metrics.execution_rate_tracker.lock().rate();
 
@@ -89,20 +96,31 @@ fn check_authority_overload(authority_state: &Weak<AuthorityState>, config: &Aut
 
     let (is_overload, load_shedding_percentage) = check_overload_signals(
         config,
-        authority.overload_info.load_shedding_percentage.load(Ordering::Relaxed),
+        authority
+            .overload_info
+            .load_shedding_percentage
+            .load(Ordering::Relaxed),
         queueing_latency,
         txn_ready_rate,
         execution_rate,
     );
 
     if is_overload {
-        authority.overload_info.set_overload(load_shedding_percentage);
+        authority
+            .overload_info
+            .set_overload(load_shedding_percentage);
     } else {
         authority.overload_info.clear_overload();
     }
 
-    authority.metrics.authority_overload_status.set(is_overload as i64);
-    authority.metrics.authority_load_shedding_percentage.set(load_shedding_percentage as i64);
+    authority
+        .metrics
+        .authority_overload_status
+        .set(is_overload as i64);
+    authority
+        .metrics
+        .authority_load_shedding_percentage
+        .set(load_shedding_percentage as i64);
     true
 }
 
@@ -124,7 +142,9 @@ fn calculate_load_shedding_percentage(txn_ready_rate: f64, execution_rate: f64) 
 
     // In order to maintain execution queue length, we need to drop at least (1 - executionRate / readyRate).
     // To reduce the queue length, here we add 10% more transactions to drop.
-    (((1.0 - execution_rate * EXECUTION_RATE_RATIO_FOR_COMPARISON / txn_ready_rate) + ADDITIONAL_LOAD_SHEDDING).min(1.0)
+    (((1.0 - execution_rate * EXECUTION_RATE_RATIO_FOR_COMPARISON / txn_ready_rate)
+        + ADDITIONAL_LOAD_SHEDDING)
+        .min(1.0)
         * 100.0)
         .round() as u32
 }
@@ -148,16 +168,22 @@ fn check_overload_signals(
     // what's the percentage of traffic to shed from `txn_ready_rate`.
     let additional_load_shedding_percentage;
     if queueing_latency > config.execution_queue_latency_hard_limit {
-        let calculated_load_shedding_percentage = calculate_load_shedding_percentage(txn_ready_rate, execution_rate);
+        let calculated_load_shedding_percentage =
+            calculate_load_shedding_percentage(txn_ready_rate, execution_rate);
 
-        additional_load_shedding_percentage =
-            if calculated_load_shedding_percentage > 0 || txn_ready_rate >= config.safe_transaction_ready_rate as f64 {
-                max(calculated_load_shedding_percentage, config.min_load_shedding_percentage_above_hard_limit)
-            } else {
-                0
-            };
+        additional_load_shedding_percentage = if calculated_load_shedding_percentage > 0
+            || txn_ready_rate >= config.safe_transaction_ready_rate as f64
+        {
+            max(
+                calculated_load_shedding_percentage,
+                config.min_load_shedding_percentage_above_hard_limit,
+            )
+        } else {
+            0
+        };
     } else if queueing_latency > config.execution_queue_latency_soft_limit {
-        additional_load_shedding_percentage = calculate_load_shedding_percentage(txn_ready_rate, execution_rate);
+        additional_load_shedding_percentage =
+            calculate_load_shedding_percentage(txn_ready_rate, execution_rate);
     } else {
         additional_load_shedding_percentage = 0;
     }
@@ -170,7 +196,9 @@ fn check_overload_signals(
         // `additional_load_shedding_percentage`.
         current_load_shedding_percentage
             + (100 - current_load_shedding_percentage) * additional_load_shedding_percentage / 100
-    } else if txn_ready_rate > config.safe_transaction_ready_rate as f64 && current_load_shedding_percentage > 10 {
+    } else if txn_ready_rate > config.safe_transaction_ready_rate as f64
+        && current_load_shedding_percentage > 10
+    {
         // We don't need to shed more load. However, the enqueue rate is still not minimal.
         // We gradually reduce load shedding percentage (10% at a time) to gracefully accept
         // more load.
@@ -180,13 +208,20 @@ fn check_overload_signals(
         0
     };
 
-    let load_shedding_percentage = min(load_shedding_percentage, config.max_load_shedding_percentage);
+    let load_shedding_percentage = min(
+        load_shedding_percentage,
+        config.max_load_shedding_percentage,
+    );
     let overload_status = load_shedding_percentage > 0;
     (overload_status, load_shedding_percentage)
 }
 
 // Return true if we should reject the txn with `tx_digest`.
-fn should_reject_tx(load_shedding_percentage: u32, tx_digest: TransactionDigest, temporal_seed: u64) -> bool {
+fn should_reject_tx(
+    load_shedding_percentage: u32,
+    tx_digest: TransactionDigest,
+    temporal_seed: u64,
+) -> bool {
     // TODO: we also need to add a secret salt (e.g. first consensus commit in the current epoch),
     // to prevent gaming the system.
     let mut hasher = XxHash64::with_seed(temporal_seed);
@@ -196,19 +231,27 @@ fn should_reject_tx(load_shedding_percentage: u32, tx_digest: TransactionDigest,
 }
 
 // Checks if we can accept the transaction with `tx_digest`.
-pub fn overload_monitor_accept_tx(load_shedding_percentage: u32, tx_digest: TransactionDigest) -> SuiResult {
+pub fn overload_monitor_accept_tx(
+    load_shedding_percentage: u32,
+    tx_digest: TransactionDigest,
+) -> SuiResult {
     // Derive a random seed from the epoch time for transaction selection. Changing the seed every
     // `SEED_UPDATE_DURATION_SECS` interval allows rejected transaction's retry to have a chance
     // to go through in the future.
     // Also, using the epoch time instead of randomly generating a seed allows that all validators
     // makes the same decision.
-    let temporal_seed = SystemTime::now().duration_since(UNIX_EPOCH).expect("Sui did not exist prior to 1970").as_secs()
+    let temporal_seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Sui did not exist prior to 1970")
+        .as_secs()
         / SEED_UPDATE_DURATION_SECS;
 
     if should_reject_tx(load_shedding_percentage, tx_digest, temporal_seed) {
         // TODO: using `SEED_UPDATE_DURATION_SECS` is a safe suggestion that the time based seed
         // is definitely different by then. However, a shorter suggestion may be available.
-        fp_bail!(SuiError::ValidatorOverloadedRetryAfter { retry_after_secs: SEED_UPDATE_DURATION_SECS });
+        fp_bail!(SuiError::ValidatorOverloadedRetryAfter {
+            retry_after_secs: SEED_UPDATE_DURATION_SECS
+        });
     }
     Ok(())
 }
@@ -221,43 +264,60 @@ mod tests {
     use crate::authority::test_authority_builder::TestAuthorityBuilder;
     use rand::{
         rngs::{OsRng, StdRng},
-        Rng,
-        SeedableRng,
+        Rng, SeedableRng,
     };
     use std::sync::Arc;
     use sui_macros::sim_test;
-    use tokio::{
-        sync::{
-            mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-            oneshot,
-        },
-        task::JoinHandle,
-        time::{interval, Instant, MissedTickBehavior},
-    };
+    use tokio::sync::mpsc::unbounded_channel;
+    use tokio::sync::mpsc::UnboundedReceiver;
+    use tokio::sync::mpsc::UnboundedSender;
+    use tokio::sync::oneshot;
+    use tokio::task::JoinHandle;
+    use tokio::time::{interval, Instant, MissedTickBehavior};
 
     #[test]
     pub fn test_authority_overload_info() {
         let overload_info = AuthorityOverloadInfo::default();
         assert!(!overload_info.is_overload.load(Ordering::Relaxed));
-        assert_eq!(overload_info.load_shedding_percentage.load(Ordering::Relaxed), 0);
+        assert_eq!(
+            overload_info
+                .load_shedding_percentage
+                .load(Ordering::Relaxed),
+            0
+        );
 
         {
             overload_info.set_overload(20);
             assert!(overload_info.is_overload.load(Ordering::Relaxed));
-            assert_eq!(overload_info.load_shedding_percentage.load(Ordering::Relaxed), 20);
+            assert_eq!(
+                overload_info
+                    .load_shedding_percentage
+                    .load(Ordering::Relaxed),
+                20
+            );
         }
 
         // Tests that load shedding percentage can't go beyond 100%.
         {
             overload_info.set_overload(110);
             assert!(overload_info.is_overload.load(Ordering::Relaxed));
-            assert_eq!(overload_info.load_shedding_percentage.load(Ordering::Relaxed), 100);
+            assert_eq!(
+                overload_info
+                    .load_shedding_percentage
+                    .load(Ordering::Relaxed),
+                100
+            );
         }
 
         {
             overload_info.clear_overload();
             assert!(!overload_info.is_overload.load(Ordering::Relaxed));
-            assert_eq!(overload_info.load_shedding_percentage.load(Ordering::Relaxed), 0);
+            assert_eq!(
+                overload_info
+                    .load_shedding_percentage
+                    .load(Ordering::Relaxed),
+                0
+            );
         }
     }
 
@@ -282,53 +342,92 @@ mod tests {
         };
 
         // When execution queueing latency is within soft limit, don't start overload protection.
-        assert_eq!(check_overload_signals(&config, 0, Duration::from_millis(500), 1000.0, 10.0), (false, 0));
+        assert_eq!(
+            check_overload_signals(&config, 0, Duration::from_millis(500), 1000.0, 10.0),
+            (false, 0)
+        );
 
         // When execution queueing latency hits soft limit and execution rate is higher, don't
         // start overload protection.
-        assert_eq!(check_overload_signals(&config, 0, Duration::from_secs(2), 100.0, 120.0), (false, 0));
+        assert_eq!(
+            check_overload_signals(&config, 0, Duration::from_secs(2), 100.0, 120.0),
+            (false, 0)
+        );
 
         // When execution queueing latency hits soft limit, but not hard limit, start overload
         // protection.
-        assert_eq!(check_overload_signals(&config, 0, Duration::from_secs(2), 100.0, 100.0), (true, 7));
+        assert_eq!(
+            check_overload_signals(&config, 0, Duration::from_secs(2), 100.0, 100.0),
+            (true, 7)
+        );
 
         // When execution queueing latency hits hard limit, start more aggressive overload
         // protection.
-        assert_eq!(check_overload_signals(&config, 0, Duration::from_secs(11), 100.0, 100.0), (true, 50));
+        assert_eq!(
+            check_overload_signals(&config, 0, Duration::from_secs(11), 100.0, 100.0),
+            (true, 50)
+        );
 
         // When execution queueing latency hits hard limit and calculated shedding percentage
         // is higher than min_load_shedding_percentage_above_hard_limit.
-        assert_eq!(check_overload_signals(&config, 0, Duration::from_secs(11), 240.0, 100.0), (true, 62));
+        assert_eq!(
+            check_overload_signals(&config, 0, Duration::from_secs(11), 240.0, 100.0),
+            (true, 62)
+        );
 
         // When execution queueing latency hits hard limit, but transaction ready rate
         // is within safe_transaction_ready_rate, don't start overload protection.
-        assert_eq!(check_overload_signals(&config, 0, Duration::from_secs(11), 20.0, 100.0), (false, 0));
+        assert_eq!(
+            check_overload_signals(&config, 0, Duration::from_secs(11), 20.0, 100.0),
+            (false, 0)
+        );
 
         // Maximum transactions shed is cap by `max_load_shedding_percentage` config.
-        assert_eq!(check_overload_signals(&config, 0, Duration::from_secs(11), 100.0, 0.0), (true, 90));
+        assert_eq!(
+            check_overload_signals(&config, 0, Duration::from_secs(11), 100.0, 0.0),
+            (true, 90)
+        );
 
         // When the system is already shedding 50% of load, and the current txn ready rate
         // and execution rate require another 20%, the final shedding rate is 60%.
-        assert_eq!(check_overload_signals(&config, 50, Duration::from_secs(2), 116.0, 100.0), (true, 60));
+        assert_eq!(
+            check_overload_signals(&config, 50, Duration::from_secs(2), 116.0, 100.0),
+            (true, 60)
+        );
 
         // Load shedding percentage is gradually reduced when txn ready rate is lower than
         // execution rate.
-        assert_eq!(check_overload_signals(&config, 90, Duration::from_secs(2), 200.0, 300.0), (true, 80));
+        assert_eq!(
+            check_overload_signals(&config, 90, Duration::from_secs(2), 200.0, 300.0),
+            (true, 80)
+        );
 
         // When queueing delay is above hard limit, we shed additional 50% every time.
-        assert_eq!(check_overload_signals(&config, 50, Duration::from_secs(11), 100.0, 100.0), (true, 75));
+        assert_eq!(
+            check_overload_signals(&config, 50, Duration::from_secs(11), 100.0, 100.0),
+            (true, 75)
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]
     pub async fn test_check_authority_overload() {
         telemetry_subscribers::init_for_testing();
 
-        let config = AuthorityOverloadConfig { safe_transaction_ready_rate: 0, ..Default::default() };
-        let state = TestAuthorityBuilder::new().with_authority_overload_config(config.clone()).build().await;
+        let config = AuthorityOverloadConfig {
+            safe_transaction_ready_rate: 0,
+            ..Default::default()
+        };
+        let state = TestAuthorityBuilder::new()
+            .with_authority_overload_config(config.clone())
+            .build()
+            .await;
 
         // Initialize latency reporter.
         for _ in 0..1000 {
-            state.metrics.execution_queueing_latency.report(Duration::from_secs(20));
+            state
+                .metrics
+                .execution_queueing_latency
+                .report(Duration::from_secs(20));
         }
 
         // Creates a simple case to see if authority state overload_info can be updated
@@ -337,7 +436,10 @@ mod tests {
         assert!(check_authority_overload(&authority, &config));
         assert!(state.overload_info.is_overload.load(Ordering::Relaxed));
         assert_eq!(
-            state.overload_info.load_shedding_percentage.load(Ordering::Relaxed),
+            state
+                .overload_info
+                .load_shedding_percentage
+                .load(Ordering::Relaxed),
             config.min_load_shedding_percentage_above_hard_limit
         );
 
@@ -351,7 +453,10 @@ mod tests {
     // Creates an AuthorityState and starts an overload monitor that monitors its metrics.
     async fn start_overload_monitor() -> (Arc<AuthorityState>, JoinHandle<()>) {
         let overload_config = AuthorityOverloadConfig::default();
-        let state = TestAuthorityBuilder::new().with_authority_overload_config(overload_config.clone()).build().await;
+        let state = TestAuthorityBuilder::new()
+            .with_authority_overload_config(overload_config.clone())
+            .build()
+            .await;
         let authority_state = Arc::downgrade(&state);
         let monitor_handle = tokio::spawn(async move {
             overload_monitor(authority_state, overload_config).await;
@@ -378,14 +483,18 @@ mod tests {
             let mut total_dropped_requests: u32 = 0;
 
             // Helper function to check whether we should send a request.
-            let mut do_send = |enable_load_shedding: bool, authority: Arc<AuthorityState>| -> bool {
-                if enable_load_shedding {
-                    let shedding_percentage = authority.overload_info.load_shedding_percentage.load(Ordering::Relaxed);
-                    !(shedding_percentage > 0 && rng.gen_range(0..100) < shedding_percentage)
-                } else {
-                    true
-                }
-            };
+            let mut do_send =
+                |enable_load_shedding: bool, authority: Arc<AuthorityState>| -> bool {
+                    if enable_load_shedding {
+                        let shedding_percentage = authority
+                            .overload_info
+                            .load_shedding_percentage
+                            .load(Ordering::Relaxed);
+                        !(shedding_percentage > 0 && rng.gen_range(0..100) < shedding_percentage)
+                    } else {
+                        true
+                    }
+                };
 
             loop {
                 tokio::select! {
@@ -458,7 +567,10 @@ mod tests {
             info!(
                 "Overload: {:?}. Shedding percentage: {:?}. Queue: {:?}, Ready rate: {:?}. Exec rate: {:?}.",
                 state.overload_info.is_overload.load(Ordering::Relaxed),
-                state.overload_info.load_shedding_percentage.load(Ordering::Relaxed),
+                state
+                    .overload_info
+                    .load_shedding_percentage
+                    .load(Ordering::Relaxed),
                 state.metrics.execution_queueing_latency.latency(),
                 state.metrics.txn_ready_rate_tracker.lock().rate(),
                 state.metrics.execution_rate_tracker.lock().rate(),
@@ -499,8 +611,8 @@ mod tests {
         stop_tx.send(()).unwrap();
         let _ = tokio::join!(load_generator, executor);
 
-        let dropped_ratio =
-            dropped_requests.load(Ordering::SeqCst) as f64 / total_requests.load(Ordering::SeqCst) as f64;
+        let dropped_ratio = dropped_requests.load(Ordering::SeqCst) as f64
+            / total_requests.load(Ordering::SeqCst) as f64;
         assert!(min_dropping_rate <= dropped_ratio);
         assert!(dropped_ratio <= max_dropping_rate);
 
@@ -604,8 +716,8 @@ mod tests {
 
         stop_tx.send(()).unwrap();
         let _ = tokio::join!(load_generator, executor);
-        let dropped_ratio =
-            dropped_requests.load(Ordering::SeqCst) as f64 / total_requests.load(Ordering::SeqCst) as f64;
+        let dropped_ratio = dropped_requests.load(Ordering::SeqCst) as f64
+            / total_requests.load(Ordering::SeqCst) as f64;
 
         // We should drop about 50% of request because the burst throughput is about 2x of
         // execution rate.
@@ -629,7 +741,10 @@ mod tests {
                 }
             }
 
-            debug!("Rejection percentage: {:?}, reject count: {:?}.", rejection_percentage, reject_count);
+            debug!(
+                "Rejection percentage: {:?}, reject count: {:?}.",
+                rejection_percentage, reject_count
+            );
             // Give it a 3% fluctuation.
             assert!(rejection_percentage as f32 / 100.0 - 0.03 < reject_count as f32 / 10000.0);
             assert!(reject_count as f32 / 10000.0 < rejection_percentage as f32 / 100.0 + 0.03);
@@ -653,7 +768,11 @@ mod tests {
 
         // It should always be rejected using the current temporal_seed.
         for _ in 0..100 {
-            assert!(should_reject_tx(load_shedding_percentage, digest, temporal_seed));
+            assert!(should_reject_tx(
+                load_shedding_percentage,
+                digest,
+                temporal_seed
+            ));
         }
 
         // It will be accepted in the future.

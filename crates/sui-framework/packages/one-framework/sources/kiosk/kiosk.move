@@ -80,15 +80,15 @@
 /// ```
 ///
 /// See `transfer_policy` module for more details on how they function.
-module one::kiosk;
+module oct::kiosk;
 
-use one::balance::{Self, Balance};
-use one::coin::{Self, Coin};
-use one::dynamic_field as df;
-use one::dynamic_object_field as dof;
-use one::event;
-use one::oct::OCT;
-use one::transfer_policy::{Self, TransferPolicy, TransferRequest};
+use sui::balance::{Self, Balance};
+use sui::coin::{Self, Coin};
+use sui::dynamic_field as df;
+use sui::dynamic_object_field as dof;
+use sui::event;
+use sui::oct::OCT;
+use sui::transfer_policy::{Self, TransferPolicy, TransferRequest};
 
 /// Allows calling `cap.kiosk()` to retrieve `for` field from `KioskOwnerCap`.
 public use fun kiosk_owner_cap_for as KioskOwnerCap.kiosk;
@@ -233,8 +233,8 @@ public struct ItemDelisted<phantom T: key + store> has copy, drop {
 /// `KioskOwnerCap` and becomes the Owner, the `Kiosk` is shared.
 entry fun default(ctx: &mut TxContext) {
     let (kiosk, cap) = new(ctx);
-    one::transfer::transfer(cap, ctx.sender());
-    one::transfer::share_object(kiosk);
+    sui::transfer::transfer(cap, ctx.sender());
+    sui::transfer::share_object(kiosk);
 }
 
 /// Creates a new `Kiosk` with a matching `KioskOwnerCap`.

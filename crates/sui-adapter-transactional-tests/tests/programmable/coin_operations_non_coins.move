@@ -24,17 +24,17 @@ module test::m1 {
 
 // split non-coin
 //# programmable --sender A --inputs 0
-//> 0: test::m1::mint<one::oct::OCT>();
+//> 0: test::m1::mint<sui::oct::OCT>();
 //> SplitCoins(Result(0), [Input(0)])
 
 // merge into non-coin
 //# programmable --sender A --inputs 0
-//> 0: test::m1::mint<one::oct::OCT>();
+//> 0: test::m1::mint<sui::oct::OCT>();
 //> MergeCoins(Result(0), [Gas])
 
 // merge non-coin into gas
 //# programmable --sender A --inputs 0
-//> 0: test::m1::mint<one::oct::OCT>();
+//> 0: test::m1::mint<sui::oct::OCT>();
 //> MergeCoins(Gas, [Result(0)])
 
 //# programmable --sender A --inputs 10000u64

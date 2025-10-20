@@ -69,7 +69,7 @@ type Address implements IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this address. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -79,13 +79,13 @@ type Address implements IOwner {
 	"""
 	The coin objects for this address.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this address.
+	The `0x3::staking_pool::StakedSui` objects owned by this address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this address.
 	"""
@@ -210,7 +210,7 @@ The total balance for a particular coin type.
 """
 type Balance {
 	"""
-	Coin type for the balance, such as 0x2:::oct::OCT
+	Coin type for the balance, such as 0x2::sui::SUI
 	"""
 	coinType: MoveType!
 	"""
@@ -232,7 +232,7 @@ type BalanceChange {
 	"""
 	owner: Owner
 	"""
-	The inner type of the coin whose balance has changed (e.g. `0x2:::oct::OCT`).
+	The inner type of the coin whose balance has changed (e.g. `0x2::sui::SUI`).
 	"""
 	coinType: MoveType
 	"""
@@ -453,7 +453,7 @@ type Coin implements IMoveObject & IObject & IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this object. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -463,13 +463,13 @@ type Coin implements IMoveObject & IObject & IOwner {
 	"""
 	The coin objects for this object.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object.
+	The `0x3::staking_pool::StakedSui` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -612,7 +612,7 @@ type CoinMetadata implements IMoveObject & IObject & IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this object. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -622,13 +622,13 @@ type CoinMetadata implements IMoveObject & IObject & IOwner {
 	"""
 	The coin objects for this object.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object.
+	The `0x3::staking_pool::StakedSui` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -1183,7 +1183,7 @@ input EventFilter {
 	
 	Generic types can be queried by either the generic type name, e.g.
 	`0x2::coin::Coin`, or by the full type name, such as
-	`0x2::coin::Coin<0x2:::oct::OCT>`.
+	`0x2::coin::Coin<0x2::sui::SUI>`.
 	"""
 	eventType: String
 }
@@ -1416,7 +1416,7 @@ interface IOwner {
 	"""
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
-	Total balance of all coins with marker type owned by this object or address. If type is not supplied, it defaults to `0x2:::oct::OCT`.
+	Total balance of all coins with marker type owned by this object or address. If type is not supplied, it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -1426,13 +1426,13 @@ interface IOwner {
 	"""
 	The coin objects for this object or address.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
+	The `0x3::staking_pool::StakedSui` objects owned by this object or address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -1750,7 +1750,7 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this object. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -1760,13 +1760,13 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	"""
 	The coin objects for this object.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object.
+	The `0x3::staking_pool::StakedSui` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -1861,9 +1861,9 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	"""
 	asCoin: Coin
 	"""
-	Attempts to convert the Move object into a `0x3::staking_pool::StakedOct`.
+	Attempts to convert the Move object into a `0x3::staking_pool::StakedSui`.
 	"""
-	asStakedOct: StakedOct
+	asStakedSui: StakedSui
 	"""
 	Attempts to convert the Move object into a `0x2::coin::CoinMetadata`.
 	"""
@@ -1918,7 +1918,7 @@ type MovePackage implements IObject & IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this package. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	
 	Note that coins owned by a package are inaccessible, because packages are immutable and
 	cannot be owned by an address.
@@ -1934,19 +1934,19 @@ type MovePackage implements IObject & IOwner {
 	"""
 	The coin objects owned by this package.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	
 	Note that coins owned by a package are inaccessible, because packages are immutable and
 	cannot be owned by an address.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this package.
+	The `0x3::staking_pool::StakedSui` objects owned by this package.
 	
 	Note that objects owned by a package are inaccessible, because packages are immutable and
 	cannot be owned by an address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2261,7 +2261,7 @@ type Object implements IObject & IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this object. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -2271,13 +2271,13 @@ type Object implements IObject & IOwner {
 	"""
 	The coin objects for this object.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object.
+	The `0x3::staking_pool::StakedSui` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -2467,7 +2467,7 @@ input ObjectFilter {
 	type name.
 	
 	Generic types can be queried by either the generic type name, e.g. `0x2::coin::Coin`, or by
-	the full type name, such as `0x2::coin::Coin<0x2:::oct::OCT>`.
+	the full type name, such as `0x2::coin::Coin<0x2::sui::SUI>`.
 	"""
 	type: String
 	"""
@@ -2602,7 +2602,7 @@ type Owner implements IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this object or address. If type is not
-	supplied, it defaults to `0x2:::oct::OCT`.
+	supplied, it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -2612,13 +2612,13 @@ type Owner implements IOwner {
 	"""
 	The coin objects for this object or address.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object or address.
+	The `0x3::staking_pool::StakedSui` objects owned by this object or address.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object or address.
 	"""
@@ -2874,7 +2874,7 @@ type Query {
 	The coin objects that exist in the network.
 	
 	The type field is a string of the inner type of the coin by which to filter (e.g.
-	`0x2:::oct::OCT`). If no type is provided, it will default to `0x2:::oct::OCT`.
+	`0x2::sui::SUI`). If no type is provided, it will default to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
@@ -3239,9 +3239,9 @@ type StakeSubsidy {
 }
 
 """
-Represents a `0x3::staking_pool::StakedOct` Move object on-chain.
+Represents a `0x3::staking_pool::StakedSui` Move object on-chain.
 """
-type StakedOct implements IMoveObject & IObject & IOwner {
+type StakedSui implements IMoveObject & IObject & IOwner {
 	address: SuiAddress!
 	"""
 	Objects owned by this object, optionally `filter`-ed.
@@ -3249,7 +3249,7 @@ type StakedOct implements IMoveObject & IObject & IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this object. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -3259,13 +3259,13 @@ type StakedOct implements IMoveObject & IObject & IOwner {
 	"""
 	The coin objects for this object.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object.
+	The `0x3::staking_pool::StakedSui` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""
@@ -3390,7 +3390,7 @@ type StakedOct implements IMoveObject & IObject & IOwner {
 	estimatedReward: BigInt
 }
 
-type StakedOctConnection {
+type StakedSuiConnection {
 	"""
 	Information to aid in pagination.
 	"""
@@ -3398,21 +3398,21 @@ type StakedOctConnection {
 	"""
 	A list of edges.
 	"""
-	edges: [StakedOctEdge!]!
+	edges: [StakedSuiEdge!]!
 	"""
 	A list of nodes.
 	"""
-	nodes: [StakedOct!]!
+	nodes: [StakedSui!]!
 }
 
 """
 An edge in a connection.
 """
-type StakedOctEdge {
+type StakedSuiEdge {
 	"""
 	The item at the end of the edge
 	"""
-	node: StakedOct!
+	node: StakedSui!
 	"""
 	A cursor for use in pagination
 	"""
@@ -3451,7 +3451,7 @@ type SuinsRegistration implements IMoveObject & IObject & IOwner {
 	objects(first: Int, after: String, last: Int, before: String, filter: ObjectFilter): MoveObjectConnection!
 	"""
 	Total balance of all coins with marker type owned by this object. If type is not supplied,
-	it defaults to `0x2:::oct::OCT`.
+	it defaults to `0x2::sui::SUI`.
 	"""
 	balance(type: String): Balance
 	"""
@@ -3461,13 +3461,13 @@ type SuinsRegistration implements IMoveObject & IObject & IOwner {
 	"""
 	The coin objects for this object.
 	
-	`type` is a filter on the coin's type parameter, defaulting to `0x2:::oct::OCT`.
+	`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
 	"""
 	coins(first: Int, after: String, last: Int, before: String, type: String): CoinConnection!
 	"""
-	The `0x3::staking_pool::StakedOct` objects owned by this object.
+	The `0x3::staking_pool::StakedSui` objects owned by this object.
 	"""
-	stakedOcts(first: Int, after: String, last: Int, before: String): StakedOctConnection!
+	stakedOcts(first: Int, after: String, last: Int, before: String): StakedSuiConnection!
 	"""
 	The domain explicitly configured as the default domain pointing to this object.
 	"""

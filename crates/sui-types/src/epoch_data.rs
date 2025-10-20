@@ -1,11 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::EpochId,
-    message_envelope::Message,
-    messages_checkpoint::{CheckpointDigest, CheckpointSummary, CheckpointTimestamp},
-};
+use crate::base_types::EpochId;
+use crate::message_envelope::Message;
+use crate::messages_checkpoint::{CheckpointDigest, CheckpointSummary, CheckpointTimestamp};
 
 /// The static epoch information that is accessible to move smart contracts
 #[derive(Default)]
@@ -16,16 +14,35 @@ pub struct EpochData {
 }
 
 impl EpochData {
-    pub fn new(epoch_id: EpochId, epoch_start_timestamp: CheckpointTimestamp, epoch_digest: CheckpointDigest) -> Self {
-        Self { epoch_id, epoch_start_timestamp, epoch_digest }
+    pub fn new(
+        epoch_id: EpochId,
+        epoch_start_timestamp: CheckpointTimestamp,
+        epoch_digest: CheckpointDigest,
+    ) -> Self {
+        Self {
+            epoch_id,
+            epoch_start_timestamp,
+            epoch_digest,
+        }
     }
 
     pub fn new_genesis(epoch_start_timestamp: CheckpointTimestamp) -> Self {
-        Self { epoch_id: 0, epoch_start_timestamp, epoch_digest: Default::default() }
+        Self {
+            epoch_id: 0,
+            epoch_start_timestamp,
+            epoch_digest: Default::default(),
+        }
     }
 
-    pub fn new_from_epoch_checkpoint(epoch_id: EpochId, epoch_checkpoint: &CheckpointSummary) -> Self {
-        Self { epoch_id, epoch_start_timestamp: epoch_checkpoint.timestamp_ms, epoch_digest: epoch_checkpoint.digest() }
+    pub fn new_from_epoch_checkpoint(
+        epoch_id: EpochId,
+        epoch_checkpoint: &CheckpointSummary,
+    ) -> Self {
+        Self {
+            epoch_id,
+            epoch_start_timestamp: epoch_checkpoint.timestamp_ms,
+            epoch_digest: epoch_checkpoint.digest(),
+        }
     }
 
     pub fn new_test() -> Self {

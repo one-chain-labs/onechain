@@ -1,58 +1,47 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    abi::EthToSuiTokenBridgeV1,
-    crypto::{
-        BridgeAuthorityPublicKey,
-        BridgeAuthorityPublicKeyBytes,
-        BridgeAuthorityRecoverableSignature,
-        BridgeAuthoritySignInfo,
-    },
-    encoding::BridgeMessageEncoding,
-    error::{BridgeError, BridgeResult},
-    events::EmittedSuiToEthTokenBridgeV1,
+use crate::abi::EthToSuiTokenBridgeV1;
+use crate::crypto::BridgeAuthorityPublicKeyBytes;
+use crate::crypto::{
+    BridgeAuthorityPublicKey, BridgeAuthorityRecoverableSignature, BridgeAuthoritySignInfo,
 };
+use crate::encoding::BridgeMessageEncoding;
+use crate::error::{BridgeError, BridgeResult};
+use crate::events::EmittedSuiToEthTokenBridgeV1;
 use enum_dispatch::enum_dispatch;
+use ethers::types::Address as EthAddress;
+use ethers::types::Log;
+use ethers::types::H256;
 pub use ethers::types::H256 as EthTransactionHash;
-use ethers::types::{Address as EthAddress, Log, H256};
-use fastcrypto::{
-    encoding::{Encoding, Hex},
-    hash::{HashFunction, Keccak256},
-};
+use fastcrypto::encoding::{Encoding, Hex};
+use fastcrypto::hash::{HashFunction, Keccak256};
 use num_enum::TryFromPrimitive;
-use rand::{seq::SliceRandom, Rng};
+use rand::seq::SliceRandom;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::IntentScope;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt::Debug,
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Debug;
 use strum_macros::Display;
-use sui_types::{
-    base_types::SuiAddress,
-    bridge::{
-        BridgeChainId,
-        MoveTypeParsedTokenTransferMessage,
-        MoveTypeTokenTransferPayload,
-        APPROVAL_THRESHOLD_ADD_TOKENS_ON_EVM,
-        APPROVAL_THRESHOLD_ADD_TOKENS_ON_SUI,
-        APPROVAL_THRESHOLD_ASSET_PRICE_UPDATE,
-        APPROVAL_THRESHOLD_COMMITTEE_BLOCKLIST,
-        APPROVAL_THRESHOLD_EMERGENCY_PAUSE,
-        APPROVAL_THRESHOLD_EMERGENCY_UNPAUSE,
-        APPROVAL_THRESHOLD_EVM_CONTRACT_UPGRADE,
-        APPROVAL_THRESHOLD_LIMIT_UPDATE,
-        APPROVAL_THRESHOLD_TOKEN_TRANSFER,
-        BRIDGE_COMMITTEE_MAXIMAL_VOTING_POWER,
-        BRIDGE_COMMITTEE_MINIMAL_VOTING_POWER,
-    },
-    committee::{CommitteeTrait, StakeUnit},
-    crypto::ToFromBytes,
-    digests::{Digest, TransactionDigest},
-    message_envelope::{Envelope, Message, VerifiedEnvelope},
-    TypeTag,
+use sui_types::base_types::SuiAddress;
+use sui_types::bridge::{
+    BridgeChainId, MoveTypeTokenTransferPayload, APPROVAL_THRESHOLD_ADD_TOKENS_ON_EVM,
+    APPROVAL_THRESHOLD_ADD_TOKENS_ON_SUI, BRIDGE_COMMITTEE_MAXIMAL_VOTING_POWER,
+    BRIDGE_COMMITTEE_MINIMAL_VOTING_POWER,
 };
+use sui_types::bridge::{
+    MoveTypeParsedTokenTransferMessage, APPROVAL_THRESHOLD_ASSET_PRICE_UPDATE,
+    APPROVAL_THRESHOLD_COMMITTEE_BLOCKLIST, APPROVAL_THRESHOLD_EMERGENCY_PAUSE,
+    APPROVAL_THRESHOLD_EMERGENCY_UNPAUSE, APPROVAL_THRESHOLD_EVM_CONTRACT_UPGRADE,
+    APPROVAL_THRESHOLD_LIMIT_UPDATE, APPROVAL_THRESHOLD_TOKEN_TRANSFER,
+};
+use sui_types::committee::CommitteeTrait;
+use sui_types::committee::StakeUnit;
+use sui_types::crypto::ToFromBytes;
+use sui_types::digests::{Digest, TransactionDigest};
+use sui_types::message_envelope::{Envelope, Message, VerifiedEnvelope};
+use sui_types::TypeTag;
 
 pub const BRIDGE_AUTHORITY_TOTAL_VOTING_POWER: u64 = 10000;
 
@@ -91,7 +80,9 @@ impl BridgeCommittee {
         for member in members {
             let public_key = BridgeAuthorityPublicKeyBytes::from(&member.pubkey);
             if members_map.contains_key(&public_key) {
-                return Err(BridgeError::InvalidBridgeCommittee("Duplicate BridgeAuthority Public key".into()));
+                return Err(BridgeError::InvalidBridgeCommittee(
+                    "Duplicate BridgeAuthority Public key".into(),
+                ));
             }
             // TODO: should we disallow identical network addresses?
             if member.is_blocklisted {
@@ -110,7 +101,10 @@ impl BridgeCommittee {
                 "Total voting power is above maximal {BRIDGE_COMMITTEE_MAXIMAL_VOTING_POWER}"
             )));
         }
-        Ok(Self { members: members_map, total_blocklisted_stake })
+        Ok(Self {
+            members: members_map,
+            total_blocklisted_stake,
+        })
     }
 
     pub fn is_active_member(&self, member: &BridgeAuthorityPublicKeyBytes) -> bool {
@@ -130,7 +124,10 @@ impl BridgeCommittee {
     }
 
     pub fn active_stake(&self, member: &BridgeAuthorityPublicKeyBytes) -> StakeUnit {
-        self.members.get(member).map(|a| if a.is_blocklisted { 0 } else { a.voting_power }).unwrap_or(0)
+        self.members
+            .get(member)
+            .map(|a| if a.is_blocklisted { 0 } else { a.voting_power })
+            .unwrap_or(0)
     }
 }
 
@@ -198,7 +195,10 @@ impl CommitteeTrait<BridgeAuthorityPublicKeyBytes> for BridgeCommittee {
     }
 
     fn weight(&self, author: &BridgeAuthorityPublicKeyBytes) -> StakeUnit {
-        self.members.get(author).map(|a| a.voting_power).unwrap_or(0)
+        self.members
+            .get(author)
+            .map(|a| a.voting_power)
+            .unwrap_or(0)
     }
 }
 
@@ -224,7 +224,11 @@ pub struct BridgeActionKey {
 
 impl Debug for BridgeActionKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BridgeActionKey({},{},{})", self.action_type as u8, self.chain_id as u8, self.seq_num)
+        write!(
+            f,
+            "BridgeActionKey({},{},{})",
+            self.action_type as u8, self.chain_id as u8, self.seq_num
+        )
     }
 }
 
@@ -255,7 +259,18 @@ pub struct EthToSuiBridgeAction {
     pub eth_bridge_event: EthToSuiTokenBridgeV1,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, TryFromPrimitive, Hash, clap::ValueEnum)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    TryFromPrimitive,
+    Hash,
+    clap::ValueEnum,
+)]
 #[repr(u8)]
 pub enum BlocklistType {
     Blocklist = 0,
@@ -270,7 +285,18 @@ pub struct BlocklistCommitteeAction {
     pub members_to_update: Vec<BridgeAuthorityPublicKeyBytes>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, TryFromPrimitive, Hash, clap::ValueEnum)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    TryFromPrimitive,
+    Hash,
+    clap::ValueEnum,
+)]
 #[repr(u8)]
 pub enum EmergencyActionType {
     Pause = 0,
@@ -362,7 +388,11 @@ impl BridgeAction {
     }
 
     pub fn key(&self) -> BridgeActionKey {
-        BridgeActionKey { action_type: self.action_type(), chain_id: self.chain_id(), seq_num: self.seq_number() }
+        BridgeActionKey {
+            action_type: self.action_type(),
+            chain_id: self.chain_id(),
+            seq_num: self.seq_number(),
+        }
     }
 
     pub fn chain_id(&self) -> BridgeChainId {
@@ -457,7 +487,8 @@ pub struct BridgeCommitteeValiditySignInfo {
 pub type SignedBridgeAction = Envelope<BridgeAction, BridgeAuthoritySignInfo>;
 pub type VerifiedSignedBridgeAction = VerifiedEnvelope<BridgeAction, BridgeAuthoritySignInfo>;
 pub type CertifiedBridgeAction = Envelope<BridgeAction, BridgeCommitteeValiditySignInfo>;
-pub type VerifiedCertifiedBridgeAction = VerifiedEnvelope<BridgeAction, BridgeCommitteeValiditySignInfo>;
+pub type VerifiedCertifiedBridgeAction =
+    VerifiedEnvelope<BridgeAction, BridgeCommitteeValiditySignInfo>;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct BridgeEventDigest(Digest);
@@ -507,11 +538,9 @@ impl EthEvent for EthLog {
     fn block_number(&self) -> u64 {
         self.block_number
     }
-
     fn tx_hash(&self) -> H256 {
         self.tx_hash
     }
-
     fn log(&self) -> &Log {
         &self.log
     }
@@ -521,11 +550,9 @@ impl EthEvent for RawEthLog {
     fn block_number(&self) -> u64 {
         self.block_number
     }
-
     fn tx_hash(&self) -> H256 {
         self.tx_hash
     }
-
     fn log(&self) -> &Log {
         &self.log
     }
@@ -587,15 +614,14 @@ impl TryFrom<MoveTypeParsedTokenTransferMessage> for ParsedTokenTransferMessage 
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{
-        get_test_authority_and_key,
-        get_test_eth_to_sui_bridge_action,
-        get_test_sui_to_eth_bridge_action,
-    };
+    use crate::test_utils::get_test_authority_and_key;
+    use crate::test_utils::get_test_eth_to_sui_bridge_action;
+    use crate::test_utils::get_test_sui_to_eth_bridge_action;
     use ethers::types::Address as EthAddress;
     use fastcrypto::traits::KeyPair;
     use std::collections::HashSet;
-    use sui_types::{bridge::TOKEN_ID_BTC, crypto::get_key_pair};
+    use sui_types::bridge::TOKEN_ID_BTC;
+    use sui_types::crypto::get_key_pair;
 
     use super::*;
 
@@ -630,13 +656,20 @@ mod tests {
     #[test]
     fn test_bridge_committee_total_blocklisted_stake() -> anyhow::Result<()> {
         let (mut authority1, _, _) = get_test_authority_and_key(10000, 9999);
-        assert_eq!(BridgeCommittee::new(vec![authority1.clone()]).unwrap().total_blocklisted_stake(), 0);
+        assert_eq!(
+            BridgeCommittee::new(vec![authority1.clone()])
+                .unwrap()
+                .total_blocklisted_stake(),
+            0
+        );
         authority1.voting_power = 6000;
 
         let (mut authority2, _, _) = get_test_authority_and_key(4000, 9999);
         authority2.is_blocklisted = true;
         assert_eq!(
-            BridgeCommittee::new(vec![authority1.clone(), authority2.clone()]).unwrap().total_blocklisted_stake(),
+            BridgeCommittee::new(vec![authority1.clone(), authority2.clone()])
+                .unwrap()
+                .total_blocklisted_stake(),
             4000
         );
 
@@ -645,7 +678,9 @@ mod tests {
         let (mut authority3, _, _) = get_test_authority_and_key(1000, 9999);
         authority3.is_blocklisted = true;
         assert_eq!(
-            BridgeCommittee::new(vec![authority1, authority2, authority3]).unwrap().total_blocklisted_stake(),
+            BridgeCommittee::new(vec![authority1, authority2, authority3])
+                .unwrap()
+                .total_blocklisted_stake(),
             3000
         );
 
@@ -717,17 +752,33 @@ mod tests {
         let (mut authority2, _, _) = get_test_authority_and_key(3000, 9999);
         authority2.is_blocklisted = true;
         let (authority3, _, _) = get_test_authority_and_key(2000, 9999);
-        let committee = BridgeCommittee::new(vec![authority1.clone(), authority2.clone(), authority3.clone()]).unwrap();
+        let committee = BridgeCommittee::new(vec![
+            authority1.clone(),
+            authority2.clone(),
+            authority3.clone(),
+        ])
+        .unwrap();
 
         // exclude authority2
-        let result = committee.shuffle_by_stake(None, None).into_iter().collect::<HashSet<_>>();
-        assert_eq!(HashSet::from_iter(vec![authority1.pubkey_bytes(), authority3.pubkey_bytes()]), result);
+        let result = committee
+            .shuffle_by_stake(None, None)
+            .into_iter()
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            HashSet::from_iter(vec![authority1.pubkey_bytes(), authority3.pubkey_bytes()]),
+            result
+        );
 
         // exclude authority2 and authority3
         let result = committee
             .shuffle_by_stake(
                 None,
-                Some(&[authority1.pubkey_bytes(), authority2.pubkey_bytes()].iter().cloned().collect()),
+                Some(
+                    &[authority1.pubkey_bytes(), authority2.pubkey_bytes()]
+                        .iter()
+                        .cloned()
+                        .collect(),
+                ),
             )
             .into_iter()
             .collect::<HashSet<_>>();

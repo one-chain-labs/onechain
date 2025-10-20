@@ -12,7 +12,10 @@ use parking_lot::RwLock;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 use crate::{
-    block::{genesis_blocks, BlockAPI, BlockDigest, BlockRef, BlockTimestampMs, Round, Slot, TestBlock, VerifiedBlock},
+    block::{
+        genesis_blocks, BlockAPI, BlockDigest, BlockRef, BlockTimestampMs, Round, Slot, TestBlock,
+        VerifiedBlock,
+    },
     commit::{CommitDigest, TrustedCommit, DEFAULT_WAVE_LENGTH},
     context::Context,
     dag_state::DagState,
@@ -95,8 +98,10 @@ impl DagBuilder {
     pub(crate) fn new(context: Arc<Context>) -> Self {
         let leader_schedule = LeaderSchedule::new(context.clone(), LeaderSwapTable::default());
         let genesis_blocks = genesis_blocks(context.clone());
-        let genesis: BTreeMap<BlockRef, VerifiedBlock> =
-            genesis_blocks.into_iter().map(|block| (block.reference(), block)).collect();
+        let genesis: BTreeMap<BlockRef, VerifiedBlock> = genesis_blocks
+            .into_iter()
+            .map(|block| (block.reference(), block))
+            .collect();
         let last_ancestors = genesis.keys().cloned().collect();
         Self {
             last_committed_rounds: vec![0; context.committee.size()],
@@ -138,13 +143,21 @@ impl DagBuilder {
     ) -> Vec<(CommittedSubDag, TrustedCommit)> {
         let (last_leader_round, mut last_commit_index, mut last_timestamp_ms) =
             if let Some((sub_dag, _)) = self.committed_sub_dags.last() {
-                (sub_dag.leader.round, sub_dag.commit_ref.index, sub_dag.timestamp_ms)
+                (
+                    sub_dag.leader.round,
+                    sub_dag.commit_ref.index,
+                    sub_dag.timestamp_ms,
+                )
             } else {
                 (0, 0, 0)
             };
 
         // Create any remaining committed sub dags
-        for leader_block in self.leader_blocks(last_leader_round + 1..=*leader_rounds.end()).into_iter().flatten() {
+        for leader_block in self
+            .leader_blocks(last_leader_round + 1..=*leader_rounds.end())
+            .into_iter()
+            .flatten()
+        {
             let leader_block_ref = leader_block.reference();
             last_commit_index += 1;
             last_timestamp_ms = leader_block.timestamp_ms().max(last_timestamp_ms);
@@ -156,7 +169,9 @@ impl DagBuilder {
             }
             impl BlockStoreAPI for FooStorage {
                 fn get_blocks(&self, refs: &[BlockRef]) -> Vec<Option<VerifiedBlock>> {
-                    refs.iter().map(|block_ref| self.blocks.get(block_ref).cloned()).collect()
+                    refs.iter()
+                        .map(|block_ref| self.blocks.get(block_ref).cloned())
+                        .collect()
                 }
 
                 fn gc_round(&self) -> Round {
@@ -170,11 +185,17 @@ impl DagBuilder {
             let storage = FooStorage {
                 context: self.context.clone(),
                 blocks: self.blocks.clone(),
-                gc_round: leader_block.round().saturating_sub(1).saturating_sub(self.context.protocol_config.gc_depth()),
+                gc_round: leader_block
+                    .round()
+                    .saturating_sub(1)
+                    .saturating_sub(self.context.protocol_config.gc_depth()),
             };
 
-            let (to_commit, rejected_transactions) =
-                Linearizer::linearize_sub_dag(leader_block, self.last_committed_rounds.clone(), storage);
+            let (to_commit, rejected_transactions) = Linearizer::linearize_sub_dag(
+                leader_block,
+                self.last_committed_rounds.clone(),
+                storage,
+            );
 
             // Update the last committed rounds
             for block in &to_commit {
@@ -187,7 +208,10 @@ impl DagBuilder {
                 CommitDigest::MIN,
                 last_timestamp_ms,
                 leader_block_ref,
-                to_commit.iter().map(|block| block.reference()).collect::<Vec<_>>(),
+                to_commit
+                    .iter()
+                    .map(|block| block.reference())
+                    .collect::<Vec<_>>(),
             );
 
             let sub_dag = CommittedSubDag::new(
@@ -209,12 +233,18 @@ impl DagBuilder {
             .collect()
     }
 
-    pub(crate) fn leader_blocks(&self, rounds: RangeInclusive<Round>) -> Vec<Option<VerifiedBlock>> {
+    pub(crate) fn leader_blocks(
+        &self,
+        rounds: RangeInclusive<Round>,
+    ) -> Vec<Option<VerifiedBlock>> {
         assert!(
             !self.blocks.is_empty(),
             "No blocks have been created, please make sure that you have called build method"
         );
-        rounds.into_iter().map(|round| self.leader_block(round)).collect()
+        rounds
+            .into_iter()
+            .map(|round| self.leader_block(round))
+            .collect()
     }
 
     pub(crate) fn leader_block(&self, round: Round) -> Option<VerifiedBlock> {
@@ -225,7 +255,8 @@ impl DagBuilder {
         self.blocks
             .iter()
             .find(|(block_ref, block)| {
-                block_ref.round == round && block_ref.author == self.leader_schedule.elect_leader(round, 0)
+                block_ref.round == round
+                    && block_ref.author == self.leader_schedule.elect_leader(round, 0)
             })
             .map(|(_block_ref, block)| block.clone())
     }
@@ -256,7 +287,9 @@ impl DagBuilder {
     }
 
     pub(crate) fn persist_all_blocks(&self, dag_state: Arc<RwLock<DagState>>) {
-        dag_state.write().accept_blocks(self.blocks.values().cloned().collect());
+        dag_state
+            .write()
+            .accept_blocks(self.blocks.values().cloned().collect());
     }
 
     pub(crate) fn print(&self) {
@@ -279,13 +312,20 @@ impl DagBuilder {
     // This method allows the user to specify specific links to ancestors. The
     // layer is written to dag state and the blocks are cached in [`DagBuilder`]
     // state.
-    pub(crate) fn layer_with_connections(&mut self, connections: Vec<(AuthorityIndex, Vec<BlockRef>)>, round: Round) {
+    pub(crate) fn layer_with_connections(
+        &mut self,
+        connections: Vec<(AuthorityIndex, Vec<BlockRef>)>,
+        round: Round,
+    ) {
         let mut references = Vec::new();
         for (authority, ancestors) in connections {
             let author = authority.value() as u32;
             let base_ts = round as BlockTimestampMs * 1000;
             let block = VerifiedBlock::new_for_test(
-                TestBlock::new(round, author).set_ancestors(ancestors).set_timestamp_ms(base_ts + author as u64).build(),
+                TestBlock::new(round, author)
+                    .set_ancestors(ancestors)
+                    .set_timestamp_ms(base_ts + author as u64)
+                    .build(),
             );
             references.push(block.reference());
             self.blocks.insert(block.reference(), block.clone());
@@ -446,7 +486,11 @@ impl<'a> LayerBuilder<'a> {
     // A list of specified leader offsets can be provided to skip those leader links.
     // If none are provided all potential leaders for the round will be skipped.
     // note: configuration is terminal and layer will be built after this call.
-    pub fn no_leader_link(mut self, leader_round: Round, specified_leader_offsets: Vec<u32>) -> Self {
+    pub fn no_leader_link(
+        mut self,
+        leader_round: Round,
+        specified_leader_offsets: Vec<u32>,
+    ) -> Self {
         self.no_leader_link = true;
         self.specified_leader_link_offsets = Some(specified_leader_offsets);
         self.leader_round = Some(leader_round);
@@ -455,7 +499,10 @@ impl<'a> LayerBuilder<'a> {
     }
 
     pub fn authorities(mut self, authorities: Vec<AuthorityIndex>) -> Self {
-        assert!(self.specified_authorities.is_none(), "Specified authorities already set");
+        assert!(
+            self.specified_authorities.is_none(),
+            "Specified authorities already set"
+        );
         self.specified_authorities = Some(authorities);
         self
     }
@@ -484,7 +531,12 @@ impl<'a> LayerBuilder<'a> {
             let authorities = if self.specified_authorities.is_some() {
                 self.specified_authorities.clone().unwrap()
             } else {
-                self.dag_builder.context.committee.authorities().map(|x| x.0).collect()
+                self.dag_builder
+                    .context
+                    .committee
+                    .authorities()
+                    .map(|x| x.0)
+                    .collect()
             };
 
             // TODO: investigate if these configurations can be called in combination
@@ -496,7 +548,10 @@ impl<'a> LayerBuilder<'a> {
             } else if self.no_leader_link {
                 self.configure_no_leader_links(authorities.clone(), round)
             } else if self.skip_ancestor_links.is_some() {
-                self.configure_skipped_ancestor_links(authorities, self.skip_ancestor_links.clone().unwrap())
+                self.configure_skipped_ancestor_links(
+                    authorities,
+                    self.skip_ancestor_links.clone().unwrap(),
+                )
             } else {
                 vec![]
             };
@@ -513,18 +568,20 @@ impl<'a> LayerBuilder<'a> {
     }
 
     pub fn persist_layers(&self, dag_state: Arc<RwLock<DagState>>) {
-        assert!(
-            !self.blocks.is_empty(),
-            "Called to persist layers although no blocks have been created. Make sure you have called build before."
-        );
+        assert!(!self.blocks.is_empty(), "Called to persist layers although no blocks have been created. Make sure you have called build before.");
         dag_state.write().accept_blocks(self.blocks.clone());
     }
 
     // Layer round is minimally and randomly connected with ancestors.
     pub fn configure_min_parent_links(&mut self) -> Vec<(AuthorityIndex, Vec<BlockRef>)> {
         let quorum_threshold = self.dag_builder.context.committee.quorum_threshold() as usize;
-        let mut authorities: Vec<AuthorityIndex> =
-            self.dag_builder.context.committee.authorities().map(|authority| authority.0).collect();
+        let mut authorities: Vec<AuthorityIndex> = self
+            .dag_builder
+            .context
+            .committee
+            .authorities()
+            .map(|authority| authority.0)
+            .collect();
 
         let mut rng = match self.min_ancestor_links_random_seed {
             Some(s) => StdRng::seed_from_u64(s),
@@ -538,7 +595,11 @@ impl<'a> LayerBuilder<'a> {
             let leader_offsets = (0..self.dag_builder.number_of_leaders).collect::<Vec<_>>();
 
             for leader_offset in leader_offsets {
-                leaders.push(self.dag_builder.leader_schedule.elect_leader(leader_round, leader_offset));
+                leaders.push(
+                    self.dag_builder
+                        .leader_schedule
+                        .elect_leader(leader_round, leader_offset),
+                );
             }
         }
 
@@ -548,14 +609,19 @@ impl<'a> LayerBuilder<'a> {
                 authorities_to_shuffle.shuffle(&mut rng);
 
                 // TODO: handle quroum threshold properly with stake
-                let min_ancestors: HashSet<AuthorityIndex> =
-                    authorities_to_shuffle.iter().take(quorum_threshold).cloned().collect();
+                let min_ancestors: HashSet<AuthorityIndex> = authorities_to_shuffle
+                    .iter()
+                    .take(quorum_threshold)
+                    .cloned()
+                    .collect();
 
                 (
                     *authority,
                     self.ancestors
                         .iter()
-                        .filter(|a| leaders.contains(&a.author) || min_ancestors.contains(&a.author))
+                        .filter(|a| {
+                            leaders.contains(&a.author) || min_ancestors.contains(&a.author)
+                        })
                         .cloned()
                         .collect::<Vec<BlockRef>>(),
                 )
@@ -575,8 +641,10 @@ impl<'a> LayerBuilder<'a> {
         round: Round,
     ) -> Vec<(AuthorityIndex, Vec<BlockRef>)> {
         let mut missing_leaders = Vec::new();
-        let mut specified_leader_offsets =
-            self.specified_leader_link_offsets.clone().expect("specified_leader_offsets should be set");
+        let mut specified_leader_offsets = self
+            .specified_leader_link_offsets
+            .clone()
+            .expect("specified_leader_offsets should be set");
         let leader_round = self.leader_round.expect("leader round should be set");
 
         // When no specified leader offsets are available, all leaders are
@@ -586,7 +654,11 @@ impl<'a> LayerBuilder<'a> {
         }
 
         for leader_offset in specified_leader_offsets {
-            missing_leaders.push(self.dag_builder.leader_schedule.elect_leader(leader_round, leader_offset));
+            missing_leaders.push(
+                self.dag_builder
+                    .leader_schedule
+                    .elect_leader(leader_round, leader_offset),
+            );
         }
 
         self.configure_skipped_ancestor_links(authorities, missing_leaders)
@@ -612,7 +684,10 @@ impl<'a> LayerBuilder<'a> {
             .into_iter()
             .filter(|ancestor| !ancestors_to_skip.contains(&ancestor.author))
             .collect::<Vec<_>>();
-        authorities.into_iter().map(|authority| (authority, filtered_ancestors.clone())).collect::<Vec<_>>()
+        authorities
+            .into_iter()
+            .map(|authority| (authority, filtered_ancestors.clone()))
+            .collect::<Vec<_>>()
     }
 
     // Creates the blocks for the new layer based on configured connections, also
@@ -635,7 +710,9 @@ impl<'a> LayerBuilder<'a> {
                         .build(),
                 );
                 references.push(block.reference());
-                self.dag_builder.blocks.insert(block.reference(), block.clone());
+                self.dag_builder
+                    .blocks
+                    .insert(block.reference(), block.clone());
                 self.blocks.push(block);
             }
         }
@@ -643,7 +720,13 @@ impl<'a> LayerBuilder<'a> {
     }
 
     fn num_blocks_to_create(&self, authority: AuthorityIndex) -> u32 {
-        if self.specified_authorities.is_some() && self.specified_authorities.clone().unwrap().contains(&authority) {
+        if self.specified_authorities.is_some()
+            && self
+                .specified_authorities
+                .clone()
+                .unwrap()
+                .contains(&authority)
+        {
             // Always create 1 block and then the equivocating blocks on top of that.
             1 + self.equivocations as u32
         } else {
@@ -654,12 +737,20 @@ impl<'a> LayerBuilder<'a> {
     fn should_skip_block(&self, round: Round, authority: AuthorityIndex) -> bool {
         // Safe to unwrap as specified authorites has to be set before skip
         // is specified.
-        if self.skip_block && self.specified_authorities.clone().unwrap().contains(&authority) {
+        if self.skip_block
+            && self
+                .specified_authorities
+                .clone()
+                .unwrap()
+                .contains(&authority)
+        {
             return true;
         }
         if self.no_leader_block {
-            let mut specified_leader_offsets =
-                self.specified_leader_block_offsets.clone().expect("specified_leader_block_offsets should be set");
+            let mut specified_leader_offsets = self
+                .specified_leader_block_offsets
+                .clone()
+                .expect("specified_leader_block_offsets should be set");
 
             // When no specified leader offsets are available, all leaders are
             // expected to be skipped.
@@ -668,7 +759,10 @@ impl<'a> LayerBuilder<'a> {
             }
 
             for leader_offset in specified_leader_offsets {
-                let leader = self.dag_builder.leader_schedule.elect_leader(round, leader_offset);
+                let leader = self
+                    .dag_builder
+                    .leader_schedule
+                    .elect_leader(round, leader_offset);
 
                 if leader == authority {
                     return true;

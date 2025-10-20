@@ -7,18 +7,12 @@ use std::{
 };
 
 use aws_config::profile::profile_file::{ProfileFileKind, ProfileFiles};
+use aws_sdk_ec2::primitives::Blob;
 use aws_sdk_ec2::{
     config::Region,
-    primitives::Blob,
     types::{
-        BlockDeviceMapping,
-        EbsBlockDevice,
-        EphemeralNvmeSupport,
-        Filter,
-        ResourceType,
-        Tag,
-        TagSpecification,
-        VolumeType,
+        BlockDeviceMapping, EbsBlockDevice, EphemeralNvmeSupport, Filter, ResourceType, Tag,
+        TagSpecification, VolumeType,
     },
 };
 use aws_smithy_http::result::SdkError;
@@ -32,7 +26,8 @@ use crate::{
 use super::{Instance, ServerProviderClient};
 
 // Make a request error from an AWS error message.
-impl<T> From<SdkError<T, aws_smithy_runtime_api::client::orchestrator::HttpResponse>> for CloudProviderError
+impl<T> From<SdkError<T, aws_smithy_runtime_api::client::orchestrator::HttpResponse>>
+    for CloudProviderError
 where
     T: Debug + std::error::Error + Send + Sync + 'static,
 {
@@ -56,7 +51,8 @@ impl Display for AwsClient {
 }
 
 impl AwsClient {
-    const OS_IMAGE: &'static str = "Canonical, Ubuntu, 22.04 LTS, amd64 jammy image build on 2023-02-16";
+    const OS_IMAGE: &'static str =
+        "Canonical, Ubuntu, 22.04 LTS, amd64 jammy image build on 2023-02-16";
 
     /// Make a new AWS client.
     pub async fn new(settings: Settings) -> Self {
@@ -81,7 +77,10 @@ impl AwsClient {
 
     /// Parse an AWS response and ignore errors if they mean a request is a duplicate.
     fn check_but_ignore_duplicates<T, E>(
-        response: Result<T, SdkError<E, aws_smithy_runtime_api::client::orchestrator::HttpResponse>>,
+        response: Result<
+            T,
+            SdkError<E, aws_smithy_runtime_api::client::orchestrator::HttpResponse>,
+        >,
     ) -> CloudProviderResult<()>
     where
         E: Debug + std::error::Error + Send + Sync + 'static,
@@ -96,9 +95,16 @@ impl AwsClient {
     }
 
     /// Convert an AWS instance into an orchestrator instance (used in the rest of the codebase).
-    fn make_instance(&self, region: String, aws_instance: &aws_sdk_ec2::types::Instance) -> Instance {
+    fn make_instance(
+        &self,
+        region: String,
+        aws_instance: &aws_sdk_ec2::types::Instance,
+    ) -> Instance {
         Instance {
-            id: aws_instance.instance_id().expect("AWS instance should have an id").into(),
+            id: aws_instance
+                .instance_id()
+                .expect("AWS instance should have an id")
+                .into(),
             region,
             main_ip: aws_instance
                 .public_ip_address()
@@ -106,7 +112,12 @@ impl AwsClient {
                 .parse()
                 .expect("AWS instance should have a valid ip"),
             tags: vec![self.settings.testbed_id.clone()],
-            specs: format!("{:?}", aws_instance.instance_type().expect("AWS instance should have a type")),
+            specs: format!(
+                "{:?}",
+                aws_instance
+                    .instance_type()
+                    .expect("AWS instance should have a type")
+            ),
             status: format!(
                 "{:?}",
                 aws_instance
@@ -122,8 +133,12 @@ impl AwsClient {
     /// NOTE: The image id changes depending on the region.
     async fn find_image_id(&self, client: &aws_sdk_ec2::Client) -> CloudProviderResult<String> {
         // Query all images that match the description.
-        let request =
-            client.describe_images().filters(Filter::builder().name("description").values(Self::OS_IMAGE).build());
+        let request = client.describe_images().filters(
+            Filter::builder()
+                .name("description")
+                .values(Self::OS_IMAGE)
+                .build(),
+        );
         let response = request.send().await?;
 
         // Parse the response to select the first returned image id.
@@ -133,7 +148,11 @@ impl AwsClient {
             .ok_or_else(|| CloudProviderError::RequestError("Cannot find image id".into()))?
             .image_id
             .clone()
-            .ok_or_else(|| CloudProviderError::UnexpectedResponse("Received image description without id".into()))
+            .ok_or_else(|| {
+                CloudProviderError::UnexpectedResponse(
+                    "Received image description without id".into(),
+                )
+            })
     }
 
     /// Create a new security group for the instance (if it doesn't already exist).
@@ -181,13 +200,20 @@ impl AwsClient {
     async fn check_nvme_support(&self) -> CloudProviderResult<bool> {
         // Get the client for the first region. A given instance type should either have NVMe support
         // in all regions or in none.
-        let client = match self.settings.regions.first().and_then(|x| self.clients.get(x)) {
+        let client = match self
+            .settings
+            .regions
+            .first()
+            .and_then(|x| self.clients.get(x))
+        {
             Some(client) => client,
             None => return Ok(false),
         };
 
         // Request storage details for the instance type specified in the settings.
-        let request = client.describe_instance_types().instance_types(self.settings.specs.as_str().into());
+        let request = client
+            .describe_instance_types()
+            .instance_types(self.settings.specs.as_str().into());
 
         // Send the request.
         let response = request.send().await?;
@@ -209,7 +235,10 @@ impl ServerProviderClient for AwsClient {
     const USERNAME: &'static str = "ubuntu";
 
     async fn list_instances(&self) -> CloudProviderResult<Vec<Instance>> {
-        let filter = Filter::builder().name("tag:Name").values(self.settings.testbed_id.clone()).build();
+        let filter = Filter::builder()
+            .name("tag:Name")
+            .values(self.settings.testbed_id.clone())
+            .build();
 
         let mut instances = Vec::new();
         for (region, client) in &self.clients {
@@ -234,13 +263,20 @@ impl ServerProviderClient for AwsClient {
     {
         let mut instance_ids = HashMap::new();
         for instance in instances {
-            instance_ids.entry(&instance.region).or_insert_with(Vec::new).push(instance.id.clone());
+            instance_ids
+                .entry(&instance.region)
+                .or_insert_with(Vec::new)
+                .push(instance.id.clone());
         }
 
         for (region, client) in &self.clients {
             let ids = instance_ids.remove(&region.to_string());
             if ids.is_some() {
-                client.start_instances().set_instance_ids(ids).send().await?;
+                client
+                    .start_instances()
+                    .set_instance_ids(ids)
+                    .send()
+                    .await?;
             }
         }
         Ok(())
@@ -252,7 +288,10 @@ impl ServerProviderClient for AwsClient {
     {
         let mut instance_ids = HashMap::new();
         for instance in instances {
-            instance_ids.entry(&instance.region).or_insert_with(Vec::new).push(instance.id.clone());
+            instance_ids
+                .entry(&instance.region)
+                .or_insert_with(Vec::new)
+                .push(instance.id.clone());
         }
 
         for (region, client) in &self.clients {
@@ -271,10 +310,9 @@ impl ServerProviderClient for AwsClient {
         let region = region.into();
         let testbed_id = &self.settings.testbed_id;
 
-        let client = self
-            .clients
-            .get(&region)
-            .ok_or_else(|| CloudProviderError::RequestError(format!("Undefined region {region:?}")))?;
+        let client = self.clients.get(&region).ok_or_else(|| {
+            CloudProviderError::RequestError(format!("Undefined region {region:?}"))
+        })?;
 
         // Create a security group (if needed).
         self.create_security_group(client).await?;
@@ -311,30 +349,34 @@ impl ServerProviderClient for AwsClient {
             .tag_specifications(tags);
 
         let response = request.send().await?;
-        let instance =
-            &response.instances().and_then(|x| x.first()).expect("AWS instances list should contain instances");
+        let instance = &response
+            .instances()
+            .and_then(|x| x.first())
+            .expect("AWS instances list should contain instances");
 
         Ok(self.make_instance(region, instance))
     }
 
     async fn delete_instance(&self, instance: Instance) -> CloudProviderResult<()> {
-        let client = self
-            .clients
-            .get(&instance.region)
-            .ok_or_else(|| CloudProviderError::RequestError(format!("Undefined region {:?}", instance.region)))?;
+        let client = self.clients.get(&instance.region).ok_or_else(|| {
+            CloudProviderError::RequestError(format!("Undefined region {:?}", instance.region))
+        })?;
 
-        client.terminate_instances().set_instance_ids(Some(vec![instance.id.clone()])).send().await?;
+        client
+            .terminate_instances()
+            .set_instance_ids(Some(vec![instance.id.clone()]))
+            .send()
+            .await?;
 
         Ok(())
     }
 
     async fn register_ssh_public_key(&self, public_key: String) -> CloudProviderResult<()> {
         for client in self.clients.values() {
-            let request = client.import_key_pair().key_name(&self.settings.testbed_id).public_key_material(Blob::new::<
-                String,
-            >(
-                public_key.clone(),
-            ));
+            let request = client
+                .import_key_pair()
+                .key_name(&self.settings.testbed_id)
+                .public_key_material(Blob::new::<String>(public_key.clone()));
 
             let response = request.send().await;
             Self::check_but_ignore_duplicates(response)?;

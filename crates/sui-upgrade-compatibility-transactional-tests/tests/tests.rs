@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 
 use move_binary_format::{
     compatibility::{Compatibility, InclusionCheck},
-    normalized,
-    CompiledModule,
+    normalized, CompiledModule,
 };
 use sui_move_build::{BuildConfig, SuiPackageHooks};
 
@@ -34,7 +33,10 @@ fn run_test(path: &Path) -> datatest_stable::Result<()> {
 }
 
 fn compile(path: &Path) -> anyhow::Result<Vec<CompiledModule>> {
-    Ok(BuildConfig::new_for_testing().build(path).unwrap().into_modules())
+    Ok(BuildConfig::new_for_testing()
+        .build(path)
+        .unwrap()
+        .into_modules())
 }
 
 fn normalize(modules: &[CompiledModule]) -> Vec<normalized::Module> {
@@ -75,7 +77,11 @@ fn check_all_compatibilities(
                 })
                 .collect();
 
-            format!("====\n{:?}\n{}\n====", compat, compatibility_checks.join("\n"))
+            format!(
+                "====\n{:?}\n{}\n====",
+                compat,
+                compatibility_checks.join("\n")
+            )
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -97,7 +103,11 @@ fn check_all_compatibilities(
                 })
                 .collect();
 
-            format!("====\n{:?}\n{}\n====", compat, compatibility_checks.join("\n"))
+            format!(
+                "====\n{:?}\n{}\n====",
+                compat,
+                compatibility_checks.join("\n")
+            )
         })
         .collect::<Vec<_>>()
         .join("\n");

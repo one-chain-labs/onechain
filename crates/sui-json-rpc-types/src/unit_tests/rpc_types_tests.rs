@@ -4,22 +4,17 @@
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveValue},
-    ident_str,
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
-};
+use move_core_types::annotated_value::{MoveStruct, MoveValue};
+use move_core_types::ident_str;
+use move_core_types::identifier::Identifier;
+use move_core_types::language_storage::{StructTag, TypeTag};
 use serde_json::json;
 
-use sui_types::{
-    base_types::{ObjectDigest, ObjectID, SequenceNumber, SuiAddress},
-    gas_coin::GasCoin,
-    object::{MoveObject, Owner},
-    parse_sui_struct_tag,
-    MOVE_STDLIB_ADDRESS,
-    SUI_FRAMEWORK_ADDRESS,
-};
+use sui_types::base_types::{ObjectDigest, SequenceNumber};
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::gas_coin::GasCoin;
+use sui_types::object::{MoveObject, Owner};
+use sui_types::{parse_sui_struct_tag, MOVE_STDLIB_ADDRESS, SUI_FRAMEWORK_ADDRESS};
 
 use crate::{ObjectChange, SuiMoveStruct, SuiMoveValue};
 
@@ -43,7 +38,10 @@ fn test_move_value_to_sui_coin() {
 fn test_move_value_to_string() {
     let test_string = "Some test string";
     let bytes = test_string.as_bytes();
-    let values = bytes.iter().map(|u8| MoveValue::U8(*u8)).collect::<Vec<_>>();
+    let values = bytes
+        .iter()
+        .map(|u8| MoveValue::U8(*u8))
+        .collect::<Vec<_>>();
 
     let move_value = MoveValue::Struct(MoveStruct {
         type_: StructTag {
@@ -62,7 +60,7 @@ fn test_move_value_to_string() {
 
 #[test]
 fn test_option() {
-    // bugfix for https://github.com/MystenLabs/sui/issues/4995
+    // bugfix for https://github.com/one-chain-labs/onechain/issues/4995
     let option = MoveValue::Struct(MoveStruct {
         type_: StructTag {
             address: MOVE_STDLIB_ADDRESS,
@@ -70,7 +68,10 @@ fn test_option() {
             name: Identifier::from_str("Option").unwrap(),
             type_params: vec![TypeTag::U8],
         },
-        fields: vec![(Identifier::from_str("vec").unwrap(), MoveValue::Vector(vec![MoveValue::U8(5)]))],
+        fields: vec![(
+            Identifier::from_str("vec").unwrap(),
+            MoveValue::Vector(vec![MoveValue::U8(5)]),
+        )],
     });
     let sui_value = SuiMoveValue::from(option);
     assert!(matches!(
@@ -83,7 +84,10 @@ fn test_option() {
 fn test_move_value_to_url() {
     let test_url = "http://testing.com";
     let bytes = test_url.as_bytes();
-    let values = bytes.iter().map(|u8| MoveValue::U8(*u8)).collect::<Vec<_>>();
+    let values = bytes
+        .iter()
+        .map(|u8| MoveValue::U8(*u8))
+        .collect::<Vec<_>>();
 
     let string_move_value = MoveValue::Struct(MoveStruct {
         type_: StructTag {
@@ -114,7 +118,9 @@ fn test_move_value_to_url() {
 fn test_serde() {
     let test_values = [
         SuiMoveValue::Number(u32::MAX),
-        SuiMoveValue::UID { id: ObjectID::random() },
+        SuiMoveValue::UID {
+            id: ObjectID::random(),
+        },
         SuiMoveValue::String("some test string".to_string()),
         SuiMoveValue::Address(SuiAddress::random_for_testing_only()),
         SuiMoveValue::Bool(true),
@@ -131,7 +137,11 @@ fn test_serde() {
         let serde_value: SuiMoveValue = serde_json::from_str(&json)
             .map_err(|e| anyhow!("Serde failed for [{:?}], Error msg : {}", value, e))
             .unwrap();
-        assert_eq!(value, serde_value, "Error converting {:?} [{json}], got {:?}", value, serde_value)
+        assert_eq!(
+            value, serde_value,
+            "Error converting {:?} [{json}], got {:?}",
+            value, serde_value
+        )
     }
 }
 

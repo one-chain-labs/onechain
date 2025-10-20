@@ -42,13 +42,23 @@ impl Context {
         metrics: Arc<Metrics>,
         clock: Arc<Clock>,
     ) -> Self {
-        Self { own_index, committee, parameters, protocol_config, metrics, clock }
+        Self {
+            own_index,
+            committee,
+            parameters,
+            protocol_config,
+            metrics,
+            clock,
+        }
     }
 
     /// Create a test context with a committee of given size and even stake
     #[cfg(test)]
-    pub(crate) fn new_for_test(committee_size: usize) -> (Self, Vec<(NetworkKeyPair, ProtocolKeyPair)>) {
-        let (committee, keypairs) = consensus_config::local_committee_and_keys(0, vec![1; committee_size]);
+    pub(crate) fn new_for_test(
+        committee_size: usize,
+    ) -> (Self, Vec<(NetworkKeyPair, ProtocolKeyPair)>) {
+        let (committee, keypairs) =
+            consensus_config::local_committee_and_keys(0, vec![1; committee_size]);
         let metrics = test_metrics();
         let temp_dir = TempDir::new().unwrap();
         let clock = Arc::new(Clock::new());
@@ -56,7 +66,10 @@ impl Context {
         let context = Context::new(
             AuthorityIndex::new_for_test(0),
             committee,
-            Parameters { db_path: temp_dir.keep(), ..Default::default() },
+            Parameters {
+                db_path: temp_dir.into_path(),
+                ..Default::default()
+            },
             ProtocolConfig::get_for_max_version_UNSAFE(),
             metrics,
             clock,
@@ -95,7 +108,10 @@ pub(crate) struct Clock {
 
 impl Clock {
     pub fn new() -> Self {
-        Self { initial_instant: Instant::now(), initial_system_time: SystemTime::now() }
+        Self {
+            initial_instant: Instant::now(),
+            initial_system_time: SystemTime::now(),
+        }
     }
 
     // Returns the current time expressed as UNIX timestamp in milliseconds.
@@ -103,16 +119,26 @@ impl Clock {
     // and to allow testing with tokio clock.
     pub(crate) fn timestamp_utc_ms(&self) -> BlockTimestampMs {
         let now: Instant = Instant::now();
-        let monotonic_system_time =
-            self.initial_system_time
-                .checked_add(now.checked_duration_since(self.initial_instant).unwrap_or_else(|| {
-                    panic!("current instant ({:?}) < initial instant ({:?})", now, self.initial_instant)
-                }))
-                .expect("Computing system time should not overflow");
+        let monotonic_system_time = self
+            .initial_system_time
+            .checked_add(
+                now.checked_duration_since(self.initial_instant)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "current instant ({:?}) < initial instant ({:?})",
+                            now, self.initial_instant
+                        )
+                    }),
+            )
+            .expect("Computing system time should not overflow");
         monotonic_system_time
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or_else(|_| {
-                panic!("system time ({:?}) < UNIX_EPOCH ({:?})", monotonic_system_time, SystemTime::UNIX_EPOCH,)
+                panic!(
+                    "system time ({:?}) < UNIX_EPOCH ({:?})",
+                    monotonic_system_time,
+                    SystemTime::UNIX_EPOCH,
+                )
             })
             .as_millis() as BlockTimestampMs
     }

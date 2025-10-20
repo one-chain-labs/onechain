@@ -1,12 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    cmp::Ordering,
-    collections::VecDeque,
-    hash::{DefaultHasher, Hash, Hasher},
-    sync::{atomic::AtomicU64, Arc},
-};
+use std::collections::VecDeque;
+use std::hash::{Hash, Hasher};
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
+use std::{cmp::Ordering, hash::DefaultHasher};
 
 use moka::sync::Cache as MokaCache;
 use mysten_common::debug_fatal;
@@ -28,7 +27,9 @@ pub struct CachedVersionMap<V> {
 
 impl<V> Default for CachedVersionMap<V> {
     fn default() -> Self {
-        Self { values: VecDeque::new() }
+        Self {
+            values: VecDeque::new(),
+        }
     }
 }
 
@@ -40,7 +41,12 @@ impl<V> CachedVersionMap<V> {
     pub fn insert(&mut self, version: SequenceNumber, value: V) {
         if !self.values.is_empty() {
             let back = self.values.back().unwrap().0;
-            assert!(back < version, "version must be monotonically increasing ({} < {})", back, version);
+            assert!(
+                back < version,
+                "version must be monotonically increasing ({} < {})",
+                back,
+                version
+            );
         }
         self.values.push_back((version, value));
     }
@@ -154,6 +160,7 @@ pub struct MonotonicCache<K, V> {
     key_generation: Vec<AtomicU64>,
 }
 
+#[derive(Copy, Clone)]
 pub enum Ticket {
     // Read tickets are used when caching the result of a read from the db.
     // They are only valid if the generation number matches the current generation.
@@ -172,13 +179,15 @@ const KEY_GENERATION_SIZE: usize = 1024 * 16;
 
 impl<K, V> MonotonicCache<K, V>
 where
-    K: Hash + Eq + Send + Sync + Copy + std::fmt::Debug + 'static,
+    K: Hash + Eq + Send + Sync + Copy + 'static,
     V: IsNewer + Clone + Send + Sync + 'static,
 {
     pub fn new(cache_size: u64) -> Self {
         Self {
             cache: MokaCache::builder().max_capacity(cache_size).build(),
-            key_generation: (0..KEY_GENERATION_SIZE).map(|_| AtomicU64::new(0)).collect(),
+            key_generation: (0..KEY_GENERATION_SIZE)
+                .map(|_| AtomicU64::new(0))
+                .collect(),
         }
     }
 
@@ -284,10 +293,9 @@ where
             let mut entry = entry.value().lock();
             check_ticket()?;
 
+            // Ticket expiry should make this assert impossible.
             if entry.is_newer_than(&value) {
-                // TODO: Ticket expiry should this assert impossible. While trying to root cause
-                // the bug we can simply ignore the insert.
-                debug_fatal!("entry is newer than value for key {:?}", key);
+                debug_fatal!("entry is newer than value");
             } else {
                 *entry = value;
             }

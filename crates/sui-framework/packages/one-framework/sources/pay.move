@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// This module provides handy functionality for wallets and `one::Coin` management.
-module one::pay;
+/// This module provides handy functionality for wallets and `sui::Coin` management.
+module oct::pay;
 
-use one::coin::Coin;
+use sui::coin::Coin;
 
 /// For when empty vector is supplied into join function.
 const ENoCoins: u64 = 0;

@@ -14,15 +14,11 @@ use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
-use crate::{
-    ingestion::{
-        broadcaster::broadcaster,
-        client::IngestionClient,
-        error::{Error, Result},
-        regulator::regulator,
-    },
-    metrics::IndexerMetrics,
-};
+use crate::ingestion::broadcaster::broadcaster;
+use crate::ingestion::client::IngestionClient;
+use crate::ingestion::error::{Error, Result};
+use crate::ingestion::regulator::regulator;
+use crate::metrics::IndexerMetrics;
 
 mod broadcaster;
 pub mod client;
@@ -92,7 +88,14 @@ impl IngestionService {
 
         let subscribers = Vec::new();
         let (ingest_hi_tx, ingest_hi_rx) = mpsc::unbounded_channel();
-        Ok(Self { config, client, ingest_hi_tx, ingest_hi_rx, subscribers, cancel })
+        Ok(Self {
+            config,
+            client,
+            ingest_hi_tx,
+            ingest_hi_rx,
+            subscribers,
+            cancel,
+        })
     }
 
     /// The client this service uses to fetch checkpoints.
@@ -111,7 +114,10 @@ impl IngestionService {
     /// Returns the channel to receive checkpoints from and the channel to accept watermarks from.
     pub(crate) fn subscribe(
         &mut self,
-    ) -> (mpsc::Receiver<Arc<CheckpointData>>, mpsc::UnboundedSender<(&'static str, u64)>) {
+    ) -> (
+        mpsc::Receiver<Arc<CheckpointData>>,
+        mpsc::UnboundedSender<(&'static str, u64)>,
+    ) {
         let (sender, receiver) = mpsc::channel(self.config.checkpoint_buffer_size);
         self.subscribers.push(sender);
         (receiver, self.ingest_hi_tx.clone())
@@ -136,7 +142,14 @@ impl IngestionService {
         I: IntoIterator<Item = u64> + Send + Sync + 'static,
         I::IntoIter: Send + Sync + 'static,
     {
-        let IngestionService { config, client, ingest_hi_tx: _, ingest_hi_rx, subscribers, cancel } = self;
+        let IngestionService {
+            config,
+            client,
+            ingest_hi_tx: _,
+            ingest_hi_rx,
+            subscribers,
+            cancel,
+        } = self;
 
         if subscribers.is_empty() {
             return Err(Error::NoSubscribers);
@@ -144,8 +157,13 @@ impl IngestionService {
 
         let (checkpoint_tx, checkpoint_rx) = mpsc::channel(config.ingest_concurrency);
 
-        let regulator =
-            regulator(checkpoints, config.checkpoint_buffer_size, ingest_hi_rx, checkpoint_tx, cancel.clone());
+        let regulator = regulator(
+            checkpoints,
+            config.checkpoint_buffer_size,
+            ingest_hi_rx,
+            checkpoint_tx,
+            cancel.clone(),
+        );
 
         let broadcaster = broadcaster(config, client, checkpoint_rx, subscribers, cancel.clone());
 
@@ -155,7 +173,11 @@ impl IngestionService {
 
 impl Default for IngestionConfig {
     fn default() -> Self {
-        Self { checkpoint_buffer_size: 5000, ingest_concurrency: 200, retry_interval_ms: 200 }
+        Self {
+            checkpoint_buffer_size: 5000,
+            ingest_concurrency: 200,
+            retry_interval_ms: 200,
+        }
     }
 }
 
@@ -166,13 +188,9 @@ mod tests {
     use reqwest::StatusCode;
     use wiremock::{MockServer, Request};
 
-    use crate::{
-        ingestion::{
-            remote_client::tests::{respond_with, status},
-            test_utils::test_checkpoint_data,
-        },
-        metrics::tests::test_metrics,
-    };
+    use crate::ingestion::remote_client::tests::{respond_with, status};
+    use crate::ingestion::test_utils::test_checkpoint_data;
+    use crate::metrics::tests::test_metrics;
 
     use super::*;
 
@@ -183,8 +201,15 @@ mod tests {
         cancel: CancellationToken,
     ) -> IngestionService {
         IngestionService::new(
-            ClientArgs { remote_store_url: Some(Url::parse(&uri).unwrap()), local_ingestion_path: None },
-            IngestionConfig { checkpoint_buffer_size, ingest_concurrency, ..Default::default() },
+            ClientArgs {
+                remote_store_url: Some(Url::parse(&uri).unwrap()),
+                local_ingestion_path: None,
+            },
+            IngestionConfig {
+                checkpoint_buffer_size,
+                ingest_concurrency,
+                ..Default::default()
+            },
             Arc::new(test_metrics()),
             cancel,
         )
@@ -237,7 +262,11 @@ mod tests {
         telemetry_subscribers::init_for_testing();
 
         let server = MockServer::start().await;
-        respond_with(&server, status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42))).await;
+        respond_with(
+            &server,
+            status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42)),
+        )
+        .await;
 
         let cancel = CancellationToken::new();
         let mut ingestion_service = test_ingestion(server.uri(), 1, 1, cancel.clone()).await;
@@ -259,7 +288,11 @@ mod tests {
         telemetry_subscribers::init_for_testing();
 
         let server = MockServer::start().await;
-        respond_with(&server, status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42))).await;
+        respond_with(
+            &server,
+            status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42)),
+        )
+        .await;
 
         let cancel = CancellationToken::new();
         let mut ingestion_service = test_ingestion(server.uri(), 1, 1, cancel.clone()).await;
@@ -380,7 +413,8 @@ mod tests {
         .await;
 
         let cancel = CancellationToken::new();
-        let mut ingestion_service = test_ingestion(server.uri(), /* buffer */ 3, 1, cancel.clone()).await;
+        let mut ingestion_service =
+            test_ingestion(server.uri(), /* buffer */ 3, 1, cancel.clone()).await;
 
         // This subscriber will take its sweet time processing checkpoints.
         let (mut laggard, _) = ingestion_service.subscribe();

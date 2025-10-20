@@ -6,41 +6,32 @@ use cluster::{Cluster, ClusterFactory};
 use config::ClusterTestOpt;
 use futures::{stream::FuturesUnordered, StreamExt};
 use helper::ObjectChecker;
-use jsonrpsee::{
-    core::{client::ClientT, params::ArrayParams},
-    http_client::HttpClientBuilder,
-};
+use jsonrpsee::core::params::ArrayParams;
+use jsonrpsee::{core::client::ClientT, http_client::HttpClientBuilder};
 use std::sync::Arc;
 use sui_faucet::CoinInfo;
 use sui_json_rpc_types::{
-    SuiExecutionStatus,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
-    SuiTransactionBlockResponseOptions,
-    TransactionBlockBytes,
+    SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions, TransactionBlockBytes,
 };
 use sui_sdk::wallet_context::WalletContext;
 use sui_test_transaction_builder::batch_make_transfer_transactions;
-use sui_types::{
-    base_types::TransactionDigest,
-    object::Owner,
-    quorum_driver_types::ExecuteTransactionRequestType,
-    sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
-};
+use sui_types::base_types::TransactionDigest;
+use sui_types::object::Owner;
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary;
 
 use sui_sdk::SuiClient;
+use sui_types::gas_coin::GasCoin;
 use sui_types::{
     base_types::SuiAddress,
-    gas_coin::GasCoin,
     transaction::{Transaction, TransactionData},
 };
 use test_case::{
-    coin_index_test::CoinIndexTest,
-    coin_merge_split_test::CoinMergeSplitTest,
+    coin_index_test::CoinIndexTest, coin_merge_split_test::CoinMergeSplitTest,
     fullnode_build_publish_transaction_test::FullNodeBuildPublishTransactionTest,
     fullnode_execute_transaction_test::FullNodeExecuteTransactionTest,
-    native_transfer_test::NativeTransferTest,
-    random_beacon_test::RandomBeaconTest,
+    native_transfer_test::NativeTransferTest, random_beacon_test::RandomBeaconTest,
     shared_object_test::SharedCounterTest,
 };
 use tokio::time::{self, Duration};
@@ -76,7 +67,9 @@ impl TestContext {
             .collect::<Vec<_>>();
         self.let_fullnode_sync(coin_info, 5).await;
 
-        let gas_coins = self.check_owner_and_into_gas_coin(faucet_response.transferred_gas_objects, addr).await;
+        let gas_coins = self
+            .check_owner_and_into_gas_coin(faucet_response.transferred_gas_objects, addr)
+            .await;
 
         let minimum_coins = minimum_coins.unwrap_or(1);
 
@@ -111,11 +104,21 @@ impl TestContext {
     }
 
     async fn get_latest_sui_system_state(&self) -> SuiSystemStateSummary {
-        self.client.get_fullnode_client().governance_api().get_latest_sui_system_state().await.unwrap()
+        self.client
+            .get_fullnode_client()
+            .governance_api()
+            .get_latest_sui_system_state()
+            .await
+            .unwrap()
     }
 
     async fn get_reference_gas_price(&self) -> u64 {
-        self.client.get_fullnode_client().governance_api().get_reference_gas_price().await.unwrap()
+        self.client
+            .get_fullnode_client()
+            .governance_api()
+            .get_reference_gas_price()
+            .await
+            .unwrap()
     }
 
     fn get_wallet_address(&self) -> SuiAddress {
@@ -140,7 +143,11 @@ impl TestContext {
         TransactionBlockBytes::to_data(rpc_client.request(method, params).await?)
     }
 
-    async fn sign_and_execute(&self, txn_data: TransactionData, desc: &str) -> SuiTransactionBlockResponse {
+    async fn sign_and_execute(
+        &self,
+        txn_data: TransactionData,
+        desc: &str,
+    ) -> SuiTransactionBlockResponse {
         let signature = self.get_context().sign(&txn_data, desc);
         let resp = self
             .get_fullnode_client()
@@ -157,7 +164,10 @@ impl TestContext {
             .await
             .unwrap_or_else(|e| panic!("Failed to execute transaction for {}. {}", desc, e));
         assert!(
-            matches!(resp.effects.as_ref().unwrap().status(), SuiExecutionStatus::Success),
+            matches!(
+                resp.effects.as_ref().unwrap().status(),
+                SuiExecutionStatus::Success
+            ),
             "Failed to execute transaction for {desc}: {:?}",
             resp
         );
@@ -168,7 +178,11 @@ impl TestContext {
         let cluster = ClusterFactory::start(&options).await?;
         let wallet_client = WalletClient::new_from_cluster(&cluster).await;
         let faucet = FaucetClientFactory::new_from_cluster(&cluster).await;
-        Ok(Self { cluster, client: wallet_client, faucet })
+        Ok(Self {
+            cluster,
+            client: wallet_client,
+            faucet,
+        })
     }
 
     // TODO: figure out a more efficient way to test a local cluster
@@ -221,7 +235,11 @@ impl TestContext {
         }
     }
 
-    async fn check_owner_and_into_gas_coin(&self, coin_info: Vec<CoinInfo>, owner: SuiAddress) -> Vec<GasCoin> {
+    async fn check_owner_and_into_gas_coin(
+        &self,
+        coin_info: Vec<CoinInfo>,
+        owner: SuiAddress,
+    ) -> Vec<GasCoin> {
         futures::future::join_all(
             coin_info
                 .iter()
@@ -244,7 +262,9 @@ pub struct TestCase<'a> {
 
 impl<'a> TestCase<'a> {
     pub fn new(test_case: impl TestCaseImpl + 'a) -> Self {
-        TestCase { test_case: (Box::new(test_case)) }
+        TestCase {
+            test_case: (Box::new(test_case)),
+        }
     }
 
     pub async fn run(self, ctx: &mut TestContext) -> bool {
@@ -277,8 +297,9 @@ pub struct ClusterTest;
 
 impl ClusterTest {
     pub async fn run(options: ClusterTestOpt) {
-        let mut ctx =
-            TestContext::setup(options).await.unwrap_or_else(|e| panic!("Failed to set up TestContext, e: {e}"));
+        let mut ctx = TestContext::setup(options)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to set up TestContext, e: {e}"));
 
         // TODO: collect tests from each test_case file instead.
         let tests = vec![

@@ -1,7 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{consistency::ConsistentIndexCursor, data::package_resolver::PackageResolver, error::Error};
+use crate::{
+    consistency::ConsistentIndexCursor, data::package_resolver::PackageResolver, error::Error,
+};
 use async_graphql::{
     connection::{Connection, ConnectionNameType, CursorType, Edge, EdgeNameType, EmptyFields},
     *,
@@ -13,17 +15,12 @@ use sui_types::{
     effects::{TransactionEffects as NativeTransactionEffects, TransactionEffectsAPI},
     event::Event as NativeEvent,
     execution_status::{
-        ExecutionFailureStatus,
-        ExecutionStatus as NativeExecutionStatus,
-        MoveLocation,
+        ExecutionFailureStatus, ExecutionStatus as NativeExecutionStatus, MoveLocation,
         MoveLocationOpt,
     },
     transaction::{
-        Command,
-        ProgrammableTransaction,
-        SenderSignedData as NativeSenderSignedData,
-        TransactionData as NativeTransactionData,
-        TransactionDataAPI,
+        Command, ProgrammableTransaction, SenderSignedData as NativeSenderSignedData,
+        TransactionData as NativeTransactionData, TransactionDataAPI,
         TransactionKind as NativeTransactionKind,
     },
 };
@@ -57,13 +54,24 @@ pub(crate) struct TransactionBlockEffects {
 pub(crate) enum TransactionBlockEffectsKind {
     /// A transaction that has been indexed and stored in the database,
     /// containing all information that the other two variants have, and more.
-    Stored { stored_tx: StoredTransaction, native: NativeTransactionEffects },
+    Stored {
+        stored_tx: StoredTransaction,
+        native: NativeTransactionEffects,
+    },
     /// A transaction block that has been executed via executeTransactionBlock
     /// but not yet indexed. So it does not contain checkpoint, timestamp or balanceChanges.
-    Executed { tx_data: NativeSenderSignedData, native: NativeTransactionEffects, events: Vec<NativeEvent> },
+    Executed {
+        tx_data: NativeSenderSignedData,
+        native: NativeTransactionEffects,
+        events: Vec<NativeEvent>,
+    },
     /// A transaction block that has been executed via dryRunTransactionBlock. Similar to
     /// Executed, it does not contain checkpoint, timestamp or balanceChanges.
-    DryRun { tx_data: NativeTransactionData, native: NativeTransactionEffects, events: Vec<NativeEvent> },
+    DryRun {
+        tx_data: NativeTransactionData,
+        native: NativeTransactionEffects,
+        events: Vec<NativeEvent>,
+    },
 }
 
 /// The execution status of this transaction block: success or failure.
@@ -117,18 +125,32 @@ impl TransactionBlockEffects {
         match status {
             NativeExecutionStatus::Success => Ok(None),
 
-            NativeExecutionStatus::Failure { error, command: None } => Ok(Some(error.to_string())),
+            NativeExecutionStatus::Failure {
+                error,
+                command: None,
+            } => Ok(Some(error.to_string())),
 
-            NativeExecutionStatus::Failure { error, command: Some(command) } => {
+            NativeExecutionStatus::Failure {
+                error,
+                command: Some(command),
+            } => {
                 let error = 'error: {
                     let ExecutionFailureStatus::MoveAbort(loc, code) = &error else {
                         break 'error error.to_string();
                     };
-                    let fname_string =
-                        if let Some(fname) = &loc.function_name { format!("::{}'", fname) } else { "'".to_string() };
+                    let fname_string = if let Some(fname) = &loc.function_name {
+                        format!("::{}'", fname)
+                    } else {
+                        "'".to_string()
+                    };
 
-                    let Some(CleverError { module_id, source_line_number, error_info }) =
-                        resolver.resolve_clever_error(loc.module.clone(), *code).await
+                    let Some(CleverError {
+                        module_id,
+                        source_line_number,
+                        error_info,
+                    }) = resolver
+                        .resolve_clever_error(loc.module.clone(), *code)
+                        .await
                     else {
                         break 'error format!(
                             "from '{}{fname_string} (instruction {}), abort code: {code}",
@@ -138,7 +160,10 @@ impl TransactionBlockEffects {
                     };
 
                     match error_info {
-                        ErrorConstants::Rendered { identifier, constant } => {
+                        ErrorConstants::Rendered {
+                            identifier,
+                            constant,
+                        } => {
                             format!(
                                 "from '{}{fname_string} (line {source_line_number}), abort '{identifier}': {constant}",
                                 module_id.to_canonical_display(true)
@@ -209,7 +234,10 @@ impl TransactionBlockEffects {
 
         let transactions = TransactionBlock::multi_query(
             ctx,
-            dependencies[fst.ix..=lst.ix].iter().map(|d| Digest::from(*d)).collect(),
+            dependencies[fst.ix..=lst.ix]
+                .iter()
+                .map(|d| Digest::from(*d))
+                .collect(),
             fst.c, // Each element's cursor has the same checkpoint sequence number set
         )
         .await
@@ -224,7 +252,10 @@ impl TransactionBlockEffects {
 
         for c in indices {
             let digest: Digest = dependencies[c.ix].into();
-            connection.edges.push(Edge::new(c.encode_cursor(), transactions.get(&digest).cloned()));
+            connection.edges.push(Edge::new(
+                c.encode_cursor(),
+                transactions.get(&digest).cloned(),
+            ));
         }
 
         Ok(connection)
@@ -249,8 +280,8 @@ impl TransactionBlockEffects {
 
         let input_shared_objects = self.native().input_shared_objects();
 
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(input_shared_objects.len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, _, cs)) = page
+            .paginate_consistent_indices(input_shared_objects.len(), self.checkpoint_viewed_at)?
         else {
             return Ok(connection);
         };
@@ -262,7 +293,9 @@ impl TransactionBlockEffects {
             let result = UnchangedSharedObject::try_from(input_shared_objects[c.ix].clone(), c.c);
             match result {
                 Ok(unchanged_shared_object) => {
-                    connection.edges.push(Edge::new(c.encode_cursor(), unchanged_shared_object));
+                    connection
+                        .edges
+                        .push(Edge::new(c.encode_cursor(), unchanged_shared_object));
                 }
                 Err(_shared_object_changed) => continue, // Only add unchanged shared objects to the connection.
             }
@@ -295,9 +328,14 @@ impl TransactionBlockEffects {
         connection.has_next_page = next;
 
         for c in cs {
-            let object_change = ObjectChange { native: object_changes[c.ix].clone(), checkpoint_viewed_at: c.c };
+            let object_change = ObjectChange {
+                native: object_changes[c.ix].clone(),
+                checkpoint_viewed_at: c.c,
+            };
 
-            connection.edges.push(Edge::new(c.encode_cursor(), object_change));
+            connection
+                .edges
+                .push(Edge::new(c.encode_cursor(), object_change));
         }
 
         Ok(connection)
@@ -320,8 +358,8 @@ impl TransactionBlockEffects {
             return Ok(connection);
         };
 
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(stored_tx.get_balance_len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, _, cs)) = page
+            .paginate_consistent_indices(stored_tx.get_balance_len(), self.checkpoint_viewed_at)?
         else {
             return Ok(connection);
         };
@@ -335,7 +373,9 @@ impl TransactionBlockEffects {
             };
 
             let balance_change = BalanceChange::read(serialized, c.c).extend()?;
-            connection.edges.push(Edge::new(c.encode_cursor(), balance_change));
+            connection
+                .edges
+                .push(Edge::new(c.encode_cursor(), balance_change));
         }
 
         Ok(connection)
@@ -357,7 +397,9 @@ impl TransactionBlockEffects {
             TransactionBlockEffectsKind::Executed { events, .. }
             | TransactionBlockEffectsKind::DryRun { events, .. } => events.len(),
         };
-        let Some((prev, next, _, cs)) = page.paginate_consistent_indices(len, self.checkpoint_viewed_at)? else {
+        let Some((prev, next, _, cs)) =
+            page.paginate_consistent_indices(len, self.checkpoint_viewed_at)?
+        else {
             return Ok(connection);
         };
 
@@ -370,9 +412,11 @@ impl TransactionBlockEffects {
                     Event::try_from_stored_transaction(stored_tx, c.ix, c.c).extend()?
                 }
                 TransactionBlockEffectsKind::Executed { events, .. }
-                | TransactionBlockEffectsKind::DryRun { events, .. } => {
-                    Event { stored: None, native: events[c.ix].clone(), checkpoint_viewed_at: c.c }
-                }
+                | TransactionBlockEffectsKind::DryRun { events, .. } => Event {
+                    stored: None,
+                    native: events[c.ix].clone(),
+                    checkpoint_viewed_at: c.c,
+                },
             };
             connection.edges.push(Edge::new(c.encode_cursor(), event));
         }
@@ -390,7 +434,13 @@ impl TransactionBlockEffects {
 
     /// The epoch this transaction was finalized in.
     async fn epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native().executed_epoch()), self.checkpoint_viewed_at).await.extend()
+        Epoch::query(
+            ctx,
+            Some(self.native().executed_epoch()),
+            self.checkpoint_viewed_at,
+        )
+        .await
+        .extend()
     }
 
     /// The checkpoint this transaction was finalized in.
@@ -438,10 +488,14 @@ impl TransactionBlockEffects {
         Ok(match &self.kind {
             TransactionBlockEffectsKind::Stored { stored_tx, .. } => {
                 let s: NativeSenderSignedData = bcs::from_bytes(&stored_tx.raw_transaction)
-                    .map_err(|e| Error::Internal(format!("Error deserializing transaction data: {e}")))?;
+                    .map_err(|e| {
+                        Error::Internal(format!("Error deserializing transaction data: {e}"))
+                    })?;
                 s.transaction_data().clone()
             }
-            TransactionBlockEffectsKind::Executed { tx_data, .. } => tx_data.transaction_data().clone(),
+            TransactionBlockEffectsKind::Executed { tx_data, .. } => {
+                tx_data.transaction_data().clone()
+            }
             TransactionBlockEffectsKind::DryRun { tx_data, .. } => tx_data.clone(),
         })
     }
@@ -465,18 +519,25 @@ impl TransactionBlockEffects {
     ///   be found, this function will do nothing.
     /// * If the error is a Move abort and the storage ID is unable to be resolved an error is
     ///   returned.
-    async fn resolve_native_status_impl(&self, resolver: &PackageResolver) -> Result<NativeExecutionStatus> {
+    async fn resolve_native_status_impl(
+        &self,
+        resolver: &PackageResolver,
+    ) -> Result<NativeExecutionStatus> {
         let mut status = self.native().status().clone();
         if let NativeExecutionStatus::Failure {
             error:
                 ExecutionFailureStatus::MoveAbort(MoveLocation { module, .. }, _)
-                | ExecutionFailureStatus::MovePrimitiveRuntimeError(MoveLocationOpt(Some(MoveLocation { module, .. }))),
+                | ExecutionFailureStatus::MovePrimitiveRuntimeError(MoveLocationOpt(Some(MoveLocation {
+                    module,
+                    ..
+                }))),
             command: Some(command_idx),
         } = &mut status
         {
             // Get the Move call that this error is associated with.
-            if let Some(Command::MoveCall(ptb_call)) =
-                self.programmable_transaction()?.and_then(|ptb| ptb.commands.into_iter().nth(*command_idx))
+            if let Some(Command::MoveCall(ptb_call)) = self
+                .programmable_transaction()?
+                .and_then(|ptb| ptb.commands.into_iter().nth(*command_idx))
             {
                 let module_new = module.clone();
                 // Resolve the runtime module ID in the Move abort to the storage ID of the package
@@ -510,17 +571,39 @@ impl TryFrom<TransactionBlock> for TransactionBlockEffects {
     fn try_from(block: TransactionBlock) -> Result<Self, Error> {
         let checkpoint_viewed_at = block.checkpoint_viewed_at;
         let kind = match block.inner {
-            TransactionBlockInner::Stored { stored_tx, .. } => bcs::from_bytes(&stored_tx.raw_effects)
-                .map(|native| TransactionBlockEffectsKind::Stored { stored_tx: stored_tx.clone(), native })
-                .map_err(|e| Error::Internal(format!("Error deserializing transaction effects: {e}"))),
-            TransactionBlockInner::Executed { tx_data, effects, events } => {
-                Ok(TransactionBlockEffectsKind::Executed { tx_data, native: effects, events })
+            TransactionBlockInner::Stored { stored_tx, .. } => {
+                bcs::from_bytes(&stored_tx.raw_effects)
+                    .map(|native| TransactionBlockEffectsKind::Stored {
+                        stored_tx: stored_tx.clone(),
+                        native,
+                    })
+                    .map_err(|e| {
+                        Error::Internal(format!("Error deserializing transaction effects: {e}"))
+                    })
             }
-            TransactionBlockInner::DryRun { tx_data, effects, events } => {
-                Ok(TransactionBlockEffectsKind::DryRun { tx_data, native: effects, events })
-            }
+            TransactionBlockInner::Executed {
+                tx_data,
+                effects,
+                events,
+            } => Ok(TransactionBlockEffectsKind::Executed {
+                tx_data,
+                native: effects,
+                events,
+            }),
+            TransactionBlockInner::DryRun {
+                tx_data,
+                effects,
+                events,
+            } => Ok(TransactionBlockEffectsKind::DryRun {
+                tx_data,
+                native: effects,
+                events,
+            }),
         }?;
 
-        Ok(Self { kind, checkpoint_viewed_at })
+        Ok(Self {
+            kind,
+            checkpoint_viewed_at,
+        })
     }
 }

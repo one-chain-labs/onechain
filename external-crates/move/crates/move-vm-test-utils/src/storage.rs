@@ -40,7 +40,11 @@ impl ModuleResolver for BlankStorage {
 impl ResourceResolver for BlankStorage {
     type Error = ();
 
-    fn get_resource(&self, _address: &AccountAddress, _tag: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_resource(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
         Ok(None)
     }
 }
@@ -82,7 +86,11 @@ impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
 impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
     type Error = S::Error;
 
-    fn get_resource(&self, _address: &AccountAddress, _tag: &StructTag) -> Result<Option<Vec<u8>>, S::Error> {
+    fn get_resource(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, S::Error> {
         unreachable!()
     }
 }
@@ -105,7 +113,10 @@ pub struct InMemoryStorage {
     accounts: BTreeMap<AccountAddress, InMemoryAccountStorage>,
 }
 
-fn apply_changes<K, V>(map: &mut BTreeMap<K, V>, changes: impl IntoIterator<Item = (K, Op<V>)>) -> Result<()>
+fn apply_changes<K, V>(
+    map: &mut BTreeMap<K, V>,
+    changes: impl IntoIterator<Item = (K, Op<V>)>,
+) -> Result<()>
 where
     K: Ord + Debug,
 {
@@ -115,7 +126,10 @@ where
     for (k, op) in changes.into_iter() {
         match (map.entry(k), op) {
             (Occupied(entry), New(_)) => {
-                bail!("Failed to apply changes -- key {:?} already exists", entry.key())
+                bail!(
+                    "Failed to apply changes -- key {:?} already exists",
+                    entry.key()
+                )
             }
             (Occupied(entry), Delete) => {
                 entry.remove();
@@ -126,9 +140,10 @@ where
             (Vacant(entry), New(val)) => {
                 entry.insert(val);
             }
-            (Vacant(entry), Delete | Modify(_)) => {
-                bail!("Failed to apply changes -- key {:?} does not exist", entry.key())
-            }
+            (Vacant(entry), Delete | Modify(_)) => bail!(
+                "Failed to apply changes -- key {:?} does not exist",
+                entry.key()
+            ),
         }
     }
     Ok(())
@@ -155,7 +170,9 @@ impl InMemoryAccountStorage {
     }
 
     fn new() -> Self {
-        Self { modules: BTreeMap::new() }
+        Self {
+            modules: BTreeMap::new(),
+        }
     }
 }
 
@@ -182,11 +199,15 @@ impl InMemoryStorage {
     }
 
     pub fn new() -> Self {
-        Self { accounts: BTreeMap::new() }
+        Self {
+            accounts: BTreeMap::new(),
+        }
     }
 
     pub fn publish_or_overwrite_module(&mut self, module_id: ModuleId, blob: Vec<u8>) {
-        let account = get_or_insert(&mut self.accounts, *module_id.address(), || InMemoryAccountStorage::new());
+        let account = get_or_insert(&mut self.accounts, *module_id.address(), || {
+            InMemoryAccountStorage::new()
+        });
         account.modules.insert(module_id.name().to_owned(), blob);
     }
 }
@@ -210,7 +231,11 @@ impl ModuleResolver for InMemoryStorage {
 impl ResourceResolver for InMemoryStorage {
     type Error = ();
 
-    fn get_resource(&self, _address: &AccountAddress, _tag: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_resource(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
         unreachable!()
     }
 }

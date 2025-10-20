@@ -1,7 +1,7 @@
 // invalid, wrong struct field type
 
 module a::m {
-    use one::tx_context;
+    use sui::tx_context;
 
     struct M has drop { value: u64 }
 
@@ -9,6 +9,6 @@ module a::m {
     }
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

@@ -43,7 +43,12 @@ pub struct Test {
     #[clap(name = "list", short = 'l', long = "list")]
     pub list: bool,
     /// Number of threads to use for running tests.
-    #[clap(name = "num-threads", default_value = "8", short = 't', long = "threads")]
+    #[clap(
+        name = "num-threads",
+        default_value = "8",
+        short = 't',
+        long = "threads"
+    )]
     pub num_threads: usize,
     /// Report test statistics at the end of testing. CSV report generated if 'csv' passed
     #[clap(name = "report-statistics", short = 's', long = "statistics")]
@@ -146,13 +151,19 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
     // Build the resolution graph (resolution graph diagnostics are only needed for CLI commands so
     // ignore them by passing a vector as the writer)
-    let resolution_graph = build_config.resolution_graph_for_package(pkg_path, None, &mut Vec::new())?;
+    let resolution_graph =
+        build_config.resolution_graph_for_package(pkg_path, None, &mut Vec::new())?;
 
     // Note: unit_test_config.named_address_values is always set to vec![] (the default value) before
     // being passed in.
     unit_test_config.named_address_values = resolution_graph
         .extract_named_address_mapping()
-        .map(|(name, addr)| (name.to_string(), NumericalAddress::new(addr.into_bytes(), NumberFormat::Hex)))
+        .map(|(name, addr)| {
+            (
+                name.to_string(),
+                NumericalAddress::new(addr.into_bytes(), NumberFormat::Hex),
+            )
+        })
         .collect();
 
     // Collect all the bytecode modules that are dependencies of the package. We need to do this
@@ -160,7 +171,10 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // VM storage.
     let mut bytecode_deps_modules = vec![];
     for pkg in resolution_graph.package_table.values() {
-        let source_available = !pkg.get_sources(&resolution_graph.build_options).unwrap().is_empty();
+        let source_available = !pkg
+            .get_sources(&resolution_graph.build_options)
+            .unwrap()
+            .is_empty();
         if source_available {
             continue;
         }
@@ -180,16 +194,22 @@ pub fn run_move_unit_tests<W: Write + Send>(
     let mut warning_diags = None;
     build_plan.compile_with_driver(writer, |compiler| {
         let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
-        let (_, compiler) = diagnostics::unwrap_or_report_pass_diagnostics(&files, comments_and_compiler_res);
+        let (_, compiler) =
+            diagnostics::unwrap_or_report_pass_diagnostics(&files, comments_and_compiler_res);
         let (compiler, cfgir) = compiler.into_ast();
         let compilation_env = compiler.compilation_env();
         let built_test_plan = construct_test_plan(compilation_env, Some(root_package), &cfgir);
         let mapped_files = compilation_env.mapped_files().clone();
 
         let compilation_result = compiler.at_cfgir(cfgir).build();
-        let (units, warnings) = diagnostics::unwrap_or_report_pass_diagnostics(&files, compilation_result);
+        let (units, warnings) =
+            diagnostics::unwrap_or_report_pass_diagnostics(&files, compilation_result);
         diagnostics::report_warnings(&files, warnings.clone());
-        let named_units: Vec<_> = units.clone().into_iter().map(|unit| unit.named_module).collect();
+        let named_units: Vec<_> = units
+            .clone()
+            .into_iter()
+            .map(|unit| unit.named_module)
+            .collect();
         test_plan = Some((built_test_plan, mapped_files, named_units));
         warning_diags = Some(warnings);
         Ok((files, units))
@@ -201,7 +221,9 @@ pub fn run_move_unit_tests<W: Write + Send>(
     let test_plan = TestPlan::new(test_plan, mapped_files, units, bytecode_deps_modules);
 
     let trace_path = pkg_path.join(".trace");
-    let coverage_map_path = pkg_path.join(".coverage_map").with_extension(MOVE_COVERAGE_MAP_EXTENSION);
+    let coverage_map_path = pkg_path
+        .join(".coverage_map")
+        .with_extension(MOVE_COVERAGE_MAP_EXTENSION);
     let cleanup_trace = || {
         if compute_coverage && trace_path.exists() {
             std::fs::remove_file(&trace_path).unwrap();
@@ -218,7 +240,10 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
-    if !unit_test_config.run_and_report_unit_tests(test_plan, Some(natives), cost_table, writer)?.1 {
+    if !unit_test_config
+        .run_and_report_unit_tests(test_plan, Some(natives), cost_table, writer)?
+        .1
+    {
         cleanup_trace();
         return Ok((UnitTestResult::Failure, warning_diags));
     }

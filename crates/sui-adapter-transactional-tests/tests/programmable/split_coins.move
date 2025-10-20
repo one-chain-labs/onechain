@@ -8,13 +8,13 @@
 
 //# publish
 module test::m1 {
-    use one::coin;
+    use sui::coin;
 
     public fun ret_one_amount(): u64 {
         100
     }
 
-    public fun transfer_(v: vector<coin::Coin<one::oct::OCT>>, r: address) {
+    public fun transfer_(v: vector<coin::Coin<sui::oct::OCT>>, r: address) {
         v.do!(|c| {
             transfer::public_transfer(c, r);
         });
@@ -26,7 +26,7 @@ module test::m1 {
 //> TransferObjects([Result(0)], Input(1))
 
 // let's get ourselves a coin worth 1000
-//# run one::pay::split_and_transfer --type-args one::oct::OCT --args object(2,0) 1000 @A --sender A
+//# run sui::pay::split_and_transfer --type-args sui::oct::OCT --args object(2,0) 1000 @A --sender A
 
 //# view-object 3,0
 
@@ -68,7 +68,7 @@ module test::m1 {
 //# programmable --sender A --inputs object(3,0) 100 @B
 //> 0: test::m1::ret_one_amount();
 //> 1: SplitCoins(Input(0), [Result(0), Input(1)]);
-//> 2: MakeMoveVec<one::coin::Coin<one::oct::OCT>>([NestedResult(1,0), NestedResult(1,1)]);
+//> 2: MakeMoveVec<sui::coin::Coin<sui::oct::OCT>>([NestedResult(1,0), NestedResult(1,1)]);
 //> test::m1::transfer_(Result(2), Input(2));
 
 //# view-object 3,0

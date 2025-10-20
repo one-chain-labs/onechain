@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// URL: standard Uniform Resource Locator string
-module one::url;
+module oct::url;
 
 use std::ascii::String;
 

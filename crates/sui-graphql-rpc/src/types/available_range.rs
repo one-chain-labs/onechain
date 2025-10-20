@@ -1,10 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data::{Conn, Db, DbConnection, QueryExecutor},
-    error::Error,
-};
+use crate::data::{Conn, Db, DbConnection, QueryExecutor};
+use crate::error::Error;
 
 use super::checkpoint::{Checkpoint, CheckpointId};
 use async_graphql::*;
@@ -22,11 +20,15 @@ pub(crate) struct AvailableRange {
 #[Object]
 impl AvailableRange {
     async fn first(&self, ctx: &Context<'_>) -> Result<Option<Checkpoint>> {
-        Checkpoint::query(ctx, CheckpointId::by_seq_num(self.first), self.last).await.extend()
+        Checkpoint::query(ctx, CheckpointId::by_seq_num(self.first), self.last)
+            .await
+            .extend()
     }
 
     async fn last(&self, ctx: &Context<'_>) -> Result<Option<Checkpoint>> {
-        Checkpoint::query(ctx, CheckpointId::by_seq_num(self.last), self.last).await.extend()
+        Checkpoint::query(ctx, CheckpointId::by_seq_num(self.last), self.last)
+            .await
+            .extend()
     }
 }
 
@@ -34,7 +36,9 @@ impl AvailableRange {
     /// Look up the available range when viewing the data consistently at `checkpoint_viewed_at`.
     pub(crate) async fn query(db: &Db, checkpoint_viewed_at: u64) -> Result<Self, Error> {
         let Some(range): Option<Self> = db
-            .execute(move |conn| async move { Self::result(conn, checkpoint_viewed_at).await }.scope_boxed())
+            .execute(move |conn| {
+                async move { Self::result(conn, checkpoint_viewed_at).await }.scope_boxed()
+            })
             .await
             .map_err(|e| Error::Internal(format!("Failed to fetch available range: {e}")))?
         else {
@@ -53,7 +57,10 @@ impl AvailableRange {
     /// Returns an error if there was an issue querying the database, Ok(None) if the checkpoint
     /// being viewed is not in the database's available range, or Ok(Some(AvailableRange))
     /// otherwise.
-    pub(crate) async fn result(conn: &mut Conn<'_>, checkpoint_viewed_at: u64) -> QueryResult<Option<Self>> {
+    pub(crate) async fn result(
+        conn: &mut Conn<'_>,
+        checkpoint_viewed_at: u64,
+    ) -> QueryResult<Option<Self>> {
         use checkpoints::dsl as checkpoints;
         use objects_snapshot::dsl as snapshots;
 

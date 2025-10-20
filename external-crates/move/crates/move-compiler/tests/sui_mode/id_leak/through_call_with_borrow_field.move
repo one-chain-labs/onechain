@@ -1,7 +1,7 @@
 // not allowed, the call tries to make a new UID
 module a::m {
-    use one::object::UID;
-    use one::transfer::transfer;
+    use sui::object::UID;
+    use sui::transfer::transfer;
 
     struct S has copy, drop { f: u64 }
 
@@ -20,13 +20,13 @@ module a::m {
 
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }
 }
 
-module one::transfer {
+module oct::transfer {
     public fun transfer<T: key>(_: T, _: address) {
         abort 0
     }

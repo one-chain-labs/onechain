@@ -5,16 +5,17 @@ use futures::{future::BoxFuture, FutureExt};
 use opentelemetry::trace::TraceError;
 use opentelemetry_proto::{
     tonic::collector::trace::v1::ExportTraceServiceRequest,
-    transform::{common::tonic::ResourceAttributesWithSchema, trace::tonic::group_spans_by_resource_and_scope},
+    transform::{
+        common::tonic::ResourceAttributesWithSchema,
+        trace::tonic::group_spans_by_resource_and_scope,
+    },
 };
 use opentelemetry_sdk::export::trace::{ExportResult, SpanData, SpanExporter};
 use prost::Message;
-use std::{
-    fs::OpenOptions,
-    io::Write,
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub(crate) struct CachedOpenFile {
@@ -40,7 +41,9 @@ impl CachedOpenFile {
         } else {
             None
         };
-        Ok(Self { inner: Arc::new(Mutex::new(inner)) })
+        Ok(Self {
+            inner: Arc::new(Mutex::new(inner)),
+        })
     }
 
     pub fn update_path<P: AsRef<Path>>(&self, file_path: P) -> std::io::Result<()> {
@@ -62,7 +65,10 @@ impl CachedOpenFile {
         self.inner.lock().unwrap().take();
     }
 
-    fn with_file(&self, f: impl FnOnce(Option<&mut std::fs::File>) -> std::io::Result<()>) -> std::io::Result<()> {
+    fn with_file(
+        &self,
+        f: impl FnOnce(Option<&mut std::fs::File>) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
         f(self.inner.lock().unwrap().as_mut().map(|(_, file)| file))
     }
 }
@@ -75,7 +81,10 @@ pub(crate) struct FileExporter {
 
 impl FileExporter {
     pub fn new(file_path: Option<PathBuf>) -> std::io::Result<Self> {
-        Ok(Self { cached_open_file: CachedOpenFile::new(file_path)?, resource: ResourceAttributesWithSchema::default() })
+        Ok(Self {
+            cached_open_file: CachedOpenFile::new(file_path)?,
+            resource: ResourceAttributesWithSchema::default(),
+        })
     }
 }
 

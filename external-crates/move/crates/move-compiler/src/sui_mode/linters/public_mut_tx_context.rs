@@ -31,7 +31,12 @@ simple_visitor!(
         // skip if in 'sui::tx_context'
         ident.value.is(&SUI_ADDR_VALUE, TX_CONTEXT_MODULE_NAME)
     },
-    fn visit_function_custom(&mut self, _module: ModuleIdent, _function_name: FunctionName, fdef: &T::Function) -> bool {
+    fn visit_function_custom(
+        &mut self,
+        _module: ModuleIdent,
+        _function_name: FunctionName,
+        fdef: &T::Function,
+    ) -> bool {
         if !matches!(&fdef.visibility, Visibility::Public(_)) {
             return false;
         }

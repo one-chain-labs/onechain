@@ -98,8 +98,13 @@ impl<'a> ModuleGenerator<'a> {
     fn base_type(&mut self, ty_param_context: &[&TypeVar]) -> Type {
         // TODO: Don't generate nested resources for now. Once we allow functions to take resources
         // (and have type parameters of kind Resource or All) then we should revisit this here.
-        let structs: Vec<_> =
-            self.current_module.structs.iter().filter(|s| !s.value.abilities.contains(&Ability::Key)).cloned().collect();
+        let structs: Vec<_> = self
+            .current_module
+            .structs
+            .iter()
+            .filter(|s| !s.value.abilities.contains(&Ability::Key))
+            .cloned()
+            .collect();
 
         let mut end = 5;
         if !ty_param_context.is_empty() {
@@ -142,7 +147,12 @@ impl<'a> ModuleGenerator<'a> {
     }
 
     fn typ(&mut self, ty_param_context: &[(TypeVar, BTreeSet<Ability>)]) -> Type {
-        let typ = self.base_type(&ty_param_context.iter().map(|(tv, _)| tv).collect::<Vec<_>>());
+        let typ = self.base_type(
+            &ty_param_context
+                .iter()
+                .map(|(tv, _)| tv)
+                .collect::<Vec<_>>(),
+        );
         // TODO: Always change the base type to a reference if it's resource type. Then we can
         // allow functions to take resources.
         // if typ.is_nominal_resource { .... }
@@ -211,7 +221,9 @@ impl<'a> ModuleGenerator<'a> {
     }
 
     fn struct_fields(&mut self, ty_params: &[DatatypeTypeParameter]) -> StructDefinitionFields {
-        let num_fields = self.gen.gen_range(self.options.min_fields..self.options.max_fields);
+        let num_fields = self
+            .gen
+            .gen_range(self.options.min_fields..self.options.max_fields);
         let fields: Fields<Type> = init!(num_fields, {
             (
                 Spanned::unsafe_no_loc(Field_(self.identifier().into())),
@@ -226,7 +238,10 @@ impl<'a> ModuleGenerator<'a> {
         let signature = self.function_signature();
         let num_locals = self.index(self.options.max_locals);
         let locals = init!(num_locals, {
-            (Spanned::unsafe_no_loc(Var_(self.identifier().into())), self.typ(&signature.type_formals))
+            (
+                Spanned::unsafe_no_loc(Var_(self.identifier().into())),
+                self.typ(&signature.type_formals),
+            )
         });
         let fun = Function_ {
             loc: Spanned::unsafe_no_loc(()).loc,
@@ -237,20 +252,31 @@ impl<'a> ModuleGenerator<'a> {
                 locals,
                 code: vec![Spanned::unsafe_no_loc(Block_ {
                     label: Spanned::unsafe_no_loc(BlockLabel_(Symbol::from("b0"))),
-                    statements: VecDeque::from(vec![Spanned::unsafe_no_loc(Statement_::return_empty())]),
+                    statements: VecDeque::from(vec![Spanned::unsafe_no_loc(
+                        Statement_::return_empty(),
+                    )]),
                 })],
             },
         };
         let fun_name = FunctionName(self.identifier().into());
-        self.current_module.functions.push((fun_name, Spanned::unsafe_no_loc(fun)));
+        self.current_module
+            .functions
+            .push((fun_name, Spanned::unsafe_no_loc(fun)));
     }
 
     fn struct_def(&mut self, abilities: BTreeSet<Ability>) {
         let name = DatatypeName(self.identifier().into());
         let type_parameters = self.struct_type_parameters();
         let fields = self.struct_fields(&type_parameters);
-        let strct = StructDefinition_ { abilities, name, type_formals: type_parameters, fields };
-        self.current_module.structs.push(Spanned::unsafe_no_loc(strct))
+        let strct = StructDefinition_ {
+            abilities,
+            name,
+            type_formals: type_parameters,
+            fields,
+        };
+        self.current_module
+            .structs
+            .push(Spanned::unsafe_no_loc(strct))
     }
 
     fn imports(callees: &Set<Symbol>) -> Vec<ImportDefinition> {
@@ -305,7 +331,10 @@ impl<'a> ModuleGenerator<'a> {
         let current_module = ModuleDefinition {
             specified_version: None,
             loc: Spanned::unsafe_no_loc(0).loc,
-            identifier: ModuleIdent { name: ModuleName(module_name.into()), address: AccountAddress::random() },
+            identifier: ModuleIdent {
+                name: ModuleName(module_name.into()),
+                address: AccountAddress::random(),
+            },
             friends: Vec::new(),
             imports: Self::imports(callable_modules),
             explicit_dependency_declarations: Vec::new(),
@@ -314,6 +343,11 @@ impl<'a> ModuleGenerator<'a> {
             functions: Vec::new(),
             constants: Vec::new(),
         };
-        Self { options, current_module, gen }.gen()
+        Self {
+            options,
+            current_module,
+            gen,
+        }
+        .gen()
     }
 }

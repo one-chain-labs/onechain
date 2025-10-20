@@ -15,9 +15,7 @@ use crate::{
         ast::{all_keywords, COMMANDS},
         builder::{display_did_you_mean, find_did_you_means},
     },
-    err,
-    error,
-    sp,
+    err, error, sp,
 };
 
 use super::{
@@ -51,7 +49,9 @@ struct ProgramParsingState {
 impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
     /// Create a PTB program parser from a sequence of string.
     pub fn new(tokens: I) -> PTBResult<Self> {
-        let Some(tokens) = Lexer::new(tokens) else { error!(Span { start: 0, end: 0 }, "No tokens") };
+        let Some(tokens) = Lexer::new(tokens) else {
+            error!(Span { start: 0, end: 0 }, "No tokens")
+        };
         Ok(Self {
             tokens: tokens.peekable(),
             state: ProgramParsingState {
@@ -123,7 +123,10 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
                     let budget = try_!(self.parse_gas_budget()).widen_span(sp);
                     if let Some(other) = self.state.gas_budget.replace(budget) {
                         self.state.errors.extend([
-                            err!(other.span, "Multiple gas budgets found. Gas budget first set here.",),
+                            err!(
+                                other.span,
+                                "Multiple gas budgets found. Gas budget first set here.",
+                            ),
                             err!(budget.span => help: {
                                 "PTBs must have exactly one gas budget set."
                             },"Budget set again here."),
@@ -151,8 +154,10 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
                 }),
 
                 L(T::Command, s) => {
-                    let possibles =
-                        find_did_you_means(s, COMMANDS.iter().copied()).into_iter().map(|s| format!("--{s}")).collect();
+                    let possibles = find_did_you_means(s, COMMANDS.iter().copied())
+                        .into_iter()
+                        .map(|s| format!("--{s}"))
+                        .collect();
                     let err = if let Some(suggestion) = display_did_you_mean(possibles) {
                         err!(
                             sp => help: { "{suggestion}" },
@@ -186,12 +191,17 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
         let sp!(sp, tok) = self.peek();
 
         if !tok.is_terminal() {
-            self.state.errors.push(err!(sp, "Trailing {tok} found after the last command",));
+            self.state
+                .errors
+                .push(err!(sp, "Trailing {tok} found after the last command",));
         }
 
         if self.state.errors.is_empty() {
             Ok((
-                A::Program { commands: self.state.parsed, warn_shadows_set: self.state.warn_shadows_set },
+                A::Program {
+                    commands: self.state.parsed,
+                    warn_shadows_set: self.state.warn_shadows_set,
+                },
                 A::ProgramMetadata {
                     preview_set: self.state.preview_set,
                     summary_set: self.state.summary_set,
@@ -226,7 +236,10 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
 
     /// Peek at the next token without advancing the iterator.
     fn peek(&mut self) -> Spanned<Lexeme<'a>> {
-        *self.tokens.peek().expect("Lexer returns an infinite stream")
+        *self
+            .tokens
+            .peek()
+            .expect("Lexer returns an infinite stream")
     }
 
     /// Unconditionally advance the next token. It is always safe to do this, because the underlying
@@ -255,7 +268,10 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
         let transfer_froms = self.parse_array()?;
         let transfer_to = self.parse_argument()?;
         let sp = transfer_to.span.widen(transfer_froms.span);
-        Ok(sp.wrap(ParsedPTBCommand::TransferObjects(transfer_froms, transfer_to)))
+        Ok(sp.wrap(ParsedPTBCommand::TransferObjects(
+            transfer_froms,
+            transfer_to,
+        )))
     }
 
     /// Parse a split-coins command.
@@ -358,7 +374,9 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
     /// Parse a gas specifier.
     /// The expected format is: `--gas-coin <address>`
     fn parse_gas_specifier(&mut self) -> PTBResult<Spanned<ObjectID>> {
-        Ok(self.parse_address_literal()?.map(|a| ObjectID::from(a.into_inner())))
+        Ok(self
+            .parse_address_literal()?
+            .map(|a| ObjectID::from(a.into_inner())))
     }
 }
 
@@ -388,7 +406,11 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
             }
 
             L(T::Number | T::HexNumber, number) => {
-                let number = if lexeme.0 == T::HexNumber { format!("0x{number}") } else { number.to_owned() };
+                let number = if lexeme.0 == T::HexNumber {
+                    format!("0x{number}")
+                } else {
+                    number.to_owned()
+                };
 
                 self.bump();
                 self.parse_number(sp.wrap(&number))?
@@ -470,14 +492,20 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
                 let sp!(_, module_name) = module_access.module_name;
                 let sp!(fun_sp, function_name) = module_access.function_name;
 
-                let module = ParsedModuleId { address, name: module_name.to_string() };
+                let module = ParsedModuleId {
+                    address,
+                    name: module_name.to_string(),
+                };
 
                 let name = function_name.to_string();
                 let fq_name = ParsedFqName { module, name };
 
                 let sp!(_, L(T::LAngle, _)) = self.peek() else {
                     let sp = sp.widen(fun_sp);
-                    break 'fq sp.wrap(ParsedType::Struct(ParsedStructType { fq_name, type_args: vec![] }));
+                    break 'fq sp.wrap(ParsedType::Struct(ParsedStructType {
+                        fq_name,
+                        type_args: vec![],
+                    }));
                 };
 
                 let sp!(tys_sp, type_args) = self.parse_type_args()?;
@@ -502,13 +530,13 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
 
         self.expect(T::ColonColon)?;
         let sp!(mod_sp, L(_, module_name)) = self.expect(T::Ident)?;
-        let module_name =
-            Identifier::new(module_name).map_err(|_| err!(mod_sp, "Invalid module name {module_name:?}"))?;
+        let module_name = Identifier::new(module_name)
+            .map_err(|_| err!(mod_sp, "Invalid module name {module_name:?}"))?;
 
         self.expect(T::ColonColon)?;
         let sp!(fun_sp, L(_, function_name)) = self.expect(T::Ident)?;
-        let function_name =
-            Identifier::new(function_name).map_err(|_| err!(fun_sp, "Invalid function name {function_name:?}"))?;
+        let function_name = Identifier::new(function_name)
+            .map_err(|_| err!(fun_sp, "Invalid function name {function_name:?}"))?;
 
         let sp = address.span.widen(fun_sp);
         Ok(sp.wrap(ModuleAccess {
@@ -654,7 +682,7 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
         Ok(sp.wrap(addr))
     }
 
-    /// Parse a numeric addres literal (must be prefixed by an `@` symbol).
+    /// Parse a numeric address literal (must be prefixed by an `@` symbol).
     fn parse_address_literal(&mut self) -> PTBResult<Spanned<NumericalAddress>> {
         let sp!(sp, _) = self.expect(Token::At).map_err(|e| {
             err!(e.span => help: {
@@ -664,9 +692,10 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
 
         Ok(match self.parse_address()?.widen_span(sp) {
             sp!(sp, ParsedAddress::Numerical(n)) => sp.wrap(n),
-            sp!(sp, ParsedAddress::Named(n)) => {
-                error!(sp, "Expected a numerical address but got a named address '{n}'",)
-            }
+            sp!(sp, ParsedAddress::Named(n)) => error!(
+                sp,
+                "Expected a numerical address but got a named address '{n}'",
+            ),
         })
     }
 
@@ -790,7 +819,9 @@ mod tests {
             let mut x = shlex::split(input).unwrap();
             x.push("--gas-budget 1".to_owned());
             let mut parser = ProgramParser::new(x.iter().map(|x| x.as_str())).unwrap();
-            let result = parser.parse_argument().unwrap_or_else(|e| panic!("Failed on {input:?}: {e:?}"));
+            let result = parser
+                .parse_argument()
+                .unwrap_or_else(|e| panic!("Failed on {input:?}: {e:?}"));
             parsed.push(result);
         }
         insta::assert_debug_snapshot!(parsed);
@@ -843,7 +874,7 @@ mod tests {
             "0x2::object::UID",
             "3::staking_pool::StakedOct",
             // Generic types
-            "0x2::coin::Coin<2::oct::OCT>",
+            "0x2::coin::Coin<2::sui::SUI>",
             "sui::table::Table<sui::object::ID, vector<0x1::option::Option<u32>>>",
         ];
         let mut parsed = Vec::new();
@@ -851,7 +882,9 @@ mod tests {
             let mut x = shlex::split(input).unwrap();
             x.push("--gas-budget 1".to_owned());
             let mut parser = ProgramParser::new(x.iter().map(|x| x.as_str())).unwrap();
-            let result = parser.parse_type().unwrap_or_else(|e| panic!("Failed on {input:?}: {e:?}"));
+            let result = parser
+                .parse_type()
+                .unwrap_or_else(|e| panic!("Failed on {input:?}: {e:?}"));
             parsed.push(result);
         }
         insta::assert_debug_snapshot!(parsed);
@@ -901,7 +934,7 @@ mod tests {
             "--make-move-vec <u64> []",
             "--make-move-vec <u8> [1u8, 2u8]",
             // Move Call
-            "--move-call 0x3::sui_system::request_add_stake system coins.0 validator",
+            "--move-call 0x3::one_system::request_add_stake system coins.0 validator",
             "--move-call std::option::is_none <u64> p",
             "--move-call std::option::is_some<u32> q",
             // Assign
@@ -924,7 +957,9 @@ mod tests {
             let mut x = shlex::split(input).unwrap();
             x.push("--gas-budget 1".to_owned());
             let parser = ProgramParser::new(x.iter().map(|x| x.as_str())).unwrap();
-            let result = parser.parse().unwrap_or_else(|e| panic!("Failed on {input:?}: {e:?}"));
+            let result = parser
+                .parse()
+                .unwrap_or_else(|e| panic!("Failed on {input:?}: {e:?}"));
             parsed.push(result);
         }
         insta::assert_debug_snapshot!(parsed);

@@ -28,7 +28,11 @@ pub trait ProtocolCommands<T: BenchmarkType> {
 
     /// The command to run a node. The function returns a vector of commands along with the
     /// associated instance on which to run the command.
-    fn node_command<I>(&self, instances: I, parameters: &BenchmarkParameters<T>) -> Vec<(Instance, String)>
+    fn node_command<I>(
+        &self,
+        instances: I,
+        parameters: &BenchmarkParameters<T>,
+    ) -> Vec<(Instance, String)>
     where
         I: IntoIterator<Item = Instance>;
 
@@ -38,7 +42,11 @@ pub trait ProtocolCommands<T: BenchmarkType> {
 
     /// The command to run a client. The function returns a vector of commands along with the
     /// associated instance on which to run the command.
-    fn client_command<I>(&self, instances: I, parameters: &BenchmarkParameters<T>) -> Vec<(Instance, String)>
+    fn client_command<I>(
+        &self,
+        instances: I,
+        parameters: &BenchmarkParameters<T>,
+    ) -> Vec<(Instance, String)>
     where
         I: IntoIterator<Item = Instance>;
 }
@@ -100,10 +108,10 @@ pub mod test_protocol_metrics {
 
     impl ProtocolMetrics for TestProtocolMetrics {
         const BENCHMARK_DURATION: &'static str = "benchmark_duration";
-        const LATENCY_BUCKETS: &'static str = "latency_s";
-        const LATENCY_SQUARED_SUM: &'static str = "latency_squared_s";
-        const LATENCY_SUM: &'static str = "latency_s_sum";
         const TOTAL_TRANSACTIONS: &'static str = "latency_s_count";
+        const LATENCY_BUCKETS: &'static str = "latency_s";
+        const LATENCY_SUM: &'static str = "latency_s_sum";
+        const LATENCY_SQUARED_SUM: &'static str = "latency_squared_s";
 
         fn nodes_metrics_path<I>(&self, instances: I) -> Vec<(Instance, String)>
         where

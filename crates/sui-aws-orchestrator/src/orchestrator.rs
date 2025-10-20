@@ -11,16 +11,15 @@ use std::{
 
 use tokio::time::{self, Instant};
 
+use crate::monitor::Monitor;
 use crate::{
     benchmark::{BenchmarkParameters, BenchmarkParametersGenerator, BenchmarkType},
     client::Instance,
-    display,
-    ensure,
+    display, ensure,
     error::{TestbedError, TestbedResult},
     faults::CrashRecoverySchedule,
     logs::LogsAnalyzer,
     measurement::{Measurement, MeasurementsCollection},
-    monitor::Monitor,
     protocol::{ProtocolCommands, ProtocolMetrics},
     settings::Settings,
     ssh::{CommandContext, CommandStatus, SshConnectionManager},
@@ -59,10 +58,10 @@ pub struct Orchestrator<P, T> {
 }
 
 impl<P, T> Orchestrator<P, T> {
-    /// The default interval to crash nodes.
-    const DEFAULT_CRASH_INTERVAL: Duration = Duration::from_secs(60);
     /// The default interval between measurements collection.
     const DEFAULT_SCRAPE_INTERVAL: Duration = Duration::from_secs(15);
+    /// The default interval to crash nodes.
+    const DEFAULT_CRASH_INTERVAL: Duration = Duration::from_secs(60);
 
     /// Make a new orchestrator.
     pub fn new(
@@ -153,7 +152,10 @@ impl<P, T> Orchestrator<P, T> {
         // Sort the instances by region.
         let mut instances_by_regions = HashMap::new();
         for instance in available_instances {
-            instances_by_regions.entry(&instance.region).or_insert_with(VecDeque::new).push_back(instance);
+            instances_by_regions
+                .entry(&instance.region)
+                .or_insert_with(VecDeque::new)
+                .push_back(instance);
         }
 
         // Select the instance to host the monitoring stack.
@@ -207,19 +209,29 @@ impl<P, T> Orchestrator<P, T> {
 
 impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P, T> {
     /// Boot one node per instance.
-    async fn boot_nodes(&self, instances: Vec<Instance>, parameters: &BenchmarkParameters<T>) -> TestbedResult<()> {
+    async fn boot_nodes(
+        &self,
+        instances: Vec<Instance>,
+        parameters: &BenchmarkParameters<T>,
+    ) -> TestbedResult<()> {
         // Run one node per instance.
-        let targets = self.protocol_commands.node_command(instances.clone(), parameters);
+        let targets = self
+            .protocol_commands
+            .node_command(instances.clone(), parameters);
 
         let repo = self.settings.repository_name();
         let context = CommandContext::new()
             .run_background("node".into())
             .with_log_file("~/node.log".into())
             .with_execute_from_path(repo.into());
-        self.ssh_manager.execute_per_instance(targets, context).await?;
+        self.ssh_manager
+            .execute_per_instance(targets, context)
+            .await?;
 
         // Wait until all nodes are reachable.
-        let commands = self.protocol_commands.nodes_metrics_command(instances.clone());
+        let commands = self
+            .protocol_commands
+            .nodes_metrics_command(instances.clone());
         self.ssh_manager.wait_for_success(commands).await;
 
         Ok(())
@@ -252,8 +264,11 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
             &format!("(git clone {url} || true)"),
         ];
 
-        let cloud_provider_specific_dependencies: Vec<_> =
-            self.instance_setup_commands.iter().map(|x| x.as_str()).collect();
+        let cloud_provider_specific_dependencies: Vec<_> = self
+            .instance_setup_commands
+            .iter()
+            .map(|x| x.as_str())
+            .collect();
 
         let protocol_dependencies = self.protocol_commands.protocol_dependencies();
 
@@ -313,11 +328,17 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
 
         let id = "update";
         let repo_name = self.settings.repository_name();
-        let context = CommandContext::new().run_background(id.into()).with_execute_from_path(repo_name.into());
-        self.ssh_manager.execute(active.clone(), command, context).await?;
+        let context = CommandContext::new()
+            .run_background(id.into())
+            .with_execute_from_path(repo_name.into());
+        self.ssh_manager
+            .execute(active.clone(), command, context)
+            .await?;
 
         // Wait until the command finished running.
-        self.ssh_manager.wait_for_command(active, id, CommandStatus::Terminated).await?;
+        self.ssh_manager
+            .wait_for_command(active, id, CommandStatus::Terminated)
+            .await?;
 
         display::done();
         Ok(())
@@ -386,14 +407,18 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
         let (clients, _, _) = self.select_instances(parameters)?;
 
         // Deploy the load generators.
-        let targets = self.protocol_commands.client_command(clients.clone(), parameters);
+        let targets = self
+            .protocol_commands
+            .client_command(clients.clone(), parameters);
 
         let repo = self.settings.repository_name();
         let context = CommandContext::new()
             .run_background("client".into())
             .with_log_file("~/client.log".into())
             .with_execute_from_path(repo.into());
-        self.ssh_manager.execute_per_instance(targets, context).await?;
+        self.ssh_manager
+            .execute_per_instance(targets, context)
+            .await?;
 
         // Wait until all load generators are reachable.
         let commands = self.protocol_commands.clients_metrics_command(clients);
@@ -404,8 +429,14 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
     }
 
     /// Collect metrics from the load generators.
-    pub async fn run(&self, parameters: &BenchmarkParameters<T>) -> TestbedResult<MeasurementsCollection<T>> {
-        display::action(format!("Scraping metrics (at least {}s)", parameters.duration.as_secs()));
+    pub async fn run(
+        &self,
+        parameters: &BenchmarkParameters<T>,
+    ) -> TestbedResult<MeasurementsCollection<T>> {
+        display::action(format!(
+            "Scraping metrics (at least {}s)",
+            parameters.duration.as_secs()
+        ));
 
         // Select the instances to run.
         let (clients, nodes, _) = self.select_instances(parameters)?;
@@ -467,7 +498,9 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
 
         let results_directory = &self.settings.results_dir;
         let commit = &self.settings.repository.commit;
-        let path: PathBuf = [results_directory, &format!("results-{commit}").into()].iter().collect();
+        let path: PathBuf = [results_directory, &format!("results-{commit}").into()]
+            .iter()
+            .collect();
         fs::create_dir_all(&path).expect("Failed to create log directory");
         aggregator.save(path);
 
@@ -476,16 +509,22 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
     }
 
     /// Download the log files from the nodes and clients.
-    pub async fn download_logs(&self, parameters: &BenchmarkParameters<T>) -> TestbedResult<LogsAnalyzer> {
+    pub async fn download_logs(
+        &self,
+        parameters: &BenchmarkParameters<T>,
+    ) -> TestbedResult<LogsAnalyzer> {
         // Select the instances to run.
         let (clients, nodes, _) = self.select_instances(parameters)?;
 
         // Create a log sub-directory for this run.
         let commit = &self.settings.repository.commit;
-        let path: PathBuf =
-            [&self.settings.logs_dir, &format!("logs-{commit}").into(), &format!("logs-{parameters:?}").into()]
-                .iter()
-                .collect();
+        let path: PathBuf = [
+            &self.settings.logs_dir,
+            &format!("logs-{commit}").into(),
+            &format!("logs-{parameters:?}").into(),
+        ]
+        .iter()
+        .collect();
         fs::create_dir_all(&path).expect("Failed to create log directory");
 
         // NOTE: Our ssh library does not seem to be able to transfers files in parallel reliably.
@@ -499,8 +538,11 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
             let connection = self.ssh_manager.connect(instance.ssh_address()).await?;
             let client_log_content = connection.download("client.log").await?;
 
-            let client_log_file = [path.clone(), format!("client-{i}.log").into()].iter().collect::<PathBuf>();
-            fs::write(&client_log_file, client_log_content.as_bytes()).expect("Cannot write log file");
+            let client_log_file = [path.clone(), format!("client-{i}.log").into()]
+                .iter()
+                .collect::<PathBuf>();
+            fs::write(&client_log_file, client_log_content.as_bytes())
+                .expect("Cannot write log file");
 
             let mut log_parser = LogsAnalyzer::default();
             log_parser.set_client_errors(&client_log_content);
@@ -515,7 +557,9 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
             let connection = self.ssh_manager.connect(instance.ssh_address()).await?;
             let node_log_content = connection.download("node.log").await?;
 
-            let node_log_file = [path.clone(), format!("node-{i}.log").into()].iter().collect::<PathBuf>();
+            let node_log_file = [path.clone(), format!("node-{i}.log").into()]
+                .iter()
+                .collect::<PathBuf>();
             fs::write(&node_log_file, node_log_content.as_bytes()).expect("Cannot write log file");
 
             let mut log_parser = LogsAnalyzer::default();
@@ -528,7 +572,10 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
     }
 
     /// Run all the benchmarks specified by the benchmark generator.
-    pub async fn run_benchmarks(&mut self, mut generator: BenchmarkParametersGenerator<T>) -> TestbedResult<()> {
+    pub async fn run_benchmarks(
+        &mut self,
+        mut generator: BenchmarkParametersGenerator<T>,
+    ) -> TestbedResult<()> {
         display::header("Preparing testbed");
         display::config("Commit", format!("'{}'", &self.settings.repository.commit));
         display::newline();

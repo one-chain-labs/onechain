@@ -1,59 +1,50 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::{
-        authority_test_utils::{publish_package_on_single_authority, upgrade_package_on_single_authority},
-        test_authority_builder::TestAuthorityBuilder,
-        AuthorityState,
-    },
-    test_utils::make_transfer_sui_transaction,
+use crate::authority::authority_test_utils::{
+    publish_package_on_single_authority, upgrade_package_on_single_authority,
 };
-use fastcrypto::{ed25519::Ed25519KeyPair, traits::KeyPair};
+use crate::authority::test_authority_builder::TestAuthorityBuilder;
+use crate::authority::AuthorityState;
+use crate::test_utils::make_transfer_oct_transaction;
+use fastcrypto::ed25519::Ed25519KeyPair;
+use fastcrypto::traits::KeyPair;
 use move_core_types::ident_str;
-use std::{path::PathBuf, sync::Arc};
-use sui_config::{
-    certificate_deny_config::CertificateDenyConfigBuilder,
-    transaction_deny_config::{TransactionDenyConfig, TransactionDenyConfigBuilder},
-};
-use sui_swarm_config::{
-    genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT},
-    network_config::NetworkConfig,
-};
+use std::path::PathBuf;
+use std::sync::Arc;
+use sui_config::certificate_deny_config::CertificateDenyConfigBuilder;
+use sui_config::transaction_deny_config::{TransactionDenyConfig, TransactionDenyConfigBuilder};
+use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
+use sui_swarm_config::network_config::NetworkConfig;
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    effects::TransactionEffectsAPI,
-    error::{SuiError, SuiResult, UserInputError},
-    execution_status::{ExecutionFailureStatus, ExecutionStatus},
-    messages_grpc::HandleTransactionResponse,
-    transaction::{
-        CallArg,
-        CertifiedTransaction,
-        Transaction,
-        TransactionData,
-        VerifiedCertificate,
-        VerifiedTransaction,
-        TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
-    },
-    utils::{
-        get_zklogin_user_address,
-        make_zklogin_tx,
-        to_sender_signed_transaction,
-        to_sender_signed_transaction_with_multi_signers,
-    },
+use sui_types::base_types::{ObjectID, ObjectRef, SuiAddress};
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::error::{SuiError, SuiResult, UserInputError};
+use sui_types::execution_status::{ExecutionFailureStatus, ExecutionStatus};
+use sui_types::messages_grpc::HandleTransactionResponse;
+use sui_types::transaction::{
+    CallArg, CertifiedTransaction, Transaction, TransactionData, VerifiedCertificate,
+    VerifiedTransaction, TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
+};
+use sui_types::utils::get_zklogin_user_address;
+use sui_types::utils::{
+    make_zklogin_tx, to_sender_signed_transaction, to_sender_signed_transaction_with_multi_signers,
 };
 
 const ACCOUNT_NUM: usize = 5;
 const GAS_OBJECT_COUNT: usize = 15;
 
 async fn setup_test(deny_config: TransactionDenyConfig) -> (NetworkConfig, Arc<AuthorityState>) {
-    let network_config = sui_swarm_config::network_config_builder::ConfigBuilder::new_with_temp_dir()
-        .with_accounts(vec![
-            AccountConfig { address: None, gas_amounts: vec![DEFAULT_GAS_AMOUNT; GAS_OBJECT_COUNT] };
-            ACCOUNT_NUM
-        ])
-        .build();
+    let network_config =
+        sui_swarm_config::network_config_builder::ConfigBuilder::new_with_temp_dir()
+            .with_accounts(vec![
+                AccountConfig {
+                    address: None,
+                    gas_amounts: vec![DEFAULT_GAS_AMOUNT; GAS_OBJECT_COUNT],
+                };
+                ACCOUNT_NUM
+            ])
+            .build();
     let state = TestAuthorityBuilder::new()
         .with_transaction_deny_config(deny_config)
         .with_network_config(&network_config, 0)
@@ -77,7 +68,10 @@ async fn reload_state_with_new_deny_config(
 
 type Account = (SuiAddress, Ed25519KeyPair, Vec<ObjectRef>);
 
-fn get_accounts_and_coins(network_config: &NetworkConfig, state: &Arc<AuthorityState>) -> Vec<Account> {
+fn get_accounts_and_coins(
+    network_config: &NetworkConfig,
+    state: &Arc<AuthorityState>,
+) -> Vec<Account> {
     let accounts: Vec<_> = network_config
         .account_keys
         .iter()
@@ -97,10 +91,15 @@ fn get_accounts_and_coins(network_config: &NetworkConfig, state: &Arc<AuthorityS
     accounts
 }
 
-async fn process_zklogin_tx(tx: Transaction, state: &Arc<AuthorityState>) -> SuiResult<HandleTransactionResponse> {
+async fn process_zklogin_tx(
+    tx: Transaction,
+    state: &Arc<AuthorityState>,
+) -> SuiResult<HandleTransactionResponse> {
     let verified_tx = VerifiedTransaction::new_from_verified(tx);
 
-    state.handle_transaction(&state.epoch_store_for_testing(), verified_tx).await
+    state
+        .handle_transaction(&state.epoch_store_for_testing(), verified_tx)
+        .await
 }
 
 async fn transfer_with_account(
@@ -121,7 +120,10 @@ async fn transfer_with_account(
     let tx = if sender_account.0 == sponsor_account.0 {
         to_sender_signed_transaction(data, &sender_account.1)
     } else {
-        to_sender_signed_transaction_with_multi_signers(data, vec![&sender_account.1, &sponsor_account.1])
+        to_sender_signed_transaction_with_multi_signers(
+            data,
+            vec![&sender_account.1, &sponsor_account.1],
+        )
     };
     let epoch_store = state.epoch_store_for_testing();
     let tx = epoch_store.verify_transaction(tx).unwrap();
@@ -157,28 +159,43 @@ async fn handle_move_call_transaction(
 }
 
 fn assert_denied<T: std::fmt::Debug>(result: &SuiResult<T>) {
-    assert!(matches!(result.as_ref().unwrap_err(), SuiError::UserInputError {
-        error: UserInputError::TransactionDenied { .. }
-    }));
+    assert!(matches!(
+        result.as_ref().unwrap_err(),
+        SuiError::UserInputError {
+            error: UserInputError::TransactionDenied { .. }
+        }
+    ));
 }
 
 #[tokio::test]
 async fn test_user_transaction_disabled() {
-    let (network_config, state) =
-        setup_test(TransactionDenyConfigBuilder::new().disable_user_transaction().build()).await;
+    let (network_config, state) = setup_test(
+        TransactionDenyConfigBuilder::new()
+            .disable_user_transaction()
+            .build(),
+    )
+    .await;
     let accounts = get_accounts_and_coins(&network_config, &state);
     assert_denied(&transfer_with_account(&accounts[0], &accounts[0], &state).await);
 }
 
 #[tokio::test]
 async fn test_zklogin_transaction_disabled() {
-    let (_, state) = setup_test(TransactionDenyConfigBuilder::new().disable_zklogin_sig().build()).await;
+    let (_, state) = setup_test(
+        TransactionDenyConfigBuilder::new()
+            .disable_zklogin_sig()
+            .build(),
+    )
+    .await;
     let (_, tx, _) = make_zklogin_tx(get_zklogin_user_address(), false);
     assert_denied(&process_zklogin_tx(tx, &state).await);
 
-    let (_, state1) =
-        setup_test(TransactionDenyConfigBuilder::new().add_zklogin_disabled_provider("Twitch".to_string()).build())
-            .await;
+    let (_, state1) = setup_test(
+        TransactionDenyConfigBuilder::new()
+            .add_zklogin_disabled_provider("Twitch".to_string())
+            .build(),
+    )
+    .await;
     let (_, tx1, _) = make_zklogin_tx(get_zklogin_user_address(), false);
     assert_denied(&process_zklogin_tx(tx1, &state1).await);
 }
@@ -193,7 +210,9 @@ async fn test_object_denied() {
     let state = reload_state_with_new_deny_config(
         &network_config,
         state,
-        TransactionDenyConfigBuilder::new().add_denied_object(obj_ref.0).build(),
+        TransactionDenyConfigBuilder::new()
+            .add_denied_object(obj_ref.0)
+            .build(),
     )
     .await;
     assert_denied(&transfer_with_account(&accounts[0], &accounts[0], &state).await);
@@ -209,7 +228,10 @@ async fn test_signer_denied() {
     let state = reload_state_with_new_deny_config(
         &network_config,
         state,
-        TransactionDenyConfigBuilder::new().add_denied_address(accounts[0].0).add_denied_address(accounts[1].0).build(),
+        TransactionDenyConfigBuilder::new()
+            .add_denied_address(accounts[0].0)
+            .add_denied_address(accounts[1].0)
+            .build(),
     )
     .await;
     // Test that sender (accounts[0]) would be denied.
@@ -220,8 +242,12 @@ async fn test_signer_denied() {
 
 #[tokio::test]
 async fn test_shared_object_transaction_disabled() {
-    let (network_config, state) =
-        setup_test(TransactionDenyConfigBuilder::new().disable_shared_object_transaction().build()).await;
+    let (network_config, state) = setup_test(
+        TransactionDenyConfigBuilder::new()
+            .disable_shared_object_transaction()
+            .build(),
+    )
+    .await;
     let accounts = get_accounts_and_coins(&network_config, &state);
     let gas_price = state.reference_gas_price_for_testing().unwrap();
     let account = &accounts[0];
@@ -236,14 +262,20 @@ async fn test_shared_object_transaction_disabled() {
 
 #[tokio::test]
 async fn test_package_publish_disabled() {
-    let (network_config, state) =
-        setup_test(TransactionDenyConfigBuilder::new().disable_package_publish().build()).await;
+    let (network_config, state) = setup_test(
+        TransactionDenyConfigBuilder::new()
+            .disable_package_publish()
+            .build(),
+    )
+    .await;
     let accounts = get_accounts_and_coins(&network_config, &state);
     let rgp = state.reference_gas_price_for_testing().unwrap();
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("src/unit_tests/data/object_basics");
     let (sender, keypair, gas_object) = (accounts[0].0, &accounts[0].1, accounts[0].2[0]);
-    let tx = TestTransactionBuilder::new(sender, gas_object, rgp).publish(path).build_and_sign(keypair);
+    let tx = TestTransactionBuilder::new(sender, gas_object, rgp)
+        .publish(path)
+        .build_and_sign(keypair);
     let epoch_store = state.epoch_store_for_testing();
     let tx = epoch_store.verify_transaction(tx).unwrap();
     let result = state.handle_transaction(&epoch_store, tx).await;
@@ -319,35 +351,47 @@ async fn test_package_denied() {
 
     state
         .get_cache_commit()
-        .commit_transaction_outputs(state.epoch_store_for_testing().epoch(), &[tx_c, tx_b, tx_a, tx_c_prime, tx_b_prime])
+        .commit_transaction_outputs(
+            state.epoch_store_for_testing().epoch(),
+            &[tx_c, tx_b, tx_a, tx_c_prime, tx_b_prime],
+        )
         .await;
 
     // Re-create the state such that we could deny package c.
     let state = reload_state_with_new_deny_config(
         &network_config,
         state,
-        TransactionDenyConfigBuilder::new().add_denied_package(package_c).build(),
+        TransactionDenyConfigBuilder::new()
+            .add_denied_package(package_c)
+            .build(),
     )
     .await;
 
     // Calling modules in package c directly should fail.
-    let result = handle_move_call_transaction(&state, package_c, "c", "c", vec![], &accounts[0], 5).await;
+    let result =
+        handle_move_call_transaction(&state, package_c, "c", "c", vec![], &accounts[0], 5).await;
     assert_denied(&result);
 
     // Calling modules in package b should fail too as it directly depends on c.
-    let result = handle_move_call_transaction(&state, package_c, "b", "b", vec![], &accounts[0], 6).await;
+    let result =
+        handle_move_call_transaction(&state, package_c, "b", "b", vec![], &accounts[0], 6).await;
     assert_denied(&result);
 
     // Calling modules in package a should fail too as it indirectly depends on c.
-    let result = handle_move_call_transaction(&state, package_c, "a", "a", vec![], &accounts[0], 7).await;
+    let result =
+        handle_move_call_transaction(&state, package_c, "a", "a", vec![], &accounts[0], 7).await;
     assert_denied(&result);
 
     // Calling modules in c' should succeed as it is not denied.
-    let result = handle_move_call_transaction(&state, package_c_prime, "c", "c", vec![], &accounts[0], 8).await;
+    let result =
+        handle_move_call_transaction(&state, package_c_prime, "c", "c", vec![], &accounts[0], 8)
+            .await;
     assert!(result.is_ok());
 
     // Calling modules in b' should succeed as it no longer depends on c.
-    let result = handle_move_call_transaction(&state, package_b_prime, "b", "b", vec![], &accounts[0], 9).await;
+    let result =
+        handle_move_call_transaction(&state, package_b_prime, "b", "b", vec![], &accounts[0], 9)
+            .await;
     assert!(result.is_ok());
 
     // Publish a should fail because it has a dependency on c, which is denied.
@@ -397,8 +441,10 @@ async fn test_package_denied() {
 #[tokio::test]
 async fn test_certificate_deny() {
     let (network_config, state) = setup_test(TransactionDenyConfig::default()).await;
-    let (sender, key, gas_objects) = get_accounts_and_coins(&network_config, &state).pop().unwrap();
-    let tx = make_transfer_sui_transaction(
+    let (sender, key, gas_objects) = get_accounts_and_coins(&network_config, &state)
+        .pop()
+        .unwrap();
+    let tx = make_transfer_oct_transaction(
         gas_objects[0],
         sender,
         None,
@@ -409,18 +455,31 @@ async fn test_certificate_deny() {
     let digest = *tx.digest();
     let state = TestAuthorityBuilder::new()
         .with_network_config(&network_config, 0)
-        .with_certificate_deny_config(CertificateDenyConfigBuilder::new().add_certificate_deny(digest).build())
+        .with_certificate_deny_config(
+            CertificateDenyConfigBuilder::new()
+                .add_certificate_deny(digest)
+                .build(),
+        )
         .build()
         .await;
     let epoch_store = state.epoch_store_for_testing();
     let tx = epoch_store.verify_transaction(tx).unwrap();
-    let signature = state.handle_transaction(&epoch_store, tx.clone()).await.unwrap().status.into_signed_for_testing();
+    let signature = state
+        .handle_transaction(&epoch_store, tx.clone())
+        .await
+        .unwrap()
+        .status
+        .into_signed_for_testing();
     let cert = VerifiedCertificate::new_unchecked(
-        CertifiedTransaction::new(tx.into_message(), vec![signature], epoch_store.committee()).unwrap(),
+        CertifiedTransaction::new(tx.into_message(), vec![signature], epoch_store.committee())
+            .unwrap(),
     );
     let (effects, _) = state.try_execute_for_test(&cert).await.unwrap();
-    assert!(matches!(effects.status(), &ExecutionStatus::Failure {
-        error: ExecutionFailureStatus::CertificateDenied,
-        ..
-    }));
+    assert!(matches!(
+        effects.status(),
+        &ExecutionStatus::Failure {
+            error: ExecutionFailureStatus::CertificateDenied,
+            ..
+        }
+    ));
 }

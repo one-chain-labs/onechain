@@ -3,35 +3,44 @@
 
 use move_core_types::annotated_value::MoveTypeLayout;
 use sui_json_rpc_types::SuiCallArg;
-use sui_types::{
-    base_types::{ObjectDigest, ObjectID, SequenceNumber, SuiAddress},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{CallArg, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
-};
+use sui_types::base_types::{ObjectDigest, ObjectID, SequenceNumber, SuiAddress};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{CallArg, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER};
 
-use crate::{
-    operations::Operations,
-    types::{ConstructionMetadata, OperationType},
-    SUI,
-};
+use crate::operations::Operations;
+use crate::types::{ConstructionMetadata, OperationType};
+use crate::SUI;
 
 #[tokio::test]
-async fn test_operation_data_parsing_pay_sui() -> Result<(), anyhow::Error> {
-    let gas = (ObjectID::random(), SequenceNumber::new(), ObjectDigest::random());
+async fn test_operation_data_parsing_pay_oct() -> Result<(), anyhow::Error> {
+    let gas = (
+        ObjectID::random(),
+        SequenceNumber::new(),
+        ObjectDigest::random(),
+    );
 
     let sender = SuiAddress::random_for_testing_only();
 
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_oct(vec![SuiAddress::random_for_testing_only()], vec![10000]).unwrap();
+        builder
+            .pay_oct(vec![SuiAddress::random_for_testing_only()], vec![10000])
+            .unwrap();
         builder.finish()
     };
     let gas_price = 10;
-    let data =
-        TransactionData::new_programmable(sender, vec![gas], pt, TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price, gas_price);
+    let data = TransactionData::new_programmable(
+        sender,
+        vec![gas],
+        pt,
+        TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
+        gas_price,
+    );
 
     let ops: Operations = data.clone().try_into()?;
-    ops.0.iter().for_each(|op| assert_eq!(op.type_, OperationType::PaySui));
+    ops.0
+        .iter()
+        .for_each(|op| assert_eq!(op.type_, OperationType::PayOct));
     let metadata = ConstructionMetadata {
         sender,
         coins: vec![gas],
@@ -48,25 +57,46 @@ async fn test_operation_data_parsing_pay_sui() -> Result<(), anyhow::Error> {
 }
 #[tokio::test]
 async fn test_operation_data_parsing_pay_coin() -> Result<(), anyhow::Error> {
-    let gas = (ObjectID::random(), SequenceNumber::new(), ObjectDigest::random());
+    let gas = (
+        ObjectID::random(),
+        SequenceNumber::new(),
+        ObjectDigest::random(),
+    );
 
-    let coin = (ObjectID::random(), SequenceNumber::new(), ObjectDigest::random());
+    let coin = (
+        ObjectID::random(),
+        SequenceNumber::new(),
+        ObjectDigest::random(),
+    );
 
     let sender = SuiAddress::random_for_testing_only();
 
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay(vec![coin], vec![SuiAddress::random_for_testing_only()], vec![10000]).unwrap();
+        builder
+            .pay(
+                vec![coin],
+                vec![SuiAddress::random_for_testing_only()],
+                vec![10000],
+            )
+            .unwrap();
         // the following is important in order to be able to transfer the coin type info between the various flow steps
         builder.pure(serde_json::to_string(&SUI.clone())?)?;
         builder.finish()
     };
     let gas_price = 10;
-    let data =
-        TransactionData::new_programmable(sender, vec![gas], pt, TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price, gas_price);
+    let data = TransactionData::new_programmable(
+        sender,
+        vec![gas],
+        pt,
+        TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
+        gas_price,
+    );
 
     let ops: Operations = data.clone().try_into()?;
-    ops.0.iter().for_each(|op| assert_eq!(op.type_, OperationType::PayCoin));
+    ops.0
+        .iter()
+        .for_each(|op| assert_eq!(op.type_, OperationType::PayCoin));
     let metadata = ConstructionMetadata {
         sender,
         coins: vec![gas],

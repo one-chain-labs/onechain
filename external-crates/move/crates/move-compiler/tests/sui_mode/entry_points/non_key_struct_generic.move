@@ -1,7 +1,7 @@
 // invalid as NoStore doesn't have store, so Obj doesn't have key
 
 module a::m {
-    use one::object;
+    use sui::object;
 
     struct Obj<T> has key { id: object::UID, value: T }
     struct NoStore has copy, drop { value: u64 }
@@ -17,7 +17,7 @@ module a::m {
 
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

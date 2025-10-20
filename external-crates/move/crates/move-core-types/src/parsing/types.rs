@@ -96,7 +96,9 @@ impl Token for TypeToken {
                 match chars.next() {
                     Some(c) if c.is_ascii_hexdigit() => {
                         // 0x + c + remaining
-                        let len = 3 + chars.take_while(|q| char::is_ascii_hexdigit(q) || *q == '_').count();
+                        let len = 3 + chars
+                            .take_while(|q| char::is_ascii_hexdigit(q) || *q == '_')
+                            .count();
                         (Self::AddressIdent, len)
                     }
                     _ => bail!("unrecognized token: {}", s),
@@ -104,7 +106,9 @@ impl Token for TypeToken {
             }
             c if c.is_ascii_digit() => {
                 // c + remaining
-                let len = 1 + chars.take_while(|c| c.is_ascii_digit() || *c == '_').count();
+                let len = 1 + chars
+                    .take_while(|c| c.is_ascii_digit() || *c == '_')
+                    .count();
                 (Self::AddressIdent, len)
             }
             c if c.is_ascii_whitespace() => {
@@ -113,10 +117,15 @@ impl Token for TypeToken {
                 (Self::Whitespace, len)
             }
             c if c.is_ascii_alphabetic()
-                || (c == '_' && chars.peek().is_some_and(|c| identifier::is_valid_identifier_char(*c))) =>
+                || (c == '_'
+                    && chars
+                        .peek()
+                        .is_some_and(|c| identifier::is_valid_identifier_char(*c))) =>
             {
                 // c + remaining
-                let len = 1 + chars.take_while(|c| identifier::is_valid_identifier_char(*c)).count();
+                let len = 1 + chars
+                    .take_while(|c| identifier::is_valid_identifier_char(*c))
+                    .count();
                 (Self::Ident, len)
             }
             _ => bail!("unrecognized token: {}", s),
@@ -125,31 +134,49 @@ impl Token for TypeToken {
 }
 
 impl ParsedModuleId {
-    pub fn into_module_id(self, mapping: &impl Fn(&str) -> Option<AccountAddress>) -> anyhow::Result<ModuleId> {
-        Ok(ModuleId::new(self.address.into_account_address(mapping)?, Identifier::new(self.name)?))
+    pub fn into_module_id(
+        self,
+        mapping: &impl Fn(&str) -> Option<AccountAddress>,
+    ) -> anyhow::Result<ModuleId> {
+        Ok(ModuleId::new(
+            self.address.into_account_address(mapping)?,
+            Identifier::new(self.name)?,
+        ))
     }
 }
 
 impl ParsedFqName {
-    pub fn into_fq_name(self, mapping: &impl Fn(&str) -> Option<AccountAddress>) -> anyhow::Result<(ModuleId, String)> {
+    pub fn into_fq_name(
+        self,
+        mapping: &impl Fn(&str) -> Option<AccountAddress>,
+    ) -> anyhow::Result<(ModuleId, String)> {
         Ok((self.module.into_module_id(mapping)?, self.name))
     }
 }
 
 impl ParsedStructType {
-    pub fn into_struct_tag(self, mapping: &impl Fn(&str) -> Option<AccountAddress>) -> anyhow::Result<StructTag> {
+    pub fn into_struct_tag(
+        self,
+        mapping: &impl Fn(&str) -> Option<AccountAddress>,
+    ) -> anyhow::Result<StructTag> {
         let Self { fq_name, type_args } = self;
         Ok(StructTag {
             address: fq_name.module.address.into_account_address(mapping)?,
             module: Identifier::new(fq_name.module.name)?,
             name: Identifier::new(fq_name.name)?,
-            type_params: type_args.into_iter().map(|t| t.into_type_tag(mapping)).collect::<anyhow::Result<_>>()?,
+            type_params: type_args
+                .into_iter()
+                .map(|t| t.into_type_tag(mapping))
+                .collect::<anyhow::Result<_>>()?,
         })
     }
 }
 
 impl ParsedType {
-    pub fn into_type_tag(self, mapping: &impl Fn(&str) -> Option<AccountAddress>) -> anyhow::Result<TypeTag> {
+    pub fn into_type_tag(
+        self,
+        mapping: &impl Fn(&str) -> Option<AccountAddress>,
+    ) -> anyhow::Result<TypeTag> {
         Ok(match self {
             ParsedType::U8 => TypeTag::U8,
             ParsedType::U16 => TypeTag::U16,

@@ -45,7 +45,6 @@ pub mod metric_metadata {
                 MetricType::Stateset => "STATESET",
             }
         }
-
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
@@ -175,7 +174,6 @@ pub mod histogram {
                 ResetHint::Gauge => "GAUGE",
             }
         }
-
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
@@ -284,7 +282,6 @@ pub mod label_matcher {
                 Type::Nre => "NRE",
             }
         }
-
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
@@ -358,7 +355,6 @@ pub mod chunk {
                 Encoding::Histogram => "HISTOGRAM",
             }
         }
-
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
@@ -436,7 +432,6 @@ pub mod read_request {
                 ResponseType::StreamedXorChunks => "STREAMED_XOR_CHUNKS",
             }
         }
-
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {

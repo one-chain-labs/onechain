@@ -64,7 +64,11 @@ fn struct_pack_and_unpack() -> PartialVMResult<()> {
 #[test]
 fn struct_borrow_field() -> PartialVMResult<()> {
     let mut locals = Locals::new(1);
-    locals.store_loc(0, Value::struct_(Struct::pack(vec![Value::u8(10), Value::bool(false)])), true)?;
+    locals.store_loc(
+        0,
+        Value::struct_(Struct::pack(vec![Value::u8(10), Value::bool(false)])),
+        true,
+    )?;
     let r: StructRef = locals.borrow_loc(0)?.value_as()?;
 
     {
@@ -159,7 +163,10 @@ fn leagacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
 
 #[test]
 fn legacy_struct_abstract_memory_size_consistenty() -> PartialVMResult<()> {
-    let structs = [Struct::pack([]), Struct::pack([Value::struct_(Struct::pack([Value::u8(0), Value::u64(0)]))])];
+    let structs = [
+        Struct::pack([]),
+        Struct::pack([Value::struct_(Struct::pack([Value::u8(0), Value::u64(0)]))]),
+    ];
 
     for s in &structs {
         assert_eq!(s.legacy_abstract_memory_size(), s.legacy_size());
@@ -200,8 +207,11 @@ fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
 
         assert_eq!(val_size_new, val_size_old);
 
-        let val_size_through_ref =
-            locals.borrow_loc(idx)?.value_as::<Reference>()?.value_view().legacy_abstract_memory_size();
+        let val_size_through_ref = locals
+            .borrow_loc(idx)?
+            .value_as::<Reference>()?
+            .value_view()
+            .legacy_abstract_memory_size();
 
         assert_eq!(val_size_through_ref, val_size_old)
     }
@@ -211,5 +221,8 @@ fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
 
 #[test]
 fn test_vm_value_vector_u64_casting() {
-    assert_eq!(vec![1, 2, 3], Value::vector_u64([1, 2, 3]).value_as::<Vec<u64>>().unwrap());
+    assert_eq!(
+        vec![1, 2, 3],
+        Value::vector_u64([1, 2, 3]).value_as::<Vec<u64>>().unwrap()
+    );
 }

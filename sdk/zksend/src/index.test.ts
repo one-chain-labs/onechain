@@ -7,7 +7,7 @@ import { decodeSuiPrivateKey, Keypair } from '@mysten/sui/cryptography';
 import { getFaucetHost, requestSuiFromFaucetV0 } from '@mysten/sui/faucet';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { Transaction } from '@mysten/sui/transactions';
-import { MIST_PER_OCT, toBase64 } from '@mysten/sui/utils';
+import { MIST_PER_SUI, toBase64 } from '@mysten/sui/utils';
 import { beforeAll, expect, test } from 'vitest';
 
 import {
@@ -38,7 +38,7 @@ beforeAll(async () => {
 		owner: keypair.toSuiAddress(),
 	});
 
-	if (Number(balance.totalBalance) < Number(MIST_PER_OCT) * 0.02) {
+	if (Number(balance.totalBalance) < Number(MIST_PER_SUI) * 0.02) {
 		await getSuiFromFaucet(keypair);
 	}
 }, 30_000);

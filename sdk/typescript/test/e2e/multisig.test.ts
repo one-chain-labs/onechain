@@ -16,7 +16,7 @@ import { DEFAULT_RECIPIENT, setupWithFundedAddress } from './utils/setup';
 
 describe('MultiSig with zklogin signature', () => {
 	it('Execute tx with multisig with 1 sig and 1 zkLogin sig combined', async () => {
-		// default ephemeral keypair, address_seed and zklogin inputs defined: https://github.com/MystenLabs/sui/blob/071a2955f7dbb83ee01c35d3a4257926a50a35f5/crates/sui-types/src/unit_tests/zklogin_test_vectors.json
+		// default ephemeral keypair, address_seed and zklogin inputs defined: https://github.com/one-chain-labs/onechain/blob/071a2955f7dbb83ee01c35d3a4257926a50a35f5/crates/sui-types/src/unit_tests/zklogin_test_vectors.json
 		// set up default zklogin public identifier with address seed consistent with default zklogin proof.
 		let pkZklogin = toZkLoginPublicIdentifier(
 			BigInt('2455937816256448139232531453880118833510874847675649348355284726183344259587'),

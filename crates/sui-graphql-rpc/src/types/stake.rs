@@ -1,32 +1,33 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{connection::ScanConnection, context_data::db_data_provider::PgManager, data::Db, error::Error};
+use crate::connection::ScanConnection;
+use crate::error::Error;
+use crate::{context_data::db_data_provider::PgManager, data::Db};
 
+use super::balance::{self, Balance};
+use super::base64::Base64;
+use super::coin::Coin;
+use super::cursor::Page;
+use super::display::DisplayEntry;
+use super::dynamic_field::{DynamicField, DynamicFieldName};
+use super::move_object::MoveObjectImpl;
+use super::move_value::MoveValue;
+use super::object::{Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus};
+use super::owner::OwnerImpl;
+use super::suins_registration::{DomainFormat, SuinsRegistration};
+use super::transaction_block::{self, TransactionBlock, TransactionBlockFilter};
+use super::type_filter::ExactTypeFilter;
+use super::uint53::UInt53;
 use super::{
-    balance::{self, Balance},
-    base64::Base64,
-    big_int::BigInt,
-    coin::Coin,
-    cursor::Page,
-    display::DisplayEntry,
-    dynamic_field::{DynamicField, DynamicFieldName},
-    epoch::Epoch,
-    move_object::{MoveObject, MoveObjectImpl},
-    move_value::MoveValue,
-    object,
-    object::{Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
-    owner::OwnerImpl,
-    sui_address::SuiAddress,
-    suins_registration::{DomainFormat, SuinsRegistration},
-    transaction_block::{self, TransactionBlock, TransactionBlockFilter},
-    type_filter::ExactTypeFilter,
-    uint53::UInt53,
+    big_int::BigInt, epoch::Epoch, move_object::MoveObject, object, sui_address::SuiAddress,
 };
-use async_graphql::{connection::Connection, *};
+use async_graphql::connection::Connection;
+use async_graphql::*;
 use move_core_types::language_storage::StructTag;
 use sui_json_rpc_types::{Stake as RpcStakedOct, StakeStatus as RpcStakeStatus};
-use sui_types::{base_types::MoveObjectType, governance::StakedOct as NativeStakedOct};
+use sui_types::base_types::MoveObjectType;
+use sui_types::governance::StakedOct as NativeStakedOct;
 
 #[derive(Copy, Clone, Enum, PartialEq, Eq)]
 /// The stake's possible status: active, pending, or unstaked.
@@ -71,13 +72,21 @@ impl StakedOct {
         before: Option<object::Cursor>,
         filter: Option<ObjectFilter>,
     ) -> Result<Connection<String, MoveObject>> {
-        OwnerImpl::from(&self.super_.super_).objects(ctx, first, after, last, before, filter).await
+        OwnerImpl::from(&self.super_.super_)
+            .objects(ctx, first, after, last, before, filter)
+            .await
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
     /// it defaults to `0x2::oct::OCT`.
-    pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
-        OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
+    pub(crate) async fn balance(
+        &self,
+        ctx: &Context<'_>,
+        type_: Option<ExactTypeFilter>,
+    ) -> Result<Option<Balance>> {
+        OwnerImpl::from(&self.super_.super_)
+            .balance(ctx, type_)
+            .await
     }
 
     /// The balances of all coin types owned by this object.
@@ -89,7 +98,9 @@ impl StakedOct {
         last: Option<u64>,
         before: Option<balance::Cursor>,
     ) -> Result<Connection<String, Balance>> {
-        OwnerImpl::from(&self.super_.super_).balances(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .balances(ctx, first, after, last, before)
+            .await
     }
 
     /// The coin objects for this object.
@@ -104,7 +115,9 @@ impl StakedOct {
         before: Option<object::Cursor>,
         type_: Option<ExactTypeFilter>,
     ) -> Result<Connection<String, Coin>> {
-        OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
+        OwnerImpl::from(&self.super_.super_)
+            .coins(ctx, first, after, last, before, type_)
+            .await
     }
 
     /// The `0x3::staking_pool::StakedOct` objects owned by this object.
@@ -116,7 +129,9 @@ impl StakedOct {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .staked_octs(ctx, first, after, last, before)
+            .await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -125,7 +140,9 @@ impl StakedOct {
         ctx: &Context<'_>,
         format: Option<DomainFormat>,
     ) -> Result<Option<String>> {
-        OwnerImpl::from(&self.super_.super_).default_suins_name(ctx, format).await
+        OwnerImpl::from(&self.super_.super_)
+            .default_suins_name(ctx, format)
+            .await
     }
 
     /// The SuinsRegistration NFTs owned by this object. These grant the owner the capability to
@@ -138,7 +155,9 @@ impl StakedOct {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, SuinsRegistration>> {
-        OwnerImpl::from(&self.super_.super_).suins_registrations(ctx, first, after, last, before).await
+        OwnerImpl::from(&self.super_.super_)
+            .suins_registrations(ctx, first, after, last, before)
+            .await
     }
 
     pub(crate) async fn version(&self) -> UInt53 {
@@ -167,8 +186,13 @@ impl StakedOct {
     }
 
     /// The transaction block that created this version of the object.
-    pub(crate) async fn previous_transaction_block(&self, ctx: &Context<'_>) -> Result<Option<TransactionBlock>> {
-        ObjectImpl(&self.super_.super_).previous_transaction_block(ctx).await
+    pub(crate) async fn previous_transaction_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<TransactionBlock>> {
+        ObjectImpl(&self.super_.super_)
+            .previous_transaction_block(ctx)
+            .await
     }
 
     /// The amount of SUI we would rebate if this object gets deleted or mutated. This number is
@@ -244,8 +268,14 @@ impl StakedOct {
     ///
     /// Dynamic fields on wrapped objects can be accessed by using the same API under the Owner
     /// type.
-    pub(crate) async fn dynamic_field(&self, ctx: &Context<'_>, name: DynamicFieldName) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_).dynamic_field(ctx, name, Some(self.super_.root_version())).await
+    pub(crate) async fn dynamic_field(
+        &self,
+        ctx: &Context<'_>,
+        name: DynamicFieldName,
+    ) -> Result<Option<DynamicField>> {
+        OwnerImpl::from(&self.super_.super_)
+            .dynamic_field(ctx, name, Some(self.super_.root_version()))
+            .await
     }
 
     /// Access a dynamic object field on an object using its name. Names are arbitrary Move values
@@ -260,7 +290,9 @@ impl StakedOct {
         ctx: &Context<'_>,
         name: DynamicFieldName,
     ) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_).dynamic_object_field(ctx, name, Some(self.super_.root_version())).await
+        OwnerImpl::from(&self.super_.super_)
+            .dynamic_object_field(ctx, name, Some(self.super_.root_version()))
+            .await
     }
 
     /// The dynamic fields and dynamic object fields on an object.
@@ -276,7 +308,14 @@ impl StakedOct {
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, DynamicField>> {
         OwnerImpl::from(&self.super_.super_)
-            .dynamic_fields(ctx, first, after, last, before, Some(self.super_.root_version()))
+            .dynamic_fields(
+                ctx,
+                first,
+                after,
+                last,
+                before,
+                Some(self.super_.root_version()),
+            )
             .await
     }
 
@@ -291,12 +330,24 @@ impl StakedOct {
 
     /// The epoch at which this stake became active.
     async fn activated_epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native.activation_epoch()), self.super_.super_.checkpoint_viewed_at).await.extend()
+        Epoch::query(
+            ctx,
+            Some(self.native.activation_epoch()),
+            self.super_.super_.checkpoint_viewed_at,
+        )
+        .await
+        .extend()
     }
 
     /// The epoch at which this object was requested to join a stake pool.
     async fn requested_epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native.request_epoch()), self.super_.super_.checkpoint_viewed_at).await.extend()
+        Epoch::query(
+            ctx,
+            Some(self.native.request_epoch()),
+            self.super_.super_.checkpoint_viewed_at,
+        )
+        .await
+        .extend()
     }
 
     /// The object id of the validator staking pool this stake belongs to.
@@ -343,16 +394,25 @@ impl StakedOct {
     ) -> Result<Connection<String, StakedOct>, Error> {
         let type_: StructTag = MoveObjectType::staked_oct().into();
 
-        let filter = ObjectFilter { type_: Some(type_.into()), owner: Some(owner), ..Default::default() };
+        let filter = ObjectFilter {
+            type_: Some(type_.into()),
+            owner: Some(owner),
+            ..Default::default()
+        };
 
         Object::paginate_subtype(db, page, filter, checkpoint_viewed_at, |object| {
             let address = object.address;
             let move_object = MoveObject::try_from(&object).map_err(|_| {
-                Error::Internal(format!("Expected {address} to be a StakedOct, but it's not a Move Object.",))
+                Error::Internal(format!(
+                    "Expected {address} to be a StakedOct, but it's not a Move Object.",
+                ))
             })?;
 
-            StakedOct::try_from(&move_object)
-                .map_err(|_| Error::Internal(format!("Expected {address} to be a StakedOct, but it is not.")))
+            StakedOct::try_from(&move_object).map_err(|_| {
+                Error::Internal(format!(
+                    "Expected {address} to be a StakedOct, but it is not."
+                ))
+            })
         })
         .await
     }
@@ -362,7 +422,9 @@ impl StakedOct {
     ///
     /// TODO: Make this obsolete
     async fn rpc_stake(&self, ctx: &Context<'_>) -> Result<RpcStakedOct, Error> {
-        ctx.data_unchecked::<PgManager>().fetch_rpc_staked_oct(self.native.clone()).await
+        ctx.data_unchecked::<PgManager>()
+            .fetch_rpc_staked_oct(self.native.clone())
+            .await
     }
 }
 
@@ -376,7 +438,8 @@ impl TryFrom<&MoveObject> for StakedOct {
 
         Ok(Self {
             super_: move_object.clone(),
-            native: bcs::from_bytes(move_object.native.contents()).map_err(StakedOctDowncastError::Bcs)?,
+            native: bcs::from_bytes(move_object.native.contents())
+                .map_err(StakedOctDowncastError::Bcs)?,
         })
     }
 }

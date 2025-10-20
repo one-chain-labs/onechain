@@ -9,11 +9,9 @@ use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
 use std::collections::{HashMap, HashSet};
 use sui_move_build::CompiledPackage;
-use sui_sdk::{
-    apis::ReadApi,
-    error::Error as SdkError,
-    rpc_types::{SuiObjectDataOptions, SuiRawData, SuiRawMovePackage},
-};
+use sui_sdk::apis::ReadApi;
+use sui_sdk::error::Error as SdkError;
+use sui_sdk::rpc_types::{SuiObjectDataOptions, SuiRawData, SuiRawMovePackage};
 use sui_types::base_types::ObjectID;
 use toolchain::units_for_toolchain;
 
@@ -68,25 +66,37 @@ impl ValidationMode {
     /// Only verify that the root package matches its on-chain version (requires that the root
     /// package is published with its address available in the manifest).
     pub fn root() -> Self {
-        Self::Root { deps: false, at: None }
+        Self::Root {
+            deps: false,
+            at: None,
+        }
     }
 
     /// Only verify that the root package matches its on-chain version, but override the location
     /// to look for the root package to `address`.
     pub fn root_at(address: AccountAddress) -> Self {
-        Self::Root { deps: false, at: Some(address) }
+        Self::Root {
+            deps: false,
+            at: Some(address),
+        }
     }
 
     /// Verify both the root package and its dependencies (requires that the root package is
     /// published with its address available in the manifest).
     pub fn root_and_deps() -> Self {
-        Self::Root { deps: true, at: None }
+        Self::Root {
+            deps: true,
+            at: None,
+        }
     }
 
     /// Verify both the root package and its dependencies, but override the location to look for
     /// the root package to `address`.
     pub fn root_and_deps_at(address: AccountAddress) -> Self {
-        Self::Root { deps: true, at: Some(address) }
+        Self::Root {
+            deps: true,
+            at: Some(address),
+        }
     }
 
     /// Should we verify dependencies?
@@ -131,10 +141,15 @@ impl ValidationMode {
         let root = self.root_address(package)?;
         let addrs = self.on_chain_addresses(package)?;
 
-        let resps = future::join_all(addrs.iter().copied().map(|a| verifier.pkg_for_address(a))).await;
+        let resps =
+            future::join_all(addrs.iter().copied().map(|a| verifier.pkg_for_address(a))).await;
 
         for (storage_id, pkg) in addrs.into_iter().zip(resps) {
-            let SuiRawMovePackage { module_map, linkage_table, .. } = pkg?;
+            let SuiRawMovePackage {
+                module_map,
+                linkage_table,
+                ..
+            } = pkg?;
 
             let mut modules = module_map
                 .into_iter()
@@ -181,8 +196,9 @@ impl ValidationMode {
             }
 
             if root.is_some_and(|r| r == storage_id) {
-                on_chain.on_chain_dependencies =
-                    Some(HashSet::from_iter(linkage_table.into_values().map(|info| *info.upgraded_id)));
+                on_chain.on_chain_dependencies = Some(HashSet::from_iter(
+                    linkage_table.into_values().map(|info| *info.upgraded_id),
+                ));
             }
         }
 
@@ -208,9 +224,11 @@ impl ValidationMode {
 
         if self.verify_deps() {
             let deps_compiled_units =
-                units_for_toolchain(&package.deps_compiled_units).map_err(|e| Error::CannotCheckLocalModules {
-                    package: package.compiled_package_info.package_name,
-                    message: e.to_string(),
+                units_for_toolchain(&package.deps_compiled_units).map_err(|e| {
+                    Error::CannotCheckLocalModules {
+                        package: package.compiled_package_info.package_name,
+                        message: e.to_string(),
+                    }
                 })?;
 
             for (package, local_unit) in deps_compiled_units {
@@ -234,7 +252,10 @@ impl ValidationMode {
                     continue;
                 }
 
-                map.insert((address, Symbol::from(module.name().as_str())), (*package, module.clone()));
+                map.insert(
+                    (address, Symbol::from(module.name().as_str())),
+                    (*package, module.clone()),
+                );
             }
         }
 
@@ -244,12 +265,17 @@ impl ValidationMode {
 
         // Potentially rebuild according to the toolchain that the package was originally built
         // with.
-        let root_compiled_units =
-            units_for_toolchain(&package.root_compiled_units.iter().map(|u| ("root".into(), u.clone())).collect())
-                .map_err(|e| Error::CannotCheckLocalModules {
-                    package: package.compiled_package_info.package_name,
-                    message: e.to_string(),
-                })?;
+        let root_compiled_units = units_for_toolchain(
+            &package
+                .root_compiled_units
+                .iter()
+                .map(|u| ("root".into(), u.clone()))
+                .collect(),
+        )
+        .map_err(|e| Error::CannotCheckLocalModules {
+            package: package.compiled_package_info.package_name,
+            message: e.to_string(),
+        })?;
 
         // Add the root modules, potentially remapping 0x0 if we have been supplied an address to
         // substitute with.
@@ -284,7 +310,10 @@ impl ValidationMode {
                     continue;
                 }
 
-                map.insert((*root_address, module), (*package, substitute_root_address(m, *root_address)?));
+                map.insert(
+                    (*root_address, module),
+                    (*package, substitute_root_address(m, *root_address)?),
+                );
             }
         }
 
@@ -300,8 +329,18 @@ impl<'a> BytecodeSourceVerifier<'a> {
     /// Verify that the `compiled_package` matches its on-chain representation.
     ///
     /// See [`ValidationMode`] for more details on what is verified.
-    pub async fn verify(&self, package: &CompiledPackage, mode: ValidationMode) -> Result<(), AggregateError> {
-        if matches!(mode, ValidationMode::Root { at: Some(AccountAddress::ZERO), .. }) {
+    pub async fn verify(
+        &self,
+        package: &CompiledPackage,
+        mode: ValidationMode,
+    ) -> Result<(), AggregateError> {
+        if matches!(
+            mode,
+            ValidationMode::Root {
+                at: Some(AccountAddress::ZERO),
+                ..
+            }
+        ) {
             return Err(Error::ZeroOnChainAddresSpecifiedFailure.into());
         }
 
@@ -331,7 +370,11 @@ impl<'a> BytecodeSourceVerifier<'a> {
             };
 
             if local_module != on_chain_module {
-                errs.push(Error::ModuleBytecodeMismatch { address, package, module })
+                errs.push(Error::ModuleBytecodeMismatch {
+                    address,
+                    package,
+                    module,
+                })
             }
         }
 
@@ -360,18 +403,29 @@ impl<'a> BytecodeSourceVerifier<'a> {
             .await
             .map_err(Error::DependencyObjectReadFailure)?;
 
-        let obj = obj_read.into_object().map_err(Error::SuiObjectRefFailure)?.bcs.ok_or_else(|| {
-            Error::DependencyObjectReadFailure(SdkError::DataError("Bcs field is not found".to_string()))
-        })?;
+        let obj = obj_read
+            .into_object()
+            .map_err(Error::SuiObjectRefFailure)?
+            .bcs
+            .ok_or_else(|| {
+                Error::DependencyObjectReadFailure(SdkError::DataError(
+                    "Bcs field is not found".to_string(),
+                ))
+            })?;
 
         match obj {
             SuiRawData::Package(pkg) => Ok(pkg),
-            SuiRawData::MoveObject(move_obj) => Err(Error::ObjectFoundWhenPackageExpected(obj_id, move_obj)),
+            SuiRawData::MoveObject(move_obj) => {
+                Err(Error::ObjectFoundWhenPackageExpected(obj_id, move_obj))
+            }
         }
     }
 }
 
-fn substitute_root_address(named_module: &NamedCompiledModule, root: AccountAddress) -> Result<CompiledModule, Error> {
+fn substitute_root_address(
+    named_module: &NamedCompiledModule,
+    root: AccountAddress,
+) -> Result<CompiledModule, Error> {
     let mut module = named_module.module.clone();
     let address_idx = module.self_handle().address;
 

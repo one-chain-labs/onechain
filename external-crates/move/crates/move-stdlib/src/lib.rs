@@ -18,7 +18,10 @@ const REFERENCES_TEMPLATE: &str = "doc_templates/references.md";
 const OVERVIEW_TEMPLATE: &str = "doc_templates/overview.md";
 
 pub fn unit_testing_files() -> Vec<String> {
-    vec![path_in_crate("sources/UnitTest.move")].into_iter().map(|p| p.into_os_string().into_string().unwrap()).collect()
+    vec![path_in_crate("sources/UnitTest.move")]
+        .into_iter()
+        .map(|p| p.into_os_string().into_string().unwrap())
+        .collect()
 }
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -45,7 +48,10 @@ pub fn move_stdlib_files() -> Vec<String> {
 
 pub fn move_stdlib_named_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [("std", "0x1")];
-    mapping.iter().map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap())).collect()
+    mapping
+        .iter()
+        .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
+        .collect()
 }
 
 pub fn build_doc(
@@ -83,8 +89,14 @@ pub fn build_stdlib_doc(output_path: &str) {
     build_doc(
         output_path,
         "",
-        vec![path_in_crate(OVERVIEW_TEMPLATE).to_string_lossy().to_string()],
-        Some(path_in_crate(REFERENCES_TEMPLATE).to_string_lossy().to_string()),
+        vec![path_in_crate(OVERVIEW_TEMPLATE)
+            .to_string_lossy()
+            .to_string()],
+        Some(
+            path_in_crate(REFERENCES_TEMPLATE)
+                .to_string_lossy()
+                .to_string(),
+        ),
         move_stdlib_files().as_slice(),
         vec![],
         false,

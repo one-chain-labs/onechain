@@ -88,7 +88,9 @@ mod tests {
 
     /// Wait up to a second for a response on the channel, but expecting this operation to timeout.
     async fn expect_timeout(rx: &mut mpsc::Receiver<u64>) -> Elapsed {
-        timeout(Duration::from_secs(1), rx.recv()).await.unwrap_err()
+        timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .unwrap_err()
     }
 
     #[tokio::test]

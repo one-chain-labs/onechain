@@ -28,16 +28,17 @@ pub struct ErrorBitsetBuilder {
 }
 
 impl ErrorBitsetField {
-    const CONSTANT_INDEX_MASK: u64 = 0x0000_0000_0000_ffff;
-    const CONSTANT_INDEX_SHIFT: u64 = 0;
-    const IDENTIFIER_INDEX_MASK: u64 = 0x0000_0000_ffff_0000;
-    const IDENTIFIER_INDEX_SHIFT: u64 = Self::CONSTANT_INDEX_SHIFT + 16;
-    const LINE_NUMBER_MASK: u64 = 0x0000_ffff_0000_0000;
-    const LINE_NUMBER_SHIFT: u64 = Self::IDENTIFIER_INDEX_SHIFT + 16;
-    const RESERVED_AREA_MASK: u64 = 0x7fff_0000_0000_0000;
-    const RESERVED_AREA_SHIFT: u64 = Self::LINE_NUMBER_SHIFT + 16;
     const TAG_MASK: u64 = 0x8000_0000_0000_0000;
+    const RESERVED_AREA_MASK: u64 = 0x7fff_0000_0000_0000;
+    const LINE_NUMBER_MASK: u64 = 0x0000_ffff_0000_0000;
+    const IDENTIFIER_INDEX_MASK: u64 = 0x0000_0000_ffff_0000;
+    const CONSTANT_INDEX_MASK: u64 = 0x0000_0000_0000_ffff;
+
     const TAG_SHIFT: u64 = Self::RESERVED_AREA_SHIFT + 15;
+    const RESERVED_AREA_SHIFT: u64 = Self::LINE_NUMBER_SHIFT + 16;
+    const LINE_NUMBER_SHIFT: u64 = Self::IDENTIFIER_INDEX_SHIFT + 16;
+    const IDENTIFIER_INDEX_SHIFT: u64 = Self::CONSTANT_INDEX_SHIFT + 16;
+    const CONSTANT_INDEX_SHIFT: u64 = 0;
 
     const fn mask(&self) -> u64 {
         match self {
@@ -66,7 +67,11 @@ impl ErrorBitsetField {
 
 impl ErrorBitsetBuilder {
     pub fn new(line_number: u16) -> Self {
-        Self { line_number, identifier_index: None, constant_index: None }
+        Self {
+            line_number,
+            identifier_index: None,
+            constant_index: None,
+        }
     }
 
     pub fn with_identifier_index(&mut self, identifier_index: u16) {
@@ -133,7 +138,8 @@ impl ErrorBitset {
 #[cfg(test)]
 mod tests {
     use super::{ErrorBitset, ErrorBitsetBuilder};
-    use proptest::{prelude::*, proptest};
+    use proptest::prelude::*;
+    use proptest::proptest;
 
     proptest! {
         #[test]

@@ -17,7 +17,8 @@ pub(crate) async fn reduce<W: Worker>(
     reducer: Option<Box<dyn Reducer<W::Result>>>,
 ) -> Result<()> {
     // convert to a stream of MAX size. This way, each iteration of the loop will process all ready messages
-    let mut stream = ReceiverStream::new(progress_receiver).ready_chunks(MAX_CHECKPOINTS_IN_PROGRESS);
+    let mut stream =
+        ReceiverStream::new(progress_receiver).ready_chunks(MAX_CHECKPOINTS_IN_PROGRESS);
     let mut unprocessed = HashMap::new();
     let mut batch = vec![];
     let mut progress_update = None;
@@ -48,7 +49,9 @@ pub(crate) async fn reduce<W: Worker>(
             None => progress_update = Some(current_checkpoint_number),
         }
         if let Some(watermark) = progress_update {
-            executor_progress_sender.send((task_name.clone(), watermark)).await?;
+            executor_progress_sender
+                .send((task_name.clone(), watermark))
+                .await?;
             progress_update = None;
         }
     }

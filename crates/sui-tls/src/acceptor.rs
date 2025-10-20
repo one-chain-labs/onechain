@@ -42,7 +42,9 @@ pub struct TlsAcceptor {
 
 impl TlsAcceptor {
     pub fn new(config: rustls::ServerConfig) -> Self {
-        Self { inner: RustlsAcceptor::new(RustlsConfig::from_config(Arc::new(config))) }
+        Self {
+            inner: RustlsAcceptor::new(RustlsConfig::from_config(Arc::new(config))),
+        }
     }
 }
 
@@ -53,9 +55,9 @@ where
     I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     S: Send + 'static,
 {
-    type Future = BoxFuture<'static, io::Result<(Self::Stream, Self::Service)>>;
-    type Service = AddExtension<S, TlsConnectionInfo>;
     type Stream = TlsStream<I>;
+    type Service = AddExtension<S, TlsConnectionInfo>;
+    type Future = BoxFuture<'static, io::Result<(Self::Stream, Self::Service)>>;
 
     fn accept(&self, stream: I, service: S) -> Self::Future {
         let acceptor = self.inner.clone();

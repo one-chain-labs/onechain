@@ -1,16 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{fs, str::FromStr};
+use std::fs;
+use std::str::FromStr;
 
-use fastcrypto::{hash::HashFunction, traits::EncodeDecodeBase64};
+use fastcrypto::hash::HashFunction;
+use fastcrypto::traits::EncodeDecodeBase64;
 use sui_keys::key_derive::generate_new_key;
 use tempfile::TempDir;
 
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, InMemKeystore, Keystore};
+use sui_types::crypto::{DefaultHash, SignatureScheme, SuiSignatureInner};
 use sui_types::{
     base_types::{SuiAddress, SUI_ADDRESS_LENGTH},
-    crypto::{DefaultHash, Ed25519SuiSignature, SignatureScheme, SuiSignatureInner},
+    crypto::Ed25519SuiSignature,
 };
 
 #[test]
@@ -18,7 +21,14 @@ fn alias_exists_test() {
     let temp_dir = TempDir::new().unwrap();
     let keystore_path = temp_dir.path().join("sui.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
-    keystore.generate_and_add_new_key(SignatureScheme::ED25519, Some("my_alias_test".to_string()), None, None).unwrap();
+    keystore
+        .generate_and_add_new_key(
+            SignatureScheme::ED25519,
+            Some("my_alias_test".to_string()),
+            None,
+            None,
+        )
+        .unwrap();
     let aliases = keystore.alias_names();
     assert_eq!(1, aliases.len());
     assert_eq!(vec!["my_alias_test"], aliases);
@@ -30,13 +40,17 @@ fn create_alias_keystore_file_test() {
     let temp_dir = TempDir::new().unwrap();
     let mut keystore_path = temp_dir.path().join("sui.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
-    keystore.generate_and_add_new_key(SignatureScheme::ED25519, None, None, None).unwrap();
+    keystore
+        .generate_and_add_new_key(SignatureScheme::ED25519, None, None, None)
+        .unwrap();
     keystore_path.set_extension("aliases");
     assert!(keystore_path.exists());
 
     keystore_path = temp_dir.path().join("myfile.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
-    keystore.generate_and_add_new_key(SignatureScheme::ED25519, None, None, None).unwrap();
+    keystore
+        .generate_and_add_new_key(SignatureScheme::ED25519, None, None, None)
+        .unwrap();
     keystore_path.set_extension("aliases");
     assert!(keystore_path.exists());
 }
@@ -50,7 +64,9 @@ fn check_reading_aliases_file_correctly() {
     let mut keystore_path = temp_dir.path().join("sui.keystore");
     let keystore_path_keep = temp_dir.path().join("sui.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
-    let kp = keystore.generate_and_add_new_key(SignatureScheme::ED25519, None, None, None).unwrap();
+    let kp = keystore
+        .generate_and_add_new_key(SignatureScheme::ED25519, None, None, None)
+        .unwrap();
     keystore_path.set_extension("aliases");
     assert!(keystore_path.exists());
 
@@ -66,7 +82,9 @@ fn create_alias_if_not_exists_test() {
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
 
     let alias = Some("my_alias_test".to_string());
-    keystore.generate_and_add_new_key(SignatureScheme::ED25519, alias.clone(), None, None).unwrap();
+    keystore
+        .generate_and_add_new_key(SignatureScheme::ED25519, alias.clone(), None, None)
+        .unwrap();
 
     // test error first
     let create_alias_result = keystore.create_alias(alias);
@@ -107,7 +125,14 @@ fn update_alias_test() {
     let temp_dir = TempDir::new().unwrap();
     let keystore_path = temp_dir.path().join("sui.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
-    keystore.generate_and_add_new_key(SignatureScheme::ED25519, Some("my_alias_test".to_string()), None, None).unwrap();
+    keystore
+        .generate_and_add_new_key(
+            SignatureScheme::ED25519,
+            Some("my_alias_test".to_string()),
+            None,
+            None,
+        )
+        .unwrap();
     let aliases = keystore.alias_names();
     assert_eq!(1, aliases.len());
     assert_eq!(vec!["my_alias_test"], aliases);
@@ -143,7 +168,14 @@ fn update_alias_test() {
 #[test]
 fn update_alias_in_memory_test() {
     let mut keystore = Keystore::InMem(InMemKeystore::new_insecure_for_tests(0));
-    keystore.generate_and_add_new_key(SignatureScheme::ED25519, Some("my_alias_test".to_string()), None, None).unwrap();
+    keystore
+        .generate_and_add_new_key(
+            SignatureScheme::ED25519,
+            Some("my_alias_test".to_string()),
+            None,
+            None,
+        )
+        .unwrap();
     let aliases = keystore.alias_names();
     assert_eq!(1, aliases.len());
     assert_eq!(vec!["my_alias_test"], aliases);
@@ -165,12 +197,15 @@ fn mnemonic_test() {
     let temp_dir = TempDir::new().unwrap();
     let keystore_path = temp_dir.path().join("sui.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
-    let (address, phrase, scheme) =
-        keystore.generate_and_add_new_key(SignatureScheme::ED25519, None, None, None).unwrap();
+    let (address, phrase, scheme) = keystore
+        .generate_and_add_new_key(SignatureScheme::ED25519, None, None, None)
+        .unwrap();
 
     let keystore_path_2 = temp_dir.path().join("sui2.keystore");
     let mut keystore2 = Keystore::from(FileBasedKeystore::new(&keystore_path_2).unwrap());
-    let imported_address = keystore2.import_from_mnemonic(&phrase, SignatureScheme::ED25519, None, None).unwrap();
+    let imported_address = keystore2
+        .import_from_mnemonic(&phrase, SignatureScheme::ED25519, None, None)
+        .unwrap();
     assert_eq!(scheme.flag(), Ed25519SuiSignature::SCHEME.flag());
     assert_eq!(address, imported_address);
 }
@@ -178,15 +213,17 @@ fn mnemonic_test() {
 /// This test confirms rust's implementation of mnemonic is the same with the Sui Wallet
 #[test]
 fn sui_wallet_address_mnemonic_test() -> Result<(), anyhow::Error> {
-    let phrase =
-        "result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss";
-    let expected_address = SuiAddress::from_str("0x936accb491f0facaac668baaedcf4d0cfc6da1120b66f77fa6a43af718669973")?;
+    let phrase = "result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss";
+    let expected_address =
+        SuiAddress::from_str("0x936accb491f0facaac668baaedcf4d0cfc6da1120b66f77fa6a43af718669973")?;
 
     let temp_dir = TempDir::new().unwrap();
     let keystore_path = temp_dir.path().join("sui.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
 
-    keystore.import_from_mnemonic(phrase, SignatureScheme::ED25519, None, None).unwrap();
+    keystore
+        .import_from_mnemonic(phrase, SignatureScheme::ED25519, None, None)
+        .unwrap();
 
     let pubkey = keystore.keys()[0].clone();
     assert_eq!(pubkey.flag(), Ed25519SuiSignature::SCHEME.flag());
@@ -220,7 +257,9 @@ fn get_alias_by_address_test() {
     let keystore_path = temp_dir.path().join("sui.keystore");
     let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
     let alias = "my_alias_test".to_string();
-    let keypair = keystore.generate_and_add_new_key(SignatureScheme::ED25519, Some(alias.clone()), None, None).unwrap();
+    let keypair = keystore
+        .generate_and_add_new_key(SignatureScheme::ED25519, Some(alias.clone()), None, None)
+        .unwrap();
     assert_eq!(alias, keystore.get_alias_by_address(&keypair.0).unwrap());
 
     // Test getting an alias of an address that is not in keystore

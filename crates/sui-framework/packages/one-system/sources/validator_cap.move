@@ -1,8 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::validator_cap {
-
+module oct_system::validator_cap {
     /// The capability object is created when creating a new `Validator` or when the
     /// validator explicitly creates a new capability object for rotation/revocation.
     /// The holder address of this object can perform some validator operations on behalf of

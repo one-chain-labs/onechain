@@ -13,9 +13,9 @@ use sui_core::authority::AuthorityState;
 use sui_macros::*;
 use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
 use sui_test_transaction_builder::TestTransactionBuilder;
+use sui_types::effects::{TransactionEffects, TransactionEffectsAPI};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    effects::{TransactionEffects, TransactionEffectsAPI},
     object::{Object, Owner},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     storage::ObjectStore,
@@ -52,9 +52,17 @@ trait GenStateChange {
 #[async_trait]
 trait StatePredicate {
     async fn run(&mut self, runner: &mut StressTestRunner) -> Result<TransactionEffects>;
-    async fn pre_epoch_post_condition(&mut self, runner: &StressTestRunner, effects: &TransactionEffects);
+    async fn pre_epoch_post_condition(
+        &mut self,
+        runner: &StressTestRunner,
+        effects: &TransactionEffects,
+    );
     #[allow(unused)]
-    async fn post_epoch_post_condition(&mut self, runner: &StressTestRunner, effects: &TransactionEffects);
+    async fn post_epoch_post_condition(
+        &mut self,
+        runner: &StressTestRunner,
+        effects: &TransactionEffects,
+    );
 }
 
 #[allow(dead_code)]
@@ -75,7 +83,13 @@ struct StressTestRunner {
 impl StressTestRunner {
     pub async fn new() -> Self {
         let test_cluster = TestClusterBuilder::new()
-            .with_accounts(vec![AccountConfig { gas_amounts: vec![DEFAULT_GAS_AMOUNT], address: None }; 100])
+            .with_accounts(vec![
+                AccountConfig {
+                    gas_amounts: vec![DEFAULT_GAS_AMOUNT],
+                    address: None,
+                };
+                100
+            ])
             .build()
             .await;
         let accounts = test_cluster.wallet.get_addresses();
@@ -99,22 +113,40 @@ impl StressTestRunner {
     }
 
     pub fn system_state(&self) -> SuiSystemStateSummary {
-        self.state().get_sui_system_state_object_for_testing().unwrap().into_sui_system_state_summary()
+        self.state()
+            .get_sui_system_state_object_for_testing()
+            .unwrap()
+            .into_sui_system_state_summary()
     }
 
     pub fn pick_random_active_validator(&mut self) -> SuiValidatorSummary {
         let system_state = self.system_state();
-        system_state.active_validators.get(self.rng.gen_range(0..system_state.active_validators.len())).unwrap().clone()
+        system_state
+            .active_validators
+            .get(self.rng.gen_range(0..system_state.active_validators.len()))
+            .unwrap()
+            .clone()
     }
 
     pub async fn run(&self, sender: SuiAddress, pt: ProgrammableTransaction) -> TransactionEffects {
         let rgp = self.test_cluster.get_reference_gas_price().await;
-        let gas_object = self.test_cluster.wallet.get_one_gas_object_owned_by_address(sender).await.unwrap().unwrap();
-        let transaction = self
+        let gas_object = self
             .test_cluster
             .wallet
-            .sign_transaction(&TestTransactionBuilder::new(sender, gas_object, rgp).programmable(pt).build());
-        let (effects, _) = self.test_cluster.execute_transaction_return_raw_effects(transaction).await.unwrap();
+            .get_one_gas_object_owned_by_address(sender)
+            .await
+            .unwrap()
+            .unwrap();
+        let transaction = self.test_cluster.wallet.sign_transaction(
+            &TestTransactionBuilder::new(sender, gas_object, rgp)
+                .programmable(pt)
+                .build(),
+        );
+        let (effects, _) = self
+            .test_cluster
+            .execute_transaction_return_raw_effects(transaction)
+            .await
+            .unwrap();
 
         assert!(effects.status().is_ok());
         effects
@@ -127,30 +159,43 @@ impl StressTestRunner {
 
         let epoch_store = state.load_epoch_store_one_call_per_task();
         let backing_package_store = state.get_backing_package_store();
-        let mut layout_resolver = epoch_store.executor().type_layout_resolver(Box::new(backing_package_store.as_ref()));
+        let mut layout_resolver = epoch_store
+            .executor()
+            .type_layout_resolver(Box::new(backing_package_store.as_ref()));
         for (obj_ref, _) in effects.created() {
-            let object_opt = state.get_object_store().get_object_by_key(&obj_ref.0, obj_ref.1);
+            let object_opt = state
+                .get_object_store()
+                .get_object_by_key(&obj_ref.0, obj_ref.1);
             let Some(object) = object_opt else { continue };
             let struct_tag = object.struct_tag().unwrap();
-            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
+            let total_oct =
+                object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_SUI: {total_oct}");
         }
 
         println!("MUTATED:");
         for (obj_ref, _) in effects.mutated() {
-            let object = state.get_object_store().get_object_by_key(&obj_ref.0, obj_ref.1).unwrap();
+            let object = state
+                .get_object_store()
+                .get_object_by_key(&obj_ref.0, obj_ref.1)
+                .unwrap();
             let struct_tag = object.struct_tag().unwrap();
-            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
+            let total_oct =
+                object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_SUI: {total_oct}");
         }
 
         println!("SHARED:");
         for kind in effects.input_shared_objects() {
             let (obj_id, version) = kind.id_and_version();
-            let object = state.get_object_store().get_object_by_key(&obj_id, version).unwrap();
+            let object = state
+                .get_object_store()
+                .get_object_by_key(&obj_id, version)
+                .unwrap();
             let struct_tag = object.struct_tag().unwrap();
-            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
+            let total_oct =
+                object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_SUI: {total_oct}");
         }
     }
 
@@ -167,15 +212,26 @@ impl StressTestRunner {
         let pre_state_summary = self.system_state();
         self.test_cluster.trigger_reconfiguration().await;
         let post_state_summary = self.system_state();
-        info!("Changing epoch form {} to {}", pre_state_summary.epoch, post_state_summary.epoch);
+        info!(
+            "Changing epoch form {} to {}",
+            pre_state_summary.epoch, post_state_summary.epoch
+        );
     }
 
-    pub async fn get_created_object_of_type_name(&self, effects: &TransactionEffects, name: &str) -> Option<Object> {
+    pub async fn get_created_object_of_type_name(
+        &self,
+        effects: &TransactionEffects,
+        name: &str,
+    ) -> Option<Object> {
         self.get_from_effects(&effects.created(), name).await
     }
 
     #[allow(dead_code)]
-    pub async fn get_mutated_object_of_type_name(&self, effects: &TransactionEffects, name: &str) -> Option<Object> {
+    pub async fn get_mutated_object_of_type_name(
+        &self,
+        effects: &TransactionEffects,
+        name: &str,
+    ) -> Option<Object> {
         self.get_from_effects(&effects.mutated(), name).await
     }
 
@@ -219,10 +275,16 @@ mod add_stake {
         type StateChange = RequestAddStake;
 
         fn create(&self, runner: &mut StressTestRunner) -> Self::StateChange {
-            let stake_amount = runner.rng.gen_range(MIN_DELEGATION_AMOUNT..=MAX_DELEGATION_AMOUNT);
+            let stake_amount = runner
+                .rng
+                .gen_range(MIN_DELEGATION_AMOUNT..=MAX_DELEGATION_AMOUNT);
             let staked_with = runner.pick_random_active_validator().sui_address;
             let sender = runner.pick_random_sender();
-            RequestAddStake { sender, stake_amount, staked_with }
+            RequestAddStake {
+                sender,
+                stake_amount,
+                staked_with,
+            }
         }
     }
 
@@ -236,7 +298,7 @@ mod add_stake {
                 let coin = StressTestRunner::split_off(&mut builder, self.stake_amount);
                 move_call! {
                     builder,
-                    (SUI_SYSTEM_PACKAGE_ID)::sui_system::request_add_stake(Argument::Input(0), coin, Argument::Input(1))
+                    (SUI_SYSTEM_PACKAGE_ID)::one_system::request_add_stake(Argument::Input(0), coin, Argument::Input(1))
                 };
                 builder.finish()
             };
@@ -245,21 +307,35 @@ mod add_stake {
             Ok(effects)
         }
 
-        async fn pre_epoch_post_condition(&mut self, runner: &StressTestRunner, effects: &TransactionEffects) {
+        async fn pre_epoch_post_condition(
+            &mut self,
+            runner: &StressTestRunner,
+            effects: &TransactionEffects,
+        ) {
             // Assert that a `StakedOct` object matching the amount delegated is created.
-            // Assert that this staked oct
-            let object = runner.get_created_object_of_type_name(effects, "StakedOct").await.unwrap();
+            // Assert that this staked sui
+            let object = runner
+                .get_created_object_of_type_name(effects, "StakedOct")
+                .await
+                .unwrap();
             let state = runner.state();
             let cache = state.get_backing_package_store();
             let epoch_store = state.load_epoch_store_one_call_per_task();
-            let mut layout_resolver = epoch_store.executor().type_layout_resolver(Box::new(cache.as_ref()));
-            let staked_amount = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            let mut layout_resolver = epoch_store
+                .executor()
+                .type_layout_resolver(Box::new(cache.as_ref()));
+            let staked_amount =
+                object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
             assert_eq!(staked_amount, self.stake_amount);
             assert_eq!(object.owner.get_owner_address().unwrap(), self.sender);
             runner.display_effects(effects);
         }
 
-        async fn post_epoch_post_condition(&mut self, _runner: &StressTestRunner, _effects: &TransactionEffects) {
+        async fn post_epoch_post_condition(
+            &mut self,
+            _runner: &StressTestRunner,
+            _effects: &TransactionEffects,
+        ) {
             todo!()
         }
     }

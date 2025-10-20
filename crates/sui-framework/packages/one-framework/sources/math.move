@@ -3,7 +3,7 @@
 
 /// DEPRECATED, use the each integer type's individual module instead, e.g. `std::u64`
 #[deprecated(note = b"Use the each integer type's individual module instead, e.g. `std::u64`")]
-module one::math;
+module oct::math;
 
 /// DEPRECATED, use `std::u64::max` instead
 public fun max(x: u64, y: u64): u64 {

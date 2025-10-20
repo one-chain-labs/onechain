@@ -33,7 +33,11 @@ pub struct ChainedMutator {
 
 impl RandomMutator {
     pub fn new() -> Self {
-        Self { rng: rand::rngs::StdRng::from_seed([0u8; 32]), mutators: vec![], num_tries: NUM_TRIES }
+        Self {
+            rng: rand::rngs::StdRng::from_seed([0u8; 32]),
+            mutators: vec![],
+            num_tries: NUM_TRIES,
+        }
     }
 
     pub fn add_mutator(&mut self, mutator: Box<dyn TransactionKindMutator + Send + Sync>) {
@@ -124,10 +128,12 @@ pub fn base_fuzzers(num_mutations: u64) -> RandomMutator {
         rng: rand::rngs::StdRng::from_seed([0u8; 32]),
         num_mutations_per_base_left: num_mutations,
     }));
-    mutator.add_mutator(Box::new(shuffle_transaction_inputs::ShuffleTransactionInputs {
-        rng: rand::rngs::StdRng::from_seed([0u8; 32]),
-        num_mutations_per_base_left: num_mutations,
-    }));
+    mutator.add_mutator(Box::new(
+        shuffle_transaction_inputs::ShuffleTransactionInputs {
+            rng: rand::rngs::StdRng::from_seed([0u8; 32]),
+            num_mutations_per_base_left: num_mutations,
+        },
+    ));
     mutator.add_mutator(Box::new(drop_random_commands::DropRandomCommands {
         rng: rand::rngs::StdRng::from_seed([0u8; 32]),
         num_mutations_per_base_left: num_mutations,

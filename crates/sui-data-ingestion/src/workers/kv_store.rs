@@ -4,24 +4,22 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use aws_config::timeout::TimeoutConfig;
-use aws_sdk_dynamodb::{
-    primitives::Blob,
-    types::{AttributeValue, PutRequest, WriteRequest},
-    Client,
-};
+use aws_sdk_dynamodb::primitives::Blob;
+use aws_sdk_dynamodb::types::{AttributeValue, PutRequest, WriteRequest};
+use aws_sdk_dynamodb::Client;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::config::{Credentials, Region};
-use backoff::{backoff::Backoff, ExponentialBackoff};
+use backoff::backoff::Backoff;
+use backoff::ExponentialBackoff;
 use serde::{Deserialize, Serialize};
-use std::{
-    borrow::Borrow,
-    collections::{HashMap, HashSet, VecDeque},
-    iter::repeat,
-    time::{Duration, Instant},
-};
+use std::borrow::Borrow;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::iter::repeat;
+use std::time::{Duration, Instant};
 use sui_data_ingestion_core::Worker;
 use sui_storage::http_key_value_store::TaggedKey;
-use sui_types::{full_checkpoint_content::CheckpointData, storage::ObjectKey};
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::storage::ObjectKey;
 use tracing::error;
 
 const TIMEOUT: Duration = Duration::from_secs(60);
@@ -56,8 +54,13 @@ pub enum KVTable {
 
 impl KVStoreWorker {
     pub async fn new(config: KVStoreTaskConfig) -> Self {
-        let credentials =
-            Credentials::new(&config.aws_access_key_id, &config.aws_secret_access_key, None, None, "dynamodb");
+        let credentials = Credentials::new(
+            &config.aws_access_key_id,
+            &config.aws_secret_access_key,
+            None,
+            None,
+            "dynamodb",
+        );
         let timeout_config = TimeoutConfig::builder()
             .operation_timeout(Duration::from_secs(3))
             .operation_attempt_timeout(Duration::from_secs(10))
@@ -71,7 +74,12 @@ impl KVStoreWorker {
             .await;
         let dynamo_client = Client::new(&aws_config);
         let s3_client = s3::Client::new(&aws_config);
-        Self { dynamo_client, s3_client, bucket_name: config.bucket_name, table_name: config.table_name }
+        Self {
+            dynamo_client,
+            s3_client,
+            bucket_name: config.bucket_name,
+            table_name: config.table_name,
+        }
     }
 
     async fn multi_set<V: Serialize>(
@@ -115,7 +123,10 @@ impl KVStoreWorker {
             let response = self
                 .dynamo_client
                 .batch_write_item()
-                .set_request_items(Some(HashMap::from([(self.table_name.clone(), chunk.to_vec())])))
+                .set_request_items(Some(HashMap::from([(
+                    self.table_name.clone(),
+                    chunk.to_vec(),
+                )])))
                 .send()
                 .await?;
             if let Some(response) = response.unprocessed_items {
@@ -134,7 +145,11 @@ impl KVStoreWorker {
         Ok(())
     }
 
-    async fn upload_blob<V: Serialize + std::marker::Send>(&self, key: Vec<u8>, value: V) -> anyhow::Result<()> {
+    async fn upload_blob<V: Serialize + std::marker::Send>(
+        &self,
+        key: Vec<u8>,
+        value: V,
+    ) -> anyhow::Result<()> {
         let body = bcs::to_bytes(value.borrow())?.into();
         self.s3_client
             .put_object()
@@ -189,18 +204,27 @@ impl Worker for KVStoreWorker {
         self.multi_set(KVTable::Effects, effects).await?;
         self.multi_set(KVTable::Events, events).await?;
         self.multi_set(KVTable::Objects, objects).await?;
-        self.multi_set(KVTable::TransactionToCheckpoint, transactions_to_checkpoint).await?;
+        self.multi_set(KVTable::TransactionToCheckpoint, transactions_to_checkpoint)
+            .await?;
 
-        let serialized_checkpoint_number = bcs::to_bytes(&TaggedKey::CheckpointSequenceNumber(checkpoint_number))?;
+        let serialized_checkpoint_number =
+            bcs::to_bytes(&TaggedKey::CheckpointSequenceNumber(checkpoint_number))?;
         let checkpoint_summary = &checkpoint.checkpoint_summary;
-        for key in [serialized_checkpoint_number.clone(), checkpoint_summary.content_digest.into_inner().to_vec()] {
-            self.upload_blob(key, checkpoint.checkpoint_contents.clone()).await?;
+        for key in [
+            serialized_checkpoint_number.clone(),
+            checkpoint_summary.content_digest.into_inner().to_vec(),
+        ] {
+            self.upload_blob(key, checkpoint.checkpoint_contents.clone())
+                .await?;
         }
         self.multi_set(
             KVTable::CheckpointSummary,
-            [serialized_checkpoint_number, checkpoint_summary.digest().into_inner().to_vec()]
-                .into_iter()
-                .zip(repeat(checkpoint_summary.data())),
+            [
+                serialized_checkpoint_number,
+                checkpoint_summary.digest().into_inner().to_vec(),
+            ]
+            .into_iter()
+            .zip(repeat(checkpoint_summary.data())),
         )
         .await?;
         Ok(())

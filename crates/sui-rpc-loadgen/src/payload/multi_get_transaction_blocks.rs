@@ -11,7 +11,11 @@ use super::validation::{check_transactions, chunk_entities};
 
 #[async_trait]
 impl<'a> ProcessPayload<'a, &'a MultiGetTransactionBlocks> for RpcCommandProcessor {
-    async fn process(&'a self, op: &'a MultiGetTransactionBlocks, _signer_info: &Option<SignerInfo>) -> Result<()> {
+    async fn process(
+        &'a self,
+        op: &'a MultiGetTransactionBlocks,
+        _signer_info: &Option<SignerInfo>,
+    ) -> Result<()> {
         let clients = self.get_clients().await?;
         let digests = &op.digests;
 

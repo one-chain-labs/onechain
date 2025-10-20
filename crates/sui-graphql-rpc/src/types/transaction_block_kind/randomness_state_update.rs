@@ -17,7 +17,9 @@ pub(crate) struct RandomnessStateUpdateTransaction {
 impl RandomnessStateUpdateTransaction {
     /// Epoch of the randomness state update transaction.
     async fn epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at).await.extend()
+        Epoch::query(ctx, Some(self.native.epoch), self.checkpoint_viewed_at)
+            .await
+            .extend()
     }
 
     /// Randomness round of the update.
@@ -32,6 +34,9 @@ impl RandomnessStateUpdateTransaction {
 
     /// The initial version the randomness object was shared at.
     async fn randomness_obj_initial_shared_version(&self) -> UInt53 {
-        self.native.randomness_obj_initial_shared_version.value().into()
+        self.native
+            .randomness_obj_initial_shared_version
+            .value()
+            .into()
     }
 }

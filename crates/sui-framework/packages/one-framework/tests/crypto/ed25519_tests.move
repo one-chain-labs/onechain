@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::ed25519_tests {
-    use one::ed25519;
+module oct::ed25519_tests {
+    use sui::ed25519;
 
     #[test]
     fun test_ed25519_valid_sig() {

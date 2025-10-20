@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::hex_tests {
-    use one::hex;
+module oct::hex_tests {
+    use sui::hex;
 
     #[test]
     fun test_hex_encode_string_literal() {

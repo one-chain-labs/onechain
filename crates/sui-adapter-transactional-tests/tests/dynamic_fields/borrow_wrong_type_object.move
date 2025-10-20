@@ -10,7 +10,7 @@
 //# publish
 module a::m {
 
-use one::dynamic_object_field::{add, borrow, borrow_mut};
+use sui::dynamic_object_field::{add, borrow, borrow_mut};
 
 public struct Obj has key, store {
     id: object::UID,
@@ -23,7 +23,7 @@ public struct Fake has key, store {
 entry fun t1(ctx: &mut TxContext) {
     let mut id = object::new(ctx);
     add(&mut id, 0, Obj { id: object::new(ctx) });
-    one::transfer::public_transfer(Obj { id }, ctx.sender())
+    sui::transfer::public_transfer(Obj { id }, ctx.sender())
 }
 
 entry fun t2(obj: &mut Obj) {

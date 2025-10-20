@@ -14,7 +14,11 @@ use sui_types::effects::TransactionEffectsAPI;
 /// `Ok` with a proof, or `Err` with a description of the error.
 pub fn construct_proof(targets: ProofTarget, data: &CheckpointData) -> anyhow::Result<Proof> {
     let checkpoint_summary = data.checkpoint_summary.clone();
-    let mut this_proof = Proof { targets, checkpoint_summary, contents_proof: None };
+    let mut this_proof = Proof {
+        targets,
+        checkpoint_summary,
+        contents_proof: None,
+    };
 
     // Do a minimal check that the given checkpoint data is consistent with the committee
     if let Some(committee) = &this_proof.targets.committee {
@@ -31,8 +35,16 @@ pub fn construct_proof(targets: ProofTarget, data: &CheckpointData) -> anyhow::R
 
     // If proof targets include objects or events, we need to include the contents proof
     // Need to ensure that all targets refer to the same transaction first of all
-    let object_tx = this_proof.targets.objects.iter().map(|(_, o)| o.previous_transaction);
-    let event_tx = this_proof.targets.events.iter().map(|(eid, _)| eid.tx_digest);
+    let object_tx = this_proof
+        .targets
+        .objects
+        .iter()
+        .map(|(_, o)| o.previous_transaction);
+    let event_tx = this_proof
+        .targets
+        .events
+        .iter()
+        .map(|(eid, _)| eid.tx_digest);
     let mut all_tx = object_tx.chain(event_tx);
 
     // Get the first tx ID
@@ -56,11 +68,20 @@ pub fn construct_proof(targets: ProofTarget, data: &CheckpointData) -> anyhow::R
         .ok_or(anyhow!("Transaction not found in checkpoint data"))?
         .clone();
 
-    let CheckpointTransaction { transaction, effects, events, .. } = tx;
+    let CheckpointTransaction {
+        transaction,
+        effects,
+        events,
+        ..
+    } = tx;
 
     // Add all the transaction data in there
-    this_proof.contents_proof =
-        Some(TransactionProof { checkpoint_contents: data.checkpoint_contents.clone(), transaction, effects, events });
+    this_proof.contents_proof = Some(TransactionProof {
+        checkpoint_contents: data.checkpoint_contents.clone(),
+        transaction,
+        effects,
+        events,
+    });
 
     // TODO: should we check that the objects & events are in the transaction, to
     //       avoid constructing invalid proofs? I opt to not check because the check

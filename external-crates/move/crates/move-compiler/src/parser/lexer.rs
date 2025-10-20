@@ -8,8 +8,7 @@ use crate::{
     editions::{create_feature_error, Edition, FeatureGate},
     parser::{syntax::make_loc, token_set::TokenSet},
     shared::CompilationEnv,
-    FileCommentMap,
-    MatchedFileCommentMap,
+    FileCommentMap, MatchedFileCommentMap,
 };
 use move_command_line_common::{character_sets::DisplayChar, files::FileHash};
 use move_ir_types::location::Loc;
@@ -276,7 +275,10 @@ impl<'input> Lexer<'input> {
     /// (`/// .. <newline>` and `/** .. */`) will be not included in extracted comment string. The
     /// span in the returned map, however, covers the whole region of the comment, including the
     /// delimiters.
-    fn trim_whitespace_and_comments(&mut self, offset: usize) -> Result<(&'input str, bool), Box<Diagnostic>> {
+    fn trim_whitespace_and_comments(
+        &mut self,
+        offset: usize,
+    ) -> Result<(&'input str, bool), Box<Diagnostic>> {
         let mut trimmed_preceding_eol;
         let mut text = &self.text[offset..];
 
@@ -306,7 +308,8 @@ impl<'input> Lexer<'input> {
                     let mut comment = &self.text[(start + 3)..end];
                     comment = comment.trim_end_matches('\r');
 
-                    self.doc_comments.insert((start as u32, end as u32), comment.to_string());
+                    self.doc_comments
+                        .insert((start as u32, end as u32), comment.to_string());
                 }
 
                 // Continue the loop on the following line, which may contain leading
@@ -333,8 +336,10 @@ impl<'input> Lexer<'input> {
         let block_doc_comment_start: &str = "/**";
 
         assert!(text.starts_with("/*"));
-        let initial_entry =
-            CommentEntry { start: get_offset(text), is_doc_comment: text.starts_with(block_doc_comment_start) };
+        let initial_entry = CommentEntry {
+            start: get_offset(text),
+            is_doc_comment: text.starts_with(block_doc_comment_start),
+        };
         let mut comment_queue: Vec<CommentEntry> = vec![initial_entry];
 
         // This is a _rough_ apporximation which disregards doc comments in order to handle the
@@ -346,9 +351,15 @@ impl<'input> Lexer<'input> {
             if text.is_empty() {
                 // We've reached the end of string while searching for a terminating '*/'.
                 // Highlight the '/**' if it's a documentation comment, or the '/*' otherwise.
-                let location =
-                    make_loc(self.file_hash, comment.start, comment.start + if comment.is_doc_comment { 3 } else { 2 });
-                return Err(Box::new(diag!(Syntax::InvalidDocComment, (location, "Unclosed block comment"),)));
+                let location = make_loc(
+                    self.file_hash,
+                    comment.start,
+                    comment.start + if comment.is_doc_comment { 3 } else { 2 },
+                );
+                return Err(Box::new(diag!(
+                    Syntax::InvalidDocComment,
+                    (location, "Unclosed block comment"),
+                )));
             };
 
             match &text[..2] {
@@ -357,8 +368,10 @@ impl<'input> Lexer<'input> {
                     // If the comment was not empty -- fuzzy ot handle `/**/`, which triggers the
                     // doc comment check but is not actually a doc comment.
                     if comment.start + 3 < end && comment.is_doc_comment {
-                        self.doc_comments
-                            .insert((comment.start as u32, end as u32), self.text[(comment.start + 3)..end].to_string());
+                        self.doc_comments.insert(
+                            (comment.start as u32, end as u32),
+                            self.text[(comment.start + 3)..end].to_string(),
+                        );
                     }
                     text = &text[2..];
                 }
@@ -388,7 +401,11 @@ impl<'input> Lexer<'input> {
         let mut text = &self.text[offset..];
         let mut iter = text.chars();
         while let Some(c) = iter.next() {
-            if c == ' ' || c == '\t' || c == '\n' || (c == '\r' && matches!(iter.next(), Some('\n'))) {
+            if c == ' '
+                || c == '\t'
+                || c == '\n'
+                || (c == '\r' && matches!(iter.next(), Some('\n')))
+            {
                 break;
             }
             text = &text[c.len_utf8()..];
@@ -401,7 +418,13 @@ impl<'input> Lexer<'input> {
     pub fn lookahead(&mut self) -> Result<Tok, Box<Diagnostic>> {
         let (text, _) = self.trim_whitespace_and_comments(self.cur_end)?;
         let next_start = self.text.len() - text.len();
-        let (result, _) = find_token(/* panic_mode */ false, self.file_hash, self.edition, text, next_start);
+        let (result, _) = find_token(
+            /* panic_mode */ false,
+            self.file_hash,
+            self.edition,
+            text,
+            next_start,
+        );
         // unwrap safe because panic_mode is false
         result.map_err(|diag_opt| diag_opt.unwrap())
     }
@@ -411,11 +434,23 @@ impl<'input> Lexer<'input> {
     pub fn lookahead2(&mut self) -> Result<(Tok, Tok), Box<Diagnostic>> {
         let (text, _) = self.trim_whitespace_and_comments(self.cur_end)?;
         let offset = self.text.len() - text.len();
-        let (result, length) = find_token(/* panic_mode */ false, self.file_hash, self.edition, text, offset);
+        let (result, length) = find_token(
+            /* panic_mode */ false,
+            self.file_hash,
+            self.edition,
+            text,
+            offset,
+        );
         let first = result.map_err(|diag_opt| diag_opt.unwrap())?;
         let (text2, _) = self.trim_whitespace_and_comments(offset + length)?;
         let offset2 = self.text.len() - text2.len();
-        let (result2, _) = find_token(/* panic_mode */ false, self.file_hash, self.edition, text2, offset2);
+        let (result2, _) = find_token(
+            /* panic_mode */ false,
+            self.file_hash,
+            self.edition,
+            text2,
+            offset2,
+        );
         let second = result2.map_err(|diag_opt| diag_opt.unwrap())?;
         Ok((first, second))
     }
@@ -466,7 +501,8 @@ impl<'input> Lexer<'input> {
     // position of an item as an index into `matched_doc_comments`.
     pub fn attach_doc_comments(&mut self, doc_comments: String) {
         let attachment_location = self.cur_start as u32;
-        self.matched_doc_comments.insert(attachment_location, doc_comments);
+        self.matched_doc_comments
+            .insert(attachment_location, doc_comments);
     }
 
     // At the end of parsing, checks whether there are any unmatched documentation comments,
@@ -518,7 +554,8 @@ impl<'input> Lexer<'input> {
             // panic_mode determines if a diag should be actually recorded in find_token (so that
             // only first one is recorded)
             let panic_mode = err.is_some();
-            let (result, len) = find_token(panic_mode, self.file_hash, self.edition, text, new_start);
+            let (result, len) =
+                find_token(panic_mode, self.file_hash, self.edition, text, new_start);
             self.cur_start = new_start;
             self.cur_end = std::cmp::min(self.cur_start + len, text_end);
             match result {
@@ -592,18 +629,19 @@ fn find_token(
             }
         }
         '`' => {
-            let (is_valid, len) =
-                if (text.len() > 1) && matches!(text[1..].chars().next(), Some('A'..='Z' | 'a'..='z' | '_')) {
-                    let sub = &text[1..];
-                    let len = get_name_len(sub);
-                    if !matches!(text[1 + len..].chars().next(), Some('`')) {
-                        (false, len + 1)
-                    } else {
-                        (true, len + 2)
-                    }
+            let (is_valid, len) = if (text.len() > 1)
+                && matches!(text[1..].chars().next(), Some('A'..='Z' | 'a'..='z' | '_'))
+            {
+                let sub = &text[1..];
+                let len = get_name_len(sub);
+                if !matches!(text[1 + len..].chars().next(), Some('`')) {
+                    (false, len + 1)
                 } else {
-                    (false, 1)
-                };
+                    (true, len + 2)
+                }
+            } else {
+                (false, 1)
+            };
             if !is_valid {
                 let diag = maybe_diag! {
                     let loc = make_loc(file_hash, start_offset, start_offset + len);
@@ -616,14 +654,15 @@ fn find_token(
             }
         }
         '\'' if edition.supports(FeatureGate::BlockLabels) => {
-            let (is_valid, len) =
-                if (text.len() > 1) && matches!(text[1..].chars().next(), Some('A'..='Z' | 'a'..='z' | '_')) {
-                    let sub = &text[1..];
-                    let len = get_name_len(sub);
-                    (true, len + 1)
-                } else {
-                    (false, 1)
-                };
+            let (is_valid, len) = if (text.len() > 1)
+                && matches!(text[1..].chars().next(), Some('A'..='Z' | 'a'..='z' | '_'))
+            {
+                let sub = &text[1..];
+                let len = get_name_len(sub);
+                (true, len + 1)
+            } else {
+                (false, 1)
+            };
             if text[len..].starts_with('\'') {
                 let diag = maybe_diag! {
                     let loc = make_loc(file_hash, start_offset, start_offset + len + 1);
@@ -648,14 +687,15 @@ fn find_token(
             }
         }
         '\'' => {
-            let (is_valid, len) =
-                if (text.len() > 1) && matches!(text[1..].chars().next(), Some('A'..='Z' | 'a'..='z' | '_')) {
-                    let sub = &text[1..];
-                    let len = get_name_len(sub);
-                    (true, len + 1)
-                } else {
-                    (false, 1)
-                };
+            let (is_valid, len) = if (text.len() > 1)
+                && matches!(text[1..].chars().next(), Some('A'..='Z' | 'a'..='z' | '_'))
+            {
+                let sub = &text[1..];
+                let len = get_name_len(sub);
+                (true, len + 1)
+            } else {
+                (false, 1)
+            };
             let rest_text = &text[len..];
             if rest_text.starts_with('\'') {
                 let diag = maybe_diag! {
@@ -710,7 +750,8 @@ fn find_token(
             }
         }
         '$' => {
-            if text.len() > 1 && text[1..].starts_with(|c| matches!(c,'A'..='Z' | 'a'..='z' | '_')) {
+            if text.len() > 1 && text[1..].starts_with(|c| matches!(c,'A'..='Z' | 'a'..='z' | '_'))
+            {
                 let len = get_name_len(&text[1..]);
                 (Ok(Tok::SyntaxIdentifier), len + 1)
             } else {
@@ -831,17 +872,24 @@ fn find_token(
 // starts with a number, so the caller is responsible for any additional
 // checks on the first character.
 fn get_name_len(text: &str) -> usize {
-    text.chars().position(|c| !matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')).unwrap_or(text.len())
+    text.chars()
+        .position(|c| !matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9'))
+        .unwrap_or(text.len())
 }
 
 fn get_decimal_number(text: &str) -> (Tok, usize) {
-    let num_text_len = text.chars().position(|c| !matches!(c, '0'..='9' | '_')).unwrap_or(text.len());
+    let num_text_len = text
+        .chars()
+        .position(|c| !matches!(c, '0'..='9' | '_'))
+        .unwrap_or(text.len());
     get_number_maybe_with_suffix(text, num_text_len)
 }
 
 // Return the length of the substring containing characters in [0-9a-fA-F].
 fn get_hex_number(text: &str) -> (Tok, usize) {
-    let num_text_len = text.find(|c| !matches!(c, 'a'..='f' | 'A'..='F' | '0'..='9'| '_')).unwrap_or(text.len());
+    let num_text_len = text
+        .find(|c| !matches!(c, 'a'..='f' | 'A'..='F' | '0'..='9'| '_'))
+        .unwrap_or(text.len());
     get_number_maybe_with_suffix(text, num_text_len)
 }
 

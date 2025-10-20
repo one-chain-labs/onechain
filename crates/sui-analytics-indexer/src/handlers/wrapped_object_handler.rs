@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use std::{collections::BTreeMap, path::Path};
+use std::collections::BTreeMap;
+use std::path::Path;
 use sui_data_ingestion_core::Worker;
 use sui_types::SYSTEM_PACKAGE_ADDRESSES;
 use tokio::sync::Mutex;
@@ -13,11 +14,9 @@ use sui_types::object::Object;
 
 use crate::handlers::{get_move_struct, parse_struct, AnalyticsHandler};
 
-use crate::{
-    package_store::{LocalDBPackageStore, PackageCache},
-    tables::WrappedObjectEntry,
-    FileType,
-};
+use crate::package_store::{LocalDBPackageStore, PackageCache};
+use crate::tables::WrappedObjectEntry;
+use crate::FileType;
 
 pub struct WrappedObjectHandler {
     state: Mutex<State>,
@@ -34,7 +33,11 @@ impl Worker for WrappedObjectHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
+        let CheckpointData {
+            checkpoint_summary,
+            transactions: checkpoint_transactions,
+            ..
+        } = checkpoint_data;
         let mut state = self.state.lock().await;
         for checkpoint_transaction in checkpoint_transactions {
             for object in checkpoint_transaction.output_objects.iter() {
@@ -49,7 +52,10 @@ impl Worker for WrappedObjectHandler {
             )
             .await?;
             if checkpoint_summary.end_of_epoch_data.is_some() {
-                state.resolver.package_store().evict(SYSTEM_PACKAGE_ADDRESSES.iter().copied());
+                state
+                    .resolver
+                    .package_store()
+                    .evict(SYSTEM_PACKAGE_ADDRESSES.iter().copied());
             }
         }
         Ok(())
@@ -84,7 +90,6 @@ impl WrappedObjectHandler {
         });
         WrappedObjectHandler { state }
     }
-
     async fn process_transaction(
         &self,
         epoch: u64,
@@ -94,7 +99,8 @@ impl WrappedObjectHandler {
         state: &mut State,
     ) -> Result<()> {
         for object in checkpoint_transaction.output_objects.iter() {
-            self.process_object(epoch, checkpoint, timestamp_ms, object, state).await?;
+            self.process_object(epoch, checkpoint, timestamp_ms, object, state)
+                .await?;
         }
         Ok(())
     }
@@ -107,8 +113,9 @@ impl WrappedObjectHandler {
         object: &Object,
         state: &mut State,
     ) -> Result<()> {
-        let move_struct = if let Some((tag, contents)) =
-            object.struct_tag().and_then(|tag| object.data.try_as_move().map(|mo| (tag, mo.contents())))
+        let move_struct = if let Some((tag, contents)) = object
+            .struct_tag()
+            .and_then(|tag| object.data.try_as_move().map(|mo| (tag, mo.contents())))
         {
             let move_struct = get_move_struct(&tag, contents, &state.resolver).await?;
             Some(move_struct)

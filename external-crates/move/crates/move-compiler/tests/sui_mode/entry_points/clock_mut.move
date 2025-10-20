@@ -1,18 +1,18 @@
 // invalid, Clock by mutable reference
 
 module a::m {
-    public entry fun no_clock_mut(_: &mut one::clock::Clock) {
+    public entry fun no_clock_mut(_: &mut sui::clock::Clock) {
         abort 0
     }
 }
 
-module one::clock {
+module oct::clock {
     struct Clock has key {
-        id: one::object::UID,
+        id: sui::object::UID,
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

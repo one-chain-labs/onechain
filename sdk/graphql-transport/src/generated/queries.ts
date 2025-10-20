@@ -162,7 +162,7 @@ export type Address = IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this address. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this address. */
@@ -170,15 +170,15 @@ export type Address = IOwner & {
   /**
    * The coin objects for this address.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this address. */
   defaultSuinsName?: Maybe<Scalars['String']['output']>;
   /** Objects owned by this address, optionally `filter`-ed. */
   objects: MoveObjectConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this address. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this address. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The SuinsRegistration NFTs owned by this address. These grant the owner the capability to
    * manage the associated domain.
@@ -253,7 +253,7 @@ export type AddressObjectsArgs = {
 
 
 /** The 32-byte address that is an account address (corresponding to a public key). */
-export type AddressStakedOctsArgs = {
+export type AddressStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -321,6 +321,9 @@ export enum AddressTransactionBlockRelationship {
   Sent = 'SENT'
 }
 
+/** An Authenticator represents the access control rules for a ConsensusV2 object. */
+export type Authenticator = Address;
+
 /** System transaction for creating the on-chain state used by zkLogin. */
 export type AuthenticatorStateCreateTransaction = {
   __typename?: 'AuthenticatorStateCreateTransaction';
@@ -370,7 +373,7 @@ export type Balance = {
   __typename?: 'Balance';
   /** How many coins of this type constitute the balance */
   coinObjectCount?: Maybe<Scalars['UInt53']['output']>;
-  /** Coin type for the balance, such as 0x2::oct::OCT */
+  /** Coin type for the balance, such as 0x2::sui::SUI */
   coinType: MoveType;
   /** Total balance across all coin objects of the coin type */
   totalBalance?: Maybe<Scalars['BigInt']['output']>;
@@ -381,7 +384,7 @@ export type BalanceChange = {
   __typename?: 'BalanceChange';
   /** The signed balance change. */
   amount?: Maybe<Scalars['BigInt']['output']>;
-  /** The inner type of the coin whose balance has changed (e.g. `0x2::oct::OCT`). */
+  /** The inner type of the coin whose balance has changed (e.g. `0x2::sui::SUI`). */
   coinType?: Maybe<MoveType>;
   /** The address or object whose balance has changed. */
   owner?: Maybe<Owner>;
@@ -490,6 +493,8 @@ export type ChangeEpochTransactionSystemPackagesArgs = {
  */
 export type Checkpoint = {
   __typename?: 'Checkpoint';
+  /** The Base64 serialized BCS bytes of CheckpointSummary for this checkpoint. */
+  bcs?: Maybe<Scalars['Base64']['output']>;
   /**
    * A 32-byte hash that uniquely identifies the checkpoint contents, encoded in Base58. This
    * hash can be used to verify checkpoint contents by checking signatures against the committee,
@@ -591,7 +596,7 @@ export type Coin = IMoveObject & IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -603,7 +608,7 @@ export type Coin = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /**
@@ -683,8 +688,8 @@ export type Coin = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -783,7 +788,7 @@ export type CoinReceivedTransactionBlocksArgs = {
 
 
 /** Some 0x2::coin::Coin Move object. */
-export type CoinStakedOctsArgs = {
+export type CoinStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -830,7 +835,7 @@ export type CoinMetadata = IMoveObject & IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -840,7 +845,7 @@ export type CoinMetadata = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /**
@@ -927,8 +932,8 @@ export type CoinMetadata = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -1031,7 +1036,7 @@ export type CoinMetadataReceivedTransactionBlocksArgs = {
 
 
 /** The metadata for a coin type. */
-export type CoinMetadataStakedOctsArgs = {
+export type CoinMetadataStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -1064,6 +1069,17 @@ export type ConsensusCommitPrologueTransaction = {
   epoch?: Maybe<Epoch>;
   /** Consensus round of the commit. */
   round: Scalars['UInt53']['output'];
+};
+
+/**
+ * A ConsensusV2 object is an object that is automatically versioned by the consensus protocol
+ * and allows different authentication modes based on the chosen authenticator.
+ * (Initially, only single-owner authentication is supported.)
+ */
+export type ConsensusV2 = {
+  __typename?: 'ConsensusV2';
+  authenticator?: Maybe<Authenticator>;
+  startVersion: Scalars['UInt53']['output'];
 };
 
 export type DependencyConnection = {
@@ -1466,7 +1482,7 @@ export type EventFilter = {
    *
    * Generic types can be queried by either the generic type name, e.g.
    * `0x2::coin::Coin`, or by the full type name, such as
-   * `0x2::coin::Coin<0x2::oct::OCT>`.
+   * `0x2::coin::Coin<0x2::sui::SUI>`.
    */
   eventType?: InputMaybe<Scalars['String']['input']>;
   /** Filter down to events from transactions sent by this address. */
@@ -1722,22 +1738,22 @@ export type IObjectReceivedTransactionBlocksArgs = {
  */
 export type IOwner = {
   address: Scalars['SuiAddress']['output'];
-  /** Total balance of all coins with marker type owned by this object or address. If type is not supplied, it defaults to `0x2::oct::OCT`. */
+  /** Total balance of all coins with marker type owned by this object or address. If type is not supplied, it defaults to `0x2::sui::SUI`. */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object or address. */
   balances: BalanceConnection;
   /**
    * The coin objects for this object or address.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this object or address. */
   defaultSuinsName?: Maybe<Scalars['String']['output']>;
   /** Objects owned by this object or address, optionally `filter`-ed. */
   objects: MoveObjectConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object or address. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object or address. */
+  stakedOcts: StakedSuiConnection;
   /** The SuinsRegistration NFTs owned by this object or address. These grant the owner the capability to manage the associated domain. */
   suinsRegistrations: SuinsRegistrationConnection;
 };
@@ -1815,7 +1831,7 @@ export type IOwnerObjectsArgs = {
  * object. The same address can only refer to an account or an object, never both, but it is not
  * possible to know which up-front.
  */
-export type IOwnerStakedOctsArgs = {
+export type IOwnerStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -2222,13 +2238,13 @@ export type MoveObject = IMoveObject & IObject & IOwner & {
   asCoin?: Maybe<Coin>;
   /** Attempts to convert the Move object into a `0x2::coin::CoinMetadata`. */
   asCoinMetadata?: Maybe<CoinMetadata>;
-  /** Attempts to convert the Move object into a `0x3::staking_pool::StakedOct`. */
-  asStakedOct?: Maybe<StakedOct>;
+  /** Attempts to convert the Move object into a `0x3::staking_pool::StakedSui`. */
+  asStakedSui?: Maybe<StakedSui>;
   /** Attempts to convert the Move object into a `SuinsRegistration` object. */
   asSuinsRegistration?: Maybe<SuinsRegistration>;
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -2238,7 +2254,7 @@ export type MoveObject = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /**
@@ -2318,8 +2334,8 @@ export type MoveObject = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -2448,7 +2464,7 @@ export type MoveObjectReceivedTransactionBlocksArgs = {
  * The representation of an object as a Move Object, which exposes additional information
  * (content, module that governs it, version, is transferrable, etc.) about this object.
  */
-export type MoveObjectStakedOctsArgs = {
+export type MoveObjectStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -2495,7 +2511,7 @@ export type MovePackage = IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this package. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    *
    * Note that coins owned by a package are inaccessible, because packages are immutable and
    * cannot be owned by an address.
@@ -2513,7 +2529,7 @@ export type MovePackage = IObject & IOwner & {
   /**
    * The coin objects owned by this package.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    *
    * Note that coins owned by a package are inaccessible, because packages are immutable and
    * cannot be owned by an address.
@@ -2559,6 +2575,8 @@ export type MovePackage = IObject & IOwner & {
    * but has the specified `version`).
    */
   packageAtVersion?: Maybe<MovePackage>;
+  /** BCS representation of the package itself, as a MovePackage. */
+  packageBcs?: Maybe<Scalars['Base64']['output']>;
   /**
    * Fetch all versions of this package (packages that share this package's original ID),
    * optionally bounding the versions exclusively from below with `afterVersion`, or from above
@@ -2593,12 +2611,12 @@ export type MovePackage = IObject & IOwner & {
    */
   receivedTransactionBlocks: TransactionBlockConnection;
   /**
-   * The `0x3::staking_pool::StakedOct` objects owned by this package.
+   * The `0x3::staking_pool::StakedSui` objects owned by this package.
    *
    * Note that objects owned by a package are inaccessible, because packages are immutable and
    * cannot be owned by an address.
    */
-  stakedOcts: StakedOctConnection;
+  stakedOcts: StakedSuiConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -2748,7 +2766,7 @@ export type MovePackageReceivedTransactionBlocksArgs = {
  * A MovePackage is a kind of Move object that represents code that has been published on chain.
  * It exposes information about its modules, type definitions, functions, and dependencies.
  */
-export type MovePackageStakedOctsArgs = {
+export type MovePackageStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -2961,7 +2979,7 @@ export type Object = IObject & IOwner & {
   asMovePackage?: Maybe<MovePackage>;
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -2971,7 +2989,7 @@ export type Object = IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this object. */
@@ -3042,8 +3060,8 @@ export type Object = IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -3182,7 +3200,7 @@ export type ObjectReceivedTransactionBlocksArgs = {
  * with fields) with additional metadata detailing its id, version, transaction digest, owner
  * field indicating how this object can be accessed.
  */
-export type ObjectStakedOctsArgs = {
+export type ObjectStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -3275,7 +3293,7 @@ export type ObjectFilter = {
    * name.
    *
    * Generic types can be queried by either the generic type name, e.g. `0x2::coin::Coin`, or by
-   * the full type name, such as `0x2::coin::Coin<0x2::oct::OCT>`.
+   * the full type name, such as `0x2::coin::Coin<0x2::sui::SUI>`.
    */
   type?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3296,7 +3314,7 @@ export enum ObjectKind {
 }
 
 /** The object's owner type: Immutable, Shared, Parent, or Address. */
-export type ObjectOwner = AddressOwner | Immutable | Parent | Shared;
+export type ObjectOwner = AddressOwner | ConsensusV2 | Immutable | Parent | Shared;
 
 export type ObjectRef = {
   /** ID of the object. */
@@ -3347,7 +3365,7 @@ export type Owner = IOwner & {
   asObject?: Maybe<Object>;
   /**
    * Total balance of all coins with marker type owned by this object or address. If type is not
-   * supplied, it defaults to `0x2::oct::OCT`.
+   * supplied, it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object or address. */
@@ -3355,7 +3373,7 @@ export type Owner = IOwner & {
   /**
    * The coin objects for this object or address.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this object or address. */
@@ -3385,8 +3403,8 @@ export type Owner = IOwner & {
   dynamicObjectField?: Maybe<DynamicField>;
   /** Objects owned by this object or address, optionally `filter`-ed. */
   objects: MoveObjectConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object or address. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object or address. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The SuinsRegistration NFTs owned by this object or address. These grant the owner the
    * capability to manage the associated domain.
@@ -3494,7 +3512,7 @@ export type OwnerObjectsArgs = {
  * represents either an Address (corresponding to a public key of an account) or an Object, but
  * never both (it is not known up-front whether a given Owner is an Address or an Object).
  */
-export type OwnerStakedOctsArgs = {
+export type OwnerStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -3697,13 +3715,16 @@ export type Query = {
   checkpoint?: Maybe<Checkpoint>;
   /** The checkpoints that exist in the network. */
   checkpoints: CheckpointConnection;
-  /** The coin metadata associated with the given coin type. */
+  /**
+   * The coin metadata associated with the given coin type. Note that if the latest version of
+   * the coin's metadata is wrapped or deleted, it will not be found.
+   */
   coinMetadata?: Maybe<CoinMetadata>;
   /**
    * The coin objects that exist in the network.
    *
    * The type field is a string of the inner type of the coin by which to filter (e.g.
-   * `0x2::oct::OCT`). If no type is provided, it will default to `0x2::oct::OCT`.
+   * `0x2::sui::SUI`). If no type is provided, it will default to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /**
@@ -4277,15 +4298,15 @@ export type StakeSubsidy = {
   periodLength?: Maybe<Scalars['Int']['output']>;
 };
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOct = IMoveObject & IObject & IOwner & {
-  __typename?: 'StakedOct';
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSui = IMoveObject & IObject & IOwner & {
+  __typename?: 'StakedSui';
   /** The epoch at which this stake became active. */
   activatedEpoch?: Maybe<Epoch>;
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -4295,7 +4316,7 @@ export type StakedOct = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /**
@@ -4396,8 +4417,8 @@ export type StakedOct = IMoveObject & IObject & IOwner & {
   requestedEpoch?: Maybe<Epoch>;
   /** A stake can be pending, active, or unstaked */
   stakeStatus: StakeStatus;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -4422,14 +4443,14 @@ export type StakedOct = IMoveObject & IObject & IOwner & {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctBalanceArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiBalanceArgs = {
   type?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctBalancesArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiBalancesArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4437,8 +4458,8 @@ export type StakedOctBalancesArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctCoinsArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiCoinsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4447,20 +4468,20 @@ export type StakedOctCoinsArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctDefaultSuinsNameArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiDefaultSuinsNameArgs = {
   format?: InputMaybe<DomainFormat>;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctDynamicFieldArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiDynamicFieldArgs = {
   name: DynamicFieldName;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctDynamicFieldsArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiDynamicFieldsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4468,14 +4489,14 @@ export type StakedOctDynamicFieldsArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctDynamicObjectFieldArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiDynamicObjectFieldArgs = {
   name: DynamicFieldName;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctObjectsArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiObjectsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   filter?: InputMaybe<ObjectFilter>;
@@ -4484,8 +4505,8 @@ export type StakedOctObjectsArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctReceivedTransactionBlocksArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiReceivedTransactionBlocksArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   filter?: InputMaybe<TransactionBlockFilter>;
@@ -4495,8 +4516,8 @@ export type StakedOctReceivedTransactionBlocksArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctStakedOctsArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4504,31 +4525,31 @@ export type StakedOctStakedOctsArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
-export type StakedOctSuinsRegistrationsArgs = {
+/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
+export type StakedSuiSuinsRegistrationsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
 };
 
-export type StakedOctConnection = {
-  __typename?: 'StakedOctConnection';
+export type StakedSuiConnection = {
+  __typename?: 'StakedSuiConnection';
   /** A list of edges. */
-  edges: Array<StakedOctEdge>;
+  edges: Array<StakedSuiEdge>;
   /** A list of nodes. */
-  nodes: Array<StakedOct>;
+  nodes: Array<StakedSui>;
   /** Information to aid in pagination. */
   pageInfo: PageInfo;
 };
 
 /** An edge in a connection. */
-export type StakedOctEdge = {
-  __typename?: 'StakedOctEdge';
+export type StakedSuiEdge = {
+  __typename?: 'StakedSuiEdge';
   /** A cursor for use in pagination */
   cursor: Scalars['String']['output'];
   /** The item at the end of the edge */
-  node: StakedOct;
+  node: StakedSui;
 };
 
 /** SUI set aside to account for objects stored on-chain. */
@@ -4551,7 +4572,7 @@ export type SuinsRegistration = IMoveObject & IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::oct::OCT`.
+   * it defaults to `0x2::sui::SUI`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -4561,7 +4582,7 @@ export type SuinsRegistration = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
    */
   coins: CoinConnection;
   /**
@@ -4643,8 +4664,8 @@ export type SuinsRegistration = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
-  stakedOcts: StakedOctConnection;
+  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
+  stakedOcts: StakedSuiConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -4733,7 +4754,7 @@ export type SuinsRegistrationReceivedTransactionBlocksArgs = {
 };
 
 
-export type SuinsRegistrationStakedOctsArgs = {
+export type SuinsRegistrationStakedSuisArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4802,7 +4823,7 @@ export type TransactionArgument = GasCoin | Input | Result;
 
 export type TransactionBlock = {
   __typename?: 'TransactionBlock';
-  /** Serialized form of this transaction's `SenderSignedData`, BCS serialized and Base64 encoded. */
+  /** Serialized form of this transaction's `TransactionData`, BCS serialized and Base64 encoded. */
   bcs?: Maybe<Scalars['Base64']['output']>;
   /**
    * A 32-byte hash that uniquely identifies the transaction block contents, encoded in Base58.
@@ -5441,7 +5462,7 @@ export type GetDynamicFieldObjectQueryVariables = Exact<{
 }>;
 
 
-export type GetDynamicFieldObjectQuery = { __typename?: 'Query', owner?: { __typename?: 'Owner', dynamicObjectField?: { __typename?: 'DynamicField', value?: { __typename: 'MoveObject', owner?: { __typename: 'AddressOwner' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any, digest?: string | null, version: any, storageRebate?: any | null, owner?: { __typename: 'AddressOwner' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared' } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null } } | null } | null } | null } | null } | { __typename: 'Shared' } | null } | { __typename: 'MoveValue' } | null } | null } | null };
+export type GetDynamicFieldObjectQuery = { __typename?: 'Query', owner?: { __typename?: 'Owner', dynamicObjectField?: { __typename?: 'DynamicField', value?: { __typename: 'MoveObject', owner?: { __typename: 'AddressOwner' } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any, digest?: string | null, version: any, storageRebate?: any | null, owner?: { __typename: 'AddressOwner' } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared' } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null } } | null } | null } | null } | null } | { __typename: 'Shared' } | null } | { __typename: 'MoveValue' } | null } | null } | null };
 
 export type GetDynamicFieldsQueryVariables = Exact<{
   parentId: Scalars['SuiAddress']['input'];
@@ -5488,7 +5509,7 @@ export type GetNormalizedMoveModuleQueryVariables = Exact<{
 }>;
 
 
-export type GetNormalizedMoveModuleQuery = { __typename?: 'Query', object?: { __typename?: 'Object', asMovePackage?: { __typename?: 'MovePackage', module?: { __typename?: 'MoveModule', name: string, fileFormatVersion: number, friends: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null } | null } | null } | null };
+export type GetNormalizedMoveModuleQuery = { __typename?: 'Query', object?: { __typename?: 'Object', asMovePackage?: { __typename?: 'MovePackage', module?: { __typename?: 'MoveModule', name: string, fileFormatVersion: number, friends: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, enums?: { __typename?: 'MoveEnumConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveEnum', name: string, abilities?: Array<MoveAbility> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null, variants?: Array<{ __typename?: 'MoveEnumVariant', name: string, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null } | null } | null } | null };
 
 export type PaginateMoveModuleListsQueryVariables = Exact<{
   packageId: Scalars['SuiAddress']['input'];
@@ -5496,15 +5517,19 @@ export type PaginateMoveModuleListsQueryVariables = Exact<{
   hasMoreFriends: Scalars['Boolean']['input'];
   hasMoreStructs: Scalars['Boolean']['input'];
   hasMoreFunctions: Scalars['Boolean']['input'];
+  hasMoreEnums: Scalars['Boolean']['input'];
   afterFriends?: InputMaybe<Scalars['String']['input']>;
   afterStructs?: InputMaybe<Scalars['String']['input']>;
   afterFunctions?: InputMaybe<Scalars['String']['input']>;
+  afterEnums?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type PaginateMoveModuleListsQuery = { __typename?: 'Query', object?: { __typename?: 'Object', asMovePackage?: { __typename?: 'MovePackage', module?: { __typename?: 'MoveModule', friends?: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null } | null } | null } | null };
+export type PaginateMoveModuleListsQuery = { __typename?: 'Query', object?: { __typename?: 'Object', asMovePackage?: { __typename?: 'MovePackage', module?: { __typename?: 'MoveModule', friends?: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, enums?: { __typename?: 'MoveEnumConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveEnum', name: string, abilities?: Array<MoveAbility> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null, variants?: Array<{ __typename?: 'MoveEnumVariant', name: string, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null } | null } | null } | null };
 
-export type Rpc_Move_Module_FieldsFragment = { __typename?: 'MoveModule', name: string, fileFormatVersion: number, friends: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null };
+export type Rpc_Move_Module_FieldsFragment = { __typename?: 'MoveModule', name: string, fileFormatVersion: number, friends: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, enums?: { __typename?: 'MoveEnumConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveEnum', name: string, abilities?: Array<MoveAbility> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null, variants?: Array<{ __typename?: 'MoveEnumVariant', name: string, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null };
+
+export type Rpc_Move_Enum_FieldsFragment = { __typename?: 'MoveEnum', name: string, abilities?: Array<MoveAbility> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null, variants?: Array<{ __typename?: 'MoveEnumVariant', name: string, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null }> | null };
 
 export type GetNormalizedMoveModulesByPackageQueryVariables = Exact<{
   packageId: Scalars['SuiAddress']['input'];
@@ -5512,7 +5537,7 @@ export type GetNormalizedMoveModulesByPackageQueryVariables = Exact<{
 }>;
 
 
-export type GetNormalizedMoveModulesByPackageQuery = { __typename?: 'Query', object?: { __typename?: 'Object', asMovePackage?: { __typename?: 'MovePackage', address: any, modules?: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, fileFormatVersion: number, friends: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null }> } | null } | null } | null };
+export type GetNormalizedMoveModulesByPackageQuery = { __typename?: 'Query', object?: { __typename?: 'Object', asMovePackage?: { __typename?: 'MovePackage', address: any, modules?: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, fileFormatVersion: number, friends: { __typename?: 'MoveModuleConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveModule', name: string, package: { __typename?: 'MovePackage', address: any } }> }, structs?: { __typename?: 'MoveStructConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveStruct', name: string, abilities?: Array<MoveAbility> | null, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null }> } | null, enums?: { __typename?: 'MoveEnumConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveEnum', name: string, abilities?: Array<MoveAbility> | null, typeParameters?: Array<{ __typename?: 'MoveStructTypeParameter', isPhantom: boolean, constraints: Array<MoveAbility> }> | null, variants?: Array<{ __typename?: 'MoveEnumVariant', name: string, fields?: Array<{ __typename?: 'MoveField', name: string, type?: { __typename?: 'OpenMoveType', signature: any } | null }> | null }> | null }> } | null, functions?: { __typename?: 'MoveFunctionConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveFunction', name: string, visibility?: MoveVisibility | null, isEntry?: boolean | null, parameters?: Array<{ __typename?: 'OpenMoveType', signature: any }> | null, typeParameters?: Array<{ __typename?: 'MoveFunctionTypeParameter', constraints: Array<MoveAbility> }> | null, return?: Array<{ __typename?: 'OpenMoveType', repr: string, signature: any }> | null }> } | null }> } | null } | null } | null };
 
 export type GetNormalizedMoveStructQueryVariables = Exact<{
   packageId: Scalars['SuiAddress']['input'];
@@ -5585,7 +5610,7 @@ export type GetOwnedObjectsQueryVariables = Exact<{
 }>;
 
 
-export type GetOwnedObjectsQuery = { __typename?: 'Query', address?: { __typename?: 'Address', objects: { __typename?: 'MoveObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveObject', bcs?: any | null, hasPublicTransfer?: boolean, storageRebate?: any | null, digest?: string | null, version: any, objectId: any, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null }> } } | null };
+export type GetOwnedObjectsQuery = { __typename?: 'Query', address?: { __typename?: 'Address', objects: { __typename?: 'MoveObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'MoveObject', bcs?: any | null, hasPublicTransfer?: boolean, storageRebate?: any | null, digest?: string | null, version: any, objectId: any, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null }> } } | null };
 
 export type GetObjectQueryVariables = Exact<{
   id: Scalars['SuiAddress']['input'];
@@ -5599,7 +5624,7 @@ export type GetObjectQueryVariables = Exact<{
 }>;
 
 
-export type GetObjectQuery = { __typename?: 'Query', object?: { __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null } | null };
+export type GetObjectQuery = { __typename?: 'Query', object?: { __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null } | null };
 
 export type TryGetPastObjectQueryVariables = Exact<{
   id: Scalars['SuiAddress']['input'];
@@ -5614,7 +5639,7 @@ export type TryGetPastObjectQueryVariables = Exact<{
 }>;
 
 
-export type TryGetPastObjectQuery = { __typename?: 'Query', current?: { __typename?: 'Object', address: any, version: any } | null, object?: { __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null } | null };
+export type TryGetPastObjectQuery = { __typename?: 'Query', current?: { __typename?: 'Object', address: any, version: any } | null, object?: { __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null } | null };
 
 export type MultiGetObjectsQueryVariables = Exact<{
   ids: Array<Scalars['SuiAddress']['input']> | Scalars['SuiAddress']['input'];
@@ -5630,13 +5655,15 @@ export type MultiGetObjectsQueryVariables = Exact<{
 }>;
 
 
-export type MultiGetObjectsQuery = { __typename?: 'Query', objects: { __typename?: 'ObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null }> } };
+export type MultiGetObjectsQuery = { __typename?: 'Query', objects: { __typename?: 'ObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null }> } };
 
-export type Rpc_Object_FieldsFragment = { __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null };
+export type Rpc_Object_FieldsFragment = { __typename?: 'Object', version: any, storageRebate?: any | null, digest?: string | null, objectId: any, asMoveObject?: { __typename?: 'MoveObject', hasPublicTransfer: boolean, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null };
 
-export type Rpc_Move_Object_FieldsFragment = { __typename?: 'MoveObject', bcs?: any | null, hasPublicTransfer?: boolean, storageRebate?: any | null, digest?: string | null, version: any, objectId: any, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null };
+export type Rpc_Move_Object_FieldsFragment = { __typename?: 'MoveObject', bcs?: any | null, hasPublicTransfer?: boolean, storageRebate?: any | null, digest?: string | null, version: any, objectId: any, contents?: { __typename?: 'MoveValue', data: any, bcs: any, type: { __typename?: 'MoveType', repr: string, layout?: any | null, signature: any } } | null, owner?: { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null } | { __typename: 'ConsensusV2' } | { __typename: 'Immutable' } | { __typename: 'Parent', parent?: { __typename?: 'Owner', address: any } | null } | { __typename: 'Shared', initialSharedVersion: any } | null, previousTransactionBlock?: { __typename?: 'TransactionBlock', digest?: string | null } | null, display?: Array<{ __typename?: 'DisplayEntry', key: string, value?: string | null, error?: string | null }> | null };
 
 type Rpc_Object_Owner_Fields_AddressOwner_Fragment = { __typename: 'AddressOwner', owner?: { __typename?: 'Owner', asObject?: { __typename?: 'Object', address: any } | null, asAddress?: { __typename?: 'Address', address: any } | null } | null };
+
+type Rpc_Object_Owner_Fields_ConsensusV2_Fragment = { __typename: 'ConsensusV2' };
 
 type Rpc_Object_Owner_Fields_Immutable_Fragment = { __typename: 'Immutable' };
 
@@ -5644,7 +5671,7 @@ type Rpc_Object_Owner_Fields_Parent_Fragment = { __typename: 'Parent', parent?: 
 
 type Rpc_Object_Owner_Fields_Shared_Fragment = { __typename: 'Shared', initialSharedVersion: any };
 
-export type Rpc_Object_Owner_FieldsFragment = Rpc_Object_Owner_Fields_AddressOwner_Fragment | Rpc_Object_Owner_Fields_Immutable_Fragment | Rpc_Object_Owner_Fields_Parent_Fragment | Rpc_Object_Owner_Fields_Shared_Fragment;
+export type Rpc_Object_Owner_FieldsFragment = Rpc_Object_Owner_Fields_AddressOwner_Fragment | Rpc_Object_Owner_Fields_ConsensusV2_Fragment | Rpc_Object_Owner_Fields_Immutable_Fragment | Rpc_Object_Owner_Fields_Parent_Fragment | Rpc_Object_Owner_Fields_Shared_Fragment;
 
 export type QueryEventsQueryVariables = Exact<{
   filter: EventFilter;
@@ -5666,7 +5693,7 @@ export type GetStakesQueryVariables = Exact<{
 }>;
 
 
-export type GetStakesQuery = { __typename?: 'Query', address?: { __typename?: 'Address', stakedOcts: { __typename?: 'StakedOctConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'StakedOct', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null }> } } | null };
+export type GetStakesQuery = { __typename?: 'Query', address?: { __typename?: 'Address', stakedOcts: { __typename?: 'StakedSuiConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'StakedSui', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null }> } } | null };
 
 export type GetStakesByIdsQueryVariables = Exact<{
   ids: Array<Scalars['SuiAddress']['input']> | Scalars['SuiAddress']['input'];
@@ -5675,9 +5702,9 @@ export type GetStakesByIdsQueryVariables = Exact<{
 }>;
 
 
-export type GetStakesByIdsQuery = { __typename?: 'Query', objects: { __typename?: 'ObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'Object', asMoveObject?: { __typename?: 'MoveObject', asStakedOct?: { __typename?: 'StakedOct', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null } | null } | null }> } };
+export type GetStakesByIdsQuery = { __typename?: 'Query', objects: { __typename?: 'ObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'Object', asMoveObject?: { __typename?: 'MoveObject', asStakedSui?: { __typename?: 'StakedSui', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null } | null } | null }> } };
 
-export type Rpc_Stake_FieldsFragment = { __typename?: 'StakedOct', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null };
+export type Rpc_Stake_FieldsFragment = { __typename?: 'StakedSui', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null };
 
 export type QueryTransactionBlocksQueryVariables = Exact<{
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -5904,6 +5931,25 @@ export const Rpc_Move_Struct_FieldsFragmentDoc = new TypedDocumentString(`
   }
 }
     `, {"fragmentName":"RPC_MOVE_STRUCT_FIELDS"}) as unknown as TypedDocumentString<Rpc_Move_Struct_FieldsFragment, unknown>;
+export const Rpc_Move_Enum_FieldsFragmentDoc = new TypedDocumentString(`
+    fragment RPC_MOVE_ENUM_FIELDS on MoveEnum {
+  name
+  abilities
+  typeParameters {
+    isPhantom
+    constraints
+  }
+  variants {
+    name
+    fields {
+      name
+      type {
+        signature
+      }
+    }
+  }
+}
+    `, {"fragmentName":"RPC_MOVE_ENUM_FIELDS"}) as unknown as TypedDocumentString<Rpc_Move_Enum_FieldsFragment, unknown>;
 export const Rpc_Move_Function_FieldsFragmentDoc = new TypedDocumentString(`
     fragment RPC_MOVE_FUNCTION_FIELDS on MoveFunction {
   name
@@ -5945,6 +5991,15 @@ export const Rpc_Move_Module_FieldsFragmentDoc = new TypedDocumentString(`
       ...RPC_MOVE_STRUCT_FIELDS
     }
   }
+  enums {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      ...RPC_MOVE_ENUM_FIELDS
+    }
+  }
   fileFormatVersion
   functions {
     pageInfo {
@@ -5969,6 +6024,23 @@ export const Rpc_Move_Module_FieldsFragmentDoc = new TypedDocumentString(`
   return {
     repr
     signature
+  }
+}
+fragment RPC_MOVE_ENUM_FIELDS on MoveEnum {
+  name
+  abilities
+  typeParameters {
+    isPhantom
+    constraints
+  }
+  variants {
+    name
+    fields {
+      name
+      type {
+        signature
+      }
+    }
   }
 }
 fragment RPC_MOVE_STRUCT_FIELDS on MoveStruct {
@@ -6137,7 +6209,7 @@ export const Rpc_Move_Object_FieldsFragmentDoc = new TypedDocumentString(`
   }
 }`, {"fragmentName":"RPC_MOVE_OBJECT_FIELDS"}) as unknown as TypedDocumentString<Rpc_Move_Object_FieldsFragment, unknown>;
 export const Rpc_Stake_FieldsFragmentDoc = new TypedDocumentString(`
-    fragment RPC_STAKE_FIELDS on StakedOct {
+    fragment RPC_STAKE_FIELDS on StakedSui {
   principal
   activatedEpoch {
     epochId
@@ -6903,7 +6975,7 @@ export const GetAllBalancesDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<GetAllBalancesQuery, GetAllBalancesQueryVariables>;
 export const GetBalanceDocument = new TypedDocumentString(`
-    query getBalance($owner: SuiAddress!, $type: String = "0x2::oct::OCT") {
+    query getBalance($owner: SuiAddress!, $type: String = "0x2::sui::SUI") {
   address(address: $owner) {
     balance(type: $type) {
       coinType {
@@ -6933,7 +7005,7 @@ export const GetCoinMetadataDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<GetCoinMetadataQuery, GetCoinMetadataQueryVariables>;
 export const GetCoinsDocument = new TypedDocumentString(`
-    query getCoins($owner: SuiAddress!, $first: Int, $cursor: String, $type: String = "0x2::oct::OCT") {
+    query getCoins($owner: SuiAddress!, $first: Int, $cursor: String, $type: String = "0x2::sui::SUI") {
   address(address: $owner) {
     address
     coins(first: $first, after: $cursor, type: $type) {
@@ -7441,6 +7513,15 @@ fragment RPC_MOVE_MODULE_FIELDS on MoveModule {
       ...RPC_MOVE_STRUCT_FIELDS
     }
   }
+  enums {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      ...RPC_MOVE_ENUM_FIELDS
+    }
+  }
   fileFormatVersion
   functions {
     pageInfo {
@@ -7449,6 +7530,23 @@ fragment RPC_MOVE_MODULE_FIELDS on MoveModule {
     }
     nodes {
       ...RPC_MOVE_FUNCTION_FIELDS
+    }
+  }
+}
+fragment RPC_MOVE_ENUM_FIELDS on MoveEnum {
+  name
+  abilities
+  typeParameters {
+    isPhantom
+    constraints
+  }
+  variants {
+    name
+    fields {
+      name
+      type {
+        signature
+      }
     }
   }
 }
@@ -7467,7 +7565,7 @@ fragment RPC_MOVE_STRUCT_FIELDS on MoveStruct {
   }
 }`) as unknown as TypedDocumentString<GetNormalizedMoveModuleQuery, GetNormalizedMoveModuleQueryVariables>;
 export const PaginateMoveModuleListsDocument = new TypedDocumentString(`
-    query paginateMoveModuleLists($packageId: SuiAddress!, $module: String!, $hasMoreFriends: Boolean!, $hasMoreStructs: Boolean!, $hasMoreFunctions: Boolean!, $afterFriends: String, $afterStructs: String, $afterFunctions: String) {
+    query paginateMoveModuleLists($packageId: SuiAddress!, $module: String!, $hasMoreFriends: Boolean!, $hasMoreStructs: Boolean!, $hasMoreFunctions: Boolean!, $hasMoreEnums: Boolean!, $afterFriends: String, $afterStructs: String, $afterFunctions: String, $afterEnums: String) {
   object(address: $packageId) {
     asMovePackage {
       module(name: $module) {
@@ -7490,6 +7588,15 @@ export const PaginateMoveModuleListsDocument = new TypedDocumentString(`
           }
           nodes {
             ...RPC_MOVE_STRUCT_FIELDS
+          }
+        }
+        enums(after: $afterEnums) @include(if: $hasMoreEnums) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            ...RPC_MOVE_ENUM_FIELDS
           }
         }
         functions(after: $afterFunctions) @include(if: $hasMoreFunctions) {
@@ -7518,6 +7625,23 @@ export const PaginateMoveModuleListsDocument = new TypedDocumentString(`
   return {
     repr
     signature
+  }
+}
+fragment RPC_MOVE_ENUM_FIELDS on MoveEnum {
+  name
+  abilities
+  typeParameters {
+    isPhantom
+    constraints
+  }
+  variants {
+    name
+    fields {
+      name
+      type {
+        signature
+      }
+    }
   }
 }
 fragment RPC_MOVE_STRUCT_FIELDS on MoveStruct {
@@ -7589,6 +7713,15 @@ fragment RPC_MOVE_MODULE_FIELDS on MoveModule {
       ...RPC_MOVE_STRUCT_FIELDS
     }
   }
+  enums {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      ...RPC_MOVE_ENUM_FIELDS
+    }
+  }
   fileFormatVersion
   functions {
     pageInfo {
@@ -7597,6 +7730,23 @@ fragment RPC_MOVE_MODULE_FIELDS on MoveModule {
     }
     nodes {
       ...RPC_MOVE_FUNCTION_FIELDS
+    }
+  }
+}
+fragment RPC_MOVE_ENUM_FIELDS on MoveEnum {
+  name
+  abilities
+  typeParameters {
+    isPhantom
+    constraints
+  }
+  variants {
+    name
+    fields {
+      name
+      type {
+        signature
+      }
     }
   }
 }
@@ -8075,7 +8225,7 @@ export const GetStakesDocument = new TypedDocumentString(`
     }
   }
 }
-    fragment RPC_STAKE_FIELDS on StakedOct {
+    fragment RPC_STAKE_FIELDS on StakedSui {
   principal
   activatedEpoch {
     epochId
@@ -8103,14 +8253,14 @@ export const GetStakesByIdsDocument = new TypedDocumentString(`
     }
     nodes {
       asMoveObject {
-        asStakedOct {
+        asStakedSui {
           ...RPC_STAKE_FIELDS
         }
       }
     }
   }
 }
-    fragment RPC_STAKE_FIELDS on StakedOct {
+    fragment RPC_STAKE_FIELDS on StakedSui {
   principal
   activatedEpoch {
     epochId

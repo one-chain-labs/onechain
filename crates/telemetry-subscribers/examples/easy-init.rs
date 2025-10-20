@@ -4,7 +4,9 @@
 use tracing::{debug, info, warn};
 
 fn main() {
-    let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new()
+        .with_env()
+        .init();
 
     info!(a = 1, "This will be INFO.");
     debug!(a = 2, "This will be DEBUG.");

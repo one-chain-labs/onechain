@@ -7,8 +7,9 @@ use chrono::{naive::NaiveDateTime, DateTime, Utc};
 use diesel::{dsl::sql, prelude::*, sql_types};
 use diesel_async::RunQueryDsl;
 use sui_field_count::FieldCount;
+use sui_pg_db::Connection;
 
-use crate::{db::Connection, schema::watermarks};
+use crate::schema::watermarks;
 
 #[derive(Insertable, Selectable, Queryable, Debug, Clone, FieldCount)]
 #[diesel(table_name = watermarks)]
@@ -60,7 +61,10 @@ pub(crate) struct PrunerWatermark<'p> {
 }
 
 impl StoredWatermark {
-    pub(crate) async fn get(conn: &mut Connection<'_>, pipeline: &'static str) -> QueryResult<Option<Self>> {
+    pub(crate) async fn get(
+        conn: &mut Connection<'_>,
+        pipeline: &'static str,
+    ) -> QueryResult<Option<Self>> {
         watermarks::table
             .select(StoredWatermark::as_select())
             .filter(watermarks::pipeline.eq(pipeline))
@@ -72,7 +76,10 @@ impl StoredWatermark {
 
 impl CommitterWatermark<'static> {
     /// Get the current high watermark for the pipeline.
-    pub(crate) async fn get(conn: &mut Connection<'_>, pipeline: &'static str) -> QueryResult<Option<Self>> {
+    pub(crate) async fn get(
+        conn: &mut Connection<'_>,
+        pipeline: &'static str,
+    ) -> QueryResult<Option<Self>> {
         watermarks::table
             .select(CommitterWatermark::as_select())
             .filter(watermarks::pipeline.eq(pipeline))
@@ -119,7 +126,10 @@ impl<'p> CommitterWatermark<'p> {
 
 impl<'p> ReaderWatermark<'p> {
     pub(crate) fn new(pipeline: impl Into<Cow<'p, str>>, reader_lo: u64) -> Self {
-        ReaderWatermark { pipeline: pipeline.into(), reader_lo: reader_lo as i64 }
+        ReaderWatermark {
+            pipeline: pipeline.into(),
+            reader_lo: reader_lo as i64,
+        }
     }
 
     /// Update the reader low watermark for an existing watermark row, as long as this raises the
@@ -161,7 +171,12 @@ impl PrunerWatermark<'static> {
         ));
 
         watermarks::table
-            .select((watermarks::pipeline, wait_for, watermarks::reader_lo, watermarks::pruner_hi))
+            .select((
+                watermarks::pipeline,
+                wait_for,
+                watermarks::reader_lo,
+                watermarks::pruner_hi,
+            ))
             .filter(watermarks::pipeline.eq(pipeline))
             .first(conn)
             .await
@@ -176,16 +191,17 @@ impl<'p> PrunerWatermark<'p> {
         (self.wait_for > 0).then(|| Duration::from_millis(self.wait_for as u64))
     }
 
-    /// Whether the pruner has any work left to do on the range in this watermark.
-    pub(crate) fn is_empty(&self) -> bool {
-        self.pruner_hi >= self.reader_lo
-    }
+    /// The next chunk of checkpoints that the pruner should work on, to advance the watermark.
+    /// If no more checkpoints to prune, returns `None`.
+    /// Otherwise, returns a tuple (from, to_exclusive) where `from` is inclusive and `to_exclusive` is exclusive.
+    pub(crate) fn next_chunk(&mut self, size: u64) -> Option<(u64, u64)> {
+        if self.pruner_hi >= self.reader_lo {
+            return None;
+        }
 
-    /// The next chunk that the pruner should work on, to advance the watermark.
-    pub(crate) fn next_chunk(&mut self, size: u64) -> (u64, u64) {
         let from = self.pruner_hi as u64;
-        let to = (from + size).min(self.reader_lo as u64);
-        (from, to)
+        let to_exclusive = (from + size).min(self.reader_lo as u64);
+        Some((from, to_exclusive))
     }
 
     /// Update the pruner high watermark (only) for an existing watermark row, as long as this

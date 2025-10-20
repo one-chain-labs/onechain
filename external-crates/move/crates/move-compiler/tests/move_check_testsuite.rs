@@ -10,13 +10,12 @@ use move_command_line_common::{
 };
 use move_compiler::{
     command_line::compiler::move_check_for_errors,
-    diagnostics::{warning_filters::WarningFiltersBuilder, *},
+    diagnostics::warning_filters::WarningFiltersBuilder,
+    diagnostics::*,
     editions::{Edition, Flavor},
     linters::{self, LintLevel},
     shared::{Flags, NumericalAddress, PackageConfig, PackagePaths},
-    sui_mode,
-    Compiler,
-    PASS_PARSER,
+    sui_mode, Compiler, PASS_PARSER,
 };
 
 /// Shared flag to keep any temporary results of the test
@@ -47,13 +46,20 @@ fn default_testing_addresses(flavor: Flavor) -> BTreeMap<String, NumericalAddres
     if flavor == Flavor::Sui {
         mapping.extend([("one", "0x2"), ("one_system", "0x3")]);
     }
-    mapping.into_iter().map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap())).collect()
+    mapping
+        .into_iter()
+        .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
+        .collect()
 }
 
 fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
     let path_contains = |s| path.components().any(|c| c.as_os_str() == s);
     let lint = path_contains(LINTER_DIR);
-    let flavor = if path_contains(SUI_MODE_DIR) { Flavor::Sui } else { Flavor::default() };
+    let flavor = if path_contains(SUI_MODE_DIR) {
+        Flavor::Sui
+    } else {
+        Flavor::default()
+    };
     let edition = if path_contains(MOVE_2024_DIR) {
         Edition::E2024_ALPHA
     } else if path_contains(DEV_DIR) {
@@ -61,8 +67,12 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
     } else {
         Edition::LEGACY
     };
-    let config =
-        PackageConfig { flavor, edition, is_dependency: false, warning_filter: WarningFiltersBuilder::new_for_source() };
+    let config = PackageConfig {
+        flavor,
+        edition,
+        is_dependency: false,
+        warning_filter: WarningFiltersBuilder::new_for_source(),
+    };
     testsuite(path, config, lint)
 }
 
@@ -70,20 +80,43 @@ fn testsuite(path: &Path, mut config: PackageConfig, lint: bool) -> datatest_sta
     // A test is marked that it should also be compiled in test mode by having a `path.unit_test`
     // file.
     if path.with_extension(TEST_EXT).exists() {
-        let test_exp_path = format!("{}.{TEST_EXT}.{EXP_EXT}", path.with_extension("").to_string_lossy(),);
-        let test_out_path = format!("{}.{TEST_EXT}.{OUT_EXT}", path.with_extension("").to_string_lossy(),);
+        let test_exp_path = format!(
+            "{}.{TEST_EXT}.{EXP_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
+        let test_out_path = format!(
+            "{}.{TEST_EXT}.{OUT_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
         let mut config = config.clone();
-        config.warning_filter.union(&WarningFiltersBuilder::unused_warnings_filter_for_test());
-        run_test(path, Path::new(&test_exp_path), Path::new(&test_out_path), Flags::testing(), config, lint)?;
+        config
+            .warning_filter
+            .union(&WarningFiltersBuilder::unused_warnings_filter_for_test());
+        run_test(
+            path,
+            Path::new(&test_exp_path),
+            Path::new(&test_out_path),
+            Flags::testing(),
+            config,
+            lint,
+        )?;
     }
 
     // A test is marked that it should also be compiled in migration mode by having a
     // `path.migration` file.
     if path.with_extension(MIGRATION_EXT).exists() {
-        let migration_exp_path = format!("{}.{MIGRATION_EXT}.{EXP_EXT}", path.with_extension("").to_string_lossy(),);
-        let migration_out_path = format!("{}.{MIGRATION_EXT}.{OUT_EXT}", path.with_extension("").to_string_lossy(),);
+        let migration_exp_path = format!(
+            "{}.{MIGRATION_EXT}.{EXP_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
+        let migration_out_path = format!(
+            "{}.{MIGRATION_EXT}.{OUT_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
         let mut config = config.clone();
-        config.warning_filter.union(&WarningFiltersBuilder::unused_warnings_filter_for_test());
+        config
+            .warning_filter
+            .union(&WarningFiltersBuilder::unused_warnings_filter_for_test());
         run_test_inner(
             path,
             Path::new(&migration_exp_path),
@@ -97,8 +130,14 @@ fn testsuite(path: &Path, mut config: PackageConfig, lint: bool) -> datatest_sta
 
     // A cross-module unused case that should run without unused warnings suppression
     if path.with_extension(UNUSED_EXT).exists() {
-        let unused_exp_path = format!("{}.{UNUSED_EXT}.{EXP_EXT}", path.with_extension("").to_string_lossy(),);
-        let unused_out_path = format!("{}.{UNUSED_EXT}.{OUT_EXT}", path.with_extension("").to_string_lossy(),);
+        let unused_exp_path = format!(
+            "{}.{UNUSED_EXT}.{EXP_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
+        let unused_out_path = format!(
+            "{}.{UNUSED_EXT}.{OUT_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
         run_test(
             path,
             Path::new(&unused_exp_path),
@@ -111,8 +150,14 @@ fn testsuite(path: &Path, mut config: PackageConfig, lint: bool) -> datatest_sta
 
     // A cross-module unused case that should run without unused warnings suppression
     if path.with_extension(IDE_EXT).exists() {
-        let ide_exp_path = format!("{}.{IDE_EXT}.{EXP_EXT}", path.with_extension("").to_string_lossy(),);
-        let ide_out_path = format!("{}.{IDE_EXT}.{OUT_EXT}", path.with_extension("").to_string_lossy(),);
+        let ide_exp_path = format!(
+            "{}.{IDE_EXT}.{EXP_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
+        let ide_out_path = format!(
+            "{}.{IDE_EXT}.{OUT_EXT}",
+            path.with_extension("").to_string_lossy(),
+        );
         run_test(
             path,
             Path::new(&ide_exp_path),
@@ -126,7 +171,9 @@ fn testsuite(path: &Path, mut config: PackageConfig, lint: bool) -> datatest_sta
     let exp_path = path.with_extension(EXP_EXT);
     let out_path = path.with_extension(OUT_EXT);
 
-    config.warning_filter.union(&WarningFiltersBuilder::unused_warnings_filter_for_test());
+    config
+        .warning_filter
+        .union(&WarningFiltersBuilder::unused_warnings_filter_for_test());
     run_test(path, &exp_path, &out_path, Flags::empty(), config, lint)?;
     Ok(())
 }
@@ -168,12 +215,18 @@ pub fn run_test_inner(
     } else {
         None
     };
-    let targets = vec![PackagePaths { name, paths: targets, named_address_map }];
+    let targets = vec![PackagePaths {
+        name,
+        paths: targets,
+        named_address_map,
+    }];
 
     let flags = flags.set_sources_shadow_deps(true);
 
-    let mut compiler =
-        Compiler::from_package_paths(None, targets, deps).unwrap().set_flags(flags).set_default_config(package_config);
+    let mut compiler = Compiler::from_package_paths(None, targets, deps)
+        .unwrap()
+        .set_flags(flags)
+        .set_default_config(package_config);
 
     if flavor == Flavor::Sui {
         let (prefix, filters) = sui_mode::linters::known_filters();
@@ -223,11 +276,17 @@ pub fn run_test_inner(
     match (has_diags, exp_exists) {
         (false, false) => Ok(()),
         (true, false) => {
-            let msg = format!("Expected success. Unexpected diagnostics:\n{}", rendered_diags);
+            let msg = format!(
+                "Expected success. Unexpected diagnostics:\n{}",
+                rendered_diags
+            );
             anyhow::bail!(add_update_baseline_fix(msg))
         }
         (false, true) => {
-            let msg = format!("Unexpected success. Expected diagnostics:\n{}", fs::read_to_string(exp_path)?);
+            let msg = format!(
+                "Unexpected success. Expected diagnostics:\n{}",
+                fs::read_to_string(exp_path)?
+            );
             anyhow::bail!(add_update_baseline_fix(msg))
         }
         (true, true) => {

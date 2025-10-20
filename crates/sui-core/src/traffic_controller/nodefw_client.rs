@@ -23,12 +23,19 @@ pub struct NodeFWClient {
 
 impl NodeFWClient {
     pub fn new(remote_fw_url: String) -> Self {
-        Self { client: reqwest::Client::new(), remote_fw_url }
+        Self {
+            client: reqwest::Client::new(),
+            remote_fw_url,
+        }
     }
 
     pub async fn block_addresses(&self, addresses: BlockAddresses) -> Result<(), reqwest::Error> {
-        let response =
-            self.client.post(format!("{}/block_addresses", self.remote_fw_url)).json(&addresses).send().await?;
+        let response = self
+            .client
+            .post(format!("{}/block_addresses", self.remote_fw_url))
+            .json(&addresses)
+            .send()
+            .await?;
         match response.error_for_status() {
             Ok(_) => Ok(()),
             Err(e) => Err(e),

@@ -5,11 +5,9 @@ use crate::{helper::ObjectChecker, TestCaseImpl, TestContext};
 use async_trait::async_trait;
 use jsonrpsee::rpc_params;
 use sui_json_rpc_types::{SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse};
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    object::Owner,
-    sui_serde::BigInt,
-};
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::object::Owner;
+use sui_types::sui_serde::BigInt;
 use tracing::{debug, info};
 
 pub struct CoinMergeSplitTest;
@@ -39,7 +37,8 @@ impl TestCaseImpl for CoinMergeSplitTest {
         info!("Testing coin split.");
         let amounts = vec![1.into(), ((original_value - 2) / 2).into()];
 
-        let response = Self::split_coin(ctx, signer, *primary_coin.id(), amounts, *gas_obj.id()).await;
+        let response =
+            Self::split_coin(ctx, signer, *primary_coin.id(), amounts, *gas_obj.id()).await;
         let tx_digest = response.digest;
         let new_coins = response.effects.as_ref().unwrap().created();
 
@@ -65,8 +64,12 @@ impl TestCaseImpl for CoinMergeSplitTest {
         // We on purpose linearize the merge operations, otherwise the primary coin may be locked
         for new_coin in new_coins {
             let coin_to_merge = new_coin.reference.object_id;
-            debug!("Merging coin {} back to {}.", coin_to_merge, primary_coin_id);
-            let response = Self::merge_coin(ctx, signer, primary_coin_id, coin_to_merge, *gas_obj.id()).await;
+            debug!(
+                "Merging coin {} back to {}.",
+                coin_to_merge, primary_coin_id
+            );
+            let response =
+                Self::merge_coin(ctx, signer, primary_coin_id, coin_to_merge, *gas_obj.id()).await;
             debug!("Verifying the merged coin {} is deleted.", coin_to_merge);
             coins_merged.push(coin_to_merge);
             txes.push(response.digest);
@@ -91,7 +94,10 @@ impl TestCaseImpl for CoinMergeSplitTest {
         .collect::<Vec<_>>();
 
         // Owner still owns the primary coin
-        debug!("Verifying owner still owns the primary coin {}", *primary_coin.id());
+        debug!(
+            "Verifying owner still owns the primary coin {}",
+            *primary_coin.id()
+        );
         let primary_after_merge = ObjectChecker::new(primary_coin_id)
             .owner(Owner::AddressOwner(ctx.get_wallet_address()))
             .check_into_gas_coin(ctx.get_fullnode_client())
@@ -115,9 +121,18 @@ impl CoinMergeSplitTest {
         coin_to_merge: ObjectID,
         gas_obj_id: ObjectID,
     ) -> SuiTransactionBlockResponse {
-        let params = rpc_params![signer, primary_coin, coin_to_merge, Some(gas_obj_id), (20_000_000).to_string()];
+        let params = rpc_params![
+            signer,
+            primary_coin,
+            coin_to_merge,
+            Some(gas_obj_id),
+            (20_000_000).to_string()
+        ];
 
-        let data = ctx.build_transaction_remotely("unsafe_mergeCoins", params).await.unwrap();
+        let data = ctx
+            .build_transaction_remotely("unsafe_mergeCoins", params)
+            .await
+            .unwrap();
 
         ctx.sign_and_execute(data, "coin merge").await
     }
@@ -129,9 +144,18 @@ impl CoinMergeSplitTest {
         amounts: Vec<BigInt<u64>>,
         gas_obj_id: ObjectID,
     ) -> SuiTransactionBlockResponse {
-        let params = rpc_params![signer, primary_coin, amounts, Some(gas_obj_id), (20_000_000).to_string()];
+        let params = rpc_params![
+            signer,
+            primary_coin,
+            amounts,
+            Some(gas_obj_id),
+            (20_000_000).to_string()
+        ];
 
-        let data = ctx.build_transaction_remotely("unsafe_splitCoin", params).await.unwrap();
+        let data = ctx
+            .build_transaction_remotely("unsafe_splitCoin", params)
+            .await
+            .unwrap();
 
         ctx.sign_and_execute(data, "coin merge").await
     }

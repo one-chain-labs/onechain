@@ -2,7 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_command_line_common::testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT};
+use move_command_line_common::testing::{
+    add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT,
+};
 use move_unit_test::{self, UnitTestingConfig};
 use regex::RegexBuilder;
 use std::{
@@ -40,14 +42,19 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
         gas_limit: Some(1000),
         source_files,
         dep_files: move_stdlib::move_stdlib_files(),
-        named_address_values: move_stdlib::move_stdlib_named_addresses().into_iter().collect(),
+        named_address_values: move_stdlib::move_stdlib_named_addresses()
+            .into_iter()
+            .collect(),
         report_stacktrace_on_abort: true,
         deterministic_generation: true,
 
         ..UnitTestingConfig::default_with_bound(None)
     };
 
-    let regex = RegexBuilder::new(r"(┌─ ).+/([^/]+)$").multi_line(true).build().unwrap();
+    let regex = RegexBuilder::new(r"(┌─ ).+/([^/]+)$")
+        .multi_line(true)
+        .build()
+        .unwrap();
 
     for ((buffer, _), exp_path) in run_test_with_modifiers(unit_test_config, path)? {
         let base_output = String::from_utf8(buffer)?;
@@ -61,8 +68,11 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
         if exp_exists {
             let expected = fs::read_to_string(&exp_path)?;
             if expected != cleaned_output {
-                let msg =
-                    format!("Expected outputs differ for {:?}:\n{}", exp_path, format_diff(expected, cleaned_output));
+                let msg = format!(
+                    "Expected outputs differ for {:?}:\n{}",
+                    exp_path,
+                    format_diff(expected, cleaned_output)
+                );
                 anyhow::bail!(add_update_baseline_fix(msg));
             }
         } else {

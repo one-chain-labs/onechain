@@ -4,11 +4,11 @@
 // Tests that overload monitor only starts on validators.
 #[cfg(msim)]
 mod simtests {
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    };
-    use sui_macros::{register_fail_point, sim_test};
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
+    use sui_macros::register_fail_point;
+    use sui_macros::sim_test;
     use test_cluster::TestClusterBuilder;
 
     #[sim_test]
@@ -26,10 +26,15 @@ mod simtests {
         // the number of validators.
         let test_cluster = TestClusterBuilder::new().build().await;
         let nodes_with_overload_monitor = counter.load(Ordering::SeqCst);
-        assert_eq!(nodes_with_overload_monitor, test_cluster.swarm.validator_node_handles().len());
+        assert_eq!(
+            nodes_with_overload_monitor,
+            test_cluster.swarm.validator_node_handles().len()
+        );
 
         // Tests (indirectly) that fullnodes don't run overload monitor.
-        assert!(test_cluster.swarm.all_nodes().collect::<Vec<_>>().len() > nodes_with_overload_monitor);
+        assert!(
+            test_cluster.swarm.all_nodes().collect::<Vec<_>>().len() > nodes_with_overload_monitor
+        );
     }
 }
 

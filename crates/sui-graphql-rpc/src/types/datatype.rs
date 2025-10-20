@@ -3,12 +3,10 @@
 
 use async_graphql::*;
 
-use super::{
-    move_enum::MoveEnum,
-    move_module::MoveModule,
-    move_struct::{MoveStruct, MoveStructTypeParameter},
-    open_move_type::MoveAbility,
-};
+use super::move_enum::MoveEnum;
+use super::move_module::MoveModule;
+use super::move_struct::{MoveStruct, MoveStructTypeParameter};
+use super::open_move_type::MoveAbility;
 
 /// Interface implemented by all GraphQL types that represent a Move datatype (either structs or
 /// enums). This interface is used to provide a way to access fields that are shared by both
@@ -17,9 +15,17 @@ use super::{
 #[derive(Interface)]
 #[graphql(
     name = "IMoveDatatype",
-    field(name = "module", ty = "MoveModule", desc = "The module that the datatype belongs to."),
+    field(
+        name = "module",
+        ty = "MoveModule",
+        desc = "The module that the datatype belongs to."
+    ),
     field(name = "name", ty = "String", desc = "The name of the datatype."),
-    field(name = "abilities", ty = "Option<&Vec<MoveAbility>>", desc = "The abilities of the datatype."),
+    field(
+        name = "abilities",
+        ty = "Option<&Vec<MoveAbility>>",
+        desc = "The abilities of the datatype."
+    ),
     field(
         name = "type_parameters",
         ty = "Option<&Vec<MoveStructTypeParameter>>",
@@ -63,7 +69,10 @@ impl MoveDatatype {
         }
     }
 
-    async fn type_parameters(&self, ctx: &Context<'_>) -> Result<Option<&Vec<MoveStructTypeParameter>>> {
+    async fn type_parameters(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<&Vec<MoveStructTypeParameter>>> {
         match self {
             MoveDatatype::Struct(s) => s.type_parameters(ctx).await,
             MoveDatatype::Enum(e) => e.type_parameters(ctx).await,

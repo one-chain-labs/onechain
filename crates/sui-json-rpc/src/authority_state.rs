@@ -16,30 +16,24 @@ use sui_core::{
     subscription_handler::SubscriptionHandler,
 };
 use sui_json_rpc_types::{
-    Coin as SuiCoin,
-    DevInspectResults,
-    DryRunTransactionBlockResponse,
-    EventFilter,
-    SuiEvent,
-    SuiObjectDataFilter,
-    TransactionFilter,
+    Coin as SuiCoin, DevInspectResults, DryRunTransactionBlockResponse, EventFilter, SuiEvent,
+    SuiObjectDataFilter, TransactionFilter,
 };
-use sui_storage::key_value_store::{KVStoreTransactionData, TransactionKeyValueStore, TransactionKeyValueStoreTrait};
+use sui_storage::key_value_store::{
+    KVStoreTransactionData, TransactionKeyValueStore, TransactionKeyValueStoreTrait,
+};
 use sui_types::{
     base_types::{MoveObjectType, ObjectID, ObjectInfo, ObjectRef, SequenceNumber, SuiAddress},
     bridge::Bridge,
     committee::{Committee, EpochId},
-    digests::{ChainIdentifier, TransactionDigest, TransactionEventsDigest},
+    digests::{ChainIdentifier, TransactionDigest},
     dynamic_field::DynamicFieldInfo,
     effects::TransactionEffects,
     error::{SuiError, UserInputError},
     event::EventID,
     governance::StakedOct,
     messages_checkpoint::{
-        CheckpointContents,
-        CheckpointContentsDigest,
-        CheckpointDigest,
-        CheckpointSequenceNumber,
+        CheckpointContents, CheckpointContentsDigest, CheckpointDigest, CheckpointSequenceNumber,
         VerifiedCheckpoint,
     },
     object::{Object, ObjectRead, PastObjectRead},
@@ -66,12 +60,15 @@ pub trait StateRead: Send + Sync {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
     ) -> StateReadResult<KVStoreTransactionData>;
 
     fn get_object_read(&self, object_id: &ObjectID) -> StateReadResult<ObjectRead>;
 
-    fn get_past_object_read(&self, object_id: &ObjectID, version: SequenceNumber) -> StateReadResult<PastObjectRead>;
+    fn get_past_object_read(
+        &self,
+        object_id: &ObjectID,
+        version: SequenceNumber,
+    ) -> StateReadResult<PastObjectRead>;
 
     async fn get_object(&self, object_id: &ObjectID) -> StateReadResult<Option<Object>>;
 
@@ -181,8 +178,15 @@ pub trait StateRead: Send + Sync {
         digest: TransactionDigest,
         kv_store: Arc<TransactionKeyValueStore>,
     ) -> StateReadResult<(Transaction, TransactionEffects)>;
-    async fn get_balance(&self, owner: SuiAddress, coin_type: TypeTag) -> StateReadResult<TotalBalance>;
-    async fn get_all_balance(&self, owner: SuiAddress) -> StateReadResult<Arc<HashMap<TypeTag, TotalBalance>>>;
+    async fn get_balance(
+        &self,
+        owner: SuiAddress,
+        coin_type: TypeTag,
+    ) -> StateReadResult<TotalBalance>;
+    async fn get_all_balance(
+        &self,
+        owner: SuiAddress,
+    ) -> StateReadResult<Arc<HashMap<TypeTag, TotalBalance>>>;
 
     // read_api
     fn get_verified_checkpoint_by_sequence_number(
@@ -190,10 +194,15 @@ pub trait StateRead: Send + Sync {
         sequence_number: CheckpointSequenceNumber,
     ) -> StateReadResult<VerifiedCheckpoint>;
 
-    fn get_checkpoint_contents(&self, digest: CheckpointContentsDigest) -> StateReadResult<CheckpointContents>;
+    fn get_checkpoint_contents(
+        &self,
+        digest: CheckpointContentsDigest,
+    ) -> StateReadResult<CheckpointContents>;
 
-    fn get_verified_checkpoint_summary_by_digest(&self, digest: CheckpointDigest)
-        -> StateReadResult<VerifiedCheckpoint>;
+    fn get_verified_checkpoint_summary_by_digest(
+        &self,
+        digest: CheckpointDigest,
+    ) -> StateReadResult<VerifiedCheckpoint>;
 
     fn deprecated_multi_get_transaction_checkpoint(
         &self,
@@ -228,9 +237,15 @@ impl StateRead for AuthorityState {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
     ) -> StateReadResult<KVStoreTransactionData> {
-        Ok(<AuthorityState as TransactionKeyValueStoreTrait>::multi_get(self, transactions, effects, events).await?)
+        Ok(
+            <AuthorityState as TransactionKeyValueStoreTrait>::multi_get(
+                self,
+                transactions,
+                effects,
+            )
+            .await?,
+        )
     }
 
     fn get_object_read(&self, object_id: &ObjectID) -> StateReadResult<ObjectRead> {
@@ -241,7 +256,11 @@ impl StateRead for AuthorityState {
         Ok(self.get_object(object_id).await)
     }
 
-    fn get_past_object_read(&self, object_id: &ObjectID, version: SequenceNumber) -> StateReadResult<PastObjectRead> {
+    fn get_past_object_read(
+        &self,
+        object_id: &ObjectID,
+        version: SequenceNumber,
+    ) -> StateReadResult<PastObjectRead> {
         Ok(self.get_past_object_read(object_id, version)?)
     }
 
@@ -276,7 +295,9 @@ impl StateRead for AuthorityState {
         cursor: Option<ObjectID>,
         filter: Option<SuiObjectDataFilter>,
     ) -> StateReadResult<Vec<ObjectInfo>> {
-        Ok(self.get_owner_objects_iterator(owner, cursor, filter)?.collect())
+        Ok(self
+            .get_owner_objects_iterator(owner, cursor, filter)?
+            .collect())
     }
 
     async fn query_events(
@@ -288,7 +309,9 @@ impl StateRead for AuthorityState {
         limit: usize,
         descending: bool,
     ) -> StateReadResult<Vec<SuiEvent>> {
-        Ok(self.query_events(kv_store, query, cursor, limit, descending).await?)
+        Ok(self
+            .query_events(kv_store, query, cursor, limit, descending)
+            .await?)
     }
 
     #[allow(clippy::type_complexity)]
@@ -302,7 +325,9 @@ impl StateRead for AuthorityState {
         TransactionEffects,
         Option<ObjectID>,
     )> {
-        Ok(self.dry_exec_transaction(transaction, transaction_digest).await?)
+        Ok(self
+            .dry_exec_transaction(transaction, transaction_digest)
+            .await?)
     }
 
     async fn dev_inspect_transaction_block(
@@ -352,7 +377,9 @@ impl StateRead for AuthorityState {
         limit: Option<usize>,
         reverse: bool,
     ) -> StateReadResult<Vec<TransactionDigest>> {
-        Ok(self.get_transactions(kv_store, filter, cursor, limit, reverse).await?)
+        Ok(self
+            .get_transactions(kv_store, filter, cursor, limit, reverse)
+            .await?)
     }
 
     fn get_dynamic_field_object_id(
@@ -366,25 +393,30 @@ impl StateRead for AuthorityState {
     }
 
     async fn get_staked_oct(&self, owner: SuiAddress) -> StateReadResult<Vec<StakedOct>> {
-        Ok(self.get_move_objects(owner, MoveObjectType::staked_oct()).await?)
+        Ok(self
+            .get_move_objects(owner, MoveObjectType::staked_oct())
+            .await?)
     }
-
     fn get_system_state(&self) -> StateReadResult<SuiSystemState> {
-        Ok(self.get_object_cache_reader().get_sui_system_state_object_unsafe()?)
+        Ok(self
+            .get_object_cache_reader()
+            .get_sui_system_state_object_unsafe()?)
     }
-
     fn get_or_latest_committee(&self, epoch: Option<BigInt<u64>>) -> StateReadResult<Committee> {
-        Ok(self.committee_store().get_or_latest_committee(epoch.map(|e| *e))?)
+        Ok(self
+            .committee_store()
+            .get_or_latest_committee(epoch.map(|e| *e))?)
     }
 
     fn get_bridge(&self) -> StateReadResult<Bridge> {
-        self.get_cache_reader().get_bridge_object_unsafe().map_err(|err| err.into())
+        self.get_cache_reader()
+            .get_bridge_object_unsafe()
+            .map_err(|err| err.into())
     }
 
     fn find_publish_txn_digest(&self, package_id: ObjectID) -> StateReadResult<TransactionDigest> {
         Ok(self.find_publish_txn_digest(package_id)?)
     }
-
     fn get_owned_coins(
         &self,
         owner: SuiAddress,
@@ -410,15 +442,34 @@ impl StateRead for AuthorityState {
         digest: TransactionDigest,
         kv_store: Arc<TransactionKeyValueStore>,
     ) -> StateReadResult<(Transaction, TransactionEffects)> {
-        Ok(self.get_executed_transaction_and_effects(digest, kv_store).await?)
+        Ok(self
+            .get_executed_transaction_and_effects(digest, kv_store)
+            .await?)
     }
 
-    async fn get_balance(&self, owner: SuiAddress, coin_type: TypeTag) -> StateReadResult<TotalBalance> {
-        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_balance(owner, coin_type).await?)
+    async fn get_balance(
+        &self,
+        owner: SuiAddress,
+        coin_type: TypeTag,
+    ) -> StateReadResult<TotalBalance> {
+        Ok(self
+            .indexes
+            .as_ref()
+            .ok_or(SuiError::IndexStoreNotAvailable)?
+            .get_balance(owner, coin_type)
+            .await?)
     }
 
-    async fn get_all_balance(&self, owner: SuiAddress) -> StateReadResult<Arc<HashMap<TypeTag, TotalBalance>>> {
-        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_all_balance(owner).await?)
+    async fn get_all_balance(
+        &self,
+        owner: SuiAddress,
+    ) -> StateReadResult<Arc<HashMap<TypeTag, TotalBalance>>> {
+        Ok(self
+            .indexes
+            .as_ref()
+            .ok_or(SuiError::IndexStoreNotAvailable)?
+            .get_all_balance(owner)
+            .await?)
     }
 
     fn get_verified_checkpoint_by_sequence_number(
@@ -428,7 +479,10 @@ impl StateRead for AuthorityState {
         Ok(self.get_verified_checkpoint_by_sequence_number(sequence_number)?)
     }
 
-    fn get_checkpoint_contents(&self, digest: CheckpointContentsDigest) -> StateReadResult<CheckpointContents> {
+    fn get_checkpoint_contents(
+        &self,
+        digest: CheckpointContentsDigest,
+    ) -> StateReadResult<CheckpointContents> {
         Ok(self.get_checkpoint_contents(digest)?)
     }
 
@@ -443,14 +497,18 @@ impl StateRead for AuthorityState {
         &self,
         digests: &[TransactionDigest],
     ) -> StateReadResult<Vec<Option<(EpochId, CheckpointSequenceNumber)>>> {
-        Ok(self.get_checkpoint_cache().deprecated_multi_get_transaction_checkpoint(digests))
+        Ok(self
+            .get_checkpoint_cache()
+            .deprecated_multi_get_transaction_checkpoint(digests))
     }
 
     fn deprecated_get_transaction_checkpoint(
         &self,
         digest: &TransactionDigest,
     ) -> StateReadResult<Option<(EpochId, CheckpointSequenceNumber)>> {
-        Ok(self.get_checkpoint_cache().deprecated_get_transaction_checkpoint(digest))
+        Ok(self
+            .get_checkpoint_cache()
+            .deprecated_get_transaction_checkpoint(digest))
     }
 
     fn multi_get_checkpoint_by_sequence_number(
@@ -476,7 +534,9 @@ impl StateRead for AuthorityState {
     }
 
     fn get_chain_identifier(&self) -> StateReadResult<ChainIdentifier> {
-        Ok(self.get_chain_identifier().ok_or(anyhow!("Chain identifier not found"))?)
+        Ok(self
+            .get_chain_identifier()
+            .ok_or(anyhow!("Chain identifier not found"))?)
     }
 }
 
@@ -486,7 +546,11 @@ impl StateRead for AuthorityState {
 impl<S: ?Sized + StateRead> ObjectProvider for Arc<S> {
     type Error = StateReadError;
 
-    async fn get_object(&self, id: &ObjectID, version: &SequenceNumber) -> Result<Object, Self::Error> {
+    async fn get_object(
+        &self,
+        id: &ObjectID,
+        version: &SequenceNumber,
+    ) -> Result<Object, Self::Error> {
         Ok(self.get_past_object_read(id, *version)?.into_object()?)
     }
 
@@ -495,7 +559,9 @@ impl<S: ?Sized + StateRead> ObjectProvider for Arc<S> {
         id: &ObjectID,
         version: &SequenceNumber,
     ) -> Result<Option<Object>, Self::Error> {
-        Ok(self.get_cache_reader().find_object_lt_or_eq_version(*id, *version))
+        Ok(self
+            .get_cache_reader()
+            .find_object_lt_or_eq_version(*id, *version))
     }
 }
 
@@ -503,7 +569,11 @@ impl<S: ?Sized + StateRead> ObjectProvider for Arc<S> {
 impl<S: ?Sized + StateRead> ObjectProvider for (Arc<S>, Arc<TransactionKeyValueStore>) {
     type Error = StateReadError;
 
-    async fn get_object(&self, id: &ObjectID, version: &SequenceNumber) -> Result<Object, Self::Error> {
+    async fn get_object(
+        &self,
+        id: &ObjectID,
+        version: &SequenceNumber,
+    ) -> Result<Object, Self::Error> {
         let object_read = self.0.get_past_object_read(id, *version)?;
         match object_read {
             PastObjectRead::ObjectNotExists(_) | PastObjectRead::VersionNotFound(..) => {
@@ -521,7 +591,10 @@ impl<S: ?Sized + StateRead> ObjectProvider for (Arc<S>, Arc<TransactionKeyValueS
         id: &ObjectID,
         version: &SequenceNumber,
     ) -> Result<Option<Object>, Self::Error> {
-        Ok(self.0.get_cache_reader().find_object_lt_or_eq_version(*id, *version))
+        Ok(self
+            .0
+            .get_cache_reader()
+            .find_object_lt_or_eq_version(*id, *version))
     }
 }
 

@@ -5,27 +5,28 @@ use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
 use diesel_async::RunQueryDsl;
-use sui_indexer_alt_framework::{
-    db,
-    pipeline::{concurrent::Handler, Processor},
-};
+use sui_indexer_alt_framework::pipeline::{concurrent::Handler, Processor};
+use sui_indexer_alt_schema::{epochs::StoredEpochStart, schema::kv_epoch_starts};
+use sui_pg_db as db;
 use sui_types::{
     full_checkpoint_content::CheckpointData,
     sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
     transaction::{TransactionDataAPI, TransactionKind},
 };
 
-use crate::{models::epochs::StoredEpochStart, schema::kv_epoch_starts};
-
 pub(crate) struct KvEpochStarts;
 
 impl Processor for KvEpochStarts {
-    type Value = StoredEpochStart;
-
     const NAME: &'static str = "kv_epoch_starts";
 
+    type Value = StoredEpochStart;
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData { checkpoint_summary, transactions, .. } = checkpoint.as_ref();
+        let CheckpointData {
+            checkpoint_summary,
+            transactions,
+            ..
+        } = checkpoint.as_ref();
 
         // If this is the last checkpoint in the current epoch, it will contain enough information
         // about the start of the next epoch.
@@ -54,7 +55,8 @@ impl Processor for KvEpochStarts {
             cp_lo: checkpoint_summary.sequence_number as i64 + 1,
             start_timestamp_ms: system_state.epoch_start_timestamp_ms() as i64,
             reference_gas_price: system_state.reference_gas_price() as i64,
-            system_state: bcs::to_bytes(&system_state).context("Failed to serialize SystemState")?,
+            system_state: bcs::to_bytes(&system_state)
+                .context("Failed to serialize SystemState")?,
         }])
     }
 }
@@ -64,6 +66,10 @@ impl Handler for KvEpochStarts {
     const MIN_EAGER_ROWS: usize = 1;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(kv_epoch_starts::table).values(values).on_conflict_do_nothing().execute(conn).await?)
+        Ok(diesel::insert_into(kv_epoch_starts::table)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?)
     }
 }

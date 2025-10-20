@@ -4,8 +4,11 @@
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 
 use anyhow::{ensure, Context, Result};
-use db::{Db, DbArgs};
-use diesel_migrations::EmbeddedMigrations;
+use diesel::{
+    migration::{self, Migration, MigrationSource},
+    pg::Pg,
+};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations};
 use ingestion::{client::IngestionClient, ClientArgs, IngestionConfig, IngestionService};
 use metrics::{IndexerMetrics, MetricsService};
 use pipeline::{
@@ -13,19 +16,22 @@ use pipeline::{
     sequential::{self, SequentialConfig},
     Processor,
 };
+use sui_pg_db::{Db, DbArgs};
 use task::graceful_shutdown;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 use watermarks::CommitterWatermark;
 
-pub mod db;
+pub mod handlers;
 pub mod ingestion;
 pub(crate) mod metrics;
 pub mod pipeline;
 pub(crate) mod schema;
 pub mod task;
 pub(crate) mod watermarks;
+
+const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 /// Command-line arguments for the indexer
 #[derive(clap::Args, Debug, Clone)]
@@ -122,16 +128,32 @@ impl Indexer {
         migrations: &'static EmbeddedMigrations,
         cancel: CancellationToken,
     ) -> Result<Self> {
-        let IndexerArgs { first_checkpoint, last_checkpoint, pipeline, skip_watermark, metrics_address } = indexer_args;
+        let IndexerArgs {
+            first_checkpoint,
+            last_checkpoint,
+            pipeline,
+            skip_watermark,
+            metrics_address,
+        } = indexer_args;
 
-        let db = Db::new(db_args).await.context("Failed to connect to database")?;
+        let db = Db::for_write(db_args)
+            .await
+            .context("Failed to connect to database")?;
 
         // At indexer initialization, we ensure that the DB schema is up-to-date.
-        db.run_migrations(migrations).await.context("Failed to run pending migrations")?;
+        db.run_migrations(Self::migrations(migrations))
+            .await
+            .context("Failed to run pending migrations")?;
 
-        let (metrics, metrics_service) = MetricsService::new(metrics_address, db.clone(), cancel.clone())?;
+        let (metrics, metrics_service) =
+            MetricsService::new(metrics_address, db.clone(), cancel.clone())?;
 
-        let ingestion_service = IngestionService::new(client_args, ingestion_config, metrics.clone(), cancel.clone())?;
+        let ingestion_service = IngestionService::new(
+            client_args,
+            ingestion_config,
+            metrics.clone(),
+            cancel.clone(),
+        )?;
 
         Ok(Self {
             db,
@@ -141,7 +163,11 @@ impl Indexer {
             first_checkpoint,
             last_checkpoint,
             skip_watermark,
-            enabled_pipelines: if pipeline.is_empty() { None } else { Some(pipeline.into_iter().collect()) },
+            enabled_pipelines: if pipeline.is_empty() {
+                None
+            } else {
+                Some(pipeline.into_iter().collect())
+            },
             added_pipelines: BTreeSet::new(),
             cancel,
             first_checkpoint_from_watermark: u64::MAX,
@@ -215,7 +241,10 @@ impl Indexer {
         };
 
         if self.skip_watermark {
-            warn!(pipeline = H::NAME, "--skip-watermarks enabled and ignored for sequential pipeline");
+            warn!(
+                pipeline = H::NAME,
+                "--skip-watermarks enabled and ignored for sequential pipeline"
+            );
         }
 
         // For a sequential pipeline, data must be written in the order of checkpoints.
@@ -242,7 +271,10 @@ impl Indexer {
     /// If the watermark does not exist, the override can be anything. If the watermark exists, the
     /// override must not leave any gap in the data: it can be in the past, or at the tip of the
     /// network, but not in the future.
-    fn check_first_checkpoint_consistency<P: Processor>(&self, watermark: &Option<CommitterWatermark>) -> Result<()> {
+    fn check_first_checkpoint_consistency<P: Processor>(
+        &self,
+        watermark: &Option<CommitterWatermark>,
+    ) -> Result<()> {
         if let (Some(watermark), Some(first_checkpoint)) = (watermark, self.first_checkpoint) {
             ensure!(
                 first_checkpoint as i64 <= watermark.checkpoint_hi_inclusive + 1,
@@ -270,11 +302,17 @@ impl Indexer {
             );
         }
 
-        let metrics_handle = self.metrics_service.run().await.context("Failed to start metrics service")?;
+        let metrics_handle = self
+            .metrics_service
+            .run()
+            .await
+            .context("Failed to start metrics service")?;
 
         // If an override has been provided, start ingestion from there, otherwise start ingestion
         // from just after the lowest committer watermark across all enabled pipelines.
-        let first_checkpoint = self.first_checkpoint.unwrap_or(self.first_checkpoint_from_watermark);
+        let first_checkpoint = self
+            .first_checkpoint
+            .unwrap_or(self.first_checkpoint_from_watermark);
 
         let last_checkpoint = self.last_checkpoint.unwrap_or(u64::MAX);
 
@@ -305,12 +343,37 @@ impl Indexer {
         }))
     }
 
+    /// Combine the provided `migrations` with the migrations necessary to set up the indexer
+    /// framework. The returned migration source can be passed to [Db::run_migrations] to ensure
+    /// the database's schema is up-to-date for both the indexer framework and the specific
+    /// indexer.
+    pub fn migrations(
+        migrations: &'static EmbeddedMigrations,
+    ) -> impl MigrationSource<Pg> + Send + Sync + 'static {
+        struct Migrations(&'static EmbeddedMigrations);
+        impl MigrationSource<Pg> for Migrations {
+            fn migrations(&self) -> migration::Result<Vec<Box<dyn Migration<Pg>>>> {
+                let mut migrations = MIGRATIONS.migrations()?;
+                migrations.extend(self.0.migrations()?);
+                Ok(migrations)
+            }
+        }
+
+        Migrations(migrations)
+    }
+
     /// Update the indexer's first checkpoint based on the watermark for the pipeline by adding for
     /// handler `H` (as long as it's enabled). Returns `Ok(None)` if the pipeline is disabled,
     /// `Ok(Some(None))` if the pipeline is enabled but its watermark is not found, and
     /// `Ok(Some(Some(watermark)))` if the pipeline is enabled and the watermark is found.
-    async fn add_pipeline<P: Processor + 'static>(&mut self) -> Result<Option<Option<CommitterWatermark<'static>>>> {
-        ensure!(self.added_pipelines.insert(P::NAME), "Pipeline {:?} already added", P::NAME,);
+    async fn add_pipeline<P: Processor + 'static>(
+        &mut self,
+    ) -> Result<Option<Option<CommitterWatermark<'static>>>> {
+        ensure!(
+            self.added_pipelines.insert(P::NAME),
+            "Pipeline {:?} already added",
+            P::NAME,
+        );
 
         if let Some(enabled_pipelines) = &mut self.enabled_pipelines {
             if !enabled_pipelines.remove(P::NAME) {

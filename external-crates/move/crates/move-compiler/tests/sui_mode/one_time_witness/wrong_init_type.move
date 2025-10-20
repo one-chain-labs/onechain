@@ -1,7 +1,7 @@
 // invalid, wrong type of the init function's first param
 
 module a::m {
-    use one::tx_context;
+    use sui::tx_context;
 
     struct M has drop { dummy: bool }
     struct N has drop { dummy: bool }
@@ -10,6 +10,6 @@ module a::m {
     }
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

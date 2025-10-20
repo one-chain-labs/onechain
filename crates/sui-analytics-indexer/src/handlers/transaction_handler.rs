@@ -10,12 +10,13 @@ use tokio::sync::Mutex;
 use tracing::error;
 
 use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::{
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    transaction::{Command, TransactionDataAPI, TransactionKind},
-};
+use sui_types::effects::TransactionEffects;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::transaction::{Command, TransactionDataAPI, TransactionKind};
 
-use crate::{handlers::AnalyticsHandler, tables::TransactionEntry, FileType};
+use crate::handlers::AnalyticsHandler;
+use crate::tables::TransactionEntry;
+use crate::FileType;
 
 pub struct TransactionHandler {
     pub(crate) state: Mutex<State>,
@@ -30,7 +31,11 @@ impl Worker for TransactionHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
+        let CheckpointData {
+            checkpoint_summary,
+            transactions: checkpoint_transactions,
+            ..
+        } = checkpoint_data;
         let mut state = self.state.lock().await;
         for checkpoint_transaction in checkpoint_transactions {
             self.process_transaction(
@@ -66,10 +71,11 @@ impl AnalyticsHandler<TransactionEntry> for TransactionHandler {
 
 impl TransactionHandler {
     pub fn new() -> Self {
-        let state = Mutex::new(State { transactions: vec![] });
+        let state = Mutex::new(State {
+            transactions: vec![],
+        });
         TransactionHandler { state }
     }
-
     fn process_transaction(
         &self,
         epoch: u64,
@@ -84,9 +90,15 @@ impl TransactionHandler {
         let gas_object = effects.gas_object();
         let gas_summary = effects.gas_cost_summary();
         let move_calls_vec = txn_data.move_calls();
-        let packages: BTreeSet<_> =
-            move_calls_vec.iter().map(|(package, _, _)| package.to_canonical_string(/* with_prefix */ false)).collect();
-        let packages = packages.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("-");
+        let packages: BTreeSet<_> = move_calls_vec
+            .iter()
+            .map(|(package, _, _)| package.to_canonical_string(/* with_prefix */ false))
+            .collect();
+        let packages = packages
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join("-");
         let transaction_digest = transaction.digest().base58_encode();
 
         let mut transfers: u64 = 0;
@@ -135,12 +147,17 @@ impl TransactionHandler {
             is_sponsored_tx,
             transaction_count: txn_data.kind().num_commands() as u64,
             execution_success: effects.status().is_ok(),
-            input: txn_data.input_objects().expect("Input objects must be valid").len() as u64,
+            input: txn_data
+                .input_objects()
+                .expect("Input objects must be valid")
+                .len() as u64,
             shared_input: txn_data.shared_input_objects().len() as u64,
             gas_coins: txn_data.gas().len() as u64,
             created: effects.created().len() as u64,
             mutated: (effects.mutated().len() + effects.unwrapped().len()) as u64,
-            deleted: (effects.deleted().len() + effects.unwrapped_then_deleted().len() + effects.wrapped().len()) as u64,
+            deleted: (effects.deleted().len()
+                + effects.unwrapped_then_deleted().len()
+                + effects.wrapped().len()) as u64,
             transfers,
             split_coins,
             merge_coins,
@@ -180,7 +197,8 @@ mod tests {
     use fastcrypto::encoding::{Base64, Encoding};
     use simulacrum::Simulacrum;
     use sui_data_ingestion_core::Worker;
-    use sui_types::{base_types::SuiAddress, storage::ReadStore};
+    use sui_types::base_types::SuiAddress;
+    use sui_types::storage::ReadStore;
 
     #[tokio::test]
     pub async fn test_transaction_handler() -> anyhow::Result<()> {
@@ -196,7 +214,8 @@ mod tests {
         let checkpoint = sim.create_checkpoint();
         let checkpoint_data = sim.get_checkpoint_data(
             checkpoint.clone(),
-            sim.get_checkpoint_contents_by_digest(&checkpoint.content_digest).unwrap(),
+            sim.get_checkpoint_contents_by_digest(&checkpoint.content_digest)
+                .unwrap(),
         )?;
         let txn_handler = TransactionHandler::new();
         txn_handler.process_checkpoint(&checkpoint_data).await?;
@@ -206,7 +225,10 @@ mod tests {
 
         // Check that the transaction was stored correctly.
         assert_eq!(db_txn.transaction_digest, transaction.digest().to_string());
-        assert_eq!(db_txn.raw_transaction, Base64::encode(bcs::to_bytes(&transaction.transaction_data()).unwrap()));
+        assert_eq!(
+            db_txn.raw_transaction,
+            Base64::encode(bcs::to_bytes(&transaction.transaction_data()).unwrap())
+        );
         assert_eq!(db_txn.epoch, checkpoint.epoch);
         assert_eq!(db_txn.timestamp_ms, checkpoint.timestamp_ms);
         assert_eq!(db_txn.checkpoint, checkpoint.sequence_number);

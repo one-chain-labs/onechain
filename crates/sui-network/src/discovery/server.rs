@@ -33,7 +33,12 @@ impl Discovery for Server {
             .ok_or_else(|| anemo::rpc::Status::internal("own_info has not been initialized yet"))?;
 
         let known_peers = if state.known_peers.len() < MAX_PEERS_TO_SEND {
-            state.known_peers.values().map(|e| e.inner()).cloned().collect()
+            state
+                .known_peers
+                .values()
+                .map(|e| e.inner())
+                .cloned()
+                .collect()
         } else {
             let mut rng = rand::thread_rng();
             // prefer returning peers that we are connected to as they are known-good
@@ -64,9 +69,16 @@ impl Discovery for Server {
                 }
             }
 
-            known_peers.into_values().map(|e| e.inner()).cloned().collect()
+            known_peers
+                .into_values()
+                .map(|e| e.inner())
+                .cloned()
+                .collect()
         };
 
-        Ok(Response::new(GetKnownPeersResponseV2 { own_info, known_peers }))
+        Ok(Response::new(GetKnownPeersResponseV2 {
+            own_info,
+            known_peers,
+        }))
     }
 }

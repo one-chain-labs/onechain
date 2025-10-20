@@ -200,11 +200,15 @@ export interface GetBalanceParams {
 	owner: string;
 	/**
 	 * optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC),
-	 * default to 0x2::oct::OCT if not specified.
+	 * default to 0x2::sui::SUI if not specified.
 	 */
 	coinType?: string | null | undefined;
 }
-/** Return metadata(e.g., symbol, decimals) for a coin */
+/**
+ * Return metadata (e.g., symbol, decimals) for a coin. Note that if the coin's metadata was wrapped in
+ * the transaction that published its marker type, or the latest version of the metadata object is
+ * wrapped or deleted, it will not be found.
+ */
 export interface GetCoinMetadataParams {
 	/** type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC) */
 	coinType: string;
@@ -215,7 +219,7 @@ export interface GetCoinsParams {
 	owner: string;
 	/**
 	 * optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC),
-	 * default to 0x2::oct::OCT if not specified.
+	 * default to 0x2::sui::SUI if not specified.
 	 */
 	coinType?: string | null | undefined;
 	/** optional paging cursor */
@@ -273,7 +277,7 @@ export interface GetStakesParams {
 }
 /** Return one or more [DelegatedStake]. If a Stake was withdrawn its status will be Unstaked. */
 export interface GetStakesByIdsParams {
-	stakedOctIds: string[];
+	stakedSuiIds: string[];
 }
 /** Return total supply for a coin */
 export interface GetTotalSupplyParams {
@@ -484,7 +488,7 @@ export interface UnsafePublishParams {
 export interface UnsafeRequestAddStakeParams {
 	/** the transaction signer's Sui address */
 	signer: string;
-	/** Coin<OCT> object to stake */
+	/** Coin<SUI> object to stake */
 	coins: string[];
 	/** stake amount */
 	amount?: string | null | undefined;
@@ -502,8 +506,8 @@ export interface UnsafeRequestAddStakeParams {
 export interface UnsafeRequestWithdrawStakeParams {
 	/** the transaction signer's Sui address */
 	signer: string;
-	/** StakedOct object ID */
-	stakedOct: string;
+	/** StakedSui object ID */
+	stakedSui: string;
 	/**
 	 * gas object to be used in this transaction, node will pick one from the signer's possession if not
 	 * provided

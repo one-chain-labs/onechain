@@ -3,16 +3,16 @@
 
 #[test_only]
 /// Tests if normally illegal (in terms of Sui bytecode verification) code is allowed in tests.
-module one::verifier_tests {
+module oct::verifier_tests {
     public struct VERIFIER_TESTS has drop {}
 
-    fun init(otw: VERIFIER_TESTS, _: &mut one::tx_context::TxContext) {
-        assert!(one::types::is_one_time_witness(&otw));
+    fun init(otw: VERIFIER_TESTS, _: &mut sui::tx_context::TxContext) {
+        assert!(sui::types::is_one_time_witness(&otw));
     }
 
     #[test]
     fun test_init() {
-        use one::test_scenario;
+        use sui::test_scenario;
         let admin = @0xBABE;
 
         let mut scenario = test_scenario::begin(admin);
@@ -22,7 +22,7 @@ module one::verifier_tests {
     }
 
     fun is_otw(witness: VERIFIER_TESTS): bool {
-        one::types::is_one_time_witness(&witness)
+        sui::types::is_one_time_witness(&witness)
     }
 
     #[test]

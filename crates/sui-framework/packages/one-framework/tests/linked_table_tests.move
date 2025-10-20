@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::linked_table_tests {
-    use one::linked_table::{
+module oct::linked_table_tests {
+    use sui::linked_table::{
         Self,
         LinkedTable,
     };
-    use one::test_scenario;
+    use sui::test_scenario;
 
     #[test]
     fun simple_all_functions() {
@@ -104,7 +104,7 @@ module one::linked_table_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
     fun push_front_duplicate() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -115,7 +115,7 @@ module one::linked_table_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
     fun push_back_duplicate() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -126,7 +126,7 @@ module one::linked_table_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
     fun push_mixed_duplicate() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -137,7 +137,7 @@ module one::linked_table_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
     fun borrow_missing() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -147,7 +147,7 @@ module one::linked_table_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
     fun borrow_mut_missing() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -157,7 +157,7 @@ module one::linked_table_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
     fun remove_missing() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);

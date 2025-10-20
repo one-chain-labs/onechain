@@ -1,21 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::{SequenceNumber, SuiAddress},
-    collection_types::{Bag, Table, VecSet},
-    dynamic_field::get_dynamic_field_from_store,
-    error::{UserInputError, UserInputResult},
-    id::{ID, UID},
-    object::{Object, Owner},
-    storage::ObjectStore,
-    transaction::{CheckedInputObjects, ReceivingObjects},
-    SUI_DENY_LIST_OBJECT_ID,
-};
-use move_core_types::{ident_str, identifier::IdentStr};
+use crate::base_types::{SequenceNumber, SuiAddress};
+use crate::collection_types::{Bag, Table, VecSet};
+use crate::dynamic_field::get_dynamic_field_from_store;
+use crate::error::{UserInputError, UserInputResult};
+use crate::id::{ID, UID};
+use crate::object::{Object, Owner};
+use crate::storage::ObjectStore;
+use crate::transaction::{CheckedInputObjects, ReceivingObjects};
+use crate::SUI_DENY_LIST_OBJECT_ID;
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use tracing::{debug, error};
+use tracing::debug;
+use tracing::error;
 
 pub const DENY_LIST_MODULE: &IdentStr = ident_str!("deny_list");
 pub const DENY_LIST_CREATE_FUNC: &IdentStr = ident_str!("create");
@@ -74,13 +74,17 @@ pub(crate) fn input_object_coin_types_for_denylist_check(
     input_objects: &CheckedInputObjects,
     receiving_objects: &ReceivingObjects,
 ) -> BTreeSet<String> {
-    let all_objects = input_objects.inner().iter_objects().chain(receiving_objects.iter_objects());
+    let all_objects = input_objects
+        .inner()
+        .iter_objects()
+        .chain(receiving_objects.iter_objects());
     all_objects
         .filter_map(|obj| {
             if obj.is_gas_coin() {
                 None
             } else {
-                obj.coin_type_maybe().map(|type_tag| type_tag.to_canonical_string(false))
+                obj.coin_type_maybe()
+                    .map(|type_tag| type_tag.to_canonical_string(false))
             }
         })
         .collect()
@@ -92,8 +96,11 @@ fn check_deny_list_v1_impl(
     coin_types: BTreeSet<String>,
     object_store: &dyn ObjectStore,
 ) -> UserInputResult {
-    let Ok(count) = get_dynamic_field_from_store::<SuiAddress, u64>(object_store, deny_list.denied_count.id, &address)
-    else {
+    let Ok(count) = get_dynamic_field_from_store::<SuiAddress, u64>(
+        object_store,
+        deny_list.denied_count.id,
+        &address,
+    ) else {
         return Ok(());
     };
     if count == 0 {
@@ -109,7 +116,10 @@ fn check_deny_list_v1_impl(
         };
         let denied_addresses: BTreeSet<_> = denied_addresses.contents.into_iter().collect();
         if denied_addresses.contains(&address) {
-            debug!("Address {} is denied for coin package {:?}", address, coin_type);
+            debug!(
+                "Address {} is denied for coin package {:?}",
+                address, coin_type
+            );
             return Err(UserInputError::AddressDeniedForCoin { address, coin_type });
         }
     }
@@ -141,8 +151,14 @@ pub fn get_deny_list_root_object(object_store: &dyn ObjectStore) -> Option<Objec
 
 pub fn get_coin_deny_list(object_store: &dyn ObjectStore) -> Option<PerTypeDenyList> {
     get_deny_list_root_object(object_store).and_then(|obj| {
-        let deny_list: DenyList = obj.to_rust().expect("DenyList object type must be consistent");
-        match get_dynamic_field_from_store(object_store, *deny_list.lists.id.object_id(), &DENY_LIST_COIN_TYPE_INDEX) {
+        let deny_list: DenyList = obj
+            .to_rust()
+            .expect("DenyList object type must be consistent");
+        match get_dynamic_field_from_store(
+            object_store,
+            *deny_list.lists.id.object_id(),
+            &DENY_LIST_COIN_TYPE_INDEX,
+        ) {
             Ok(deny_list) => Some(deny_list),
             Err(err) => {
                 error!("Failed to get deny list inner state: {}", err);
@@ -152,9 +168,13 @@ pub fn get_coin_deny_list(object_store: &dyn ObjectStore) -> Option<PerTypeDenyL
     })
 }
 
-pub fn get_deny_list_obj_initial_shared_version(object_store: &dyn ObjectStore) -> Option<SequenceNumber> {
+pub fn get_deny_list_obj_initial_shared_version(
+    object_store: &dyn ObjectStore,
+) -> Option<SequenceNumber> {
     get_deny_list_root_object(object_store).map(|obj| match obj.owner {
-        Owner::Shared { initial_shared_version } => initial_shared_version,
+        Owner::Shared {
+            initial_shared_version,
+        } => initial_shared_version,
         _ => unreachable!("Deny list object must be shared"),
     })
 }

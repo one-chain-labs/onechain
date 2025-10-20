@@ -4,21 +4,20 @@
 use std::sync::Arc;
 
 use super::to_signing_message;
+use crate::crypto::DefaultHash;
+use crate::passkey_authenticator::{PasskeyAuthenticator, RawPasskeyAuthenticator};
 use crate::{
     base_types::{dbg_addr, ObjectID, SuiAddress},
-    crypto::{DefaultHash, PublicKey, Signature, SignatureScheme},
+    crypto::{PublicKey, Signature, SignatureScheme},
     error::SuiError,
     object::Object,
-    passkey_authenticator::{PasskeyAuthenticator, RawPasskeyAuthenticator},
     signature::GenericSignature,
     signature_verification::VerifiedDigestCache,
     transaction::{TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
 };
-use fastcrypto::{
-    hash::HashFunction,
-    rsa::{Base64UrlUnpadded, Encoding as _},
-    traits::ToFromBytes,
-};
+use fastcrypto::hash::HashFunction;
+use fastcrypto::rsa::{Base64UrlUnpadded, Encoding as _};
+use fastcrypto::traits::ToFromBytes;
 use p256::pkcs8::DecodePublicKey;
 use passkey_authenticator::{Authenticator, UserValidationMethod};
 use passkey_client::Client;
@@ -26,19 +25,12 @@ use passkey_types::{
     ctap2::Aaguid,
     rand::random_vec,
     webauthn::{
-        AttestationConveyancePreference,
-        CredentialCreationOptions,
-        CredentialRequestOptions,
-        PublicKeyCredentialCreationOptions,
-        PublicKeyCredentialParameters,
-        PublicKeyCredentialRequestOptions,
-        PublicKeyCredentialRpEntity,
-        PublicKeyCredentialType,
-        PublicKeyCredentialUserEntity,
-        UserVerificationRequirement,
+        AttestationConveyancePreference, CredentialCreationOptions, CredentialRequestOptions,
+        PublicKeyCredentialCreationOptions, PublicKeyCredentialParameters,
+        PublicKeyCredentialRequestOptions, PublicKeyCredentialRpEntity, PublicKeyCredentialType,
+        PublicKeyCredentialUserEntity, UserVerificationRequirement,
     },
-    Bytes,
-    Passkey,
+    Bytes, Passkey,
 };
 use shared_crypto::intent::{Intent, IntentMessage};
 use url::Url;
@@ -89,9 +81,14 @@ async fn create_credential_and_sign_test_tx(
 
     // Create credential with the request option.
     let my_webauthn_credential = my_client.register(origin, request, None).await.unwrap();
-    let verifying_key =
-        p256::ecdsa::VerifyingKey::from_public_key_der(my_webauthn_credential.response.public_key.unwrap().as_slice())
-            .unwrap();
+    let verifying_key = p256::ecdsa::VerifyingKey::from_public_key_der(
+        my_webauthn_credential
+            .response
+            .public_key
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
 
     // Derive its compact pubkey from DER format.
     let encoded_point = verifying_key.to_encoded_point(false);
@@ -102,7 +99,7 @@ async fn create_credential_and_sign_test_tx(
     pk_bytes.extend_from_slice(x.unwrap());
     let pk = PublicKey::try_from_bytes(SignatureScheme::PasskeyAuthenticator, &pk_bytes).unwrap();
 
-    // Derives its OneChain address and make a test transaction with it as sender.
+    // Derives its sui address and make a test transaction with it as sender.
     let sender = SuiAddress::from(&pk);
     let recipient = dbg_addr(2);
     let object_id = ObjectID::ZERO;
@@ -136,7 +133,10 @@ async fn create_credential_and_sign_test_tx(
         },
     };
 
-    let authenticated_cred = my_client.authenticate(origin, credential_request, None).await.unwrap();
+    let authenticated_cred = my_client
+        .authenticate(origin, credential_request, None)
+        .await
+        .unwrap();
 
     // Parse the response, gets the signature from der format and normalize it to lower s.
     let sig_bytes_der = authenticated_cred.response.signature.as_slice();
@@ -254,7 +254,12 @@ async fn test_passkey_fails_invalid_json() {
     };
     let res: Result<PasskeyAuthenticator, SuiError> = raw.try_into();
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid client data json".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid client data json".to_string()
+        }
+    );
     const CORRECT_LEN: usize = DefaultHash::OUTPUT_SIZE;
     let client_data_json_too_short = format!(
         r#"{{"type":"webauthn.get", "challenge":"{}","origin":"http://localhost:5173","crossOrigin":false, "unknown": "unknown"}}"#,
@@ -306,7 +311,12 @@ async fn test_passkey_fails_invalid_challenge() {
     };
     let res: Result<PasskeyAuthenticator, SuiError> = raw.try_into();
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid encoded challenge".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid encoded challenge".to_string()
+        }
+    );
 }
 
 #[tokio::test]
@@ -322,7 +332,12 @@ async fn test_passkey_fails_wrong_client_data_type() {
     };
     let res: Result<PasskeyAuthenticator, SuiError> = raw.try_into();
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid client data type".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid client data type".to_string()
+        }
+    );
 }
 
 // #[tokio::test]

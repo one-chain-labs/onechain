@@ -8,26 +8,10 @@ use inline_colorization as IC;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::{
     file_format::{
-        Ability,
-        AbilitySet,
-        Bytecode,
-        CodeUnit,
-        Constant,
-        DatatypeTyParameter,
-        EnumDefinitionIndex,
-        FieldHandleIndex,
-        FunctionDefinitionIndex,
-        FunctionHandle,
-        JumpTableInner,
-        ModuleHandle,
-        Signature,
-        SignatureIndex,
-        SignatureToken,
-        StructDefinitionIndex,
-        StructFieldInformation,
-        TableIndex,
-        TypeSignature,
-        Visibility,
+        Ability, AbilitySet, Bytecode, CodeUnit, Constant, DatatypeTyParameter,
+        EnumDefinitionIndex, FieldHandleIndex, FunctionDefinitionIndex, FunctionHandle,
+        JumpTableInner, ModuleHandle, Signature, SignatureIndex, SignatureToken,
+        StructDefinitionIndex, StructFieldInformation, TableIndex, TypeSignature, Visibility,
     },
     CompiledModule,
 };
@@ -175,7 +159,12 @@ impl<'a> Disassembler<'a> {
                 })
                 .or_insert(0);
         }
-        Self { source_mapper, options, coverage_map: None, module_aliases }
+        Self {
+            source_mapper,
+            options,
+            coverage_map: None,
+            module_aliases,
+        }
     }
 
     pub fn from_module(module: &'a CompiledModule, default_loc: Loc) -> Result<Self> {
@@ -190,7 +179,10 @@ impl<'a> Disassembler<'a> {
         let mut options = DisassemblerOptions::new();
         options.print_code = true;
         options.max_output_size = max_size;
-        Ok(Self::new(SourceMapping::new_without_source_map(module, default_loc)?, options))
+        Ok(Self::new(
+            SourceMapping::new_without_source_map(module, default_loc)?,
+            options,
+        ))
     }
 
     pub fn from_unit(unit: &'a CompiledUnit) -> Self {
@@ -208,8 +200,11 @@ impl<'a> Disassembler<'a> {
     pub fn disassemble(&self) -> Result<String> {
         let mut buffer = String::new();
         if let Some(budget) = self.options.max_output_size {
-            self.print_module(&mut BoundedBuffer { buf: &mut buffer, budget })
-                .map_err(|e| anyhow::anyhow!("{e}: Module exceeded max allowed disassembly size"))?;
+            self.print_module(&mut BoundedBuffer {
+                buf: &mut buffer,
+                budget,
+            })
+            .map_err(|e| anyhow::anyhow!("{e}: Module exceeded max allowed disassembly size"))?;
         } else {
             self.print_module(&mut buffer)?;
         };
@@ -280,7 +275,11 @@ impl<'a> Disassembler<'a> {
 
     fn print_constants(&self, buffer: &mut impl Write) -> Result<()> {
         delimited_list(
-            self.source_mapper.bytecode.constant_pool().iter().enumerate(),
+            self.source_mapper
+                .bytecode
+                .constant_pool()
+                .iter()
+                .enumerate(),
             "Constants [\n",
             "",
             "]\n",
@@ -299,27 +298,45 @@ impl<'a> Disassembler<'a> {
 
     // The struct defs will filter out the structs that we print to only be the ones that are
     // defined in the module in question.
-    fn disassemble_struct_def(&self, buffer: &mut impl Write, struct_def_idx: StructDefinitionIndex) -> Result<()> {
+    fn disassemble_struct_def(
+        &self,
+        buffer: &mut impl Write,
+        struct_def_idx: StructDefinitionIndex,
+    ) -> Result<()> {
         let struct_definition = self.source_mapper.bytecode.struct_def_at(struct_def_idx);
-        let struct_handle = self.source_mapper.bytecode.datatype_handle_at(struct_definition.struct_handle);
-        let struct_source_map = self.source_mapper.source_map.get_struct_source_map(struct_def_idx)?;
+        let struct_handle = self
+            .source_mapper
+            .bytecode
+            .datatype_handle_at(struct_definition.struct_handle);
+        let struct_source_map = self
+            .source_mapper
+            .source_map
+            .get_struct_source_map(struct_def_idx)?;
 
-        let field_info: Option<Vec<(&IdentStr, &TypeSignature)>> = match &struct_definition.field_information {
-            StructFieldInformation::Native => None,
-            StructFieldInformation::Declared(fields) => Some(
-                fields
-                    .iter()
-                    .map(|field_definition| {
-                        let type_sig = &field_definition.signature;
-                        let field_name = self.source_mapper.bytecode.identifier_at(field_definition.name);
-                        (field_name, type_sig)
-                    })
-                    .collect(),
-            ),
-        };
+        let field_info: Option<Vec<(&IdentStr, &TypeSignature)>> =
+            match &struct_definition.field_information {
+                StructFieldInformation::Native => None,
+                StructFieldInformation::Declared(fields) => Some(
+                    fields
+                        .iter()
+                        .map(|field_definition| {
+                            let type_sig = &field_definition.signature;
+                            let field_name = self
+                                .source_mapper
+                                .bytecode
+                                .identifier_at(field_definition.name);
+                            (field_name, type_sig)
+                        })
+                        .collect(),
+                ),
+            };
 
         let native = if field_info.is_none() { "native " } else { "" };
-        let name = self.source_mapper.bytecode.identifier_at(struct_handle.name).to_string();
+        let name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(struct_handle.name)
+            .to_string();
 
         any_write!(buffer, "{native}struct {name}")?;
 
@@ -336,10 +353,22 @@ impl<'a> Disassembler<'a> {
         match field_info {
             None => (),
             Some(field_info) => {
-                delimited_list(&field_info, "\n", ",\n", "", buffer, |buffer, (name, ty)| {
-                    any_write!(buffer, "\t{name}: ")?;
-                    self.disassemble_sig_tok(buffer, &ty.0, None, &struct_source_map.type_parameters)
-                })?;
+                delimited_list(
+                    &field_info,
+                    "\n",
+                    ",\n",
+                    "",
+                    buffer,
+                    |buffer, (name, ty)| {
+                        any_write!(buffer, "\t{name}: ")?;
+                        self.disassemble_sig_tok(
+                            buffer,
+                            &ty.0,
+                            None,
+                            &struct_source_map.type_parameters,
+                        )
+                    },
+                )?;
                 any_writeln!(buffer)?;
             }
         }
@@ -349,33 +378,76 @@ impl<'a> Disassembler<'a> {
         Ok(())
     }
 
-    fn disassemble_enum_def(&self, buffer: &mut impl Write, enum_def_idx: EnumDefinitionIndex) -> Result<()> {
+    fn disassemble_enum_def(
+        &self,
+        buffer: &mut impl Write,
+        enum_def_idx: EnumDefinitionIndex,
+    ) -> Result<()> {
         let enum_definition = self.source_mapper.bytecode.enum_def_at(enum_def_idx);
-        let enum_handle = self.source_mapper.bytecode.datatype_handle_at(enum_definition.enum_handle);
-        let enum_source_map = self.source_mapper.source_map.get_enum_source_map(enum_def_idx)?;
+        let enum_handle = self
+            .source_mapper
+            .bytecode
+            .datatype_handle_at(enum_definition.enum_handle);
+        let enum_source_map = self
+            .source_mapper
+            .source_map
+            .get_enum_source_map(enum_def_idx)?;
 
-        let name = self.source_mapper.bytecode.identifier_at(enum_handle.name).to_string();
+        let name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(enum_handle.name)
+            .to_string();
 
         any_write!(buffer, "enum {name}")?;
 
-        Self::disassemble_datatype_type_formals(buffer, &enum_source_map.type_parameters, &enum_handle.type_parameters)?;
+        Self::disassemble_datatype_type_formals(
+            buffer,
+            &enum_source_map.type_parameters,
+            &enum_handle.type_parameters,
+        )?;
 
         Self::disassemble_abilites(buffer, enum_handle.abilities)?;
 
-        delimited_list(&enum_definition.variants, " {", ",", "\n}\n", buffer, |buffer, variant| {
-            let variant_name = self.source_mapper.bytecode.identifier_at(variant.variant_name);
+        delimited_list(
+            &enum_definition.variants,
+            " {",
+            ",",
+            "\n}\n",
+            buffer,
+            |buffer, variant| {
+                let variant_name = self
+                    .source_mapper
+                    .bytecode
+                    .identifier_at(variant.variant_name);
 
-            any_write!(buffer, "\n\t{variant_name} {{ ")?;
+                any_write!(buffer, "\n\t{variant_name} {{ ")?;
 
-            delimited_list(&variant.fields, "", ", ", "", buffer, |buffer, field_definition| {
-                let type_sig = &field_definition.signature;
-                let field_name = self.source_mapper.bytecode.identifier_at(field_definition.name);
-                any_write!(buffer, "{field_name}: ")?;
-                self.disassemble_sig_tok(buffer, &type_sig.0, None, &enum_source_map.type_parameters)
-            })?;
+                delimited_list(
+                    &variant.fields,
+                    "",
+                    ", ",
+                    "",
+                    buffer,
+                    |buffer, field_definition| {
+                        let type_sig = &field_definition.signature;
+                        let field_name = self
+                            .source_mapper
+                            .bytecode
+                            .identifier_at(field_definition.name);
+                        any_write!(buffer, "{field_name}: ")?;
+                        self.disassemble_sig_tok(
+                            buffer,
+                            &type_sig.0,
+                            None,
+                            &enum_source_map.type_parameters,
+                        )
+                    },
+                )?;
 
-            any_write!(buffer, " }}")
-        })?;
+                any_write!(buffer, " }}")
+            },
+        )?;
 
         Ok(())
     }
@@ -385,12 +457,28 @@ impl<'a> Disassembler<'a> {
         buffer: &mut impl Write,
         function_definition_index: FunctionDefinitionIndex,
     ) -> Result<()> {
-        let function_definition = self.source_mapper.bytecode.function_def_at(function_definition_index);
-        let function_handle = self.source_mapper.bytecode.function_handle_at(function_definition.function);
-        let function_source_map = self.source_mapper.source_map.get_function_source_map(function_definition_index)?;
+        let function_definition = self
+            .source_mapper
+            .bytecode
+            .function_def_at(function_definition_index);
+        let function_handle = self
+            .source_mapper
+            .bytecode
+            .function_handle_at(function_definition.function);
+        let function_source_map = self
+            .source_mapper
+            .source_map
+            .get_function_source_map(function_definition_index)?;
         let parameters = function_handle.parameters;
-        let name = self.source_mapper.bytecode.identifier_at(function_handle.name).to_owned();
-        let function = self.source_mapper.bytecode.function_def_at(function_definition_index);
+        let name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(function_handle.name)
+            .to_owned();
+        let function = self
+            .source_mapper
+            .bytecode
+            .function_def_at(function_definition_index);
         debug_assert_eq!(
             function_source_map.parameters.len(),
             self.source_mapper.bytecode.signature_at(parameters).len(),
@@ -412,7 +500,10 @@ impl<'a> Disassembler<'a> {
         let entry_modifier = if function.is_entry { "entry " } else { "" };
         let native_modifier = if function.is_native() { "native " } else { "" };
 
-        any_write!(buffer, "{entry_modifier}{native_modifier}{visibility_modifier}{name}",)?;
+        any_write!(
+            buffer,
+            "{entry_modifier}{native_modifier}{visibility_modifier}{name}",
+        )?;
 
         Self::disassemble_fun_type_formals(
             buffer,
@@ -423,7 +514,12 @@ impl<'a> Disassembler<'a> {
         any_write!(buffer, "(")?;
 
         delimited_list(
-            self.source_mapper.bytecode.signature_at(parameters).0.iter().zip(function_source_map.parameters.iter()),
+            self.source_mapper
+                .bytecode
+                .signature_at(parameters)
+                .0
+                .iter()
+                .zip(function_source_map.parameters.iter()),
             "",
             ", ",
             "",
@@ -437,12 +533,18 @@ impl<'a> Disassembler<'a> {
         any_write!(buffer, ")")?;
 
         delimited_list(
-            &self.source_mapper.bytecode.signature_at(function_handle.return_).0,
+            &self
+                .source_mapper
+                .bytecode
+                .signature_at(function_handle.return_)
+                .0,
             ": ",
             " * ",
             "",
             buffer,
-            |buffer, tok| self.disassemble_sig_tok(buffer, tok, None, &function_source_map.type_parameters),
+            |buffer, tok| {
+                self.disassemble_sig_tok(buffer, tok, None, &function_source_map.type_parameters)
+            },
         )?;
 
         let Some(code) = &function.code else {
@@ -475,9 +577,19 @@ impl<'a> Disassembler<'a> {
         }
 
         let signature = self.source_mapper.bytecode.signature_at(locals_idx);
-        for (local_idx, (name, _)) in function_source_map.locals.iter().skip(parameter_len).enumerate() {
+        for (local_idx, (name, _)) in function_source_map
+            .locals
+            .iter()
+            .skip(parameter_len)
+            .enumerate()
+        {
             any_write!(buffer, "L{local_idx}:\t{name}: ")?;
-            self.disassemble_type_for_local(buffer, function_source_map, parameter_len + local_idx, signature)?;
+            self.disassemble_type_for_local(
+                buffer,
+                function_source_map,
+                parameter_len + local_idx,
+                signature,
+            )?;
             any_writeln!(buffer)?;
         }
 
@@ -493,8 +605,14 @@ impl<'a> Disassembler<'a> {
 
         for (i, jt) in code.jump_tables.iter().enumerate() {
             let enum_def = self.source_mapper.bytecode.enum_def_at(jt.head_enum);
-            let enum_handle = self.source_mapper.bytecode.datatype_handle_at(enum_def.enum_handle);
-            let enum_source_map = self.source_mapper.source_map.get_enum_source_map(jt.head_enum)?;
+            let enum_handle = self
+                .source_mapper
+                .bytecode
+                .datatype_handle_at(enum_def.enum_handle);
+            let enum_source_map = self
+                .source_mapper
+                .source_map
+                .get_enum_source_map(jt.head_enum)?;
             let enum_name = self.source_mapper.bytecode.identifier_at(enum_handle.name);
             let JumpTableInner::Full(jt) = &jt.jump_table;
             any_writeln!(buffer, "[{i}]:\tvariant_switch {enum_name} {{")?;
@@ -561,21 +679,48 @@ impl<'a> Disassembler<'a> {
                 }
             }
 
-            self.disassemble_instruction(buffer, function_source_map, parameters, locals_sigs, instruction)?;
+            self.disassemble_instruction(
+                buffer,
+                function_source_map,
+                parameters,
+                locals_sigs,
+                instruction,
+            )?;
 
-            any_writeln!(buffer, "{}", if coverage_enabled { IC::color_reset } else { "" })?;
+            any_writeln!(
+                buffer,
+                "{}",
+                if coverage_enabled {
+                    IC::color_reset
+                } else {
+                    ""
+                }
+            )?;
         }
 
         Ok(())
     }
 
-    fn disassemble_import(&self, buffer: &mut impl Write, module_handle: &ModuleHandle) -> Result<()> {
-        let module_id = self.source_mapper.bytecode.module_id_for_handle(module_handle);
+    fn disassemble_import(
+        &self,
+        buffer: &mut impl Write,
+        module_handle: &ModuleHandle,
+    ) -> Result<()> {
+        let module_id = self
+            .source_mapper
+            .bytecode
+            .module_id_for_handle(module_handle);
         if self.is_self_id(&module_id) {
             // No need to import self handle
             Ok(())
         } else if let Some(alias) = self.module_aliases.get(&module_id) {
-            any_writeln!(buffer, "use {}::{} as {};", module_id.address(), module_id.name(), alias)
+            any_writeln!(
+                buffer,
+                "use {}::{} as {};",
+                module_id.address(),
+                module_id.name(),
+                alias
+            )
         } else {
             any_writeln!(buffer, "use {}::{};", module_id.address(), module_id.name())
         }
@@ -799,7 +944,10 @@ impl<'a> Disassembler<'a> {
             }
             Bytecode::Call(method_idx) => {
                 let function_handle = self.source_mapper.bytecode.function_handle_at(*method_idx);
-                let module_handle = self.source_mapper.bytecode.module_handle_at(function_handle.module);
+                let module_handle = self
+                    .source_mapper
+                    .bytecode
+                    .module_handle_at(function_handle.module);
                 any_write!(buffer, "Call ")?;
                 self.disassemble_function_string(buffer, module_handle, function_handle)?;
                 parens! {
@@ -815,7 +963,11 @@ impl<'a> Disassembler<'a> {
                     )?;
                 }?;
                 delimited_list(
-                    &self.source_mapper.bytecode.signature_at(function_handle.return_).0,
+                    &self
+                        .source_mapper
+                        .bytecode
+                        .signature_at(function_handle.return_)
+                        .0,
                     ": ",
                     " * ",
                     "",
@@ -824,12 +976,25 @@ impl<'a> Disassembler<'a> {
                 )
             }
             Bytecode::CallGeneric(method_idx) => {
-                let func_inst = self.source_mapper.bytecode.function_instantiation_at(*method_idx);
-                let function_handle = self.source_mapper.bytecode.function_handle_at(func_inst.handle);
-                let module_handle = self.source_mapper.bytecode.module_handle_at(function_handle.module);
+                let func_inst = self
+                    .source_mapper
+                    .bytecode
+                    .function_instantiation_at(*method_idx);
+                let function_handle = self
+                    .source_mapper
+                    .bytecode
+                    .function_handle_at(func_inst.handle);
+                let module_handle = self
+                    .source_mapper
+                    .bytecode
+                    .module_handle_at(function_handle.module);
                 any_write!(buffer, "Call ")?;
                 self.disassemble_function_string(buffer, module_handle, function_handle)?;
-                let func_instantiation = &self.source_mapper.bytecode.signature_at(func_inst.type_parameters).0;
+                let func_instantiation = &self
+                    .source_mapper
+                    .bytecode
+                    .signature_at(func_inst.type_parameters)
+                    .0;
                 delimited_list(func_instantiation, "<", ", ", ">", buffer, |buffer, ty| {
                     self.disassemble_sig_tok(buffer, ty, None, &function_source_map.type_parameters)
                 })?;
@@ -846,7 +1011,11 @@ impl<'a> Disassembler<'a> {
                     )?;
                 }?;
                 delimited_list(
-                    &self.source_mapper.bytecode.signature_at(function_handle.return_).0,
+                    &self
+                        .source_mapper
+                        .bytecode
+                        .signature_at(function_handle.return_)
+                        .0,
                     ": ",
                     " * ",
                     "",
@@ -900,33 +1069,58 @@ impl<'a> Disassembler<'a> {
             SignatureToken::Datatype(struct_handle_idx) => any_write!(
                 buffer,
                 "{}",
-                self.source_mapper
-                    .bytecode
-                    .identifier_at(self.source_mapper.bytecode.datatype_handle_at(*struct_handle_idx).name,)
+                self.source_mapper.bytecode.identifier_at(
+                    self.source_mapper
+                        .bytecode
+                        .datatype_handle_at(*struct_handle_idx)
+                        .name,
+                )
             ),
             SignatureToken::DatatypeInstantiation(struct_inst) => {
                 let (struct_handle_idx, instantiation) = &**struct_inst;
-                let name = self
-                    .source_mapper
-                    .bytecode
-                    .identifier_at(self.source_mapper.bytecode.datatype_handle_at(*struct_handle_idx).name);
+                let name = self.source_mapper.bytecode.identifier_at(
+                    self.source_mapper
+                        .bytecode
+                        .datatype_handle_at(*struct_handle_idx)
+                        .name,
+                );
                 any_write!(buffer, "{name}")?;
                 delimited_list(instantiation, "<", ", ", ">", buffer, |buffer, tok| {
-                    self.disassemble_sig_tok(buffer, tok, type_instantiation, type_param_name_context)
+                    self.disassemble_sig_tok(
+                        buffer,
+                        tok,
+                        type_instantiation,
+                        type_param_name_context,
+                    )
                 })
             }
             SignatureToken::Vector(sig_tok) => {
                 any_write!(buffer, "vector<")?;
-                self.disassemble_sig_tok(buffer, sig_tok, type_instantiation, type_param_name_context)?;
+                self.disassemble_sig_tok(
+                    buffer,
+                    sig_tok,
+                    type_instantiation,
+                    type_param_name_context,
+                )?;
                 any_write!(buffer, ">")
             }
             SignatureToken::Reference(sig_tok) => {
                 any_write!(buffer, "&")?;
-                self.disassemble_sig_tok(buffer, sig_tok, type_instantiation, type_param_name_context)
+                self.disassemble_sig_tok(
+                    buffer,
+                    sig_tok,
+                    type_instantiation,
+                    type_param_name_context,
+                )
             }
             SignatureToken::MutableReference(sig_tok) => {
                 any_write!(buffer, "&mut ")?;
-                self.disassemble_sig_tok(buffer, sig_tok, type_instantiation, type_param_name_context)
+                self.disassemble_sig_tok(
+                    buffer,
+                    sig_tok,
+                    type_instantiation,
+                    type_param_name_context,
+                )
             }
             SignatureToken::TypeParameter(ty_param_index) if type_instantiation.is_none() => {
                 if let Some(name) = type_param_name_context.get(*ty_param_index as usize) {
@@ -940,7 +1134,9 @@ impl<'a> Disassembler<'a> {
             }
             SignatureToken::TypeParameter(ty_param_index) => {
                 match type_instantiation.and_then(|i| i.get(*ty_param_index as usize)) {
-                    Some(tok) => self.disassemble_sig_tok(buffer, tok, None, type_param_name_context),
+                    Some(tok) => {
+                        self.disassemble_sig_tok(buffer, tok, None, type_param_name_context)
+                    }
                     None => any_write!(
                         buffer,
                         "ERROR[Type parameter index {ty_param_index} out of bounds while disassembling type signature]",
@@ -967,7 +1163,8 @@ impl<'a> Disassembler<'a> {
                 }
                 buf.write_str(name.as_str())?;
                 delimited_list(ty_param.constraints, ": ", " + ", "", buf, |buf, a| {
-                    buf.write_str(&Self::format_ability(a)).map_err(anyhow::Error::from)
+                    buf.write_str(&Self::format_ability(a))
+                        .map_err(anyhow::Error::from)
                 })
             },
         )
@@ -978,7 +1175,8 @@ impl<'a> Disassembler<'a> {
             return Ok(());
         }
         delimited_list(abilities, " has ", ", ", "", buffer, |buf, a| {
-            buf.write_str(&Self::format_ability(a)).map_err(anyhow::Error::from)
+            buf.write_str(&Self::format_ability(a))
+                .map_err(anyhow::Error::from)
         })
     }
 
@@ -987,10 +1185,19 @@ impl<'a> Disassembler<'a> {
         source_map_ty_params: &[SourceName],
         ablities: &[AbilitySet],
     ) -> Result<()> {
-        delimited_list(source_map_ty_params.iter().zip(ablities), "<", ", ", ">", buffer, |buffer, ((name, _), abs)| {
-            any_write!(buffer, "{}", name)?;
-            delimited_list(*abs, ": ", " + ", "", buffer, |buffer, a| any_write!(buffer, "{}", Self::format_ability(a)))
-        })
+        delimited_list(
+            source_map_ty_params.iter().zip(ablities),
+            "<",
+            ", ",
+            ">",
+            buffer,
+            |buffer, ((name, _), abs)| {
+                any_write!(buffer, "{}", name)?;
+                delimited_list(*abs, ": ", " + ", "", buffer, |buffer, a| {
+                    any_write!(buffer, "{}", Self::format_ability(a))
+                })
+            },
+        )
     }
 
     fn disassemble_type_for_local(
@@ -1001,7 +1208,10 @@ impl<'a> Disassembler<'a> {
         locals: &Signature,
     ) -> Result<()> {
         let Some(sig_tok) = locals.0.get(local_idx) else {
-            any_write!(buffer, "ERROR[Unable to get type for local at index {local_idx}]",)?;
+            any_write!(
+                buffer,
+                "ERROR[Unable to get type for local at index {local_idx}]",
+            )?;
             return Ok(());
         };
         self.disassemble_sig_tok(buffer, sig_tok, None, &function_source_map.type_parameters)
@@ -1020,7 +1230,10 @@ impl<'a> Disassembler<'a> {
         } else if idx < parameters.len() + locals.len() {
             &locals.0[idx - parameters.len()]
         } else {
-            any_write!(buffer, "ERROR[Unable to get type for parameter or local at index {idx}]",)?;
+            any_write!(
+                buffer,
+                "ERROR[Unable to get type for parameter or local at index {idx}]",
+            )?;
             return Ok(());
         };
         self.disassemble_sig_tok(buffer, sig_tok, None, &function_source_map.type_parameters)
@@ -1034,7 +1247,10 @@ impl<'a> Disassembler<'a> {
         field_idx: FieldHandleIndex,
     ) -> Result<()> {
         let field_handle = self.source_mapper.bytecode.field_handle_at(field_idx);
-        let struct_def = self.source_mapper.bytecode.struct_def_at(field_handle.owner);
+        let struct_def = self
+            .source_mapper
+            .bytecode
+            .struct_def_at(field_handle.owner);
         let field_def = match &struct_def.field_information {
             StructFieldInformation::Native => {
                 return any_write!(buffer, "ERROR[Attempt to access field on a native struct]");
@@ -1047,7 +1263,12 @@ impl<'a> Disassembler<'a> {
             }
         };
         let field_type_sig = &field_def.signature.0;
-        self.disassemble_sig_tok(buffer, field_type_sig, instantiation, &function_source_map.type_parameters)
+        self.disassemble_sig_tok(
+            buffer,
+            field_type_sig,
+            instantiation,
+            &function_source_map.type_parameters,
+        )
     }
 
     fn disassemble_struct_call(
@@ -1058,8 +1279,15 @@ impl<'a> Disassembler<'a> {
         signature: &Signature,
     ) -> Result<()> {
         let struct_definition = self.source_mapper.bytecode.struct_def_at(struct_idx);
-        let struct_handle = self.source_mapper.bytecode.datatype_handle_at(struct_definition.struct_handle);
-        let name = self.source_mapper.bytecode.identifier_at(struct_handle.name).to_string();
+        let struct_handle = self
+            .source_mapper
+            .bytecode
+            .datatype_handle_at(struct_definition.struct_handle);
+        let name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(struct_handle.name)
+            .to_string();
         any_write!(buffer, "{name}")?;
         delimited_list(&signature.0, "<", ", ", ">", buffer, |buffer, sig_tok| {
             self.disassemble_sig_tok(buffer, sig_tok, None, &function_source_map.type_parameters)
@@ -1088,12 +1316,23 @@ impl<'a> Disassembler<'a> {
         }
     }
 
-    fn disassemble_struct_field_access(&self, buffer: &mut impl Write, field_idx: FieldHandleIndex) -> Result<()> {
+    fn disassemble_struct_field_access(
+        &self,
+        buffer: &mut impl Write,
+        field_idx: FieldHandleIndex,
+    ) -> Result<()> {
         let field_handle = self.source_mapper.bytecode.field_handle_at(field_idx);
-        let struct_def = self.source_mapper.bytecode.struct_def_at(field_handle.owner);
+        let struct_def = self
+            .source_mapper
+            .bytecode
+            .struct_def_at(field_handle.owner);
         let field_def = match &struct_def.field_information {
             StructFieldInformation::Native => {
-                return any_write!(buffer, "ERROR[Attempt to access field on a native struct {}]", field_idx);
+                return any_write!(
+                    buffer,
+                    "ERROR[Attempt to access field on a native struct {}]",
+                    field_idx
+                );
             }
             StructFieldInformation::Declared(fields) => {
                 let Some(fields) = fields.get(field_handle.field as usize) else {
@@ -1102,9 +1341,20 @@ impl<'a> Disassembler<'a> {
                 fields
             }
         };
-        let field_name = self.source_mapper.bytecode.identifier_at(field_def.name).to_string();
-        let struct_handle = self.source_mapper.bytecode.datatype_handle_at(struct_def.struct_handle);
-        let struct_name = self.source_mapper.bytecode.identifier_at(struct_handle.name).to_string();
+        let field_name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(field_def.name)
+            .to_string();
+        let struct_handle = self
+            .source_mapper
+            .bytecode
+            .datatype_handle_at(struct_def.struct_handle);
+        let struct_name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(struct_handle.name)
+            .to_string();
         any_write!(buffer, "{struct_name}.{field_name}")
     }
 
@@ -1114,14 +1364,23 @@ impl<'a> Disassembler<'a> {
         module_handle: &ModuleHandle,
         function_handle: &FunctionHandle,
     ) -> Result<()> {
-        let module_id = self.source_mapper.bytecode.module_id_for_handle(module_handle);
-        let function_name = self.source_mapper.bytecode.identifier_at(function_handle.name);
+        let module_id = self
+            .source_mapper
+            .bytecode
+            .module_id_for_handle(module_handle);
+        let function_name = self
+            .source_mapper
+            .bytecode
+            .identifier_at(function_handle.name);
         if self.is_self_id(&module_id) {
             // this is the "self" module. Omit the "module_name::" prefix
             any_write!(buffer, "{function_name}")
         } else {
-            let module_name =
-                self.module_aliases.get(&module_id).cloned().unwrap_or_else(|| module_id.name().to_string());
+            let module_name = self
+                .module_aliases
+                .get(&module_id)
+                .cloned()
+                .unwrap_or_else(|| module_id.name().to_string());
             any_write!(buffer, "{module_name}::{function_name}")
         }
     }
@@ -1142,7 +1401,11 @@ impl<'a> Disassembler<'a> {
         .to_string()
     }
 
-    fn format_name_for_parameter_or_local(&self, function_source_map: &FunctionSourceMap, local_idx: usize) -> String {
+    fn format_name_for_parameter_or_local(
+        &self,
+        function_source_map: &FunctionSourceMap,
+        local_idx: usize,
+    ) -> String {
         let Some(name) = function_source_map.get_parameter_or_local_name(local_idx as u64) else {
             return format!(
                 "ERROR[Unable to get local name at index {local_idx} while disassembling location-based instruction]"
@@ -1177,7 +1440,10 @@ impl<'a> Disassembler<'a> {
         let module = &self.source_mapper.source_map.module_name;
 
         self.coverage_map.as_ref().and_then(|coverage_map| {
-            coverage_map.module_maps.get(module).and_then(|module_map| module_map.get_function_coverage(function_name))
+            coverage_map
+                .module_maps
+                .get(module)
+                .and_then(|module_map| module_map.get_function_coverage(function_name))
         })
     }
 }

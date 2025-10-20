@@ -1,39 +1,37 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::Duration;
 
-use diesel::{dsl::count_star, ExpressionMethods, QueryDsl};
+use diesel::dsl::count_star;
+use diesel::ExpressionMethods;
+use diesel::QueryDsl;
 use diesel_async::RunQueryDsl;
 use simulacrum::Simulacrum;
-use sui_indexer::{
-    errors::IndexerError,
-    handlers::TransactionObjectChangesToCommit,
-    models::{
-        checkpoints::StoredCheckpoint,
-        objects::{StoredObject, StoredObjectSnapshot},
-        transactions::StoredTransaction,
-    },
-    schema::{
-        checkpoints,
-        epochs,
-        events,
-        full_objects_history,
-        objects,
-        objects_history,
-        objects_snapshot,
-        transactions,
-    },
-    store::indexer_store::IndexerStore,
-    test_utils::{
-        set_up,
-        set_up_on_mvr_mode,
-        set_up_with_start_and_end_checkpoints,
-        wait_for_checkpoint,
-        wait_for_objects_snapshot,
-    },
-    types::{EventIndex, IndexedDeletedObject, IndexedObject, TxIndex},
+use sui_indexer::errors::IndexerError;
+use sui_indexer::handlers::TransactionObjectChangesToCommit;
+use sui_indexer::models::{
+    checkpoints::StoredCheckpoint, objects::StoredObject, objects::StoredObjectSnapshot,
+    transactions::StoredTransaction,
 };
-use sui_types::{base_types::SuiAddress, effects::TransactionEffectsAPI, gas_coin::GasCoin, SUI_FRAMEWORK_PACKAGE_ID};
+use sui_indexer::schema::epochs;
+use sui_indexer::schema::events;
+use sui_indexer::schema::full_objects_history;
+use sui_indexer::schema::objects_history;
+use sui_indexer::schema::{checkpoints, objects, objects_snapshot, transactions};
+use sui_indexer::store::indexer_store::IndexerStore;
+use sui_indexer::test_utils::set_up_on_mvr_mode;
+use sui_indexer::test_utils::{
+    set_up, set_up_with_start_and_end_checkpoints, wait_for_checkpoint, wait_for_objects_snapshot,
+};
+use sui_indexer::types::EventIndex;
+use sui_indexer::types::IndexedDeletedObject;
+use sui_indexer::types::IndexedObject;
+use sui_indexer::types::TxIndex;
+use sui_types::base_types::SuiAddress;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::gas_coin::GasCoin;
+use sui_types::SUI_FRAMEWORK_PACKAGE_ID;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -70,7 +68,10 @@ pub async fn test_transaction_table() -> Result<(), IndexerError> {
     // Check that the transaction was stored correctly.
     assert_eq!(db_txn.tx_sequence_number, 1);
     assert_eq!(db_txn.transaction_digest, digest.inner().to_vec());
-    assert_eq!(db_txn.raw_transaction, bcs::to_bytes(&transaction.data()).unwrap());
+    assert_eq!(
+        db_txn.raw_transaction,
+        bcs::to_bytes(&transaction.data()).unwrap()
+    );
     assert_eq!(db_txn.raw_effects, bcs::to_bytes(&effects).unwrap());
     assert_eq!(db_txn.timestamp_ms, checkpoint.timestamp_ms as i64);
     assert_eq!(db_txn.checkpoint_sequence_number, 1);
@@ -98,17 +99,24 @@ pub async fn test_checkpoint_range_ingestion() -> Result<(), IndexerError> {
     // Set up indexer with specific start and end checkpoints
     let start_checkpoint = 2;
     let end_checkpoint = 4;
-    let (_, pg_store, _, _database) =
-        set_up_with_start_and_end_checkpoints(Arc::new(sim), data_ingestion_path, start_checkpoint, end_checkpoint)
-            .await;
+    let (_, pg_store, _, _database) = set_up_with_start_and_end_checkpoints(
+        Arc::new(sim),
+        data_ingestion_path,
+        start_checkpoint,
+        end_checkpoint,
+    )
+    .await;
 
     // Wait for the indexer to catch up to the end checkpoint
     wait_for_checkpoint(&pg_store, end_checkpoint).await?;
 
     // Verify that only checkpoints within the specified range were ingested
     let mut connection = pg_store.pool().dedicated_connection().await.unwrap();
-    let checkpoint_count: i64 =
-        checkpoints::table.count().get_result(&mut connection).await.expect("Failed to count checkpoints");
+    let checkpoint_count: i64 = checkpoints::table
+        .count()
+        .get_result(&mut connection)
+        .await
+        .expect("Failed to count checkpoints");
     assert_eq!(checkpoint_count, 3, "Expected 3 checkpoints to be ingested");
 
     // Verify the range of ingested checkpoints
@@ -124,8 +132,16 @@ pub async fn test_checkpoint_range_ingestion() -> Result<(), IndexerError> {
         .await
         .expect("Failed to get max checkpoint")
         .expect("Max checkpoint should be Some");
-    assert_eq!(min_checkpoint, start_checkpoint as i64, "Minimum ingested checkpoint should be {}", start_checkpoint);
-    assert_eq!(max_checkpoint, end_checkpoint as i64, "Maximum ingested checkpoint should be {}", end_checkpoint);
+    assert_eq!(
+        min_checkpoint, start_checkpoint as i64,
+        "Minimum ingested checkpoint should be {}",
+        start_checkpoint
+    );
+    assert_eq!(
+        max_checkpoint, end_checkpoint as i64,
+        "Maximum ingested checkpoint should be {}",
+        end_checkpoint
+    );
 
     Ok(())
 }
@@ -164,8 +180,14 @@ pub async fn test_object_type() -> Result<(), IndexerError> {
     let obj_type_tag = GasCoin::type_();
 
     // Check that the different components of the event type were stored correctly.
-    assert_eq!(db_object.object_type, Some(obj_type_tag.to_canonical_string(true)));
-    assert_eq!(db_object.object_type_package, Some(SUI_FRAMEWORK_PACKAGE_ID.to_vec()));
+    assert_eq!(
+        db_object.object_type,
+        Some(obj_type_tag.to_canonical_string(true))
+    );
+    assert_eq!(
+        db_object.object_type_package,
+        Some(SUI_FRAMEWORK_PACKAGE_ID.to_vec())
+    );
     assert_eq!(db_object.object_type_module, Some("coin".to_string()));
     assert_eq!(db_object.object_type_name, Some("Coin".to_string()));
     Ok(())
@@ -205,7 +227,10 @@ pub async fn test_objects_snapshot() -> Result<(), IndexerError> {
         .first::<i64>(&mut connection)
         .await
         .expect("Failed to read max checkpoint_sequence_number from objects_snapshot");
-    assert_eq!(max_checkpoint_sequence_number, max_expected_checkpoint_sequence_number as i64);
+    assert_eq!(
+        max_checkpoint_sequence_number,
+        max_expected_checkpoint_sequence_number as i64
+    );
 
     // Get the object state at max_expected_checkpoint_sequence_number and assert.
     let last_tx = last_transaction.unwrap();
@@ -214,13 +239,19 @@ pub async fn test_objects_snapshot() -> Result<(), IndexerError> {
 
     let snapshot_object = objects_snapshot::table
         .filter(objects_snapshot::object_id.eq(obj_id.to_vec()))
-        .filter(objects_snapshot::checkpoint_sequence_number.eq(max_expected_checkpoint_sequence_number as i64))
+        .filter(
+            objects_snapshot::checkpoint_sequence_number
+                .eq(max_expected_checkpoint_sequence_number as i64),
+        )
         .first::<StoredObjectSnapshot>(&mut connection)
         .await
         .expect("Failed reading object from objects_snapshot");
     // Assert that the object state is as expected at checkpoint max_expected_checkpoint_sequence_number
     assert_eq!(snapshot_object.object_id, obj_id.to_vec());
-    assert_eq!(snapshot_object.checkpoint_sequence_number, max_expected_checkpoint_sequence_number as i64);
+    assert_eq!(
+        snapshot_object.checkpoint_sequence_number,
+        max_expected_checkpoint_sequence_number as i64
+    );
     assert_eq!(snapshot_object.owner_type, Some(1));
     assert_eq!(snapshot_object.owner_id, Some(gas_owner_id.to_vec()));
     Ok(())
@@ -336,7 +367,8 @@ pub async fn test_mvr_mode() -> Result<(), IndexerError> {
 
     sim.create_checkpoint(); // advance to checkpoint 4 to stabilize indexer
 
-    let (_, pg_store, _, _database) = set_up_on_mvr_mode(Arc::new(sim), data_ingestion_path, true).await;
+    let (_, pg_store, _, _database) =
+        set_up_on_mvr_mode(Arc::new(sim), data_ingestion_path, true).await;
     wait_for_checkpoint(&pg_store, 4).await?;
     let mut connection = pg_store.pool().dedicated_connection().await.unwrap();
     let db_checkpoint: StoredCheckpoint = checkpoints::table
@@ -365,7 +397,11 @@ pub async fn test_mvr_mode() -> Result<(), IndexerError> {
     );
     assert_eq!(
         0_i64,
-        events::table.select(count_star()).first::<i64>(&mut connection).await.expect("Failed to count * transactions")
+        events::table
+            .select(count_star())
+            .first::<i64>(&mut connection)
+            .await
+            .expect("Failed to count * transactions")
     );
     assert_eq!(
         0_i64,

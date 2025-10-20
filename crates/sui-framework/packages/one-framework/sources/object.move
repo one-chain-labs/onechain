@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Sui object identifiers
-module one::object;
+/// Oct object identifiers
+module oct::object;
 
 use std::bcs;
-use one::address;
+use sui::address;
 
 /// Allows calling `.to_address` on an `ID` to get an `address`.
 public use fun id_to_address as ID.to_address;
@@ -176,10 +176,10 @@ public fun new(ctx: &mut TxContext): UID {
 }
 
 /// Delete the object and it's `UID`. This is the only way to eliminate a `UID`.
-/// This exists to inform Sui of object deletions. When an object
-/// gets unpacked, the programmer will have to do something with its
-/// `UID`. The implementation of this function emits a deleted
-/// system event so Sui knows to process the object deletion
+// This exists to inform Sui of object deletions. When an object
+// gets unpacked, the programmer will have to do something with its
+// `UID`. The implementation of this function emits a deleted
+// system event so Sui knows to process the object deletion
 public fun delete(id: UID) {
     let UID { id: ID { bytes } } = id;
     delete_impl(bytes)

@@ -31,8 +31,7 @@ use crate::{
     errors::{PartialVMError, PartialVMResult},
     file_format_common,
     internals::ModuleIndex,
-    IndexKind,
-    SignatureTokenKind,
+    IndexKind, SignatureTokenKind,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -45,10 +44,8 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{Display, Formatter},
-    ops::BitOr,
-};
+use std::fmt::{Display, Formatter};
+use std::ops::BitOr;
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -555,22 +552,27 @@ pub struct FunctionDefinition {
     /// that type are considered as being acquired
     pub acquires_global_resources: Vec<StructDefinitionIndex>,
     /// Code for this function.
-    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "any_with::<CodeUnit>(params).prop_map(Some)"))]
+    #[cfg_attr(
+        any(test, feature = "fuzzing"),
+        proptest(strategy = "any_with::<CodeUnit>(params).prop_map(Some)")
+    )]
     pub code: Option<CodeUnit>,
 }
 
 impl FunctionDefinition {
-    // Deprecated public bit, deprecated in favor a the Visibility enum
-    pub const DEPRECATED_PUBLIC_BIT: u8 = 0b01;
-    /// An entry function, intended to be used as an entry point to execution
-    pub const ENTRY: u8 = 0b100;
-    /// A native function implemented in Rust.
-    pub const NATIVE: u8 = 0b10;
-
     /// Returns whether the FunctionDefinition is native.
     pub fn is_native(&self) -> bool {
         self.code.is_none()
     }
+
+    // Deprecated public bit, deprecated in favor a the Visibility enum
+    pub const DEPRECATED_PUBLIC_BIT: u8 = 0b01;
+
+    /// A native function implemented in Rust.
+    pub const NATIVE: u8 = 0b10;
+
+    /// An entry function, intended to be used as an entry point to execution
+    pub const ENTRY: u8 = 0b100;
 }
 
 // Signature
@@ -597,10 +599,16 @@ pub struct TypeSignature(pub SignatureToken);
 #[cfg_attr(feature = "wasm", derive(Serialize, Deserialize))]
 pub struct FunctionSignature {
     /// The list of return types.
-    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "vec(any::<SignatureToken>(), 0..=params)"))]
+    #[cfg_attr(
+        any(test, feature = "fuzzing"),
+        proptest(strategy = "vec(any::<SignatureToken>(), 0..=params)")
+    )]
     pub return_: Vec<SignatureToken>,
     /// The list of arguments to the function.
-    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "vec(any::<SignatureToken>(), 0..=params)"))]
+    #[cfg_attr(
+        any(test, feature = "fuzzing"),
+        proptest(strategy = "vec(any::<SignatureToken>(), 0..=params)")
+    )]
     pub parameters: Vec<SignatureToken>,
     /// The type formals (identified by their index into the vec) and their constraints
     pub type_parameters: Vec<AbilitySet>,
@@ -616,8 +624,11 @@ pub struct FunctionSignature {
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "wasm", derive(Serialize, Deserialize))]
 pub struct Signature(
-    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "vec(any::<SignatureToken>(), 0..=params)"))]
-    pub  Vec<SignatureToken>,
+    #[cfg_attr(
+        any(test, feature = "fuzzing"),
+        proptest(strategy = "vec(any::<SignatureToken>(), 0..=params)")
+    )]
+    pub Vec<SignatureToken>,
 );
 
 impl Signature {
@@ -798,21 +809,27 @@ impl Display for Ability {
 pub struct AbilitySet(u8);
 
 impl AbilitySet {
-    /// Ability set containing all abilities
-    pub const ALL: Self = Self(
-        // Cannot use AbilitySet bitor because it is not const
-        (Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8) | (Ability::Key as u8),
-    );
     /// The empty ability set
     pub const EMPTY: Self = Self(0);
     /// Abilities for `Bool`, `U8`, `U16`, `U32`, `U64`, `U128`, `U256`, and `Address`
-    pub const PRIMITIVES: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
+    pub const PRIMITIVES: AbilitySet =
+        Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// Abilities for `Reference` and `MutableReference`
     pub const REFERENCES: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
     /// Abilities for `Signer`
     pub const SIGNER: AbilitySet = Self(Ability::Drop as u8);
     /// Abilities for `Vector`, note they are predicated on the type argument
-    pub const VECTOR: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
+    pub const VECTOR: AbilitySet =
+        Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
+
+    /// Ability set containing all abilities
+    pub const ALL: Self = Self(
+        // Cannot use AbilitySet bitor because it is not const
+        (Ability::Copy as u8)
+            | (Ability::Drop as u8)
+            | (Ability::Store as u8)
+            | (Ability::Key as u8),
+    );
 
     pub fn singleton(ability: Ability) -> Self {
         Self(ability as u8)
@@ -882,9 +899,11 @@ impl AbilitySet {
         let type_arguments = type_arguments.into_iter();
 
         if declared_phantom_parameters.len() != type_arguments.len() {
-            return Err(PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
-                "the length of `declared_phantom_parameters` doesn't match the length of `type_arguments`".to_string(),
-            ));
+            return Err(
+                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
+                    "the length of `declared_phantom_parameters` doesn't match the length of `type_arguments`".to_string(),
+                ),
+            );
         }
 
         // Conceptually this is performing the following operation:
@@ -899,9 +918,14 @@ impl AbilitySet {
             .zip(declared_phantom_parameters)
             .filter(|(_, is_phantom)| !is_phantom)
             .map(|(ty_arg_abilities, _)| {
-                ty_arg_abilities.into_iter().map(|a| a.required_by()).fold(AbilitySet::EMPTY, AbilitySet::union)
+                ty_arg_abilities
+                    .into_iter()
+                    .map(|a| a.required_by())
+                    .fold(AbilitySet::EMPTY, AbilitySet::union)
             })
-            .fold(declared_abilities, |acc, ty_arg_abilities| acc.intersect(ty_arg_abilities));
+            .fold(declared_abilities, |acc, ty_arg_abilities| {
+                acc.intersect(ty_arg_abilities)
+            });
         Ok(abs)
     }
 
@@ -924,7 +948,6 @@ impl AbilitySet {
 
 impl BitOr<Ability> for AbilitySet {
     type Output = Self;
-
     fn bitor(self, rhs: Ability) -> Self {
         AbilitySet(self.0 | (rhs as u8))
     }
@@ -932,7 +955,6 @@ impl BitOr<Ability> for AbilitySet {
 
 impl BitOr<AbilitySet> for AbilitySet {
     type Output = Self;
-
     fn bitor(self, rhs: Self) -> Self {
         AbilitySet(self.0 | rhs.0)
     }
@@ -959,11 +981,13 @@ impl Iterator for AbilitySetIterator {
 }
 
 impl IntoIterator for AbilitySet {
-    type IntoIter = AbilitySetIterator;
     type Item = Ability;
-
+    type IntoIter = AbilitySetIterator;
     fn into_iter(self) -> Self::IntoIter {
-        AbilitySetIterator { idx: 0x1, set: self }
+        AbilitySetIterator {
+            idx: 0x1,
+            set: self,
+        }
     }
 }
 
@@ -979,8 +1003,8 @@ impl std::fmt::Debug for AbilitySet {
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for AbilitySet {
-    type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
+    type Parameters = ();
 
     fn arbitrary_with(_params: Self::Parameters) -> Self::Strategy {
         proptest::bits::u8::masked(AbilitySet::ALL.0)
@@ -1048,14 +1072,17 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
         match self.stack.pop() {
             Some(tok) => {
                 match tok {
-                    Reference(inner_tok) | MutableReference(inner_tok) | Vector(inner_tok) => self.stack.push(inner_tok),
+                    Reference(inner_tok) | MutableReference(inner_tok) | Vector(inner_tok) => {
+                        self.stack.push(inner_tok)
+                    }
 
                     DatatypeInstantiation(inst) => {
                         let (_, inner_toks) = &**inst;
                         self.stack.extend(inner_toks.iter().rev())
                     }
 
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Datatype(_) | TypeParameter(_) => (),
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Datatype(_)
+                    | TypeParameter(_) => (),
                 }
                 Some(tok)
             }
@@ -1085,10 +1112,12 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
 
                     DatatypeInstantiation(inst) => {
                         let (_, inner_toks) = &**inst;
-                        self.stack.extend(inner_toks.iter().map(|tok| (tok, depth + 1)).rev())
+                        self.stack
+                            .extend(inner_toks.iter().map(|tok| (tok, depth + 1)).rev())
                     }
 
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Datatype(_) | TypeParameter(_) => (),
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Datatype(_)
+                    | TypeParameter(_) => (),
                 }
                 Some((tok, depth))
             }
@@ -1100,8 +1129,8 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
 /// `Arbitrary` for `SignatureToken` cannot be derived automatically as it's a recursive type.
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for SignatureToken {
-    type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
+    type Parameters = ();
 
     fn arbitrary_with(_params: Self::Parameters) -> Self::Strategy {
         use SignatureToken::*;
@@ -1234,9 +1263,12 @@ impl SignatureToken {
         match self {
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
-            Signer | Datatype(_) | DatatypeInstantiation(_) | Reference(_) | MutableReference(_) | TypeParameter(_) => {
-                false
-            }
+            Signer
+            | Datatype(_)
+            | DatatypeInstantiation(_)
+            | Reference(_)
+            | MutableReference(_)
+            | TypeParameter(_) => false,
         }
     }
 
@@ -1247,10 +1279,12 @@ impl SignatureToken {
         match self {
             SignatureToken::Datatype(ref mut wrapped) => *wrapped = sh_idx,
             SignatureToken::DatatypeInstantiation(ref mut inst) => Box::as_mut(inst).0 = sh_idx,
-            SignatureToken::Reference(ref mut token) | SignatureToken::MutableReference(ref mut token) => {
-                token.debug_set_sh_idx(sh_idx)
-            }
-            other => panic!("debug_set_sh_idx (to {}) called for non-struct token {:?}", sh_idx, other),
+            SignatureToken::Reference(ref mut token)
+            | SignatureToken::MutableReference(ref mut token) => token.debug_set_sh_idx(sh_idx),
+            other => panic!(
+                "debug_set_sh_idx (to {}) called for non-struct token {:?}",
+                sh_idx, other
+            ),
         }
     }
 
@@ -1258,8 +1292,12 @@ impl SignatureToken {
         SignatureTokenPreorderTraversalIter { stack: vec![self] }
     }
 
-    pub fn preorder_traversal_with_depth(&self) -> SignatureTokenPreorderTraversalIterWithDepth<'_> {
-        SignatureTokenPreorderTraversalIterWithDepth { stack: vec![(self, 1)] }
+    pub fn preorder_traversal_with_depth(
+        &self,
+    ) -> SignatureTokenPreorderTraversalIterWithDepth<'_> {
+        SignatureTokenPreorderTraversalIterWithDepth {
+            stack: vec![(self, 1)],
+        }
     }
 }
 
@@ -1283,7 +1321,10 @@ pub struct CodeUnit {
     /// List of locals type. All locals are typed.
     pub locals: SignatureIndex,
     /// Code stream, function body.
-    #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "vec(any::<Bytecode>(), 0..=params)"))]
+    #[cfg_attr(
+        any(test, feature = "fuzzing"),
+        proptest(strategy = "vec(any::<Bytecode>(), 0..=params)")
+    )]
     pub code: Vec<Bytecode>,
     #[cfg_attr(any(test, feature = "fuzzing"), proptest(value = "vec![]"))]
     pub jump_tables: Vec<VariantJumpTable>,
@@ -2204,7 +2245,11 @@ impl Bytecode {
     }
 
     /// Return the successor offsets of this bytecode instruction.
-    pub fn get_successors(pc: CodeOffset, code: &[Bytecode], jump_tables: &[VariantJumpTable]) -> Vec<CodeOffset> {
+    pub fn get_successors(
+        pc: CodeOffset,
+        code: &[Bytecode],
+        jump_tables: &[VariantJumpTable],
+    ) -> Vec<CodeOffset> {
         assert!(
             // The program counter must remain within the bounds of the code
             pc < u16::MAX && (pc as usize) < code.len(),
@@ -2296,9 +2341,9 @@ pub struct CompiledModule {
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for CompiledModule {
+    type Strategy = BoxedStrategy<Self>;
     /// The size of the compiled module.
     type Parameters = usize;
-    type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(size: Self::Parameters) -> Self::Strategy {
         (
@@ -2310,8 +2355,14 @@ impl Arbitrary for CompiledModule {
             any::<ModuleHandleIndex>(),
             vec(any::<ModuleHandle>(), 0..=size),
             vec(any_with::<Signature>(size), 0..=size),
-            (vec(any::<Identifier>(), 0..=size), vec(any::<AccountAddress>(), 0..=size)),
-            (vec(any::<StructDefinition>(), 0..=size), vec(any_with::<FunctionDefinition>(size), 0..=size)),
+            (
+                vec(any::<Identifier>(), 0..=size),
+                vec(any::<AccountAddress>(), 0..=size),
+            ),
+            (
+                vec(any::<StructDefinition>(), 0..=size),
+                vec(any_with::<FunctionDefinition>(size), 0..=size),
+            ),
         )
             .prop_map(
                 |(
@@ -2461,13 +2512,19 @@ impl CompiledModule {
         handle
     }
 
-    pub fn variant_instantiation_handle_at(&self, idx: VariantInstantiationHandleIndex) -> &VariantInstantiationHandle {
+    pub fn variant_instantiation_handle_at(
+        &self,
+        idx: VariantInstantiationHandleIndex,
+    ) -> &VariantInstantiationHandle {
         let handle = &self.variant_instantiation_handles[idx.into_index()];
         debug_assert!(handle.enum_def.into_index() < self.enum_def_instantiations.len()); // invariant
         handle
     }
 
-    pub fn struct_instantiation_at(&self, idx: StructDefInstantiationIndex) -> &StructDefInstantiation {
+    pub fn struct_instantiation_at(
+        &self,
+        idx: StructDefInstantiationIndex,
+    ) -> &StructDefInstantiation {
         &self.struct_def_instantiations[idx.into_index()]
     }
 
@@ -2475,7 +2532,10 @@ impl CompiledModule {
         &self.enum_def_instantiations[idx.into_index()]
     }
 
-    pub fn function_instantiation_at(&self, idx: FunctionInstantiationIndex) -> &FunctionInstantiation {
+    pub fn function_instantiation_at(
+        &self,
+        idx: FunctionInstantiationIndex,
+    ) -> &FunctionInstantiation {
         &self.function_instantiations[idx.into_index()]
     }
 
@@ -2507,7 +2567,11 @@ impl CompiledModule {
         &self.enum_defs[idx.into_index()]
     }
 
-    pub fn variant_def_at(&self, enum_idx: EnumDefinitionIndex, variant_tag: VariantTag) -> &VariantDefinition {
+    pub fn variant_def_at(
+        &self,
+        enum_idx: EnumDefinitionIndex,
+        variant_tag: VariantTag,
+    ) -> &VariantDefinition {
         // invariant
         debug_assert!(self.enum_def_at(enum_idx).variants.len() > variant_tag as usize);
         &self.enum_def_at(enum_idx).variants[variant_tag as usize]
@@ -2609,7 +2673,10 @@ impl CompiledModule {
     }
 
     pub fn immediate_friends(&self) -> Vec<ModuleId> {
-        self.friend_decls().iter().map(|handle| self.module_id_for_handle(handle)).collect()
+        self.friend_decls()
+            .iter()
+            .map(|handle| self.module_id_for_handle(handle))
+            .collect()
     }
 
     pub fn find_struct_def(&self, idx: DatatypeHandleIndex) -> Option<&StructDefinition> {
@@ -2637,7 +2704,11 @@ impl CompiledModule {
     // Return the `AbilitySet` of a `SignatureToken` given a context.
     // A `TypeParameter` has the abilities of its `constraints`.
     // `StructInstantiation` abilities are predicated on the particular instantiation
-    pub fn abilities(&self, ty: &SignatureToken, constraints: &[AbilitySet]) -> PartialVMResult<AbilitySet> {
+    pub fn abilities(
+        &self,
+        ty: &SignatureToken,
+        constraints: &[AbilitySet],
+    ) -> PartialVMResult<AbilitySet> {
         use SignatureToken::*;
 
         match ty {
@@ -2646,13 +2717,11 @@ impl CompiledModule {
             Reference(_) | MutableReference(_) => Ok(AbilitySet::REFERENCES),
             Signer => Ok(AbilitySet::SIGNER),
             TypeParameter(idx) => Ok(constraints[*idx as usize]),
-            Vector(ty) => {
-                AbilitySet::polymorphic_abilities(
-                    AbilitySet::VECTOR,
-                    vec![false],
-                    vec![self.abilities(ty, constraints)?],
-                )
-            }
+            Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![self.abilities(ty, constraints)?],
+            ),
             Datatype(idx) => {
                 let sh = self.datatype_handle_at(*idx);
                 Ok(sh.abilities)
@@ -2661,8 +2730,10 @@ impl CompiledModule {
                 let (idx, type_args) = &**inst;
                 let sh = self.datatype_handle_at(*idx);
                 let declared_abilities = sh.abilities;
-                let type_arguments =
-                    type_args.iter().map(|arg| self.abilities(arg, constraints)).collect::<PartialVMResult<Vec<_>>>()?;
+                let type_arguments = type_args
+                    .iter()
+                    .map(|arg| self.abilities(arg, constraints))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
                 AbilitySet::polymorphic_abilities(
                     declared_abilities,
                     sh.type_parameters.iter().map(|param| param.is_phantom),
@@ -2690,7 +2761,10 @@ impl CompiledModule {
 pub fn empty_module() -> CompiledModule {
     CompiledModule {
         version: file_format_common::VERSION_MAX,
-        module_handles: vec![ModuleHandle { address: AddressIdentifierIndex(0), name: IdentifierIndex(0) }],
+        module_handles: vec![ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex(0),
+        }],
         self_module_handle_idx: ModuleHandleIndex(0),
         identifiers: vec![self_module_name().to_owned()],
         address_identifiers: vec![AccountAddress::ZERO],
@@ -2730,14 +2804,19 @@ pub fn basic_test_module() -> CompiledModule {
         return_: SignatureIndex(0),
         type_parameters: vec![],
     });
-    m.identifiers.push(Identifier::new("foo".to_string()).unwrap());
+    m.identifiers
+        .push(Identifier::new("foo".to_string()).unwrap());
 
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
         visibility: Visibility::Private,
         is_entry: false,
         acquires_global_resources: vec![],
-        code: Some(CodeUnit { locals: SignatureIndex(0), code: vec![Bytecode::Ret], jump_tables: vec![] }),
+        code: Some(CodeUnit {
+            locals: SignatureIndex(0),
+            code: vec![Bytecode::Ret],
+            jump_tables: vec![],
+        }),
     });
 
     m.datatype_handles.push(DatatypeHandle {
@@ -2746,7 +2825,8 @@ pub fn basic_test_module() -> CompiledModule {
         abilities: AbilitySet::EMPTY,
         type_parameters: vec![],
     });
-    m.identifiers.push(Identifier::new("Bar".to_string()).unwrap());
+    m.identifiers
+        .push(Identifier::new("Bar".to_string()).unwrap());
 
     m.struct_defs.push(StructDefinition {
         struct_handle: DatatypeHandleIndex(0),
@@ -2755,7 +2835,8 @@ pub fn basic_test_module() -> CompiledModule {
             signature: TypeSignature(SignatureToken::U64),
         }]),
     });
-    m.identifiers.push(Identifier::new("x".to_string()).unwrap());
+    m.identifiers
+        .push(Identifier::new("x".to_string()).unwrap());
     m
 }
 
@@ -2767,11 +2848,18 @@ pub fn basic_test_module_with_enum() -> CompiledModule {
         abilities: AbilitySet::EMPTY,
         type_parameters: vec![],
     });
-    m.identifiers.push(Identifier::new("enum".to_string()).unwrap());
+    m.identifiers
+        .push(Identifier::new("enum".to_string()).unwrap());
     m.enum_defs.push(EnumDefinition {
         enum_handle: DatatypeHandleIndex::new(1),
-        variants: vec![VariantDefinition { variant_name: IdentifierIndex::new(0), fields: vec![] }],
+        variants: vec![VariantDefinition {
+            variant_name: IdentifierIndex::new(0),
+            fields: vec![],
+        }],
     });
-    m.variant_handles.push(VariantHandle { enum_def: EnumDefinitionIndex::new(0), variant: 0 });
+    m.variant_handles.push(VariantHandle {
+        enum_def: EnumDefinitionIndex::new(0),
+        variant: 0,
+    });
     m
 }

@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::storage_fund {
-    use one::balance::{Self, Balance};
-    use one::oct::OCT;
+module oct_system::storage_fund {
+    use sui::balance::{Self, Balance};
+    use sui::oct::OCT;
 
     /// Struct representing the storage fund, containing two `Balance`s:
     /// - `total_object_storage_rebates` has the invariant that it's the sum of `storage_rebate` of

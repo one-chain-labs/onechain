@@ -4,7 +4,10 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use crate::{
-    block::{genesis_blocks, BlockAPI, BlockRef, BlockTimestampMs, SignedBlock, VerifiedBlock, GENESIS_ROUND},
+    block::{
+        genesis_blocks, BlockAPI, BlockRef, BlockTimestampMs, SignedBlock, VerifiedBlock,
+        GENESIS_ROUND,
+    },
     context::Context,
     error::{ConsensusError, ConsensusResult},
     transaction::TransactionVerifier,
@@ -42,25 +45,46 @@ pub(crate) struct SignedBlockVerifier {
 }
 
 impl SignedBlockVerifier {
-    pub(crate) fn new(context: Arc<Context>, transaction_verifier: Arc<dyn TransactionVerifier>) -> Self {
-        let genesis = genesis_blocks(context.clone()).into_iter().map(|b| b.reference()).collect();
-        Self { context, genesis, transaction_verifier }
+    pub(crate) fn new(
+        context: Arc<Context>,
+        transaction_verifier: Arc<dyn TransactionVerifier>,
+    ) -> Self {
+        let genesis = genesis_blocks(context.clone())
+            .into_iter()
+            .map(|b| b.reference())
+            .collect();
+        Self {
+            context,
+            genesis,
+            transaction_verifier,
+        }
     }
 
     pub(crate) fn check_transactions(&self, batch: &[&[u8]]) -> ConsensusResult<()> {
-        let max_transaction_size_limit = self.context.protocol_config.max_transaction_size_bytes() as usize;
+        let max_transaction_size_limit =
+            self.context.protocol_config.max_transaction_size_bytes() as usize;
         for t in batch {
             if t.len() > max_transaction_size_limit && max_transaction_size_limit > 0 {
-                return Err(ConsensusError::TransactionTooLarge { size: t.len(), limit: max_transaction_size_limit });
+                return Err(ConsensusError::TransactionTooLarge {
+                    size: t.len(),
+                    limit: max_transaction_size_limit,
+                });
             }
         }
 
-        let max_num_transactions_limit = self.context.protocol_config.max_num_transactions_in_block() as usize;
+        let max_num_transactions_limit =
+            self.context.protocol_config.max_num_transactions_in_block() as usize;
         if batch.len() > max_num_transactions_limit && max_num_transactions_limit > 0 {
-            return Err(ConsensusError::TooManyTransactions { count: batch.len(), limit: max_num_transactions_limit });
+            return Err(ConsensusError::TooManyTransactions {
+                count: batch.len(),
+                limit: max_num_transactions_limit,
+            });
         }
 
-        let total_transactions_size_limit = self.context.protocol_config.max_transactions_in_block_bytes() as usize;
+        let total_transactions_size_limit = self
+            .context
+            .protocol_config
+            .max_transactions_in_block_bytes() as usize;
         if batch.iter().map(|t| t.len()).sum::<usize>() > total_transactions_size_limit
             && total_transactions_size_limit > 0
         {
@@ -80,13 +104,19 @@ impl BlockVerifier for SignedBlockVerifier {
         // The block must belong to the current epoch and have valid authority index,
         // before having its signature verified.
         if block.epoch() != committee.epoch() {
-            return Err(ConsensusError::WrongEpoch { expected: committee.epoch(), actual: block.epoch() });
+            return Err(ConsensusError::WrongEpoch {
+                expected: committee.epoch(),
+                actual: block.epoch(),
+            });
         }
         if block.round() == 0 {
             return Err(ConsensusError::UnexpectedGenesisBlock);
         }
         if !committee.is_valid_index(block.author()) {
-            return Err(ConsensusError::InvalidAuthorityIndex { index: block.author(), max: committee.size() - 1 });
+            return Err(ConsensusError::InvalidAuthorityIndex {
+                index: block.author(),
+                max: committee.size() - 1,
+            });
         }
 
         // Verify the block's signature.
@@ -95,7 +125,10 @@ impl BlockVerifier for SignedBlockVerifier {
         // Verify the block's ancestor refs are consistent with the block's round,
         // and total parent stakes reach quorum.
         if block.ancestors().len() > committee.size() {
-            return Err(ConsensusError::TooManyAncestors(block.ancestors().len(), committee.size()));
+            return Err(ConsensusError::TooManyAncestors(
+                block.ancestors().len(),
+                committee.size(),
+            ));
         }
         if block.ancestors().is_empty() {
             return Err(ConsensusError::InsufficientParentStakes {
@@ -107,9 +140,14 @@ impl BlockVerifier for SignedBlockVerifier {
         let mut parent_stakes = 0;
         for (i, ancestor) in block.ancestors().iter().enumerate() {
             if !committee.is_valid_index(ancestor.author) {
-                return Err(ConsensusError::InvalidAuthorityIndex { index: ancestor.author, max: committee.size() - 1 });
+                return Err(ConsensusError::InvalidAuthorityIndex {
+                    index: ancestor.author,
+                    max: committee.size() - 1,
+                });
             }
-            if (i == 0 && ancestor.author != block.author()) || (i > 0 && ancestor.author == block.author()) {
+            if (i == 0 && ancestor.author != block.author())
+                || (i > 0 && ancestor.author == block.author())
+            {
                 return Err(ConsensusError::InvalidAncestorPosition {
                     block_authority: block.author(),
                     ancestor_authority: ancestor.author,
@@ -117,13 +155,18 @@ impl BlockVerifier for SignedBlockVerifier {
                 });
             }
             if ancestor.round >= block.round() {
-                return Err(ConsensusError::InvalidAncestorRound { ancestor: ancestor.round, block: block.round() });
+                return Err(ConsensusError::InvalidAncestorRound {
+                    ancestor: ancestor.round,
+                    block: block.round(),
+                });
             }
             if ancestor.round == GENESIS_ROUND && !self.genesis.contains(ancestor) {
                 return Err(ConsensusError::InvalidGenesisAncestor(*ancestor));
             }
             if seen_ancestors[ancestor.author] {
-                return Err(ConsensusError::DuplicatedAncestorsAuthority(ancestor.author));
+                return Err(ConsensusError::DuplicatedAncestorsAuthority(
+                    ancestor.author,
+                ));
             }
             seen_ancestors[ancestor.author] = true;
             // Block must have round >= 1 so checked_sub(1) should be safe.
@@ -142,7 +185,9 @@ impl BlockVerifier for SignedBlockVerifier {
 
         self.check_transactions(&batch)?;
 
-        self.transaction_verifier.verify_batch(&batch).map_err(|e| ConsensusError::InvalidTransaction(format!("{e:?}")))
+        self.transaction_verifier
+            .verify_batch(&batch)
+            .map_err(|e| ConsensusError::InvalidTransaction(format!("{e:?}")))
     }
 
     fn check_ancestors(
@@ -174,7 +219,9 @@ impl BlockVerifier for SignedBlockVerifier {
             // This checks the invariant that block timestamp >= max ancestor timestamp.
             let mut max_timestamp_ms = BlockTimestampMs::MIN;
             for (ancestor_ref, ancestor_block) in block.ancestors().iter().zip(ancestors.iter()) {
-                let ancestor_block = ancestor_block.as_ref().expect("There should never be an empty slot");
+                let ancestor_block = ancestor_block
+                    .as_ref()
+                    .expect("There should never be an empty slot");
                 assert_eq!(ancestor_ref, &ancestor_block.reference());
                 max_timestamp_ms = max_timestamp_ms.max(ancestor_block.timestamp_ms());
             }
@@ -228,13 +275,19 @@ mod test {
         fn verify_batch(&self, transactions: &[&[u8]]) -> Result<(), ValidationError> {
             for txn in transactions {
                 if txn.len() < 4 {
-                    return Err(ValidationError::InvalidTransaction(format!("Length {} is too short!", txn.len())));
+                    return Err(ValidationError::InvalidTransaction(format!(
+                        "Length {} is too short!",
+                        txn.len()
+                    )));
                 }
             }
             Ok(())
         }
 
-        async fn verify_and_vote_batch(&self, _batch: &[&[u8]]) -> Result<Vec<TransactionIndex>, ValidationError> {
+        async fn verify_and_vote_batch(
+            &self,
+            _batch: &[&[u8]],
+        ) -> Result<Vec<TransactionIndex>, ValidationError> {
             Ok(vec![])
         }
     }
@@ -268,7 +321,10 @@ mod test {
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
-                Err(ConsensusError::WrongEpoch { expected: _, actual: _ })
+                Err(ConsensusError::WrongEpoch {
+                    expected: _,
+                    actual: _
+                })
             ));
         }
 
@@ -276,12 +332,18 @@ mod test {
         {
             let block = test_block.clone().set_round(0).build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
-            assert!(matches!(verifier.verify(&signed_block), Err(ConsensusError::UnexpectedGenesisBlock)));
+            assert!(matches!(
+                verifier.verify(&signed_block),
+                Err(ConsensusError::UnexpectedGenesisBlock)
+            ));
         }
 
         // Block with invalid authority index.
         {
-            let block = test_block.clone().set_author(AuthorityIndex::new_for_test(4)).build();
+            let block = test_block
+                .clone()
+                .set_author(AuthorityIndex::new_for_test(4))
+                .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
@@ -291,16 +353,25 @@ mod test {
 
         // Block with mismatched authority index and signature.
         {
-            let block = test_block.clone().set_author(AuthorityIndex::new_for_test(1)).build();
+            let block = test_block
+                .clone()
+                .set_author(AuthorityIndex::new_for_test(1))
+                .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
-            assert!(matches!(verifier.verify(&signed_block), Err(ConsensusError::SignatureVerificationFailure(_))));
+            assert!(matches!(
+                verifier.verify(&signed_block),
+                Err(ConsensusError::SignatureVerificationFailure(_))
+            ));
         }
 
         // Block with wrong key.
         {
             let block = test_block.clone().build();
             let signed_block = SignedBlock::new(block, &keypairs[3].1).unwrap();
-            assert!(matches!(verifier.verify(&signed_block), Err(ConsensusError::SignatureVerificationFailure(_))));
+            assert!(matches!(
+                verifier.verify(&signed_block),
+                Err(ConsensusError::SignatureVerificationFailure(_))
+            ));
         }
 
         // Block without signature.
@@ -308,7 +379,10 @@ mod test {
             let block = test_block.clone().build();
             let mut signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             signed_block.clear_signature();
-            assert!(matches!(verifier.verify(&signed_block), Err(ConsensusError::MalformedSignature(_))));
+            assert!(matches!(
+                verifier.verify(&signed_block),
+                Err(ConsensusError::MalformedSignature(_))
+            ));
         }
 
         // Block with invalid ancestor round.
@@ -325,7 +399,10 @@ mod test {
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
-                Err(ConsensusError::InvalidAncestorRound { ancestor: _, block: _ })
+                Err(ConsensusError::InvalidAncestorRound {
+                    ancestor: _,
+                    block: _
+                })
             ));
         }
 
@@ -343,7 +420,10 @@ mod test {
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
-                Err(ConsensusError::InsufficientParentStakes { parent_stakes: _, quorum: _ })
+                Err(ConsensusError::InsufficientParentStakes {
+                    parent_stakes: _,
+                    quorum: _
+                })
             ));
         }
 
@@ -360,7 +440,10 @@ mod test {
                 ])
                 .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
-            assert!(matches!(verifier.verify(&signed_block), Err(ConsensusError::TooManyAncestors(_, _))));
+            assert!(matches!(
+                verifier.verify(&signed_block),
+                Err(ConsensusError::TooManyAncestors(_, _))
+            ));
         }
 
         // Block without own ancestor.
@@ -376,7 +459,11 @@ mod test {
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
-                Err(ConsensusError::InvalidAncestorPosition { block_authority: _, ancestor_authority: _, position: _ })
+                Err(ConsensusError::InvalidAncestorPosition {
+                    block_authority: _,
+                    ancestor_authority: _,
+                    position: _
+                })
             ));
         }
 
@@ -394,7 +481,11 @@ mod test {
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
-                Err(ConsensusError::InvalidAncestorPosition { block_authority: _, ancestor_authority: _, position: _ })
+                Err(ConsensusError::InvalidAncestorPosition {
+                    block_authority: _,
+                    ancestor_authority: _,
+                    position: _
+                })
             ));
         }
 
@@ -409,19 +500,31 @@ mod test {
                 ])
                 .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
-            assert!(matches!(verifier.verify(&signed_block), Err(ConsensusError::DuplicatedAncestorsAuthority(_))));
+            assert!(matches!(
+                verifier.verify(&signed_block),
+                Err(ConsensusError::DuplicatedAncestorsAuthority(_))
+            ));
         }
 
         // Block with invalid transaction.
         {
-            let block = test_block.clone().set_transactions(vec![Transaction::new(vec![1; 2])]).build();
+            let block = test_block
+                .clone()
+                .set_transactions(vec![Transaction::new(vec![1; 2])])
+                .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
-            assert!(matches!(verifier.verify(&signed_block), Err(ConsensusError::InvalidTransaction(_))));
+            assert!(matches!(
+                verifier.verify(&signed_block),
+                Err(ConsensusError::InvalidTransaction(_))
+            ));
         }
 
         // Block with transaction too large.
         {
-            let block = test_block.clone().set_transactions(vec![Transaction::new(vec![4; 257 * 1024])]).build();
+            let block = test_block
+                .clone()
+                .set_transactions(vec![Transaction::new(vec![4; 257 * 1024])])
+                .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
@@ -431,8 +534,10 @@ mod test {
 
         // Block with too many transactions.
         {
-            let block =
-                test_block.clone().set_transactions((0..1000).map(|_| Transaction::new(vec![4; 8])).collect()).build();
+            let block = test_block
+                .clone()
+                .set_transactions((0..1000).map(|_| Transaction::new(vec![4; 8])).collect())
+                .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
                 verifier.verify(&signed_block),
@@ -444,7 +549,11 @@ mod test {
         {
             let block = test_block
                 .clone()
-                .set_transactions((0..100).map(|_| Transaction::new(vec![4; 8 * 1024])).collect())
+                .set_transactions(
+                    (0..100)
+                        .map(|_| Transaction::new(vec![4; 8 * 1024]))
+                        .collect(),
+                )
                 .build();
             let signed_block = SignedBlock::new(block, authority_2_protocol_keypair).unwrap();
             assert!(matches!(
@@ -467,25 +576,42 @@ mod test {
 
         let mut ancestor_blocks = vec![];
         for i in 0..num_authorities {
-            let test_block = TestBlock::new(10, i as u32).set_timestamp_ms(1000 + 100 * i as BlockTimestampMs).build();
+            let test_block = TestBlock::new(10, i as u32)
+                .set_timestamp_ms(1000 + 100 * i as BlockTimestampMs)
+                .build();
             ancestor_blocks.push(Some(VerifiedBlock::new_for_test(test_block)));
         }
-        let ancestor_refs = ancestor_blocks.iter().flatten().map(|block| block.reference()).collect::<Vec<_>>();
+        let ancestor_refs = ancestor_blocks
+            .iter()
+            .flatten()
+            .map(|block| block.reference())
+            .collect::<Vec<_>>();
 
         // Block respecting timestamp invariant.
         {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1500).build();
+            let block = TestBlock::new(11, 0)
+                .set_ancestors(ancestor_refs.clone())
+                .set_timestamp_ms(1500)
+                .build();
             let verified_block = VerifiedBlock::new_for_test(block);
-            assert!(verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round).is_ok());
+            assert!(verifier
+                .check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round)
+                .is_ok());
         }
 
         // Block not respecting timestamp invariant.
         {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1000).build();
+            let block = TestBlock::new(11, 0)
+                .set_ancestors(ancestor_refs.clone())
+                .set_timestamp_ms(1000)
+                .build();
             let verified_block = VerifiedBlock::new_for_test(block);
             assert!(matches!(
                 verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round),
-                Err(ConsensusError::InvalidBlockTimestamp { max_timestamp_ms: _, block_timestamp_ms: _ })
+                Err(ConsensusError::InvalidBlockTimestamp {
+                    max_timestamp_ms: _,
+                    block_timestamp_ms: _
+                })
             ));
         }
     }
@@ -503,41 +629,63 @@ mod test {
 
         // Create one block just on the `gc_round` (so it should be considered garbage collected). This has higher
         // timestamp that the block we are testing.
-        let test_block = TestBlock::new(gc_round, 0_u32).set_timestamp_ms(1500 as BlockTimestampMs).build();
+        let test_block = TestBlock::new(gc_round, 0_u32)
+            .set_timestamp_ms(1500 as BlockTimestampMs)
+            .build();
         ancestor_blocks.push(Some(VerifiedBlock::new_for_test(test_block)));
 
         // Rest of the blocks
         for i in 1..=3 {
-            let test_block =
-                TestBlock::new(gc_round + 1, i as u32).set_timestamp_ms(1000 + 100 * i as BlockTimestampMs).build();
+            let test_block = TestBlock::new(gc_round + 1, i as u32)
+                .set_timestamp_ms(1000 + 100 * i as BlockTimestampMs)
+                .build();
             ancestor_blocks.push(Some(VerifiedBlock::new_for_test(test_block)));
         }
 
-        let ancestor_refs = ancestor_blocks.iter().flatten().map(|block| block.reference()).collect::<Vec<_>>();
+        let ancestor_refs = ancestor_blocks
+            .iter()
+            .flatten()
+            .map(|block| block.reference())
+            .collect::<Vec<_>>();
 
         // Block respecting timestamp invariant.
         {
-            let block =
-                TestBlock::new(gc_round + 2, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1600).build();
+            let block = TestBlock::new(gc_round + 2, 0)
+                .set_ancestors(ancestor_refs.clone())
+                .set_timestamp_ms(1600)
+                .build();
             let verified_block = VerifiedBlock::new_for_test(block);
-            assert!(verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round).is_ok());
+            assert!(verifier
+                .check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round)
+                .is_ok());
         }
 
         // Block not respecting timestamp invariant for the block that is garbage collected
         // Validation should pass.
         {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1400).build();
+            let block = TestBlock::new(11, 0)
+                .set_ancestors(ancestor_refs.clone())
+                .set_timestamp_ms(1400)
+                .build();
             let verified_block = VerifiedBlock::new_for_test(block);
-            assert!(verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round).is_ok());
+            assert!(verifier
+                .check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round)
+                .is_ok());
         }
 
         // Block not respecting timestamp invariant for the blocks that are not garbage collected
         {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1100).build();
+            let block = TestBlock::new(11, 0)
+                .set_ancestors(ancestor_refs.clone())
+                .set_timestamp_ms(1100)
+                .build();
             let verified_block = VerifiedBlock::new_for_test(block);
             assert!(matches!(
                 verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round),
-                Err(ConsensusError::InvalidBlockTimestamp { max_timestamp_ms: _, block_timestamp_ms: _ })
+                Err(ConsensusError::InvalidBlockTimestamp {
+                    max_timestamp_ms: _,
+                    block_timestamp_ms: _
+                })
             ));
         }
     }

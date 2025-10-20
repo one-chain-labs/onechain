@@ -10,12 +10,12 @@
 /// substitution and filling-in the pieces using the data from the object T.
 ///
 /// More entry functions might be added in the future depending on the use cases.
-module one::display;
+module oct::display;
 
 use std::string::String;
-use one::event;
-use one::package::Publisher;
-use one::vec_map::{Self, VecMap};
+use sui::event;
+use sui::package::Publisher;
+use sui::vec_map::{Self, VecMap};
 
 /// For when T does not belong to the package `Publisher`.
 const ENotOwner: u64 = 0;

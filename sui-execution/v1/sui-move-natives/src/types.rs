@@ -8,7 +8,9 @@ use move_core_types::{
     runtime_value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
-use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+};
 use smallvec::smallvec;
 use std::collections::VecDeque;
 
@@ -48,17 +50,24 @@ pub fn is_one_time_witness(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    let type_is_one_time_witness_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().type_is_one_time_witness_cost_params.clone();
+    let type_is_one_time_witness_cost_params = context
+        .extensions_mut()
+        .get::<NativesCostTable>()
+        .type_is_one_time_witness_cost_params
+        .clone();
 
-    native_charge_gas_early_exit!(context, type_is_one_time_witness_cost_params.types_is_one_time_witness_cost_base);
+    native_charge_gas_early_exit!(
+        context,
+        type_is_one_time_witness_cost_params.types_is_one_time_witness_cost_base
+    );
 
     // unwrap safe because the interface of native function guarantees it.
     let ty = ty_args.pop().unwrap();
 
     native_charge_gas_early_exit!(
         context,
-        type_is_one_time_witness_cost_params.types_is_one_time_witness_type_cost_per_byte * u64::from(ty.size()).into()
+        type_is_one_time_witness_cost_params.types_is_one_time_witness_type_cost_per_byte
+            * u64::from(ty.size()).into()
     );
 
     let type_tag = context.type_to_type_tag(&ty)?;

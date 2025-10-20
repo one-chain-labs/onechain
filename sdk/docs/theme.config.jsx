@@ -6,12 +6,12 @@ import { useRouter } from 'next/router';
 const config = {
 	logo: <span>Sui TypeScript Docs</span>,
 	project: {
-		link: 'https://github.com/MystenLabs/sui/tree/main/sdk/',
+		link: 'https://github.com/one-chain-labs/onechain/tree/main/sdk/',
 	},
 	chat: {
 		link: 'https://discord.com/invite/Sui',
 	},
-	docsRepositoryBase: 'https://github.com/MystenLabs/sui/tree/main/sdk/docs',
+	docsRepositoryBase: 'https://github.com/one-chain-labs/onechain/tree/main/sdk/docs',
 	footer: {
 		text: `Copyright © ${new Date().getFullYear()}, Mysten Labs, Inc.`,
 	},

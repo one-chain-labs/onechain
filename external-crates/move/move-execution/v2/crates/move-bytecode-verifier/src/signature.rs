@@ -8,19 +8,9 @@
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet,
-        Bytecode,
-        CodeUnit,
-        CompiledModule,
-        DatatypeTyParameter,
-        FunctionDefinition,
-        FunctionHandle,
-        Signature,
-        SignatureIndex,
-        SignatureToken,
-        StructDefinition,
-        StructFieldInformation,
-        TableIndex,
+        AbilitySet, Bytecode, CodeUnit, CompiledModule, DatatypeTyParameter, FunctionDefinition,
+        FunctionHandle, Signature, SignatureIndex, SignatureToken, StructDefinition,
+        StructFieldInformation, TableIndex,
     },
     file_format_common::VERSION_6,
     IndexKind,
@@ -39,7 +29,10 @@ impl<'a> SignatureChecker<'a> {
     }
 
     fn verify_module_impl(module: &'a CompiledModule) -> PartialVMResult<()> {
-        let mut sig_check = Self { resolver: module, abilities_cache: HashMap::new() };
+        let mut sig_check = Self {
+            resolver: module,
+            abilities_cache: HashMap::new(),
+        };
         sig_check.verify_signature_pool(module.signatures())?;
         sig_check.verify_function_signatures(module.function_handles())?;
         sig_check.verify_fields(module.struct_defs())?;
@@ -53,14 +46,20 @@ impl<'a> SignatureChecker<'a> {
         Ok(())
     }
 
-    fn verify_function_signatures(&mut self, function_handles: &[FunctionHandle]) -> PartialVMResult<()> {
+    fn verify_function_signatures(
+        &mut self,
+        function_handles: &[FunctionHandle],
+    ) -> PartialVMResult<()> {
         let err_handler = |err: PartialVMError, idx| {
-            err.at_index(IndexKind::Signature, idx as TableIndex).at_index(IndexKind::FunctionHandle, idx as TableIndex)
+            err.at_index(IndexKind::Signature, idx as TableIndex)
+                .at_index(IndexKind::FunctionHandle, idx as TableIndex)
         };
 
         for (idx, fh) in function_handles.iter().enumerate() {
-            self.check_instantiation(fh.return_, &fh.type_parameters).map_err(|err| err_handler(err, idx))?;
-            self.check_instantiation(fh.parameters, &fh.type_parameters).map_err(|err| err_handler(err, idx))?;
+            self.check_instantiation(fh.return_, &fh.type_parameters)
+                .map_err(|err| err_handler(err, idx))?;
+            self.check_instantiation(fh.parameters, &fh.type_parameters)
+                .map_err(|err| err_handler(err, idx))?;
             if !fh.type_parameters.is_empty() {}
         }
         Ok(())
@@ -78,13 +77,19 @@ impl<'a> SignatureChecker<'a> {
                     .at_index(IndexKind::StructDefinition, struct_def_idx as TableIndex)
             };
             for (field_offset, field_def) in fields.iter().enumerate() {
-                self.check_signature_token(&field_def.signature.0).map_err(|err| err_handler(err, field_offset))?;
-                let type_param_constraints: Vec<_> = struct_handle.type_param_constraints().collect();
+                self.check_signature_token(&field_def.signature.0)
+                    .map_err(|err| err_handler(err, field_offset))?;
+                let type_param_constraints: Vec<_> =
+                    struct_handle.type_param_constraints().collect();
                 self.check_type_instantiation(&field_def.signature.0, &type_param_constraints)
                     .map_err(|err| err_handler(err, field_offset))?;
 
-                self.check_phantom_params(&field_def.signature.0, false, &struct_handle.type_parameters)
-                    .map_err(|err| err_handler(err, field_offset))?;
+                self.check_phantom_params(
+                    &field_def.signature.0,
+                    false,
+                    &struct_handle.type_parameters,
+                )
+                .map_err(|err| err_handler(err, field_offset))?;
             }
         }
         Ok(())
@@ -102,15 +107,20 @@ impl<'a> SignatureChecker<'a> {
                 None => continue,
             };
             let func_handle = &function_handles[func_def.function.0 as usize];
-            self.verify_code(code, &func_handle.type_parameters).map_err(|err| {
-                err.at_index(IndexKind::Signature, code.locals.0)
-                    .at_index(IndexKind::FunctionDefinition, func_def_idx as TableIndex)
-            })?
+            self.verify_code(code, &func_handle.type_parameters)
+                .map_err(|err| {
+                    err.at_index(IndexKind::Signature, code.locals.0)
+                        .at_index(IndexKind::FunctionDefinition, func_def_idx as TableIndex)
+                })?
         }
         Ok(())
     }
 
-    fn verify_code(&mut self, code: &CodeUnit, type_parameters: &[AbilitySet]) -> PartialVMResult<()> {
+    fn verify_code(
+        &mut self,
+        code: &CodeUnit,
+        type_parameters: &[AbilitySet],
+    ) -> PartialVMResult<()> {
         self.check_instantiation(code.locals, type_parameters)?;
 
         // Check if the type actuals in certain bytecode instructions are well defined.
@@ -140,7 +150,11 @@ impl<'a> SignatureChecker<'a> {
                     let struct_handle = self.resolver.datatype_handle_at(struct_def.struct_handle);
                     let type_arguments = &self.resolver.signature_at(struct_inst.type_parameters).0;
                     self.check_signature_tokens(type_arguments)?;
-                    self.check_generic_instance(type_arguments, struct_handle.type_param_constraints(), type_parameters)
+                    self.check_generic_instance(
+                        type_arguments,
+                        struct_handle.type_param_constraints(),
+                        type_parameters,
+                    )
                 }
                 ImmBorrowFieldGeneric(idx) | MutBorrowFieldGeneric(idx) => {
                     let field_inst = self.resolver.field_instantiation_at(*idx);
@@ -149,7 +163,11 @@ impl<'a> SignatureChecker<'a> {
                     let struct_handle = self.resolver.datatype_handle_at(struct_def.struct_handle);
                     let type_arguments = &self.resolver.signature_at(field_inst.type_parameters).0;
                     self.check_signature_tokens(type_arguments)?;
-                    self.check_generic_instance(type_arguments, struct_handle.type_param_constraints(), type_parameters)
+                    self.check_generic_instance(
+                        type_arguments,
+                        struct_handle.type_param_constraints(),
+                        type_parameters,
+                    )
                 }
                 VecPack(idx, _)
                 | VecLen(idx)
@@ -161,9 +179,13 @@ impl<'a> SignatureChecker<'a> {
                 | VecSwap(idx) => {
                     let type_arguments = &self.resolver.signature_at(*idx).0;
                     if type_arguments.len() != 1 {
-                        return Err(PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH).with_message(
-                            format!("expected 1 type token for vector operations, got {}", type_arguments.len()),
-                        ));
+                        return Err(PartialVMError::new(
+                            StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+                        )
+                        .with_message(format!(
+                            "expected 1 type token for vector operations, got {}",
+                            type_arguments.len()
+                        )));
                     }
                     self.check_signature_tokens(type_arguments)
                 }
@@ -238,11 +260,15 @@ impl<'a> SignatureChecker<'a> {
                 | UnpackVariantMutRef(_)
                 | UnpackVariantGenericMutRef(_)
                 | VariantSwitch(_) => {
-                    return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Unexpected variant opcode in version 0".to_string()));
+                    return Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message("Unexpected variant opcode in version 0".to_string()),
+                    );
                 }
             };
-            result.map_err(|err| err.append_message_with_separator(' ', format!("at offset {} ", offset)))?
+            result.map_err(|err| {
+                err.append_message_with_separator(' ', format!("at offset {} ", offset))
+            })?
         }
         Ok(())
     }
@@ -260,13 +286,21 @@ impl<'a> SignatureChecker<'a> {
                 let (idx, type_arguments) = &**struct_inst;
                 let sh = self.resolver.datatype_handle_at(*idx);
                 for (i, ty) in type_arguments.iter().enumerate() {
-                    self.check_phantom_params(ty, sh.type_parameters[i].is_phantom, type_parameters)?;
+                    self.check_phantom_params(
+                        ty,
+                        sh.type_parameters[i].is_phantom,
+                        type_parameters,
+                    )?;
                 }
             }
             SignatureToken::TypeParameter(idx) => {
                 if type_parameters[*idx as usize].is_phantom && !is_phantom_pos {
-                    return Err(PartialVMError::new(StatusCode::INVALID_PHANTOM_TYPE_PARAM_POSITION)
-                        .with_message("phantom type parameter cannot be used in non-phantom position".to_string()));
+                    return Err(PartialVMError::new(
+                        StatusCode::INVALID_PHANTOM_TYPE_PARAM_POSITION,
+                    )
+                    .with_message(
+                        "phantom type parameter cannot be used in non-phantom position".to_string(),
+                    ));
                 }
             }
 
@@ -314,7 +348,8 @@ impl<'a> SignatureChecker<'a> {
     fn check_signature_token(&self, ty: &SignatureToken) -> PartialVMResult<()> {
         use SignatureToken::*;
         match ty {
-            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address | Signer | Datatype(_) | TypeParameter(_) => Ok(()),
+            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address | Signer | Datatype(_)
+            | TypeParameter(_) => Ok(()),
             Reference(_) | MutableReference(_) => {
                 // TODO: Prop tests expect us to NOT check the inner types.
                 // Revisit this once we rework prop tests.
@@ -329,7 +364,11 @@ impl<'a> SignatureChecker<'a> {
         }
     }
 
-    fn check_instantiation(&mut self, idx: SignatureIndex, type_parameters: &[AbilitySet]) -> PartialVMResult<()> {
+    fn check_instantiation(
+        &mut self,
+        idx: SignatureIndex,
+        type_parameters: &[AbilitySet],
+    ) -> PartialVMResult<()> {
         if let Some(checked_abilities) = self.abilities_cache.get(&idx) {
             if checked_abilities.contains(type_parameters) {
                 return Ok(());
@@ -343,7 +382,11 @@ impl<'a> SignatureChecker<'a> {
         Ok(())
     }
 
-    fn check_type_instantiation(&self, s: &SignatureToken, type_parameters: &[AbilitySet]) -> PartialVMResult<()> {
+    fn check_type_instantiation(
+        &self,
+        s: &SignatureToken,
+        type_parameters: &[AbilitySet],
+    ) -> PartialVMResult<()> {
         if self.resolver.version() >= VERSION_6 {
             for ty in s.preorder_traversal() {
                 self.check_type_instantiation_(ty, type_parameters)?
@@ -355,7 +398,11 @@ impl<'a> SignatureChecker<'a> {
         }
     }
 
-    fn check_type_instantiation_(&self, s: &SignatureToken, type_parameters: &[AbilitySet]) -> PartialVMResult<()> {
+    fn check_type_instantiation_(
+        &self,
+        s: &SignatureToken,
+        type_parameters: &[AbilitySet],
+    ) -> PartialVMResult<()> {
         match s {
             SignatureToken::DatatypeInstantiation(struct_inst) => {
                 let (idx, type_arguments) = &**struct_inst;
@@ -364,7 +411,11 @@ impl<'a> SignatureChecker<'a> {
                 // i.e. it cannot be checked unless we are inside some module member. The only case
                 // where that happens is when checking the signature pool itself
                 let sh = self.resolver.datatype_handle_at(*idx);
-                self.check_generic_instance(type_arguments, sh.type_param_constraints(), type_parameters)
+                self.check_generic_instance(
+                    type_arguments,
+                    sh.type_param_constraints(),
+                    type_parameters,
+                )
             }
             SignatureToken::Reference(_)
             | SignatureToken::MutableReference(_)
@@ -391,21 +442,26 @@ impl<'a> SignatureChecker<'a> {
         global_abilities: &[AbilitySet],
     ) -> PartialVMResult<()> {
         if type_arguments.len() != constraints.len() {
-            return Err(PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH).with_message(format!(
-                "expected {} type argument(s), got {}",
-                constraints.len(),
-                type_arguments.len()
-            )));
+            return Err(
+                PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH).with_message(
+                    format!(
+                        "expected {} type argument(s), got {}",
+                        constraints.len(),
+                        type_arguments.len()
+                    ),
+                ),
+            );
         }
 
         for (constraint, ty) in constraints.into_iter().zip(type_arguments) {
             let given = self.resolver.abilities(ty, global_abilities)?;
             if !constraint.is_subset(given) {
-                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED).with_message(format!(
-                    "expected type with abilities {:?} got type actual {:?} with incompatible \
+                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                    .with_message(format!(
+                        "expected type with abilities {:?} got type actual {:?} with incompatible \
                         abilities {:?}",
-                    constraint, ty, given
-                )));
+                        constraint, ty, given
+                    )));
             }
         }
         Ok(())

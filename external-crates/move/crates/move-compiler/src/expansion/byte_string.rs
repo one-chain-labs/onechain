@@ -14,7 +14,11 @@ struct Context {
 
 impl Context {
     fn new(file_hash: FileHash, start_offset: usize) -> Self {
-        Self { file_hash, start_offset, diags: Diagnostics::new() }
+        Self {
+            file_hash,
+            start_offset,
+            diags: Diagnostics::new(),
+        }
     }
 
     fn error(&mut self, start: usize, end: usize, err_text: String) {
@@ -23,7 +27,8 @@ impl Context {
             self.start_offset + 2 + start, // add 2 for the beginning of the string
             self.start_offset + 2 + end,
         );
-        self.diags.add(diag!(Syntax::InvalidByteString, (loc, err_text)))
+        self.diags
+            .add(diag!(Syntax::InvalidByteString, (loc, err_text)))
     }
 
     fn has_diags(&self) -> bool {

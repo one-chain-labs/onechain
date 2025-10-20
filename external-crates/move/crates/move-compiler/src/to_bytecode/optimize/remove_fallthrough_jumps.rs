@@ -22,7 +22,10 @@ pub fn optimize(
     fall_through_removed || block_removed
 }
 
-fn remove_fall_through(loop_heads: &BTreeSet<IR::BlockLabel_>, blocks: &mut IR::BytecodeBlocks) -> bool {
+fn remove_fall_through(
+    loop_heads: &BTreeSet<IR::BlockLabel_>,
+    blocks: &mut IR::BytecodeBlocks,
+) -> bool {
     use IR::Bytecode_ as B;
     let mut changed = false;
     for idx in 0..(blocks.len() - 1) {
@@ -33,7 +36,8 @@ fn remove_fall_through(loop_heads: &BTreeSet<IR::BlockLabel_>, blocks: &mut IR::
             continue;
         }
 
-        let remove_last = matches!(&block.last().unwrap().value, B::Branch(lbl) if lbl == next_block);
+        let remove_last =
+            matches!(&block.last().unwrap().value, B::Branch(lbl) if lbl == next_block);
         if remove_last {
             changed = true;
             block.pop();

@@ -6,8 +6,8 @@ edition = "2024.beta"
 
 [dependencies]
 MoveStdlib = { local = "../move-stdlib" }
-One = { local = "../one-framework" }
-OneSystem = { local = "../one-system" }
+Sui = { local = "../sui-framework" }
+OneSystem = { local = "../sui-system" }
 
 [addresses]
 bridge = "0xb"

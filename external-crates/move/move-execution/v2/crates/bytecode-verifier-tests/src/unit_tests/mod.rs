@@ -5,10 +5,7 @@
 use move_binary_format::file_format_common::VERSION_6;
 use move_core_types::VARIANT_COUNT_MAX;
 use move_vm_config::verifier::{
-    MeterConfig,
-    VerifierConfig,
-    DEFAULT_MAX_CONSTANT_VECTOR_LEN,
-    DEFAULT_MAX_IDENTIFIER_LENGTH,
+    MeterConfig, VerifierConfig, DEFAULT_MAX_CONSTANT_VECTOR_LEN, DEFAULT_MAX_IDENTIFIER_LENGTH,
 };
 
 pub mod binary_samples;

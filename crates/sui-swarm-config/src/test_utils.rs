@@ -7,16 +7,13 @@ use std::collections::HashMap;
 use sui_types::{
     base_types::AuthorityName,
     committee::{Committee, EpochId, StakeUnit},
-    crypto::{AuthorityKeyPair, AuthoritySignInfo, AuthoritySignature, KeypairTraits, SuiAuthoritySignature},
+    crypto::{
+        AuthorityKeyPair, AuthoritySignInfo, AuthoritySignature, KeypairTraits,
+        SuiAuthoritySignature,
+    },
     messages_checkpoint::{
-        CertifiedCheckpointSummary,
-        CheckpointDigest,
-        CheckpointSequenceNumber,
-        CheckpointSummary,
-        CheckpointVersionSpecificData,
-        EndOfEpochData,
-        FullCheckpointContents,
-        VerifiedCheckpoint,
+        CertifiedCheckpointSummary, CheckpointDigest, CheckpointSequenceNumber, CheckpointSummary,
+        CheckpointVersionSpecificData, EndOfEpochData, FullCheckpointContents, VerifiedCheckpoint,
         VerifiedCheckpointContents,
     },
 };
@@ -35,7 +32,11 @@ type MakeCheckpointResults = (
 );
 
 impl CommitteeFixture {
-    pub fn generate<R: ::rand::RngCore + ::rand::CryptoRng>(mut rng: R, epoch: EpochId, committee_size: usize) -> Self {
+    pub fn generate<R: ::rand::RngCore + ::rand::CryptoRng>(
+        mut rng: R,
+        epoch: EpochId,
+        committee_size: usize,
+    ) -> Self {
         let validators = (0..committee_size)
             .map(|_| sui_types::crypto::get_key_pair_from_rng::<AuthorityKeyPair, _>(&mut rng).1)
             .map(|keypair| (keypair.public().into(), (keypair, 1)))
@@ -43,10 +44,17 @@ impl CommitteeFixture {
 
         let committee = Committee::new_for_testing_with_normalized_voting_power(
             epoch,
-            validators.iter().map(|(name, (_, stake))| (*name, *stake)).collect(),
+            validators
+                .iter()
+                .map(|(name, (_, stake))| (*name, *stake))
+                .collect(),
         );
 
-        Self { epoch, validators, committee }
+        Self {
+            epoch,
+            validators,
+            committee,
+        }
     }
 
     pub fn from_network_config(network_config: &NetworkConfig) -> Self {
@@ -85,16 +93,23 @@ impl CommitteeFixture {
             epoch: 0,
             sequence_number: 0,
             network_total_transactions: 0,
-            content_digest: *empty_contents().into_inner().into_checkpoint_contents().digest(),
+            content_digest: *empty_contents()
+                .into_inner()
+                .into_checkpoint_contents()
+                .digest(),
             previous_digest: None,
             epoch_rolling_gas_cost_summary: Default::default(),
             end_of_epoch_data: None,
             timestamp_ms: 0,
-            version_specific_data: bcs::to_bytes(&CheckpointVersionSpecificData::empty_for_tests()).unwrap(),
+            version_specific_data: bcs::to_bytes(&CheckpointVersionSpecificData::empty_for_tests())
+                .unwrap(),
             checkpoint_commitments: Default::default(),
         };
 
-        (self.create_certified_checkpoint(checkpoint), empty_contents())
+        (
+            self.create_certified_checkpoint(checkpoint),
+            empty_contents(),
+        )
     }
 
     fn create_certified_checkpoint(&self, checkpoint: CheckpointSummary) -> VerifiedCheckpoint {
@@ -102,9 +117,16 @@ impl CommitteeFixture {
             .validators
             .iter()
             .map(|(name, (key, _))| {
-                let intent_msg = IntentMessage::new(Intent::sui_app(IntentScope::CheckpointSummary), checkpoint.clone());
+                let intent_msg = IntentMessage::new(
+                    Intent::sui_app(IntentScope::CheckpointSummary),
+                    checkpoint.clone(),
+                );
                 let signature = AuthoritySignature::new_secure(&intent_msg, &checkpoint.epoch, key);
-                AuthoritySignInfo { epoch: checkpoint.epoch, authority: *name, signature }
+                AuthoritySignInfo {
+                    epoch: checkpoint.epoch,
+                    authority: *name,
+                    signature,
+                }
             })
             .collect();
 
@@ -140,31 +162,42 @@ impl CommitteeFixture {
     ) -> MakeCheckpointResults {
         // Only skip the first one if it was supplied
         let skip = previous_checkpoint.is_some() as usize;
-        let first = previous_checkpoint.map(|c| (c, empty_contents())).unwrap_or_else(|| self.create_root_checkpoint());
+        let first = previous_checkpoint
+            .map(|c| (c, empty_contents()))
+            .unwrap_or_else(|| self.create_root_checkpoint());
 
-        let (ordered_checkpoints, contents): (Vec<_>, Vec<_>) = std::iter::successors(Some(first), |prev| {
-            let contents = content_generator();
-            let contents_digest = *contents.clone().into_inner().into_checkpoint_contents().digest();
-            let summary = CheckpointSummary {
-                epoch: self.epoch,
-                sequence_number: prev.0.sequence_number + 1,
-                network_total_transactions: prev.0.network_total_transactions + contents.num_of_transactions() as u64,
-                content_digest: contents_digest,
-                previous_digest: Some(*prev.0.digest()),
-                epoch_rolling_gas_cost_summary: Default::default(),
-                end_of_epoch_data: None,
-                timestamp_ms: 0,
-                version_specific_data: bcs::to_bytes(&CheckpointVersionSpecificData::empty_for_tests()).unwrap(),
-                checkpoint_commitments: Default::default(),
-            };
+        let (ordered_checkpoints, contents): (Vec<_>, Vec<_>) =
+            std::iter::successors(Some(first), |prev| {
+                let contents = content_generator();
+                let contents_digest = *contents
+                    .clone()
+                    .into_inner()
+                    .into_checkpoint_contents()
+                    .digest();
+                let summary = CheckpointSummary {
+                    epoch: self.epoch,
+                    sequence_number: prev.0.sequence_number + 1,
+                    network_total_transactions: prev.0.network_total_transactions
+                        + contents.num_of_transactions() as u64,
+                    content_digest: contents_digest,
+                    previous_digest: Some(*prev.0.digest()),
+                    epoch_rolling_gas_cost_summary: Default::default(),
+                    end_of_epoch_data: None,
+                    timestamp_ms: 0,
+                    version_specific_data: bcs::to_bytes(
+                        &CheckpointVersionSpecificData::empty_for_tests(),
+                    )
+                    .unwrap(),
+                    checkpoint_commitments: Default::default(),
+                };
 
-            let checkpoint = self.create_certified_checkpoint(summary);
+                let checkpoint = self.create_certified_checkpoint(summary);
 
-            Some((checkpoint, contents))
-        })
-        .skip(skip)
-        .take(number_of_checkpoints)
-        .unzip();
+                Some((checkpoint, contents))
+            })
+            .skip(skip)
+            .take(number_of_checkpoints)
+            .unzip();
 
         let (sequence_number_to_digest, checkpoints) = ordered_checkpoints
             .iter()
@@ -175,24 +208,37 @@ impl CommitteeFixture {
             })
             .unzip();
 
-        (ordered_checkpoints, contents, sequence_number_to_digest, checkpoints)
+        (
+            ordered_checkpoints,
+            contents,
+            sequence_number_to_digest,
+            checkpoints,
+        )
     }
 
     pub fn make_end_of_epoch_checkpoint(
         &self,
         previous_checkpoint: VerifiedCheckpoint,
         end_of_epoch_data: Option<EndOfEpochData>,
-    ) -> (CheckpointSequenceNumber, CheckpointDigest, VerifiedCheckpoint) {
+    ) -> (
+        CheckpointSequenceNumber,
+        CheckpointDigest,
+        VerifiedCheckpoint,
+    ) {
         let summary = CheckpointSummary {
             epoch: self.epoch,
             sequence_number: previous_checkpoint.sequence_number + 1,
             network_total_transactions: 0,
-            content_digest: *empty_contents().into_inner().into_checkpoint_contents().digest(),
+            content_digest: *empty_contents()
+                .into_inner()
+                .into_checkpoint_contents()
+                .digest(),
             previous_digest: Some(*previous_checkpoint.digest()),
             epoch_rolling_gas_cost_summary: Default::default(),
             end_of_epoch_data,
             timestamp_ms: 0,
-            version_specific_data: bcs::to_bytes(&CheckpointVersionSpecificData::empty_for_tests()).unwrap(),
+            version_specific_data: bcs::to_bytes(&CheckpointVersionSpecificData::empty_for_tests())
+                .unwrap(),
             checkpoint_commitments: Default::default(),
         };
 
@@ -203,9 +249,9 @@ impl CommitteeFixture {
 }
 
 pub fn empty_contents() -> VerifiedCheckpointContents {
-    VerifiedCheckpointContents::new_unchecked(FullCheckpointContents::new_with_causally_ordered_transactions(
-        std::iter::empty(),
-    ))
+    VerifiedCheckpointContents::new_unchecked(
+        FullCheckpointContents::new_with_causally_ordered_transactions(std::iter::empty()),
+    )
 }
 
 pub fn random_contents() -> VerifiedCheckpointContents {

@@ -2,27 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use indexmap::IndexSet;
-use move_binary_format::{file_format::Visibility, normalized::Type};
+use move_binary_format::file_format::Visibility;
+use move_binary_format::normalized::Type;
 use move_core_types::language_storage::StructTag;
 use rand::rngs::StdRng;
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-    sync::Arc,
-    time::Duration,
-};
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_move_build::BuildConfig;
 use sui_protocol_config::{Chain, ProtocolConfig};
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    execution_config_utils::to_binary_config,
-    object::{Object, Owner},
-    storage::WriteKind,
-    transaction::{CallArg, ObjectArg, TransactionData, TEST_ONLY_GAS_UNIT_FOR_PUBLISH},
-    Identifier,
-    SUI_FRAMEWORK_ADDRESS,
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress};
+use sui_types::execution_config_utils::to_binary_config;
+use sui_types::object::{Object, Owner};
+use sui_types::storage::WriteKind;
+use sui_types::transaction::{CallArg, ObjectArg, TransactionData, TEST_ONLY_GAS_UNIT_FOR_PUBLISH};
+use sui_types::{Identifier, SUI_FRAMEWORK_ADDRESS};
 use test_cluster::TestCluster;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
@@ -63,7 +59,8 @@ impl SurfStatistics {
         } else {
             self.num_owned_obj_transactions += 1;
         }
-        self.unique_move_functions_called.insert((package, module, function));
+        self.unique_move_functions_called
+            .insert((package, module, function));
     }
 
     pub fn aggregate(stats: Vec<Self>) -> Self {
@@ -73,7 +70,9 @@ impl SurfStatistics {
             result.num_failed_transactions += stat.num_failed_transactions;
             result.num_owned_obj_transactions += stat.num_owned_obj_transactions;
             result.num_shared_obj_transactions += stat.num_shared_obj_transactions;
-            result.unique_move_functions_called.extend(stat.unique_move_functions_called);
+            result
+                .unique_move_functions_called
+                .extend(stat.unique_move_functions_called);
         }
         result
     }
@@ -89,7 +88,10 @@ impl SurfStatistics {
             "{} are owned object transactions, {} are shared object transactions",
             self.num_owned_obj_transactions, self.num_shared_obj_transactions
         );
-        info!("Unique move functions called: {}", self.unique_move_functions_called.len());
+        info!(
+            "Unique move functions called: {}",
+            self.unique_move_functions_called.len()
+        );
     }
 }
 
@@ -151,7 +153,9 @@ impl SurferState {
         args: Vec<CallArg>,
     ) {
         let rgp = self.cluster.get_reference_gas_price().await;
-        let use_shared_object = args.iter().any(|arg| matches!(arg, CallArg::Object(ObjectArg::SharedObject { .. })));
+        let use_shared_object = args
+            .iter()
+            .any(|arg| matches!(arg, CallArg::Object(ObjectArg::SharedObject { .. })));
         let tx_data = TransactionData::new_move_call(
             self.address,
             package,
@@ -166,7 +170,12 @@ impl SurferState {
         .unwrap();
         let tx = self.cluster.wallet.sign_transaction(&tx_data);
         let response = loop {
-            match self.cluster.wallet.execute_transaction_may_fail(tx.clone()).await {
+            match self
+                .cluster
+                .wallet
+                .execute_transaction_may_fail(tx.clone())
+                .await
+            {
                 Ok(effects) => break effects,
                 Err(e) => {
                     error!("Error executing transaction: {:?}", e);
@@ -174,10 +183,25 @@ impl SurferState {
                 }
             }
         };
-        debug!("Successfully executed transaction {:?} with response {:?}", tx, response);
+        debug!(
+            "Successfully executed transaction {:?} with response {:?}",
+            tx, response
+        );
         let effects = response.effects.unwrap();
-        info!("[{:?}] Calling Move function {:?}::{:?} returned {:?}", self.address, module, function, effects.status());
-        self.stats.record_transaction(use_shared_object, effects.status().is_ok(), package, module, function);
+        info!(
+            "[{:?}] Calling Move function {:?}::{:?} returned {:?}",
+            self.address,
+            module,
+            function,
+            effects.status()
+        );
+        self.stats.record_transaction(
+            use_shared_object,
+            effects.status().is_ok(),
+            package,
+            module,
+            function,
+        );
         self.process_tx_effects(&effects).await;
     }
 
@@ -191,7 +215,11 @@ impl SurferState {
                 continue;
             }
             let obj_ref = owned_ref.reference.to_object_ref();
-            let object = self.cluster.get_object_from_fullnode_store(&obj_ref.0).await.unwrap();
+            let object = self
+                .cluster
+                .get_object_from_fullnode_store(&obj_ref.0)
+                .await
+                .unwrap();
             if object.is_package() {
                 self.discover_entry_functions(object).await;
                 continue;
@@ -284,7 +312,10 @@ impl SurferState {
                     .collect::<Vec<_>>()
             })
             .collect();
-        info!("Number of entry functions discovered: {:?}", entry_functions.len());
+        info!(
+            "Number of entry functions discovered: {:?}",
+            entry_functions.len()
+        );
         debug!("Entry functions: {:?}", entry_functions);
         self.entry_functions.write().await.extend(entry_functions);
     }
@@ -304,7 +335,12 @@ impl SurferState {
         );
         let tx = self.cluster.wallet.sign_transaction(&tx_data);
         let response = loop {
-            match self.cluster.wallet.execute_transaction_may_fail(tx.clone()).await {
+            match self
+                .cluster
+                .wallet
+                .execute_transaction_may_fail(tx.clone())
+                .await
+            {
                 Ok(response) => {
                     break response;
                 }
@@ -319,26 +355,47 @@ impl SurferState {
     }
 
     pub fn matching_owned_objects_count(&self, type_tag: &StructTag) -> usize {
-        self.owned_objects.get(type_tag).map(|objects| objects.len()).unwrap_or(0)
+        self.owned_objects
+            .get(type_tag)
+            .map(|objects| objects.len())
+            .unwrap_or(0)
     }
 
     pub async fn matching_immutable_objects_count(&self, type_tag: &StructTag) -> usize {
-        self.immutable_objects.read().await.get(type_tag).map(|objects| objects.len()).unwrap_or(0)
+        self.immutable_objects
+            .read()
+            .await
+            .get(type_tag)
+            .map(|objects| objects.len())
+            .unwrap_or(0)
     }
 
     pub async fn matching_shared_objects_count(&self, type_tag: &StructTag) -> usize {
-        self.shared_objects.read().await.get(type_tag).map(|objects| objects.len()).unwrap_or(0)
+        self.shared_objects
+            .read()
+            .await
+            .get(type_tag)
+            .map(|objects| objects.len())
+            .unwrap_or(0)
     }
 
     pub fn choose_nth_owned_object(&mut self, type_tag: &StructTag, n: usize) -> ObjectRef {
-        self.owned_objects.get_mut(type_tag).unwrap().swap_remove_index(n).unwrap()
+        self.owned_objects
+            .get_mut(type_tag)
+            .unwrap()
+            .swap_remove_index(n)
+            .unwrap()
     }
 
     pub async fn choose_nth_immutable_object(&self, type_tag: &StructTag, n: usize) -> ObjectRef {
         self.immutable_objects.read().await.get(type_tag).unwrap()[n]
     }
 
-    pub async fn choose_nth_shared_object(&self, type_tag: &StructTag, n: usize) -> (ObjectID, SequenceNumber) {
+    pub async fn choose_nth_shared_object(
+        &self,
+        type_tag: &StructTag,
+        n: usize,
+    ) -> (ObjectID, SequenceNumber) {
         self.shared_objects.read().await.get(type_tag).unwrap()[n]
     }
 }
@@ -346,7 +403,12 @@ impl SurferState {
 fn is_type_tx_context(ty: &Type) -> bool {
     match ty {
         Type::Reference(inner) | Type::MutableReference(inner) => match inner.as_ref() {
-            Type::Struct { address, module, name, type_arguments } => {
+            Type::Struct {
+                address,
+                module,
+                name,
+                type_arguments,
+            } => {
                 address == &SUI_FRAMEWORK_ADDRESS
                     && module == &Identifier::new("tx_context").unwrap()
                     && name == &Identifier::new("TxContext").unwrap()

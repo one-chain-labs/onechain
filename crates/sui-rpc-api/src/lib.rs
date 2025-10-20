@@ -5,7 +5,8 @@ use mysten_network::callback::CallbackLayer;
 use reader::StateReader;
 use rest::build_rest_router;
 use std::sync::Arc;
-use sui_types::{storage::RpcStateReader, transaction_executor::TransactionExecutor};
+use sui_types::storage::RpcStateReader;
+use sui_types::transaction_executor::TransactionExecutor;
 use tap::Pipe;
 
 pub mod client;
@@ -25,7 +26,8 @@ pub use config::Config;
 pub use error::{Result, RpcServiceError};
 pub use metrics::RpcMetrics;
 pub use sui_types::full_checkpoint_content::{CheckpointData, CheckpointTransaction};
-pub use types::{CheckpointResponse, ObjectResponse};
+pub use types::CheckpointResponse;
+pub use types::ObjectResponse;
 
 #[derive(Clone)]
 pub struct RpcService {
@@ -74,23 +76,68 @@ impl RpcService {
         self.software_version
     }
 
-    pub fn into_router(self) -> axum::Router {
+    pub async fn into_router(self) -> axum::Router {
         let metrics = self.metrics.clone();
 
-        let rest_router = build_rest_router(self.clone());
+        let mut router = {
+            let node_service =
+                crate::proto::node::node_service_server::NodeServiceServer::new(self.clone());
+            // legacy node service
+            let node = crate::proto::node::node_server::NodeServer::new(self.clone());
 
-        let grpc_router = {
+            let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+
+            let reflection_v1 = tonic_reflection::server::Builder::configure()
+                .register_encoded_file_descriptor_set(crate::proto::node::FILE_DESCRIPTOR_SET)
+                .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
+                .build_v1()
+                .unwrap();
+
+            let reflection_v1alpha = tonic_reflection::server::Builder::configure()
+                .register_encoded_file_descriptor_set(crate::proto::node::FILE_DESCRIPTOR_SET)
+                .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
+                .build_v1alpha()
+                .unwrap();
+
+            fn service_name<S: tonic::server::NamedService>(_service: &S) -> &'static str {
+                S::NAME
+            }
+
+            health_reporter
+                .set_service_status(
+                    service_name(&node_service),
+                    tonic_health::ServingStatus::Serving,
+                )
+                .await;
+
             grpc::Services::new()
-                .add_service(crate::proto::node::node_server::NodeServer::new(self.clone()))
+                .add_service(health_service)
+                .add_service(reflection_v1)
+                .add_service(reflection_v1alpha)
+                .add_service(node_service)
+                .add_service(node)
                 .into_router()
         };
 
-        rest_router
-            .merge(grpc_router)
-            .layer(axum::middleware::map_response_with_state(self, response::append_info_headers))
+        if self.config.enable_experimental_rest_api() {
+            router = router.merge(build_rest_router(self.clone()));
+        }
+
+        let health_endpoint = axum::Router::new()
+            .route("/health", axum::routing::get(rest::health::health))
+            .with_state(self.clone());
+
+        router
+            .merge(health_endpoint)
+            .layer(axum::middleware::map_response_with_state(
+                self,
+                response::append_info_headers,
+            ))
             .pipe(|router| {
                 if let Some(metrics) = metrics {
-                    router.layer(CallbackLayer::new(metrics::RpcMetricsMakeCallbackHandler::new(metrics)))
+                    router.layer(CallbackLayer::new(
+                        metrics::RpcMetricsMakeCallbackHandler::new(metrics),
+                    ))
                 } else {
                     router
                 }
@@ -99,11 +146,13 @@ impl RpcService {
 
     pub async fn start_service(self, socket_address: std::net::SocketAddr) {
         let listener = tokio::net::TcpListener::bind(socket_address).await.unwrap();
-        axum::serve(listener, self.into_router()).await.unwrap();
+        axum::serve(listener, self.into_router().await)
+            .await
+            .unwrap();
     }
 }
 
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Direction {
     Ascending,

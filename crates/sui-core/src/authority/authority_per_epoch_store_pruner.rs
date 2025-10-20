@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::authority::authority_per_epoch_store::EPOCH_DB_PREFIX;
 use itertools::Itertools;
-use std::{fs, path::PathBuf, time::Duration};
+use std::fs;
+use std::path::PathBuf;
+use std::time::Duration;
 use sui_config::node::AuthorityStorePruningConfig;
 use tokio::sync::oneshot;
 use tracing::log::{error, info};
@@ -20,7 +22,8 @@ impl AuthorityPerEpochStorePruner {
             info!("Skipping pruning of epoch tables as we want to retain all versions");
             return Self { _cancel_handle };
         }
-        let mut prune_interval = tokio::time::interval(Duration::from_secs(config.epoch_db_pruning_period_secs));
+        let mut prune_interval =
+            tokio::time::interval(Duration::from_secs(config.epoch_db_pruning_period_secs));
         tokio::task::spawn(async move {
             loop {
                 tokio::select! {
@@ -75,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_basic_epoch_pruner() {
-        let parent_directory = tempfile::tempdir().unwrap().keep();
+        let parent_directory = tempfile::tempdir().unwrap().into_path();
         let directories: Vec<_> = vec!["epoch_0", "epoch_1", "epoch_3", "epoch_4"]
             .into_iter()
             .map(|name| parent_directory.join(name))
@@ -84,10 +87,15 @@ mod tests {
             fs::create_dir(directory).expect("failed to create directory");
         }
 
-        let pruned = AuthorityPerEpochStorePruner::prune_old_directories(&parent_directory, 2).unwrap();
+        let pruned =
+            AuthorityPerEpochStorePruner::prune_old_directories(&parent_directory, 2).unwrap();
         assert_eq!(pruned, 2);
-        assert_eq!(directories.into_iter().map(|f| fs::metadata(f).is_ok()).collect::<Vec<_>>(), vec![
-            false, false, true, true
-        ]);
+        assert_eq!(
+            directories
+                .into_iter()
+                .map(|f| fs::metadata(f).is_ok())
+                .collect::<Vec<_>>(),
+            vec![false, false, true, true]
+        );
     }
 }

@@ -4,15 +4,9 @@
 
 use mysten_network::metrics::MetricsCallbackProvider;
 use prometheus::{
-    register_histogram_vec_with_registry,
-    register_int_counter_vec_with_registry,
-    register_int_gauge_vec_with_registry,
-    register_int_gauge_with_registry,
-    HistogramVec,
-    IntCounterVec,
-    IntGauge,
-    IntGaugeVec,
-    Registry,
+    register_histogram_vec_with_registry, register_int_counter_vec_with_registry,
+    register_int_gauge_vec_with_registry, register_int_gauge_with_registry, HistogramVec,
+    IntCounterVec, IntGauge, IntGaugeVec, Registry,
 };
 use std::time::Duration;
 use tonic::Code;
@@ -41,7 +35,9 @@ pub struct FaucetMetrics {
     pub(crate) total_coin_requests_succeeded: IntGauge,
 }
 
-const LATENCY_SEC_BUCKETS: &[f64] = &[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1., 2.5, 5., 10., 20., 30., 60., 90.];
+const LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1., 2.5, 5., 10., 20., 30., 60., 90.,
+];
 
 impl RequestMetrics {
     pub fn new(registry: &Registry) -> Self {
@@ -108,8 +104,7 @@ impl FaucetMetrics {
                 "balance",
                 "Current balance of the all the available coins",
                 registry,
-            )
-            .unwrap(),
+            ).unwrap(),
             current_executions_in_flight: register_int_gauge_with_registry!(
                 "current_executions_in_flight",
                 "Current number of transactions being executed in Faucet",
@@ -145,7 +140,9 @@ impl MetricsCallbackProvider for RequestMetrics {
             return;
         }
 
-        self.total_requests_received.with_label_values(&[normalized_path]).inc();
+        self.total_requests_received
+            .with_label_values(&[normalized_path])
+            .inc();
     }
 
     fn on_response(&self, path: String, latency: Duration, _status: u16, grpc_status_code: Code) {
@@ -154,17 +151,25 @@ impl MetricsCallbackProvider for RequestMetrics {
             return;
         }
 
-        self.process_latency.with_label_values(&[normalized_path]).observe(latency.as_secs_f64());
+        self.process_latency
+            .with_label_values(&[normalized_path])
+            .observe(latency.as_secs_f64());
 
         match grpc_status_code {
             Code::Ok => {
-                self.total_requests_succeeded.with_label_values(&[normalized_path]).inc();
+                self.total_requests_succeeded
+                    .with_label_values(&[normalized_path])
+                    .inc();
             }
             Code::Unavailable | Code::ResourceExhausted => {
-                self.total_requests_shed.with_label_values(&[normalized_path]).inc();
+                self.total_requests_shed
+                    .with_label_values(&[normalized_path])
+                    .inc();
             }
             _ => {
-                self.total_requests_failed.with_label_values(&[normalized_path]).inc();
+                self.total_requests_failed
+                    .with_label_values(&[normalized_path])
+                    .inc();
             }
         }
     }
@@ -175,7 +180,9 @@ impl MetricsCallbackProvider for RequestMetrics {
             return;
         }
 
-        self.current_requests_in_flight.with_label_values(&[normalized_path]).inc();
+        self.current_requests_in_flight
+            .with_label_values(&[normalized_path])
+            .inc();
     }
 
     fn on_drop(&self, path: &str) {
@@ -184,8 +191,12 @@ impl MetricsCallbackProvider for RequestMetrics {
             return;
         }
 
-        self.total_requests_disconnected.with_label_values(&[normalized_path]).inc();
-        self.current_requests_in_flight.with_label_values(&[normalized_path]).dec();
+        self.total_requests_disconnected
+            .with_label_values(&[normalized_path])
+            .inc();
+        self.current_requests_in_flight
+            .with_label_values(&[normalized_path])
+            .dec();
     }
 }
 

@@ -5,15 +5,15 @@ use std::{cmp, str::FromStr};
 
 use move_core_types::identifier::Identifier;
 use once_cell::sync::Lazy;
-use proptest::{collection::vec, prelude::*};
+use proptest::collection::vec;
+use proptest::prelude::*;
 use sui_protocol_config::ProtocolConfig;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{Argument, CallArg, Command, ProgrammableTransaction},
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SuiAddress};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{Argument, CallArg, Command, ProgrammableTransaction};
 
-static PROTOCOL_CONFIG: Lazy<ProtocolConfig> = Lazy::new(ProtocolConfig::get_for_max_version_UNSAFE);
+static PROTOCOL_CONFIG: Lazy<ProtocolConfig> =
+    Lazy::new(ProtocolConfig::get_for_max_version_UNSAFE);
 
 prop_compose! {
     pub fn gen_transfer()
@@ -60,7 +60,12 @@ prop_compose! {
 }
 
 pub fn gen_command() -> impl Strategy<Value = Command> {
-    prop_oneof![gen_transfer(), gen_split_coins(), gen_merge_coins(), gen_move_vec(),]
+    prop_oneof![
+        gen_transfer(),
+        gen_split_coins(),
+        gen_merge_coins(),
+        gen_move_vec(),
+    ]
 }
 
 pub fn gen_argument() -> impl Strategy<Value = Argument> {
@@ -68,7 +73,11 @@ pub fn gen_argument() -> impl Strategy<Value = Argument> {
         Just(Argument::GasCoin),
         u16_with_boundaries_strategy().prop_map(Argument::Input),
         u16_with_boundaries_strategy().prop_map(Argument::Result),
-        (u16_with_boundaries_strategy(), u16_with_boundaries_strategy()).prop_map(|(a, b)| Argument::NestedResult(a, b))
+        (
+            u16_with_boundaries_strategy(),
+            u16_with_boundaries_strategy()
+        )
+            .prop_map(|(a, b)| Argument::NestedResult(a, b))
     ]
 }
 
@@ -203,12 +212,24 @@ fn gen_input(
     cap: ObjectRef,
 ) -> (Command, i64) {
     match cmd {
-        CommandSketch::TransferObjects(_) => {
-            gen_transfer_input(builder, prev_command, cmd, prev_cmd_num, recipient, package, cap)
+        CommandSketch::TransferObjects(_) => gen_transfer_input(
+            builder,
+            prev_command,
+            cmd,
+            prev_cmd_num,
+            recipient,
+            package,
+            cap,
+        ),
+        CommandSketch::SplitCoins(_) => {
+            gen_split_coins_input(builder, cmd, prev_cmd_num, package, cap)
         }
-        CommandSketch::SplitCoins(_) => gen_split_coins_input(builder, cmd, prev_cmd_num, package, cap),
-        CommandSketch::MergeCoins(_) => gen_merge_coins_input(builder, prev_command, cmd, prev_cmd_num, package, cap),
-        CommandSketch::MakeMoveVec(_) => gen_move_vec_input(builder, prev_command, cmd, prev_cmd_num, package, cap),
+        CommandSketch::MergeCoins(_) => {
+            gen_merge_coins_input(builder, prev_command, cmd, prev_cmd_num, package, cap)
+        }
+        CommandSketch::MakeMoveVec(_) => {
+            gen_move_vec_input(builder, prev_command, cmd, prev_cmd_num, package, cap)
+        }
     }
 }
 
@@ -260,7 +281,14 @@ pub fn gen_split_coins_input(
     // succeed or we will very quickly hit the insufficient coin error only after a few (often just
     // 2) split coin transactions are executed making the whole batch testing into a rather narrow
     // error case
-    create_input_calls(builder, package, cap, prev_cmd_num, MAX_SPLIT_AMOUNT * split_amounts.len() as u64, 1);
+    create_input_calls(
+        builder,
+        package,
+        cap,
+        prev_cmd_num,
+        MAX_SPLIT_AMOUNT * split_amounts.len() as u64,
+        1,
+    );
     cmd_inc += 2; // two input calls
 
     for s in split_amounts {
@@ -295,7 +323,10 @@ pub fn gen_merge_coins_input(
                 create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
                 cmd_inc += 2; // two input calls
                 for i in 0..coins_needed - 1 {
-                    coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
+                    coins.push(Argument::NestedResult(
+                        (prev_cmd_num + cmd_inc) as u16,
+                        i as u16,
+                    ));
                 }
                 Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, *coins_to_merge as u16)
             }
@@ -330,7 +361,10 @@ pub fn gen_merge_coins_input(
         create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
         cmd_inc += 2; // two input calls
         for i in 0..coins_needed - 1 {
-            coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
+            coins.push(Argument::NestedResult(
+                (prev_cmd_num + cmd_inc) as u16,
+                i as u16,
+            ));
         }
         Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, *coins_to_merge as u16)
     };
@@ -384,15 +418,28 @@ fn gen_enough_arguments(
     mut cmd_inc: i64,
 ) -> i64 {
     for i in available_coins_used..coins_available {
-        coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
+        coins.push(Argument::NestedResult(
+            (prev_cmd_num + cmd_inc) as u16,
+            i as u16,
+        ));
     }
     if prev_cmd_out_len < coins_needed {
         // we have some arguments from previous command's output but not all
         let remaining_args_num = (coins_needed - prev_cmd_out_len) as u64;
-        create_input_calls(builder, package, cap, prev_cmd_num + cmd_inc, 7, remaining_args_num);
+        create_input_calls(
+            builder,
+            package,
+            cap,
+            prev_cmd_num + cmd_inc,
+            7,
+            remaining_args_num,
+        );
         cmd_inc += 2; // two input calls
         for i in 0..remaining_args_num {
-            coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
+            coins.push(Argument::NestedResult(
+                (prev_cmd_num + cmd_inc) as u16,
+                i as u16,
+            ));
         }
     }
     cmd_inc
@@ -417,7 +464,10 @@ fn gen_transfer_or_move_vec_input_internal(
                 create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
                 cmd_inc += 2; // two input calls
                 for i in 0..coins_needed {
-                    coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
+                    coins.push(Argument::NestedResult(
+                        (prev_cmd_num + cmd_inc) as u16,
+                        i as u16,
+                    ));
                 }
             }
             CommandSketch::SplitCoins(output) | CommandSketch::MakeMoveVec(output) => {
@@ -448,7 +498,10 @@ fn gen_transfer_or_move_vec_input_internal(
         create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
         cmd_inc += 2; // two input calls
         for i in 0..coins_needed {
-            coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
+            coins.push(Argument::NestedResult(
+                (prev_cmd_num + cmd_inc) as u16,
+                i as u16,
+            ));
         }
     }
     cmd_inc
@@ -468,7 +521,11 @@ fn create_input_calls(
             Identifier::from_str("coin_factory").unwrap(),
             Identifier::from_str("mint_vec").unwrap(),
             vec![],
-            vec![CallArg::from(cap), CallArg::from(coin_value), CallArg::from(input_size)],
+            vec![
+                CallArg::from(cap),
+                CallArg::from(coin_value),
+                CallArg::from(input_size),
+            ],
         )
         .unwrap();
     create_unpack_call(builder, package, prev_cmd_num + 1, input_size);

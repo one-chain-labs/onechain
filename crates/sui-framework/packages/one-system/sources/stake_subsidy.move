@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::stake_subsidy {
-    use one::balance::Balance;
-    use one::oct::OCT;
-    use one::bag::Bag;
-    use one::bag;
+module oct_system::stake_subsidy {
+    use sui::balance::Balance;
+    use sui::oct::OCT;
+    use sui::bag::Bag;
+    use sui::bag;
 
     public struct StakeSubsidy has store {
-        /// Balance of OCT set aside for stake subsidies that will be drawn down over time.
+        /// Balance of SUI set aside for stake subsidies that will be drawn down over time.
         balance: Balance<OCT>,
 
         /// Count of the number of times stake subsidies have been distributed.

@@ -20,7 +20,11 @@ pub struct HealthResponse {
 
 impl HealthResponse {
     pub fn new(package_name: &str, package_version: &str) -> Self {
-        Self { name: package_name.to_owned(), version: package_version.to_owned(), status: ServiceStatus::Up }
+        Self {
+            name: package_name.to_owned(),
+            version: package_version.to_owned(),
+            status: ServiceStatus::Up,
+        }
     }
 }
 
@@ -31,10 +35,13 @@ mod tests {
     #[test]
     fn health_response_new_works() {
         let result = HealthResponse::new("myslib", "0.0.1");
-        assert_eq!(result, HealthResponse {
-            name: "myslib".to_owned(),
-            version: "0.0.1".to_owned(),
-            status: ServiceStatus::Up
-        });
+        assert_eq!(
+            result,
+            HealthResponse {
+                name: "myslib".to_owned(),
+                version: "0.0.1".to_owned(),
+                status: ServiceStatus::Up
+            }
+        );
     }
 }

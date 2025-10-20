@@ -35,20 +35,32 @@ impl SurfStrategy {
     /// explore them for a while, and eventually return. This function may
     /// not return in some situations, so its important to call it with a
     /// timeout or select! to ensure the task doesn't block forever.
-    pub async fn surf_for_a_while(&mut self, state: &mut SurferState, mut entry_functions: Vec<EntryFunction>) {
+    pub async fn surf_for_a_while(
+        &mut self,
+        state: &mut SurferState,
+        mut entry_functions: Vec<EntryFunction>,
+    ) {
         entry_functions.shuffle(&mut state.rng);
         for entry in entry_functions {
             let next_tx_time = Instant::now() + self.min_tx_interval;
             let Some(args) = Self::choose_function_call_args(state, entry.parameters).await else {
-                debug!("Failed to choose arguments for Move function {:?}::{:?}", entry.module, entry.function);
+                debug!(
+                    "Failed to choose arguments for Move function {:?}::{:?}",
+                    entry.module, entry.function
+                );
                 continue;
             };
-            state.execute_move_transaction(entry.package, entry.module, entry.function, args).await;
+            state
+                .execute_move_transaction(entry.package, entry.module, entry.function, args)
+                .await;
             tokio::time::sleep_until(next_tx_time).await;
         }
     }
 
-    async fn choose_function_call_args(state: &mut SurferState, params: Vec<Type>) -> Option<Vec<CallArg>> {
+    async fn choose_function_call_args(
+        state: &mut SurferState,
+        params: Vec<Type>,
+    ) -> Option<Vec<CallArg>> {
         let mut args = vec![];
         let mut chosen_owned_objects = vec![];
         let mut failed = false;
@@ -60,12 +72,17 @@ impl SurfStrategy {
                 Type::U32 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u32>()).unwrap()),
                 Type::U64 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u64>()).unwrap()),
                 Type::U128 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u128>()).unwrap()),
-                Type::Address => {
-                    CallArg::Pure(bcs::to_bytes(&state.cluster.get_addresses().choose(&mut state.rng)).unwrap())
-                }
+                Type::Address => CallArg::Pure(
+                    bcs::to_bytes(&state.cluster.get_addresses().choose(&mut state.rng)).unwrap(),
+                ),
                 ty @ Type::Struct { .. } => {
-                    match Self::choose_object_call_arg(state, InputObjectPassKind::Value, ty, &mut chosen_owned_objects)
-                        .await
+                    match Self::choose_object_call_arg(
+                        state,
+                        InputObjectPassKind::Value,
+                        ty,
+                        &mut chosen_owned_objects,
+                    )
+                    .await
                     {
                         Some(arg) => arg,
                         None => {
@@ -75,8 +92,13 @@ impl SurfStrategy {
                     }
                 }
                 Type::Reference(ty) => {
-                    match Self::choose_object_call_arg(state, InputObjectPassKind::ByRef, *ty, &mut chosen_owned_objects)
-                        .await
+                    match Self::choose_object_call_arg(
+                        state,
+                        InputObjectPassKind::ByRef,
+                        *ty,
+                        &mut chosen_owned_objects,
+                    )
+                    .await
                     {
                         Some(arg) => arg,
                         None => {
@@ -110,7 +132,11 @@ impl SurfStrategy {
         }
         if failed {
             for (struct_tag, obj_ref) in chosen_owned_objects {
-                state.owned_objects.get_mut(&struct_tag).unwrap().insert(obj_ref);
+                state
+                    .owned_objects
+                    .get_mut(&struct_tag)
+                    .unwrap()
+                    .insert(obj_ref);
             }
             None
         } else {
@@ -125,11 +151,19 @@ impl SurfStrategy {
         chosen_owned_objects: &mut Vec<(StructTag, ObjectRef)>,
     ) -> Option<CallArg> {
         let type_tag = match arg_type {
-            Type::Struct { address, module, name, type_arguments } => StructTag {
+            Type::Struct {
                 address,
                 module,
                 name,
-                type_params: type_arguments.into_iter().map(|t| t.into_type_tag().unwrap()).collect(),
+                type_arguments,
+            } => StructTag {
+                address,
+                module,
+                name,
+                type_params: type_arguments
+                    .into_iter()
+                    .map(|t| t.into_type_tag().unwrap())
+                    .collect(),
             },
             _ => {
                 return None;

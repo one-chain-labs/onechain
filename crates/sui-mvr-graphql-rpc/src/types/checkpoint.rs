@@ -13,9 +13,8 @@ use super::{
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
     uint53::UInt53,
 };
+use crate::{connection::ScanConnection, consistency::Checkpointed};
 use crate::{
-    connection::ScanConnection,
-    consistency::Checkpointed,
     data::{self, Conn, DataLoader, Db, DbConnection, QueryExecutor},
     error::Error,
 };
@@ -111,7 +110,10 @@ impl Checkpoint {
 
     /// The digest of the checkpoint at the previous sequence number.
     async fn previous_checkpoint_digest(&self) -> Option<String> {
-        self.stored.previous_checkpoint_digest.as_ref().map(Base58::encode)
+        self.stored
+            .previous_checkpoint_digest
+            .as_ref()
+            .map(Base58::encode)
     }
 
     /// The total number of transaction blocks in the network by the end of this checkpoint.
@@ -133,7 +135,13 @@ impl Checkpoint {
 
     /// The epoch this checkpoint is part of.
     async fn epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.stored.epoch as u64), self.checkpoint_viewed_at).await.extend()
+        Epoch::query(
+            ctx,
+            Some(self.stored.epoch as u64),
+            self.checkpoint_viewed_at,
+        )
+        .await
+        .extend()
     }
 
     /// Transactions in this checkpoint.
@@ -166,20 +174,28 @@ impl Checkpoint {
     ) -> Result<ScanConnection<String, TransactionBlock>> {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
-        let Some(filter) = filter.unwrap_or_default().intersect(TransactionBlockFilter {
-            at_checkpoint: Some(UInt53::from(self.stored.sequence_number as u64)),
-            ..Default::default()
-        }) else {
+        let Some(filter) = filter
+            .unwrap_or_default()
+            .intersect(TransactionBlockFilter {
+                at_checkpoint: Some(UInt53::from(self.stored.sequence_number as u64)),
+                ..Default::default()
+            })
+        else {
             return Ok(ScanConnection::new(false, false));
         };
 
-        TransactionBlock::paginate(ctx, page, filter, self.checkpoint_viewed_at, scan_limit).await.extend()
+        TransactionBlock::paginate(ctx, page, filter, self.checkpoint_viewed_at, scan_limit)
+            .await
+            .extend()
     }
 }
 
 impl CheckpointId {
     pub(crate) fn by_seq_num(seq_num: u64) -> Self {
-        CheckpointId { sequence_number: Some(seq_num.into()), digest: None }
+        CheckpointId {
+            sequence_number: Some(seq_num.into()),
+            digest: None,
+        }
     }
 }
 
@@ -206,19 +222,35 @@ impl Checkpoint {
         checkpoint_viewed_at: u64,
     ) -> Result<Option<Self>, Error> {
         match filter {
-            CheckpointId { sequence_number: Some(sequence_number), digest } => {
+            CheckpointId {
+                sequence_number: Some(sequence_number),
+                digest,
+            } => {
                 let DataLoader(dl) = ctx.data_unchecked();
-                dl.load_one(SeqNumKey { sequence_number: sequence_number.into(), digest, checkpoint_viewed_at }).await
+                dl.load_one(SeqNumKey {
+                    sequence_number: sequence_number.into(),
+                    digest,
+                    checkpoint_viewed_at,
+                })
+                .await
             }
 
-            CheckpointId { sequence_number: None, digest: Some(digest) } => {
+            CheckpointId {
+                sequence_number: None,
+                digest: Some(digest),
+            } => {
                 let DataLoader(dl) = ctx.data_unchecked();
-                dl.load_one(DigestKey { digest, checkpoint_viewed_at }).await
+                dl.load_one(DigestKey {
+                    digest,
+                    checkpoint_viewed_at,
+                })
+                .await
             }
 
-            CheckpointId { sequence_number: None, digest: None } => {
-                Checkpoint::query_latest_at(ctx.data_unchecked(), checkpoint_viewed_at).await
-            }
+            CheckpointId {
+                sequence_number: None,
+                digest: None,
+            } => Checkpoint::query_latest_at(ctx.data_unchecked(), checkpoint_viewed_at).await,
         }
     }
 
@@ -244,16 +276,26 @@ impl Checkpoint {
             .await
             .map_err(|e| Error::Internal(format!("Failed to fetch checkpoint: {e}")))?;
 
-        Ok(stored.map(|stored| Checkpoint { stored, checkpoint_viewed_at }))
+        Ok(stored.map(|stored| Checkpoint {
+            stored,
+            checkpoint_viewed_at,
+        }))
     }
 
     /// Look up a `Checkpoint` in the database and retrieve its `timestamp_ms` field. This method
     /// takes a connection, so that it can be used within a transaction.
-    pub(crate) async fn query_timestamp(conn: &mut Conn<'_>, seq_num: u64) -> Result<u64, diesel::result::Error> {
+    pub(crate) async fn query_timestamp(
+        conn: &mut Conn<'_>,
+        seq_num: u64,
+    ) -> Result<u64, diesel::result::Error> {
         use checkpoints::dsl;
 
         let stored: i64 = conn
-            .first(move || dsl::checkpoints.select(dsl::timestamp_ms).filter(dsl::sequence_number.eq(seq_num as i64)))
+            .first(move || {
+                dsl::checkpoints
+                    .select(dsl::timestamp_ms)
+                    .filter(dsl::sequence_number.eq(seq_num as i64))
+            })
             .await?;
 
         Ok(stored as u64)
@@ -284,14 +326,19 @@ impl Checkpoint {
         let (prev, next, results) = db
             .execute(move |conn| {
                 async move {
-                    page.paginate_query::<StoredCheckpoint, _, _, _>(conn, checkpoint_viewed_at, move || {
-                        let mut query = dsl::checkpoints.into_boxed();
-                        query = query.filter(dsl::sequence_number.le(checkpoint_viewed_at as i64));
-                        if let Some(epoch) = filter {
-                            query = query.filter(dsl::epoch.eq(epoch as i64));
-                        }
-                        query
-                    })
+                    page.paginate_query::<StoredCheckpoint, _, _, _>(
+                        conn,
+                        checkpoint_viewed_at,
+                        move || {
+                            let mut query = dsl::checkpoints.into_boxed();
+                            query =
+                                query.filter(dsl::sequence_number.le(checkpoint_viewed_at as i64));
+                            if let Some(epoch) = filter {
+                                query = query.filter(dsl::epoch.eq(epoch as i64));
+                            }
+                            query
+                        },
+                    )
                     .await
                 }
                 .scope_boxed()
@@ -302,7 +349,13 @@ impl Checkpoint {
         let mut conn = Connection::new(prev, next);
         for stored in results {
             let cursor = stored.cursor(checkpoint_viewed_at).encode_cursor();
-            conn.edges.push(Edge::new(cursor, Checkpoint { stored, checkpoint_viewed_at }));
+            conn.edges.push(Edge::new(
+                cursor,
+                Checkpoint {
+                    stored,
+                    checkpoint_viewed_at,
+                },
+            ));
         }
 
         Ok(conn)
@@ -332,7 +385,10 @@ impl Paginated<Cursor> for StoredCheckpoint {
 
 impl Target<Cursor> for StoredCheckpoint {
     fn cursor(&self, checkpoint_viewed_at: u64) -> Cursor {
-        Cursor::new(CheckpointCursor { checkpoint_viewed_at, sequence_number: self.sequence_number as u64 })
+        Cursor::new(CheckpointCursor {
+            checkpoint_viewed_at,
+            sequence_number: self.sequence_number as u64,
+        })
     }
 }
 
@@ -346,8 +402,8 @@ impl ScanLimited for Cursor {}
 
 #[async_trait::async_trait]
 impl Loader<SeqNumKey> for Db {
-    type Error = Error;
     type Value = Checkpoint;
+    type Error = Error;
 
     async fn load(&self, keys: &[SeqNumKey]) -> Result<HashMap<SeqNumKey, Checkpoint>, Error> {
         use checkpoints::dsl;
@@ -356,7 +412,8 @@ impl Loader<SeqNumKey> for Db {
             .iter()
             .filter_map(|key| {
                 // Filter out keys querying for checkpoints after their own consistency cursor.
-                (key.checkpoint_viewed_at >= key.sequence_number).then_some(key.sequence_number as i64)
+                (key.checkpoint_viewed_at >= key.sequence_number)
+                    .then_some(key.sequence_number as i64)
             })
             .collect();
 
@@ -364,7 +421,8 @@ impl Loader<SeqNumKey> for Db {
             .execute(move |conn| {
                 async move {
                     conn.results(move || {
-                        dsl::checkpoints.filter(dsl::sequence_number.eq_any(checkpoint_ids.iter().cloned()))
+                        dsl::checkpoints
+                            .filter(dsl::sequence_number.eq_any(checkpoint_ids.iter().cloned()))
                     })
                     .await
                 }
@@ -373,14 +431,19 @@ impl Loader<SeqNumKey> for Db {
             .await
             .map_err(|e| Error::Internal(format!("Failed to fetch checkpoints: {e}")))?;
 
-        let checkpoint_id_to_stored: BTreeMap<_, _> =
-            checkpoints.into_iter().map(|stored| (stored.sequence_number as u64, stored)).collect();
+        let checkpoint_id_to_stored: BTreeMap<_, _> = checkpoints
+            .into_iter()
+            .map(|stored| (stored.sequence_number as u64, stored))
+            .collect();
 
         Ok(keys
             .iter()
             .filter_map(|key| {
                 let stored = checkpoint_id_to_stored.get(&key.sequence_number).cloned()?;
-                let checkpoint = Checkpoint { stored, checkpoint_viewed_at: key.checkpoint_viewed_at };
+                let checkpoint = Checkpoint {
+                    stored,
+                    checkpoint_viewed_at: key.checkpoint_viewed_at,
+                };
 
                 let digest = &checkpoint.stored.checkpoint_digest;
                 if matches!(key.digest, Some(d) if d.as_slice() != digest) {
@@ -395,8 +458,8 @@ impl Loader<SeqNumKey> for Db {
 
 #[async_trait::async_trait]
 impl Loader<DigestKey> for Db {
-    type Error = Error;
     type Value = Checkpoint;
+    type Error = Error;
 
     async fn load(&self, keys: &[DigestKey]) -> Result<HashMap<DigestKey, Checkpoint>, Error> {
         use checkpoints::dsl;
@@ -406,25 +469,36 @@ impl Loader<DigestKey> for Db {
         let checkpoints: Vec<StoredCheckpoint> = self
             .execute(move |conn| {
                 async move {
-                    conn.results(move || dsl::checkpoints.filter(dsl::checkpoint_digest.eq_any(digests.iter().cloned())))
-                        .await
+                    conn.results(move || {
+                        dsl::checkpoints
+                            .filter(dsl::checkpoint_digest.eq_any(digests.iter().cloned()))
+                    })
+                    .await
                 }
                 .scope_boxed()
             })
             .await
             .map_err(|e| Error::Internal(format!("Failed to fetch checkpoints: {e}")))?;
 
-        let checkpoint_id_to_stored: BTreeMap<_, _> =
-            checkpoints.into_iter().map(|stored| (stored.checkpoint_digest.clone(), stored)).collect();
+        let checkpoint_id_to_stored: BTreeMap<_, _> = checkpoints
+            .into_iter()
+            .map(|stored| (stored.checkpoint_digest.clone(), stored))
+            .collect();
 
         Ok(keys
             .iter()
             .filter_map(|key| {
-                let DigestKey { digest, checkpoint_viewed_at } = *key;
+                let DigestKey {
+                    digest,
+                    checkpoint_viewed_at,
+                } = *key;
 
                 let stored = checkpoint_id_to_stored.get(digest.as_slice()).cloned()?;
 
-                let checkpoint = Checkpoint { stored, checkpoint_viewed_at };
+                let checkpoint = Checkpoint {
+                    stored,
+                    checkpoint_viewed_at,
+                };
 
                 // Filter by key's checkpoint viewed at here. Doing this in memory because it should
                 // be quite rare that this query actually filters something, but encoding it in SQL

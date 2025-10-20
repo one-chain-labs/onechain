@@ -42,7 +42,11 @@ pub struct Build {
 }
 
 impl Build {
-    pub fn execute(&self, path: Option<&Path>, build_config: MoveBuildConfig) -> anyhow::Result<()> {
+    pub fn execute(
+        &self,
+        path: Option<&Path>,
+        build_config: MoveBuildConfig,
+    ) -> anyhow::Result<()> {
         let rerooted_path = base::reroot_path(path)?;
         let build_config = resolve_lock_file_path(build_config, Some(&rerooted_path))?;
         Self::execute_internal(
@@ -63,8 +67,13 @@ impl Build {
         generate_struct_layouts: bool,
         chain_id: Option<String>,
     ) -> anyhow::Result<()> {
-        let pkg = BuildConfig { config, run_bytecode_verifier: true, print_diags_to_stderr: true, chain_id }
-            .build(rerooted_path)?;
+        let pkg = BuildConfig {
+            config,
+            run_bytecode_verifier: true,
+            print_diags_to_stderr: true,
+            chain_id,
+        }
+        .build(rerooted_path)?;
         if dump_bytecode_as_base64 {
             check_invalid_dependencies(&pkg.dependency_ids.invalid)?;
             if !with_unpublished_deps {

@@ -1,16 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{types::NodeInfo, Result, RpcService};
-use sui_sdk_types::types::CheckpointDigest;
+use crate::Result;
+use crate::{types::NodeInfo, RpcService};
+use sui_sdk_types::CheckpointDigest;
 use tap::Pipe;
 
 impl RpcService {
     pub fn get_node_info(&self) -> Result<NodeInfo> {
         let latest_checkpoint = self.reader.inner().get_latest_checkpoint()?;
-        let lowest_available_checkpoint = self.reader.inner().get_lowest_available_checkpoint()?.pipe(Some);
-        let lowest_available_checkpoint_objects =
-            self.reader.inner().get_lowest_available_checkpoint_objects()?.pipe(Some);
+        let lowest_available_checkpoint = self
+            .reader
+            .inner()
+            .get_lowest_available_checkpoint()?
+            .pipe(Some);
+        let lowest_available_checkpoint_objects = self
+            .reader
+            .inner()
+            .get_lowest_available_checkpoint_objects()?
+            .pipe(Some);
 
         NodeInfo {
             checkpoint_height: latest_checkpoint.sequence_number,

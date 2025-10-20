@@ -3,21 +3,32 @@
 use super::cluster::{new_wallet_context_from_cluster, Cluster};
 use async_trait::async_trait;
 use fastcrypto::encoding::{Encoding, Hex};
-use std::{collections::HashMap, env, sync::Arc};
-use sui_faucet::{BatchFaucetResponse, BatchStatusFaucetResponse, Faucet, FaucetConfig, FaucetResponse, SimpleFaucet};
-use sui_types::{base_types::SuiAddress, crypto::KeypairTraits};
+use std::collections::HashMap;
+use std::env;
+use std::sync::Arc;
+use sui_faucet::{
+    BatchFaucetResponse, BatchStatusFaucetResponse, Faucet, FaucetConfig, FaucetResponse,
+    SimpleFaucet,
+};
+use sui_types::base_types::SuiAddress;
+use sui_types::crypto::KeypairTraits;
 use tracing::{debug, info, info_span, Instrument};
 use uuid::Uuid;
 
 pub struct FaucetClientFactory;
 
 impl FaucetClientFactory {
-    pub async fn new_from_cluster(cluster: &(dyn Cluster + Sync + Send)) -> Arc<dyn FaucetClient + Sync + Send> {
+    pub async fn new_from_cluster(
+        cluster: &(dyn Cluster + Sync + Send),
+    ) -> Arc<dyn FaucetClient + Sync + Send> {
         match cluster.remote_faucet_url() {
             Some(url) => Arc::new(RemoteFaucetClient::new(url.into())),
             // If faucet_url is none, it's a local cluster
             None => {
-                let key = cluster.local_faucet_key().expect("Expect local faucet key for local cluster").copy();
+                let key = cluster
+                    .local_faucet_key()
+                    .expect("Expect local faucet key for local cluster")
+                    .copy();
                 let wallet_context = new_wallet_context_from_cluster(cluster, key)
                     .instrument(info_span!("init_wallet_context_for_faucet"));
 
@@ -91,7 +102,6 @@ impl FaucetClient for RemoteFaucetClient {
 
         faucet_response
     }
-
     async fn batch_request_sui_coins(&self, request_address: SuiAddress) -> BatchFaucetResponse {
         let gas_url = format!("{}/v1/gas", self.remote_url);
         debug!("Getting coin from remote faucet {}", gas_url);
@@ -121,10 +131,13 @@ impl FaucetClient for RemoteFaucetClient {
 
         faucet_response
     }
-
     async fn get_batch_send_status(&self, task_id: Uuid) -> BatchStatusFaucetResponse {
         let status_url = format!("{}/v1/status/{}", self.remote_url, task_id);
-        debug!("Checking status for task {} from remote faucet {}", task_id.to_string(), status_url);
+        debug!(
+            "Checking status for task {} from remote faucet {}",
+            task_id.to_string(),
+            status_url
+        );
 
         let auth_header = match env::var("FAUCET_AUTH_HEADER") {
             Ok(val) => val,
@@ -136,7 +149,9 @@ impl FaucetClient for RemoteFaucetClient {
             .header("Authorization", auth_header)
             .send()
             .await
-            .unwrap_or_else(|e| panic!("Failed to talk to remote faucet {:?}: {:?}", status_url, e));
+            .unwrap_or_else(|e| {
+                panic!("Failed to talk to remote faucet {:?}: {:?}", status_url, e)
+            });
         let full_bytes = response.bytes().await.unwrap();
         let faucet_response: BatchStatusFaucetResponse = serde_json::from_slice(&full_bytes)
             .map_err(|e| anyhow::anyhow!("json deser failed with bytes {:?}: {e}", full_bytes))
@@ -168,7 +183,6 @@ impl FaucetClient for LocalFaucetClient {
 
         receipt.into()
     }
-
     async fn batch_request_sui_coins(&self, request_address: SuiAddress) -> BatchFaucetResponse {
         let receipt = self
             .simple_faucet
@@ -178,7 +192,6 @@ impl FaucetClient for LocalFaucetClient {
 
         receipt.into()
     }
-
     async fn get_batch_send_status(&self, task_id: Uuid) -> BatchStatusFaucetResponse {
         let status = self
             .simple_faucet

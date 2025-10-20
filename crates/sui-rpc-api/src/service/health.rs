@@ -1,9 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
+use std::time::SystemTime;
 
-use crate::{Result, RpcService};
+use crate::Result;
+use crate::RpcService;
 
 impl RpcService {
     /// Perform a simple health check on the service.
@@ -23,9 +25,10 @@ impl RpcService {
             let threshold = SystemTime::now() - Duration::from_secs(threshold_seconds as u64);
 
             if latest_chain_time < threshold {
-                return Err(
-                    anyhow::anyhow!("The latest checkpoint timestamp is less than the provided threshold").into()
-                );
+                return Err(anyhow::anyhow!(
+                    "The latest checkpoint timestamp is less than the provided threshold"
+                )
+                .into());
             }
         }
 

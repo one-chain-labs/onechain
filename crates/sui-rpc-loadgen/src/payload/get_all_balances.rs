@@ -13,7 +13,11 @@ use super::validation::chunk_entities;
 
 #[async_trait]
 impl<'a> ProcessPayload<'a, &'a GetAllBalances> for RpcCommandProcessor {
-    async fn process(&'a self, op: &'a GetAllBalances, _signer_info: &Option<SignerInfo>) -> Result<()> {
+    async fn process(
+        &'a self,
+        op: &'a GetAllBalances,
+        _signer_info: &Option<SignerInfo>,
+    ) -> Result<()> {
         if op.addresses.is_empty() {
             panic!("No addresses provided, skipping query");
         }
@@ -37,6 +41,10 @@ impl<'a> ProcessPayload<'a, &'a GetAllBalances> for RpcCommandProcessor {
 }
 
 async fn get_all_balances(client: &SuiClient, owner_address: SuiAddress) -> Result<Vec<Balance>> {
-    let balances = client.coin_read_api().get_all_balances(owner_address).await.unwrap();
+    let balances = client
+        .coin_read_api()
+        .get_all_balances(owner_address)
+        .await
+        .unwrap();
     Ok(balances)
 }

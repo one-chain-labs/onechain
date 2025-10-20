@@ -1,25 +1,25 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use diesel::{associations::HasTable, QueryDsl};
+use diesel::associations::HasTable;
+use diesel::QueryDsl;
 use diesel_async::RunQueryDsl;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations};
 use prometheus::Registry;
 use std::time::Duration;
-use sui_bridge::e2e_tests::test_utils::{initiate_bridge_eth_to_sui, BridgeTestCluster, BridgeTestClusterBuilder};
-use sui_bridge_indexer::{
-    config::IndexerConfig,
-    create_sui_indexer,
-    metrics::BridgeIndexerMetrics,
-    models::{GovernanceAction, TokenTransfer},
-    postgres_manager::get_connection_pool,
-    schema,
-    storage::PgBridgePersistent,
+use sui_bridge::e2e_tests::test_utils::{
+    initiate_bridge_eth_to_sui, BridgeTestCluster, BridgeTestClusterBuilder,
 };
+use sui_bridge_indexer::config::IndexerConfig;
+use sui_bridge_indexer::metrics::BridgeIndexerMetrics;
+use sui_bridge_indexer::models::{GovernanceAction, TokenTransfer};
+use sui_bridge_indexer::postgres_manager::get_connection_pool;
+use sui_bridge_indexer::storage::PgBridgePersistent;
+use sui_bridge_indexer::{create_sui_indexer, schema};
 use sui_data_ingestion_core::DataIngestionMetrics;
 use sui_indexer::database::Connection;
 use sui_indexer_builder::indexer_builder::IndexerProgressStore;
-use sui_pg_temp_db::TempDb;
+use sui_pg_db::temp::TempDb;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/migrations");
 
@@ -32,16 +32,22 @@ async fn test_indexing_transfer() {
     let (config, cluster, _db) = setup_bridge_env(false).await;
 
     let pool = get_connection_pool(config.db_url.clone()).await;
-    let indexer = create_sui_indexer(pool.clone(), metrics.clone(), ingestion_metrics, &config).await.unwrap();
+    let indexer = create_sui_indexer(pool.clone(), metrics.clone(), ingestion_metrics, &config)
+        .await
+        .unwrap();
     let storage = indexer.test_only_storage().clone();
     let indexer_name = indexer.test_only_name();
     let indexer_handle = tokio::spawn(indexer.start());
 
     // wait until backfill finish
-    wait_for_back_fill_to_finish(&storage, &indexer_name).await.unwrap();
+    wait_for_back_fill_to_finish(&storage, &indexer_name)
+        .await
+        .unwrap();
 
-    let data: Vec<TokenTransfer> =
-        schema::token_transfer::dsl::token_transfer::table().load(&mut pool.get().await.unwrap()).await.unwrap();
+    let data: Vec<TokenTransfer> = schema::token_transfer::dsl::token_transfer::table()
+        .load(&mut pool.get().await.unwrap())
+        .await
+        .unwrap();
 
     // token transfer data should be empty
     assert!(data.is_empty());
@@ -67,8 +73,15 @@ async fn test_indexing_transfer() {
     // transfer eth to sui
     initiate_bridge_eth_to_sui(&cluster, 1000, 0).await.unwrap();
 
-    let current_block_height = cluster.sui_client().read_api().get_latest_checkpoint_sequence_number().await.unwrap();
-    wait_for_block(&storage, &indexer_name, current_block_height).await.unwrap();
+    let current_block_height = cluster
+        .sui_client()
+        .read_api()
+        .get_latest_checkpoint_sequence_number()
+        .await
+        .unwrap();
+    wait_for_block(&storage, &indexer_name, current_block_height)
+        .await
+        .unwrap();
 
     let data = schema::token_transfer::dsl::token_transfer::table()
         .load::<TokenTransfer>(&mut pool.get().await.unwrap())
@@ -79,25 +92,50 @@ async fn test_indexing_transfer() {
         .collect::<Vec<_>>();
 
     assert_eq!(2, data.len());
-    assert_eq!(vec![(12, 0, "Approved".to_string()), (12, 0, "Claimed".to_string())], data);
+    assert_eq!(
+        vec![
+            (12, 0, "Approved".to_string()),
+            (12, 0, "Claimed".to_string())
+        ],
+        data
+    );
 
     indexer_handle.abort()
 }
 
-async fn wait_for_block(storage: &PgBridgePersistent, task: &str, block: u64) -> Result<(), anyhow::Error> {
-    while storage.get_ongoing_tasks(task).await?.live_task().map(|t| t.start_checkpoint).unwrap_or_default() < block {
+async fn wait_for_block(
+    storage: &PgBridgePersistent,
+    task: &str,
+    block: u64,
+) -> Result<(), anyhow::Error> {
+    while storage
+        .get_ongoing_tasks(task)
+        .await?
+        .live_task()
+        .map(|t| t.start_checkpoint)
+        .unwrap_or_default()
+        < block
+    {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     Ok(())
 }
 
-async fn wait_for_back_fill_to_finish(storage: &PgBridgePersistent, task: &str) -> Result<(), anyhow::Error> {
+async fn wait_for_back_fill_to_finish(
+    storage: &PgBridgePersistent,
+    task: &str,
+) -> Result<(), anyhow::Error> {
     // wait until tasks are set up
     while storage.get_ongoing_tasks(task).await?.live_task().is_none() {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     // wait until all backfill tasks have completed
-    while !storage.get_ongoing_tasks(task).await?.backfill_tasks_ordered_desc().is_empty() {
+    while !storage
+        .get_ongoing_tasks(task)
+        .await?
+        .backfill_tasks_ordered_desc()
+        .is_empty()
+    {
         tokio::time::sleep(Duration::from_millis(1000)).await;
     }
     Ok(())

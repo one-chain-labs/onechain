@@ -8,12 +8,11 @@ use sui_types::digests::CheckpointDigest;
 use tracing::info;
 
 use sui_archival::reader::{ArchiveReader, ArchiveReaderMetrics};
-use sui_config::{
-    node::ArchiveReaderConfig,
-    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
-};
+use sui_config::node::ArchiveReaderConfig;
+use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 
-use crate::{errors::IndexerError, types::IndexerResult};
+use crate::errors::IndexerError;
+use crate::types::IndexerResult;
 
 #[derive(Clone, Debug)]
 pub struct RestoreCheckpointInfo {
@@ -42,13 +41,20 @@ pub async fn read_restore_checkpoint_info(
     archive_reader.sync_manifest_once().await?;
     let manifest = archive_reader.get_manifest().await?;
     let next_checkpoint_after_epoch = manifest.next_checkpoint_after_epoch(epoch);
-    info!("Read from archives: next checkpoint sequence after epoch {} is: {}", epoch, next_checkpoint_after_epoch);
+    info!(
+        "Read from archives: next checkpoint sequence after epoch {} is: {}",
+        epoch, next_checkpoint_after_epoch
+    );
     let cp_summaries = archive_reader
         .get_summaries_for_list_no_verify(vec![0])
         .await
         .map_err(|e| IndexerError::ArchiveReaderError(format!("Failed to get summaries: {}", e)))?;
-    let first_cp =
-        cp_summaries.first().ok_or_else(|| IndexerError::ArchiveReaderError("No checkpoint found".to_string()))?;
+    let first_cp = cp_summaries
+        .first()
+        .ok_or_else(|| IndexerError::ArchiveReaderError("No checkpoint found".to_string()))?;
     let chain_identifier = *first_cp.digest();
-    Ok(RestoreCheckpointInfo { next_checkpoint_after_epoch, chain_identifier })
+    Ok(RestoreCheckpointInfo {
+        next_checkpoint_after_epoch,
+        chain_identifier,
+    })
 }

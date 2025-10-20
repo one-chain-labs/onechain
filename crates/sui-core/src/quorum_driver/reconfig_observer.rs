@@ -11,11 +11,9 @@ use crate::{
 };
 use async_trait::async_trait;
 use std::sync::Arc;
-use sui_types::sui_system_state::{
-    epoch_start_sui_system_state::EpochStartSystemStateTrait,
-    SuiSystemState,
-    SuiSystemStateTrait,
-};
+use sui_types::sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait;
+use sui_types::sui_system_state::SuiSystemState;
+use sui_types::sui_system_state::SuiSystemStateTrait;
 use tokio::sync::broadcast::error::RecvError;
 use tracing::{info, warn};
 
@@ -44,7 +42,13 @@ impl OnsiteReconfigObserver {
         safe_client_metrics_base: SafeClientMetricsBase,
         auth_agg_metrics: AuthAggMetrics,
     ) -> Self {
-        Self { reconfig_rx, execution_cache, committee_store, safe_client_metrics_base, auth_agg_metrics }
+        Self {
+            reconfig_rx,
+            execution_cache,
+            committee_store,
+            safe_client_metrics_base,
+            auth_agg_metrics,
+        }
     }
 }
 
@@ -60,7 +64,10 @@ impl ReconfigObserver<NetworkAuthorityClient> for OnsiteReconfigObserver {
         })
     }
 
-    async fn run(&mut self, updatable: Arc<dyn AuthorityAggregatorUpdatable<NetworkAuthorityClient>>) {
+    async fn run(
+        &mut self,
+        updatable: Arc<dyn AuthorityAggregatorUpdatable<NetworkAuthorityClient>>,
+    ) {
         loop {
             match self.reconfig_rx.recv().await {
                 Ok(system_state) => {
@@ -68,8 +75,9 @@ impl ReconfigObserver<NetworkAuthorityClient> for OnsiteReconfigObserver {
                     let committee = epoch_start_state.get_sui_committee();
                     info!("Got reconfig message. New committee: {}", committee);
                     if committee.epoch() > updatable.epoch() {
-                        let new_auth_agg =
-                            updatable.authority_aggregator().recreate_with_new_epoch_start_state(&epoch_start_state);
+                        let new_auth_agg = updatable
+                            .authority_aggregator()
+                            .recreate_with_new_epoch_start_state(&epoch_start_state);
                         updatable.update_authority_aggregator(Arc::new(new_auth_agg));
                     } else {
                         // This should only happen when the node just starts

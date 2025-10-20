@@ -3,30 +3,26 @@
 
 //! BridgeAuthorityAggregator aggregates signatures from BridgeCommittee.
 
-use crate::{
-    client::bridge_client::BridgeClient,
-    crypto::{BridgeAuthorityPublicKeyBytes, BridgeAuthoritySignInfo},
-    error::{BridgeError, BridgeResult},
-    metrics::BridgeMetrics,
-    types::{
-        BridgeAction,
-        BridgeCommittee,
-        BridgeCommitteeValiditySignInfo,
-        CertifiedBridgeAction,
-        VerifiedCertifiedBridgeAction,
-        VerifiedSignedBridgeAction,
-    },
+use crate::client::bridge_client::BridgeClient;
+use crate::crypto::BridgeAuthorityPublicKeyBytes;
+use crate::crypto::BridgeAuthoritySignInfo;
+use crate::error::{BridgeError, BridgeResult};
+use crate::metrics::BridgeMetrics;
+use crate::types::BridgeCommitteeValiditySignInfo;
+use crate::types::{
+    BridgeAction, BridgeCommittee, CertifiedBridgeAction, VerifiedCertifiedBridgeAction,
+    VerifiedSignedBridgeAction,
 };
-use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    sync::Arc,
-    time::Duration,
-};
-use sui_authority_aggregation::{quorum_map_then_reduce_with_timeout_and_prefs, ReduceOutput, SigRequestPrefs};
-use sui_types::{
-    base_types::ConciseableName,
-    committee::{StakeUnit, TOTAL_VOTING_POWER},
-};
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::sync::Arc;
+use std::time::Duration;
+use sui_authority_aggregation::ReduceOutput;
+use sui_authority_aggregation::{quorum_map_then_reduce_with_timeout_and_prefs, SigRequestPrefs};
+use sui_types::base_types::ConciseableName;
+use sui_types::committee::StakeUnit;
+use sui_types::committee::TOTAL_VOTING_POWER;
 use tracing::{error, info, warn};
 
 const TOTAL_TIMEOUT_MS: u64 = 5_000;
@@ -51,29 +47,41 @@ impl BridgeAuthorityAggregator {
             .iter()
             .filter_map(|(name, authority)| {
                 if authority.is_blocklisted {
-                    warn!(
-                        "Ignored blocklisted authority {:?} (stake: {}) when creating BridgeAuthorityAggregator",
-                        name.concise(),
-                        authority.voting_power
-                    );
+                    warn!("Ignored blocklisted authority {:?} (stake: {}) when creating BridgeAuthorityAggregator", name.concise(), authority.voting_power);
                     return None;
                 }
                 // TODO: we could also record bad stakes here and use in signature aggregation
-                match BridgeClient::new(name.clone(), committee.clone()) {
+                match BridgeClient::new(
+                    name.clone(),
+                    committee.clone(),
+                ) {
                     Ok(client) => Some((name.clone(), Arc::new(client))),
                     Err(e) => {
-                        error!("Failed to create BridgeClient for {:?}: {:?}", name.concise(), e);
+                        error!(
+                            "Failed to create BridgeClient for {:?}: {:?}",
+                            name.concise(),
+                            e
+                        );
                         None
                     }
                 }
             })
             .collect::<BTreeMap<_, _>>();
-        Self { committee, clients: Arc::new(clients), metrics, committee_keys_to_names }
+        Self {
+            committee,
+            clients: Arc::new(clients),
+            metrics,
+            committee_keys_to_names,
+        }
     }
 
     #[cfg(test)]
     pub fn new_for_testing(committee: Arc<BridgeCommittee>) -> Self {
-        Self::new(committee, Arc::new(BridgeMetrics::new_for_testing()), Arc::new(BTreeMap::new()))
+        Self::new(
+            committee,
+            Arc::new(BridgeMetrics::new_for_testing()),
+            Arc::new(BTreeMap::new()),
+        )
     }
 
     pub async fn request_committee_signatures(
@@ -159,12 +167,23 @@ impl GetSigsState {
                 self.sigs.len(),
                 self.total_ok_stake
             );
-            let signatures = self.sigs.iter().map(|(k, v)| (k.clone(), v.signature.clone())).collect::<BTreeMap<_, _>>();
+            let signatures = self
+                .sigs
+                .iter()
+                .map(|(k, v)| (k.clone(), v.signature.clone()))
+                .collect::<BTreeMap<_, _>>();
             let sig_info = BridgeCommitteeValiditySignInfo { signatures };
-            let certified_action: sui_types::message_envelope::Envelope<BridgeAction, BridgeCommitteeValiditySignInfo> =
-                CertifiedBridgeAction::new_from_data_and_sig(signed_action.into_inner().into_data(), sig_info);
+            let certified_action: sui_types::message_envelope::Envelope<
+                BridgeAction,
+                BridgeCommitteeValiditySignInfo,
+            > = CertifiedBridgeAction::new_from_data_and_sig(
+                signed_action.into_inner().into_data(),
+                sig_info,
+            );
             // `BridgeClient` already verified individual signatures
-            Ok(Some(VerifiedCertifiedBridgeAction::new_from_verified(certified_action)))
+            Ok(Some(VerifiedCertifiedBridgeAction::new_from_verified(
+                certified_action,
+            )))
         } else {
             Ok(None)
         }
@@ -172,20 +191,27 @@ impl GetSigsState {
 
     fn add_ok_stake(&mut self, ok_stake: StakeUnit, name: &BridgeAuthorityPublicKeyBytes) {
         if let Some(host_name) = self.committee_keys_to_names.get(name) {
-            self.metrics.auth_agg_ok_responses.with_label_values(&[host_name]).inc();
+            self.metrics
+                .auth_agg_ok_responses
+                .with_label_values(&[host_name])
+                .inc();
         }
         self.total_ok_stake += ok_stake;
     }
 
     fn add_bad_stake(&mut self, bad_stake: StakeUnit, name: &BridgeAuthorityPublicKeyBytes) {
         if let Some(host_name) = self.committee_keys_to_names.get(name) {
-            self.metrics.auth_agg_bad_responses.with_label_values(&[host_name]).inc();
+            self.metrics
+                .auth_agg_bad_responses
+                .with_label_values(&[host_name])
+                .inc();
         }
         self.total_bad_stake += bad_stake;
     }
 
     fn is_too_many_error(&self) -> bool {
-        TOTAL_VOTING_POWER - self.total_bad_stake - self.committee.total_blocklisted_stake() < self.validity_threshold
+        TOTAL_VOTING_POWER - self.total_bad_stake - self.committee.total_blocklisted_stake()
+            < self.validity_threshold
     }
 }
 
@@ -203,15 +229,19 @@ async fn request_sign_bridge_action_into_certification(
     // we pass in `Some` to make sure the validators with higher voting power are requested first
     // to save gas cost.
     let preference = match action {
-        BridgeAction::SuiToEthBridgeAction(_) => {
-            Some(SigRequestPrefs { ordering_pref: BTreeSet::new(), prefetch_timeout })
-        }
+        BridgeAction::SuiToEthBridgeAction(_) => Some(SigRequestPrefs {
+            ordering_pref: BTreeSet::new(),
+            prefetch_timeout,
+        }),
         BridgeAction::EthToSuiBridgeAction(_) => None,
         _ => {
             if action.chain_id().is_sui_chain() {
                 None
             } else {
-                Some(SigRequestPrefs { ordering_pref: BTreeSet::new(), prefetch_timeout })
+                Some(SigRequestPrefs {
+                    ordering_pref: BTreeSet::new(),
+                    prefetch_timeout,
+                })
             }
         }
     };
@@ -312,20 +342,18 @@ mod tests {
     use std::collections::BTreeSet;
 
     use fastcrypto::traits::ToFromBytes;
-    use sui_types::{committee::VALIDITY_THRESHOLD, digests::TransactionDigest};
+    use sui_types::committee::VALIDITY_THRESHOLD;
+    use sui_types::digests::TransactionDigest;
 
-    use crate::{crypto::BridgeAuthorityPublicKey, server::mock_handler::BridgeRequestMockHandler};
+    use crate::crypto::BridgeAuthorityPublicKey;
+    use crate::server::mock_handler::BridgeRequestMockHandler;
 
     use super::*;
-    use crate::{
-        test_utils::{
-            get_test_authorities_and_run_mock_bridge_server,
-            get_test_authority_and_key,
-            get_test_sui_to_eth_bridge_action,
-            sign_action_with_key,
-        },
-        types::BridgeCommittee,
+    use crate::test_utils::{
+        get_test_authorities_and_run_mock_bridge_server, get_test_authority_and_key,
+        get_test_sui_to_eth_bridge_action, sign_action_with_key,
     };
+    use crate::types::BridgeCommittee;
 
     #[tokio::test]
     async fn test_bridge_auth_agg_construction() {
@@ -386,13 +414,10 @@ mod tests {
         let mock3 = BridgeRequestMockHandler::new();
 
         // start servers
-        let (_handles, authorities, secrets) =
-            get_test_authorities_and_run_mock_bridge_server(vec![2500, 2500, 2500, 2500], vec![
-                mock0.clone(),
-                mock1.clone(),
-                mock2.clone(),
-                mock3.clone(),
-            ]);
+        let (_handles, authorities, secrets) = get_test_authorities_and_run_mock_bridge_server(
+            vec![2500, 2500, 2500, 2500],
+            vec![mock0.clone(), mock1.clone(), mock2.clone(), mock3.clone()],
+        );
 
         let committee = BridgeCommittee::new(authorities).unwrap();
 
@@ -437,20 +462,47 @@ mod tests {
             Ok(sign_action_with_key(&action, &secrets[3])),
             None,
         );
-        agg.request_committee_signatures(action.clone()).await.unwrap();
+        agg.request_committee_signatures(action.clone())
+            .await
+            .unwrap();
 
         // 1 out of 4 authorities returns error
-        mock3.add_sui_event_response(sui_tx_digest, sui_tx_event_index, Err(BridgeError::RestAPIError("".into())), None);
-        agg.request_committee_signatures(action.clone()).await.unwrap();
+        mock3.add_sui_event_response(
+            sui_tx_digest,
+            sui_tx_event_index,
+            Err(BridgeError::RestAPIError("".into())),
+            None,
+        );
+        agg.request_committee_signatures(action.clone())
+            .await
+            .unwrap();
 
         // 2 out of 4 authorities returns error
-        mock2.add_sui_event_response(sui_tx_digest, sui_tx_event_index, Err(BridgeError::RestAPIError("".into())), None);
-        agg.request_committee_signatures(action.clone()).await.unwrap();
+        mock2.add_sui_event_response(
+            sui_tx_digest,
+            sui_tx_event_index,
+            Err(BridgeError::RestAPIError("".into())),
+            None,
+        );
+        agg.request_committee_signatures(action.clone())
+            .await
+            .unwrap();
 
         // 3 out of 4 authorities returns error - good stake below valdiity threshold
-        mock1.add_sui_event_response(sui_tx_digest, sui_tx_event_index, Err(BridgeError::RestAPIError("".into())), None);
-        let err = agg.request_committee_signatures(action.clone()).await.unwrap_err();
-        assert!(matches!(err, BridgeError::AuthoritySignatureAggregationTooManyError(_)));
+        mock1.add_sui_event_response(
+            sui_tx_digest,
+            sui_tx_event_index,
+            Err(BridgeError::RestAPIError("".into())),
+            None,
+        );
+        let err = agg
+            .request_committee_signatures(action.clone())
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            BridgeError::AuthoritySignatureAggregationTooManyError(_)
+        ));
     }
 
     #[tokio::test]
@@ -468,8 +520,9 @@ mod tests {
         let mock8 = BridgeRequestMockHandler::new();
 
         // start servers - there is only one permutation of size 2 (1112, 2222) that will achieve quorum
-        let (_handles, authorities, secrets) =
-            get_test_authorities_and_run_mock_bridge_server(vec![666, 1000, 900, 900, 900, 900, 900, 1612, 2222], vec![
+        let (_handles, authorities, secrets) = get_test_authorities_and_run_mock_bridge_server(
+            vec![666, 1000, 900, 900, 900, 900, 900, 1612, 2222],
+            vec![
                 mock0.clone(),
                 mock1.clone(),
                 mock2.clone(),
@@ -479,7 +532,8 @@ mod tests {
                 mock6.clone(),
                 mock7.clone(),
                 mock8.clone(),
-            ]);
+            ],
+        );
 
         let authorities_clone = authorities.clone();
         let committee = Arc::new(BridgeCommittee::new(authorities_clone).unwrap());
@@ -647,13 +701,10 @@ mod tests {
         let mock3 = BridgeRequestMockHandler::new();
 
         // start servers
-        let (_handles, mut authorities, secrets) =
-            get_test_authorities_and_run_mock_bridge_server(vec![2500, 2500, 2500, 2500], vec![
-                mock0.clone(),
-                mock1.clone(),
-                mock2.clone(),
-                mock3.clone(),
-            ]);
+        let (_handles, mut authorities, secrets) = get_test_authorities_and_run_mock_bridge_server(
+            vec![2500, 2500, 2500, 2500],
+            vec![mock0.clone(), mock1.clone(), mock2.clone(), mock3.clone()],
+        );
         // 0 and 1 are blocklisted
         authorities[0].is_blocklisted = true;
         authorities[1].is_blocklisted = true;
@@ -690,14 +741,39 @@ mod tests {
             Ok(sign_action_with_key(&action, &secrets[3])),
             None,
         );
-        let certified = agg.request_committee_signatures(action.clone()).await.unwrap();
-        let signers = certified.auth_sig().signatures.keys().cloned().collect::<BTreeSet<_>>();
-        assert_eq!(signers, BTreeSet::from_iter(vec![authorities[2].pubkey_bytes(), authorities[3].pubkey_bytes()]));
+        let certified = agg
+            .request_committee_signatures(action.clone())
+            .await
+            .unwrap();
+        let signers = certified
+            .auth_sig()
+            .signatures
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            signers,
+            BTreeSet::from_iter(vec![
+                authorities[2].pubkey_bytes(),
+                authorities[3].pubkey_bytes()
+            ])
+        );
 
         // if mock 3 returns error, then it won't reach validity threshold
-        mock3.add_sui_event_response(sui_tx_digest, sui_tx_event_index, Err(BridgeError::RestAPIError("".into())), None);
-        let err = agg.request_committee_signatures(action.clone()).await.unwrap_err();
-        assert!(matches!(err, BridgeError::AuthoritySignatureAggregationTooManyError(_)));
+        mock3.add_sui_event_response(
+            sui_tx_digest,
+            sui_tx_event_index,
+            Err(BridgeError::RestAPIError("".into())),
+            None,
+        );
+        let err = agg
+            .request_committee_signatures(action.clone())
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            BridgeError::AuthoritySignatureAggregationTooManyError(_)
+        ));
 
         // if mock 3 returns duplicated signature (by authority 2), `BridgeClient` will catch this
         mock3.add_sui_event_response(
@@ -706,8 +782,14 @@ mod tests {
             Ok(sign_action_with_key(&action, &secrets[2])),
             None,
         );
-        let err = agg.request_committee_signatures(action.clone()).await.unwrap_err();
-        assert!(matches!(err, BridgeError::AuthoritySignatureAggregationTooManyError(_)));
+        let err = agg
+            .request_committee_signatures(action.clone())
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            BridgeError::AuthoritySignatureAggregationTooManyError(_)
+        ));
     }
 
     #[test]
@@ -726,7 +808,12 @@ mod tests {
 
         let threshold = VALIDITY_THRESHOLD;
         let metrics = Arc::new(BridgeMetrics::new_for_testing());
-        let mut state = GetSigsState::new(threshold, Arc::new(committee), metrics.clone(), Arc::new(BTreeMap::new()));
+        let mut state = GetSigsState::new(
+            threshold,
+            Arc::new(committee),
+            metrics.clone(),
+            Arc::new(BTreeMap::new()),
+        );
 
         assert!(!state.is_too_many_error());
         let dummy = authorities[0].pubkey_bytes();
@@ -751,7 +838,12 @@ mod tests {
         let committee = BridgeCommittee::new(authorities.clone()).unwrap();
         let threshold = VALIDITY_THRESHOLD;
         let metrics = Arc::new(BridgeMetrics::new_for_testing());
-        let mut state = GetSigsState::new(threshold, Arc::new(committee), metrics.clone(), Arc::new(BTreeMap::new()));
+        let mut state = GetSigsState::new(
+            threshold,
+            Arc::new(committee),
+            metrics.clone(),
+            Arc::new(BTreeMap::new()),
+        );
 
         assert!(!state.is_too_many_error());
 
@@ -770,8 +862,12 @@ mod tests {
         authorities[3].is_blocklisted = true; // blocklist authority 3
         let committee = BridgeCommittee::new(authorities.clone()).unwrap();
         let threshold = VALIDITY_THRESHOLD;
-        let mut state =
-            GetSigsState::new(threshold, Arc::new(committee.clone()), metrics.clone(), Arc::new(BTreeMap::new()));
+        let mut state = GetSigsState::new(
+            threshold,
+            Arc::new(committee.clone()),
+            metrics.clone(),
+            Arc::new(BTreeMap::new()),
+        );
 
         let sui_tx_digest = TransactionDigest::random();
         let sui_tx_event_index = 0;
@@ -866,7 +962,12 @@ mod tests {
         assert_eq!(state.total_ok_stake, 7500);
 
         assert_eq!(certificate.data(), &action);
-        let signers = certificate.auth_sig().signatures.keys().cloned().collect::<BTreeSet<_>>();
+        let signers = certificate
+            .auth_sig()
+            .signatures
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>();
         assert_eq!(
             signers,
             BTreeSet::from_iter(vec![

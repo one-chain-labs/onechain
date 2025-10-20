@@ -154,7 +154,10 @@ impl MallocSizeOfOps {
 
     /// Call `have_seen_ptr_op` on `ptr`.
     pub fn have_seen_ptr<T>(&mut self, ptr: *const T) -> bool {
-        let have_seen_ptr_op = self.have_seen_ptr_op.as_mut().expect("missing have_seen_ptr_op");
+        let have_seen_ptr_op = self
+            .have_seen_ptr_op
+            .as_mut()
+            .expect("missing have_seen_ptr_op");
         have_seen_ptr_op(ptr as *const c_void)
     }
 }
@@ -207,7 +210,6 @@ impl<'a, T: ?Sized> MallocSizeOf for &'a T {
         // Zero makes sense for a non-owning reference.
         0
     }
-
     fn constant_size() -> Option<usize> {
         Some(0)
     }
@@ -226,7 +228,6 @@ impl MallocSizeOf for Tuple {
         for_tuples!( #( result += Tuple.size_of(ops); )* );
         result
     }
-
     fn constant_size() -> Option<usize> {
         let mut result = Some(0);
         for_tuples!( #( result = result.and_then(|s| Tuple::constant_size().map(|t| s + t)); )* );
@@ -242,7 +243,6 @@ impl<T: MallocSizeOf> MallocSizeOf for Option<T> {
             0
         }
     }
-
     fn constant_size() -> Option<usize> {
         T::constant_size().filter(|s| *s == 0)
     }
@@ -255,7 +255,6 @@ impl<T: MallocSizeOf, E: MallocSizeOf> MallocSizeOf for Result<T, E> {
             Err(ref e) => e.size_of(ops),
         }
     }
-
     fn constant_size() -> Option<usize> {
         // Result<T, E> has constant size iff T::constant_size == E::constant_size
         T::constant_size().and_then(|t| E::constant_size().filter(|e| *e == t))
@@ -266,7 +265,6 @@ impl<T: MallocSizeOf + Copy> MallocSizeOf for rstd::cell::Cell<T> {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         self.get().size_of(ops)
     }
-
     fn constant_size() -> Option<usize> {
         T::constant_size()
     }
@@ -276,7 +274,6 @@ impl<T: MallocSizeOf> MallocSizeOf for rstd::cell::RefCell<T> {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         self.borrow().size_of(ops)
     }
-
     fn constant_size() -> Option<usize> {
         T::constant_size()
     }
@@ -360,7 +357,9 @@ where
             // `ops.malloc_enclosing_size_of()` then gives us the storage size.
             // This assumes that the `HashSet`'s contents (values and hashes)
             // are all stored in a single contiguous heap allocation.
-            self.iter().next().map_or(0, |t| unsafe { ops.malloc_enclosing_size_of(t) })
+            self.iter()
+                .next()
+                .map_or(0, |t| unsafe { ops.malloc_enclosing_size_of(t) })
         } else {
             // An estimate.
             self.capacity() * (size_of::<T>() + size_of::<usize>())
@@ -389,7 +388,6 @@ impl<I: MallocSizeOf> MallocSizeOf for rstd::cmp::Reverse<I> {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         self.0.size_of(ops)
     }
-
     fn constant_size() -> Option<usize> {
         I::constant_size()
     }
@@ -400,7 +398,9 @@ impl<K, V, S> MallocShallowSizeOf for std::collections::HashMap<K, V, S> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         // See the implementation for std::collections::HashSet for details.
         if ops.has_malloc_enclosing_size_of() {
-            self.values().next().map_or(0, |v| unsafe { ops.malloc_enclosing_size_of(v) })
+            self.values()
+                .next()
+                .map_or(0, |v| unsafe { ops.malloc_enclosing_size_of(v) })
         } else {
             self.capacity() * (size_of::<V>() + size_of::<K>() + size_of::<usize>())
         }
@@ -418,7 +418,9 @@ where
         if let (Some(k), Some(v)) = (K::constant_size(), V::constant_size()) {
             n += self.len() * (k + v)
         } else {
-            n = self.iter().fold(n, |acc, (k, v)| acc + k.size_of(ops) + v.size_of(ops))
+            n = self
+                .iter()
+                .fold(n, |acc, (k, v)| acc + k.size_of(ops) + v.size_of(ops))
         }
         n
     }
@@ -427,7 +429,9 @@ where
 impl<K, V> MallocShallowSizeOf for rstd::collections::BTreeMap<K, V> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         if ops.has_malloc_enclosing_size_of() {
-            self.values().next().map_or(0, |v| unsafe { ops.malloc_enclosing_size_of(v) })
+            self.values()
+                .next()
+                .map_or(0, |v| unsafe { ops.malloc_enclosing_size_of(v) })
         } else {
             self.len() * (size_of::<V>() + size_of::<K>() + size_of::<usize>())
         }
@@ -444,7 +448,9 @@ where
         if let (Some(k), Some(v)) = (K::constant_size(), V::constant_size()) {
             n += self.len() * (k + v)
         } else {
-            n = self.iter().fold(n, |acc, (k, v)| acc + k.size_of(ops) + v.size_of(ops))
+            n = self
+                .iter()
+                .fold(n, |acc, (k, v)| acc + k.size_of(ops) + v.size_of(ops))
         }
         n
     }
@@ -454,7 +460,9 @@ impl<T> MallocShallowSizeOf for rstd::collections::BTreeSet<T> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         if ops.has_malloc_enclosing_size_of() {
             // See implementation for HashSet how this works.
-            self.iter().next().map_or(0, |t| unsafe { ops.malloc_enclosing_size_of(t) })
+            self.iter()
+                .next()
+                .map_or(0, |t| unsafe { ops.malloc_enclosing_size_of(t) })
         } else {
             // An estimate.
             self.len() * (size_of::<T>() + size_of::<usize>())
@@ -643,7 +651,9 @@ impl<K, V, S> MallocShallowSizeOf for hashbrown::HashMap<K, V, S> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         // See the implementation for std::collections::HashSet for details.
         if ops.has_malloc_enclosing_size_of() {
-            self.values().next().map_or(0, |v| unsafe { ops.malloc_enclosing_size_of(v) })
+            self.values()
+                .next()
+                .map_or(0, |v| unsafe { ops.malloc_enclosing_size_of(v) })
         } else {
             self.capacity() * (size_of::<V>() + size_of::<K>() + size_of::<usize>())
         }
@@ -661,16 +671,19 @@ where
         if let (Some(k), Some(v)) = (K::constant_size(), V::constant_size()) {
             n += self.len() * (k + v)
         } else {
-            n = self.iter().fold(n, |acc, (k, v)| acc + k.size_of(ops) + v.size_of(ops))
+            n = self
+                .iter()
+                .fold(n, |acc, (k, v)| acc + k.size_of(ops) + v.size_of(ops))
         }
         n
     }
 }
 
 malloc_size_of_is_0!(
-    [u8; 1], [u8; 2], [u8; 3], [u8; 4], [u8; 5], [u8; 6], [u8; 7], [u8; 8], [u8; 9], [u8; 10], [u8; 11], [u8; 12],
-    [u8; 13], [u8; 14], [u8; 15], [u8; 16], [u8; 17], [u8; 18], [u8; 19], [u8; 20], [u8; 21], [u8; 22], [u8; 23],
-    [u8; 24], [u8; 25], [u8; 26], [u8; 27], [u8; 28], [u8; 29], [u8; 30], [u8; 31], [u8; 32]
+    [u8; 1], [u8; 2], [u8; 3], [u8; 4], [u8; 5], [u8; 6], [u8; 7], [u8; 8], [u8; 9], [u8; 10],
+    [u8; 11], [u8; 12], [u8; 13], [u8; 14], [u8; 15], [u8; 16], [u8; 17], [u8; 18], [u8; 19],
+    [u8; 20], [u8; 21], [u8; 22], [u8; 23], [u8; 24], [u8; 25], [u8; 26], [u8; 27], [u8; 28],
+    [u8; 29], [u8; 30], [u8; 31], [u8; 32]
 );
 
 macro_rules! impl_smallvec {
@@ -681,7 +694,11 @@ macro_rules! impl_smallvec {
             T: MallocSizeOf,
         {
             fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
-                let mut n = if self.spilled() { self.capacity() * core::mem::size_of::<T>() } else { 0 };
+                let mut n = if self.spilled() {
+                    self.capacity() * core::mem::size_of::<T>()
+                } else {
+                    0
+                };
                 if let Some(t) = T::constant_size() {
                     n += self.len() * t;
                 } else {
@@ -719,7 +736,10 @@ mod tests {
         assert_eq!(v.size_of(&mut ops), 0);
         assert!(!v.spilled());
         v.push(4);
-        assert!(v.spilled(), "SmallVec spills when going beyond the capacity of the inner backing array");
+        assert!(
+            v.spilled(),
+            "SmallVec spills when going beyond the capacity of the inner backing array"
+        );
         assert_eq!(v.size_of(&mut ops), 4); // 4 u8s on the heap
     }
 
@@ -734,7 +754,10 @@ mod tests {
         assert!(v.size_of(&mut ops) >= 3);
         assert!(!v.spilled());
         v.push(Box::new(4u8));
-        assert!(v.spilled(), "SmallVec spills when going beyond the capacity of the inner backing array");
+        assert!(
+            v.spilled(),
+            "SmallVec spills when going beyond the capacity of the inner backing array"
+        );
         let mut ops = new_malloc_size_ops();
         let expected_min_allocs = mem::size_of::<Box<u8>>() * 4 + 4;
         assert!(v.size_of(&mut ops) >= expected_min_allocs);
@@ -753,7 +776,8 @@ mod tests {
         v.push("ÖWL".into());
         assert!(v.spilled());
         let mut ops = new_malloc_size_ops();
-        let expected_min_allocs = mem::size_of::<String>() * 4 + "ÖWL".len() + "COW".len() + "PIG".len() + "DUCK".len();
+        let expected_min_allocs =
+            mem::size_of::<String>() * 4 + "ÖWL".len() + "COW".len() + "PIG".len() + "DUCK".len();
         assert!(v.size_of(&mut ops) >= expected_min_allocs);
     }
 
@@ -785,7 +809,12 @@ mod tests {
         malloc_size_of_is_0!(any: Data<P>);
 
         // MallocSizeOf is not implemented for [u8; 333]
-        assert_eq!(crate::malloc_size(&Data::<[u8; 333]> { phantom: std::marker::PhantomData }), 0);
+        assert_eq!(
+            crate::malloc_size(&Data::<[u8; 333]> {
+                phantom: std::marker::PhantomData
+            }),
+            0
+        );
     }
 
     #[test]
@@ -796,7 +825,6 @@ mod tests {
             fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
                 self.0.size_of(ops)
             }
-
             fn constant_size() -> Option<usize> {
                 Some(2)
             }
@@ -807,7 +835,10 @@ mod tests {
         assert_eq!(std::cell::RefCell::<u8>::constant_size(), Some(0));
         assert_eq!(std::cell::Cell::<u8>::constant_size(), Some(0));
         assert_eq!(Result::<(), ()>::constant_size(), Some(0));
-        assert_eq!(<(AlwaysTwo, (), [u8; 32], AlwaysTwo)>::constant_size(), Some(2 + 2));
+        assert_eq!(
+            <(AlwaysTwo, (), [u8; 32], AlwaysTwo)>::constant_size(),
+            Some(2 + 2)
+        );
         assert_eq!(Option::<u8>::constant_size(), Some(0));
         assert_eq!(<&String>::constant_size(), Some(0));
 

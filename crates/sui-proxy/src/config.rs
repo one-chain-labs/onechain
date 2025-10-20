@@ -102,7 +102,9 @@ fn remote_write_url() -> String {
 pub fn load<P: AsRef<std::path::Path>, T: DeserializeOwned + Serialize>(path: P) -> Result<T> {
     let path = path.as_ref();
     debug!("Reading config from {:?}", path);
-    Ok(serde_yaml::from_reader(std::fs::File::open(path).context(format!("cannot open {:?}", path))?)?)
+    Ok(serde_yaml::from_reader(
+        std::fs::File::open(path).context(format!("cannot open {:?}", path))?,
+    )?)
 }
 
 #[cfg(test)]

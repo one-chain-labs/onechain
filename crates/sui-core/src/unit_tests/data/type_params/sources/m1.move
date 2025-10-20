@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module type_params::m1 {
-    use one::object::{Self, UID};
-    use one::tx_context::TxContext;
-    use one::transfer;
+    use sui::object::{Self, UID};
+    use sui::tx_context::TxContext;
+    use sui::transfer;
     use type_params::m2;
 
     public struct Object has key, store {

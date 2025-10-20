@@ -26,19 +26,16 @@ use tokio::{
 };
 use tracing::{debug, error, info, trace, warn};
 
+use crate::{authority_service::COMMIT_LAG_MULTIPLIER, core_thread::CoreThreadDispatcher};
 use crate::{
-    authority_service::COMMIT_LAG_MULTIPLIER,
     block::{BlockRef, SignedBlock, VerifiedBlock},
     block_verifier::BlockVerifier,
     commit_vote_monitor::CommitVoteMonitor,
     context::Context,
-    core_thread::CoreThreadDispatcher,
     dag_state::DagState,
     error::{ConsensusError, ConsensusResult},
     network::NetworkClient,
-    BlockAPI,
-    CommitIndex,
-    Round,
+    BlockAPI, CommitIndex, Round,
 };
 
 /// The number of concurrent fetch blocks requests per authority
@@ -83,7 +80,9 @@ struct InflightBlocksMap {
 
 impl InflightBlocksMap {
     fn new() -> Arc<Self> {
-        Arc::new(Self { inner: Mutex::new(HashMap::new()) })
+        Arc::new(Self {
+            inner: Mutex::new(HashMap::new()),
+        })
     }
 
     /// Locks the blocks to be fetched for the assigned `peer_index`. We want to avoid re-fetching the
@@ -103,7 +102,9 @@ impl InflightBlocksMap {
             // check that the number of authorities that are already instructed to fetch the block is not
             // higher than the allowed and the `peer_index` has not already been instructed to do that.
             let authorities = inner.entry(block_ref).or_default();
-            if authorities.len() < MAX_AUTHORITIES_TO_FETCH_PER_BLOCK && authorities.get(&peer).is_none() {
+            if authorities.len() < MAX_AUTHORITIES_TO_FETCH_PER_BLOCK
+                && authorities.get(&peer).is_none()
+            {
                 assert!(authorities.insert(peer));
                 blocks.insert(block_ref);
             }
@@ -112,7 +113,11 @@ impl InflightBlocksMap {
         if blocks.is_empty() {
             None
         } else {
-            Some(BlocksGuard { map: self.clone(), block_refs: blocks, peer })
+            Some(BlocksGuard {
+                map: self.clone(),
+                block_refs: blocks,
+                peer,
+            })
         }
     }
 
@@ -123,7 +128,9 @@ impl InflightBlocksMap {
         // Now mark all the blocks as fetched from the map
         let mut blocks_to_fetch = self.inner.lock();
         for block_ref in block_refs {
-            let authorities = blocks_to_fetch.get_mut(block_ref).expect("Should have found a non empty map");
+            let authorities = blocks_to_fetch
+                .get_mut(block_ref)
+                .expect("Should have found a non empty map");
 
             assert!(authorities.remove(&peer), "Peer index should be present!");
 
@@ -137,7 +144,11 @@ impl InflightBlocksMap {
     /// Drops the provided `blocks_guard` which will force to unlock the blocks, and lock now again the
     /// referenced block refs. The swap is best effort and there is no guarantee that the `peer` will
     /// be able to acquire the new locks.
-    fn swap_locks(self: &Arc<Self>, blocks_guard: BlocksGuard, peer: AuthorityIndex) -> Option<BlocksGuard> {
+    fn swap_locks(
+        self: &Arc<Self>,
+        blocks_guard: BlocksGuard,
+        peer: AuthorityIndex,
+    ) -> Option<BlocksGuard> {
         let block_refs = blocks_guard.block_refs.clone();
 
         // Explicitly drop the guard
@@ -179,7 +190,11 @@ impl SynchronizerHandle {
     ) -> ConsensusResult<()> {
         let (sender, receiver) = oneshot::channel();
         self.commands_sender
-            .send(Command::FetchBlocks { missing_block_refs, peer_index, result: sender })
+            .send(Command::FetchBlocks {
+                missing_block_refs,
+                peer_index,
+                result: sender,
+            })
             .await
             .map_err(|_err| ConsensusError::Shutdown)?;
         receiver.await.map_err(|_err| ConsensusError::Shutdown)?
@@ -241,7 +256,8 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         dag_state: Arc<RwLock<DagState>>,
         sync_last_known_own_block: bool,
     ) -> Arc<SynchronizerHandle> {
-        let (commands_sender, commands_receiver) = channel("consensus_synchronizer_commands", 1_000);
+        let (commands_sender, commands_receiver) =
+            channel("consensus_synchronizer_commands", 1_000);
         let inflight_blocks_map = InflightBlocksMap::new();
 
         // Spawn the tasks to fetch the blocks from the others
@@ -251,7 +267,8 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
             if index == context.own_index {
                 continue;
             }
-            let (sender, receiver) = channel("consensus_synchronizer_fetches", FETCH_BLOCKS_CONCURRENCY);
+            let (sender, receiver) =
+                channel("consensus_synchronizer_fetches", FETCH_BLOCKS_CONCURRENCY);
             let fetch_blocks_from_authority_async = Self::fetch_blocks_from_authority(
                 index,
                 network_client.clone(),
@@ -270,7 +287,9 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         let commands_sender_clone = commands_sender.clone();
 
         if sync_last_known_own_block {
-            commands_sender.try_send(Command::FetchOwnLastBlock).expect("Failed to sync our last block");
+            commands_sender
+                .try_send(Command::FetchOwnLastBlock)
+                .expect("Failed to sync our last block");
         }
 
         // Spawn the task to listen to the requests & periodic runs
@@ -292,7 +311,10 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
             s.run().await;
         }));
 
-        Arc::new(SynchronizerHandle { commands_sender, tasks: tokio::sync::Mutex::new(tasks) })
+        Arc::new(SynchronizerHandle {
+            commands_sender,
+            tasks: tokio::sync::Mutex::new(tasks),
+        })
     }
 
     // The main loop to listen for the submitted commands.
@@ -418,7 +440,7 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         commands_sender: Sender<Command>,
     ) {
         const MAX_RETRIES: u32 = 5;
-
+        let peer_hostname = &context.committee.authority(peer_index).hostname;
         let mut requests = FuturesUnordered::new();
 
         loop {
@@ -442,14 +464,14 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
                                 commands_sender.clone(),
                                 "live"
                             ).await {
-                                warn!("Error while processing fetched blocks from peer {peer_index}: {err}");
+                                warn!("Error while processing fetched blocks from peer {peer_index} {peer_hostname}: {err}");
                             }
                         },
                         Err(_) => {
                             if retries <= MAX_RETRIES {
                                 requests.push(Self::fetch_blocks_request(network_client.clone(), peer_index, blocks_guard, highest_rounds, FETCH_REQUEST_TIMEOUT, retries))
                             } else {
-                                warn!("Max retries {retries} reached while trying to fetch blocks from peer {peer_index}.");
+                                warn!("Max retries {retries} reached while trying to fetch blocks from peer {peer_index} {peer_hostname}.");
                                 // we don't necessarily need to do, but dropping the guard here to unlock the blocks
                                 drop(blocks_guard);
                             }
@@ -482,12 +504,18 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         const MAX_ADDITIONAL_BLOCKS: usize = 10;
 
         // Ensure that all the returned blocks do not go over the total max allowed returned blocks
-        if serialized_blocks.len() > requested_blocks_guard.block_refs.len() + MAX_ADDITIONAL_BLOCKS {
+        if serialized_blocks.len() > requested_blocks_guard.block_refs.len() + MAX_ADDITIONAL_BLOCKS
+        {
             return Err(ConsensusError::TooManyFetchedBlocksReturned(peer_index));
         }
 
         // Verify all the fetched blocks
-        let blocks = Self::verify_blocks(serialized_blocks, block_verifier.clone(), &context, peer_index)?;
+        let blocks = Self::verify_blocks(
+            serialized_blocks,
+            block_verifier.clone(),
+            &context,
+            peer_index,
+        )?;
 
         // Get all the ancestors of the requested blocks only
         let ancestors = blocks
@@ -498,9 +526,15 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
 
         // Now confirm that the blocks are either between the ones requested, or they are parents of the requested blocks
         for block in &blocks {
-            if !requested_blocks_guard.block_refs.contains(&block.reference()) && !ancestors.contains(&block.reference())
+            if !requested_blocks_guard
+                .block_refs
+                .contains(&block.reference())
+                && !ancestors.contains(&block.reference())
             {
-                return Err(ConsensusError::UnexpectedFetchedBlock { index: peer_index, block_ref: block.reference() });
+                return Err(ConsensusError::UnexpectedFetchedBlock {
+                    index: peer_index,
+                    block_ref: block.reference(),
+                });
             }
         }
 
@@ -517,18 +551,25 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
             .inc_by(blocks.len() as u64);
         for block in &blocks {
             let block_hostname = &context.committee.authority(block.author()).hostname;
-            metrics.synchronizer_fetched_blocks_by_authority.with_label_values(&[block_hostname, sync_method]).inc();
+            metrics
+                .synchronizer_fetched_blocks_by_authority
+                .with_label_values(&[block_hostname, sync_method])
+                .inc();
         }
 
         debug!(
-            "Synced missing ancestor blocks {} from peer {peer_index}",
-            blocks.iter().map(|b| b.reference().to_string()).join(","),
+            "Synced {} missing blocks from peer {peer_index} {peer_hostname}: {}",
+            blocks.len(),
+            blocks.iter().map(|b| b.reference().to_string()).join(", "),
         );
 
         // Now send them to core for processing. Ignore the returned missing blocks as we don't want
         // this mechanism to keep feedback looping on fetching more blocks. The periodic synchronization
         // will take care of that.
-        let missing_blocks = core_dispatcher.add_blocks(blocks).await.map_err(|_| ConsensusError::Shutdown)?;
+        let missing_blocks = core_dispatcher
+            .add_blocks(blocks)
+            .await
+            .map_err(|_| ConsensusError::Shutdown)?;
 
         // now release all the locked blocks as they have been fetched, verified & processed
         drop(requested_blocks_guard);
@@ -536,21 +577,34 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         // kick off immediately the scheduled synchronizer
         if !missing_blocks.is_empty() {
             // do not block here, so we avoid any possible cycles.
-            if let Err(TrySendError::Full(_)) = commands_sender.try_send(Command::KickOffScheduler) {
+            if let Err(TrySendError::Full(_)) = commands_sender.try_send(Command::KickOffScheduler)
+            {
                 warn!("Commands channel is full")
             }
         }
 
-        context.metrics.node_metrics.missing_blocks_after_fetch_total.inc_by(missing_blocks.len() as u64);
+        context
+            .metrics
+            .node_metrics
+            .missing_blocks_after_fetch_total
+            .inc_by(missing_blocks.len() as u64);
 
         Ok(())
     }
 
-    fn get_highest_accepted_rounds(dag_state: Arc<RwLock<DagState>>, context: &Arc<Context>) -> Vec<Round> {
-        let blocks = dag_state.read().get_last_cached_block_per_authority(Round::MAX);
+    fn get_highest_accepted_rounds(
+        dag_state: Arc<RwLock<DagState>>,
+        context: &Arc<Context>,
+    ) -> Vec<Round> {
+        let blocks = dag_state
+            .read()
+            .get_last_cached_block_per_authority(Round::MAX);
         assert_eq!(blocks.len(), context.committee.size());
 
-        blocks.into_iter().map(|block| block.round()).collect::<Vec<_>>()
+        blocks
+            .into_iter()
+            .map(|block| block.round())
+            .collect::<Vec<_>>()
     }
 
     fn verify_blocks(
@@ -587,8 +641,8 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
             let now = context.clock.timestamp_utc_ms();
             if now < verified_block.timestamp_ms() {
                 warn!(
-                    "Fetched block {} timestamp {} is in the future (now={}). Ignoring.",
-                    verified_block,
+                    "Synced block {} timestamp {} is in the future (now={}). Ignoring.",
+                    verified_block.reference(),
                     verified_block.timestamp_ms(),
                     now
                 );
@@ -608,13 +662,23 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         highest_rounds: Vec<Round>,
         request_timeout: Duration,
         mut retries: u32,
-    ) -> (ConsensusResult<Vec<Bytes>>, BlocksGuard, u32, AuthorityIndex, Vec<Round>) {
+    ) -> (
+        ConsensusResult<Vec<Bytes>>,
+        BlocksGuard,
+        u32,
+        AuthorityIndex,
+        Vec<Round>,
+    ) {
         let start = Instant::now();
         let resp = timeout(
             request_timeout,
             network_client.fetch_blocks(
                 peer,
-                blocks_guard.block_refs.clone().into_iter().collect::<Vec<_>>(),
+                blocks_guard
+                    .block_refs
+                    .clone()
+                    .into_iter()
+                    .collect::<Vec<_>>(),
                 highest_rounds.clone().into_iter().collect::<Vec<_>>(),
                 request_timeout,
             ),
@@ -776,8 +840,11 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
     }
 
     async fn start_fetch_missing_blocks_task(&mut self) -> ConsensusResult<()> {
-        let mut missing_blocks =
-            self.core_dispatcher.get_missing_blocks().await.map_err(|_err| ConsensusError::Shutdown)?;
+        let mut missing_blocks = self
+            .core_dispatcher
+            .get_missing_blocks()
+            .await
+            .map_err(|_err| ConsensusError::Shutdown)?;
 
         // No reason to kick off the scheduler if there are no missing blocks to fetch
         if missing_blocks.is_empty() {
@@ -800,7 +867,9 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
             let highest_accepted_round = dag_state.read().highest_accepted_round();
             missing_blocks = missing_blocks
                 .into_iter()
-                .take_while(|b| b.round <= highest_accepted_round + SYNC_MISSING_BLOCK_ROUND_THRESHOLD)
+                .take_while(|b| {
+                    b.round <= highest_accepted_round + SYNC_MISSING_BLOCK_ROUND_THRESHOLD
+                })
                 .collect::<BTreeSet<_>>();
 
             // If no missing blocks are within the acceptable thresholds to sync while we commit lag, then we disable the scheduler completely for this run.
@@ -816,62 +885,46 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
             }
         }
 
-        self.fetch_blocks_scheduler_task.spawn(monitored_future!(async move {
-            let _scope = monitored_scope("FetchMissingBlocksScheduler");
-            context.metrics.node_metrics.fetch_blocks_scheduler_inflight.inc();
-            let total_requested = missing_blocks.len();
+        self.fetch_blocks_scheduler_task
+            .spawn(monitored_future!(async move {
+                let _scope = monitored_scope("FetchMissingBlocksScheduler");
+                context.metrics.node_metrics.fetch_blocks_scheduler_inflight.inc();
+                let total_requested = missing_blocks.len();
 
-            fail_point_async!("consensus-delay");
+                fail_point_async!("consensus-delay");
 
-            // Fetch blocks from peers
-            let results = Self::fetch_blocks_from_authorities(
-                context.clone(),
-                blocks_to_fetch.clone(),
-                network_client,
-                missing_blocks,
-                core_dispatcher.clone(),
-                dag_state,
-            )
-            .await;
-            context.metrics.node_metrics.fetch_blocks_scheduler_inflight.dec();
-            if results.is_empty() {
-                warn!("No results returned while requesting missing blocks");
-                return;
-            }
-
-            // Now process the returned results
-            let mut total_fetched = 0;
-            for (blocks_guard, fetched_blocks, peer) in results {
-                total_fetched += fetched_blocks.len();
-
-                if let Err(err) = Self::process_fetched_blocks(
-                    fetched_blocks,
-                    peer,
-                    blocks_guard,
-                    core_dispatcher.clone(),
-                    block_verifier.clone(),
-                    commit_vote_monitor.clone(),
-                    context.clone(),
-                    commands_sender.clone(),
-                    "periodic",
-                )
-                .await
-                {
-                    warn!("Error occurred while processing fetched blocks from peer {peer}: {err}");
+                // Fetch blocks from peers
+                let results = Self::fetch_blocks_from_authorities(context.clone(), blocks_to_fetch.clone(), network_client, missing_blocks, dag_state).await;
+                context.metrics.node_metrics.fetch_blocks_scheduler_inflight.dec();
+                if results.is_empty() {
+                    return;
                 }
-            }
 
-            debug!("Total blocks requested to fetch: {}, total fetched: {}", total_requested, total_fetched);
-        }));
+                // Now process the returned results
+                let mut total_fetched = 0;
+                for (blocks_guard, fetched_blocks, peer) in results {
+                    total_fetched += fetched_blocks.len();
+
+                    if let Err(err) = Self::process_fetched_blocks(fetched_blocks, peer, blocks_guard, core_dispatcher.clone(), block_verifier.clone(), commit_vote_monitor.clone(), context.clone(), commands_sender.clone(), "periodic").await {
+                        warn!("Error occurred while processing fetched blocks from peer {peer}: {err}");
+                    }
+                }
+
+                debug!("Total blocks requested to fetch: {}, total fetched: {}", total_requested, total_fetched);
+            }));
         Ok(())
     }
 
     fn is_commit_lagging(&self) -> (bool, CommitIndex, CommitIndex) {
         let last_commit_index = self.dag_state.read().last_commit_index();
         let quorum_commit_index = self.commit_vote_monitor.quorum_commit_index();
-        let commit_threshold =
-            last_commit_index + self.context.parameters.commit_sync_batch_size * COMMIT_LAG_MULTIPLIER;
-        (commit_threshold < quorum_commit_index, last_commit_index, quorum_commit_index)
+        let commit_threshold = last_commit_index
+            + self.context.parameters.commit_sync_batch_size * COMMIT_LAG_MULTIPLIER;
+        (
+            commit_threshold < quorum_commit_index,
+            last_commit_index,
+            quorum_commit_index,
+        )
     }
 
     /// Fetches the `missing_blocks` from available peers. The method will attempt to split the load amongst multiple (random) peers.
@@ -882,24 +935,36 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
         inflight_blocks: Arc<InflightBlocksMap>,
         network_client: Arc<C>,
         missing_blocks: BTreeSet<BlockRef>,
-        _core_dispatcher: Arc<D>,
         dag_state: Arc<RwLock<DagState>>,
     ) -> Vec<(BlocksGuard, Vec<Bytes>, AuthorityIndex)> {
         const MAX_PEERS: usize = 3;
 
         // Attempt to fetch only up to a max of blocks
-        let missing_blocks = missing_blocks.into_iter().take(MAX_PEERS * MAX_BLOCKS_PER_FETCH).collect::<Vec<_>>();
+        let missing_blocks = missing_blocks
+            .into_iter()
+            .take(MAX_PEERS * MAX_BLOCKS_PER_FETCH)
+            .collect::<Vec<_>>();
+
         let mut missing_blocks_per_authority = vec![0; context.committee.size()];
         for block in &missing_blocks {
             missing_blocks_per_authority[block.author] += 1;
         }
-        for (missing, (_, authority)) in missing_blocks_per_authority.into_iter().zip(context.committee.authorities()) {
+        for (missing, (_, authority)) in missing_blocks_per_authority
+            .into_iter()
+            .zip(context.committee.authorities())
+        {
             context
                 .metrics
                 .node_metrics
                 .synchronizer_missing_blocks_by_authority
                 .with_label_values(&[&authority.hostname])
                 .inc_by(missing as u64);
+            context
+                .metrics
+                .node_metrics
+                .synchronizer_current_missing_blocks_by_authority
+                .with_label_values(&[&authority.hostname])
+                .set(missing as i64);
         }
 
         let mut peers = context
@@ -921,11 +986,25 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
 
         // Send the initial requests
         for blocks in missing_blocks.chunks(MAX_BLOCKS_PER_FETCH) {
-            let peer = peers.next().expect("Possible misconfiguration as a peer should be found");
+            let peer = peers
+                .next()
+                .expect("Possible misconfiguration as a peer should be found");
+            let peer_hostname = &context.committee.authority(peer).hostname;
             let block_refs = blocks.iter().cloned().collect::<BTreeSet<_>>();
 
             // lock the blocks to be fetched. If no lock can be acquired for any of the blocks then don't bother
             if let Some(blocks_guard) = inflight_blocks.lock_blocks(block_refs.clone(), peer) {
+                info!(
+                    "Periodic sync of {} missing blocks from peer {} {}: {}",
+                    block_refs.len(),
+                    peer,
+                    peer_hostname,
+                    block_refs
+                        .iter()
+                        .map(|b| b.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
                 request_futures.push(Self::fetch_blocks_request(
                     network_client.clone(),
                     peer,
@@ -944,7 +1023,8 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
 
         loop {
             tokio::select! {
-                Some((response, blocks_guard, _retries, peer_index, highest_rounds)) = request_futures.next() =>
+                Some((response, blocks_guard, _retries, peer_index, highest_rounds)) = request_futures.next() => {
+                    let peer_hostname = &context.committee.authority(peer_index).hostname;
                     match response {
                         Ok(fetched_blocks) => {
                             results.push((blocks_guard, fetched_blocks, peer_index));
@@ -959,6 +1039,16 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
                             if let Some(next_peer) = peers.next() {
                                 // do best effort to lock guards. If we can't lock then don't bother at this run.
                                 if let Some(blocks_guard) = inflight_blocks.swap_locks(blocks_guard, next_peer) {
+                                    info!(
+                                        "Retrying syncing {} missing blocks from peer {}: {}",
+                                        blocks_guard.block_refs.len(),
+                                        peer_hostname,
+                                        blocks_guard.block_refs
+                                            .iter()
+                                            .map(|b| b.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    );
                                     request_futures.push(Self::fetch_blocks_request(
                                         network_client.clone(),
                                         next_peer,
@@ -974,9 +1064,10 @@ impl<C: NetworkClient, V: BlockVerifier, D: CoreThreadDispatcher> Synchronizer<C
                                 debug!("No more peers left to fetch blocks");
                             }
                         }
-                    },
+                    }
+                },
                 _ = &mut fetcher_timeout => {
-                    debug!("Timed out while fetching all the blocks");
+                    debug!("Timed out while fetching missing blocks");
                     break;
                 }
             }
@@ -1002,27 +1093,28 @@ mod tests {
 
     use crate::{
         authority_service::COMMIT_LAG_MULTIPLIER,
+        core_thread::MockCoreThreadDispatcher,
+        synchronizer::{MAX_BLOCKS_PER_FETCH, SYNC_MISSING_BLOCK_ROUND_THRESHOLD},
+    };
+    use crate::{
         block::{BlockDigest, BlockRef, Round, TestBlock, VerifiedBlock},
         block_verifier::NoopBlockVerifier,
-        commit::{CommitRange, CommitVote, TrustedCommit},
+        commit::CommitRange,
         commit_vote_monitor::CommitVoteMonitor,
         context::Context,
-        core_thread::{CoreThreadDispatcher, MockCoreThreadDispatcher},
+        core_thread::CoreThreadDispatcher,
         dag_state::DagState,
         error::{ConsensusError, ConsensusResult},
         network::{BlockStream, NetworkClient},
         storage::mem_store::MemStore,
         synchronizer::{
-            InflightBlocksMap,
-            Synchronizer,
-            FETCH_BLOCKS_CONCURRENCY,
-            FETCH_REQUEST_TIMEOUT,
-            MAX_BLOCKS_PER_FETCH,
-            SYNC_MISSING_BLOCK_ROUND_THRESHOLD,
+            InflightBlocksMap, Synchronizer, FETCH_BLOCKS_CONCURRENCY, FETCH_REQUEST_TIMEOUT,
         },
+        CommitDigest, CommitIndex,
+    };
+    use crate::{
+        commit::{CommitVote, TrustedCommit},
         BlockAPI,
-        CommitDigest,
-        CommitIndex,
     };
 
     type FetchRequestKey = (Vec<BlockRef>, AuthorityIndex);
@@ -1033,13 +1125,22 @@ mod tests {
     #[derive(Default)]
     struct MockNetworkClient {
         fetch_blocks_requests: Mutex<BTreeMap<FetchRequestKey, FetchRequestResponse>>,
-        fetch_latest_blocks_requests: Mutex<BTreeMap<FetchLatestBlockKey, Vec<FetchLatestBlockResponse>>>,
+        fetch_latest_blocks_requests:
+            Mutex<BTreeMap<FetchLatestBlockKey, Vec<FetchLatestBlockResponse>>>,
     }
 
     impl MockNetworkClient {
-        async fn stub_fetch_blocks(&self, blocks: Vec<VerifiedBlock>, peer: AuthorityIndex, latency: Option<Duration>) {
+        async fn stub_fetch_blocks(
+            &self,
+            blocks: Vec<VerifiedBlock>,
+            peer: AuthorityIndex,
+            latency: Option<Duration>,
+        ) {
             let mut lock = self.fetch_blocks_requests.lock().await;
-            let block_refs = blocks.iter().map(|block| block.reference()).collect::<Vec<_>>();
+            let block_refs = blocks
+                .iter()
+                .map(|block| block.reference())
+                .collect::<Vec<_>>();
             lock.insert((block_refs, peer), (blocks, latency));
         }
 
@@ -1051,7 +1152,9 @@ mod tests {
             latency: Option<Duration>,
         ) {
             let mut lock = self.fetch_latest_blocks_requests.lock().await;
-            lock.entry((peer, authorities)).or_default().push((blocks, latency));
+            lock.entry((peer, authorities))
+                .or_default()
+                .push((blocks, latency));
         }
 
         async fn fetch_latest_blocks_pending_calls(&self) -> usize {
@@ -1090,9 +1193,15 @@ mod tests {
             _timeout: Duration,
         ) -> ConsensusResult<Vec<Bytes>> {
             let mut lock = self.fetch_blocks_requests.lock().await;
-            let response = lock.remove(&(block_refs, peer)).expect("Unexpected fetch blocks request made");
+            let response = lock
+                .remove(&(block_refs, peer))
+                .expect("Unexpected fetch blocks request made");
 
-            let serialised = response.0.into_iter().map(|block| block.serialized().clone()).collect::<Vec<_>>();
+            let serialised = response
+                .0
+                .into_iter()
+                .map(|block| block.serialized().clone())
+                .collect::<Vec<_>>();
 
             drop(lock);
 
@@ -1119,10 +1228,16 @@ mod tests {
             _timeout: Duration,
         ) -> ConsensusResult<Vec<Bytes>> {
             let mut lock = self.fetch_latest_blocks_requests.lock().await;
-            let mut responses = lock.remove(&(peer, authorities.clone())).expect("Unexpected fetch blocks request made");
+            let mut responses = lock
+                .remove(&(peer, authorities.clone()))
+                .expect("Unexpected fetch blocks request made");
 
             let response = responses.remove(0);
-            let serialised = response.0.into_iter().map(|block| block.serialized().clone()).collect::<Vec<_>>();
+            let serialised = response
+                .0
+                .into_iter()
+                .map(|block| block.serialized().clone())
+                .collect::<Vec<_>>();
 
             if !responses.is_empty() {
                 lock.insert((peer, authorities), responses);
@@ -1202,7 +1317,9 @@ mod tests {
         {
             // acquire a lock for authority 1
             let authority_1 = AuthorityIndex::new_for_test(1);
-            let guard = map.lock_blocks(missing_block_refs.clone(), authority_1).unwrap();
+            let guard = map
+                .lock_blocks(missing_block_refs.clone(), authority_1)
+                .unwrap();
 
             // Now swap the locks for authority 2
             let authority_2 = AuthorityIndex::new_for_test(2);
@@ -1235,13 +1352,19 @@ mod tests {
         );
 
         // Create some test blocks
-        let expected_blocks =
-            (0..10).map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build())).collect::<Vec<_>>();
-        let missing_blocks = expected_blocks.iter().map(|block| block.reference()).collect::<BTreeSet<_>>();
+        let expected_blocks = (0..10)
+            .map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build()))
+            .collect::<Vec<_>>();
+        let missing_blocks = expected_blocks
+            .iter()
+            .map(|block| block.reference())
+            .collect::<BTreeSet<_>>();
 
         // AND stub the fetch_blocks request from peer 1
         let peer = AuthorityIndex::new_for_test(1);
-        network_client.stub_fetch_blocks(expected_blocks.clone(), peer, None).await;
+        network_client
+            .stub_fetch_blocks(expected_blocks.clone(), peer, None)
+            .await;
 
         // WHEN request missing blocks from peer 1
         assert!(handle.fetch_blocks(missing_blocks, peer).await.is_ok());
@@ -1287,7 +1410,13 @@ mod tests {
         while let Some(block) = iter.next() {
             // stub the fetch_blocks request from peer 1 and give some high response latency so requests
             // can start blocking the peer task.
-            network_client.stub_fetch_blocks(vec![block.clone()], peer, Some(Duration::from_millis(5_000))).await;
+            network_client
+                .stub_fetch_blocks(
+                    vec![block.clone()],
+                    peer,
+                    Some(Duration::from_millis(5_000)),
+                )
+                .await;
 
             let mut missing_blocks = BTreeSet::new();
             missing_blocks.insert(block.reference());
@@ -1320,20 +1449,36 @@ mod tests {
         let dag_state = Arc::new(RwLock::new(DagState::new(context.clone(), store)));
 
         // Create some test blocks
-        let expected_blocks =
-            (0..10).map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build())).collect::<Vec<_>>();
-        let missing_blocks = expected_blocks.iter().map(|block| block.reference()).collect::<BTreeSet<_>>();
+        let expected_blocks = (0..10)
+            .map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build()))
+            .collect::<Vec<_>>();
+        let missing_blocks = expected_blocks
+            .iter()
+            .map(|block| block.reference())
+            .collect::<BTreeSet<_>>();
 
         // AND stub the missing blocks
-        core_dispatcher.stub_missing_blocks(missing_blocks.clone()).await;
+        core_dispatcher
+            .stub_missing_blocks(missing_blocks.clone())
+            .await;
 
         // AND stub the requests for authority 1 & 2
         // Make the first authority timeout, so the second will be called. "We" are authority = 0, so
         // we are skipped anyways.
         network_client
-            .stub_fetch_blocks(expected_blocks.clone(), AuthorityIndex::new_for_test(1), Some(FETCH_REQUEST_TIMEOUT))
+            .stub_fetch_blocks(
+                expected_blocks.clone(),
+                AuthorityIndex::new_for_test(1),
+                Some(FETCH_REQUEST_TIMEOUT),
+            )
             .await;
-        network_client.stub_fetch_blocks(expected_blocks.clone(), AuthorityIndex::new_for_test(2), None).await;
+        network_client
+            .stub_fetch_blocks(
+                expected_blocks.clone(),
+                AuthorityIndex::new_for_test(2),
+                None,
+            )
+            .await;
 
         // WHEN start the synchronizer and wait for a couple of seconds
         let _handle = Synchronizer::start(
@@ -1353,11 +1498,16 @@ mod tests {
         assert_eq!(added_blocks, expected_blocks);
 
         // AND missing blocks should have been consumed by the stub
-        assert!(core_dispatcher.get_missing_blocks().await.unwrap().is_empty());
+        assert!(core_dispatcher
+            .get_missing_blocks()
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
-    async fn synchronizer_periodic_task_when_commit_lagging_with_missing_blocks_in_acceptable_thresholds() {
+    async fn synchronizer_periodic_task_when_commit_lagging_with_missing_blocks_in_acceptable_thresholds(
+    ) {
         // GIVEN
         let (context, _) = Context::new_for_test(4);
         let context = Arc::new(context);
@@ -1373,7 +1523,10 @@ mod tests {
             .map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build()))
             .collect::<Vec<_>>();
 
-        let missing_blocks = expected_blocks.iter().map(|block| block.reference()).collect::<BTreeSet<_>>();
+        let missing_blocks = expected_blocks
+            .iter()
+            .map(|block| block.reference())
+            .collect::<BTreeSet<_>>();
         core_dispatcher.stub_missing_blocks(missing_blocks).await;
 
         // AND stub the requests for authority 1 & 2
@@ -1386,10 +1539,16 @@ mod tests {
 
         for chunk in expected_blocks.chunks(MAX_BLOCKS_PER_FETCH) {
             network_client
-                .stub_fetch_blocks(chunk.to_vec(), AuthorityIndex::new_for_test(1), Some(FETCH_REQUEST_TIMEOUT))
+                .stub_fetch_blocks(
+                    chunk.to_vec(),
+                    AuthorityIndex::new_for_test(1),
+                    Some(FETCH_REQUEST_TIMEOUT),
+                )
                 .await;
 
-            network_client.stub_fetch_blocks(chunk.to_vec(), AuthorityIndex::new_for_test(2), None).await;
+            network_client
+                .stub_fetch_blocks(chunk.to_vec(), AuthorityIndex::new_for_test(2), None)
+                .await;
         }
 
         // Now create some blocks to simulate a commit lag
@@ -1398,7 +1557,9 @@ mod tests {
         let blocks = (0..4)
             .map(|authority| {
                 let commit_votes = vec![CommitVote::new(commit_index, CommitDigest::MIN)];
-                let block = TestBlock::new(round, authority).set_commit_votes(commit_votes).build();
+                let block = TestBlock::new(round, authority)
+                    .set_commit_votes(commit_votes)
+                    .build();
 
                 VerifiedBlock::new_for_test(block)
             })
@@ -1445,20 +1606,32 @@ mod tests {
         let commit_vote_monitor = Arc::new(CommitVoteMonitor::new(context.clone()));
 
         // AND stub some missing blocks. The highest accepted round is 0. Create blocks that are above the threshold sync.
-        let mut expected_blocks = (SYNC_MISSING_BLOCK_ROUND_THRESHOLD * 2..SYNC_MISSING_BLOCK_ROUND_THRESHOLD * 3)
+        let mut expected_blocks = (SYNC_MISSING_BLOCK_ROUND_THRESHOLD * 2
+            ..SYNC_MISSING_BLOCK_ROUND_THRESHOLD * 3)
             .map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build()))
             .collect::<Vec<_>>();
-        let missing_blocks = expected_blocks.iter().map(|block| block.reference()).collect::<BTreeSet<_>>();
-        core_dispatcher.stub_missing_blocks(missing_blocks.clone()).await;
+        let missing_blocks = expected_blocks
+            .iter()
+            .map(|block| block.reference())
+            .collect::<BTreeSet<_>>();
+        core_dispatcher
+            .stub_missing_blocks(missing_blocks.clone())
+            .await;
 
         // AND stub the requests for authority 1 & 2
         // Make the first authority timeout, so the second will be called. "We" are authority = 0, so
         // we are skipped anyways.
         for chunk in expected_blocks.chunks(MAX_BLOCKS_PER_FETCH) {
             network_client
-                .stub_fetch_blocks(chunk.to_vec(), AuthorityIndex::new_for_test(1), Some(FETCH_REQUEST_TIMEOUT))
+                .stub_fetch_blocks(
+                    chunk.to_vec(),
+                    AuthorityIndex::new_for_test(1),
+                    Some(FETCH_REQUEST_TIMEOUT),
+                )
                 .await;
-            network_client.stub_fetch_blocks(chunk.to_vec(), AuthorityIndex::new_for_test(2), None).await;
+            network_client
+                .stub_fetch_blocks(chunk.to_vec(), AuthorityIndex::new_for_test(2), None)
+                .await;
         }
 
         // Now create some blocks to simulate a commit lag
@@ -1467,7 +1640,9 @@ mod tests {
         let blocks = (0..4)
             .map(|authority| {
                 let commit_votes = vec![CommitVote::new(commit_index, CommitDigest::MIN)];
-                let block = TestBlock::new(round, authority).set_commit_votes(commit_votes).build();
+                let block = TestBlock::new(round, authority)
+                    .set_commit_votes(commit_votes)
+                    .build();
 
                 VerifiedBlock::new_for_test(block)
             })
@@ -1502,16 +1677,22 @@ mod tests {
         {
             let mut d = dag_state.write();
             for index in 1..=commit_index {
-                let commit = TrustedCommit::new_for_test(index, CommitDigest::MIN, 0, BlockRef::MIN, vec![]);
+                let commit =
+                    TrustedCommit::new_for_test(index, CommitDigest::MIN, 0, BlockRef::MIN, vec![]);
 
                 d.add_commit(commit);
             }
 
-            assert_eq!(d.last_commit_index(), commit_vote_monitor.quorum_commit_index());
+            assert_eq!(
+                d.last_commit_index(),
+                commit_vote_monitor.quorum_commit_index()
+            );
         }
 
         // Now stub again the missing blocks to fetch the exact same ones.
-        core_dispatcher.stub_missing_blocks(missing_blocks.clone()).await;
+        core_dispatcher
+            .stub_missing_blocks(missing_blocks.clone())
+            .await;
 
         sleep(2 * FETCH_REQUEST_TIMEOUT).await;
 
@@ -1541,17 +1722,28 @@ mod tests {
         let our_index = AuthorityIndex::new_for_test(0);
 
         // Create some test blocks
-        let mut expected_blocks =
-            (9..=10).map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build())).collect::<Vec<_>>();
+        let mut expected_blocks = (9..=10)
+            .map(|round| VerifiedBlock::new_for_test(TestBlock::new(round, 0).build()))
+            .collect::<Vec<_>>();
 
         // Now set different latest blocks for the peers
         // For peer 1 we give the block of round 10 (highest)
         let block_1 = expected_blocks.pop().unwrap();
         network_client
-            .stub_fetch_latest_blocks(vec![block_1.clone()], AuthorityIndex::new_for_test(1), vec![our_index], None)
+            .stub_fetch_latest_blocks(
+                vec![block_1.clone()],
+                AuthorityIndex::new_for_test(1),
+                vec![our_index],
+                None,
+            )
             .await;
         network_client
-            .stub_fetch_latest_blocks(vec![block_1], AuthorityIndex::new_for_test(1), vec![our_index], None)
+            .stub_fetch_latest_blocks(
+                vec![block_1],
+                AuthorityIndex::new_for_test(1),
+                vec![our_index],
+                None,
+            )
             .await;
 
         // For peer 2 we give the block of round 9
@@ -1565,7 +1757,12 @@ mod tests {
             )
             .await;
         network_client
-            .stub_fetch_latest_blocks(vec![block_2], AuthorityIndex::new_for_test(2), vec![our_index], None)
+            .stub_fetch_latest_blocks(
+                vec![block_2],
+                AuthorityIndex::new_for_test(2),
+                vec![our_index],
+                None,
+            )
             .await;
 
         // For peer 3 we don't give any block - and it should return an empty vector
@@ -1577,7 +1774,14 @@ mod tests {
                 Some(Duration::from_secs(10)),
             )
             .await;
-        network_client.stub_fetch_latest_blocks(vec![], AuthorityIndex::new_for_test(3), vec![our_index], None).await;
+        network_client
+            .stub_fetch_latest_blocks(
+                vec![],
+                AuthorityIndex::new_for_test(3),
+                vec![our_index],
+                None,
+            )
+            .await;
 
         // WHEN start the synchronizer and wait for a couple of seconds
         let handle = Synchronizer::start(
@@ -1594,13 +1798,23 @@ mod tests {
         sleep(context.parameters.sync_last_known_own_block_timeout * 2).await;
 
         // Assert that core has been called to set the min propose round
-        assert_eq!(core_dispatcher.get_last_own_proposed_round().await, vec![10]);
+        assert_eq!(
+            core_dispatcher.get_last_own_proposed_round().await,
+            vec![10]
+        );
 
         // Ensure that all the requests have been called
         assert_eq!(network_client.fetch_latest_blocks_pending_calls().await, 0);
 
         // And we got one retry
-        assert_eq!(context.metrics.node_metrics.sync_last_known_own_block_retries.get(), 1);
+        assert_eq!(
+            context
+                .metrics
+                .node_metrics
+                .sync_last_known_own_block_retries
+                .get(),
+            1
+        );
 
         // Ensure that no panic occurred
         if let Err(err) = handle.stop().await {

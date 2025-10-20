@@ -11,12 +11,14 @@ use clap::*;
 use move_vm_config::verifier::VerifierConfig;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use sui_protocol_config_macros::{ProtocolConfigAccessors, ProtocolConfigFeatureFlagsGetters, ProtocolConfigOverride};
+use sui_protocol_config_macros::{
+    ProtocolConfigAccessors, ProtocolConfigFeatureFlagsGetters, ProtocolConfigOverride,
+};
 use tracing::{info, warn};
 
 /// The minimum and maximum protocol versions supported by this build.
 const MIN_PROTOCOL_VERSION: u64 = 1;
-const MAX_PROTOCOL_VERSION: u64 = 70;
+const MAX_PROTOCOL_VERSION: u64 = 71;
 
 // Record history of protocol version allocations here:
 //
@@ -201,22 +203,26 @@ const MAX_PROTOCOL_VERSION: u64 = 70;
 //             Add new gas model version to update charging of native functions.
 //             Add std::uq64_64 module to Move stdlib.
 //             Improve gas/wall time efficiency of some Move stdlib vector functions
+// Version 71: [SIP-45] Enable consensus amplification.
 
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProtocolVersion(u64);
 
 impl ProtocolVersion {
-    pub const MAX: Self = Self(MAX_PROTOCOL_VERSION);
-    #[cfg(not(msim))]
-    const MAX_ALLOWED: Self = Self::MAX;
-    // We create one additional "fake" version in simulator builds so that we can test upgrades.
-    #[cfg(msim)]
-    pub const MAX_ALLOWED: Self = Self(MAX_PROTOCOL_VERSION + 1);
     // The minimum and maximum protocol version supported by this binary. Counterintuitively, this constant may
     // change over time as support for old protocol versions is removed from the source. This
     // ensures that when a new network (such as a testnet) is created, its genesis committee will
     // use a protocol version that is actually supported by the binary.
     pub const MIN: Self = Self(MIN_PROTOCOL_VERSION);
+
+    pub const MAX: Self = Self(MAX_PROTOCOL_VERSION);
+
+    #[cfg(not(msim))]
+    const MAX_ALLOWED: Self = Self::MAX;
+
+    // We create one additional "fake" version in simulator builds so that we can test upgrades.
+    #[cfg(msim)]
+    pub const MAX_ALLOWED: Self = Self(MAX_PROTOCOL_VERSION + 1);
 
     pub fn new(v: u64) -> Self {
         Self(v)
@@ -241,7 +247,6 @@ impl From<u64> for ProtocolVersion {
 
 impl std::ops::Sub<u64> for ProtocolVersion {
     type Output = Self;
-
     fn sub(self, rhs: u64) -> Self::Output {
         Self::new(self.0 - rhs)
     }
@@ -249,7 +254,6 @@ impl std::ops::Sub<u64> for ProtocolVersion {
 
 impl std::ops::Add<u64> for ProtocolVersion {
     type Output = Self;
-
     fn add(self, rhs: u64) -> Self::Output {
         Self::new(self.0 + rhs)
     }
@@ -1283,9 +1287,15 @@ pub struct ProtocolConfig {
     /// Transactions will be cancelled after this many rounds.
     max_deferral_rounds_for_congestion_control: Option<u64>,
 
-    /// If >0, congestion control will allow up to one transaction per object to exceed
-    /// the configured maximum accumulated cost by the given amount.
+    /// If >0, congestion control will allow the configured maximum accumulated cost per object
+    /// to be exceeded by at most the given amount. Only one limit-exceeding transaction per
+    /// object will be allowed, unless bursting is configured below.
     max_txn_cost_overage_per_object_in_commit: Option<u64>,
+
+    /// If >0, congestion control will allow transactions in total cost equaling the
+    /// configured amount to exceed the configured maximum accumulated cost per object.
+    /// As above, up to one transaction per object exceeding the burst limit will be allowed.
+    allowed_txn_cost_overage_burst_per_object_in_commit: Option<u64>,
 
     /// Minimum interval of commit timestamps between consecutive checkpoints.
     min_checkpoint_interval_ms: Option<u64>,
@@ -1324,6 +1334,10 @@ pub struct ProtocolConfig {
     /// Adds an absolute cap on the maximum transaction cost when using TotalGasBudgetWithCap at
     /// the given multiple of the per-commit budget.
     gas_budget_based_txn_cost_absolute_cap_commit_count: Option<u64>,
+
+    /// SIP-45: K in the formula `amplification_factor = max(0, gas_price / reference_gas_price - K)`.
+    /// This is the threshold for activating consensus amplification.
+    sip_45_consensus_amplification_threshold: Option<u64>,
 }
 
 // feature flags
@@ -1344,7 +1358,10 @@ impl ProtocolConfig {
         if self.feature_flags.package_upgrades {
             Ok(())
         } else {
-            Err(Error(format!("package upgrades are not supported at {:?}", self.version)))
+            Err(Error(format!(
+                "package upgrades are not supported at {:?}",
+                self.version
+            )))
         }
     }
 
@@ -1393,11 +1410,13 @@ impl ProtocolConfig {
     }
 
     pub fn disable_invariant_violation_check_in_swap_loc(&self) -> bool {
-        self.feature_flags.disable_invariant_violation_check_in_swap_loc
+        self.feature_flags
+            .disable_invariant_violation_check_in_swap_loc
     }
 
     pub fn advance_to_highest_supported_protocol_version(&self) -> bool {
-        self.feature_flags.advance_to_highest_supported_protocol_version
+        self.feature_flags
+            .advance_to_highest_supported_protocol_version
     }
 
     pub fn ban_entry_init(&self) -> bool {
@@ -1409,7 +1428,8 @@ impl ProtocolConfig {
     }
 
     pub fn disallow_change_struct_type_params_on_upgrade(&self) -> bool {
-        self.feature_flags.disallow_change_struct_type_params_on_upgrade
+        self.feature_flags
+            .disallow_change_struct_type_params_on_upgrade
     }
 
     pub fn no_extraneous_module_bytes(&self) -> bool {
@@ -1479,7 +1499,8 @@ impl ProtocolConfig {
     }
 
     pub fn recompute_has_public_transfer_in_execution(&self) -> bool {
-        self.feature_flags.recompute_has_public_transfer_in_execution
+        self.feature_flags
+            .recompute_has_public_transfer_in_execution
     }
 
     // this function only exists for readability in the genesis code.
@@ -1542,11 +1563,13 @@ impl ProtocolConfig {
     }
 
     pub fn record_consensus_determined_version_assignments_in_prologue(&self) -> bool {
-        self.feature_flags.record_consensus_determined_version_assignments_in_prologue
+        self.feature_flags
+            .record_consensus_determined_version_assignments_in_prologue
     }
 
     pub fn prepend_prologue_tx_in_consensus_commit_in_checkpoints(&self) -> bool {
-        self.feature_flags.prepend_prologue_tx_in_consensus_commit_in_checkpoints
+        self.feature_flags
+            .prepend_prologue_tx_in_consensus_commit_in_checkpoints
     }
 
     pub fn hardened_otw_check(&self) -> bool {
@@ -1627,14 +1650,16 @@ impl ProtocolConfig {
 
     pub fn max_transaction_size_bytes(&self) -> u64 {
         // Provide a default value if protocol config version is too low.
-        self.consensus_max_transaction_size_bytes.unwrap_or(256 * 1024)
+        self.consensus_max_transaction_size_bytes
+            .unwrap_or(256 * 1024)
     }
 
     pub fn max_transactions_in_block_bytes(&self) -> u64 {
         if cfg!(msim) {
             256 * 1024
         } else {
-            self.consensus_max_transactions_in_block_bytes.unwrap_or(512 * 1024)
+            self.consensus_max_transactions_in_block_bytes
+                .unwrap_or(512 * 1024)
         }
     }
 
@@ -1651,7 +1676,8 @@ impl ProtocolConfig {
     }
 
     pub fn consensus_distributed_vote_scoring_strategy(&self) -> bool {
-        self.feature_flags.consensus_distributed_vote_scoring_strategy
+        self.feature_flags
+            .consensus_distributed_vote_scoring_strategy
     }
 
     pub fn consensus_round_prober(&self) -> bool {
@@ -1682,7 +1708,8 @@ impl ProtocolConfig {
     }
 
     pub fn disallow_new_modules_in_deps_only_packages(&self) -> bool {
-        self.feature_flags.disallow_new_modules_in_deps_only_packages
+        self.feature_flags
+            .disallow_new_modules_in_deps_only_packages
     }
 
     pub fn consensus_smart_ancestor_selection(&self) -> bool {
@@ -1690,7 +1717,8 @@ impl ProtocolConfig {
     }
 
     pub fn consensus_round_prober_probe_accepted_rounds(&self) -> bool {
-        self.feature_flags.consensus_round_prober_probe_accepted_rounds
+        self.feature_flags
+            .consensus_round_prober_probe_accepted_rounds
     }
 
     pub fn native_charging_v2(&self) -> bool {
@@ -1741,8 +1769,9 @@ impl ProtocolConfig {
 
         if std::env::var("SUI_PROTOCOL_CONFIG_OVERRIDE_ENABLE").is_ok() {
             warn!("overriding ProtocolConfig settings with custom settings; this may break non-local networks");
-            let overrides: ProtocolConfigOptional = serde_env::from_env_with_prefix("SUI_PROTOCOL_CONFIG_OVERRIDE")
-                .expect("failed to parse ProtocolConfig override env variables");
+            let overrides: ProtocolConfigOptional =
+                serde_env::from_env_with_prefix("SUI_PROTOCOL_CONFIG_OVERRIDE")
+                    .expect("failed to parse ProtocolConfig override env variables");
             overrides.apply_to(&mut ret);
         }
 
@@ -2208,6 +2237,8 @@ impl ProtocolConfig {
 
             max_txn_cost_overage_per_object_in_commit: None,
 
+            allowed_txn_cost_overage_burst_per_object_in_commit: None,
+
             min_checkpoint_interval_ms: None,
 
             checkpoint_summary_version_specific_data: None,
@@ -2225,6 +2256,8 @@ impl ProtocolConfig {
             gas_budget_based_txn_cost_cap_factor: None,
 
             gas_budget_based_txn_cost_absolute_cap_commit_count: None,
+
+            sip_45_consensus_amplification_threshold: None,
             // When adding a new constant, set it to None in the earliest version, like this:
             // new_constant: None,
         };
@@ -2277,18 +2310,21 @@ impl ProtocolConfig {
                 }
                 7 => {
                     cfg.feature_flags.disallow_adding_abilities_on_upgrade = true;
-                    cfg.feature_flags.disable_invariant_violation_check_in_swap_loc = true;
+                    cfg.feature_flags
+                        .disable_invariant_violation_check_in_swap_loc = true;
                     cfg.feature_flags.ban_entry_init = true;
                     cfg.feature_flags.package_digest_hash_module = true;
                 }
                 8 => {
-                    cfg.feature_flags.disallow_change_struct_type_params_on_upgrade = true;
+                    cfg.feature_flags
+                        .disallow_change_struct_type_params_on_upgrade = true;
                 }
                 9 => {
                     // Limits the length of a Move identifier
                     cfg.max_move_identifier_len = Some(128);
                     cfg.feature_flags.no_extraneous_module_bytes = true;
-                    cfg.feature_flags.advance_to_highest_supported_protocol_version = true;
+                    cfg.feature_flags
+                        .advance_to_highest_supported_protocol_version = true;
                 }
                 10 => {
                     cfg.max_verifier_meter_ticks_per_function = Some(16_000_000);
@@ -2313,7 +2349,8 @@ impl ProtocolConfig {
                     cfg.gas_model_version = Some(6);
                 }
                 15 => {
-                    cfg.feature_flags.consensus_transaction_ordering = ConsensusTransactionOrdering::ByGasPrice;
+                    cfg.feature_flags.consensus_transaction_ordering =
+                        ConsensusTransactionOrdering::ByGasPrice;
                 }
                 16 => {
                     cfg.feature_flags.simplified_unwrap_then_delete = true;
@@ -2339,8 +2376,9 @@ impl ProtocolConfig {
                     cfg.max_num_event_emit = Some(1024);
                     // We maintain the same total size limit for events, but increase the number of
                     // events that can be emitted.
-                    cfg.max_event_emit_size_total =
-                        Some(256 /* former event count limit */ * 250 * 1024 /* size limit per event */);
+                    cfg.max_event_emit_size_total = Some(
+                        256 /* former event count limit */ * 250 * 1024, /* size limit per event */
+                    );
                 }
                 20 => {
                     cfg.feature_flags.commit_root_state_digest = true;
@@ -2353,8 +2391,11 @@ impl ProtocolConfig {
 
                 21 => {
                     if chain != Chain::Mainnet {
-                        cfg.feature_flags.zklogin_supported_providers =
-                            BTreeSet::from(["Google".to_string(), "Facebook".to_string(), "Twitch".to_string()]);
+                        cfg.feature_flags.zklogin_supported_providers = BTreeSet::from([
+                            "Google".to_string(),
+                            "Facebook".to_string(),
+                            "Twitch".to_string(),
+                        ]);
                     }
                 }
                 22 => {
@@ -2385,8 +2426,11 @@ impl ProtocolConfig {
                 }
                 25 => {
                     // Enable zkLogin for all providers in all networks.
-                    cfg.feature_flags.zklogin_supported_providers =
-                        BTreeSet::from(["Google".to_string(), "Facebook".to_string(), "Twitch".to_string()]);
+                    cfg.feature_flags.zklogin_supported_providers = BTreeSet::from([
+                        "Google".to_string(),
+                        "Facebook".to_string(),
+                        "Twitch".to_string(),
+                    ]);
                     cfg.feature_flags.zklogin_auth = true;
 
                     // Enable jwk consensus updates
@@ -2688,7 +2732,8 @@ impl ProtocolConfig {
 
                     // Only enable consensus commit prologue V3 in devnet.
                     if chain != Chain::Testnet && chain != Chain::Mainnet {
-                        cfg.feature_flags.record_consensus_determined_version_assignments_in_prologue = true;
+                        cfg.feature_flags
+                            .record_consensus_determined_version_assignments_in_prologue = true;
                     }
 
                     // Run Mysticeti consensus in testnet.
@@ -2708,7 +2753,8 @@ impl ProtocolConfig {
 
                     // Only enable prepose consensus commit prologue in checkpoints in devnet.
                     if chain != Chain::Testnet && chain != Chain::Mainnet {
-                        cfg.feature_flags.prepend_prologue_tx_in_consensus_commit_in_checkpoints = true;
+                        cfg.feature_flags
+                            .prepend_prologue_tx_in_consensus_commit_in_checkpoints = true;
                     }
 
                     cfg.feature_flags.mysticeti_num_leaders_per_round = Some(1);
@@ -2751,8 +2797,10 @@ impl ProtocolConfig {
 
                     // Enable consensus commit prologue V3 in testnet.
                     if chain != Chain::Mainnet {
-                        cfg.feature_flags.record_consensus_determined_version_assignments_in_prologue = true;
-                        cfg.feature_flags.prepend_prologue_tx_in_consensus_commit_in_checkpoints = true;
+                        cfg.feature_flags
+                            .record_consensus_determined_version_assignments_in_prologue = true;
+                        cfg.feature_flags
+                            .prepend_prologue_tx_in_consensus_commit_in_checkpoints = true;
                     }
                     // Turn on enums in testnet and devnet
                     if chain != Chain::Mainnet {
@@ -2769,8 +2817,10 @@ impl ProtocolConfig {
                     cfg.bridge_should_try_to_finalize_committee = Some(chain != Chain::Mainnet);
 
                     // Enable consensus commit prologue V3 on mainnet.
-                    cfg.feature_flags.record_consensus_determined_version_assignments_in_prologue = true;
-                    cfg.feature_flags.prepend_prologue_tx_in_consensus_commit_in_checkpoints = true;
+                    cfg.feature_flags
+                        .record_consensus_determined_version_assignments_in_prologue = true;
+                    cfg.feature_flags
+                        .prepend_prologue_tx_in_consensus_commit_in_checkpoints = true;
 
                     if chain == Chain::Unknown {
                         cfg.feature_flags.authority_capabilities_v2 = true;
@@ -2825,7 +2875,8 @@ impl ProtocolConfig {
                     // Turns on shared object congestion control on mainnet.
                     cfg.max_accumulated_txn_cost_per_object_in_narwhal_commit = Some(100);
                     cfg.max_accumulated_txn_cost_per_object_in_mysticeti_commit = Some(10);
-                    cfg.feature_flags.per_object_congestion_control_mode = PerObjectCongestionControlMode::TotalTxCount;
+                    cfg.feature_flags.per_object_congestion_control_mode =
+                        PerObjectCongestionControlMode::TotalTxCount;
 
                     // Enable soft bundle on mainnet.
                     cfg.feature_flags.soft_bundle = true;
@@ -2859,7 +2910,8 @@ impl ProtocolConfig {
 
                     if chain != Chain::Mainnet && chain != Chain::Testnet {
                         // Enable distributed vote scoring for devnet
-                        cfg.feature_flags.consensus_distributed_vote_scoring_strategy = true;
+                        cfg.feature_flags
+                            .consensus_distributed_vote_scoring_strategy = true;
                     }
                 }
                 59 => {
@@ -2873,7 +2925,8 @@ impl ProtocolConfig {
                 61 => {
                     if chain != Chain::Mainnet {
                         // Enable distributed vote scoring for testnet
-                        cfg.feature_flags.consensus_distributed_vote_scoring_strategy = true;
+                        cfg.feature_flags
+                            .consensus_distributed_vote_scoring_strategy = true;
                     }
                     // Further reduce minimum number of random beacon shares.
                     cfg.random_beacon_reduction_lower_bound = Some(700);
@@ -2894,23 +2947,27 @@ impl ProtocolConfig {
                     cfg.max_accumulated_txn_cost_per_object_in_narwhal_commit = Some(240_000_000);
                 }
                 64 => {
-                    cfg.feature_flags.per_object_congestion_control_mode = PerObjectCongestionControlMode::TotalTxCount;
+                    cfg.feature_flags.per_object_congestion_control_mode =
+                        PerObjectCongestionControlMode::TotalTxCount;
                     cfg.max_accumulated_txn_cost_per_object_in_narwhal_commit = Some(40);
                     cfg.max_accumulated_txn_cost_per_object_in_mysticeti_commit = Some(3);
                 }
                 65 => {
                     // Enable distributed vote scoring for mainnet
-                    cfg.feature_flags.consensus_distributed_vote_scoring_strategy = true;
+                    cfg.feature_flags
+                        .consensus_distributed_vote_scoring_strategy = true;
                 }
                 66 => {
                     if chain == Chain::Mainnet {
                         // Revert the distributed vote scoring for mainnet (for one protocol upgrade)
-                        cfg.feature_flags.consensus_distributed_vote_scoring_strategy = false;
+                        cfg.feature_flags
+                            .consensus_distributed_vote_scoring_strategy = false;
                     }
                 }
                 67 => {
                     // Enable it once again.
-                    cfg.feature_flags.consensus_distributed_vote_scoring_strategy = true;
+                    cfg.feature_flags
+                        .consensus_distributed_vote_scoring_strategy = true;
                 }
                 68 => {
                     cfg.group_ops_bls12381_g1_to_uncompressed_g1_cost = Some(26);
@@ -2927,7 +2984,8 @@ impl ProtocolConfig {
                         PerObjectCongestionControlMode::TotalGasBudgetWithCap;
                     cfg.gas_budget_based_txn_cost_cap_factor = Some(400_000);
                     cfg.max_accumulated_txn_cost_per_object_in_mysticeti_commit = Some(18_500_000);
-                    cfg.max_accumulated_randomness_txn_cost_per_object_in_mysticeti_commit = Some(3_700_000); // 20% of above
+                    cfg.max_accumulated_randomness_txn_cost_per_object_in_mysticeti_commit =
+                        Some(3_700_000); // 20% of above
                     cfg.max_txn_cost_overage_per_object_in_commit = Some(u64::MAX);
                     cfg.gas_budget_based_txn_cost_absolute_cap_commit_count = Some(50);
 
@@ -2954,7 +3012,8 @@ impl ProtocolConfig {
                         // Enable smart ancestor selection for testnet
                         cfg.feature_flags.consensus_smart_ancestor_selection = true;
                         // Enable probing for accepted rounds in round prober for testnet
-                        cfg.feature_flags.consensus_round_prober_probe_accepted_rounds = true;
+                        cfg.feature_flags
+                            .consensus_round_prober_probe_accepted_rounds = true;
                     }
 
                     cfg.poseidon_bn254_cost_per_block = Some(388);
@@ -2979,9 +3038,11 @@ impl ProtocolConfig {
                     cfg.groth16_prepare_verifying_key_bls12381_cost_base = Some(53838);
                     cfg.groth16_prepare_verifying_key_bn254_cost_base = Some(82010);
                     cfg.groth16_verify_groth16_proof_internal_bls12381_cost_base = Some(72090);
-                    cfg.groth16_verify_groth16_proof_internal_bls12381_cost_per_public_input = Some(8213);
+                    cfg.groth16_verify_groth16_proof_internal_bls12381_cost_per_public_input =
+                        Some(8213);
                     cfg.groth16_verify_groth16_proof_internal_bn254_cost_base = Some(115502);
-                    cfg.groth16_verify_groth16_proof_internal_bn254_cost_per_public_input = Some(9484);
+                    cfg.groth16_verify_groth16_proof_internal_bn254_cost_per_public_input =
+                        Some(9484);
 
                     cfg.hash_keccak256_cost_base = Some(10);
                     cfg.hash_blake2b256_cost_base = Some(10);
@@ -3030,6 +3091,12 @@ impl ProtocolConfig {
 
                     cfg.validator_validate_metadata_cost_base = Some(20000);
                 }
+                71 => {
+                    cfg.sip_45_consensus_amplification_threshold = Some(5);
+
+                    // Enable bursts for congestion control. (10x the per-commit budget)
+                    cfg.allowed_txn_cost_overage_burst_per_object_in_commit = Some(185_000_000);
+                }
                 // Use this template when making changes:
                 //
                 //     // modify an existing constant.
@@ -3049,12 +3116,18 @@ impl ProtocolConfig {
     // Extract the bytecode verifier config from this protocol config. `for_signing` indicates
     // whether this config is used for verification during signing or execution.
     pub fn verifier_config(&self, signing_limits: Option<(usize, usize)>) -> VerifierConfig {
-        let (max_back_edges_per_function, max_back_edges_per_module) =
-            if let Some((max_back_edges_per_function, max_back_edges_per_module)) = signing_limits {
-                (Some(max_back_edges_per_function), Some(max_back_edges_per_module))
-            } else {
-                (None, None)
-            };
+        let (max_back_edges_per_function, max_back_edges_per_module) = if let Some((
+            max_back_edges_per_function,
+            max_back_edges_per_module,
+        )) = signing_limits
+        {
+            (
+                Some(max_back_edges_per_function),
+                Some(max_back_edges_per_module),
+            )
+        } else {
+            (None, None)
+        };
 
         VerifierConfig {
             max_loop_depth: Some(self.max_loop_depth() as usize),
@@ -3074,7 +3147,8 @@ impl ProtocolConfig {
             max_basic_blocks_in_script: None,
             max_idenfitier_len: self.max_move_identifier_len_as_option(), // Before protocol version 9, there was no limit
             allow_receiving_object_id: self.allow_receiving_object_id(),
-            reject_mutable_random_on_entry_functions: self.reject_mutable_random_on_entry_functions(),
+            reject_mutable_random_on_entry_functions: self
+                .reject_mutable_random_on_entry_functions(),
             bytecode_version: self.move_binary_format_version(),
             max_variants_in_enum: self.max_move_enum_variants_as_option(),
         }
@@ -3100,21 +3174,18 @@ impl ProtocolConfig {
 // Non-feature_flags should already have test setters defined through macros.
 impl ProtocolConfig {
     pub fn set_advance_to_highest_supported_protocol_version_for_testing(&mut self, val: bool) {
-        self.feature_flags.advance_to_highest_supported_protocol_version = val
+        self.feature_flags
+            .advance_to_highest_supported_protocol_version = val
     }
-
     pub fn set_commit_root_state_digest_supported_for_testing(&mut self, val: bool) {
         self.feature_flags.commit_root_state_digest = val
     }
-
     pub fn set_zklogin_auth_for_testing(&mut self, val: bool) {
         self.feature_flags.zklogin_auth = val
     }
-
     pub fn set_enable_jwk_consensus_updates_for_testing(&mut self, val: bool) {
         self.feature_flags.enable_jwk_consensus_updates = val
     }
-
     pub fn set_random_beacon_for_testing(&mut self, val: bool) {
         self.feature_flags.random_beacon = val
     }
@@ -3122,7 +3193,6 @@ impl ProtocolConfig {
     pub fn set_upgraded_multisig_for_testing(&mut self, val: bool) {
         self.feature_flags.upgraded_multisig_supported = val
     }
-
     pub fn set_accept_zklogin_in_multisig_for_testing(&mut self, val: bool) {
         self.feature_flags.accept_zklogin_in_multisig = val
     }
@@ -3138,16 +3208,17 @@ impl ProtocolConfig {
     pub fn set_receive_object_for_testing(&mut self, val: bool) {
         self.feature_flags.receive_objects = val
     }
-
     pub fn set_narwhal_certificate_v2_for_testing(&mut self, val: bool) {
         self.feature_flags.narwhal_certificate_v2 = val
     }
-
     pub fn set_verify_legacy_zklogin_address_for_testing(&mut self, val: bool) {
         self.feature_flags.verify_legacy_zklogin_address = val
     }
 
-    pub fn set_per_object_congestion_control_mode_for_testing(&mut self, val: PerObjectCongestionControlMode) {
+    pub fn set_per_object_congestion_control_mode_for_testing(
+        &mut self,
+        val: PerObjectCongestionControlMode,
+    ) {
         self.feature_flags.per_object_congestion_control_mode = val;
     }
 
@@ -3180,7 +3251,8 @@ impl ProtocolConfig {
     }
 
     pub fn set_consensus_distributed_vote_scoring_strategy_for_testing(&mut self, val: bool) {
-        self.feature_flags.consensus_distributed_vote_scoring_strategy = val;
+        self.feature_flags
+            .consensus_distributed_vote_scoring_strategy = val;
     }
 
     pub fn set_consensus_round_prober_for_testing(&mut self, val: bool) {
@@ -3188,11 +3260,13 @@ impl ProtocolConfig {
     }
 
     pub fn set_disallow_new_modules_in_deps_only_packages_for_testing(&mut self, val: bool) {
-        self.feature_flags.disallow_new_modules_in_deps_only_packages = val;
+        self.feature_flags
+            .disallow_new_modules_in_deps_only_packages = val;
     }
 
     pub fn set_consensus_round_prober_probe_accepted_rounds(&mut self, val: bool) {
-        self.feature_flags.consensus_round_prober_probe_accepted_rounds = val;
+        self.feature_flags
+            .consensus_round_prober_probe_accepted_rounds = val;
     }
 }
 
@@ -3328,13 +3402,18 @@ mod test {
 
     #[test]
     fn test_getters() {
-        let prot: ProtocolConfig = ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
-        assert_eq!(prot.max_arguments(), prot.max_arguments_as_option().unwrap());
+        let prot: ProtocolConfig =
+            ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
+        assert_eq!(
+            prot.max_arguments(),
+            prot.max_arguments_as_option().unwrap()
+        );
     }
 
     #[test]
     fn test_setters() {
-        let mut prot: ProtocolConfig = ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
+        let mut prot: ProtocolConfig =
+            ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
         prot.set_max_arguments_for_testing(123);
         assert_eq!(prot.max_arguments(), 123);
 
@@ -3353,46 +3432,92 @@ mod test {
     fn max_version_test() {
         // When this does not panic, version higher than MAX_PROTOCOL_VERSION exists.
         // To fix, bump MAX_PROTOCOL_VERSION or disable this check for the version.
-        let _ = ProtocolConfig::get_for_version_impl(ProtocolVersion::new(MAX_PROTOCOL_VERSION + 1), Chain::Unknown);
+        let _ = ProtocolConfig::get_for_version_impl(
+            ProtocolVersion::new(MAX_PROTOCOL_VERSION + 1),
+            Chain::Unknown,
+        );
     }
 
     #[test]
     fn lookup_by_string_test() {
-        let prot: ProtocolConfig = ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
+        let prot: ProtocolConfig =
+            ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
         // Does not exist
         assert!(prot.lookup_attr("some random string".to_string()).is_none());
 
-        assert!(prot.lookup_attr("max_arguments".to_string()) == Some(ProtocolConfigValue::u32(prot.max_arguments())),);
+        assert!(
+            prot.lookup_attr("max_arguments".to_string())
+                == Some(ProtocolConfigValue::u32(prot.max_arguments())),
+        );
 
         // We didnt have this in version 1
-        assert!(prot.lookup_attr("max_move_identifier_len".to_string()).is_none());
+        assert!(prot
+            .lookup_attr("max_move_identifier_len".to_string())
+            .is_none());
 
         // But we did in version 9
-        let prot: ProtocolConfig = ProtocolConfig::get_for_version(ProtocolVersion::new(9), Chain::Unknown);
+        let prot: ProtocolConfig =
+            ProtocolConfig::get_for_version(ProtocolVersion::new(9), Chain::Unknown);
         assert!(
             prot.lookup_attr("max_move_identifier_len".to_string())
                 == Some(ProtocolConfigValue::u64(prot.max_move_identifier_len()))
         );
 
-        let prot: ProtocolConfig = ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
+        let prot: ProtocolConfig =
+            ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
         // We didnt have this in version 1
-        assert!(prot.attr_map().get("max_move_identifier_len").unwrap().is_none());
+        assert!(prot
+            .attr_map()
+            .get("max_move_identifier_len")
+            .unwrap()
+            .is_none());
         // We had this in version 1
-        assert!(prot.attr_map().get("max_arguments").unwrap() == &Some(ProtocolConfigValue::u32(prot.max_arguments())));
+        assert!(
+            prot.attr_map().get("max_arguments").unwrap()
+                == &Some(ProtocolConfigValue::u32(prot.max_arguments()))
+        );
 
         // Check feature flags
-        let prot: ProtocolConfig = ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
+        let prot: ProtocolConfig =
+            ProtocolConfig::get_for_version(ProtocolVersion::new(1), Chain::Unknown);
         // Does not exist
-        assert!(prot.feature_flags.lookup_attr("some random string".to_owned()).is_none());
-        assert!(!prot.feature_flags.attr_map().contains_key("some random string"));
+        assert!(prot
+            .feature_flags
+            .lookup_attr("some random string".to_owned())
+            .is_none());
+        assert!(!prot
+            .feature_flags
+            .attr_map()
+            .contains_key("some random string"));
 
         // Was false in v1
-        assert!(prot.feature_flags.lookup_attr("package_upgrades".to_owned()) == Some(false));
-        assert!(prot.feature_flags.attr_map().get("package_upgrades").unwrap() == &false);
-        let prot: ProtocolConfig = ProtocolConfig::get_for_version(ProtocolVersion::new(4), Chain::Unknown);
+        assert!(
+            prot.feature_flags
+                .lookup_attr("package_upgrades".to_owned())
+                == Some(false)
+        );
+        assert!(
+            prot.feature_flags
+                .attr_map()
+                .get("package_upgrades")
+                .unwrap()
+                == &false
+        );
+        let prot: ProtocolConfig =
+            ProtocolConfig::get_for_version(ProtocolVersion::new(4), Chain::Unknown);
         // Was true from v3 and up
-        assert!(prot.feature_flags.lookup_attr("package_upgrades".to_owned()) == Some(true));
-        assert!(prot.feature_flags.attr_map().get("package_upgrades").unwrap() == &true);
+        assert!(
+            prot.feature_flags
+                .lookup_attr("package_upgrades".to_owned())
+                == Some(true)
+        );
+        assert!(
+            prot.feature_flags
+                .attr_map()
+                .get("package_upgrades")
+                .unwrap()
+                == &true
+        );
     }
 
     #[test]
@@ -3401,20 +3526,35 @@ mod test {
         let high = 10000u64;
 
         assert!(check_limit!(1u8, low, high) == LimitThresholdCrossed::None);
-        assert!(matches!(check_limit!(255u16, low, high), LimitThresholdCrossed::Soft(255u128, 100)));
+        assert!(matches!(
+            check_limit!(255u16, low, high),
+            LimitThresholdCrossed::Soft(255u128, 100)
+        ));
         // This wont compile because lossy
         //assert!(check_limit!(100000000u128, low, high) == LimitThresholdCrossed::None);
         // This wont compile because lossy
         //assert!(check_limit!(100000000usize, low, high) == LimitThresholdCrossed::None);
 
-        assert!(matches!(check_limit!(2550000u64, low, high), LimitThresholdCrossed::Hard(2550000, 10000)));
+        assert!(matches!(
+            check_limit!(2550000u64, low, high),
+            LimitThresholdCrossed::Hard(2550000, 10000)
+        ));
 
-        assert!(matches!(check_limit!(2550000u64, high, high), LimitThresholdCrossed::Hard(2550000, 10000)));
+        assert!(matches!(
+            check_limit!(2550000u64, high, high),
+            LimitThresholdCrossed::Hard(2550000, 10000)
+        ));
 
-        assert!(matches!(check_limit!(1u8, high), LimitThresholdCrossed::None));
+        assert!(matches!(
+            check_limit!(1u8, high),
+            LimitThresholdCrossed::None
+        ));
 
         assert!(check_limit!(255u16, high) == LimitThresholdCrossed::None);
 
-        assert!(matches!(check_limit!(2550000u64, high), LimitThresholdCrossed::Hard(2550000, 10000)));
+        assert!(matches!(
+            check_limit!(2550000u64, high),
+            LimitThresholdCrossed::Hard(2550000, 10000)
+        ));
     }
 }

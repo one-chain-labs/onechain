@@ -2,26 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::coin_balance_tests {
-    use one::test_scenario;
-    use one::pay;
-    use one::coin;
-    use one::balance;
-    use one::oct::OCT;
-    use one::test_utils;
+module oct::coin_balance_tests {
+    use sui::test_scenario;
+    use sui::pay;
+    use sui::coin;
+    use sui::balance;
+    use sui::oct::OCT;
+    use sui::test_utils;
 
 
     #[test]
     fun type_morphing() {
         let mut scenario = test_scenario::begin(@0x1);
 
-        let balance = balance::zero<OCT>();
+        let balance = balance::zero<SUI>();
         let coin = balance.into_coin(scenario.ctx());
         let balance = coin.into_balance();
 
         balance.destroy_zero();
 
-        let mut coin = coin::mint_for_testing<OCT>(100, scenario.ctx());
+        let mut coin = coin::mint_for_testing<SUI>(100, scenario.ctx());
         let balance_mut = coin::balance_mut(&mut coin);
         let sub_balance = balance_mut.split(50);
 
@@ -40,7 +40,7 @@ module one::coin_balance_tests {
 
     #[test]
     fun test_balance() {
-        let mut balance = balance::zero<OCT>();
+        let mut balance = balance::zero<SUI>();
         let another = balance::create_for_testing(1000);
 
         balance.join(another);

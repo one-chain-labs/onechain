@@ -1,18 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{ident_str, language_storage::TypeTag};
+use move_core_types::ident_str;
+use move_core_types::language_storage::TypeTag;
 use rand::random;
-use std::{future::Future, path::PathBuf, sync::Arc, time::Duration};
+use std::future::Future;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_macros::sim_test;
-use sui_types::{
-    base_types::{EpochId, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{CallArg, ObjectArg, TransactionData},
-    SUI_DENY_LIST_OBJECT_ID,
-    SUI_FRAMEWORK_PACKAGE_ID,
-};
+use sui_types::base_types::SequenceNumber;
+use sui_types::base_types::{EpochId, ObjectID, ObjectRef, SuiAddress};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{CallArg, ObjectArg, TransactionData};
+use sui_types::{SUI_DENY_LIST_OBJECT_ID, SUI_FRAMEWORK_PACKAGE_ID};
 use test_cluster::{TestCluster, TestClusterBuilder};
 
 const DENY_ADDRESS: SuiAddress = SuiAddress::ZERO;
@@ -21,19 +23,32 @@ const DENY_ADDRESS: SuiAddress = SuiAddress::ZERO;
 async fn per_epoch_config_stress_test() {
     let test_env = Arc::new(create_test_env().await);
     let target_epoch = 10;
-    let mut gas_objects =
-        test_env.test_cluster.wallet.get_all_gas_objects_owned_by_address(test_env.regulated_coin_owner).await.unwrap();
+    let mut gas_objects = test_env
+        .test_cluster
+        .wallet
+        .get_all_gas_objects_owned_by_address(test_env.regulated_coin_owner)
+        .await
+        .unwrap();
     let gas1 = gas_objects.pop().unwrap();
     let gas2 = gas_objects.pop().unwrap();
     let handle1 = {
         let test_env = test_env.clone();
-        tokio::spawn(async move { run_thread(test_env, target_epoch, gas1.0, create_transfer_tx, true).await })
+        tokio::spawn(async move {
+            run_thread(test_env, target_epoch, gas1.0, create_transfer_tx, true).await
+        })
     };
     let handle2 = {
         let test_env = test_env.clone();
-        tokio::spawn(async move { run_thread(test_env, target_epoch, gas2.0, create_deny_tx, false).await })
+        tokio::spawn(async move {
+            run_thread(test_env, target_epoch, gas2.0, create_deny_tx, false).await
+        })
     };
-    tokio::time::timeout(Duration::from_secs(600), async { tokio::try_join!(handle1, handle2) }).await.unwrap().unwrap();
+    tokio::time::timeout(Duration::from_secs(600), async {
+        tokio::try_join!(handle1, handle2)
+    })
+    .await
+    .unwrap()
+    .unwrap();
 }
 
 async fn run_thread<F, Fut>(
@@ -52,8 +67,12 @@ async fn run_thread<F, Fut>(
         let gas = test_env.get_latest_object_ref(&gas_id).await;
         let tx_data = tx_creation_func(test_env.clone(), gas).await;
         let tx = test_env.test_cluster.sign_transaction(&tx_data);
-        let Ok(effects) =
-            test_env.test_cluster.wallet.execute_transaction_may_fail(tx).await.map(|r| r.effects.unwrap())
+        let Ok(effects) = test_env
+            .test_cluster
+            .wallet
+            .execute_transaction_may_fail(tx)
+            .await
+            .map(|r| r.effects.unwrap())
         else {
             // When epochs are short, it is possible that some transactions
             // keep getting sent at epoch boundaries and timeout eventually.
@@ -84,7 +103,11 @@ async fn create_deny_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> TransactionDa
         .move_call(
             SUI_FRAMEWORK_PACKAGE_ID,
             "coin",
-            if deny { "deny_list_v2_add" } else { "deny_list_v2_remove" },
+            if deny {
+                "deny_list_v2_add"
+            } else {
+                "deny_list_v2_remove"
+            },
             vec![
                 CallArg::Object(ObjectArg::SharedObject {
                     id: SUI_DENY_LIST_OBJECT_ID,
@@ -115,13 +138,20 @@ async fn create_move_transfer_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> Tran
         .test_cluster
         .test_transaction_builder_with_gas_object(test_env.regulated_coin_owner, gas)
         .await
-        .move_call(SUI_FRAMEWORK_PACKAGE_ID, "pay", "split_and_transfer", vec![
-            CallArg::Object(ObjectArg::ImmOrOwnedObject(
-                test_env.get_latest_object_ref(&test_env.regulated_coin_id).await,
-            )),
-            CallArg::Pure(bcs::to_bytes(&1u64).unwrap()),
-            CallArg::Pure(bcs::to_bytes(&DENY_ADDRESS).unwrap()),
-        ])
+        .move_call(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            "pay",
+            "split_and_transfer",
+            vec![
+                CallArg::Object(ObjectArg::ImmOrOwnedObject(
+                    test_env
+                        .get_latest_object_ref(&test_env.regulated_coin_id)
+                        .await,
+                )),
+                CallArg::Pure(bcs::to_bytes(&1u64).unwrap()),
+                CallArg::Pure(bcs::to_bytes(&DENY_ADDRESS).unwrap()),
+            ],
+        )
         .with_type_args(vec![test_env.regulated_coin_type.clone()])
         .build()
 }
@@ -129,7 +159,11 @@ async fn create_move_transfer_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> Tran
 async fn create_native_transfer_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> TransactionData {
     let mut pt_builder = ProgrammableTransactionBuilder::new();
     let coin_input = pt_builder
-        .obj(ObjectArg::ImmOrOwnedObject(test_env.get_latest_object_ref(&test_env.regulated_coin_id).await))
+        .obj(ObjectArg::ImmOrOwnedObject(
+            test_env
+                .get_latest_object_ref(&test_env.regulated_coin_id)
+                .await,
+        ))
         .unwrap();
     let amount_input = pt_builder.pure(1u64).unwrap();
     let split_coin = pt_builder.programmable_move_call(
@@ -160,25 +194,47 @@ struct TestEnv {
 
 impl TestEnv {
     async fn get_latest_object_ref(&self, object_id: &ObjectID) -> ObjectRef {
-        self.test_cluster.get_object_from_fullnode_store(object_id).await.unwrap().compute_object_reference()
+        self.test_cluster
+            .get_object_from_fullnode_store(object_id)
+            .await
+            .unwrap()
+            .compute_object_reference()
     }
 }
 
 async fn create_test_env() -> TestEnv {
-    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(1000).with_num_validators(5).build().await;
-    let deny_list_object_init_version =
-        test_cluster.get_object_from_fullnode_store(&SUI_DENY_LIST_OBJECT_ID).await.unwrap().version();
+    let test_cluster = TestClusterBuilder::new()
+        .with_epoch_duration_ms(1000)
+        .with_num_validators(5)
+        .build()
+        .await;
+    let deny_list_object_init_version = test_cluster
+        .get_object_from_fullnode_store(&SUI_DENY_LIST_OBJECT_ID)
+        .await
+        .unwrap()
+        .version();
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests/move_test_code");
-    let tx_data = test_cluster.test_transaction_builder().await.publish(path).build();
-    let effects = test_cluster.sign_and_execute_transaction(&tx_data).await.effects.unwrap();
+    let tx_data = test_cluster
+        .test_transaction_builder()
+        .await
+        .publish(path)
+        .build();
+    let effects = test_cluster
+        .sign_and_execute_transaction(&tx_data)
+        .await
+        .effects
+        .unwrap();
     let mut coin_id = None;
     let mut coin_type = None;
     let mut coin_owner = None;
     let mut deny_cap = None;
     for created in effects.created() {
         let object_id = created.reference.object_id;
-        let object = test_cluster.get_object_from_fullnode_store(&object_id).await.unwrap();
+        let object = test_cluster
+            .get_object_from_fullnode_store(&object_id)
+            .await
+            .unwrap();
         if object.is_package() {
             continue;
         } else if object.is_coin() {

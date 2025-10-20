@@ -68,7 +68,9 @@ impl TransactionConsumer {
     pub(crate) fn new(tx_receiver: Receiver<TransactionsGuard>, context: Arc<Context>) -> Self {
         Self {
             tx_receiver,
-            max_transactions_in_block_bytes: context.protocol_config.max_transactions_in_block_bytes(),
+            max_transactions_in_block_bytes: context
+                .protocol_config
+                .max_transactions_in_block_bytes(),
             max_num_transactions_in_block: context.protocol_config.max_num_transactions_in_block(),
             context,
             pending_transactions: None,
@@ -90,7 +92,8 @@ impl TransactionConsumer {
         // The method will return `None` if all the transactions can be included in the block. Otherwise none of the transactions will be
         // included in the block and the method will return the TransactionGuard.
         let mut handle_txs = |t: TransactionsGuard| -> Option<TransactionsGuard> {
-            let transactions_bytes = t.transactions.iter().map(|t| t.data().len()).sum::<usize>() as u64;
+            let transactions_bytes =
+                t.transactions.iter().map(|t| t.data().len()).sum::<usize>() as u64;
             let transactions_num = t.transactions.len() as u64;
 
             if total_bytes + transactions_bytes > self.max_transactions_in_block_bytes {
@@ -112,10 +115,7 @@ impl TransactionConsumer {
 
         if let Some(t) = self.pending_transactions.take() {
             if let Some(pending_transactions) = handle_txs(t) {
-                debug_fatal!(
-                    "Previously pending transaction(s) should fit into an empty block! Dropping: {:?}",
-                    pending_transactions.transactions
-                );
+                debug_fatal!("Previously pending transaction(s) should fit into an empty block! Dropping: {:?}", pending_transactions.transactions);
             }
         }
 
@@ -140,7 +140,10 @@ impl TransactionConsumer {
                     let (status_tx, status_rx) = oneshot::channel();
 
                     if gc_enabled {
-                        block_status_subscribers.entry(block_ref).or_default().push(status_tx);
+                        block_status_subscribers
+                            .entry(block_ref)
+                            .or_default()
+                            .push(status_tx);
                     } else {
                         // When gc is not enabled, then report directly the block as sequenced while tx is acknowledged for inclusion.
                         // As blocks can never get garbage collected it is there is actually no meaning to do otherwise and also is safer for edge cases.
@@ -157,7 +160,11 @@ impl TransactionConsumer {
     /// Notifies all the transaction submitters who are waiting to receive an update on the status of the block.
     /// The `committed_blocks` are the blocks that have been committed and the `gc_round` is the round up to which the blocks have been garbage collected.
     /// First we'll notify for all the committed blocks, and then for all the blocks that have been garbage collected.
-    pub(crate) fn notify_own_blocks_status(&self, committed_blocks: Vec<BlockRef>, gc_round: Round) {
+    pub(crate) fn notify_own_blocks_status(
+        &self,
+        committed_blocks: Vec<BlockRef>,
+        gc_round: Round,
+    ) {
         // Notify for all the committed blocks first
         let mut block_status_subscribers = self.block_status_subscribers.lock();
         for block_ref in committed_blocks {
@@ -182,10 +189,16 @@ impl TransactionConsumer {
     }
 
     #[cfg(test)]
-    pub(crate) fn subscribe_for_block_status_testing(&self, block_ref: BlockRef) -> oneshot::Receiver<BlockStatus> {
+    pub(crate) fn subscribe_for_block_status_testing(
+        &self,
+        block_ref: BlockRef,
+    ) -> oneshot::Receiver<BlockStatus> {
         let (tx, rx) = oneshot::channel();
         let mut block_status_subscribers = self.block_status_subscribers.lock();
-        block_status_subscribers.entry(block_ref).or_default().push(tx);
+        block_status_subscribers
+            .entry(block_ref)
+            .or_default()
+            .push(tx);
         rx
     }
 
@@ -233,8 +246,12 @@ impl TransactionClient {
             Self {
                 sender,
                 max_transaction_size: context.protocol_config.max_transaction_size_bytes(),
-                max_transactions_in_block_bytes: context.protocol_config.max_transactions_in_block_bytes(),
-                max_transactions_in_block_count: context.protocol_config.max_num_transactions_in_block(),
+                max_transactions_in_block_bytes: context
+                    .protocol_config
+                    .max_transactions_in_block_bytes(),
+                max_transactions_in_block_count: context
+                    .protocol_config
+                    .max_num_transactions_in_block(),
             },
             receiver,
         )
@@ -280,7 +297,10 @@ impl TransactionClient {
 
         for transaction in &transactions {
             if transaction.len() as u64 > self.max_transaction_size {
-                return Err(ClientError::OversizedTransaction(transaction.len() as u64, self.max_transaction_size));
+                return Err(ClientError::OversizedTransaction(
+                    transaction.len() as u64,
+                    self.max_transaction_size,
+                ));
             }
             bundle_size += transaction.len() as u64;
 
@@ -317,7 +337,10 @@ pub trait TransactionVerifier: Send + Sync + 'static {
     /// Currently only uncertified user transactions can be rejected. The rest of transactions
     /// are implicitly voted to be accepted.
     /// When the result is an error, the whole block should be rejected from local DAG instead.
-    async fn verify_and_vote_batch(&self, batch: &[&[u8]]) -> Result<Vec<TransactionIndex>, ValidationError>;
+    async fn verify_and_vote_batch(
+        &self,
+        batch: &[&[u8]],
+    ) -> Result<Vec<TransactionIndex>, ValidationError>;
 }
 
 #[derive(Debug, Error)]
@@ -337,7 +360,10 @@ impl TransactionVerifier for NoopTransactionVerifier {
         Ok(())
     }
 
-    async fn verify_and_vote_batch(&self, _batch: &[&[u8]]) -> Result<Vec<TransactionIndex>, ValidationError> {
+    async fn verify_and_vote_batch(
+        &self,
+        _batch: &[&[u8]],
+    ) -> Result<Vec<TransactionIndex>, ValidationError> {
         Ok(vec![])
     }
 }
@@ -351,11 +377,12 @@ mod tests {
     use sui_protocol_config::ProtocolConfig;
     use tokio::time::timeout;
 
+    use crate::transaction::NoopTransactionVerifier;
     use crate::{
         block::{BlockDigest, BlockRef},
         block_verifier::SignedBlockVerifier,
         context::Context,
-        transaction::{BlockStatus, LimitReached, NoopTransactionVerifier, TransactionClient, TransactionConsumer},
+        transaction::{BlockStatus, LimitReached, TransactionClient, TransactionConsumer},
     };
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
@@ -373,8 +400,12 @@ mod tests {
         // submit asynchronously the transactions and keep the waiters
         let mut included_in_block_waiters = FuturesUnordered::new();
         for i in 0..3 {
-            let transaction = bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
-            let w = client.submit_no_wait(vec![transaction]).await.expect("Shouldn't submit successfully transaction");
+            let transaction =
+                bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
+            let w = client
+                .submit_no_wait(vec![transaction])
+                .await
+                .expect("Shouldn't submit successfully transaction");
             included_in_block_waiters.push(w);
         }
 
@@ -388,7 +419,9 @@ mod tests {
         }
 
         assert!(
-            timeout(Duration::from_secs(1), included_in_block_waiters.next()).await.is_err(),
+            timeout(Duration::from_secs(1), included_in_block_waiters.next())
+                .await
+                .is_err(),
             "We should expect to timeout as none of the transactions have been acknowledged yet"
         );
 
@@ -420,22 +453,31 @@ mod tests {
         // submit the transactions and include 2 of each on a new block
         let mut included_in_block_waiters = FuturesUnordered::new();
         for i in 1..=10 {
-            let transaction = bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
-            let w = client.submit_no_wait(vec![transaction]).await.expect("Shouldn't submit successfully transaction");
+            let transaction =
+                bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
+            let w = client
+                .submit_no_wait(vec![transaction])
+                .await
+                .expect("Shouldn't submit successfully transaction");
             included_in_block_waiters.push(w);
 
             // Every 2 transactions simulate the creation of a new block and acknowledge the inclusion of the transactions
             if i % 2 == 0 {
                 let (transactions, ack_transactions, _limit_reached) = consumer.next();
                 assert_eq!(transactions.len(), 2);
-                ack_transactions(BlockRef::new(i, AuthorityIndex::new_for_test(0), BlockDigest::MIN));
+                ack_transactions(BlockRef::new(
+                    i,
+                    AuthorityIndex::new_for_test(0),
+                    BlockDigest::MIN,
+                ));
             }
         }
 
         // Now iterate over all the waiters. Everyone should have been acknowledged.
         let mut block_status_waiters = Vec::new();
         while let Some(result) = included_in_block_waiters.next().await {
-            let (block_ref, block_status_waiter) = result.expect("Block inclusion waiter shouldn't fail");
+            let (block_ref, block_status_waiter) =
+                result.expect("Block inclusion waiter shouldn't fail");
             block_status_waiters.push((block_ref, block_status_waiter));
         }
 
@@ -480,22 +522,31 @@ mod tests {
         // submit the transactions and include 2 of each on a new block
         let mut included_in_block_waiters = FuturesUnordered::new();
         for i in 1..=10 {
-            let transaction = bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
-            let w = client.submit_no_wait(vec![transaction]).await.expect("Shouldn't submit successfully transaction");
+            let transaction =
+                bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
+            let w = client
+                .submit_no_wait(vec![transaction])
+                .await
+                .expect("Shouldn't submit successfully transaction");
             included_in_block_waiters.push(w);
 
             // Every 2 transactions simulate the creation of a new block and acknowledge the inclusion of the transactions
             if i % 2 == 0 {
                 let (transactions, ack_transactions, _limit_reached) = consumer.next();
                 assert_eq!(transactions.len(), 2);
-                ack_transactions(BlockRef::new(i, AuthorityIndex::new_for_test(0), BlockDigest::MIN));
+                ack_transactions(BlockRef::new(
+                    i,
+                    AuthorityIndex::new_for_test(0),
+                    BlockDigest::MIN,
+                ));
             }
         }
 
         // Now iterate over all the waiters. Everyone should have been acknowledged.
         let mut block_status_waiters = Vec::new();
         while let Some(result) = included_in_block_waiters.next().await {
-            let (block_ref, block_status_waiter) = result.expect("Block inclusion waiter shouldn't fail");
+            let (block_ref, block_status_waiter) =
+                result.expect("Block inclusion waiter shouldn't fail");
             block_status_waiters.push((block_ref, block_status_waiter));
         }
 
@@ -523,8 +574,12 @@ mod tests {
 
         // submit some transactions
         for i in 0..10 {
-            let transaction = bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
-            let _w = client.submit_no_wait(vec![transaction]).await.expect("Shouldn't submit successfully transaction");
+            let transaction =
+                bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
+            let _w = client
+                .submit_no_wait(vec![transaction])
+                .await
+                .expect("Shouldn't submit successfully transaction");
         }
 
         // now pull the transactions from the consumer
@@ -577,35 +632,55 @@ mod tests {
         let mut all_receivers = Vec::new();
         // submit a few transactions individually.
         for i in 0..10 {
-            let transaction = bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
-            let w = client.submit_no_wait(vec![transaction]).await.expect("Should submit successfully transaction");
+            let transaction =
+                bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
+            let w = client
+                .submit_no_wait(vec![transaction])
+                .await
+                .expect("Should submit successfully transaction");
             all_receivers.push(w);
         }
 
         // construct an acceptable batch and submit, it should be accepted
         {
             let transactions: Vec<_> = (10..15)
-                .map(|i| bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail."))
+                .map(|i| {
+                    bcs::to_bytes(&format!("transaction {i}"))
+                        .expect("Serialization should not fail.")
+                })
                 .collect();
-            let w = client.submit_no_wait(transactions).await.expect("Should submit successfully transaction");
+            let w = client
+                .submit_no_wait(transactions)
+                .await
+                .expect("Should submit successfully transaction");
             all_receivers.push(w);
         }
 
         // submit another individual transaction.
         {
             let i = 15;
-            let transaction = bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
-            let w = client.submit_no_wait(vec![transaction]).await.expect("Shouldn't submit successfully transaction");
+            let transaction =
+                bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
+            let w = client
+                .submit_no_wait(vec![transaction])
+                .await
+                .expect("Shouldn't submit successfully transaction");
             all_receivers.push(w);
         }
 
         // construct a over-size-limit batch and submit, it should not be accepted
         {
             let transactions: Vec<_> = (16..32)
-                .map(|i| bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail."))
+                .map(|i| {
+                    bcs::to_bytes(&format!("transaction {i}"))
+                        .expect("Serialization should not fail.")
+                })
                 .collect();
             let result = client.submit_no_wait(transactions).await.unwrap_err();
-            assert_eq!(result.to_string(), "Transaction bundle size (210B) is over limit (200B)");
+            assert_eq!(
+                result.to_string(),
+                "Transaction bundle size (210B) is over limit (200B)"
+            );
         }
 
         // now pull the transactions from the consumer.
@@ -616,7 +691,8 @@ mod tests {
             let (transactions, ack_transactions, _limit_reached) = consumer.next();
 
             assert!(
-                transactions.len() as u64 <= context.protocol_config.max_num_transactions_in_block(),
+                transactions.len() as u64
+                    <= context.protocol_config.max_num_transactions_in_block(),
                 "Should have fetched transactions up to {}",
                 context.protocol_config.max_num_transactions_in_block()
             );
@@ -680,10 +756,15 @@ mod tests {
             let mut all_receivers = Vec::new();
 
             // create enough transactions
-            let max_num_transactions_in_block = context.protocol_config.max_num_transactions_in_block();
+            let max_num_transactions_in_block =
+                context.protocol_config.max_num_transactions_in_block();
             for i in 0..2 * max_num_transactions_in_block {
-                let transaction = bcs::to_bytes(&format!("transaction {i}")).expect("Serialization should not fail.");
-                let w = client.submit_no_wait(vec![transaction]).await.expect("Should submit successfully transaction");
+                let transaction = bcs::to_bytes(&format!("transaction {i}"))
+                    .expect("Serialization should not fail.");
+                let w = client
+                    .submit_no_wait(vec![transaction])
+                    .await
+                    .expect("Should submit successfully transaction");
                 all_receivers.push(w);
             }
 
@@ -693,7 +774,8 @@ mod tests {
             assert_eq!(transactions.len() as u64, max_num_transactions_in_block);
 
             // Now create a block and verify that transactions are within the size limits
-            let block_verifier = SignedBlockVerifier::new(context.clone(), Arc::new(NoopTransactionVerifier {}));
+            let block_verifier =
+                SignedBlockVerifier::new(context.clone(), Arc::new(NoopTransactionVerifier {}));
 
             let batch: Vec<_> = transactions.iter().map(|t| t.data()).collect();
             assert!(
@@ -716,12 +798,17 @@ mod tests {
             let mut consumer = TransactionConsumer::new(tx_receiver, context.clone());
             let mut all_receivers = Vec::new();
 
-            let max_transactions_in_block_bytes = context.protocol_config.max_transactions_in_block_bytes();
+            let max_transactions_in_block_bytes =
+                context.protocol_config.max_transactions_in_block_bytes();
             let mut total_size = 0;
             loop {
-                let transaction = bcs::to_bytes(&"transaction".to_string()).expect("Serialization should not fail.");
+                let transaction = bcs::to_bytes(&"transaction".to_string())
+                    .expect("Serialization should not fail.");
                 total_size += transaction.len() as u64;
-                let w = client.submit_no_wait(vec![transaction]).await.expect("Should submit successfully transaction");
+                let w = client
+                    .submit_no_wait(vec![transaction])
+                    .await
+                    .expect("Should submit successfully transaction");
                 all_receivers.push(w);
 
                 // create enough transactions to reach the block size limit
@@ -737,13 +824,17 @@ mod tests {
 
             assert_eq!(limit, LimitReached::MaxBytes);
             assert!(
-                batch.len() < context.protocol_config.consensus_max_num_transactions_in_block() as usize,
+                batch.len()
+                    < context
+                        .protocol_config
+                        .consensus_max_num_transactions_in_block() as usize,
                 "Should have submitted less than the max number of transactions in a block"
             );
             assert!(size <= max_transactions_in_block_bytes);
 
             // Now create a block and verify that transactions are within the size limits
-            let block_verifier = SignedBlockVerifier::new(context.clone(), Arc::new(NoopTransactionVerifier {}));
+            let block_verifier =
+                SignedBlockVerifier::new(context.clone(), Arc::new(NoopTransactionVerifier {}));
 
             assert!(
                 block_verifier.check_transactions(&batch).is_ok(),

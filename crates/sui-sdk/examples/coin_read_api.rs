@@ -57,7 +57,10 @@ async fn main() -> Result<(), anyhow::Error> {
     println!(" *** Coins Stream ***\n");
 
     // Select coins based on the provided coin type (SUI in this example). Use `None` for the default Sui coin
-    let select_coins = sui.coin_read_api().select_coins(active_address, coin_type, 1, vec![]).await?;
+    let select_coins = sui
+        .coin_read_api()
+        .select_coins(active_address, coin_type, 1, vec![])
+        .await?;
 
     println!(" *** Select Coins ***");
     println!("{:?}", select_coins);
@@ -66,7 +69,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // Balance
     // Returns the balance for the specified coin type for this address,
     // or if None is passed, it will use Coin<OCT> as the coin type
-    let balance = sui.coin_read_api().get_balance(active_address, None).await?;
+    let balance = sui
+        .coin_read_api()
+        .get_balance(active_address, None)
+        .await?;
 
     // Total balance
     // Returns the balance for each coin owned by this address
@@ -77,14 +83,20 @@ async fn main() -> Result<(), anyhow::Error> {
     println!(" *** Balance + Total Balance ***\n ");
 
     // Return the coin metadata for the Coin<OCT>
-    let coin_metadata = sui.coin_read_api().get_coin_metadata("0x2::oct::OCT".to_string()).await?;
+    let coin_metadata = sui
+        .coin_read_api()
+        .get_coin_metadata("0x2::oct::OCT".to_string())
+        .await?;
 
     println!(" *** Coin Metadata *** ");
     println!("{:?}", coin_metadata);
     println!(" *** Coin Metadata ***\n ");
 
     // Total Supply
-    let total_supply = sui.coin_read_api().get_total_supply("0x2::oct::OCT".to_string()).await?;
+    let total_supply = sui
+        .coin_read_api()
+        .get_total_supply("0x2::oct::OCT".to_string())
+        .await?;
     println!(" *** Total Supply *** ");
     println!("{:?}", total_supply);
     println!(" *** Total Supply ***\n ");

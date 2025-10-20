@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::verifier::{VerifierConfig, DEFAULT_MAX_CONSTANT_VECTOR_LEN};
-use move_binary_format::{binary_config::BinaryConfig, file_format_common::VERSION_MAX};
+use move_binary_format::binary_config::BinaryConfig;
+use move_binary_format::file_format_common::VERSION_MAX;
 #[cfg(feature = "tracing")]
 use once_cell::sync::Lazy;
 
@@ -10,7 +11,8 @@ use once_cell::sync::Lazy;
 const MOVE_VM_PROFILER_ENV_VAR_NAME: &str = "MOVE_VM_PROFILE";
 
 #[cfg(feature = "tracing")]
-static PROFILER_ENABLED: Lazy<bool> = Lazy::new(|| std::env::var(MOVE_VM_PROFILER_ENV_VAR_NAME).is_ok());
+static PROFILER_ENABLED: Lazy<bool> =
+    Lazy::new(|| std::env::var(MOVE_VM_PROFILER_ENV_VAR_NAME).is_ok());
 
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
 

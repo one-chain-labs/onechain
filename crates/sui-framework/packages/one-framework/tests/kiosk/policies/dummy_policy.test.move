@@ -3,10 +3,10 @@
 
 #[test_only]
 /// Dummy policy which showcases all of the methods.
-module one::dummy_policy {
-    use one::coin::Coin;
-    use one::oct::OCT;
-    use one::transfer_policy::{
+module oct::dummy_policy {
+    use sui::coin::Coin;
+    use sui::oct::OCT;
+    use sui::transfer_policy::{
         Self as policy,
         TransferPolicy,
         TransferPolicyCap,

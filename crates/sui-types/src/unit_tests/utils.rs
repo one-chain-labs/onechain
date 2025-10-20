@@ -1,31 +1,28 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::crypto::{Signer, SuiKeyPair};
+use crate::multisig::{MultiSig, MultiSigPublicKey};
+use crate::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use crate::transaction::{SenderSignedData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER};
+use crate::SuiAddress;
 use crate::{
     base_types::{dbg_addr, ObjectID},
     committee::Committee,
     crypto::{
-        get_key_pair,
-        get_key_pair_from_rng,
-        AccountKeyPair,
-        AuthorityKeyPair,
-        AuthorityPublicKeyBytes,
-        DefaultHash,
-        Signature,
-        SignatureScheme,
-        Signer,
-        SuiKeyPair,
+        get_key_pair, get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair,
+        AuthorityPublicKeyBytes, DefaultHash, Signature, SignatureScheme,
     },
-    multisig::{MultiSig, MultiSigPublicKey},
     object::Object,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
     signature::GenericSignature,
-    transaction::{SenderSignedData, Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
+    transaction::{Transaction, TransactionData},
     zk_login_authenticator::ZkLoginAuthenticator,
-    SuiAddress,
 };
-use fastcrypto::{ed25519::Ed25519KeyPair, hash::HashFunction, traits::KeyPair as KeypairTraits};
-use rand::{rngs::StdRng, SeedableRng};
+use fastcrypto::ed25519::Ed25519KeyPair;
+use fastcrypto::hash::HashFunction;
+use fastcrypto::traits::KeyPair as KeypairTraits;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use serde::Deserialize;
 use shared_crypto::intent::{Intent, IntentMessage};
 use std::collections::BTreeMap;
@@ -89,7 +86,9 @@ pub fn create_fake_transaction() -> Transaction {
 }
 
 pub fn make_transaction_data(sender: SuiAddress) -> TransactionData {
-    let object = Object::immutable_with_id_for_testing(ObjectID::random_from_rng(&mut StdRng::from_seed([0; 32])));
+    let object = Object::immutable_with_id_for_testing(ObjectID::random_from_rng(
+        &mut StdRng::from_seed([0; 32]),
+    ));
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
         builder.transfer_oct(dbg_addr(2), None);
@@ -112,7 +111,10 @@ pub fn make_transaction(sender: SuiAddress, kp: &SuiKeyPair) -> Transaction {
 }
 
 // This is used to sign transaction with signer using default Intent.
-pub fn to_sender_signed_transaction(data: TransactionData, signer: &dyn Signer<Signature>) -> Transaction {
+pub fn to_sender_signed_transaction(
+    data: TransactionData,
+    signer: &dyn Signer<Signature>,
+) -> Transaction {
     to_sender_signed_transaction_with_multi_signers(data, vec![signer])
 }
 
@@ -132,7 +134,8 @@ mod zk_login {
     use super::*;
     pub static DEFAULT_ADDRESS_SEED: &str =
         "20794788559620669596206457022966176986688727876128223628113916380927502737911";
-    pub static SHORT_ADDRESS_SEED: &str = "380704556853533152350240698167704405529973457670972223618755249929828551006";
+    pub static SHORT_ADDRESS_SEED: &str =
+        "380704556853533152350240698167704405529973457670972223618755249929828551006";
 
     pub fn load_test_vectors(path: &str) -> Vec<(SuiKeyPair, PublicKey, ZkLoginInputs)> {
         // read in test files that has a list of matching zklogin_inputs and its ephemeral private keys.
@@ -142,7 +145,8 @@ mod zk_login {
         let mut res = vec![];
         for test in test_datum {
             let kp = SuiKeyPair::decode(&test.kp).unwrap();
-            let inputs = ZkLoginInputs::from_json(&test.zklogin_inputs, &test.address_seed).unwrap();
+            let inputs =
+                ZkLoginInputs::from_json(&test.zklogin_inputs, &test.address_seed).unwrap();
             let pk_zklogin = PublicKey::from_zklogin_inputs(&inputs).unwrap();
             res.push((kp, pk_zklogin, inputs));
         }
@@ -196,7 +200,8 @@ mod zk_login {
         let inputs = get_zklogin_inputs();
         let msg = IntentMessage::new(Intent::personal_message(), data);
         let s = Signature::new_secure(&msg, &get_zklogin_user_key());
-        let authenticator = GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(inputs, 10, s));
+        let authenticator =
+            GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(inputs, 10, s));
         let address = get_zklogin_user_address();
         (address, authenticator)
     }
@@ -205,7 +210,11 @@ mod zk_login {
         data: TransactionData,
         legacy: bool,
     ) -> (SuiAddress, Transaction, GenericSignature) {
-        let inputs = if legacy { get_inputs_with_bad_address_seed() } else { get_zklogin_inputs() };
+        let inputs = if legacy {
+            get_inputs_with_bad_address_seed()
+        } else {
+            get_zklogin_inputs()
+        };
 
         sign_zklogin_tx(&get_zklogin_user_key(), inputs, data)
     }
@@ -223,13 +232,20 @@ mod zk_login {
         };
 
         // Construct the authenticator with all user submitted components.
-        let authenticator = GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(proof, 10, s.clone()));
+        let authenticator =
+            GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(proof, 10, s.clone()));
 
-        let tx = Transaction::new(SenderSignedData::new(tx.transaction_data().clone(), vec![authenticator.clone()]));
+        let tx = Transaction::new(SenderSignedData::new(
+            tx.transaction_data().clone(),
+            vec![authenticator.clone()],
+        ));
         (data.execution_parts().1, tx, authenticator)
     }
 
-    pub fn make_zklogin_tx(address: SuiAddress, legacy: bool) -> (SuiAddress, Transaction, GenericSignature) {
+    pub fn make_zklogin_tx(
+        address: SuiAddress,
+        legacy: bool,
+    ) -> (SuiAddress, Transaction, GenericSignature) {
         let data = make_transaction_data(address);
         sign_zklogin_tx_with_default_proof(data, legacy)
     }
@@ -248,7 +264,12 @@ mod zk_login {
         let pk2 = &keys[1].public();
         let pk3 = &keys[2].public();
 
-        let multisig_pk = MultiSigPublicKey::new(vec![pk1.clone(), pk2.clone(), pk3.clone()], vec![1, 1, 1], 2).unwrap();
+        let multisig_pk = MultiSigPublicKey::new(
+            vec![pk1.clone(), pk2.clone(), pk3.clone()],
+            vec![1, 1, 1],
+            2,
+        )
+        .unwrap();
         let addr = SuiAddress::from(&multisig_pk);
         let tx = make_transaction(addr, &keys[0]);
 
@@ -258,9 +279,10 @@ mod zk_login {
 
         // Any 2 of 3 signatures verifies ok.
         let multi_sig1 = MultiSig::combine(vec![sig1, sig2], multisig_pk).unwrap();
-        Transaction::new(SenderSignedData::new(tx.transaction_data().clone(), vec![GenericSignature::MultiSig(
-            multi_sig1,
-        )]))
+        Transaction::new(SenderSignedData::new(
+            tx.transaction_data().clone(),
+            vec![GenericSignature::MultiSig(multi_sig1)],
+        ))
     }
 }
 pub use zk_login::*;

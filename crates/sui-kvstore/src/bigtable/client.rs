@@ -1,57 +1,41 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    bigtable::proto::bigtable::v2::{
-        bigtable_client::BigtableClient as BigtableInternalClient,
-        mutate_rows_request::Entry,
-        mutation,
-        mutation::SetCell,
-        read_rows_response::cell_chunk::RowStatus,
-        row_range::EndKey,
-        MutateRowsRequest,
-        MutateRowsResponse,
-        Mutation,
-        ReadRowsRequest,
-        RowRange,
-        RowSet,
-    },
-    Checkpoint,
-    KeyValueStoreReader,
-    KeyValueStoreWriter,
-    TransactionData,
+use crate::bigtable::proto::bigtable::v2::bigtable_client::BigtableClient as BigtableInternalClient;
+use crate::bigtable::proto::bigtable::v2::mutate_rows_request::Entry;
+use crate::bigtable::proto::bigtable::v2::mutation::SetCell;
+use crate::bigtable::proto::bigtable::v2::read_rows_response::cell_chunk::RowStatus;
+use crate::bigtable::proto::bigtable::v2::row_range::EndKey;
+use crate::bigtable::proto::bigtable::v2::{
+    mutation, MutateRowsRequest, MutateRowsResponse, Mutation, ReadRowsRequest, RowRange, RowSet,
 };
+use crate::{Checkpoint, KeyValueStoreReader, KeyValueStoreWriter, TransactionData};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use gcp_auth::{Token, TokenProvider};
 use http::{HeaderValue, Request, Response};
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, RwLock},
-    task::{Context, Poll},
-    time::Duration,
-};
-use sui_types::{
-    base_types::{ObjectID, TransactionDigest},
-    digests::CheckpointDigest,
-    full_checkpoint_content::CheckpointData,
-    messages_checkpoint::CheckpointSequenceNumber,
-    object::Object,
-    storage::ObjectKey,
-};
-use tonic::{
-    body::BoxBody,
-    codegen::Service,
-    transport::{Certificate, Channel, ClientTlsConfig},
-    Streaming,
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
+use std::time::Duration;
+use sui_types::base_types::{ObjectID, TransactionDigest};
+use sui_types::digests::CheckpointDigest;
+use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use sui_types::object::Object;
+use sui_types::storage::ObjectKey;
+use tonic::body::BoxBody;
+use tonic::codegen::Service;
+use tonic::transport::{Certificate, Channel, ClientTlsConfig};
+use tonic::Streaming;
 use tracing::error;
 
 const OBJECTS_TABLE: &str = "objects";
 const TRANSACTIONS_TABLE: &str = "transactions";
 const CHECKPOINTS_TABLE: &str = "checkpoints";
 const CHECKPOINTS_BY_DIGEST_TABLE: &str = "checkpoints_by_digest";
+const WATERMARK_TABLE: &str = "watermark";
 
 const COLUMN_FAMILY_NAME: &str = "sui";
 const DEFAULT_COLUMN_QUALIFIER: &str = "";
@@ -86,7 +70,10 @@ impl KeyValueStoreWriter for BigTableClient {
         let mut items = Vec::with_capacity(objects.len());
         for object in objects {
             let object_key = ObjectKey(object.id(), object.version());
-            items.push((Self::raw_object_key(&object_key)?, vec![(DEFAULT_COLUMN_QUALIFIER, bcs::to_bytes(object)?)]));
+            items.push((
+                Self::raw_object_key(&object_key)?,
+                vec![(DEFAULT_COLUMN_QUALIFIER, bcs::to_bytes(object)?)],
+            ));
         }
         self.multi_set(OBJECTS_TABLE, items).await
     }
@@ -95,11 +82,23 @@ impl KeyValueStoreWriter for BigTableClient {
         let mut items = Vec::with_capacity(transactions.len());
         for transaction in transactions {
             let cells = vec![
-                (TRANSACTION_COLUMN_QUALIFIER, bcs::to_bytes(&transaction.transaction)?),
-                (EFFECTS_COLUMN_QUALIFIER, bcs::to_bytes(&transaction.effects)?),
+                (
+                    TRANSACTION_COLUMN_QUALIFIER,
+                    bcs::to_bytes(&transaction.transaction)?,
+                ),
+                (
+                    EFFECTS_COLUMN_QUALIFIER,
+                    bcs::to_bytes(&transaction.effects)?,
+                ),
                 (EVENTS_COLUMN_QUALIFIER, bcs::to_bytes(&transaction.events)?),
-                (TIMESTAMP_COLUMN_QUALIFIER, bcs::to_bytes(&transaction.timestamp)?),
-                (CHECKPOINT_NUMBER_COLUMN_QUALIFIER, bcs::to_bytes(&transaction.checkpoint_number)?),
+                (
+                    TIMESTAMP_COLUMN_QUALIFIER,
+                    bcs::to_bytes(&transaction.timestamp)?,
+                ),
+                (
+                    CHECKPOINT_NUMBER_COLUMN_QUALIFIER,
+                    bcs::to_bytes(&transaction.checkpoint_number)?,
+                ),
             ];
             items.push((transaction.transaction.digest().inner().to_vec(), cells));
         }
@@ -113,14 +112,33 @@ impl KeyValueStoreWriter for BigTableClient {
         let key = summary.sequence_number.to_be_bytes().to_vec();
         let cells = vec![
             (CHECKPOINT_SUMMARY_COLUMN_QUALIFIER, bcs::to_bytes(summary)?),
-            (CHECKPOINT_SIGNATURES_COLUMN_QUALIFIER, bcs::to_bytes(signatures)?),
-            (CHECKPOINT_CONTENTS_COLUMN_QUALIFIER, bcs::to_bytes(contents)?),
+            (
+                CHECKPOINT_SIGNATURES_COLUMN_QUALIFIER,
+                bcs::to_bytes(signatures)?,
+            ),
+            (
+                CHECKPOINT_CONTENTS_COLUMN_QUALIFIER,
+                bcs::to_bytes(contents)?,
+            ),
         ];
-        self.multi_set(CHECKPOINTS_TABLE, [(key.clone(), cells)]).await?;
-        self.multi_set(CHECKPOINTS_BY_DIGEST_TABLE, [(checkpoint.checkpoint_summary.digest().inner().to_vec(), vec![(
-            DEFAULT_COLUMN_QUALIFIER,
-            key,
-        )])])
+        self.multi_set(CHECKPOINTS_TABLE, [(key.clone(), cells)])
+            .await?;
+        self.multi_set(
+            CHECKPOINTS_BY_DIGEST_TABLE,
+            [(
+                checkpoint.checkpoint_summary.digest().inner().to_vec(),
+                vec![(DEFAULT_COLUMN_QUALIFIER, key)],
+            )],
+        )
+        .await
+    }
+
+    async fn save_watermark(&mut self, watermark: CheckpointSequenceNumber) -> Result<()> {
+        let key = watermark.to_be_bytes().to_vec();
+        self.multi_set(
+            WATERMARK_TABLE,
+            [(key, vec![(DEFAULT_COLUMN_QUALIFIER, vec![])])],
+        )
         .await
     }
 }
@@ -138,7 +156,10 @@ impl KeyValueStoreReader for BigTableClient {
         Ok(objects)
     }
 
-    async fn get_transactions(&mut self, transactions: &[TransactionDigest]) -> Result<Vec<TransactionData>> {
+    async fn get_transactions(
+        &mut self,
+        transactions: &[TransactionDigest],
+    ) -> Result<Vec<TransactionData>> {
         let keys = transactions.iter().map(|tx| tx.inner().to_vec()).collect();
         let mut result = vec![];
         for row in self.multi_get(TRANSACTIONS_TABLE, keys).await? {
@@ -154,7 +175,9 @@ impl KeyValueStoreReader for BigTableClient {
                     EFFECTS_COLUMN_QUALIFIER => effects = Some(bcs::from_bytes(&value)?),
                     EVENTS_COLUMN_QUALIFIER => events = Some(bcs::from_bytes(&value)?),
                     TIMESTAMP_COLUMN_QUALIFIER => timestamp = bcs::from_bytes(&value)?,
-                    CHECKPOINT_NUMBER_COLUMN_QUALIFIER => checkpoint_number = bcs::from_bytes(&value)?,
+                    CHECKPOINT_NUMBER_COLUMN_QUALIFIER => {
+                        checkpoint_number = bcs::from_bytes(&value)?
+                    }
                     _ => error!("unexpected column {:?} in transactions table", column),
                 }
             }
@@ -169,8 +192,14 @@ impl KeyValueStoreReader for BigTableClient {
         Ok(result)
     }
 
-    async fn get_checkpoints(&mut self, sequence_numbers: &[CheckpointSequenceNumber]) -> Result<Vec<Checkpoint>> {
-        let keys = sequence_numbers.iter().map(|sq| sq.to_be_bytes().to_vec()).collect();
+    async fn get_checkpoints(
+        &mut self,
+        sequence_numbers: &[CheckpointSequenceNumber],
+    ) -> Result<Vec<Checkpoint>> {
+        let keys = sequence_numbers
+            .iter()
+            .map(|sq| sq.to_be_bytes().to_vec())
+            .collect();
         let mut checkpoints = vec![];
         for row in self.multi_get(CHECKPOINTS_TABLE, keys).await? {
             let mut summary = None;
@@ -179,8 +208,12 @@ impl KeyValueStoreReader for BigTableClient {
             for (column, value) in row {
                 match std::str::from_utf8(&column)? {
                     CHECKPOINT_SUMMARY_COLUMN_QUALIFIER => summary = Some(bcs::from_bytes(&value)?),
-                    CHECKPOINT_CONTENTS_COLUMN_QUALIFIER => contents = Some(bcs::from_bytes(&value)?),
-                    CHECKPOINT_SIGNATURES_COLUMN_QUALIFIER => signatures = Some(bcs::from_bytes(&value)?),
+                    CHECKPOINT_CONTENTS_COLUMN_QUALIFIER => {
+                        contents = Some(bcs::from_bytes(&value)?)
+                    }
+                    CHECKPOINT_SIGNATURES_COLUMN_QUALIFIER => {
+                        signatures = Some(bcs::from_bytes(&value)?)
+                    }
                     _ => error!("unexpected column {:?} in checkpoints table", column),
                 }
             }
@@ -194,9 +227,14 @@ impl KeyValueStoreReader for BigTableClient {
         Ok(checkpoints)
     }
 
-    async fn get_checkpoint_by_digest(&mut self, digest: CheckpointDigest) -> Result<Option<Checkpoint>> {
+    async fn get_checkpoint_by_digest(
+        &mut self,
+        digest: CheckpointDigest,
+    ) -> Result<Option<Checkpoint>> {
         let key = digest.inner().to_vec();
-        let mut response = self.multi_get(CHECKPOINTS_BY_DIGEST_TABLE, vec![key]).await?;
+        let mut response = self
+            .multi_get(CHECKPOINTS_BY_DIGEST_TABLE, vec![key])
+            .await?;
         if let Some(row) = response.pop() {
             if let Some((_, value)) = row.into_iter().next() {
                 let sequence_number = u64::from_be_bytes(value.as_slice().try_into()?);
@@ -210,7 +248,11 @@ impl KeyValueStoreReader for BigTableClient {
 
     async fn get_latest_checkpoint(&mut self) -> Result<CheckpointSequenceNumber> {
         let upper_limit = u64::MAX.to_be_bytes().to_vec();
-        match self.reversed_scan(CHECKPOINTS_TABLE, upper_limit).await?.pop() {
+        match self
+            .reversed_scan(WATERMARK_TABLE, upper_limit)
+            .await?
+            .pop()
+        {
             Some((key_bytes, _)) => Ok(u64::from_be_bytes(key_bytes.as_slice().try_into()?)),
             None => Ok(0),
         }
@@ -242,7 +284,11 @@ impl BigTableClient {
         })
     }
 
-    pub async fn new_remote(instance_id: String, is_read_only: bool, timeout: Option<Duration>) -> Result<Self> {
+    pub async fn new_remote(
+        instance_id: String,
+        is_read_only: bool,
+        timeout: Option<Duration>,
+    ) -> Result<Self> {
         let policy = if is_read_only {
             "https://www.googleapis.com/auth/bigtable.data.readonly"
         } else {
@@ -259,21 +305,34 @@ impl BigTableClient {
         if let Some(timeout) = timeout {
             endpoint = endpoint.timeout(timeout);
         }
-        let table_prefix = format!("projects/{}/instances/{}/tables/", token_provider.project_id().await?, instance_id);
+        let table_prefix = format!(
+            "projects/{}/instances/{}/tables/",
+            token_provider.project_id().await?,
+            instance_id
+        );
         let auth_channel = AuthChannel {
             channel: endpoint.connect_lazy(),
             policy: policy.to_string(),
             token_provider: Some(token_provider),
             token: Arc::new(RwLock::new(None)),
         };
-        Ok(Self { table_prefix, client: BigtableInternalClient::new(auth_channel) })
+        Ok(Self {
+            table_prefix,
+            client: BigtableInternalClient::new(auth_channel),
+        })
     }
 
-    pub async fn mutate_rows(&mut self, request: MutateRowsRequest) -> Result<Streaming<MutateRowsResponse>> {
+    pub async fn mutate_rows(
+        &mut self,
+        request: MutateRowsRequest,
+    ) -> Result<Streaming<MutateRowsResponse>> {
         Ok(self.client.mutate_rows(request).await?.into_inner())
     }
 
-    pub async fn read_rows(&mut self, request: ReadRowsRequest) -> Result<Vec<(Vec<u8>, Vec<(Vec<u8>, Vec<u8>)>)>> {
+    pub async fn read_rows(
+        &mut self,
+        request: ReadRowsRequest,
+    ) -> Result<Vec<(Vec<u8>, Vec<(Vec<u8>, Vec<u8>)>)>> {
         let mut result = vec![];
         let mut response = self.client.read_rows(request).await?.into_inner();
 
@@ -360,11 +419,18 @@ impl BigTableClient {
         Ok(())
     }
 
-    pub async fn multi_get(&mut self, table_name: &str, keys: Vec<Vec<u8>>) -> Result<Vec<Vec<(Bytes, Bytes)>>> {
+    pub async fn multi_get(
+        &mut self,
+        table_name: &str,
+        keys: Vec<Vec<u8>>,
+    ) -> Result<Vec<Vec<(Bytes, Bytes)>>> {
         let request = ReadRowsRequest {
             table_name: format!("{}{}", self.table_prefix, table_name),
             rows_limit: keys.len() as i64,
-            rows: Some(RowSet { row_keys: keys, row_ranges: vec![] }),
+            rows: Some(RowSet {
+                row_keys: keys,
+                row_ranges: vec![],
+            }),
             ..ReadRowsRequest::default()
         };
         let mut result = vec![];
@@ -379,11 +445,17 @@ impl BigTableClient {
         table_name: &str,
         upper_limit: Bytes,
     ) -> Result<Vec<(Bytes, Vec<(Bytes, Bytes)>)>> {
-        let range = RowRange { start_key: None, end_key: Some(EndKey::EndKeyClosed(upper_limit)) };
+        let range = RowRange {
+            start_key: None,
+            end_key: Some(EndKey::EndKeyClosed(upper_limit)),
+        };
         let request = ReadRowsRequest {
             table_name: format!("{}{}", self.table_prefix, table_name),
             rows_limit: 1,
-            rows: Some(RowSet { row_keys: vec![], row_ranges: vec![range] }),
+            rows: Some(RowSet {
+                row_keys: vec![],
+                row_ranges: vec![range],
+            }),
             reversed: true,
             ..ReadRowsRequest::default()
         };
@@ -398,10 +470,10 @@ impl BigTableClient {
 }
 
 impl Service<Request<BoxBody>> for AuthChannel {
+    type Response = Response<BoxBody>;
     type Error = Box<dyn std::error::Error + Send + Sync>;
     #[allow(clippy::type_complexity)]
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-    type Response = Response<BoxBody>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.channel.poll_ready(cx).map_err(Into::into)
@@ -436,7 +508,8 @@ impl Service<Request<BoxBody>> for AuthChannel {
                     Some(token) => token,
                 };
                 let token_string = token.as_str().parse::<String>()?;
-                let header = HeaderValue::from_str(format!("Bearer {}", token_string.as_str()).as_str())?;
+                let header =
+                    HeaderValue::from_str(format!("Bearer {}", token_string.as_str()).as_str())?;
                 request.headers_mut().insert("authorization", header);
             }
             // enable reverse scan

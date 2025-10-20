@@ -5,9 +5,9 @@
 /// This module implements tests for the TreasuryCap-related functionality such
 /// as spending, "flush"-ing, issuing new coins and performing marketplace-like
 /// operations.
-module one::token_treasury_cap_tests {
-    use one::token_test_utils as test;
-    use one::token;
+module oct::token_treasury_cap_tests {
+    use sui::token_test_utils as test;
+    use sui::token;
 
     #[test]
     /// Scenario: mint and spend a Token, confirm spending request with the

@@ -7,64 +7,43 @@ submit transactions to validators for finality, and proactively executes
 finalized transactions locally, when possible.
 */
 
-use crate::{
-    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
-    authority_aggregator::AuthorityAggregator,
-    authority_client::{AuthorityAPI, NetworkAuthorityClient},
-    quorum_driver::{
-        reconfig_observer::{OnsiteReconfigObserver, ReconfigObserver},
-        QuorumDriverHandler,
-        QuorumDriverHandlerBuilder,
-        QuorumDriverMetrics,
-    },
-};
-use futures::{
-    future::{select, Either, Future},
-    FutureExt,
-};
+use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
+use crate::authority::AuthorityState;
+use crate::authority_aggregator::AuthorityAggregator;
+use crate::authority_client::{AuthorityAPI, NetworkAuthorityClient};
+use crate::quorum_driver::reconfig_observer::{OnsiteReconfigObserver, ReconfigObserver};
+use crate::quorum_driver::{QuorumDriverHandler, QuorumDriverHandlerBuilder, QuorumDriverMetrics};
+use futures::future::{select, Either, Future};
+use futures::FutureExt;
 use mysten_common::sync::notify_read::NotifyRead;
-use mysten_metrics::{
-    add_server_timing,
-    spawn_logged_monitored_task,
-    spawn_monitored_task,
-    TX_TYPE_SHARED_OBJ_TX,
-    TX_TYPE_SINGLE_WRITER_TX,
-};
+use mysten_metrics::{add_server_timing, spawn_logged_monitored_task, spawn_monitored_task};
+use mysten_metrics::{TX_TYPE_SHARED_OBJ_TX, TX_TYPE_SINGLE_WRITER_TX};
+use prometheus::core::{AtomicI64, AtomicU64, GenericCounter, GenericGauge};
 use prometheus::{
-    core::{AtomicI64, AtomicU64, GenericCounter, GenericGauge},
-    register_histogram_vec_with_registry,
-    register_int_counter_vec_with_registry,
-    register_int_counter_with_registry,
-    register_int_gauge_vec_with_registry,
-    register_int_gauge_with_registry,
-    Histogram,
-    Registry,
+    register_histogram_vec_with_registry, register_int_counter_vec_with_registry,
+    register_int_counter_with_registry, register_int_gauge_vec_with_registry,
+    register_int_gauge_with_registry, Histogram, Registry,
 };
-use std::{net::SocketAddr, ops::Deref, path::Path, sync::Arc, time::Duration};
+use std::net::SocketAddr;
+use std::ops::Deref;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 use sui_storage::write_path_pending_tx_log::WritePathPendingTransactionLog;
-use sui_types::{
-    base_types::TransactionDigest,
-    error::{SuiError, SuiResult},
-    quorum_driver_types::{
-        ExecuteTransactionRequestType,
-        ExecuteTransactionRequestV3,
-        ExecuteTransactionResponseV3,
-        FinalizedEffects,
-        IsTransactionExecutedLocally,
-        QuorumDriverEffectsQueueResult,
-        QuorumDriverError,
-        QuorumDriverResponse,
-        QuorumDriverResult,
-    },
-    sui_system_state::SuiSystemState,
-    transaction::{TransactionData, VerifiedTransaction},
-    transaction_executor::SimulateTransactionResult,
+use sui_types::base_types::TransactionDigest;
+use sui_types::error::{SuiError, SuiResult};
+use sui_types::quorum_driver_types::{
+    ExecuteTransactionRequestType, ExecuteTransactionRequestV3, ExecuteTransactionResponseV3,
+    FinalizedEffects, IsTransactionExecutedLocally, QuorumDriverEffectsQueueResult,
+    QuorumDriverError, QuorumDriverResponse, QuorumDriverResult,
 };
-use tokio::{
-    sync::broadcast::{error::RecvError, Receiver},
-    task::JoinHandle,
-    time::timeout,
-};
+use sui_types::sui_system_state::SuiSystemState;
+use sui_types::transaction::{TransactionData, VerifiedTransaction};
+use sui_types::transaction_executor::SimulateTransactionResult;
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::broadcast::Receiver;
+use tokio::task::JoinHandle;
+use tokio::time::timeout;
 use tracing::{debug, error, error_span, info, instrument, warn, Instrument};
 
 // How long to wait for local execution (including parents) before a timeout
@@ -97,7 +76,13 @@ impl TransactiondOrchestrator<NetworkAuthorityClient> {
             validators.safe_client_metrics_base.clone(),
             validators.metrics.deref().clone(),
         );
-        TransactiondOrchestrator::new(validators, validator_state, parent_path, prometheus_registry, observer)
+        TransactiondOrchestrator::new(
+            validators,
+            validator_state,
+            parent_path,
+            prometheus_registry,
+            observer,
+        )
     }
 }
 
@@ -125,8 +110,9 @@ where
 
         let effects_receiver = quorum_driver_handler.subscribe_to_effects();
         let metrics = Arc::new(TransactionOrchestratorMetrics::new(prometheus_registry));
-        let pending_tx_log =
-            Arc::new(WritePathPendingTransactionLog::new(parent_path.join("fullnode_pending_transactions")));
+        let pending_tx_log = Arc::new(WritePathPendingTransactionLog::new(
+            parent_path.join("fullnode_pending_transactions"),
+        ));
         let pending_tx_log_clone = pending_tx_log.clone();
         let _local_executor_handle = {
             spawn_monitored_task!(async move {
@@ -134,7 +120,14 @@ where
             })
         };
         Self::schedule_txes_in_log(pending_tx_log.clone(), quorum_driver_handler.clone());
-        Self { quorum_driver_handler, validator_state, _local_executor_handle, pending_tx_log, notifier, metrics }
+        Self {
+            quorum_driver_handler,
+            validator_state,
+            _local_executor_handle,
+            pending_tx_log,
+            notifier,
+            metrics,
+        }
     }
 }
 
@@ -153,12 +146,18 @@ where
         request: ExecuteTransactionRequestV3,
         request_type: ExecuteTransactionRequestType,
         client_addr: Option<SocketAddr>,
-    ) -> Result<(ExecuteTransactionResponseV3, IsTransactionExecutedLocally), QuorumDriverError> {
+    ) -> Result<(ExecuteTransactionResponseV3, IsTransactionExecutedLocally), QuorumDriverError>
+    {
         let epoch_store = self.validator_state.load_epoch_store_one_call_per_task();
 
-        let (transaction, response) = self.execute_transaction_impl(&epoch_store, request, client_addr).await?;
+        let (transaction, response) = self
+            .execute_transaction_impl(&epoch_store, request, client_addr)
+            .await?;
 
-        let executed_locally = if matches!(request_type, ExecuteTransactionRequestType::WaitForLocalExecution) {
+        let executed_locally = if matches!(
+            request_type,
+            ExecuteTransactionRequestType::WaitForLocalExecution
+        ) {
             let executed_locally = Self::wait_for_finalized_tx_executed_locally_with_timeout(
                 &self.validator_state,
                 &transaction,
@@ -172,7 +171,13 @@ where
             false
         };
 
-        let QuorumDriverResponse { effects_cert, events, input_objects, output_objects, auxiliary_data } = response;
+        let QuorumDriverResponse {
+            effects_cert,
+            events,
+            input_objects,
+            output_objects,
+            auxiliary_data,
+        } = response;
 
         let response = ExecuteTransactionResponseV3 {
             effects: FinalizedEffects::new_from_effects_cert(effects_cert.into()),
@@ -195,8 +200,16 @@ where
     ) -> Result<ExecuteTransactionResponseV3, QuorumDriverError> {
         let epoch_store = self.validator_state.load_epoch_store_one_call_per_task();
 
-        let QuorumDriverResponse { effects_cert, events, input_objects, output_objects, auxiliary_data } =
-            self.execute_transaction_impl(&epoch_store, request, client_addr).await.map(|(_, r)| r)?;
+        let QuorumDriverResponse {
+            effects_cert,
+            events,
+            input_objects,
+            output_objects,
+            auxiliary_data,
+        } = self
+            .execute_transaction_impl(&epoch_store, request, client_addr)
+            .await
+            .map(|(_, r)| r)?;
 
         Ok(ExecuteTransactionResponseV3 {
             effects: FinalizedEffects::new_from_effects_cert(effects_cert.into()),
@@ -226,12 +239,16 @@ where
         let (_e2e_latency_timer, _txn_finality_timer) = if transaction.contains_shared_object() {
             (
                 self.metrics.request_latency_shared_obj.start_timer(),
-                self.metrics.wait_for_finality_latency_shared_obj.start_timer(),
+                self.metrics
+                    .wait_for_finality_latency_shared_obj
+                    .start_timer(),
             )
         } else {
             (
                 self.metrics.request_latency_single_writer.start_timer(),
-                self.metrics.wait_for_finality_latency_single_writer.start_timer(),
+                self.metrics
+                    .wait_for_finality_latency_single_writer
+                    .start_timer(),
             )
         };
 
@@ -242,10 +259,13 @@ where
             in_flight.dec();
         });
 
-        let ticket = self.submit(transaction.clone(), request, client_addr).await.map_err(|e| {
-            warn!(?tx_digest, "QuorumDriverInternalError: {e:?}");
-            QuorumDriverError::QuorumDriverInternalError(e)
-        })?;
+        let ticket = self
+            .submit(transaction.clone(), request, client_addr)
+            .await
+            .map_err(|e| {
+                warn!(?tx_digest, "QuorumDriverInternalError: {e:?}");
+                QuorumDriverError::QuorumDriverInternalError(e)
+            })?;
 
         let Ok(result) = timeout(WAIT_FOR_FINALITY_TIMEOUT, ticket).await else {
             debug!(?tx_digest, "Timeout waiting for transaction finality.");
@@ -284,9 +304,15 @@ where
         let ticket = self.notifier.register_one(&tx_digest);
         // TODO(william) need to also write client adr to pending tx log below
         // so that we can re-execute with this client addr if we restart
-        if self.pending_tx_log.write_pending_transaction_maybe(&transaction).await? {
+        if self
+            .pending_tx_log
+            .write_pending_transaction_maybe(&transaction)
+            .await?
+        {
             debug!(?tx_digest, "no pending request in flight, submitting.");
-            self.quorum_driver().submit_transaction_no_ticket(request.clone(), client_addr).await?;
+            self.quorum_driver()
+                .submit_transaction_no_ticket(request.clone(), client_addr)
+                .await?;
         }
         // It's possible that the transaction effects is already stored in DB at this point.
         // So we also subscribe to that. If we hear from `effects_await` first, it means
@@ -302,8 +328,12 @@ where
             let res = match select(ticket, effects_await.boxed()).await {
                 Either::Left((quorum_driver_response, _)) => Ok(quorum_driver_response),
                 Either::Right((_, unfinished_quorum_driver_task)) => {
-                    debug!(?tx_digest, "Effects are available in DB, use quorum driver to get a certificate");
-                    qd.submit_transaction_no_ticket(request, client_addr).await?;
+                    debug!(
+                        ?tx_digest,
+                        "Effects are available in DB, use quorum driver to get a certificate"
+                    );
+                    qd.submit_transaction_no_ticket(request, client_addr)
+                        .await?;
                     Ok(unfinished_quorum_driver_task.await)
                 }
             };
@@ -319,27 +349,37 @@ where
     ) -> SuiResult {
         let tx_digest = *transaction.digest();
         metrics.local_execution_in_flight.inc();
-        let _metrics_guard = scopeguard::guard(metrics.local_execution_in_flight.clone(), |in_flight| {
-            in_flight.dec();
-        });
+        let _metrics_guard =
+            scopeguard::guard(metrics.local_execution_in_flight.clone(), |in_flight| {
+                in_flight.dec();
+            });
 
         let _guard = if transaction.contains_shared_object() {
             metrics.local_execution_latency_shared_obj.start_timer()
         } else {
             metrics.local_execution_latency_single_writer.start_timer()
         };
-        debug!(?tx_digest, "Waiting for finalized tx to be executed locally.");
+        debug!(
+            ?tx_digest,
+            "Waiting for finalized tx to be executed locally."
+        );
         match timeout(
             LOCAL_EXECUTION_TIMEOUT,
-            validator_state.get_transaction_cache_reader().notify_read_executed_effects_digests(&[tx_digest]),
+            validator_state
+                .get_transaction_cache_reader()
+                .notify_read_executed_effects_digests(&[tx_digest]),
         )
-        .instrument(error_span!("transaction_orchestrator::local_execution", ?tx_digest))
+        .instrument(error_span!(
+            "transaction_orchestrator::local_execution",
+            ?tx_digest
+        ))
         .await
         {
             Err(_elapsed) => {
                 debug!(
                     ?tx_digest,
-                    "Waiting for finalized tx to be executed locally timed out within {:?}.", LOCAL_EXECUTION_TIMEOUT
+                    "Waiting for finalized tx to be executed locally timed out within {:?}.",
+                    LOCAL_EXECUTION_TIMEOUT
                 );
                 metrics.local_execution_timeout.inc();
                 Err(SuiError::TimeoutError)
@@ -361,12 +401,18 @@ where
                 Ok(Ok((transaction, ..))) => {
                     let tx_digest = transaction.digest();
                     if let Err(err) = pending_transaction_log.finish_transaction(tx_digest) {
-                        error!(?tx_digest, "Failed to finish transaction in pending transaction log: {err}");
+                        error!(
+                            ?tx_digest,
+                            "Failed to finish transaction in pending transaction log: {err}"
+                        );
                     }
                 }
                 Ok(Err((tx_digest, _err))) => {
                     if let Err(err) = pending_transaction_log.finish_transaction(&tx_digest) {
-                        error!(?tx_digest, "Failed to finish transaction in pending transaction log: {err}");
+                        error!(
+                            ?tx_digest,
+                            "Failed to finish transaction in pending transaction log: {err}"
+                        );
                     }
                 }
                 Err(RecvError::Closed) => {
@@ -396,13 +442,22 @@ where
         self.quorum_driver_handler.subscribe_to_effects()
     }
 
-    fn update_metrics(&'_ self, transaction: &VerifiedTransaction) -> (impl Drop, &'_ GenericCounter<AtomicU64>) {
+    fn update_metrics(
+        &'_ self,
+        transaction: &VerifiedTransaction,
+    ) -> (impl Drop, &'_ GenericCounter<AtomicU64>) {
         let (in_flight, good_response) = if transaction.contains_shared_object() {
             self.metrics.total_req_received_shared_object.inc();
-            (self.metrics.req_in_flight_shared_object.clone(), &self.metrics.good_response_shared_object)
+            (
+                self.metrics.req_in_flight_shared_object.clone(),
+                &self.metrics.good_response_shared_object,
+            )
         } else {
             self.metrics.total_req_received_single_writer.inc();
-            (self.metrics.req_in_flight_single_writer.clone(), &self.metrics.good_response_single_writer)
+            (
+                self.metrics.req_in_flight_single_writer.clone(),
+                &self.metrics.good_response_single_writer,
+            )
         };
         in_flight.inc();
         (
@@ -423,7 +478,10 @@ where
                 return;
             }
             let pending_txes = pending_tx_log.load_all_pending_transactions();
-            info!("Recovering {} pending transactions from pending_tx_log.", pending_txes.len());
+            info!(
+                "Recovering {} pending transactions from pending_tx_log.",
+                pending_txes.len()
+            );
             for (i, tx) in pending_txes.into_iter().enumerate() {
                 // TODO: ideally pending_tx_log would not contain VerifiedTransaction, but that
                 // requires a migration.
@@ -444,7 +502,10 @@ where
                     )
                     .await
                 {
-                    warn!(?tx_digest, "Failed to enqueue transaction from pending_tx_log, err: {err:?}");
+                    warn!(
+                        ?tx_digest,
+                        "Failed to enqueue transaction from pending_tx_log, err: {err:?}"
+                    );
                 } else {
                     debug!(?tx_digest, "Enqueued transaction from pending_tx_log");
                     if (i + 1) % 1000 == 0 {
@@ -503,8 +564,10 @@ impl TransactionOrchestratorMetrics {
         )
         .unwrap();
 
-        let total_req_received_single_writer = total_req_received.with_label_values(&[TX_TYPE_SINGLE_WRITER_TX]);
-        let total_req_received_shared_object = total_req_received.with_label_values(&[TX_TYPE_SHARED_OBJ_TX]);
+        let total_req_received_single_writer =
+            total_req_received.with_label_values(&[TX_TYPE_SINGLE_WRITER_TX]);
+        let total_req_received_shared_object =
+            total_req_received.with_label_values(&[TX_TYPE_SHARED_OBJ_TX]);
 
         let good_response = register_int_counter_vec_with_registry!(
             "tx_orchestrator_good_response",
@@ -514,7 +577,8 @@ impl TransactionOrchestratorMetrics {
         )
         .unwrap();
 
-        let good_response_single_writer = good_response.with_label_values(&[TX_TYPE_SINGLE_WRITER_TX]);
+        let good_response_single_writer =
+            good_response.with_label_values(&[TX_TYPE_SINGLE_WRITER_TX]);
         let good_response_shared_object = good_response.with_label_values(&[TX_TYPE_SHARED_OBJ_TX]);
 
         let req_in_flight = register_int_gauge_vec_with_registry!(
@@ -525,7 +589,8 @@ impl TransactionOrchestratorMetrics {
         )
         .unwrap();
 
-        let req_in_flight_single_writer = req_in_flight.with_label_values(&[TX_TYPE_SINGLE_WRITER_TX]);
+        let req_in_flight_single_writer =
+            req_in_flight.with_label_values(&[TX_TYPE_SINGLE_WRITER_TX]);
         let req_in_flight_shared_object = req_in_flight.with_label_values(&[TX_TYPE_SHARED_OBJ_TX]);
 
         let request_latency = register_histogram_vec_with_registry!(
@@ -629,7 +694,10 @@ where
         self.execute_transaction_v3(request, client_addr).await
     }
 
-    fn simulate_transaction(&self, transaction: TransactionData) -> Result<SimulateTransactionResult, SuiError> {
+    fn simulate_transaction(
+        &self,
+        transaction: TransactionData,
+    ) -> Result<SimulateTransactionResult, SuiError> {
         self.validator_state.simulate_transaction(transaction)
     }
 }

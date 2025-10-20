@@ -29,9 +29,16 @@ pub struct ErrorMapping {
 }
 
 impl ErrorMapping {
-    pub fn add_error_category(&mut self, category_id: u64, description: ErrorDescription) -> Result<()> {
+    pub fn add_error_category(
+        &mut self,
+        category_id: u64,
+        description: ErrorDescription,
+    ) -> Result<()> {
         if let Some(previous_entry) = self.error_categories.insert(category_id, description) {
-            bail!(format!("Entry for category {} already taken by: {:#?}", category_id, previous_entry))
+            bail!(format!(
+                "Entry for category {} already taken by: {:#?}",
+                category_id, previous_entry
+            ))
         }
         Ok(())
     }
@@ -65,6 +72,8 @@ impl ErrorMapping {
     }
 
     pub fn get_explanation(&self, module: &ModuleId, output_code: u64) -> Option<ErrorDescription> {
-        self.module_error_maps.get(module).and_then(|module_map| module_map.get(&output_code).cloned())
+        self.module_error_maps
+            .get(module)
+            .and_then(|module_map| module_map.get(&output_code).cloned())
     }
 }

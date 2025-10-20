@@ -7,10 +7,8 @@ use std::{
     collections::BTreeMap,
     future::Future,
     path::PathBuf,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::Ordering,
+    sync::{atomic::AtomicU32, Arc},
     time::{Duration, Instant},
 };
 use sui_framework::BuiltInFramework;
@@ -19,10 +17,12 @@ use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
     base_types::{random_object_ref, SuiAddress},
     crypto::{deterministic_random_account_key, get_key_pair_from_rng, AccountKeyPair},
-    effects::{TestEffectsBuilder, TransactionEffectsAPI},
-    event::Event,
     object::{MoveObject, Owner, OBJECT_START_VERSION},
     storage::ChildObjectResolver,
+};
+use sui_types::{
+    effects::{TestEffectsBuilder, TransactionEffectsAPI},
+    event::Event,
 };
 
 use super::*;
@@ -74,7 +74,12 @@ impl Scenario {
         static METRICS: once_cell::sync::Lazy<Arc<ExecutionCacheMetrics>> =
             once_cell::sync::Lazy::new(|| Arc::new(ExecutionCacheMetrics::new(default_registry())));
 
-        let cache = Arc::new(WritebackCache::new(&Default::default(), store.clone(), (*METRICS).clone()));
+        let cache = Arc::new(WritebackCache::new(
+            &Default::default(),
+            store.clone(),
+            (*METRICS).clone(),
+            BackpressureManager::new_for_tests(),
+        ));
         Self {
             authority,
             store,
@@ -146,7 +151,9 @@ impl Scenario {
         let tx = VerifiedTransaction::new_unchecked(tx);
         let events: TransactionEvents = Default::default();
 
-        let effects = TestEffectsBuilder::new(tx.inner()).with_events_digest(events.digest()).build();
+        let effects = TestEffectsBuilder::new(tx.inner())
+            .with_events_digest(events.digest())
+            .build();
 
         TransactionOutputs {
             transaction: Arc::new(tx),
@@ -177,9 +184,15 @@ impl Scenario {
         // add object_basics package object to genesis, since lots of test use it
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("src/unit_tests/data/object_basics");
-        let modules: Vec<_> = BuildConfig::new_for_testing().build(&path).unwrap().get_modules().cloned().collect();
+        let modules: Vec<_> = BuildConfig::new_for_testing()
+            .build(&path)
+            .unwrap()
+            .get_modules()
+            .cloned()
+            .collect();
         let digest = TransactionDigest::genesis_marker();
-        Object::new_package_for_testing(&modules, digest, BuiltInFramework::genesis_move_packages()).unwrap()
+        Object::new_package_for_testing(&modules, digest, BuiltInFramework::genesis_move_packages())
+            .unwrap()
     }
 
     fn new_child(owner: ObjectID) -> Object {
@@ -194,14 +207,20 @@ impl Scenario {
     fn inc_version_by(object: Object, delta: u64) -> Object {
         let version = object.version();
         let mut inner = object.into_inner();
-        inner.data.try_as_move_mut().unwrap().increment_version_to(SequenceNumber::from_u64(version.value() + delta));
+        inner
+            .data
+            .try_as_move_mut()
+            .unwrap()
+            .increment_version_to(SequenceNumber::from_u64(version.value() + delta));
         inner.into()
     }
 
     pub fn with_child(&mut self, short_id: u32, owner: u32) {
         let owner_id = self.id_map.get(&owner).expect("no such object");
         let object = Self::new_child(*owner_id);
-        self.outputs.new_locks_to_init.push(object.compute_object_reference());
+        self.outputs
+            .new_locks_to_init
+            .push(object.compute_object_reference());
         let id = object.id();
         assert!(self.id_map.insert(short_id, id).is_none());
         self.outputs.written.insert(id, object.clone());
@@ -212,7 +231,9 @@ impl Scenario {
         // for every id in short_ids, create an object with that id if it doesn't exist
         for short_id in short_ids {
             let object = Self::new_object();
-            self.outputs.new_locks_to_init.push(object.compute_object_reference());
+            self.outputs
+                .new_locks_to_init
+                .push(object.compute_object_reference());
             let id = object.id();
             assert!(self.id_map.insert(*short_id, id).is_none());
             self.outputs.written.insert(id, object.clone());
@@ -224,8 +245,9 @@ impl Scenario {
         let mut events: TransactionEvents = Default::default();
         events.data.push(Event::random_for_testing());
 
-        let effects =
-            TestEffectsBuilder::new(self.outputs.transaction.inner()).with_events_digest(events.digest()).build();
+        let effects = TestEffectsBuilder::new(self.outputs.transaction.inner())
+            .with_events_digest(events.digest())
+            .build();
         self.outputs.events = events;
         self.outputs.effects = effects;
     }
@@ -250,10 +272,14 @@ impl Scenario {
         for short_id in short_ids {
             let id = self.id_map.get(short_id).expect("object not found");
             let object = self.objects.get(id).cloned().expect("object not found");
-            self.outputs.locks_to_delete.push(object.compute_object_reference());
+            self.outputs
+                .locks_to_delete
+                .push(object.compute_object_reference());
             let object = Self::inc_version_by(object, delta);
             self.objects.insert(*id, object.clone());
-            self.outputs.new_locks_to_init.push(object.compute_object_reference());
+            self.outputs
+                .new_locks_to_init
+                .push(object.compute_object_reference());
             self.outputs.written.insert(object.id(), object);
         }
     }
@@ -298,7 +324,10 @@ impl Scenario {
                 .iter()
                 .find(|o| **o == object.compute_object_reference())
                 .expect("received object must have new lock");
-            self.outputs.markers.push((object.compute_object_reference().into(), MarkerValue::Received));
+            self.outputs.markers.push((
+                object.compute_object_reference().into(),
+                MarkerValue::Received,
+            ));
         }
     }
 
@@ -318,7 +347,9 @@ impl Scenario {
         let tx = *outputs.transaction.digest();
         assert!(self.transactions.insert(tx), "transaction is not unique");
 
-        self.cache().write_transaction_outputs(1 /* epoch */, outputs.clone()).await;
+        self.cache()
+            .write_transaction_outputs(1 /* epoch */, outputs.clone())
+            .await;
 
         self.count_action();
         tx
@@ -342,14 +373,21 @@ impl Scenario {
     }
 
     pub fn reset_cache(&mut self) {
-        self.cache = Arc::new(WritebackCache::new(&Default::default(), self.store.clone(), self.cache.metrics.clone()));
+        self.cache = Arc::new(WritebackCache::new(
+            &Default::default(),
+            self.store.clone(),
+            self.cache.metrics.clone(),
+            BackpressureManager::new_for_tests(),
+        ));
 
         // reset the scenario state to match the db
         let reverse_id_map: BTreeMap<_, _> = self.id_map.iter().map(|(k, v)| (*v, *k)).collect();
         self.objects.clear();
 
         self.store.iter_live_object_set(false).for_each(|o| {
-            let LiveObject::Normal(o) = o else { panic!("expected normal object") };
+            let LiveObject::Normal(o) = o else {
+                panic!("expected normal object")
+            };
             let id = o.id();
             // genesis objects are not managed by Scenario, ignore them
             if reverse_id_map.contains_key(&id) {
@@ -363,7 +401,10 @@ impl Scenario {
             let id = self.id_map.get(short_id).expect("no such object");
             let expected = self.objects.get(id).expect("no such object");
             let version = expected.version();
-            assert_eq!(self.cache().get_object_by_key(id, version).unwrap(), *expected);
+            assert_eq!(
+                self.cache().get_object_by_key(id, version).unwrap(),
+                *expected
+            );
             assert_eq!(self.cache().get_object(&expected.id()).unwrap(), *expected);
             // TODO: enable after lock caching is implemented
             // assert!(!self
@@ -378,14 +419,21 @@ impl Scenario {
         self.assert_live(short_ids);
         for short_id in short_ids {
             let id = self.id_map.get(short_id).expect("no such object");
-            self.cache().get_package_object(id).expect("no such package");
+            self.cache()
+                .get_package_object(id)
+                .expect("no such package");
         }
     }
 
     pub fn get_from_dirty_cache(&self, short_id: u32) -> Option<Object> {
         let id = self.id_map.get(&short_id).expect("no such object");
         let object = self.objects.get(id).expect("no such object");
-        self.cache.dirty.objects.get(id)?.get(&object.version()).map(|e| e.unwrap_object().clone())
+        self.cache
+            .dirty
+            .objects
+            .get(id)?
+            .get(&object.version())
+            .map(|e| e.unwrap_object().clone())
     }
 
     pub fn assert_dirty(&self, short_ids: &[u32]) {
@@ -393,13 +441,20 @@ impl Scenario {
         for short_id in short_ids {
             let id = self.id_map.get(short_id).expect("no such object");
             let object = self.objects.get(id).expect("no such object");
-            assert_eq!(*object, self.get_from_dirty_cache(*short_id).expect("no such object in dirty cache"));
+            assert_eq!(
+                *object,
+                self.get_from_dirty_cache(*short_id)
+                    .expect("no such object in dirty cache")
+            );
         }
     }
 
     pub fn assert_not_dirty(&self, short_ids: &[u32]) {
         for short_id in short_ids {
-            assert!(self.get_from_dirty_cache(*short_id).is_none(), "object exists in dirty cache");
+            assert!(
+                self.get_from_dirty_cache(*short_id).is_none(),
+                "object exists in dirty cache"
+            );
         }
     }
 
@@ -427,8 +482,15 @@ impl Scenario {
         for short_id in short_ids {
             let id = self.id_map.get(short_id).expect("no such object");
             let object = self.objects.get(id).expect("no such object");
-            assert_eq!(self.cache().get_object_by_key(id, object.version()).unwrap(), *object);
-            assert!(self.cache().have_received_object_at_version(id, object.version(), 1));
+            assert_eq!(
+                self.cache()
+                    .get_object_by_key(id, object.version())
+                    .unwrap(),
+                *object
+            );
+            assert!(self
+                .cache()
+                .have_received_object_at_version(id, object.version(), 1));
         }
     }
 
@@ -436,7 +498,10 @@ impl Scenario {
         for short_id in short_ids {
             let id = self.id_map.get(short_id).expect("no such id");
 
-            assert!(self.cache().get_object(id).is_none(), "object exists in cache");
+            assert!(
+                self.cache().get_object(id).is_none(),
+                "object exists in cache"
+            );
         }
     }
 
@@ -445,7 +510,10 @@ impl Scenario {
     }
 
     pub fn object(&self, short_id: u32) -> Object {
-        self.objects.get(&self.obj_id(short_id)).expect("no such object").clone()
+        self.objects
+            .get(&self.obj_id(short_id))
+            .expect("no such object")
+            .clone()
     }
 
     pub fn obj_ref(&self, short_id: u32) -> ObjectRef {
@@ -594,13 +662,22 @@ async fn test_extra_outputs() {
         // when Events is empty, it should be treated as None
         let fx = s.cache.get_executed_effects(&tx).unwrap();
         let events_digest = fx.events_digest().unwrap();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(
+            s.cache.get_events(events_digest).is_none(),
+            "empty events should be none"
+        );
 
         s.commit(tx).await.unwrap();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(
+            s.cache.get_events(events_digest).is_none(),
+            "empty events should be none"
+        );
 
         s.reset_cache();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(
+            s.cache.get_events(events_digest).is_none(),
+            "empty events should be none"
+        );
     })
     .await;
 }
@@ -628,7 +705,13 @@ async fn test_lt_or_eq() {
         let check_all_versions = |s: &Scenario| {
             for i in 1u64..=3 {
                 let v = SequenceNumber::from_u64(i);
-                assert_eq!(s.cache().find_object_lt_or_eq_version(s.obj_id(1), v).unwrap().version(), v);
+                assert_eq!(
+                    s.cache()
+                        .find_object_lt_or_eq_version(s.obj_id(1), v)
+                        .unwrap()
+                        .version(),
+                    v
+                );
             }
         };
 
@@ -675,7 +758,10 @@ async fn test_lt_or_eq_caching() {
             let lookup_version = SequenceNumber::from_u64(lookup_version);
             let expected_version = SequenceNumber::from_u64(expected_version);
             assert_eq!(
-                s.cache().find_object_lt_or_eq_version(s.obj_id(1), lookup_version).unwrap().version(),
+                s.cache()
+                    .find_object_lt_or_eq_version(s.obj_id(1), lookup_version)
+                    .unwrap()
+                    .version(),
                 expected_version
             );
         };
@@ -684,10 +770,24 @@ async fn test_lt_or_eq_caching() {
         assert!(!s.cache.cached.object_by_id_cache.contains_key(&s.obj_id(1)));
 
         // version <= 0 does not exist
-        assert!(s.cache().find_object_lt_or_eq_version(s.obj_id(1), 0.into()).is_none());
+        assert!(s
+            .cache()
+            .find_object_lt_or_eq_version(s.obj_id(1), 0.into())
+            .is_none());
 
         // query above populates cache
-        assert_eq!(s.cache.cached.object_by_id_cache.get(&s.obj_id(1)).unwrap().lock().version().unwrap().value(), 5);
+        assert_eq!(
+            s.cache
+                .cached
+                .object_by_id_cache
+                .get(&s.obj_id(1))
+                .unwrap()
+                .lock()
+                .version()
+                .unwrap()
+                .value(),
+            5
+        );
 
         // all queries get correct answer with a populated cache
         check_version(1, 1);
@@ -718,7 +818,9 @@ async fn test_lt_or_eq_with_cached_tombstone() {
         let check_version = |lookup_version: u64, expected_version: Option<u64>| {
             let lookup_version = SequenceNumber::from_u64(lookup_version);
             assert_eq!(
-                s.cache().find_object_lt_or_eq_version(s.obj_id(1), lookup_version).map(|v| v.version()),
+                s.cache()
+                    .find_object_lt_or_eq_version(s.obj_id(1), lookup_version)
+                    .map(|v| v.version()),
                 expected_version.map(SequenceNumber::from_u64)
             );
         };
@@ -746,7 +848,10 @@ async fn test_write_transaction_outputs_is_sync() {
         let outputs = s.take_outputs();
         // assert that write_transaction_outputs is sync in non-simtest, which causes the
         // fail_point_async! macros above to be elided
-        s.cache.write_transaction_outputs(1, outputs).now_or_never().unwrap();
+        s.cache
+            .write_transaction_outputs(1, outputs)
+            .now_or_never()
+            .unwrap();
     })
     .await;
 }
@@ -845,7 +950,11 @@ async fn test_invalidate_package_cache_on_revert() {
         s.cache().revert_state_update(&tx1);
         s.clear_state_end_of_epoch().await;
 
-        assert!(s.cache().get_package_object(&s.obj_id(2)).unwrap().is_none());
+        assert!(s
+            .cache()
+            .get_package_object(&s.obj_id(2))
+            .unwrap()
+            .is_none());
     })
     .await;
 }
@@ -877,7 +986,12 @@ async fn test_concurrent_readers() {
         s.with_deleted(&[child_id]);
         let tx2 = s.take_outputs();
 
-        txns.push((tx1, tx2, s.object(parent_id).compute_object_reference(), child_full_id));
+        txns.push((
+            tx1,
+            tx2,
+            s.object(parent_id).compute_object_reference(),
+            child_full_id,
+        ));
     }
 
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
@@ -916,7 +1030,9 @@ async fn test_concurrent_readers() {
                     assert_eq!(parent.unwrap().version(), parent_ref.1);
                     break;
                 }
-                let child = cache.read_child_object(&parent_ref.0, &child_id, parent_ref.1).unwrap();
+                let child = cache
+                    .read_child_object(&parent_ref.0, &child_id, parent_ref.1)
+                    .unwrap();
                 assert!(child.is_none(), "Inconsistent child read detected");
             }
         })
@@ -971,7 +1087,12 @@ async fn test_concurrent_lockers() {
             for (tx1, _, a_ref, b_ref) in txns {
                 results.push(
                     cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx1.digest(), Some(tx1.clone()))
+                        .acquire_transaction_locks(
+                            &epoch_store,
+                            &[a_ref, b_ref],
+                            *tx1.digest(),
+                            Some(tx1.clone()),
+                        )
                         .await,
                 );
                 barrier.wait().await;
@@ -990,7 +1111,12 @@ async fn test_concurrent_lockers() {
             for (_, tx2, a_ref, b_ref) in txns {
                 results.push(
                     cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx2.digest(), Some(tx2.clone()))
+                        .acquire_transaction_locks(
+                            &epoch_store,
+                            &[a_ref, b_ref],
+                            *tx2.digest(),
+                            Some(tx2.clone()),
+                        )
                         .await,
                 );
                 barrier.wait().await;
@@ -1044,7 +1170,12 @@ async fn test_concurrent_lockers_same_tx() {
             for (tx1, a_ref, b_ref) in txns {
                 results.push(
                     cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx1.digest(), Some(tx1.clone()))
+                        .acquire_transaction_locks(
+                            &epoch_store,
+                            &[a_ref, b_ref],
+                            *tx1.digest(),
+                            Some(tx1.clone()),
+                        )
                         .await,
                 );
                 barrier.wait().await;
@@ -1063,7 +1194,12 @@ async fn test_concurrent_lockers_same_tx() {
             for (tx1, a_ref, b_ref) in txns {
                 results.push(
                     cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx1.digest(), Some(tx1.clone()))
+                        .acquire_transaction_locks(
+                            &epoch_store,
+                            &[a_ref, b_ref],
+                            *tx1.digest(),
+                            Some(tx1.clone()),
+                        )
                         .await,
                 );
                 barrier.wait().await;
@@ -1091,7 +1227,12 @@ async fn latest_object_cache_race_test() {
     static METRICS: once_cell::sync::Lazy<Arc<ExecutionCacheMetrics>> =
         once_cell::sync::Lazy::new(|| Arc::new(ExecutionCacheMetrics::new(default_registry())));
 
-    let cache = Arc::new(WritebackCache::new(&Default::default(), store.clone(), (*METRICS).clone()));
+    let cache = Arc::new(WritebackCache::new(
+        &Default::default(),
+        store.clone(),
+        (*METRICS).clone(),
+        BackpressureManager::new_for_tests(),
+    ));
 
     let object_id = ObjectID::random();
     let owner = SuiAddress::random_for_testing_only();
@@ -1105,7 +1246,10 @@ async fn latest_object_cache_race_test() {
             while start.elapsed() < Duration::from_secs(2) {
                 let object = Object::with_id_owner_version_for_testing(object_id, version, owner);
 
-                cache.write_object_entry(&object_id, version, object.into()).now_or_never().unwrap();
+                cache
+                    .write_object_entry(&object_id, version, object.into())
+                    .now_or_never()
+                    .unwrap();
 
                 version = version.next();
             }
@@ -1120,11 +1264,17 @@ async fn latest_object_cache_race_test() {
             while start.elapsed() < Duration::from_secs(2) {
                 // If you move the get_ticket_for_read to after we get the latest version,
                 // the test will fail! (this is good, it means the test is doing something)
-                let ticket = cache.cached.object_by_id_cache.get_ticket_for_read(&object_id);
+                let ticket = cache
+                    .cached
+                    .object_by_id_cache
+                    .get_ticket_for_read(&object_id);
 
                 // get the latest version, but then let it become stale
-                let Some(latest_version) =
-                    cache.dirty.objects.get(&object_id).and_then(|e| e.value().get_highest().map(|v| v.0))
+                let Some(latest_version) = cache
+                    .dirty
+                    .objects
+                    .get(&object_id)
+                    .and_then(|e| e.value().get_highest().map(|v| v.0))
                 else {
                     continue;
                 };
@@ -1134,7 +1284,8 @@ async fn latest_object_cache_race_test() {
                     std::thread::sleep(Duration::from_micros(1));
                 }
 
-                let object = Object::with_id_owner_version_for_testing(object_id, latest_version, owner);
+                let object =
+                    Object::with_id_owner_version_for_testing(object_id, latest_version, owner);
 
                 // because we obtained the ticket before reading the object, we will not write a stale
                 // version to the cache.
@@ -1168,7 +1319,12 @@ async fn latest_object_cache_race_test() {
             let mut latest = OBJECT_START_VERSION;
 
             while start.elapsed() < Duration::from_secs(2) {
-                let Some(cur) = cache.cached.object_by_id_cache.get(&object_id).and_then(|e| e.lock().version()) else {
+                let Some(cur) = cache
+                    .cached
+                    .object_by_id_cache
+                    .get(&object_id)
+                    .and_then(|e| e.lock().version())
+                else {
                     continue;
                 };
 
@@ -1182,4 +1338,61 @@ async fn latest_object_cache_race_test() {
     reader.join().unwrap();
     checker.join().unwrap();
     invalidator.join().unwrap();
+}
+
+#[tokio::test]
+async fn test_transaction_cache_race() {
+    telemetry_subscribers::init_for_testing();
+
+    let mut s = Scenario::new(None, Arc::new(AtomicU32::new(0))).await;
+    let cache = s.cache.clone();
+    let mut txns = Vec::new();
+
+    for i in 0..1000 {
+        let a = i * 4;
+        s.with_created(&[a]);
+        s.do_tx().await;
+
+        let outputs = s.take_outputs();
+        let tx = (*outputs.transaction).clone();
+        let effects = outputs.effects.clone();
+
+        txns.push((tx, effects));
+    }
+
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+
+    let t1 = {
+        let txns = txns.clone();
+        let cache = cache.clone();
+        let barrier = barrier.clone();
+        std::thread::spawn(move || {
+            for (i, (tx, effects)) in txns.into_iter().enumerate() {
+                barrier.wait();
+                // test both single and multi insert
+                if i % 2 == 0 {
+                    cache.insert_transaction_and_effects(&tx, &effects);
+                } else {
+                    cache.multi_insert_transaction_and_effects(&[VerifiedExecutionData::new(
+                        tx, effects,
+                    )]);
+                }
+            }
+        })
+    };
+
+    let t2 = {
+        let txns = txns.clone();
+        let cache = cache.clone();
+        let barrier = barrier.clone();
+        std::thread::spawn(move || {
+            for (tx, _) in txns {
+                barrier.wait();
+                cache.get_transaction_block(tx.digest());
+            }
+        })
+    };
+
+    t1.join().unwrap();
+    t2.join().unwrap();
 }

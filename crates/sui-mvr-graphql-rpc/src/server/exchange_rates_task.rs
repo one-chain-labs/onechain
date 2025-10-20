@@ -17,8 +17,16 @@ pub(crate) struct TriggerExchangeRatesTask {
 }
 
 impl TriggerExchangeRatesTask {
-    pub(crate) fn new(db: PgExecutor, epoch_rx: watch::Receiver<u64>, cancel: CancellationToken) -> Self {
-        Self { db, epoch_rx, cancel }
+    pub(crate) fn new(
+        db: PgExecutor,
+        epoch_rx: watch::Receiver<u64>,
+        cancel: CancellationToken,
+    ) -> Self {
+        Self {
+            db,
+            epoch_rx,
+            cancel,
+        }
     }
 
     pub(crate) async fn run(&mut self) {

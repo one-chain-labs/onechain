@@ -3,14 +3,16 @@
 
 use crate::client::bridge_authority_aggregator::BridgeAuthorityAggregator;
 
-use crate::{
-    e2e_tests::test_utils::{initiate_bridge_eth_to_sui, initiate_bridge_sui_to_eth, BridgeTestClusterBuilder},
-    sui_transaction_builder::build_sui_transaction,
-    types::{BridgeAction, BridgeActionStatus, EmergencyAction, EmergencyActionType},
+use crate::e2e_tests::test_utils::{
+    initiate_bridge_eth_to_sui, initiate_bridge_sui_to_eth, BridgeTestClusterBuilder,
 };
+use crate::sui_transaction_builder::build_sui_transaction;
+use crate::types::{BridgeAction, EmergencyAction};
+use crate::types::{BridgeActionStatus, EmergencyActionType};
 use ethers::types::Address as EthAddress;
 use std::sync::Arc;
-use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI};
+use sui_json_rpc_types::SuiExecutionStatus;
+use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_types::bridge::{BridgeChainId, TOKEN_ID_ETH};
 use tracing::info;
 
@@ -52,9 +54,11 @@ async fn test_sui_bridge_paused() {
     // verify bridge are not paused
     assert!(!bridge_client.get_bridge_summary().await.unwrap().is_frozen);
 
-    // try bridge from eth and verify it works on OneChain
-    initiate_bridge_eth_to_sui(&bridge_test_cluster, 10, 0).await.unwrap();
-    // verify Eth was transferred to OneChain address
+    // try bridge from eth and verify it works on sui
+    initiate_bridge_eth_to_sui(&bridge_test_cluster, 10, 0)
+        .await
+        .unwrap();
+    // verify Eth was transferred to Sui address
     let eth_coin_type = sui_token_type_tags.get(&TOKEN_ID_ETH).unwrap();
     let eth_coin = bridge_client
         .sui_client()
@@ -68,23 +72,36 @@ async fn test_sui_bridge_paused() {
     // get pause bridge signatures from committee
     let bridge_committee = Arc::new(bridge_client.get_bridge_committee().await.unwrap());
     let agg = BridgeAuthorityAggregator::new_for_testing(bridge_committee);
-    let certified_action = agg.request_committee_signatures(pause_action).await.unwrap();
+    let certified_action = agg
+        .request_committee_signatures(pause_action)
+        .await
+        .unwrap();
 
     // execute pause bridge on sui
-    let gas = bridge_test_cluster.wallet().get_one_gas_object_owned_by_address(sui_address).await.unwrap().unwrap();
+    let gas = bridge_test_cluster
+        .wallet()
+        .get_one_gas_object_owned_by_address(sui_address)
+        .await
+        .unwrap()
+        .unwrap();
 
     let tx = build_sui_transaction(
         sui_address,
         &gas,
         certified_action,
-        bridge_client.get_mutable_bridge_object_arg_must_succeed().await,
+        bridge_client
+            .get_mutable_bridge_object_arg_must_succeed()
+            .await,
         &sui_token_type_tags,
         1000,
     )
     .unwrap();
 
     let response = bridge_test_cluster.sign_and_execute_transaction(&tx).await;
-    assert_eq!(response.effects.unwrap().status(), &SuiExecutionStatus::Success);
+    assert_eq!(
+        response.effects.unwrap().status(),
+        &SuiExecutionStatus::Success
+    );
     info!("Bridge paused");
 
     // verify bridge paused
@@ -96,7 +113,10 @@ async fn test_sui_bridge_paused() {
     // message should not be recorded on Sui when the bridge is paused
     let res = bridge_test_cluster
         .bridge_client()
-        .get_token_transfer_action_onchain_status_until_success(bridge_test_cluster.eth_chain_id() as u8, 1)
+        .get_token_transfer_action_onchain_status_until_success(
+            bridge_test_cluster.eth_chain_id() as u8,
+            1,
+        )
         .await;
     assert_eq!(BridgeActionStatus::NotFound, res);
     // Transfer from Sui to eth should fail

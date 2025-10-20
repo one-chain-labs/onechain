@@ -3,8 +3,8 @@
 // where a given instantiation`T<...>` has key but does _not_ have store
 
 module a::m {
-    use one::transfer::{Self, Receiving};
-    use one::object::UID;
+    use sui::transfer::{Self, Receiving};
+    use sui::object::UID;
 
     public fun t1<T: key>(s: T) {
         transfer::transfer(s, @0x100);
@@ -23,14 +23,14 @@ module a::m {
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }
 }
 
-module one::transfer {
-    use one::object::UID;
+module oct::transfer {
+    use sui::object::UID;
 
     struct Receiving<phantom T: key> { }
 

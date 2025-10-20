@@ -19,11 +19,8 @@ use async_graphql::{
 };
 use sui_json_rpc_types::SuiArgument;
 use sui_types::transaction::{
-    Argument as NativeArgument,
-    CallArg as NativeCallArg,
-    Command as NativeProgrammableTransaction,
-    ObjectArg as NativeObjectArg,
-    ProgrammableMoveCall as NativeMoveCallTransaction,
+    Argument as NativeArgument, CallArg as NativeCallArg, Command as NativeProgrammableTransaction,
+    ObjectArg as NativeObjectArg, ProgrammableMoveCall as NativeMoveCallTransaction,
     ProgrammableTransaction as NativeProgrammableTransactionBlock,
 };
 
@@ -248,8 +245,8 @@ impl ProgrammableTransactionBlock {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
         let mut connection = Connection::new(false, false);
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(self.native.commands.len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, _, cs)) = page
+            .paginate_consistent_indices(self.native.commands.len(), self.checkpoint_viewed_at)?
         else {
             return Ok(connection);
         };
@@ -299,12 +296,21 @@ impl MoveCallTransaction {
 
     /// The actual type parameters passed in for this move call.
     async fn type_arguments(&self) -> Vec<MoveType> {
-        self.native.type_arguments.iter().cloned().map(Into::into).collect()
+        self.native
+            .type_arguments
+            .iter()
+            .cloned()
+            .map(Into::into)
+            .collect()
     }
 
     /// The actual function parameters passed in for this move call.
     async fn arguments(&self) -> Vec<TransactionArgument> {
-        self.native.arguments.iter().map(|arg| TransactionArgument::from(*arg)).collect()
+        self.native
+            .arguments
+            .iter()
+            .map(|arg| TransactionArgument::from(*arg))
+            .collect()
     }
 }
 
@@ -315,21 +321,33 @@ impl TransactionInput {
         use TransactionInput as I;
 
         match argument {
-            N::Pure(bytes) => I::Pure(Pure { bytes: Base64::from(bytes) }),
+            N::Pure(bytes) => I::Pure(Pure {
+                bytes: Base64::from(bytes),
+            }),
 
-            N::Object(O::ImmOrOwnedObject(oref)) => {
-                I::OwnedOrImmutable(OwnedOrImmutable { read: ObjectRead { native: oref, checkpoint_viewed_at } })
-            }
+            N::Object(O::ImmOrOwnedObject(oref)) => I::OwnedOrImmutable(OwnedOrImmutable {
+                read: ObjectRead {
+                    native: oref,
+                    checkpoint_viewed_at,
+                },
+            }),
 
-            N::Object(O::SharedObject { id, initial_shared_version, mutable }) => I::SharedInput(SharedInput {
+            N::Object(O::SharedObject {
+                id,
+                initial_shared_version,
+                mutable,
+            }) => I::SharedInput(SharedInput {
                 address: id.into(),
                 initial_shared_version: initial_shared_version.value().into(),
                 mutable,
             }),
 
-            N::Object(O::Receiving(oref)) => {
-                I::Receiving(Receiving { read: ObjectRead { native: oref, checkpoint_viewed_at } })
-            }
+            N::Object(O::Receiving(oref)) => I::Receiving(Receiving {
+                read: ObjectRead {
+                    native: oref,
+                    checkpoint_viewed_at,
+                },
+            }),
         }
     }
 }
@@ -339,7 +357,10 @@ impl ProgrammableTransaction {
         use NativeProgrammableTransaction as N;
         use ProgrammableTransaction as P;
         match pt {
-            N::MoveCall(call) => P::MoveCall(MoveCallTransaction { native: *call, checkpoint_viewed_at }),
+            N::MoveCall(call) => P::MoveCall(MoveCallTransaction {
+                native: *call,
+                checkpoint_viewed_at,
+            }),
 
             N::TransferObjects(inputs, address) => P::TransferObjects(TransferObjectsTransaction {
                 inputs: inputs.into_iter().map(TransactionArgument::from).collect(),
@@ -363,15 +384,20 @@ impl ProgrammableTransaction {
 
             N::MakeMoveVec(type_, elements) => P::MakeMoveVec(MakeMoveVecTransaction {
                 type_: type_.map(Into::into),
-                elements: elements.into_iter().map(TransactionArgument::from).collect(),
+                elements: elements
+                    .into_iter()
+                    .map(TransactionArgument::from)
+                    .collect(),
             }),
 
-            N::Upgrade(modules, dependencies, current_package, upgrade_ticket) => P::Upgrade(UpgradeTransaction {
-                modules: modules.into_iter().map(Base64::from).collect(),
-                dependencies: dependencies.into_iter().map(SuiAddress::from).collect(),
-                current_package: current_package.into(),
-                upgrade_ticket: upgrade_ticket.into(),
-            }),
+            N::Upgrade(modules, dependencies, current_package, upgrade_ticket) => {
+                P::Upgrade(UpgradeTransaction {
+                    modules: modules.into_iter().map(Base64::from).collect(),
+                    dependencies: dependencies.into_iter().map(SuiAddress::from).collect(),
+                    current_package: current_package.into(),
+                    upgrade_ticket: upgrade_ticket.into(),
+                })
+            }
         }
     }
 }

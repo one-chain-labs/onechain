@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use sui_sdk_types::types::CheckpointDigest;
+use sui_sdk_types::CheckpointDigest;
 
 /// Extension trait used to facilitate retrieval of Sui specific data from responses
 pub trait ResponseExt {
@@ -22,19 +22,26 @@ impl ResponseExt for tonic::metadata::MetadataMap {
     }
 
     fn chain(&self) -> Option<&str> {
-        self.get(crate::types::X_SUI_CHAIN).and_then(|h| h.to_str().ok())
+        self.get(crate::types::X_SUI_CHAIN)
+            .and_then(|h| h.to_str().ok())
     }
 
     fn epoch(&self) -> Option<u64> {
-        self.get(crate::types::X_SUI_EPOCH).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok())
+        self.get(crate::types::X_SUI_EPOCH)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok())
     }
 
     fn checkpoint_height(&self) -> Option<u64> {
-        self.get(crate::types::X_SUI_CHECKPOINT_HEIGHT).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok())
+        self.get(crate::types::X_SUI_CHECKPOINT_HEIGHT)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok())
     }
 
     fn timestamp_ms(&self) -> Option<u64> {
-        self.get(crate::types::X_SUI_TIMESTAMP_MS).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok())
+        self.get(crate::types::X_SUI_TIMESTAMP_MS)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok())
     }
 
     fn lowest_available_checkpoint(&self) -> Option<u64> {

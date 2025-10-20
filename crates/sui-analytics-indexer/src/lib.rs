@@ -1,13 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{ops::Range, path::PathBuf};
+use std::ops::Range;
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use arrow_array::{Array, Int32Array};
 use clap::*;
-use gcp_bigquery_client::{model::query_request::QueryRequest, Client};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use gcp_bigquery_client::model::query_request::QueryRequest;
+use gcp_bigquery_client::Client;
+use num_enum::IntoPrimitive;
+use num_enum::TryFromPrimitive;
 use object_store::path::Path;
 use serde::{Deserialize, Serialize};
 use snowflake_api::{QueryResult, SnowflakeApi};
@@ -17,40 +20,33 @@ use tracing::info;
 use sui_config::object_storage_config::ObjectStoreConfig;
 use sui_data_ingestion_core::Worker;
 use sui_rpc_api::CheckpointData;
-use sui_storage::object_store::util::{find_all_dirs_with_epoch_prefix, find_all_files_with_epoch_prefix};
-use sui_types::{base_types::EpochId, dynamic_field::DynamicFieldType, messages_checkpoint::CheckpointSequenceNumber};
-
-use crate::{
-    analytics_metrics::AnalyticsMetrics,
-    analytics_processor::AnalyticsProcessor,
-    handlers::{
-        checkpoint_handler::CheckpointHandler,
-        df_handler::DynamicFieldHandler,
-        event_handler::EventHandler,
-        move_call_handler::MoveCallHandler,
-        object_handler::ObjectHandler,
-        package_handler::PackageHandler,
-        transaction_handler::TransactionHandler,
-        transaction_objects_handler::TransactionObjectsHandler,
-        wrapped_object_handler::WrappedObjectHandler,
-        AnalyticsHandler,
-    },
-    tables::{
-        CheckpointEntry,
-        DynamicFieldEntry,
-        EventEntry,
-        InputObjectKind,
-        MoveCallEntry,
-        MovePackageEntry,
-        ObjectEntry,
-        ObjectStatus,
-        OwnerType,
-        TransactionEntry,
-        TransactionObjectEntry,
-        WrappedObjectEntry,
-    },
-    writers::{csv_writer::CSVWriter, parquet_writer::ParquetWriter, AnalyticsWriter},
+use sui_storage::object_store::util::{
+    find_all_dirs_with_epoch_prefix, find_all_files_with_epoch_prefix,
 };
+use sui_types::base_types::EpochId;
+use sui_types::dynamic_field::DynamicFieldType;
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+
+use crate::analytics_metrics::AnalyticsMetrics;
+use crate::analytics_processor::AnalyticsProcessor;
+use crate::handlers::checkpoint_handler::CheckpointHandler;
+use crate::handlers::df_handler::DynamicFieldHandler;
+use crate::handlers::event_handler::EventHandler;
+use crate::handlers::move_call_handler::MoveCallHandler;
+use crate::handlers::object_handler::ObjectHandler;
+use crate::handlers::package_handler::PackageHandler;
+use crate::handlers::transaction_handler::TransactionHandler;
+use crate::handlers::transaction_objects_handler::TransactionObjectsHandler;
+use crate::handlers::wrapped_object_handler::WrappedObjectHandler;
+use crate::handlers::AnalyticsHandler;
+use crate::tables::{
+    CheckpointEntry, DynamicFieldEntry, EventEntry, InputObjectKind, MoveCallEntry,
+    MovePackageEntry, ObjectEntry, ObjectStatus, OwnerType, TransactionEntry,
+    TransactionObjectEntry, WrappedObjectEntry,
+};
+use crate::writers::csv_writer::CSVWriter;
+use crate::writers::parquet_writer::ParquetWriter;
+use crate::writers::AnalyticsWriter;
 
 pub mod analytics_metrics;
 pub mod analytics_processor;
@@ -115,10 +111,20 @@ pub struct AnalyticsIndexerConfig {
     // Type of data to write i.e. checkpoint, object, transaction, etc
     #[clap(long, value_enum, long, global = true)]
     pub file_type: FileType,
-    #[clap(long, default_value = "https://checkpoints.mainnet.sui.io", global = true)]
+    #[clap(
+        long,
+        default_value = "https://checkpoints.mainnet.sui.io",
+        global = true
+    )]
     pub remote_store_url: String,
     // Directory to contain the package cache for pipelines
-    #[clap(long, value_enum, long, global = true, default_value = "/opt/sui/db/package_cache")]
+    #[clap(
+        long,
+        value_enum,
+        long,
+        global = true,
+        default_value = "/opt/sui/db/package_cache"
+    )]
     pub package_cache_path: PathBuf,
     #[clap(long, default_value = None, global = true)]
     pub bq_service_account_key_file: Option<String>,
@@ -188,7 +194,10 @@ impl SnowflakeMaxCheckpointReader {
             passwd,
         )
         .expect("Failed to build sf api client");
-        Ok(SnowflakeMaxCheckpointReader { query: format!("SELECT max({}) from {}", col_id, table_id), api })
+        Ok(SnowflakeMaxCheckpointReader {
+            query: format!("SELECT max({}) from {}", col_id, table_id),
+            api,
+        })
     }
 }
 
@@ -200,7 +209,10 @@ impl MaxCheckpointReader for SnowflakeMaxCheckpointReader {
             QueryResult::Arrow(a) => {
                 if let Some(record_batch) = a.first() {
                     let col = record_batch.column(0);
-                    let col_array = col.as_any().downcast_ref::<Int32Array>().expect("Failed to downcast arrow column");
+                    let col_array = col
+                        .as_any()
+                        .downcast_ref::<Int32Array>()
+                        .expect("Failed to downcast arrow column");
                     Ok(col_array.value(0) as i64)
                 } else {
                     Ok(-1)
@@ -227,7 +239,10 @@ impl BQMaxCheckpointReader {
         col_id: &str,
     ) -> anyhow::Result<Self> {
         Ok(BQMaxCheckpointReader {
-            query: format!("SELECT max({}) from `{}.{}.{}`", col_id, project_id, dataset_id, table_id),
+            query: format!(
+                "SELECT max({}) from `{}.{}.{}`",
+                col_id, project_id, dataset_id, table_id
+            ),
             client: Client::from_service_account_key_file(key_path).await?,
             project_id: project_id.to_string(),
         })
@@ -237,7 +252,11 @@ impl BQMaxCheckpointReader {
 #[async_trait::async_trait]
 impl MaxCheckpointReader for BQMaxCheckpointReader {
     async fn max_checkpoint(&self) -> Result<i64> {
-        let mut result = self.client.job().query(&self.project_id, QueryRequest::new(&self.query)).await?;
+        let mut result = self
+            .client
+            .job()
+            .query(&self.project_id, QueryRequest::new(&self.query))
+            .await?;
         if result.next_row() {
             let max_checkpoint = result.get_i64(0)?.ok_or(anyhow!("No rows returned"))?;
             Ok(max_checkpoint)
@@ -287,7 +306,17 @@ impl FileFormat {
 }
 
 #[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive, EnumIter, ValueEnum,
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    TryFromPrimitive,
+    IntoPrimitive,
+    EnumIter,
+    ValueEnum,
 )]
 #[repr(u8)]
 pub enum FileType {
@@ -317,13 +346,20 @@ impl FileType {
         }
     }
 
-    pub fn file_path(&self, file_format: FileFormat, epoch_num: EpochId, checkpoint_range: Range<u64>) -> Path {
-        self.dir_prefix().child(format!("{}{}", EPOCH_DIR_PREFIX, epoch_num)).child(format!(
-            "{}_{}.{}",
-            checkpoint_range.start,
-            checkpoint_range.end,
-            file_format.file_suffix()
-        ))
+    pub fn file_path(
+        &self,
+        file_format: FileFormat,
+        epoch_num: EpochId,
+        checkpoint_range: Range<u64>,
+    ) -> Path {
+        self.dir_prefix()
+            .child(format!("{}{}", EPOCH_DIR_PREFIX, epoch_num))
+            .child(format!(
+                "{}_{}.{}",
+                checkpoint_range.start,
+                checkpoint_range.end,
+                file_format.file_suffix()
+            ))
     }
 }
 
@@ -435,11 +471,20 @@ impl FileMetadata {
         epoch_num: u64,
         checkpoint_seq_range: Range<u64>,
     ) -> FileMetadata {
-        FileMetadata { file_type, file_format, epoch_num, checkpoint_seq_range }
+        FileMetadata {
+            file_type,
+            file_format,
+            epoch_num,
+            checkpoint_seq_range,
+        }
     }
 
     pub fn file_path(&self) -> Path {
-        self.file_type.file_path(self.file_format, self.epoch_num, self.checkpoint_seq_range.clone())
+        self.file_type.file_path(
+            self.file_format,
+            self.epoch_num,
+            self.checkpoint_seq_range.clone(),
+        )
     }
 }
 
@@ -479,7 +524,10 @@ impl Processor {
             .await?,
         );
 
-        Ok(Processor { processor, starting_checkpoint_seq_num })
+        Ok(Processor {
+            processor,
+            starting_checkpoint_seq_num,
+        })
     }
 
     pub fn last_committed_checkpoint(&self) -> Option<u64> {
@@ -505,35 +553,81 @@ pub async fn read_store_for_checkpoint(
     let epoch_dirs = find_all_dirs_with_epoch_prefix(&remote_object_store, Some(&prefix)).await?;
     let epoch = epoch_dirs.last_key_value().map(|(k, _v)| *k).unwrap_or(0);
     let epoch_prefix = prefix.child(format!("epoch_{}", epoch));
-    let checkpoints = find_all_files_with_epoch_prefix(&remote_object_store, Some(&epoch_prefix)).await?;
-    let next_checkpoint_seq_num = checkpoints.iter().max_by(|x, y| x.end.cmp(&y.end)).map(|r| r.end).unwrap_or(0);
+    let checkpoints =
+        find_all_files_with_epoch_prefix(&remote_object_store, Some(&epoch_prefix)).await?;
+    let next_checkpoint_seq_num = checkpoints
+        .iter()
+        .max_by(|x, y| x.end.cmp(&y.end))
+        .map(|r| r.end)
+        .unwrap_or(0);
     Ok(next_checkpoint_seq_num)
 }
 
-pub async fn make_max_checkpoint_reader(config: &AnalyticsIndexerConfig) -> Result<Box<dyn MaxCheckpointReader>> {
+pub async fn make_max_checkpoint_reader(
+    config: &AnalyticsIndexerConfig,
+) -> Result<Box<dyn MaxCheckpointReader>> {
     let res: Box<dyn MaxCheckpointReader> = if config.report_bq_max_table_checkpoint {
         Box::new(
             BQMaxCheckpointReader::new(
-                config.bq_service_account_key_file.as_ref().ok_or(anyhow!("Missing gcp key file"))?,
-                config.bq_project_id.as_ref().ok_or(anyhow!("Missing big query project id"))?,
-                config.bq_dataset_id.as_ref().ok_or(anyhow!("Missing big query dataset id"))?,
-                config.bq_table_id.as_ref().ok_or(anyhow!("Missing big query table id"))?,
-                config.bq_checkpoint_col_id.as_ref().ok_or(anyhow!("Missing big query checkpoint col id"))?,
+                config
+                    .bq_service_account_key_file
+                    .as_ref()
+                    .ok_or(anyhow!("Missing gcp key file"))?,
+                config
+                    .bq_project_id
+                    .as_ref()
+                    .ok_or(anyhow!("Missing big query project id"))?,
+                config
+                    .bq_dataset_id
+                    .as_ref()
+                    .ok_or(anyhow!("Missing big query dataset id"))?,
+                config
+                    .bq_table_id
+                    .as_ref()
+                    .ok_or(anyhow!("Missing big query table id"))?,
+                config
+                    .bq_checkpoint_col_id
+                    .as_ref()
+                    .ok_or(anyhow!("Missing big query checkpoint col id"))?,
             )
             .await?,
         )
     } else if config.report_sf_max_table_checkpoint {
         Box::new(
             SnowflakeMaxCheckpointReader::new(
-                config.sf_account_identifier.as_ref().ok_or(anyhow!("Missing sf account identifier"))?,
-                config.sf_warehouse.as_ref().ok_or(anyhow!("Missing sf warehouse"))?,
-                config.sf_database.as_ref().ok_or(anyhow!("Missing sf database"))?,
-                config.sf_schema.as_ref().ok_or(anyhow!("Missing sf schema"))?,
-                config.sf_username.as_ref().ok_or(anyhow!("Missing sf username"))?,
+                config
+                    .sf_account_identifier
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf account identifier"))?,
+                config
+                    .sf_warehouse
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf warehouse"))?,
+                config
+                    .sf_database
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf database"))?,
+                config
+                    .sf_schema
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf schema"))?,
+                config
+                    .sf_username
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf username"))?,
                 config.sf_role.as_ref().ok_or(anyhow!("Missing sf role"))?,
-                config.sf_password.as_ref().ok_or(anyhow!("Missing sf password"))?,
-                config.sf_table_id.as_ref().ok_or(anyhow!("Missing sf table id"))?,
-                config.sf_checkpoint_col_id.as_ref().ok_or(anyhow!("Missing sf checkpoint col id"))?,
+                config
+                    .sf_password
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf password"))?,
+                config
+                    .sf_table_id
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf table id"))?,
+                config
+                    .sf_checkpoint_col_id
+                    .as_ref()
+                    .ok_or(anyhow!("Missing sf checkpoint col id"))?,
             )
             .await?,
         )
@@ -543,10 +637,18 @@ pub async fn make_max_checkpoint_reader(config: &AnalyticsIndexerConfig) -> Resu
     Ok(res)
 }
 
-pub async fn make_checkpoint_processor(config: AnalyticsIndexerConfig, metrics: AnalyticsMetrics) -> Result<Processor> {
+pub async fn make_checkpoint_processor(
+    config: AnalyticsIndexerConfig,
+    metrics: AnalyticsMetrics,
+) -> Result<Processor> {
     let handler: Box<dyn AnalyticsHandler<CheckpointEntry>> = Box::new(CheckpointHandler::new());
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::Checkpoint).await?;
-    let writer = make_writer::<CheckpointEntry>(config.clone(), FileType::Checkpoint, starting_checkpoint_seq_num)?;
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::Checkpoint).await?;
+    let writer = make_writer::<CheckpointEntry>(
+        config.clone(),
+        FileType::Checkpoint,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
     Processor::new::<CheckpointEntry>(
         handler,
@@ -559,10 +661,18 @@ pub async fn make_checkpoint_processor(config: AnalyticsIndexerConfig, metrics: 
     .await
 }
 
-pub async fn make_transaction_processor(config: AnalyticsIndexerConfig, metrics: AnalyticsMetrics) -> Result<Processor> {
+pub async fn make_transaction_processor(
+    config: AnalyticsIndexerConfig,
+    metrics: AnalyticsMetrics,
+) -> Result<Processor> {
     let handler: Box<dyn AnalyticsHandler<TransactionEntry>> = Box::new(TransactionHandler::new());
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::Transaction).await?;
-    let writer = make_writer::<TransactionEntry>(config.clone(), FileType::Transaction, starting_checkpoint_seq_num)?;
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::Transaction).await?;
+    let writer = make_writer::<TransactionEntry>(
+        config.clone(),
+        FileType::Transaction,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
     Processor::new::<TransactionEntry>(
         handler,
@@ -575,24 +685,56 @@ pub async fn make_transaction_processor(config: AnalyticsIndexerConfig, metrics:
     .await
 }
 
-pub async fn make_object_processor(config: AnalyticsIndexerConfig, metrics: AnalyticsMetrics) -> Result<Processor> {
-    let handler: Box<dyn AnalyticsHandler<ObjectEntry>> =
-        Box::new(ObjectHandler::new(&config.package_cache_path, &config.rest_url, &config.package_id_filter));
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::Object).await?;
-    let writer = make_writer::<ObjectEntry>(config.clone(), FileType::Object, starting_checkpoint_seq_num)?;
+pub async fn make_object_processor(
+    config: AnalyticsIndexerConfig,
+    metrics: AnalyticsMetrics,
+) -> Result<Processor> {
+    let handler: Box<dyn AnalyticsHandler<ObjectEntry>> = Box::new(ObjectHandler::new(
+        &config.package_cache_path,
+        &config.rest_url,
+        &config.package_id_filter,
+    ));
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::Object).await?;
+    let writer = make_writer::<ObjectEntry>(
+        config.clone(),
+        FileType::Object,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
-    Processor::new::<ObjectEntry>(handler, writer, max_checkpoint_reader, starting_checkpoint_seq_num, metrics, config)
-        .await
+    Processor::new::<ObjectEntry>(
+        handler,
+        writer,
+        max_checkpoint_reader,
+        starting_checkpoint_seq_num,
+        metrics,
+        config,
+    )
+    .await
 }
 
-pub async fn make_event_processor(config: AnalyticsIndexerConfig, metrics: AnalyticsMetrics) -> Result<Processor> {
-    let handler: Box<dyn AnalyticsHandler<EventEntry>> =
-        Box::new(EventHandler::new(&config.package_cache_path, &config.rest_url));
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::Event).await?;
-    let writer = make_writer::<EventEntry>(config.clone(), FileType::Event, starting_checkpoint_seq_num)?;
+pub async fn make_event_processor(
+    config: AnalyticsIndexerConfig,
+    metrics: AnalyticsMetrics,
+) -> Result<Processor> {
+    let handler: Box<dyn AnalyticsHandler<EventEntry>> = Box::new(EventHandler::new(
+        &config.package_cache_path,
+        &config.rest_url,
+    ));
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::Event).await?;
+    let writer =
+        make_writer::<EventEntry>(config.clone(), FileType::Event, starting_checkpoint_seq_num)?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
-    Processor::new::<EventEntry>(handler, writer, max_checkpoint_reader, starting_checkpoint_seq_num, metrics, config)
-        .await
+    Processor::new::<EventEntry>(
+        handler,
+        writer,
+        max_checkpoint_reader,
+        starting_checkpoint_seq_num,
+        metrics,
+        config,
+    )
+    .await
 }
 
 pub async fn make_transaction_objects_processor(
@@ -602,7 +744,11 @@ pub async fn make_transaction_objects_processor(
     let starting_checkpoint_seq_num =
         get_starting_checkpoint_seq_num(config.clone(), FileType::TransactionObjects).await?;
     let handler = Box::new(TransactionObjectsHandler::new());
-    let writer = make_writer(config.clone(), FileType::TransactionObjects, starting_checkpoint_seq_num)?;
+    let writer = make_writer(
+        config.clone(),
+        FileType::TransactionObjects,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
     Processor::new::<TransactionObjectEntry>(
         handler,
@@ -620,8 +766,13 @@ pub async fn make_move_package_processor(
     metrics: AnalyticsMetrics,
 ) -> Result<Processor> {
     let handler: Box<dyn AnalyticsHandler<MovePackageEntry>> = Box::new(PackageHandler::new());
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::MovePackage).await?;
-    let writer = make_writer::<MovePackageEntry>(config.clone(), FileType::MovePackage, starting_checkpoint_seq_num)?;
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::MovePackage).await?;
+    let writer = make_writer::<MovePackageEntry>(
+        config.clone(),
+        FileType::MovePackage,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
     Processor::new::<MovePackageEntry>(
         handler,
@@ -634,23 +785,45 @@ pub async fn make_move_package_processor(
     .await
 }
 
-pub async fn make_move_call_processor(config: AnalyticsIndexerConfig, metrics: AnalyticsMetrics) -> Result<Processor> {
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::MoveCall).await?;
+pub async fn make_move_call_processor(
+    config: AnalyticsIndexerConfig,
+    metrics: AnalyticsMetrics,
+) -> Result<Processor> {
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::MoveCall).await?;
     let handler: Box<dyn AnalyticsHandler<MoveCallEntry>> = Box::new(MoveCallHandler::new());
-    let writer = make_writer::<MoveCallEntry>(config.clone(), FileType::MoveCall, starting_checkpoint_seq_num)?;
+    let writer = make_writer::<MoveCallEntry>(
+        config.clone(),
+        FileType::MoveCall,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
-    Processor::new::<MoveCallEntry>(handler, writer, max_checkpoint_reader, starting_checkpoint_seq_num, metrics, config)
-        .await
+    Processor::new::<MoveCallEntry>(
+        handler,
+        writer,
+        max_checkpoint_reader,
+        starting_checkpoint_seq_num,
+        metrics,
+        config,
+    )
+    .await
 }
 
 pub async fn make_dynamic_field_processor(
     config: AnalyticsIndexerConfig,
     metrics: AnalyticsMetrics,
 ) -> Result<Processor> {
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::DynamicField).await?;
-    let handler: Box<dyn AnalyticsHandler<DynamicFieldEntry>> =
-        Box::new(DynamicFieldHandler::new(&config.package_cache_path, &config.rest_url));
-    let writer = make_writer::<DynamicFieldEntry>(config.clone(), FileType::DynamicField, starting_checkpoint_seq_num)?;
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::DynamicField).await?;
+    let handler: Box<dyn AnalyticsHandler<DynamicFieldEntry>> = Box::new(DynamicFieldHandler::new(
+        &config.package_cache_path,
+        &config.rest_url,
+    ));
+    let writer = make_writer::<DynamicFieldEntry>(
+        config.clone(),
+        FileType::DynamicField,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
     Processor::new::<DynamicFieldEntry>(
         handler,
@@ -667,11 +840,16 @@ pub async fn make_wrapped_object_processor(
     config: AnalyticsIndexerConfig,
     metrics: AnalyticsMetrics,
 ) -> Result<Processor> {
-    let starting_checkpoint_seq_num = get_starting_checkpoint_seq_num(config.clone(), FileType::WrappedObject).await?;
-    let handler: Box<dyn AnalyticsHandler<WrappedObjectEntry>> =
-        Box::new(WrappedObjectHandler::new(&config.package_cache_path, &config.rest_url));
-    let writer =
-        make_writer::<WrappedObjectEntry>(config.clone(), FileType::WrappedObject, starting_checkpoint_seq_num)?;
+    let starting_checkpoint_seq_num =
+        get_starting_checkpoint_seq_num(config.clone(), FileType::WrappedObject).await?;
+    let handler: Box<dyn AnalyticsHandler<WrappedObjectEntry>> = Box::new(
+        WrappedObjectHandler::new(&config.package_cache_path, &config.rest_url),
+    );
+    let writer = make_writer::<WrappedObjectEntry>(
+        config.clone(),
+        FileType::WrappedObject,
+        starting_checkpoint_seq_num,
+    )?;
     let max_checkpoint_reader = make_max_checkpoint_reader(&config).await?;
     Processor::new::<WrappedObjectEntry>(
         handler,
@@ -690,23 +868,40 @@ pub fn make_writer<S: Serialize + ParquetSchema>(
     starting_checkpoint_seq_num: u64,
 ) -> Result<Box<dyn AnalyticsWriter<S>>> {
     Ok(match config.file_format {
-        FileFormat::CSV => Box::new(CSVWriter::new(&config.checkpoint_dir, file_type, starting_checkpoint_seq_num)?),
-        FileFormat::PARQUET => {
-            Box::new(ParquetWriter::new(&config.checkpoint_dir, file_type, starting_checkpoint_seq_num)?)
-        }
+        FileFormat::CSV => Box::new(CSVWriter::new(
+            &config.checkpoint_dir,
+            file_type,
+            starting_checkpoint_seq_num,
+        )?),
+        FileFormat::PARQUET => Box::new(ParquetWriter::new(
+            &config.checkpoint_dir,
+            file_type,
+            starting_checkpoint_seq_num,
+        )?),
     })
 }
 
-pub async fn get_starting_checkpoint_seq_num(config: AnalyticsIndexerConfig, file_type: FileType) -> Result<u64> {
+pub async fn get_starting_checkpoint_seq_num(
+    config: AnalyticsIndexerConfig,
+    file_type: FileType,
+) -> Result<u64> {
     let checkpoint = if let Some(starting_checkpoint_seq_num) = config.starting_checkpoint_seq_num {
         starting_checkpoint_seq_num
     } else {
-        read_store_for_checkpoint(config.remote_store_config.clone(), file_type, config.remote_store_path_prefix).await?
+        read_store_for_checkpoint(
+            config.remote_store_config.clone(),
+            file_type,
+            config.remote_store_path_prefix,
+        )
+        .await?
     };
     Ok(checkpoint)
 }
 
-pub async fn make_analytics_processor(config: AnalyticsIndexerConfig, metrics: AnalyticsMetrics) -> Result<Processor> {
+pub async fn make_analytics_processor(
+    config: AnalyticsIndexerConfig,
+    metrics: AnalyticsMetrics,
+) -> Result<Processor> {
     match config.file_type {
         FileType::Checkpoint => make_checkpoint_processor(config, metrics).await,
         FileType::Object => make_object_processor(config, metrics).await,

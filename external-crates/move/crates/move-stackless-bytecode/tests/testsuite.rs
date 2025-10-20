@@ -13,7 +13,9 @@ use move_stackless_bytecode::{
     clean_and_optimize::CleanAndOptimizeProcessor,
     eliminate_imm_refs::EliminateImmRefsProcessor,
     escape_analysis::EscapeAnalysisProcessor,
-    function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder, ProcessorResultDisplay},
+    function_target_pipeline::{
+        FunctionTargetPipeline, FunctionTargetsHolder, ProcessorResultDisplay,
+    },
     livevar_analysis::LiveVarAnalysisProcessor,
     memory_instrumentation::MemoryInstrumentationProcessor,
     mut_ref_instrumentation::MutRefInstrumenter,
@@ -23,7 +25,9 @@ use move_stackless_bytecode::{
 };
 use std::path::Path;
 
-fn get_tested_transformation_pipeline(dir_name: &str) -> anyhow::Result<Option<FunctionTargetPipeline>> {
+fn get_tested_transformation_pipeline(
+    dir_name: &str,
+) -> anyhow::Result<Option<FunctionTargetPipeline>> {
     match dir_name {
         "from_move" => Ok(None),
         "eliminate_imm_refs" => {
@@ -96,7 +100,10 @@ fn get_tested_transformation_pipeline(dir_name: &str) -> anyhow::Result<Option<F
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             Ok(Some(pipeline))
         }
-        _ => Err(anyhow!("the sub-directory `{}` has no associated pipeline to test", dir_name)),
+        _ => Err(anyhow!(
+            "the sub-directory `{}` has no associated pipeline to test",
+            dir_name
+        )),
     }
 }
 
@@ -104,7 +111,11 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let mut sources = extract_test_directives(path, "// dep:")?;
     sources.push(path.to_string_lossy().to_string());
     let env: GlobalEnv = run_model_builder_with_options(
-        vec![PackagePaths { name: None, paths: sources, named_address_map: move_stdlib::move_stdlib_named_addresses() }],
+        vec![PackagePaths {
+            name: None,
+            paths: sources,
+            named_address_map: move_stdlib::move_stdlib_named_addresses(),
+        }],
         vec![],
         ModelBuilderOptions::default(),
         Some(WarningFiltersBuilder::unused_warnings_filter_for_test()),
@@ -114,7 +125,10 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         env.report_diag(&mut error_writer, Severity::Error);
         String::from_utf8_lossy(&error_writer.into_inner()).to_string()
     } else {
-        let options = ProverOptions { stable_test_output: true, ..Default::default() };
+        let options = ProverOptions {
+            stable_test_output: true,
+            ..Default::default()
+        };
         env.set_extension(options);
         let dir_name = path
             .parent()
@@ -138,9 +152,18 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             pipeline.run(&env, &mut targets);
             let processor = pipeline.last_processor();
             if !processor.is_single_run() {
-                text += &print_targets_for_test(&env, &format!("after pipeline `{}`", dir_name), &targets);
+                text += &print_targets_for_test(
+                    &env,
+                    &format!("after pipeline `{}`", dir_name),
+                    &targets,
+                );
             }
-            text += &ProcessorResultDisplay { env: &env, targets: &targets, processor }.to_string();
+            text += &ProcessorResultDisplay {
+                env: &env,
+                targets: &targets,
+                processor,
+            }
+            .to_string();
         }
         // add Warning and Error diagnostics to output
         let mut error_writer = Buffer::no_color();

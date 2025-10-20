@@ -33,7 +33,12 @@ impl CertificateDenyConfig {
     }
 
     pub fn certificate_deny_set(&self) -> &HashSet<TransactionDigest> {
-        self.certificate_deny_set.get_or_init(|| self.certificate_deny_list.iter().cloned().collect::<HashSet<_>>())
+        self.certificate_deny_set.get_or_init(|| {
+            self.certificate_deny_list
+                .iter()
+                .cloned()
+                .collect::<HashSet<_>>()
+        })
     }
 }
 

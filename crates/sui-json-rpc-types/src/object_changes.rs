@@ -6,11 +6,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt::{Display, Formatter, Result};
-use sui_types::{
-    base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    object::Owner,
-    sui_serde::{SequenceNumber as AsSequenceNumber, SuiStructTag},
-};
+use sui_types::base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber, SuiAddress};
+use sui_types::object::Owner;
+use sui_types::sui_serde::SequenceNumber as AsSequenceNumber;
+use sui_types::sui_serde::SuiStructTag;
 
 /// ObjectChange are derived from the object mutations in the TransactionEffect to provide richer object information.
 #[serde_as]
@@ -112,29 +111,59 @@ impl ObjectChange {
 
     pub fn object_ref(&self) -> ObjectRef {
         match self {
-            ObjectChange::Published { package_id, version, digest, .. } => (*package_id, *version, *digest),
-            ObjectChange::Transferred { object_id, version, digest, .. }
-            | ObjectChange::Mutated { object_id, version, digest, .. }
-            | ObjectChange::Created { object_id, version, digest, .. } => (*object_id, *version, *digest),
-            ObjectChange::Deleted { object_id, version, .. } => {
-                (*object_id, *version, ObjectDigest::OBJECT_DIGEST_DELETED)
+            ObjectChange::Published {
+                package_id,
+                version,
+                digest,
+                ..
+            } => (*package_id, *version, *digest),
+            ObjectChange::Transferred {
+                object_id,
+                version,
+                digest,
+                ..
             }
-            ObjectChange::Wrapped { object_id, version, .. } => {
-                (*object_id, *version, ObjectDigest::OBJECT_DIGEST_WRAPPED)
+            | ObjectChange::Mutated {
+                object_id,
+                version,
+                digest,
+                ..
             }
+            | ObjectChange::Created {
+                object_id,
+                version,
+                digest,
+                ..
+            } => (*object_id, *version, *digest),
+            ObjectChange::Deleted {
+                object_id, version, ..
+            } => (*object_id, *version, ObjectDigest::OBJECT_DIGEST_DELETED),
+            ObjectChange::Wrapped {
+                object_id, version, ..
+            } => (*object_id, *version, ObjectDigest::OBJECT_DIGEST_WRAPPED),
         }
     }
 
     pub fn mask_for_test(&mut self, new_version: SequenceNumber, new_digest: ObjectDigest) {
         match self {
-            ObjectChange::Published { version, digest, .. }
-            | ObjectChange::Transferred { version, digest, .. }
-            | ObjectChange::Mutated { version, digest, .. }
-            | ObjectChange::Created { version, digest, .. } => {
+            ObjectChange::Published {
+                version, digest, ..
+            }
+            | ObjectChange::Transferred {
+                version, digest, ..
+            }
+            | ObjectChange::Mutated {
+                version, digest, ..
+            }
+            | ObjectChange::Created {
+                version, digest, ..
+            } => {
                 *version = new_version;
                 *digest = new_digest
             }
-            ObjectChange::Deleted { version, .. } | ObjectChange::Wrapped { version, .. } => *version = new_version,
+            ObjectChange::Deleted { version, .. } | ObjectChange::Wrapped { version, .. } => {
+                *version = new_version
+            }
         }
     }
 }
@@ -142,7 +171,12 @@ impl ObjectChange {
 impl Display for ObjectChange {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            ObjectChange::Published { package_id, version, digest, modules } => {
+            ObjectChange::Published {
+                package_id,
+                version,
+                digest,
+                modules,
+            } => {
                 write!(
                     f,
                     " ┌──\n │ PackageID: {} \n │ Version: {} \n │ Digest: {}\n │ Modules: {}\n └──",
@@ -152,41 +186,67 @@ impl Display for ObjectChange {
                     modules.join(", ")
                 )
             }
-            ObjectChange::Transferred { sender, recipient, object_type, object_id, version, digest } => {
+            ObjectChange::Transferred {
+                sender,
+                recipient,
+                object_type,
+                object_id,
+                version,
+                digest,
+            } => {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ Recipient: {}\n │ ObjectType: {} \n │ Version: {}\n │ Digest: {}\n └──",
                     object_id, sender, recipient, object_type, u64::from(*version), digest
                 )
             }
-            ObjectChange::Mutated { sender, owner, object_type, object_id, version, previous_version: _, digest } => {
+            ObjectChange::Mutated {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                previous_version: _,
+                digest,
+            } => {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ Owner: {}\n │ ObjectType: {} \n │ Version: {}\n │ Digest: {}\n └──",
                     object_id, sender, owner, object_type, u64::from(*version), digest
                 )
             }
-            ObjectChange::Deleted { sender, object_type, object_id, version } => {
+            ObjectChange::Deleted {
+                sender,
+                object_type,
+                object_id,
+                version,
+            } => {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ ObjectType: {} \n │ Version: {}\n └──",
-                    object_id,
-                    sender,
-                    object_type,
-                    u64::from(*version)
+                    object_id, sender, object_type, u64::from(*version)
                 )
             }
-            ObjectChange::Wrapped { sender, object_type, object_id, version } => {
+            ObjectChange::Wrapped {
+                sender,
+                object_type,
+                object_id,
+                version,
+            } => {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ ObjectType: {} \n │ Version: {}\n └──",
-                    object_id,
-                    sender,
-                    object_type,
-                    u64::from(*version)
+                    object_id, sender, object_type, u64::from(*version)
                 )
             }
-            ObjectChange::Created { sender, owner, object_type, object_id, version, digest } => {
+            ObjectChange::Created {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                digest,
+            } => {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ Owner: {}\n │ ObjectType: {} \n │ Version: {}\n │ Digest: {}\n └──",

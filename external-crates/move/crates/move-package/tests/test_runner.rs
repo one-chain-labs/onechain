@@ -3,15 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail};
-use move_command_line_common::testing::{add_update_baseline_fix, format_diff, read_env_update_baseline};
+use move_command_line_common::testing::{
+    add_update_baseline_fix, format_diff, read_env_update_baseline,
+};
 use move_package::{
-    compilation::{build_plan::BuildPlan, compiled_package::CompiledPackageInfo, model_builder::ModelBuilder},
+    compilation::{
+        build_plan::BuildPlan, compiled_package::CompiledPackageInfo, model_builder::ModelBuilder,
+    },
     package_hooks,
-    package_hooks::{PackageHooks, PackageIdentifier},
+    package_hooks::PackageHooks,
+    package_hooks::PackageIdentifier,
     resolution::resolution_graph::Package,
     source_package::parsed_manifest::{OnChainInfo, PackageDigest, SourceManifest},
-    BuildConfig,
-    ModelConfig,
+    BuildConfig, ModelConfig,
 };
 use move_symbol_pool::Symbol;
 use std::{
@@ -21,14 +25,24 @@ use std::{
 };
 use tempfile::{tempdir, TempDir};
 
-const EXTENSIONS: &[&str] = &["progress", "resolved", "locked", "notlocked", "compiled", "modeled"];
+const EXTENSIONS: &[&str] = &[
+    "progress",
+    "resolved",
+    "locked",
+    "notlocked",
+    "compiled",
+    "modeled",
+];
 
 pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
     if path.iter().any(|part| part == "deps_only") {
         return Ok(());
     }
 
-    let mut tests = EXTENSIONS.iter().filter_map(|kind| Test::from_path_with_kind(path, kind).transpose()).peekable();
+    let mut tests = EXTENSIONS
+        .iter()
+        .filter_map(|kind| Test::from_path_with_kind(path, kind).transpose())
+        .peekable();
 
     if tests.peek().is_none() {
         return Err(anyhow!(
@@ -55,12 +69,19 @@ struct Test<'a> {
 }
 
 impl Test<'_> {
-    fn from_path_with_kind<'p>(toml_path: &'p Path, kind: &str) -> datatest_stable::Result<Option<Test<'p>>> {
+    fn from_path_with_kind<'p>(
+        toml_path: &'p Path,
+        kind: &str,
+    ) -> datatest_stable::Result<Option<Test<'p>>> {
         let expected = toml_path.with_extension(kind);
         if !expected.is_file() {
             Ok(None)
         } else {
-            Ok(Some(Test { toml_path, expected, output_dir: tempdir()? }))
+            Ok(Some(Test {
+                toml_path,
+                expected,
+                output_dir: tempdir()?,
+            }))
         }
     }
 
@@ -90,7 +111,10 @@ impl Test<'_> {
 
     fn output(&self) -> anyhow::Result<String> {
         let Some(ext) = self.expected.extension().and_then(OsStr::to_str) else {
-            bail!("Unexpected snapshot file extension: {:?}", self.expected.extension());
+            bail!(
+                "Unexpected snapshot file extension: {:?}",
+                self.expected.extension()
+            );
         };
 
         let out_path = self.output_dir.path().to_path_buf();
@@ -102,12 +126,15 @@ impl Test<'_> {
             generate_docs: false,
             install_dir: Some(out_path),
             force_recompilation: false,
-            lock_file: ["locked", "notlocked"].contains(&ext).then(|| lock_path.clone()),
+            lock_file: ["locked", "notlocked"]
+                .contains(&ext)
+                .then(|| lock_path.clone()),
             ..Default::default()
         };
 
         let mut progress = Vec::new();
-        let resolved_package = config.resolution_graph_for_package(self.toml_path, None, &mut progress);
+        let resolved_package =
+            config.resolution_graph_for_package(self.toml_path, None, &mut progress);
 
         Ok(match ext {
             "progress" => String::from_utf8(progress)?,
@@ -127,10 +154,13 @@ impl Test<'_> {
             }
 
             "modeled" => {
-                ModelBuilder::create(resolved_package?, ModelConfig {
-                    all_files_as_targets: false,
-                    target_filter: None,
-                })
+                ModelBuilder::create(
+                    resolved_package?,
+                    ModelConfig {
+                        all_files_as_targets: false,
+                        target_filter: None,
+                    },
+                )
                 .build_model()?;
                 "Built model\n".to_string()
             }
@@ -173,11 +203,18 @@ impl PackageHooks for TestHooks {
         vec!["test_hooks_field".to_owned(), "version".to_owned()]
     }
 
-    fn resolve_on_chain_dependency(&self, dep_name: Symbol, info: &OnChainInfo) -> anyhow::Result<()> {
+    fn resolve_on_chain_dependency(
+        &self,
+        dep_name: Symbol,
+        info: &OnChainInfo,
+    ) -> anyhow::Result<()> {
         bail!("TestHooks resolve dep {:?} = {:?}", dep_name, info.id,)
     }
 
-    fn custom_resolve_pkg_id(&self, manifest: &SourceManifest) -> anyhow::Result<PackageIdentifier> {
+    fn custom_resolve_pkg_id(
+        &self,
+        manifest: &SourceManifest,
+    ) -> anyhow::Result<PackageIdentifier> {
         let name = manifest.package.name.to_string();
         if name.ends_with("-rename") {
             Ok(Symbol::from(name.replace("-rename", "-resolved")))
@@ -187,7 +224,11 @@ impl PackageHooks for TestHooks {
     }
 
     fn resolve_version(&self, manifest: &SourceManifest) -> anyhow::Result<Option<Symbol>> {
-        Ok(manifest.package.custom_properties.get(&Symbol::from("version")).map(|v| Symbol::from(v.as_ref())))
+        Ok(manifest
+            .package
+            .custom_properties
+            .get(&Symbol::from("version"))
+            .map(|v| Symbol::from(v.as_ref())))
     }
 }
 

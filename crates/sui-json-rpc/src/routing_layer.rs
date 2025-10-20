@@ -15,7 +15,11 @@ impl RpcRouter {
     pub fn new(routes: HashMap<String, MethodRouting>, disable_routing: bool) -> Self {
         let route_to_methods = routes.values().map(|v| v.route_to.clone()).collect();
 
-        Self { routes, route_to_methods, disable_routing }
+        Self {
+            routes,
+            route_to_methods,
+            disable_routing,
+        }
     }
 
     pub fn route<'c, 'a: 'c, 'b: 'c>(&'a self, method: &'b str, version: Option<&str>) -> &'c str {

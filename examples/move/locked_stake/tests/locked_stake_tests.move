@@ -5,7 +5,7 @@
 module locked_stake::locked_stake_tests;
 
 use locked_stake::{epoch_time_lock, locked_stake as ls};
-use one::{balance, coin, test_scenario, test_utils::{assert_eq, destroy}, vec_map};
+use sui::{balance, coin, test_scenario, test_utils::{assert_eq, destroy}, vec_map};
 use one_system::{
     governance_test_utils::{advance_epoch, set_up_sui_system_state},
     one_system::{Self, SuiSystemState}

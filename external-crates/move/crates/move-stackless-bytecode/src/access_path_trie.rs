@@ -45,11 +45,17 @@ pub struct AccessPathTrie<T: FootprintDomain>(MapDomain<Root, TrieNode<T>>);
 
 impl<T: FootprintDomain> TrieNode<T> {
     pub fn new(data: T) -> Self {
-        TrieNode { data: Some(data), children: MapDomain::default() }
+        TrieNode {
+            data: Some(data),
+            children: MapDomain::default(),
+        }
     }
 
     pub fn new_opt(data: Option<T>) -> Self {
-        TrieNode { data, children: MapDomain::default() }
+        TrieNode {
+            data,
+            children: MapDomain::default(),
+        }
     }
 
     /// Like join, but gracefully handles `Non` data fields by treating None as Bottom
@@ -140,7 +146,10 @@ impl<T: FootprintDomain> TrieNode<T> {
         let mut acc = Self::new_opt(self.data);
         for (mut k, v) in self.children.into_iter() {
             k.substitute_footprint(type_actuals);
-            acc.children.insert_join(k, v.substitute_footprint(actuals, type_actuals, func_env, sub_map, sub_data));
+            acc.children.insert_join(
+                k,
+                v.substitute_footprint(actuals, type_actuals, func_env, sub_map, sub_data),
+            );
         }
         acc
     }
@@ -316,7 +325,12 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
     /// If `weak_update` is false, attempt to replace the old value with `new_node`.
     /// However, this may still result in a weak update if `ap` does not permit a strong
     /// update (e.g., if it contains a vector index)
-    fn update_access_path_(&mut self, ap: AccessPath, new_node: TrieNode<T>, mut weak_update: bool) {
+    fn update_access_path_(
+        &mut self,
+        ap: AccessPath,
+        new_node: TrieNode<T>,
+        mut weak_update: bool,
+    ) {
         let (root, offsets) = ap.into();
         let needs_weak_update = match &root {
             // local base. strong update possible because of Move aliasing semantics
@@ -348,7 +362,12 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
     }
 
     /// Bind `node` to `local_index` in the trie, overwriting the old value of `local_index`
-    pub fn bind_local_node(&mut self, local_index: TempIndex, node: TrieNode<T>, fun_env: &FunctionEnv) {
+    pub fn bind_local_node(
+        &mut self,
+        local_index: TempIndex,
+        node: TrieNode<T>,
+        fun_env: &FunctionEnv,
+    ) {
         self.bind_node(Root::from_index(local_index, fun_env), node);
     }
 
@@ -374,11 +393,16 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
 
     /// Retrieve the data associated with `local_index` in the trie. Returns `None` if there is no associated data
     pub fn get_local(&self, local_index: TempIndex, fun_env: &FunctionEnv) -> Option<&T> {
-        self.get_local_node(local_index, fun_env).and_then(|n| n.data.as_ref())
+        self.get_local_node(local_index, fun_env)
+            .and_then(|n| n.data.as_ref())
     }
 
     /// Retrieve the node associated with `local_index` in the trie. Returns `None` if there is no associated node
-    pub fn get_local_node(&self, local_index: TempIndex, fun_env: &FunctionEnv) -> Option<&TrieNode<T>> {
+    pub fn get_local_node(
+        &self,
+        local_index: TempIndex,
+        fun_env: &FunctionEnv,
+    ) -> Option<&TrieNode<T>> {
         self.0.get(&Root::from_index(local_index, fun_env))
     }
 
@@ -430,7 +454,14 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
         sub_map: &dyn AccessPathMap<AbsAddr>,
     ) -> Self {
         // TODO: is there a less hacky way to do this?
-        fn no_op<T>(_: &mut T, _: &[TempIndex], _: &[Type], _: &FunctionEnv, _: &dyn AccessPathMap<AbsAddr>) {}
+        fn no_op<T>(
+            _: &mut T,
+            _: &[TempIndex],
+            _: &[Type],
+            _: &FunctionEnv,
+            _: &dyn AccessPathMap<AbsAddr>,
+        ) {
+        }
         self.substitute_footprint(actuals, type_actuals, func_env, sub_map, no_op)
     }
 
@@ -443,7 +474,10 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
         sub_map: &dyn AccessPathMap<AbsAddr>,
         env: &GlobalEnv,
     ) -> Self {
-        let types = type_actuals.iter().map(|t| Type::from_type_tag(t, env)).collect::<Vec<Type>>();
+        let types = type_actuals
+            .iter()
+            .map(|t| Type::from_type_tag(t, env))
+            .collect::<Vec<Type>>();
         self.substitute_footprint_skip_data(actuals, &types, func_env, sub_map)
     }
 
@@ -515,7 +549,10 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
 
 impl<T: FootprintDomain> Default for TrieNode<T> {
     fn default() -> Self {
-        TrieNode { data: None, children: MapDomain::default() }
+        TrieNode {
+            data: None,
+            children: MapDomain::default(),
+        }
     }
 }
 
@@ -546,7 +583,8 @@ pub struct AccessPathTrieDisplay<'a, T: FootprintDomain> {
 
 impl<'a, T: FootprintDomain> fmt::Display for AccessPathTrieDisplay<'a, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.t.iter_paths(|path, v| writeln!(f, "{}: {:?}", path.display(self.env), v).unwrap());
+        self.t
+            .iter_paths(|path, v| writeln!(f, "{}: {:?}", path.display(self.env), v).unwrap());
         Ok(())
     }
 }

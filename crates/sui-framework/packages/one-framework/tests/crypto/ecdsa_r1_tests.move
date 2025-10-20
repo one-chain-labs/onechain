@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::ecdsa_r1_tests {
-    use one::ecdsa_r1;
+module oct::ecdsa_r1_tests {
+    use sui::ecdsa_r1;
 
     #[test]
     fun test_ecrecover_pubkey() {

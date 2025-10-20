@@ -1,18 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{workloads::Gas, ValidatorProxy};
+use crate::workloads::Gas;
+use crate::ValidatorProxy;
 use anyhow::Result;
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
+use std::sync::Arc;
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore};
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{ObjectRef, SuiAddress},
-    crypto::{AccountKeyPair, KeypairTraits, SuiKeyPair},
-    object::Owner,
-    transaction::{Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
-    utils::to_sender_signed_transaction,
-};
+use sui_types::base_types::ObjectRef;
+use sui_types::crypto::{AccountKeyPair, KeypairTraits};
+use sui_types::object::Owner;
+use sui_types::transaction::{Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER};
+use sui_types::utils::to_sender_signed_transaction;
+use sui_types::{base_types::SuiAddress, crypto::SuiKeyPair};
 
 // This is the maximum gas we will transfer from primary coin into any gas coin
 // for running the benchmark
@@ -58,8 +59,9 @@ pub async fn publish_basics_package(
     keypair: &AccountKeyPair,
     gas_price: u64,
 ) -> ObjectRef {
-    let transaction =
-        TestTransactionBuilder::new(sender, gas, gas_price).publish_examples("basics").build_and_sign(keypair);
+    let transaction = TestTransactionBuilder::new(sender, gas, gas_price)
+        .publish_examples("basics")
+        .build_and_sign(keypair);
     let effects = proxy.execute_transaction_block(transaction).await.unwrap();
     effects
         .created()

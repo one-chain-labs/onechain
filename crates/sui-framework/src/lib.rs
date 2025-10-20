@@ -1,27 +1,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::{binary_config::BinaryConfig, compatibility::Compatibility, CompiledModule};
+use move_binary_format::binary_config::BinaryConfig;
+use move_binary_format::compatibility::Compatibility;
+use move_binary_format::CompiledModule;
 use move_core_types::gas_algebra::InternalGas;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
+use sui_types::base_types::ObjectRef;
+use sui_types::storage::ObjectStore;
 use sui_types::{
-    base_types::{ObjectID, ObjectRef},
+    base_types::ObjectID,
     digests::TransactionDigest,
     move_package::MovePackage,
     object::{Object, OBJECT_START_VERSION},
-    storage::ObjectStore,
-    BRIDGE_PACKAGE_ID,
-    DEEPBOOK_PACKAGE_ID,
-    MOVE_STDLIB_PACKAGE_ID,
-    SUI_FRAMEWORK_PACKAGE_ID,
-    SUI_SYSTEM_PACKAGE_ID,
+    MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID, SUI_SYSTEM_PACKAGE_ID,
 };
+use sui_types::{BRIDGE_PACKAGE_ID, DEEPBOOK_PACKAGE_ID};
 use tracing::error;
 
 /// Represents a system package in the framework, that's built from the source code inside
-/// sui-framework.
+/// one-framework.
 #[derive(Clone, Serialize, PartialEq, Eq, Deserialize)]
 pub struct SystemPackage {
     pub id: ObjectID,
@@ -32,7 +32,11 @@ pub struct SystemPackage {
 impl SystemPackage {
     pub fn new(id: ObjectID, raw_bytes: &'static [u8], dependencies: &[ObjectID]) -> Self {
         let bytes: Vec<Vec<u8>> = bcs::from_bytes(raw_bytes).unwrap();
-        Self { id, bytes, dependencies: dependencies.to_vec() }
+        Self {
+            id,
+            bytes,
+            dependencies: dependencies.to_vec(),
+        }
     }
 
     pub fn id(&self) -> &ObjectID {
@@ -48,11 +52,18 @@ impl SystemPackage {
     }
 
     pub fn modules(&self) -> Vec<CompiledModule> {
-        self.bytes.iter().map(|b| CompiledModule::deserialize_with_defaults(b).unwrap()).collect()
+        self.bytes
+            .iter()
+            .map(|b| CompiledModule::deserialize_with_defaults(b).unwrap())
+            .collect()
     }
 
     pub fn genesis_move_package(&self) -> MovePackage {
-        MovePackage::new_system(OBJECT_START_VERSION, &self.modules(), self.dependencies.iter().copied())
+        MovePackage::new_system(
+            OBJECT_START_VERSION,
+            &self.modules(),
+            self.dependencies.iter().copied(),
+        )
     }
 
     pub fn genesis_object(&self) -> Object {
@@ -97,10 +108,30 @@ impl BuiltInFramework {
         // TODO: Is it possible to derive dependencies from the bytecode instead of manually specifying them?
         define_system_packages!([
             (MOVE_STDLIB_PACKAGE_ID, "move-stdlib", []),
-            (SUI_FRAMEWORK_PACKAGE_ID, "one-framework", [MOVE_STDLIB_PACKAGE_ID]),
-            (SUI_SYSTEM_PACKAGE_ID, "one-system", [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]),
-            (DEEPBOOK_PACKAGE_ID, "deepbook", [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]),
-            (BRIDGE_PACKAGE_ID, "bridge", [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID, SUI_SYSTEM_PACKAGE_ID])
+            (
+                SUI_FRAMEWORK_PACKAGE_ID,
+                "one-framework",
+                [MOVE_STDLIB_PACKAGE_ID]
+            ),
+            (
+                SUI_SYSTEM_PACKAGE_ID,
+                "one-system",
+                [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]
+            ),
+            (
+                DEEPBOOK_PACKAGE_ID,
+                "deepbook",
+                [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]
+            ),
+            (
+                BRIDGE_PACKAGE_ID,
+                "bridge",
+                [
+                    MOVE_STDLIB_PACKAGE_ID,
+                    SUI_FRAMEWORK_PACKAGE_ID,
+                    SUI_SYSTEM_PACKAGE_ID
+                ]
+            )
         ])
         .iter()
     }
@@ -168,7 +199,10 @@ pub async fn compare_system_package<S: ObjectStore>(
     };
 
     let cur_ref = cur_object.compute_object_reference();
-    let cur_pkg = cur_object.data.try_as_package().expect("Framework not package");
+    let cur_pkg = cur_object
+        .data
+        .try_as_package()
+        .expect("Framework not package");
 
     let mut new_object = Object::new_system_package(
         modules,
@@ -185,7 +219,10 @@ pub async fn compare_system_package<S: ObjectStore>(
 
     let compatibility = Compatibility::framework_upgrade_check();
 
-    let new_pkg = new_object.data.try_as_package_mut().expect("Created as package");
+    let new_pkg = new_object
+        .data
+        .try_as_package_mut()
+        .expect("Created as package");
 
     let cur_normalized = match cur_pkg.normalize(binary_config) {
         Ok(v) => v,

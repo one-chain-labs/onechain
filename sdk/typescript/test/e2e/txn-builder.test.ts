@@ -67,7 +67,7 @@ describe('Transaction Builders', () => {
 		const tx = new Transaction();
 		tx.moveCall({
 			target: '0x2::pay::split',
-			typeArguments: ['0x2::oct::OCT'],
+			typeArguments: ['0x2::sui::SUI'],
 			arguments: [tx.object(coin_0.coinObjectId), tx.pure.u64(DEFAULT_GAS_BUDGET * 2)],
 		});
 		await validateTransaction(toolbox.client, toolbox.keypair, tx);
@@ -214,10 +214,10 @@ describe('Transaction Builders', () => {
 
 		tx.moveCall({
 			target: `${packageId}::serializer_tests::none`,
-			typeArguments: ['0x2::coin::Coin<0x2::oct::OCT>'],
+			typeArguments: ['0x2::coin::Coin<0x2::sui::SUI>'],
 			arguments: [
 				tx.object.option({
-					type: '0x2::coin::Coin<0x2::oct::OCT>',
+					type: '0x2::coin::Coin<0x2::sui::SUI>',
 					value: null,
 				}),
 			],
@@ -225,10 +225,10 @@ describe('Transaction Builders', () => {
 		const coin = tx.splitCoins(tx.gas, [1]);
 		const coin2 = tx.moveCall({
 			target: `${packageId}::serializer_tests::some`,
-			typeArguments: ['0x2::coin::Coin<0x2::oct::OCT>'],
+			typeArguments: ['0x2::coin::Coin<0x2::sui::SUI>'],
 			arguments: [
 				tx.object.option({
-					type: '0x2::coin::Coin<0x2::oct::OCT>',
+					type: '0x2::coin::Coin<0x2::sui::SUI>',
 					value: coin,
 				}),
 			],
@@ -236,10 +236,10 @@ describe('Transaction Builders', () => {
 
 		const coin3 = tx.moveCall({
 			target: `${packageId}::serializer_tests::some`,
-			typeArguments: ['0x2::coin::Coin<0x2::oct::OCT>'],
+			typeArguments: ['0x2::coin::Coin<0x2::sui::SUI>'],
 			arguments: [
 				tx.object.option({
-					type: '0x2::coin::Coin<0x2::oct::OCT>',
+					type: '0x2::coin::Coin<0x2::sui::SUI>',
 					value: coin2,
 				}),
 			],

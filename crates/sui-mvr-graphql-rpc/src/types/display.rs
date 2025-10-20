@@ -54,7 +54,9 @@ impl Display {
                 async move {
                     conn.first(move || {
                         use display::dsl;
-                        dsl::display.filter(dsl::object_type.eq(type_.to_canonical_string(/* with_prefix */ true)))
+                        dsl::display.filter(
+                            dsl::object_type.eq(type_.to_canonical_string(/* with_prefix */ true)),
+                        )
                     })
                     .await
                     .optional()
@@ -68,7 +70,10 @@ impl Display {
 
     /// Render the fields defined by this `Display` from the contents of `struct_`.
     pub(crate) fn render(&self, struct_: &MoveStruct) -> Result<Vec<DisplayEntry>, Error> {
-        let event = self.stored.to_display_update_event().map_err(|e| Error::Internal(e.to_string()))?;
+        let event = self
+            .stored
+            .to_display_update_event()
+            .map_err(|e| Error::Internal(e.to_string()))?;
 
         let mut rendered = vec![];
         for entry in event.fields.contents {
@@ -84,11 +89,19 @@ impl Display {
 
 impl DisplayEntry {
     pub(crate) fn create_value(key: String, value: String) -> Self {
-        Self { key, value: Some(value), error: None }
+        Self {
+            key,
+            value: Some(value),
+            error: None,
+        }
     }
 
     pub(crate) fn create_error(key: String, error: String) -> Self {
-        Self { key, value: None, error: Some(error) }
+        Self {
+            key,
+            value: None,
+            error: Some(error),
+        }
     }
 }
 
@@ -152,14 +165,22 @@ pub(crate) fn get_value_from_move_struct(
     // update this as we iterate through the parts
     let start_value = &MoveValue::Struct(move_struct.clone());
 
-    let result = parts.iter().try_fold(start_value, |current_value, part| match current_value {
-        MoveValue::Struct(s) => s
-            .fields
-            .iter()
-            .find_map(|(id, value)| if id.as_str() == *part { Some(value) } else { None })
-            .ok_or_else(|| DisplayRenderError::FieldNotFound(part.to_string())),
-        _ => Err(DisplayRenderError::UnexpectedMoveValue),
-    })?;
+    let result = parts
+        .iter()
+        .try_fold(start_value, |current_value, part| match current_value {
+            MoveValue::Struct(s) => s
+                .fields
+                .iter()
+                .find_map(|(id, value)| {
+                    if id.as_str() == *part {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                })
+                .ok_or_else(|| DisplayRenderError::FieldNotFound(part.to_string())),
+            _ => Err(DisplayRenderError::UnexpectedMoveValue),
+        })?;
 
     // TODO: move off dependency on SuiMoveValue
     let sui_move_value: SuiMoveValue = result.clone().into();

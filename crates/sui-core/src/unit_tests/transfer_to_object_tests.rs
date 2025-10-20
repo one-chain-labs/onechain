@@ -12,15 +12,17 @@ use sui_types::{
     execution_status::{ExecutionFailureStatus, ExecutionStatus},
     object::{Object, Owner},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{CallArg, ObjectArg, ProgrammableTransaction, VerifiedCertificate, TEST_ONLY_GAS_UNIT_FOR_PUBLISH},
+    transaction::{
+        CallArg, ObjectArg, ProgrammableTransaction, VerifiedCertificate,
+        TEST_ONLY_GAS_UNIT_FOR_PUBLISH,
+    },
 };
 
 use crate::{
     authority::{
         authority_test_utils::{certify_transaction, send_consensus},
         authority_tests::{
-            build_programmable_transaction,
-            execute_programmable_transaction,
+            build_programmable_transaction, execute_programmable_transaction,
             execute_programmable_transaction_with_shared,
         },
         move_integration_tests::build_and_publish_test_package_with_upgrade_cap,
@@ -69,7 +71,11 @@ struct TestRunner {
 }
 
 impl TestRunner {
-    pub async fn new_with_objects(base_package_name: &str, num: usize, aggressive_pruning_enabled: bool) -> Self {
+    pub async fn new_with_objects(
+        base_package_name: &str,
+        num: usize,
+        aggressive_pruning_enabled: bool,
+    ) -> Self {
         telemetry_subscribers::init_for_testing();
         let (sender, sender_key): (_, AccountKeyPair) = get_key_pair();
 
@@ -123,7 +129,11 @@ impl TestRunner {
         .unwrap_err()
     }
 
-    pub async fn run_with_gas_object(&mut self, pt: ProgrammableTransaction, idx: usize) -> TransactionEffects {
+    pub async fn run_with_gas_object(
+        &mut self,
+        pt: ProgrammableTransaction,
+        idx: usize,
+    ) -> TransactionEffects {
         let effects = execute_programmable_transaction(
             &self.authority_state,
             &self.gas_object_ids[idx],
@@ -143,8 +153,10 @@ impl TestRunner {
                 .unwrap();
         }
 
-        if let Some(updated_cap) =
-            effects.mutated().into_iter().find_map(|(cap, _)| (cap.0 == self.upgrade_cap.0).then_some(cap))
+        if let Some(updated_cap) = effects
+            .mutated()
+            .into_iter()
+            .find_map(|(cap, _)| (cap.0 == self.upgrade_cap.0).then_some(cap))
         {
             self.upgrade_cap = updated_cap;
         }
@@ -152,7 +164,11 @@ impl TestRunner {
         effects
     }
 
-    pub async fn run_with_gas_object_shared(&mut self, pt: ProgrammableTransaction, idx: usize) -> TransactionEffects {
+    pub async fn run_with_gas_object_shared(
+        &mut self,
+        pt: ProgrammableTransaction,
+        idx: usize,
+    ) -> TransactionEffects {
         let effects = execute_programmable_transaction_with_shared(
             &self.authority_state,
             &self.gas_object_ids[idx],
@@ -172,8 +188,10 @@ impl TestRunner {
                 .unwrap();
         }
 
-        if let Some(updated_cap) =
-            effects.mutated().into_iter().find_map(|(cap, _)| (cap.0 == self.upgrade_cap.0).then_some(cap))
+        if let Some(updated_cap) = effects
+            .mutated()
+            .into_iter()
+            .find_map(|(cap, _)| (cap.0 == self.upgrade_cap.0).then_some(cap))
         {
             self.upgrade_cap = updated_cap;
         }
@@ -200,16 +218,26 @@ impl TestRunner {
         )
         .await
         .unwrap();
-        certify_transaction(&self.authority_state, transaction).await.unwrap()
+        certify_transaction(&self.authority_state, transaction)
+            .await
+            .unwrap()
     }
 
-    pub async fn execute_certificate(&mut self, ct: VerifiedCertificate, shared: bool) -> TransactionEffects {
+    pub async fn execute_certificate(
+        &mut self,
+        ct: VerifiedCertificate,
+        shared: bool,
+    ) -> TransactionEffects {
         let epoch_store = self.authority_state.load_epoch_store_one_call_per_task();
         if shared {
             send_consensus(&self.authority_state, &ct).await;
         }
         // Call `execute_certificate` instead of `execute_certificate_with_execution_error` to make sure we go through TM
-        let effects = self.authority_state.execute_certificate(&ct, &epoch_store).await.unwrap();
+        let effects = self
+            .authority_state
+            .execute_certificate(&ct, &epoch_store)
+            .await
+            .unwrap();
 
         if self.aggressive_pruning_enabled {
             self.authority_state
@@ -222,18 +250,26 @@ impl TestRunner {
     }
 }
 
-fn get_parent_and_child(created: Vec<(ObjectRef, Owner)>) -> ((ObjectRef, Owner), (ObjectRef, Owner)) {
+fn get_parent_and_child(
+    created: Vec<(ObjectRef, Owner)>,
+) -> ((ObjectRef, Owner), (ObjectRef, Owner)) {
     // make sure there is an object with an `AddressOwner` who matches the object ID of another
     // object.
     let created_addrs: HashSet<_> = created.iter().map(|((i, _, _), _)| i).collect();
     let (child, parent_id) = created
         .iter()
         .find_map(|child @ (_, owner)| match owner {
-            Owner::AddressOwner(j) if created_addrs.contains(&ObjectID::from(*j)) => Some((child, (*j).into())),
+            Owner::AddressOwner(j) if created_addrs.contains(&ObjectID::from(*j)) => {
+                Some((child, (*j).into()))
+            }
             _ => None,
         })
         .unwrap();
-    let parent = created.iter().find(|((id, _, _), _)| *id == parent_id).cloned().unwrap();
+    let parent = created
+        .iter()
+        .find(|((id, _, _), _)| *id == parent_id)
+        .cloned()
+        .unwrap();
     (parent, child.clone())
 }
 
@@ -907,7 +943,9 @@ async fn verify_tto_not_locked(
         .lock_and_verify_transaction(
             {
                 let mut builder = ProgrammableTransactionBuilder::new();
-                let parent = builder.obj(ObjectArg::ImmOrOwnedObject(fake_parent.0)).unwrap();
+                let parent = builder
+                    .obj(ObjectArg::ImmOrOwnedObject(fake_parent.0))
+                    .unwrap();
                 let child = builder.obj(ObjectArg::Receiving(child.0)).unwrap();
                 if should_delete {
                     move_call!(builder, (runner.package.0)::M3::deleter(parent, child));
@@ -943,21 +981,28 @@ async fn verify_tto_not_locked(
     // The order of the execution of these transactions is flipped depending on the value of
     // flipper. However, the result should be the same in either case.
     let (valid_effects, invalid_effects) = if flipper {
-        let invalid_effects = runner.execute_certificate(cert_for_fake_parent, false).await;
+        let invalid_effects = runner
+            .execute_certificate(cert_for_fake_parent, false)
+            .await;
         let valid_effects = runner.execute_certificate(valid_cert, false).await;
         (valid_effects, invalid_effects)
     } else {
         let valid_effects = runner.execute_certificate(valid_cert, false).await;
-        let invalid_effects = runner.execute_certificate(cert_for_fake_parent, false).await;
+        let invalid_effects = runner
+            .execute_certificate(cert_for_fake_parent, false)
+            .await;
         (valid_effects, invalid_effects)
     };
 
     assert!(valid_effects.status().is_ok());
     assert!(invalid_effects.status().is_err());
-    assert!(matches!(invalid_effects.status(), ExecutionStatus::Failure {
-        error: ExecutionFailureStatus::MoveAbort(_, _),
-        ..
-    }));
+    assert!(matches!(
+        invalid_effects.status(),
+        ExecutionStatus::Failure {
+            error: ExecutionFailureStatus::MoveAbort(_, _),
+            ..
+        }
+    ));
     (valid_effects, invalid_effects)
 }
 
@@ -965,12 +1010,18 @@ fn assert_effects_equivalent(ef1: &TransactionEffects, ef2: &TransactionEffects)
     assert_eq!(ef1.status(), ef2.status());
     assert_eq!(ef1.executed_epoch(), ef2.executed_epoch());
     assert_eq!(ef1.gas_cost_summary(), ef2.gas_cost_summary());
-    assert_eq!(ef1.modified_at_versions().len(), ef2.modified_at_versions().len());
+    assert_eq!(
+        ef1.modified_at_versions().len(),
+        ef2.modified_at_versions().len()
+    );
     assert_eq!(ef1.created().len(), ef2.created().len());
     assert_eq!(ef1.mutated().len(), ef2.mutated().len());
     assert_eq!(ef1.unwrapped().len(), ef2.unwrapped().len());
     assert_eq!(ef1.deleted().len(), ef2.deleted().len());
-    assert_eq!(ef1.unwrapped_then_deleted().len(), ef2.unwrapped_then_deleted().len());
+    assert_eq!(
+        ef1.unwrapped_then_deleted().len(),
+        ef2.unwrapped_then_deleted().len()
+    );
     assert_eq!(ef1.wrapped().len(), ef2.wrapped().len());
     assert_eq!(ef1.dependencies().len(), ef2.dependencies().len());
 }
@@ -980,14 +1031,18 @@ async fn test_tto_not_locked() {
     for aggressive_pruning_enabled in [true, false] {
         // The transaction effects for the valid and invalid transactions should be the same regardless
         // of the order in which they are run.
-        let (valid1, invalid1) = verify_tto_not_locked(false, false, aggressive_pruning_enabled).await;
-        let (valid2, invalid2) = verify_tto_not_locked(true, false, aggressive_pruning_enabled).await;
+        let (valid1, invalid1) =
+            verify_tto_not_locked(false, false, aggressive_pruning_enabled).await;
+        let (valid2, invalid2) =
+            verify_tto_not_locked(true, false, aggressive_pruning_enabled).await;
         assert_effects_equivalent(&valid1, &valid2);
         assert_effects_equivalent(&invalid1, &invalid2);
 
         // The same should hold if the object is deleted by an intervening transaction.
-        let (valid1, invalid1) = verify_tto_not_locked(false, true, aggressive_pruning_enabled).await;
-        let (valid2, invalid2) = verify_tto_not_locked(true, true, aggressive_pruning_enabled).await;
+        let (valid1, invalid1) =
+            verify_tto_not_locked(false, true, aggressive_pruning_enabled).await;
+        let (valid2, invalid2) =
+            verify_tto_not_locked(true, true, aggressive_pruning_enabled).await;
         assert_effects_equivalent(&valid1, &valid2);
         assert_effects_equivalent(&invalid1, &invalid2);
     }

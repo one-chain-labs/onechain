@@ -1,22 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
+use move_core_types::language_storage::StructTag;
 use serde::{Deserialize, Serialize};
-use std::{fmt, marker::PhantomData, str::FromStr};
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    collection_types::VecMap,
-    dynamic_field::Field,
-    id::{ID, UID},
-    object::{MoveObject, Object},
-    TypeTag,
-};
+use std::fmt;
+use std::marker::PhantomData;
+use std::str::FromStr;
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::collection_types::VecMap;
+use sui_types::dynamic_field::Field;
+use sui_types::id::{ID, UID};
+use sui_types::object::{MoveObject, Object};
+use sui_types::TypeTag;
 
 const NAME_SERVICE_DOMAIN_MODULE: &IdentStr = ident_str!("domain");
 const NAME_SERVICE_DOMAIN_STRUCT: &IdentStr = ident_str!("Domain");
 const LEAF_EXPIRATION_TIMESTAMP: u64 = 0;
-const DEFAULT_TLD: &str = "oct";
+const DEFAULT_TLD: &str = "sui";
 const ACCEPTED_SEPARATORS: [char; 2] = ['.', '*'];
 const SUI_NEW_FORMAT_SEPARATOR: char = '@';
 
@@ -71,7 +73,9 @@ impl Domain {
     /// SAFETY: This is a safe operation because we only allow a
     /// domain's label vector size to be >= 2 (see `Domain::from_str`)
     pub fn parent(&self) -> Domain {
-        Domain { labels: self.labels[0..(self.labels.len() - 1)].to_vec() }
+        Domain {
+            labels: self.labels[0..(self.labels.len() - 1)].to_vec(),
+        }
     }
 
     pub fn is_subdomain(&self) -> bool {
@@ -116,8 +120,16 @@ pub struct NameServiceConfig {
 }
 
 impl NameServiceConfig {
-    pub fn new(package_address: SuiAddress, registry_id: ObjectID, reverse_registry_id: ObjectID) -> Self {
-        Self { package_address, registry_id, reverse_registry_id }
+    pub fn new(
+        package_address: SuiAddress,
+        registry_id: ObjectID,
+        reverse_registry_id: ObjectID,
+    ) -> Self {
+        Self {
+            package_address,
+            registry_id,
+            reverse_registry_id,
+        }
     }
 
     pub fn record_field_id(&self, domain: &Domain) -> ObjectID {
@@ -133,15 +145,22 @@ impl NameServiceConfig {
     }
 
     pub fn reverse_record_field_id(&self, address: &[u8]) -> ObjectID {
-        sui_types::dynamic_field::derive_dynamic_field_id(self.reverse_registry_id, &TypeTag::Address, address).unwrap()
+        sui_types::dynamic_field::derive_dynamic_field_id(
+            self.reverse_registry_id,
+            &TypeTag::Address,
+            address,
+        )
+        .unwrap()
     }
 
     // Create a config based on the package and object ids published on mainnet
     pub fn mainnet() -> Self {
-        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0xb518b15510de80320a046288ca391a2a06b8aa4ca979287549edc123dbe8313f";
-        const MAINNET_NS_REGISTRY_ID: &str = "0x7bd439c354340ced161f29bbd9ee8c4799402fb83ec43eec0277a356e68878cf";
+        const MAINNET_NS_PACKAGE_ADDRESS: &str =
+            "0xd22b24490e0bae52676651b4f56660a5ff8022a2576e0089f79b3c88d44e08f0";
+        const MAINNET_NS_REGISTRY_ID: &str =
+            "0xe64cd9db9f829c6cc405d9790bd71567ae07259855f4fba6f02c84f52298c106";
         const MAINNET_NS_REVERSE_REGISTRY_ID: &str =
-            "0x3040c34cff1bc755e9a58a0b14973648757cbed4826ff2cd8a20df292f3547b7";
+            "0x2fd099e17a292d2bc541df474f9fafa595653848cbabb2d7a4656ec786a1969f";
 
         let package_address = SuiAddress::from_str(MAINNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(MAINNET_NS_REGISTRY_ID).unwrap();
@@ -152,10 +171,12 @@ impl NameServiceConfig {
 
     // Create a config based on the package and object ids published on testnet
     pub fn testnet() -> Self {
-        const TESTNET_NS_PACKAGE_ADDRESS: &str = "0xc0e4184d4e6026206ae6b1fb454d17478ffb5174380707bb37add35610b79b51";
-        const TESTNET_NS_REGISTRY_ID: &str = "0xb01097dfebb8fe21fe91a4502051e94920cc78c5382708271732b430e1af281f";
+        const TESTNET_NS_PACKAGE_ADDRESS: &str =
+            "0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93";
+        const TESTNET_NS_REGISTRY_ID: &str =
+            "0xb120c0d55432630fce61f7854795a3463deb6e3b443cc4ae72e1282073ff56e4";
         const TESTNET_NS_REVERSE_REGISTRY_ID: &str =
-            "0x6f35cfef2e07be3323901211a4e5cdd9ab8fef5274489ca0481ab38a754e0eb4";
+            "0xcee9dbb070db70936c3a374439a6adb16f3ba97eac5468d2e1e6fff6ed93e465";
 
         let package_address = SuiAddress::from_str(TESTNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(TESTNET_NS_REGISTRY_ID).unwrap();
@@ -179,14 +200,20 @@ impl FromStr for Domain {
         const MAX_DOMAIN_LENGTH: usize = 200;
 
         if s.len() > MAX_DOMAIN_LENGTH {
-            return Err(NameServiceError::ExceedsMaxLength(s.len(), MAX_DOMAIN_LENGTH));
+            return Err(NameServiceError::ExceedsMaxLength(
+                s.len(),
+                MAX_DOMAIN_LENGTH,
+            ));
         }
         let separator = separator(s)?;
 
         let formatted_string = convert_from_new_format(s, &separator)?;
 
-        let labels =
-            formatted_string.split(separator).rev().map(validate_label).collect::<Result<Vec<_>, Self::Err>>()?;
+        let labels = formatted_string
+            .split(separator)
+            .rev()
+            .map(validate_label)
+            .collect::<Result<Vec<_>, Self::Err>>()?;
 
         // A valid domain in our system has at least a TLD and an SLD (len == 2).
         if labels.len() < 2 {
@@ -256,7 +283,11 @@ pub fn validate_label(label: &str) -> Result<&str, NameServiceError> {
     let len = bytes.len();
 
     if !(MIN_LABEL_LENGTH..=MAX_LABEL_LENGTH).contains(&len) {
-        return Err(NameServiceError::InvalidLength(len, MIN_LABEL_LENGTH, MAX_LABEL_LENGTH));
+        return Err(NameServiceError::InvalidLength(
+            len,
+            MIN_LABEL_LENGTH,
+            MAX_LABEL_LENGTH,
+        ));
     }
 
     for (i, character) in bytes.iter().enumerate() {

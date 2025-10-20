@@ -1,5 +1,11 @@
 # Change Log
 
+## 1.2.0
+
+### Minor Changes
+
+- ad24b95: Verify hex string is valid hex in `fromHex`
+
 ## 1.1.1
 
 ### Patch Changes
@@ -141,7 +147,7 @@
   (`stake_amount`, `pending_stake`, and `pending_withdraw`) and renamed `delegation_staking_pool` to
   `staking_pool`. Additionally removed the `validator_stake` and `delegated_stake` fields in the
   `ValidatorSet` type and replaced them with a `total_stake` field.
-- 5c3b00cde: Add object id to staking pool and pool id to staked oct.
+- 5c3b00cde: Add object id to staking pool and pool id to staked sui.
 - 3d9a04648: Adds `deactivation_epoch` to staking pool object, and adds `inactive_pools` to the
   validator set object.
 - a8049d159: Fixes the issue with deep nested generics by introducing array type names

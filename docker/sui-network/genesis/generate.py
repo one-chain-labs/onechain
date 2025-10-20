@@ -71,7 +71,7 @@ def main(args: argparse.ArgumentParser) -> None:
     # run genesis with newly created genesis configuration file
     _ = subprocess.run(
         [
-            "one_chain",
+            "sui",
             "genesis",
             "--from-config",
             f"{args.target_directory}/genesis.yaml",

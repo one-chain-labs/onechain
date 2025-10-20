@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::versioned_tests {
-    use one::versioned;
+module oct::versioned_tests {
+    use sui::versioned;
 
     #[test]
     fun test_upgrade() {

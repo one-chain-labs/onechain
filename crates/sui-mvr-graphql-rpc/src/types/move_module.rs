@@ -1,29 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    *,
-};
+use async_graphql::connection::{Connection, CursorType, Edge};
+use async_graphql::*;
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Loc;
 
-use crate::{
-    consistency::{ConsistentIndexCursor, ConsistentNamedCursor},
-    error::Error,
-};
+use crate::consistency::{ConsistentIndexCursor, ConsistentNamedCursor};
+use crate::error::Error;
 use sui_package_resolver::Module as ParsedMoveModule;
 
-use super::{
-    base64::Base64,
-    cursor::{JsonCursor, Page},
-    datatype::MoveDatatype,
-    move_enum::MoveEnum,
-    move_function::MoveFunction,
-    move_package::MovePackage,
-    move_struct::MoveStruct,
-    sui_address::SuiAddress,
-};
+use super::cursor::{JsonCursor, Page};
+use super::datatype::MoveDatatype;
+use super::move_enum::MoveEnum;
+use super::move_function::MoveFunction;
+use super::move_struct::MoveStruct;
+use super::{base64::Base64, move_package::MovePackage, sui_address::SuiAddress};
 
 #[derive(Clone)]
 pub(crate) struct MoveModule {
@@ -44,13 +36,21 @@ pub(crate) type CFunction = JsonCursor<ConsistentNamedCursor>;
 impl MoveModule {
     /// The package that this Move module was defined in
     async fn package(&self, ctx: &Context<'_>) -> Result<MovePackage> {
-        MovePackage::query(ctx, self.storage_id, MovePackage::by_id_at(self.checkpoint_viewed_at))
-            .await
-            .extend()?
-            .ok_or_else(|| {
-                Error::Internal(format!("Cannot load package for module {}::{}", self.storage_id, self.parsed.name(),))
-            })
-            .extend()
+        MovePackage::query(
+            ctx,
+            self.storage_id,
+            MovePackage::by_id_at(self.checkpoint_viewed_at),
+        )
+        .await
+        .extend()?
+        .ok_or_else(|| {
+            Error::Internal(format!(
+                "Cannot load package for module {}::{}",
+                self.storage_id,
+                self.parsed.name(),
+            ))
+        })
+        .extend()
     }
 
     /// The module's (unqualified) name.
@@ -77,8 +77,8 @@ impl MoveModule {
         let bytecode = self.parsed.bytecode();
 
         let mut connection = Connection::new(false, false);
-        let Some((prev, next, checkpoint_viewed_at, cs)) =
-            page.paginate_consistent_indices(bytecode.friend_decls.len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, checkpoint_viewed_at, cs)) = page
+            .paginate_consistent_indices(bytecode.friend_decls.len(), self.checkpoint_viewed_at)?
         else {
             return Ok(connection);
         };
@@ -87,10 +87,19 @@ impl MoveModule {
         connection.has_next_page = next;
 
         let runtime_id = *bytecode.self_id().address();
-        let Some(package) =
-            MovePackage::query(ctx, self.storage_id, MovePackage::by_id_at(checkpoint_viewed_at)).await.extend()?
+        let Some(package) = MovePackage::query(
+            ctx,
+            self.storage_id,
+            MovePackage::by_id_at(checkpoint_viewed_at),
+        )
+        .await
+        .extend()?
         else {
-            return Err(Error::Internal(format!("Failed to load package for module: {}", self.storage_id,)).extend());
+            return Err(Error::Internal(format!(
+                "Failed to load package for module: {}",
+                self.storage_id,
+            ))
+            .extend());
         };
 
         // Select `friend_decls[lo..hi]` using iterators to enumerate before taking a sub-sequence
@@ -158,11 +167,13 @@ impl MoveModule {
             names
         };
 
-        connection.has_previous_page =
-            struct_names.first().is_some_and(|fst| self.parsed.structs(None, Some(fst)).next().is_some());
+        connection.has_previous_page = struct_names
+            .first()
+            .is_some_and(|fst| self.parsed.structs(None, Some(fst)).next().is_some());
 
-        connection.has_next_page =
-            struct_names.last().is_some_and(|lst| self.parsed.structs(Some(lst), None).next().is_some());
+        connection.has_next_page = struct_names
+            .last()
+            .is_some_and(|lst| self.parsed.structs(Some(lst), None).next().is_some());
 
         for name in struct_names {
             let Some(struct_) = self.struct_impl(name.to_string()).extend()? else {
@@ -174,8 +185,11 @@ impl MoveModule {
                 .extend();
             };
 
-            let cursor = JsonCursor::new(ConsistentNamedCursor { name: name.to_string(), c: checkpoint_viewed_at })
-                .encode_cursor();
+            let cursor = JsonCursor::new(ConsistentNamedCursor {
+                name: name.to_string(),
+                c: checkpoint_viewed_at,
+            })
+            .encode_cursor();
             connection.edges.push(Edge::new(cursor, struct_));
         }
 
@@ -218,11 +232,13 @@ impl MoveModule {
             names
         };
 
-        connection.has_previous_page =
-            enum_names.first().is_some_and(|fst| self.parsed.enums(None, Some(fst)).next().is_some());
+        connection.has_previous_page = enum_names
+            .first()
+            .is_some_and(|fst| self.parsed.enums(None, Some(fst)).next().is_some());
 
-        connection.has_next_page =
-            enum_names.last().is_some_and(|lst| self.parsed.enums(Some(lst), None).next().is_some());
+        connection.has_next_page = enum_names
+            .last()
+            .is_some_and(|lst| self.parsed.enums(Some(lst), None).next().is_some());
 
         for name in enum_names {
             let Some(enum_) = self.enum_impl(name.to_string()).extend()? else {
@@ -234,8 +250,11 @@ impl MoveModule {
                 .extend();
             };
 
-            let cursor = JsonCursor::new(ConsistentNamedCursor { name: name.to_string(), c: checkpoint_viewed_at })
-                .encode_cursor();
+            let cursor = JsonCursor::new(ConsistentNamedCursor {
+                name: name.to_string(),
+                c: checkpoint_viewed_at,
+            })
+            .encode_cursor();
             connection.edges.push(Edge::new(cursor, enum_));
         }
 
@@ -250,7 +269,10 @@ impl MoveModule {
     async fn datatype(&self, name: String) -> Result<Option<MoveDatatype>> {
         match self.struct_impl(name.clone()) {
             Ok(Some(s)) => Ok(Some(MoveDatatype::Struct(s))),
-            Ok(None) => self.enum_impl(name).map(|x| x.map(MoveDatatype::Enum)).extend(),
+            Ok(None) => self
+                .enum_impl(name)
+                .map(|x| x.map(MoveDatatype::Enum))
+                .extend(),
             Err(e) => Err(e.into()),
         }
     }
@@ -281,15 +303,20 @@ impl MoveModule {
             names
         };
 
-        connection.has_previous_page =
-            datatype_names.first().is_some_and(|fst| self.parsed.datatypes(None, Some(fst)).next().is_some());
+        connection.has_previous_page = datatype_names
+            .first()
+            .is_some_and(|fst| self.parsed.datatypes(None, Some(fst)).next().is_some());
 
-        connection.has_next_page =
-            datatype_names.last().is_some_and(|lst| self.parsed.datatypes(Some(lst), None).next().is_some());
+        connection.has_next_page = datatype_names
+            .last()
+            .is_some_and(|lst| self.parsed.datatypes(Some(lst), None).next().is_some());
 
         for name in datatype_names {
             let datatype = match self.struct_impl(name.to_string()) {
-                Ok(None) => self.enum_impl(name.to_string()).map(|x| x.map(MoveDatatype::Enum)).extend()?,
+                Ok(None) => self
+                    .enum_impl(name.to_string())
+                    .map(|x| x.map(MoveDatatype::Enum))
+                    .extend()?,
                 Ok(Some(s)) => Some(MoveDatatype::Struct(s)),
                 Err(e) => return Err(e.into()),
             }
@@ -301,8 +328,11 @@ impl MoveModule {
                 ))
             })?;
 
-            let cursor = JsonCursor::new(ConsistentNamedCursor { name: name.to_string(), c: checkpoint_viewed_at })
-                .encode_cursor();
+            let cursor = JsonCursor::new(ConsistentNamedCursor {
+                name: name.to_string(),
+                c: checkpoint_viewed_at,
+            })
+            .encode_cursor();
             connection.edges.push(Edge::new(cursor, datatype));
         }
 
@@ -344,11 +374,13 @@ impl MoveModule {
             names
         };
 
-        connection.has_previous_page =
-            function_names.first().is_some_and(|fst| self.parsed.functions(None, Some(fst)).next().is_some());
+        connection.has_previous_page = function_names
+            .first()
+            .is_some_and(|fst| self.parsed.functions(None, Some(fst)).next().is_some());
 
-        connection.has_next_page =
-            function_names.last().is_some_and(|lst| self.parsed.functions(Some(lst), None).next().is_some());
+        connection.has_next_page = function_names
+            .last()
+            .is_some_and(|lst| self.parsed.functions(Some(lst), None).next().is_some());
 
         for name in function_names {
             let Some(function) = self.function_impl(name.to_string()).extend()? else {
@@ -360,8 +392,11 @@ impl MoveModule {
                 .extend();
             };
 
-            let cursor = JsonCursor::new(ConsistentNamedCursor { name: name.to_string(), c: checkpoint_viewed_at })
-                .encode_cursor();
+            let cursor = JsonCursor::new(ConsistentNamedCursor {
+                name: name.to_string(),
+                c: checkpoint_viewed_at,
+            })
+            .encode_cursor();
             connection.edges.push(Edge::new(cursor, function));
         }
 
@@ -398,7 +433,13 @@ impl MoveModule {
             Err(e) => return Err(Error::Internal(e.to_string())),
         };
 
-        MoveStruct::new(self.parsed.name().to_string(), name, def, self.checkpoint_viewed_at).map(Option::Some)
+        MoveStruct::new(
+            self.parsed.name().to_string(),
+            name,
+            def,
+            self.checkpoint_viewed_at,
+        )
+        .map(Option::Some)
     }
 
     fn enum_impl(&self, name: String) -> Result<Option<MoveEnum>, Error> {
@@ -408,7 +449,13 @@ impl MoveModule {
             Err(e) => return Err(Error::Internal(e.to_string())),
         };
 
-        MoveEnum::new(self.parsed.name().to_string(), name, def, self.checkpoint_viewed_at).map(Option::Some)
+        MoveEnum::new(
+            self.parsed.name().to_string(),
+            name,
+            def,
+            self.checkpoint_viewed_at,
+        )
+        .map(Option::Some)
     }
 
     pub(crate) fn function_impl(&self, name: String) -> Result<Option<MoveFunction>, Error> {
@@ -433,7 +480,9 @@ impl MoveModule {
         name: &str,
         checkpoint_viewed_at: u64,
     ) -> Result<Option<Self>, Error> {
-        let Some(package) = MovePackage::query(ctx, address, MovePackage::by_id_at(checkpoint_viewed_at)).await? else {
+        let Some(package) =
+            MovePackage::query(ctx, address, MovePackage::by_id_at(checkpoint_viewed_at)).await?
+        else {
             return Ok(None);
         };
 

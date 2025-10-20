@@ -1,21 +1,21 @@
 // valid, Receiving type by mut ref with object type param
 
 module a::m {
-    use one::object;
-    use one::transfer::Receiving;
+    use sui::object;
+    use sui::transfer::Receiving;
 
     struct S has key { id: object::UID }
 
     public entry fun yes(_: &mut Receiving<S>) { }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }
 }
 
-module one::transfer {
+module oct::transfer {
     struct Receiving<phantom T: key> has drop {
         id: address
     }

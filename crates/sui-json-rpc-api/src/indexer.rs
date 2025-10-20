@@ -1,29 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use jsonrpsee::core::RpcResult;
+use jsonrpsee::proc_macros::rpc;
 
+use sui_json_rpc_types::SuiTransactionBlockEffects;
 use sui_json_rpc_types::{
-    DynamicFieldPage,
-    EventFilter,
-    EventPage,
-    ObjectsPage,
-    Page,
-    SuiEvent,
-    SuiObjectResponse,
-    SuiObjectResponseQuery,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockResponseQuery,
-    TransactionBlocksPage,
+    DynamicFieldPage, EventFilter, EventPage, ObjectsPage, Page, SuiEvent, SuiObjectResponse,
+    SuiObjectResponseQuery, SuiTransactionBlockResponseQuery, TransactionBlocksPage,
     TransactionFilter,
 };
 use sui_open_rpc_macros::open_rpc;
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    digests::TransactionDigest,
-    dynamic_field::DynamicFieldName,
-    event::EventID,
-};
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::digests::TransactionDigest;
+use sui_types::dynamic_field::DynamicFieldName;
+use sui_types::event::EventID;
 
 #[open_rpc(namespace = "suix", tag = "Extended API")]
 #[rpc(server, client, namespace = "suix")]
@@ -36,7 +27,7 @@ pub trait IndexerApi {
     #[method(name = "getOwnedObjects")]
     async fn get_owned_objects(
         &self,
-        /// the owner's OneChain address
+        /// the owner's Sui address
         address: SuiAddress,
         /// the objects query criteria.
         query: Option<SuiObjectResponseQuery>,

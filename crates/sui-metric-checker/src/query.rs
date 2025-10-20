@@ -7,25 +7,37 @@ use prometheus_http_query::Client;
 use reqwest::header::{HeaderValue, AUTHORIZATION};
 use tracing::{debug, info};
 
-pub async fn instant_query(auth_header: &str, client: Client, query: &str) -> Result<f64, anyhow::Error> {
+pub async fn instant_query(
+    auth_header: &str,
+    client: Client,
+    query: &str,
+) -> Result<f64, anyhow::Error> {
     debug!("Executing {query}");
     let response = client
         .query(query)
         .header(
             AUTHORIZATION,
-            HeaderValue::from_str(&format!("Basic {}", general_purpose::STANDARD.encode(auth_header)))?,
+            HeaderValue::from_str(&format!(
+                "Basic {}",
+                general_purpose::STANDARD.encode(auth_header)
+            ))?,
         )
         .get()
         .await?;
 
-    let result = response.data().as_vector().unwrap_or_else(|| panic!("Expected result of type vector for {query}"));
+    let result = response
+        .data()
+        .as_vector()
+        .unwrap_or_else(|| panic!("Expected result of type vector for {query}"));
 
     if !result.is_empty() {
         let first = result.first().unwrap();
         debug!("Got value {}", first.sample().value());
         Ok(first.sample().value())
     } else {
-        Err(anyhow!("Did not get expected response from server for {query}"))
+        Err(anyhow!(
+            "Did not get expected response from server for {query}"
+        ))
     }
 }
 
@@ -44,15 +56,23 @@ pub async fn range_query(
         .query_range(query, start, end, step)
         .header(
             AUTHORIZATION,
-            HeaderValue::from_str(&format!("Basic {}", general_purpose::STANDARD.encode(auth_header)))?,
+            HeaderValue::from_str(&format!(
+                "Basic {}",
+                general_purpose::STANDARD.encode(auth_header)
+            ))?,
         )
         .get()
         .await?;
 
-    let result = response.data().as_matrix().unwrap_or_else(|| panic!("Expected result of type matrix for {query}"));
+    let result = response
+        .data()
+        .as_matrix()
+        .unwrap_or_else(|| panic!("Expected result of type matrix for {query}"));
 
     if result.is_empty() {
-        return Err(anyhow!("Did not get expected response from server for {query}"));
+        return Err(anyhow!(
+            "Did not get expected response from server for {query}"
+        ));
     }
 
     let mut samples: Vec<f64> = result
@@ -74,7 +94,10 @@ pub async fn range_query(
     }
     samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    assert!((1..=100).contains(&percentile), "Invalid percentile {percentile}");
+    assert!(
+        (1..=100).contains(&percentile),
+        "Invalid percentile {percentile}"
+    );
     let index = samples.len() * percentile as usize / 100;
     let result = samples[index];
     info!(

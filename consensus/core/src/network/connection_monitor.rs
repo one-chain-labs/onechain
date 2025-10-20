@@ -59,11 +59,22 @@ impl AnemoConnectionMonitor {
         let connection_statuses = connection_statuses_outer.clone();
         let (stop_sender, stop) = tokio::sync::oneshot::channel();
         let handle = spawn_logged_monitored_task!(
-            Self { network, connection_metrics, known_peers, connection_statuses, stop }.run(),
+            Self {
+                network,
+                connection_metrics,
+                known_peers,
+                connection_statuses,
+                stop
+            }
+            .run(),
             "AnemoConnectionMonitor"
         );
 
-        ConnectionMonitorHandle { handle, stop: stop_sender, connection_statuses: connection_statuses_outer }
+        ConnectionMonitorHandle {
+            handle,
+            stop: stop_sender,
+            connection_statuses: connection_statuses_outer,
+        }
     }
 
     async fn run(mut self) {
@@ -81,7 +92,10 @@ impl AnemoConnectionMonitor {
         // we report first all the known peers as disconnected - so we can see
         // their labels in the metrics reporting tool
         for (peer_id, peer_label) in &self.known_peers {
-            self.connection_metrics.network_peer_connected.with_label_values(&[&format!("{peer_id}"), peer_label]).set(0)
+            self.connection_metrics
+                .network_peer_connected
+                .with_label_values(&[&format!("{peer_id}"), peer_label])
+                .set(0)
         }
 
         // now report the connected peers
@@ -89,7 +103,8 @@ impl AnemoConnectionMonitor {
             self.handle_peer_event(PeerEvent::NewPeer(*peer_id)).await;
         }
 
-        let mut connection_stat_collection_interval = time::interval(CONNECTION_STAT_COLLECTION_INTERVAL);
+        let mut connection_stat_collection_interval =
+            time::interval(CONNECTION_STAT_COLLECTION_INTERVAL);
 
         loop {
             tokio::select! {
@@ -124,7 +139,9 @@ impl AnemoConnectionMonitor {
 
     async fn handle_peer_event(&self, peer_event: PeerEvent) {
         if let Some(network) = self.network.upgrade() {
-            self.connection_metrics.network_peers.set(network.peers().len() as i64);
+            self.connection_metrics
+                .network_peers
+                .set(network.peers().len() as i64);
         } else {
             return;
         }
@@ -155,7 +172,12 @@ impl AnemoConnectionMonitor {
     }
 
     // TODO: Replace this with ClosureMetric
-    fn update_quinn_metrics_for_peer(&self, peer_id: &str, peer_label: &str, stats: &ConnectionStats) {
+    fn update_quinn_metrics_for_peer(
+        &self,
+        peer_id: &str,
+        peer_label: &str,
+        stats: &ConnectionStats,
+    ) {
         // Update PathStats
         self.connection_metrics
             .network_peer_rtt
@@ -266,7 +288,8 @@ mod tests {
         known_peers.insert(network_3.peer_id(), "peer_3".to_string());
 
         // WHEN bring up the monitor
-        let handle = AnemoConnectionMonitor::spawn(network_1.downgrade(), metrics.clone(), known_peers);
+        let handle =
+            AnemoConnectionMonitor::spawn(network_1.downgrade(), metrics.clone(), known_peers);
         let connection_statuses = handle.connection_statuses();
 
         // THEN peer 2 should be already connected
@@ -277,29 +300,48 @@ mod tests {
         let peer_2_str = format!("{peer_2}");
         labels.insert("peer_id", peer_2_str.as_str());
         labels.insert("peer_label", "peer_2");
-        assert_ne!(metrics.network_peer_rtt.get_metric_with(&labels).unwrap().get(), 0);
-        assert_eq!(*connection_statuses.get(&peer_2).unwrap().value(), ConnectionStatus::Connected);
+        assert_ne!(
+            metrics
+                .network_peer_rtt
+                .get_metric_with(&labels)
+                .unwrap()
+                .get(),
+            0
+        );
+        assert_eq!(
+            *connection_statuses.get(&peer_2).unwrap().value(),
+            ConnectionStatus::Connected
+        );
 
         // WHEN connect to peer 3
         let peer_3 = network_1.connect(network_3.local_addr()).await.unwrap();
 
         // THEN
         assert_network_peers(&metrics, 2).await;
-        assert_eq!(*connection_statuses.get(&peer_3).unwrap().value(), ConnectionStatus::Connected);
+        assert_eq!(
+            *connection_statuses.get(&peer_3).unwrap().value(),
+            ConnectionStatus::Connected
+        );
 
         // AND disconnect peer 2
         network_1.disconnect(peer_2).unwrap();
 
         // THEN
         assert_network_peers(&metrics, 1).await;
-        assert_eq!(*connection_statuses.get(&peer_2).unwrap().value(), ConnectionStatus::Disconnected);
+        assert_eq!(
+            *connection_statuses.get(&peer_2).unwrap().value(),
+            ConnectionStatus::Disconnected
+        );
 
         // AND disconnect peer 3
         network_1.disconnect(peer_3).unwrap();
 
         // THEN
         assert_network_peers(&metrics, 0).await;
-        assert_eq!(*connection_statuses.get(&peer_3).unwrap().value(), ConnectionStatus::Disconnected);
+        assert_eq!(
+            *connection_statuses.get(&peer_3).unwrap().value(),
+            ConnectionStatus::Disconnected
+        );
     }
 
     async fn assert_network_peers(metrics: &QuinnConnectionMetrics, value: i64) {
@@ -309,14 +351,21 @@ mod tests {
             }
         })
         .await
-        .unwrap_or_else(|_| panic!("Timeout while waiting for connectivity results for value {}", value));
+        .unwrap_or_else(|_| {
+            panic!(
+                "Timeout while waiting for connectivity results for value {}",
+                value
+            )
+        });
 
         assert_eq!(metrics.network_peers.get(), value);
     }
 
     fn build_network() -> anyhow::Result<Network> {
-        let network =
-            Network::bind("localhost:0").private_key(random_private_key()).server_name("test").start(echo_service())?;
+        let network = Network::bind("localhost:0")
+            .private_key(random_private_key())
+            .server_name("test")
+            .start(echo_service())?;
         Ok(network)
     }
 

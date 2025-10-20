@@ -44,7 +44,11 @@ impl UniversalCommitter {
         // Try to decide as many leaders as possible, starting with the highest round.
         let mut leaders = VecDeque::new();
 
-        let last_round = match self.context.protocol_config.mysticeti_num_leaders_per_round() {
+        let last_round = match self
+            .context
+            .protocol_config
+            .mysticeti_num_leaders_per_round()
+        {
             Some(1) => {
                 // Ensure that we don't commit any leaders from the same round as last_decided
                 // until we have full support for multi-leader per round.
@@ -108,18 +112,35 @@ impl UniversalCommitter {
     /// Return list of leaders for the round.
     /// Can return empty vec if round does not have a designated leader.
     pub(crate) fn get_leaders(&self, round: Round) -> Vec<AuthorityIndex> {
-        self.committers.iter().filter_map(|committer| committer.elect_leader(round)).map(|l| l.authority).collect()
+        self.committers
+            .iter()
+            .filter_map(|committer| committer.elect_leader(round))
+            .map(|l| l.authority)
+            .collect()
     }
 
     /// Update metrics.
     fn update_metrics(&self, decided_leader: &DecidedLeader, decision: Decision) {
-        let decision_str = if decision == Decision::Direct { "direct" } else { "indirect" };
+        let decision_str = if decision == Decision::Direct {
+            "direct"
+        } else {
+            "indirect"
+        };
         let status = match decided_leader {
             DecidedLeader::Commit(..) => format!("{decision_str}-commit"),
             DecidedLeader::Skip(..) => format!("{decision_str}-skip"),
         };
-        let leader_host = &self.context.committee.authority(decided_leader.slot().authority).hostname;
-        self.context.metrics.node_metrics.committed_leaders_total.with_label_values(&[leader_host, &status]).inc();
+        let leader_host = &self
+            .context
+            .committee
+            .authority(decided_leader.slot().authority)
+            .hostname;
+        self.context
+            .metrics
+            .node_metrics
+            .committed_leaders_total
+            .with_label_values(&[leader_host, &status])
+            .inc();
     }
 }
 
@@ -127,7 +148,10 @@ impl UniversalCommitter {
 /// base committer, that is, a single leader and no pipeline.
 pub(crate) mod universal_committer_builder {
     use super::*;
-    use crate::{base_committer::BaseCommitterOptions, commit::DEFAULT_WAVE_LENGTH, leader_schedule::LeaderSchedule};
+    use crate::{
+        base_committer::BaseCommitterOptions, commit::DEFAULT_WAVE_LENGTH,
+        leader_schedule::LeaderSchedule,
+    };
 
     pub(crate) struct UniversalCommitterBuilder {
         context: Arc<Context>,
@@ -190,7 +214,11 @@ pub(crate) mod universal_committer_builder {
                 }
             }
 
-            UniversalCommitter { context: self.context, dag_state: self.dag_state, committers }
+            UniversalCommitter {
+                context: self.context,
+                dag_state: self.dag_state,
+                committers,
+            }
         }
     }
 }

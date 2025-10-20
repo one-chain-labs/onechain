@@ -44,7 +44,10 @@ fn fail_arg_deserialize() {
             let err = run(&mod_code, name, value.clone())
                 .map(|_| ())
                 .expect_err("Should have failed to deserialize non-u64 type to u64");
-            assert_eq!(err.major_status(), StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+            assert_eq!(
+                err.major_status(),
+                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+            );
         }
     }
 }
@@ -79,7 +82,11 @@ fn setup_module() -> ModuleCode {
     (module_id, code)
 }
 
-fn run(module: &ModuleCode, fun_name: &str, arg_val0: MoveValue) -> VMResult<(ChangeSet, SerializedReturnValues)> {
+fn run(
+    module: &ModuleCode,
+    fun_name: &str,
+    arg_val0: MoveValue,
+) -> VMResult<(ChangeSet, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
     let (vm, storage) = setup_vm(&modules);
@@ -125,6 +132,8 @@ fn compile_module(storage: &mut InMemoryStorage, mod_id: &ModuleId, code: &str) 
 }
 
 fn parse_u64_arg(arg: &[u8]) -> u64 {
-    let as_arr: [u8; 8] = arg[..8].try_into().expect("wrong u64 length, must be 8 bytes");
+    let as_arr: [u8; 8] = arg[..8]
+        .try_into()
+        .expect("wrong u64 length, must be 8 bytes");
     u64::from_le_bytes(as_arr)
 }

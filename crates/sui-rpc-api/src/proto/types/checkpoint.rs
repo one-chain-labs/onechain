@@ -5,9 +5,9 @@ use tap::Pipe;
 // CheckpointSummary
 //
 
-impl From<sui_sdk_types::types::CheckpointSummary> for super::CheckpointSummary {
+impl From<sui_sdk_types::CheckpointSummary> for super::CheckpointSummary {
     fn from(
-        sui_sdk_types::types::CheckpointSummary {
+        sui_sdk_types::CheckpointSummary {
             epoch,
             sequence_number,
             network_total_transactions,
@@ -18,7 +18,7 @@ impl From<sui_sdk_types::types::CheckpointSummary> for super::CheckpointSummary 
             checkpoint_commitments,
             end_of_epoch_data,
             version_specific_data,
-        }: sui_sdk_types::types::CheckpointSummary,
+        }: sui_sdk_types::CheckpointSummary,
     ) -> Self {
         Self {
             epoch: Some(epoch),
@@ -35,7 +35,7 @@ impl From<sui_sdk_types::types::CheckpointSummary> for super::CheckpointSummary 
     }
 }
 
-impl TryFrom<&super::CheckpointSummary> for sui_sdk_types::types::CheckpointSummary {
+impl TryFrom<&super::CheckpointSummary> for sui_sdk_types::CheckpointSummary {
     type Error = TryFromProtoError;
 
     fn try_from(
@@ -53,25 +53,40 @@ impl TryFrom<&super::CheckpointSummary> for sui_sdk_types::types::CheckpointSumm
         }: &super::CheckpointSummary,
     ) -> Result<Self, Self::Error> {
         let epoch = epoch.ok_or_else(|| TryFromProtoError::missing("epoch"))?;
-        let sequence_number = sequence_number.ok_or_else(|| TryFromProtoError::missing("sequence_number"))?;
-        let network_total_transactions =
-            total_network_transactions.ok_or_else(|| TryFromProtoError::missing("total_network_transactions"))?;
-        let content_digest =
-            content_digest.as_ref().ok_or_else(|| TryFromProtoError::missing("content_digest"))?.try_into()?;
-        let previous_digest = previous_digest.as_ref().map(TryInto::try_into).transpose()?;
+        let sequence_number =
+            sequence_number.ok_or_else(|| TryFromProtoError::missing("sequence_number"))?;
+        let network_total_transactions = total_network_transactions
+            .ok_or_else(|| TryFromProtoError::missing("total_network_transactions"))?;
+        let content_digest = content_digest
+            .as_ref()
+            .ok_or_else(|| TryFromProtoError::missing("content_digest"))?
+            .try_into()?;
+        let previous_digest = previous_digest
+            .as_ref()
+            .map(TryInto::try_into)
+            .transpose()?;
         let epoch_rolling_gas_cost_summary = epoch_rolling_gas_cost_summary
             .as_ref()
             .ok_or_else(|| TryFromProtoError::missing("epoch_rolling_gas_cost_summary"))?
             .try_into()?;
 
-        let timestamp_ms = timestamp_ms.ok_or_else(|| TryFromProtoError::missing("timestamp_ms"))?;
+        let timestamp_ms =
+            timestamp_ms.ok_or_else(|| TryFromProtoError::missing("timestamp_ms"))?;
 
-        let checkpoint_commitments = commitments.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
+        let checkpoint_commitments = commitments
+            .iter()
+            .map(TryInto::try_into)
+            .collect::<Result<_, _>>()?;
 
-        let end_of_epoch_data = end_of_epoch_data.as_ref().map(TryInto::try_into).transpose()?;
+        let end_of_epoch_data = end_of_epoch_data
+            .as_ref()
+            .map(TryInto::try_into)
+            .transpose()?;
 
-        let version_specific_data =
-            version_specific_data.as_ref().ok_or_else(|| TryFromProtoError::missing("version_specific_data"))?.to_vec();
+        let version_specific_data = version_specific_data
+            .as_ref()
+            .ok_or_else(|| TryFromProtoError::missing("version_specific_data"))?
+            .to_vec();
 
         Ok(Self {
             epoch,
@@ -92,14 +107,14 @@ impl TryFrom<&super::CheckpointSummary> for sui_sdk_types::types::CheckpointSumm
 // GasCostSummary
 //
 
-impl From<sui_sdk_types::types::GasCostSummary> for super::GasCostSummary {
+impl From<sui_sdk_types::GasCostSummary> for super::GasCostSummary {
     fn from(
-        sui_sdk_types::types::GasCostSummary {
+        sui_sdk_types::GasCostSummary {
             computation_cost,
             storage_cost,
             storage_rebate,
             non_refundable_storage_fee,
-        }: sui_sdk_types::types::GasCostSummary,
+        }: sui_sdk_types::GasCostSummary,
     ) -> Self {
         Self {
             computation_cost: Some(computation_cost),
@@ -110,7 +125,7 @@ impl From<sui_sdk_types::types::GasCostSummary> for super::GasCostSummary {
     }
 }
 
-impl TryFrom<&super::GasCostSummary> for sui_sdk_types::types::GasCostSummary {
+impl TryFrom<&super::GasCostSummary> for sui_sdk_types::GasCostSummary {
     type Error = TryFromProtoError;
 
     fn try_from(
@@ -121,12 +136,20 @@ impl TryFrom<&super::GasCostSummary> for sui_sdk_types::types::GasCostSummary {
             non_refundable_storage_fee,
         }: &super::GasCostSummary,
     ) -> Result<Self, Self::Error> {
-        let computation_cost = computation_cost.ok_or_else(|| TryFromProtoError::missing("computation_cost"))?;
-        let storage_cost = storage_cost.ok_or_else(|| TryFromProtoError::missing("storage_cost"))?;
-        let storage_rebate = storage_rebate.ok_or_else(|| TryFromProtoError::missing("storage_rebate"))?;
-        let non_refundable_storage_fee =
-            non_refundable_storage_fee.ok_or_else(|| TryFromProtoError::missing("non_refundable_storage_fee"))?;
-        Ok(Self { computation_cost, storage_cost, storage_rebate, non_refundable_storage_fee })
+        let computation_cost =
+            computation_cost.ok_or_else(|| TryFromProtoError::missing("computation_cost"))?;
+        let storage_cost =
+            storage_cost.ok_or_else(|| TryFromProtoError::missing("storage_cost"))?;
+        let storage_rebate =
+            storage_rebate.ok_or_else(|| TryFromProtoError::missing("storage_rebate"))?;
+        let non_refundable_storage_fee = non_refundable_storage_fee
+            .ok_or_else(|| TryFromProtoError::missing("non_refundable_storage_fee"))?;
+        Ok(Self {
+            computation_cost,
+            storage_cost,
+            storage_rebate,
+            non_refundable_storage_fee,
+        })
     }
 }
 
@@ -134,25 +157,33 @@ impl TryFrom<&super::GasCostSummary> for sui_sdk_types::types::GasCostSummary {
 // CheckpointCommitment
 //
 
-impl From<sui_sdk_types::types::CheckpointCommitment> for super::CheckpointCommitment {
-    fn from(value: sui_sdk_types::types::CheckpointCommitment) -> Self {
+impl From<sui_sdk_types::CheckpointCommitment> for super::CheckpointCommitment {
+    fn from(value: sui_sdk_types::CheckpointCommitment) -> Self {
         let commitment = match value {
-            sui_sdk_types::types::CheckpointCommitment::EcmhLiveObjectSet { digest } => {
+            sui_sdk_types::CheckpointCommitment::EcmhLiveObjectSet { digest } => {
                 super::checkpoint_commitment::Commitment::EcmhLiveObjectSet(digest.into())
             }
         };
 
-        Self { commitment: Some(commitment) }
+        Self {
+            commitment: Some(commitment),
+        }
     }
 }
 
-impl TryFrom<&super::CheckpointCommitment> for sui_sdk_types::types::CheckpointCommitment {
+impl TryFrom<&super::CheckpointCommitment> for sui_sdk_types::CheckpointCommitment {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::CheckpointCommitment) -> Result<Self, Self::Error> {
-        match value.commitment.as_ref().ok_or_else(|| TryFromProtoError::missing("commitment"))? {
+        match value
+            .commitment
+            .as_ref()
+            .ok_or_else(|| TryFromProtoError::missing("commitment"))?
+        {
             super::checkpoint_commitment::Commitment::EcmhLiveObjectSet(digest) => {
-                Self::EcmhLiveObjectSet { digest: digest.try_into()? }
+                Self::EcmhLiveObjectSet {
+                    digest: digest.try_into()?,
+                }
             }
         }
         .pipe(Ok)
@@ -163,13 +194,13 @@ impl TryFrom<&super::CheckpointCommitment> for sui_sdk_types::types::CheckpointC
 // EndOfEpochData
 //
 
-impl From<sui_sdk_types::types::EndOfEpochData> for super::EndOfEpochData {
+impl From<sui_sdk_types::EndOfEpochData> for super::EndOfEpochData {
     fn from(
-        sui_sdk_types::types::EndOfEpochData {
+        sui_sdk_types::EndOfEpochData {
             next_epoch_committee,
             next_epoch_protocol_version,
             epoch_commitments,
-        }: sui_sdk_types::types::EndOfEpochData,
+        }: sui_sdk_types::EndOfEpochData,
     ) -> Self {
         Self {
             next_epoch_committee: next_epoch_committee.into_iter().map(Into::into).collect(),
@@ -179,7 +210,7 @@ impl From<sui_sdk_types::types::EndOfEpochData> for super::EndOfEpochData {
     }
 }
 
-impl TryFrom<&super::EndOfEpochData> for sui_sdk_types::types::EndOfEpochData {
+impl TryFrom<&super::EndOfEpochData> for sui_sdk_types::EndOfEpochData {
     type Error = TryFromProtoError;
 
     fn try_from(
@@ -189,13 +220,19 @@ impl TryFrom<&super::EndOfEpochData> for sui_sdk_types::types::EndOfEpochData {
             epoch_commitments,
         }: &super::EndOfEpochData,
     ) -> Result<Self, Self::Error> {
-        let next_epoch_protocol_version =
-            next_epoch_protocol_version.ok_or_else(|| TryFromProtoError::missing("next_epoch_protocol_version"))?;
+        let next_epoch_protocol_version = next_epoch_protocol_version
+            .ok_or_else(|| TryFromProtoError::missing("next_epoch_protocol_version"))?;
 
         Ok(Self {
-            next_epoch_committee: next_epoch_committee.iter().map(TryInto::try_into).collect::<Result<_, _>>()?,
+            next_epoch_committee: next_epoch_committee
+                .iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_, _>>()?,
             next_epoch_protocol_version,
-            epoch_commitments: epoch_commitments.iter().map(TryInto::try_into).collect::<Result<_, _>>()?,
+            epoch_commitments: epoch_commitments
+                .iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_, _>>()?,
         })
     }
 }
@@ -204,8 +241,8 @@ impl TryFrom<&super::EndOfEpochData> for sui_sdk_types::types::EndOfEpochData {
 // CheckpointedTransactionInfo
 //
 
-impl From<sui_sdk_types::types::CheckpointTransactionInfo> for super::CheckpointedTransactionInfo {
-    fn from(value: sui_sdk_types::types::CheckpointTransactionInfo) -> Self {
+impl From<sui_sdk_types::CheckpointTransactionInfo> for super::CheckpointedTransactionInfo {
+    fn from(value: sui_sdk_types::CheckpointTransactionInfo) -> Self {
         Self {
             transaction: Some(value.transaction.into()),
             effects: Some(value.effects.into()),
@@ -214,18 +251,33 @@ impl From<sui_sdk_types::types::CheckpointTransactionInfo> for super::Checkpoint
     }
 }
 
-impl TryFrom<&super::CheckpointedTransactionInfo> for sui_sdk_types::types::CheckpointTransactionInfo {
+impl TryFrom<&super::CheckpointedTransactionInfo> for sui_sdk_types::CheckpointTransactionInfo {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::CheckpointedTransactionInfo) -> Result<Self, Self::Error> {
-        let transaction =
-            value.transaction.as_ref().ok_or_else(|| TryFromProtoError::missing("transaction"))?.try_into()?;
+        let transaction = value
+            .transaction
+            .as_ref()
+            .ok_or_else(|| TryFromProtoError::missing("transaction"))?
+            .try_into()?;
 
-        let effects = value.effects.as_ref().ok_or_else(|| TryFromProtoError::missing("effects"))?.try_into()?;
+        let effects = value
+            .effects
+            .as_ref()
+            .ok_or_else(|| TryFromProtoError::missing("effects"))?
+            .try_into()?;
 
-        let signatures = value.signatures.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
+        let signatures = value
+            .signatures
+            .iter()
+            .map(TryInto::try_into)
+            .collect::<Result<_, _>>()?;
 
-        Ok(Self { transaction, effects, signatures })
+        Ok(Self {
+            transaction,
+            effects,
+            signatures,
+        })
     }
 }
 
@@ -233,24 +285,33 @@ impl TryFrom<&super::CheckpointedTransactionInfo> for sui_sdk_types::types::Chec
 // CheckpointContents
 //
 
-impl From<sui_sdk_types::types::CheckpointContents> for super::CheckpointContents {
-    fn from(value: sui_sdk_types::types::CheckpointContents) -> Self {
+impl From<sui_sdk_types::CheckpointContents> for super::CheckpointContents {
+    fn from(value: sui_sdk_types::CheckpointContents) -> Self {
         let contents = super::checkpoint_contents::Contents::V1(super::checkpoint_contents::V1 {
             transactions: value.into_v1().into_iter().map(Into::into).collect(),
         });
 
-        Self { contents: Some(contents) }
+        Self {
+            contents: Some(contents),
+        }
     }
 }
 
-impl TryFrom<&super::CheckpointContents> for sui_sdk_types::types::CheckpointContents {
+impl TryFrom<&super::CheckpointContents> for sui_sdk_types::CheckpointContents {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::CheckpointContents) -> Result<Self, Self::Error> {
-        match value.contents.as_ref().ok_or_else(|| TryFromProtoError::missing("commitment"))? {
-            super::checkpoint_contents::Contents::V1(v1) => {
-                Self::new(v1.transactions.iter().map(TryInto::try_into).collect::<Result<_, _>>()?)
-            }
+        match value
+            .contents
+            .as_ref()
+            .ok_or_else(|| TryFromProtoError::missing("commitment"))?
+        {
+            super::checkpoint_contents::Contents::V1(v1) => Self::new(
+                v1.transactions
+                    .iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            ),
         }
         .pipe(Ok)
     }

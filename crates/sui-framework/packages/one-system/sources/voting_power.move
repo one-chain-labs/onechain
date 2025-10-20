@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::voting_power {
+module oct_system::voting_power {
     use one_system::validator::Validator;
 
     #[allow(unused_field)]
@@ -28,9 +28,9 @@ module one_system::voting_power {
     /// up to BFT assumptions
     const QUORUM_THRESHOLD: u64 = 6_667;
 
-    // Cap voting power of an individual validator at 20%.
+    // Cap voting power of an individual validator at 10%.
     // TODO: determine what this should be
-    const MAX_VOTING_POWER: u64 = 2_000;
+    const MAX_VOTING_POWER: u64 = 1_000;
 
     const ETotalPowerMismatch: u64 = 1;
     const ERelativePowerMismatch: u64 = 2;

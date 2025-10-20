@@ -31,7 +31,7 @@ tx.setSender(keypair.toSuiAddress());
 
 tx.transferObjects(
 	[
-		// Create a SUI coin (balance is in MIST)
+		// Create a OCT coin (balance is in MIST)
 		coinWithBalance({ balance: 100 }),
 		// Create a coin of another type
 		coinWithBalance({ balance: 100, type: '0x123::foo:Bar' }),
@@ -51,7 +51,7 @@ tx.transferObjects([coinWithBalance({ balance: 100, useGasCoin: false })], recip
 ```
 
 It's important to only set `useGasCoin` option to false for sponsored transactions, otherwise the
-coinWithBalance intent may use all the SUI coins, leaving no coins to use for gas.
+coinWithBalance intent may use all the OCT coins, leaving no coins to use for gas.
 
 ## How it works
 

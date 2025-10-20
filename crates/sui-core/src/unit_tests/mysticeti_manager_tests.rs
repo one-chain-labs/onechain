@@ -7,7 +7,9 @@ use fastcrypto::traits::KeyPair;
 use mysten_metrics::RegistryService;
 use prometheus::Registry;
 use sui_swarm_config::network_config_builder::ConfigBuilder;
-use sui_types::messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSummary};
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointContents, CheckpointSummary,
+};
 use tokio::{sync::mpsc, time::sleep};
 
 use crate::{
@@ -15,7 +17,9 @@ use crate::{
     checkpoints::{CheckpointMetrics, CheckpointService, CheckpointServiceNoop},
     consensus_adapter::NoopConsensusOverloadChecker,
     consensus_handler::ConsensusHandlerInitializer,
-    consensus_manager::{mysticeti_manager::MysticetiManager, ConsensusManagerMetrics, ConsensusManagerTrait},
+    consensus_manager::{
+        mysticeti_manager::MysticetiManager, ConsensusManagerMetrics, ConsensusManagerTrait,
+    },
     consensus_validator::{SuiTxValidator, SuiTxValidatorMetrics},
     mysticeti_adapter::LazyMysticetiClient,
     state_accumulator::StateAccumulator,
@@ -24,7 +28,10 @@ use crate::{
 pub fn checkpoint_service_for_testing(state: Arc<AuthorityState>) -> Arc<CheckpointService> {
     let (output, _result) = mpsc::channel::<(CheckpointContents, CheckpointSummary)>(10);
     let epoch_store = state.epoch_store_for_testing();
-    let accumulator = Arc::new(StateAccumulator::new_for_tests(state.get_accumulator_store().clone(), &epoch_store));
+    let accumulator = Arc::new(StateAccumulator::new_for_tests(
+        state.get_accumulator_store().clone(),
+        &epoch_store,
+    ));
     let (certified_output, _certified_result) = mpsc::channel::<CertifiedCheckpointSummary>(10);
 
     let (checkpoint_service, _) = CheckpointService::spawn(
@@ -45,7 +52,9 @@ pub fn checkpoint_service_for_testing(state: Arc<AuthorityState>) -> Arc<Checkpo
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn test_mysticeti_manager() {
     // GIVEN
-    let configs = ConfigBuilder::new_with_temp_dir().committee_size(4.try_into().unwrap()).build();
+    let configs = ConfigBuilder::new_with_temp_dir()
+        .committee_size(4.try_into().unwrap())
+        .build();
 
     let config = &configs.validator_configs()[0];
 
@@ -54,7 +63,10 @@ async fn test_mysticeti_manager() {
     let secret = Arc::pin(config.protocol_key_pair().copy());
     let genesis = config.genesis().unwrap();
 
-    let state = TestAuthorityBuilder::new().with_genesis_and_keypair(genesis, &secret).build().await;
+    let state = TestAuthorityBuilder::new()
+        .with_genesis_and_keypair(genesis, &secret)
+        .build()
+        .await;
 
     let metrics = Arc::new(ConsensusManagerMetrics::new(&Registry::new()));
     let epoch_store = state.epoch_store_for_testing();
@@ -73,8 +85,10 @@ async fn test_mysticeti_manager() {
     assert_eq!(boot_counter, 0);
 
     for i in 1..=3 {
-        let consensus_handler_initializer =
-            ConsensusHandlerInitializer::new_for_testing(state.clone(), checkpoint_service_for_testing(state.clone()));
+        let consensus_handler_initializer = ConsensusHandlerInitializer::new_for_testing(
+            state.clone(),
+            checkpoint_service_for_testing(state.clone()),
+        );
 
         // WHEN start mysticeti
         manager
@@ -108,7 +122,10 @@ async fn test_mysticeti_manager() {
         // Simulate a commit by bumping the handled commit index so we can ensure that boot counter increments only after the first run.
         // Practically we want to simulate a case where consensus engine restarts when no commits have happened before for first run.
         if i > 1 {
-            let monitor = manager.consumer_monitor.load_full().expect("A consumer monitor should have been initialised");
+            let monitor = manager
+                .consumer_monitor
+                .load_full()
+                .expect("A consumer monitor should have been initialised");
             monitor.set_highest_handled_commit(100);
         }
 

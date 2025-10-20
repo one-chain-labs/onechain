@@ -1,7 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use consensus_config::{Authority, AuthorityKeyPair, Committee, NetworkKeyPair, ProtocolKeyPair, Stake};
+use consensus_config::{
+    Authority, AuthorityKeyPair, Committee, NetworkKeyPair, ProtocolKeyPair, Stake,
+};
 use insta::assert_yaml_snapshot;
 use mysten_network::Multiaddr;
 use rand::{rngs::StdRng, SeedableRng as _};

@@ -30,7 +30,9 @@ pub struct LazyMysticetiClient {
 
 impl LazyMysticetiClient {
     pub fn new() -> Self {
-        Self { client: Arc::new(ArcSwapOption::empty()) }
+        Self {
+            client: Arc::new(ArcSwapOption::empty()),
+        }
     }
 
     async fn get(&self) -> Guard<Option<Arc<TransactionClient>>> {
@@ -54,7 +56,10 @@ impl LazyMysticetiClient {
                 sleep(RETRY_INTERVAL).await;
                 count += 1;
                 if count % 100 == 0 {
-                    warn!("Waiting for consensus to initialize after {:?}", Instant::now() - start);
+                    warn!(
+                        "Waiting for consensus to initialize after {:?}",
+                        Instant::now() - start
+                    );
                 }
             }
         }

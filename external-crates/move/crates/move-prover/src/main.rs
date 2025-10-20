@@ -7,7 +7,8 @@
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
 use move_prover::{cli::Options, run_move_prover};
-use std::{env, io::IsTerminal};
+use std::env;
+use std::io::IsTerminal;
 
 fn main() {
     if let Err(e) = run() {

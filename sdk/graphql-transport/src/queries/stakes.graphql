@@ -23,7 +23,7 @@ query getStakesByIds($ids: [SuiAddress!]!, $limit: Int, $cursor: String) {
 		}
 		nodes {
 			asMoveObject {
-				asStakedOct {
+				asStakedSui {
 					...RPC_STAKE_FIELDS
 				}
 			}
@@ -31,7 +31,7 @@ query getStakesByIds($ids: [SuiAddress!]!, $limit: Int, $cursor: String) {
 	}
 }
 
-fragment RPC_STAKE_FIELDS on StakedOct {
+fragment RPC_STAKE_FIELDS on StakedSui {
 	principal
 	activatedEpoch {
 		epochId

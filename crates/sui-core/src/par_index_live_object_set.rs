@@ -1,9 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::{authority_store_tables::LiveObject, AuthorityStore};
+use crate::authority::authority_store_tables::LiveObject;
+use crate::authority::AuthorityStore;
 use std::time::Instant;
-use sui_types::{base_types::ObjectID, object::Object, storage::error::Error as StorageError};
+use sui_types::base_types::ObjectID;
+use sui_types::object::Object;
+use sui_types::storage::error::Error as StorageError;
 use tracing::info;
 
 /// Make `LiveObjectIndexer`s for parallel indexing of the live object set
@@ -54,7 +57,10 @@ pub fn par_index_live_object_set<T: ParMakeLiveObjectIndexer>(
         Ok(())
     })?;
 
-    info!("Indexing Live Object Set took {} seconds", start_time.elapsed().as_secs());
+    info!(
+        "Indexing Live Object Set took {} seconds",
+        start_time.elapsed().as_secs()
+    );
 
     Ok(())
 }
@@ -83,7 +89,10 @@ fn live_object_set_index_task<T: LiveObjectIndexer>(
     {
         object_scanned += 1;
         if object_scanned % 2_000_000 == 0 {
-            info!("[Index] Task {}: object scanned: {}", task_id, object_scanned);
+            info!(
+                "[Index] Task {}: object scanned: {}",
+                task_id, object_scanned
+            );
         }
 
         object_indexer.index_object(object)?

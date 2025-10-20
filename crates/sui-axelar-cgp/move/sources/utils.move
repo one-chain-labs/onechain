@@ -4,8 +4,8 @@
 module axelar::utils {
     use std::vector;
 
-    use one::bcs;
-    use one::hash;
+    use sui::bcs;
+    use sui::hash;
 
     const EInvalidSignatureLength: u64 = 0;
 

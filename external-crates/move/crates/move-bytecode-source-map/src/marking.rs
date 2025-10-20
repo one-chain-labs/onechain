@@ -3,11 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::{
-    CodeOffset,
-    FunctionDefinitionIndex,
-    MemberCount,
-    StructDefinitionIndex,
-    TableIndex,
+    CodeOffset, FunctionDefinitionIndex, MemberCount, StructDefinitionIndex, TableIndex,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -46,21 +42,33 @@ pub struct MarkedSourceMapping {
 
 impl FunctionMarking {
     pub fn new() -> Self {
-        Self { code_offsets: BTreeMap::new(), type_param_offsets: BTreeMap::new() }
+        Self {
+            code_offsets: BTreeMap::new(),
+            type_param_offsets: BTreeMap::new(),
+        }
     }
 
     pub fn code_offset(&mut self, code_offset: CodeOffset, message: String) {
-        self.code_offsets.entry(code_offset).or_default().push(message)
+        self.code_offsets
+            .entry(code_offset)
+            .or_default()
+            .push(message)
     }
 
     pub fn type_param(&mut self, type_param_index: usize, message: String) {
-        self.type_param_offsets.entry(type_param_index).or_default().push(message)
+        self.type_param_offsets
+            .entry(type_param_index)
+            .or_default()
+            .push(message)
     }
 }
 
 impl StructMarking {
     pub fn new() -> Self {
-        Self { fields: BTreeMap::new(), type_param_offsets: BTreeMap::new() }
+        Self {
+            fields: BTreeMap::new(),
+            type_param_offsets: BTreeMap::new(),
+        }
     }
 
     pub fn field(&mut self, field_index: MemberCount, message: String) {
@@ -68,13 +76,19 @@ impl StructMarking {
     }
 
     pub fn type_param(&mut self, type_param_index: usize, message: String) {
-        self.type_param_offsets.entry(type_param_index).or_default().push(message)
+        self.type_param_offsets
+            .entry(type_param_index)
+            .or_default()
+            .push(message)
     }
 }
 
 impl MarkedSourceMapping {
     pub fn new() -> Self {
-        Self { function_marks: HashMap::new(), struct_marks: HashMap::new() }
+        Self {
+            function_marks: HashMap::new(),
+            struct_marks: HashMap::new(),
+        }
     }
 
     pub fn mark_code_offset(
@@ -83,7 +97,10 @@ impl MarkedSourceMapping {
         code_offset: CodeOffset,
         message: String,
     ) {
-        self.function_marks.entry(function_definition_index.0).or_default().code_offset(code_offset, message)
+        self.function_marks
+            .entry(function_definition_index.0)
+            .or_default()
+            .code_offset(code_offset, message)
     }
 
     pub fn mark_function_type_param(
@@ -92,7 +109,10 @@ impl MarkedSourceMapping {
         type_param_offset: usize,
         message: String,
     ) {
-        self.function_marks.entry(function_definition_index.0).or_default().type_param(type_param_offset, message)
+        self.function_marks
+            .entry(function_definition_index.0)
+            .or_default()
+            .type_param(type_param_offset, message)
     }
 
     pub fn mark_struct_field(
@@ -101,7 +121,10 @@ impl MarkedSourceMapping {
         field_index: MemberCount,
         message: String,
     ) {
-        self.struct_marks.entry(struct_definition_index.0).or_default().field(field_index, message)
+        self.struct_marks
+            .entry(struct_definition_index.0)
+            .or_default()
+            .field(field_index, message)
     }
 
     pub fn mark_struct_type_param(
@@ -110,6 +133,9 @@ impl MarkedSourceMapping {
         type_param_offset: usize,
         message: String,
     ) {
-        self.struct_marks.entry(struct_definition_index.0).or_default().type_param(type_param_offset, message)
+        self.struct_marks
+            .entry(struct_definition_index.0)
+            .or_default()
+            .type_param(type_param_offset, message)
     }
 }

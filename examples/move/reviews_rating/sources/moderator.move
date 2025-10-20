@@ -3,7 +3,7 @@
 
 module reviews_rating::moderator;
 
-use one::tx_context::sender;
+use sui::tx_context::sender;
 
 /// Represents a moderator that can be used to delete reviews
 public struct Moderator has key {

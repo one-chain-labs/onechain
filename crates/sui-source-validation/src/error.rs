@@ -28,7 +28,10 @@ pub enum Error {
     InvalidModuleFailure { name: String, message: String },
 
     #[error("Local version of dependency {address}::{module} was not found.")]
-    LocalDependencyNotFound { address: AccountAddress, module: Symbol },
+    LocalDependencyNotFound {
+        address: AccountAddress,
+        module: Symbol,
+    },
 
     #[error("Source package depends on {0} which is not in the linkage table.")]
     MissingDependencyInLinkageTable(AccountAddress),
@@ -36,14 +39,23 @@ pub enum Error {
     #[error("On-chain package depends on {0} which is not a source dependency.")]
     MissingDependencyInSourcePackage(AccountAddress),
 
-    #[error("Local dependency did not match its on-chain version at {address}::{package}::{module}")]
-    ModuleBytecodeMismatch { address: AccountAddress, package: Symbol, module: Symbol },
+    #[error(
+        "Local dependency did not match its on-chain version at {address}::{package}::{module}"
+    )]
+    ModuleBytecodeMismatch {
+        address: AccountAddress,
+        package: Symbol,
+        module: Symbol,
+    },
 
     #[error("Dependency ID contains a Sui object, not a Move package: {0}")]
     ObjectFoundWhenPackageExpected(ObjectID, SuiRawMoveObject),
 
     #[error("Could not deserialize on-chain dependency {address}::{module}.")]
-    OnChainDependencyDeserializationError { address: AccountAddress, module: Symbol },
+    OnChainDependencyDeserializationError {
+        address: AccountAddress,
+        module: Symbol,
+    },
 
     #[error("On-chain version of dependency {package}::{module} was not found.")]
     OnChainDependencyNotFound { package: Symbol, module: Symbol },

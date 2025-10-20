@@ -1,27 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::transaction_block_effects::TransactionBlockEffectsKind;
 use crate::{
-    error::Error,
-    types::{
-        execution_result::ExecutionResult,
-        transaction_block_effects::{TransactionBlockEffects, TransactionBlockEffectsKind},
-    },
+    error::Error, types::execution_result::ExecutionResult,
+    types::transaction_block_effects::TransactionBlockEffects,
 };
 use async_graphql::*;
-use fastcrypto::{
-    encoding::{Base64, Encoding},
-    traits::ToFromBytes,
-};
+use fastcrypto::encoding::Encoding;
+use fastcrypto::{encoding::Base64, traits::ToFromBytes};
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_sdk::SuiClient;
-use sui_types::{
-    effects::TransactionEffects as NativeTransactionEffects,
-    event::Event as NativeEvent,
-    quorum_driver_types::ExecuteTransactionRequestType,
-    signature::GenericSignature,
-    transaction::{SenderSignedData, Transaction},
-};
+use sui_types::effects::TransactionEffects as NativeTransactionEffects;
+use sui_types::event::Event as NativeEvent;
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::transaction::SenderSignedData;
+use sui_types::{signature::GenericSignature, transaction::Transaction};
 pub struct Mutation;
 
 /// Mutations are used to write to the Sui network.
@@ -47,18 +41,28 @@ impl Mutation {
         tx_bytes: String,
         signatures: Vec<String>,
     ) -> Result<ExecutionResult> {
-        let sui_sdk_client: &Option<SuiClient> =
-            ctx.data().map_err(|_| Error::Internal("Unable to fetch Sui SDK client".to_string())).extend()?;
+        let sui_sdk_client: &Option<SuiClient> = ctx
+            .data()
+            .map_err(|_| Error::Internal("Unable to fetch Sui SDK client".to_string()))
+            .extend()?;
         let sui_sdk_client = sui_sdk_client
             .as_ref()
             .ok_or_else(|| Error::Internal("Sui SDK client not initialized".to_string()))
             .extend()?;
         let tx_data = bcs::from_bytes(
             &Base64::decode(&tx_bytes)
-                .map_err(|e| Error::Client(format!("Unable to deserialize transaction bytes from Base64: {e}")))
+                .map_err(|e| {
+                    Error::Client(format!(
+                        "Unable to deserialize transaction bytes from Base64: {e}"
+                    ))
+                })
                 .extend()?,
         )
-        .map_err(|e| Error::Client(format!("Unable to deserialize transaction bytes as BCS: {e}")))
+        .map_err(|e| {
+            Error::Client(format!(
+                "Unable to deserialize transaction bytes as BCS: {e}"
+            ))
+        })
         .extend()?;
 
         let mut sigs = Vec::new();
@@ -67,7 +71,9 @@ impl Mutation {
                 GenericSignature::from_bytes(
                     &Base64::decode(&sig)
                         .map_err(|e| {
-                            Error::Client(format!("Unable to deserialize signature bytes {sig} from Base64: {e}"))
+                            Error::Client(format!(
+                                "Unable to deserialize signature bytes {sig} from Base64: {e}"
+                            ))
                         })
                         .extend()?,
                 )
@@ -76,7 +82,10 @@ impl Mutation {
             );
         }
         let transaction = Transaction::from_generic_sig_data(tx_data, sigs);
-        let options = SuiTransactionBlockResponseOptions::new().with_events().with_raw_input().with_raw_effects();
+        let options = SuiTransactionBlockResponseOptions::new()
+            .with_events()
+            .with_raw_input()
+            .with_raw_effects();
 
         let result = sui_sdk_client
             .quorum_driver_api()
@@ -100,7 +109,9 @@ impl Mutation {
 
         let events = result
             .events
-            .ok_or_else(|| Error::Internal("No events are returned from transaction execution".to_string()))?
+            .ok_or_else(|| {
+                Error::Internal("No events are returned from transaction execution".to_string())
+            })?
             .data
             .into_iter()
             .map(|e| NativeEvent {
@@ -113,9 +124,17 @@ impl Mutation {
             .collect();
 
         Ok(ExecutionResult {
-            errors: if result.errors.is_empty() { None } else { Some(result.errors) },
+            errors: if result.errors.is_empty() {
+                None
+            } else {
+                Some(result.errors)
+            },
             effects: TransactionBlockEffects {
-                kind: TransactionBlockEffectsKind::Executed { tx_data, native, events },
+                kind: TransactionBlockEffectsKind::Executed {
+                    tx_data,
+                    native,
+                    events,
+                },
                 // set to u64::MAX, as the executed transaction has not been indexed yet
                 checkpoint_viewed_at: u64::MAX,
             },

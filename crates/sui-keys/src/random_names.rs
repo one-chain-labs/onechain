@@ -211,5 +211,9 @@ pub fn random_names(mut conflicts: HashSet<String>, output_size: usize) -> Vec<S
 fn generate(rng: &mut ThreadRng) -> String {
     let left_idx = rng.gen_range(0..LEFT_LENGTH);
     let right_idx = rng.gen_range(0..RIGHT_LENGTH);
-    format!("{}-{}", LEFT_NAMES.get(left_idx).unwrap(), RIGHT_NAMES.get(right_idx).unwrap())
+    format!(
+        "{}-{}",
+        LEFT_NAMES.get(left_idx).unwrap(),
+        RIGHT_NAMES.get(right_idx).unwrap()
+    )
 }

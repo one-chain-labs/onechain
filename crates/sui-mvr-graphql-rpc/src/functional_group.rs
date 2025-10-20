@@ -124,7 +124,8 @@ pub(crate) fn functional_group(type_: &str, field: &str) -> Option<FunctionalGro
 mod tests {
     use std::collections::BTreeSet;
 
-    use async_graphql::{registry::Registry, OutputType};
+    use async_graphql::registry::Registry;
+    use async_graphql::OutputType;
 
     use crate::types::query::Query;
 

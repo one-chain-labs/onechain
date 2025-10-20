@@ -1,7 +1,7 @@
 // valid, ID is allowed
 
 module a::m {
-    use one::object;
+    use sui::object;
 
     public entry fun yes<T>(
         _: object::ID,
@@ -13,7 +13,7 @@ module a::m {
 
 }
 
-module one::object {
+module oct::object {
     struct ID has store {
         id: address,
     }

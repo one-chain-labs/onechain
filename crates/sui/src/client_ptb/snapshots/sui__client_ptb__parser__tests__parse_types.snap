@@ -78,7 +78,7 @@ expression: parsed
                 fq_name: ParsedFqName {
                     module: ParsedModuleId {
                         address: Named(
-                            "sui",
+                            "oct",
                         ),
                         name: "object",
                     },
@@ -152,9 +152,9 @@ expression: parsed
                                     address: Numerical(
                                         2,
                                     ),
-                                    name: "sui",
+                                    name: "oct",
                                 },
-                                name: "SUI",
+                                name: "OCT",
                             },
                             type_args: [],
                         },
@@ -173,7 +173,7 @@ expression: parsed
                 fq_name: ParsedFqName {
                     module: ParsedModuleId {
                         address: Named(
-                            "sui",
+                            "oct",
                         ),
                         name: "table",
                     },
@@ -185,7 +185,7 @@ expression: parsed
                             fq_name: ParsedFqName {
                                 module: ParsedModuleId {
                                     address: Named(
-                                        "sui",
+                                        "oct",
                                     ),
                                     name: "object",
                                 },

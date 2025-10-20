@@ -71,8 +71,12 @@ pub const SHARE_FUNCTION_NAME: Symbol = symbol!("share_object");
 pub const RECEIVE_FUNCTION_NAME: Symbol = symbol!("receive");
 pub const RECEIVING_TYPE_NAME: Symbol = symbol!("Receiving");
 
-pub const PRIVATE_TRANSFER_FUNCTIONS: &[Symbol] =
-    &[TRANSFER_FUNCTION_NAME, FREEZE_FUNCTION_NAME, SHARE_FUNCTION_NAME, RECEIVE_FUNCTION_NAME];
+pub const PRIVATE_TRANSFER_FUNCTIONS: &[Symbol] = &[
+    TRANSFER_FUNCTION_NAME,
+    FREEZE_FUNCTION_NAME,
+    SHARE_FUNCTION_NAME,
+    RECEIVE_FUNCTION_NAME,
+];
 
 //**************************************************************************************************
 // Diagnostics
@@ -134,8 +138,13 @@ pub const OBJECT_DECL_DIAG: DiagnosticInfo = custom(
     /* code */ 7,
     "invalid object declaration",
 );
-pub const EVENT_EMIT_CALL_DIAG: DiagnosticInfo =
-    custom(SUI_DIAG_PREFIX, Severity::NonblockingError, /* category */ TYPING, /* code */ 8, "invalid event");
+pub const EVENT_EMIT_CALL_DIAG: DiagnosticInfo = custom(
+    SUI_DIAG_PREFIX,
+    Severity::NonblockingError,
+    /* category */ TYPING,
+    /* code */ 8,
+    "invalid event",
+);
 pub const PRIVATE_TRANSFER_CALL_DIAG: DiagnosticInfo = custom(
     SUI_DIAG_PREFIX,
     Severity::NonblockingError,

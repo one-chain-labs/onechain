@@ -4,11 +4,9 @@
 use jsonrpsee::core::RpcResult;
 use simulacrum::Simulacrum;
 use std::sync::Arc;
-use sui_indexer::{
-    apis::read_api::ReadApi,
-    indexer_reader::IndexerReader,
-    test_utils::{set_up, wait_for_checkpoint},
-};
+use sui_indexer::apis::read_api::ReadApi;
+use sui_indexer::indexer_reader::IndexerReader;
+use sui_indexer::test_utils::{set_up, wait_for_checkpoint};
 use sui_json_rpc_api::ReadApiServer;
 use tempfile::tempdir;
 
@@ -40,7 +38,9 @@ async fn test_checkpoint_apis() -> RpcResult<()> {
     assert!(!checkpoints.has_next_page);
     assert_eq!(checkpoints.next_cursor, Some(2.into()));
 
-    let checkpoints = read_api.get_checkpoints(Some(2.into()), Some(2), true).await?;
+    let checkpoints = read_api
+        .get_checkpoints(Some(2.into()), Some(2), true)
+        .await?;
     assert_eq!(checkpoints.data.len(), 2);
     assert!(!checkpoints.has_next_page);
     assert_eq!(checkpoints.next_cursor, Some(0.into()));

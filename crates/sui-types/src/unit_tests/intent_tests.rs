@@ -7,13 +7,8 @@ use crate::{
     base_types::{dbg_addr, ObjectID},
     committee::EpochId,
     crypto::{
-        AccountKeyPair,
-        AuthorityKeyPair,
-        AuthoritySignature,
-        Signature,
-        SignatureScheme,
-        SuiAuthoritySignature,
-        SuiSignature,
+        AccountKeyPair, AuthorityKeyPair, AuthoritySignature, Signature, SignatureScheme,
+        SuiAuthoritySignature, SuiSignature,
     },
     object::Object,
     transaction::{Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
@@ -21,7 +16,9 @@ use crate::{
 
 use crate::crypto::get_key_pair;
 
-use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage};
+use shared_crypto::intent::{
+    AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage,
+};
 
 #[test]
 fn test_personal_message_intent() {
@@ -38,14 +35,25 @@ fn test_personal_message_intent() {
     assert_eq!(intent_bcs.len(), p_message_bcs.len() + 3);
 
     // Check that the first 3 bytes are the domain separation information.
-    assert_eq!(&intent_bcs[..3], vec![IntentScope::PersonalMessage as u8, IntentVersion::V0 as u8, AppId::Sui as u8,]);
+    assert_eq!(
+        &intent_bcs[..3],
+        vec![
+            IntentScope::PersonalMessage as u8,
+            IntentVersion::V0 as u8,
+            AppId::Sui as u8,
+        ]
+    );
 
     // Check that intent's last bytes match the p_message's bsc bytes.
     assert_eq!(&intent_bcs[3..], &p_message_bcs);
 
     // Let's ensure we can sign and verify intents.
     let s = Signature::new_secure(&IntentMessage::new(intent1, p_message), &sec1);
-    let verification = s.verify_secure(&IntentMessage::new(intent2, p_message_2), addr1, SignatureScheme::ED25519);
+    let verification = s.verify_secure(
+        &IntentMessage::new(intent2, p_message_2),
+        addr1,
+        SignatureScheme::ED25519,
+    );
     assert!(verification.is_ok())
 }
 
@@ -68,16 +76,28 @@ fn test_authority_signature_intent() {
         gas_price * TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
         gas_price,
     );
-    let signature = Signature::new_secure(&IntentMessage::new(Intent::sui_transaction(), data.clone()), &sender_key);
+    let signature = Signature::new_secure(
+        &IntentMessage::new(Intent::sui_transaction(), data.clone()),
+        &sender_key,
+    );
     let tx = Transaction::from_data(data, vec![signature]);
     let tx1 = tx.clone();
-    assert!(tx.try_into_verified_for_testing(epoch, &Default::default()).is_ok());
+    assert!(tx
+        .try_into_verified_for_testing(epoch, &Default::default())
+        .is_ok());
 
     // Create an intent with signed data.
     let intent_bcs = bcs::to_bytes(tx1.intent_message()).unwrap();
 
     // Check that the first 3 bytes are the domain separation information.
-    assert_eq!(&intent_bcs[..3], vec![IntentScope::TransactionData as u8, IntentVersion::V0 as u8, AppId::Sui as u8,]);
+    assert_eq!(
+        &intent_bcs[..3],
+        vec![
+            IntentScope::TransactionData as u8,
+            IntentVersion::V0 as u8,
+            AppId::Sui as u8,
+        ]
+    );
 
     // Check that intent's last bytes match the signed_data's bsc bytes.
     let signed_data_bcs = bcs::to_bytes(&tx1.data().intent_message().value).unwrap();

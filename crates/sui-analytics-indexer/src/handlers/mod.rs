@@ -4,24 +4,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{anyhow, Result};
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveTypeLayout, MoveValue},
-    language_storage::{StructTag, TypeTag},
-};
+use move_core_types::annotated_value::{MoveStruct, MoveTypeLayout, MoveValue};
+use move_core_types::language_storage::{StructTag, TypeTag};
 use sui_data_ingestion_core::Worker;
 
 use sui_package_resolver::{PackageStore, Resolver};
-use sui_types::{
-    base_types::ObjectID,
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    object::{bounded_visitor::BoundedVisitor, Object, Owner},
-    transaction::{TransactionData, TransactionDataAPI},
-};
+use sui_types::base_types::ObjectID;
+use sui_types::effects::TransactionEffects;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::object::bounded_visitor::BoundedVisitor;
+use sui_types::object::{Object, Owner};
+use sui_types::transaction::TransactionData;
+use sui_types::transaction::TransactionDataAPI;
 
-use crate::{
-    tables::{InputObjectKind, ObjectStatus, OwnerType},
-    FileType,
-};
+use crate::tables::{InputObjectKind, ObjectStatus, OwnerType};
+use crate::FileType;
 
 pub mod checkpoint_handler;
 pub mod df_handler;
@@ -32,8 +29,12 @@ pub mod package_handler;
 pub mod transaction_handler;
 pub mod transaction_objects_handler;
 pub mod wrapped_object_handler;
-const WRAPPED_INDEXING_DISALLOW_LIST: [&str; 4] =
-    ["0x1::string::String", "0x1::ascii::String", "0x2::url::Url", "0x2::object::ID"];
+const WRAPPED_INDEXING_DISALLOW_LIST: [&str; 4] = [
+    "0x1::string::String",
+    "0x1::ascii::String",
+    "0x2::url::Url",
+    "0x2::object::ID",
+];
 
 #[async_trait::async_trait]
 pub trait AnalyticsHandler<S>: Worker<Result = ()> {
@@ -48,7 +49,9 @@ pub trait AnalyticsHandler<S>: Worker<Result = ()> {
 
 fn initial_shared_version(object: &Object) -> Option<u64> {
     match object.owner {
-        Owner::Shared { initial_shared_version } => Some(initial_shared_version.value()),
+        Owner::Shared {
+            initial_shared_version,
+        } => Some(initial_shared_version.value()),
         _ => None,
     }
 }
@@ -87,8 +90,11 @@ struct InputObjectTracker {
 
 impl InputObjectTracker {
     fn new(txn_data: &TransactionData) -> Self {
-        let shared: BTreeSet<ObjectID> =
-            txn_data.shared_input_objects().iter().map(|shared_io| shared_io.id()).collect();
+        let shared: BTreeSet<ObjectID> = txn_data
+            .shared_input_objects()
+            .iter()
+            .map(|shared_io| shared_io.id())
+            .collect();
         let coins: BTreeSet<ObjectID> = txn_data.gas().iter().map(|obj_ref| obj_ref.0).collect();
         let input: BTreeSet<ObjectID> = txn_data
             .input_objects()
@@ -96,7 +102,11 @@ impl InputObjectTracker {
             .iter()
             .map(|io_kind| io_kind.object_id())
             .collect();
-        Self { shared, coins, input }
+        Self {
+            shared,
+            coins,
+            input,
+        }
     }
 
     fn get_input_object_kind(&self, object_id: &ObjectID) -> Option<InputObjectKind> {
@@ -123,11 +133,27 @@ struct ObjectStatusTracker {
 
 impl ObjectStatusTracker {
     fn new(effects: &TransactionEffects) -> Self {
-        let created: BTreeSet<ObjectID> = effects.created().iter().map(|(obj_ref, _)| obj_ref.0).collect();
-        let mutated: BTreeSet<ObjectID> =
-            effects.mutated().iter().chain(effects.unwrapped().iter()).map(|(obj_ref, _)| obj_ref.0).collect();
-        let deleted: BTreeSet<ObjectID> = effects.all_tombstones().into_iter().map(|(id, _)| id).collect();
-        Self { created, mutated, deleted }
+        let created: BTreeSet<ObjectID> = effects
+            .created()
+            .iter()
+            .map(|(obj_ref, _)| obj_ref.0)
+            .collect();
+        let mutated: BTreeSet<ObjectID> = effects
+            .mutated()
+            .iter()
+            .chain(effects.unwrapped().iter())
+            .map(|(obj_ref, _)| obj_ref.0)
+            .collect();
+        let deleted: BTreeSet<ObjectID> = effects
+            .all_tombstones()
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        Self {
+            created,
+            mutated,
+            deleted,
+        }
     }
 
     fn get_object_status(&self, object_id: &ObjectID) -> Option<ObjectStatus> {
@@ -148,8 +174,13 @@ async fn get_move_struct<T: PackageStore>(
     contents: &[u8],
     resolver: &Resolver<T>,
 ) -> Result<MoveStruct> {
-    let move_struct = match resolver.type_layout(TypeTag::Struct(Box::new(struct_tag.clone()))).await? {
-        MoveTypeLayout::Struct(move_struct_layout) => BoundedVisitor::deserialize_struct(contents, &move_struct_layout),
+    let move_struct = match resolver
+        .type_layout(TypeTag::Struct(Box::new(struct_tag.clone())))
+        .await?
+    {
+        MoveTypeLayout::Struct(move_struct_layout) => {
+            BoundedVisitor::deserialize_struct(contents, &move_struct_layout)
+        }
         _ => Err(anyhow!("Object is not a move struct")),
     }?;
     Ok(move_struct)
@@ -161,10 +192,22 @@ pub struct WrappedStruct {
     struct_tag: Option<StructTag>,
 }
 
-fn parse_struct(path: &str, move_struct: MoveStruct, all_structs: &mut BTreeMap<String, WrappedStruct>) {
-    let mut wrapped_struct = WrappedStruct { struct_tag: Some(move_struct.type_), ..Default::default() };
+fn parse_struct(
+    path: &str,
+    move_struct: MoveStruct,
+    all_structs: &mut BTreeMap<String, WrappedStruct>,
+) {
+    let mut wrapped_struct = WrappedStruct {
+        struct_tag: Some(move_struct.type_),
+        ..Default::default()
+    };
     for (k, v) in move_struct.fields {
-        parse_struct_field(&format!("{}.{}", path, &k), v, &mut wrapped_struct, all_structs);
+        parse_struct_field(
+            &format!("{}.{}", path, &k),
+            v,
+            &mut wrapped_struct,
+            all_structs,
+        );
     }
     all_structs.insert(path.to_string(), wrapped_struct);
 }
@@ -177,8 +220,11 @@ fn parse_struct_field(
 ) {
     match move_value {
         MoveValue::Struct(move_struct) => {
-            let values =
-                move_struct.fields.iter().map(|(id, value)| (id.to_string(), value)).collect::<BTreeMap<_, _>>();
+            let values = move_struct
+                .fields
+                .iter()
+                .map(|(id, value)| (id.to_string(), value))
+                .collect::<BTreeMap<_, _>>();
             let struct_name = format!(
                 "0x{}::{}::{}",
                 move_struct.type_.address.short_str_lossless(),
@@ -187,8 +233,11 @@ fn parse_struct_field(
             );
             if "0x2::object::UID" == struct_name {
                 if let Some(MoveValue::Struct(id_struct)) = values.get("id").cloned() {
-                    let id_values =
-                        id_struct.fields.iter().map(|(id, value)| (id.to_string(), value)).collect::<BTreeMap<_, _>>();
+                    let id_values = id_struct
+                        .fields
+                        .iter()
+                        .map(|(id, value)| (id.to_string(), value))
+                        .collect::<BTreeMap<_, _>>();
                     if let Some(MoveValue::Address(address) | MoveValue::Signer(address)) =
                         id_values.get("bytes").cloned()
                     {
@@ -199,7 +248,12 @@ fn parse_struct_field(
                 // Option in sui move is implemented as vector of size 1
                 if let Some(MoveValue::Vector(vec_values)) = values.get("vec").cloned() {
                     if let Some(first_value) = vec_values.first() {
-                        parse_struct_field(&format!("{}[0]", path), first_value.clone(), curr_struct, all_structs);
+                        parse_struct_field(
+                            &format!("{}[0]", path),
+                            first_value.clone(),
+                            curr_struct,
+                            all_structs,
+                        );
                     }
                 }
             } else if !WRAPPED_INDEXING_DISALLOW_LIST.contains(&&*struct_name) {
@@ -209,12 +263,22 @@ fn parse_struct_field(
         }
         MoveValue::Variant(v) => {
             for (k, field) in v.fields.iter() {
-                parse_struct_field(&format!("{}.{}", path, k), field.clone(), curr_struct, all_structs);
+                parse_struct_field(
+                    &format!("{}.{}", path, k),
+                    field.clone(),
+                    curr_struct,
+                    all_structs,
+                );
             }
         }
         MoveValue::Vector(fields) => {
             for (index, field) in fields.iter().enumerate() {
-                parse_struct_field(&format!("{}[{}]", path, &index), field.clone(), curr_struct, all_structs);
+                parse_struct_field(
+                    &format!("{}[{}]", path, &index),
+                    field.clone(),
+                    curr_struct,
+                    all_structs,
+                );
             }
         }
         _ => {}
@@ -224,13 +288,12 @@ fn parse_struct_field(
 #[cfg(test)]
 mod tests {
     use crate::handlers::parse_struct;
-    use move_core_types::{
-        account_address::AccountAddress,
-        annotated_value::{MoveStruct, MoveValue, MoveVariant},
-        identifier::Identifier,
-        language_storage::StructTag,
-    };
-    use std::{collections::BTreeMap, str::FromStr};
+    use move_core_types::account_address::AccountAddress;
+    use move_core_types::annotated_value::{MoveStruct, MoveValue, MoveVariant};
+    use move_core_types::identifier::Identifier;
+    use move_core_types::language_storage::StructTag;
+    use std::collections::BTreeMap;
+    use std::str::FromStr;
     use sui_types::base_types::ObjectID;
 
     #[tokio::test]
@@ -254,11 +317,17 @@ mod tests {
         });
         let move_struct = MoveStruct {
             type_: StructTag::from_str("0x2::test::Test")?,
-            fields: vec![(Identifier::from_str("id")?, uid_field), (Identifier::from_str("principal")?, balance_field)],
+            fields: vec![
+                (Identifier::from_str("id")?, uid_field),
+                (Identifier::from_str("principal")?, balance_field),
+            ],
         };
         let mut all_structs = BTreeMap::new();
         parse_struct("$", move_struct, &mut all_structs);
-        assert_eq!(all_structs.get("$").unwrap().object_id, Some(ObjectID::from_hex_literal("0x300")?));
+        assert_eq!(
+            all_structs.get("$").unwrap().object_id,
+            Some(ObjectID::from_hex_literal("0x300")?)
+        );
         assert_eq!(
             all_structs.get("$.principal").unwrap().struct_tag,
             Some(StructTag::from_str("0x2::balance::Balance")?)
@@ -298,14 +367,23 @@ mod tests {
             type_: StructTag::from_str("0x2::test::Test")?,
             fields: vec![
                 (Identifier::from_str("id")?, uid_field),
-                (Identifier::from_str("enum_field")?, MoveValue::Variant(move_enum)),
+                (
+                    Identifier::from_str("enum_field")?,
+                    MoveValue::Variant(move_enum),
+                ),
             ],
         };
         let mut all_structs = BTreeMap::new();
         parse_struct("$", move_struct, &mut all_structs);
-        assert_eq!(all_structs.get("$").unwrap().object_id, Some(ObjectID::from_hex_literal("0x300")?));
         assert_eq!(
-            all_structs.get("$.enum_field.principal").unwrap().struct_tag,
+            all_structs.get("$").unwrap().object_id,
+            Some(ObjectID::from_hex_literal("0x300")?)
+        );
+        assert_eq!(
+            all_structs
+                .get("$.enum_field.principal")
+                .unwrap()
+                .struct_tag,
             Some(StructTag::from_str("0x2::balance::Balance")?)
         );
         Ok(())

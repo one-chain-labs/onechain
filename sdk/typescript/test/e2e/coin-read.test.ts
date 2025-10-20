@@ -55,7 +55,7 @@ describe('CoinRead API', () => {
 		const suiBalance = await toolbox.client.getBalance({
 			owner: toolbox.address(),
 		});
-		expect(suiBalance.coinType).toEqual('0x2::oct::OCT');
+		expect(suiBalance.coinType).toEqual('0x2::sui::SUI');
 		expect(suiBalance.coinObjectCount).toEqual(5);
 		expect(Number(suiBalance.totalBalance)).toBeGreaterThan(0);
 

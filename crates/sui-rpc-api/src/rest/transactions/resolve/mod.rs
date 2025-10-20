@@ -1,34 +1,41 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 
-use super::{execution::SimulateTransactionQueryParameters, TransactionSimulationResponse};
-use crate::{
-    reader::StateReader,
-    rest::openapi::{ApiEndpoint, OperationBuilder, RequestBodyBuilder, ResponseBuilder, RouteHandler},
-    service::objects::ObjectNotFoundError,
-    Result,
-    RpcService,
-    RpcServiceError,
-};
-use axum::{
-    extract::{Query, State},
-    Json,
-};
+use super::execution::SimulateTransactionQueryParameters;
+use super::TransactionSimulationResponse;
+use super::{ApiEndpoint, RouteHandler};
+use crate::reader::StateReader;
+use crate::service::objects::ObjectNotFoundError;
+use crate::Result;
+use crate::RpcService;
+use crate::RpcServiceError;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Json;
 use itertools::Itertools;
 use move_binary_format::normalized;
-use schemars::JsonSchema;
 use sui_protocol_config::ProtocolConfig;
-use sui_sdk_types::types::{unresolved, Argument, Command, ObjectId, Transaction};
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    effects::TransactionEffectsAPI,
-    gas::GasCostSummary,
-    gas_coin::GasCoin,
-    move_package::MovePackage,
-    transaction::{CallArg, GasData, ObjectArg, ProgrammableTransaction, TransactionData, TransactionDataAPI},
-};
+use sui_sdk_transaction_builder::unresolved;
+use sui_sdk_types::Argument;
+use sui_sdk_types::Command;
+use sui_sdk_types::ObjectId;
+use sui_sdk_types::Transaction;
+use sui_types::base_types::ObjectID;
+use sui_types::base_types::ObjectRef;
+use sui_types::base_types::SuiAddress;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::gas::GasCostSummary;
+use sui_types::gas_coin::GasCoin;
+use sui_types::move_package::MovePackage;
+use sui_types::transaction::CallArg;
+use sui_types::transaction::GasData;
+use sui_types::transaction::ObjectArg;
+use sui_types::transaction::ProgrammableTransaction;
+use sui_types::transaction::TransactionData;
+use sui_types::transaction::TransactionDataAPI;
 use tap::Pipe;
 
 mod literal;
@@ -44,16 +51,6 @@ impl ApiEndpoint<RpcService> for ResolveTransaction {
         "/transactions/resolve"
     }
 
-    fn operation(&self, generator: &mut schemars::gen::SchemaGenerator) -> openapiv3::v3_1::Operation {
-        OperationBuilder::new()
-            .tag("Transactions")
-            .operation_id("ResolveTransaction")
-            .query_parameters::<ResolveTransactionQueryParameters>(generator)
-            .request_body(RequestBodyBuilder::new().json_content::<unresolved::Transaction>(generator).build())
-            .response(200, ResponseBuilder::new().json_content::<ResolveTransactionResponse>(generator).build())
-            .build()
-    }
-
     fn handler(&self) -> RouteHandler<RpcService> {
         RouteHandler::new(self.method(), resolve_transaction)
     }
@@ -64,7 +61,10 @@ async fn resolve_transaction(
     Query(parameters): Query<ResolveTransactionQueryParameters>,
     Json(unresolved_transaction): Json<unresolved::Transaction>,
 ) -> Result<Json<ResolveTransactionResponse>> {
-    let executor = state.executor.as_ref().ok_or_else(|| anyhow::anyhow!("No Transaction Executor"))?;
+    let executor = state
+        .executor
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("No Transaction Executor"))?;
     let (reference_gas_price, protocol_config) = {
         let system_state = state.reader.get_system_state_summary()?;
 
@@ -75,13 +75,20 @@ async fn resolve_transaction(
             state.reader.inner().get_chain_identifier()?.chain(),
         )
         .ok_or_else(|| {
-            RpcServiceError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "unable to get current protocol config")
+            RpcServiceError::new(
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "unable to get current protocol config",
+            )
         })?;
 
         (system_state.reference_gas_price, protocol_config)
     };
-    let called_packages = called_packages(&state.reader, &protocol_config, &unresolved_transaction)?;
-    let user_provided_budget = unresolved_transaction.gas_payment.as_ref().and_then(|payment| payment.budget);
+    let called_packages =
+        called_packages(&state.reader, &protocol_config, &unresolved_transaction)?;
+    let user_provided_budget = unresolved_transaction
+        .gas_payment
+        .as_ref()
+        .and_then(|payment| payment.budget);
     let mut resolved_transaction = resolve_unresolved_transaction(
         &state.reader,
         &called_packages,
@@ -95,11 +102,14 @@ async fn resolve_transaction(
     let budget = if let Some(user_provided_budget) = user_provided_budget {
         user_provided_budget
     } else {
-        let simulation_result =
-            executor.simulate_transaction(resolved_transaction.clone()).map_err(anyhow::Error::from)?;
+        let simulation_result = executor
+            .simulate_transaction(resolved_transaction.clone())
+            .map_err(anyhow::Error::from)?;
 
-        let estimate =
-            estimate_gas_budget_from_gas_cost(simulation_result.effects.gas_cost_summary(), reference_gas_price);
+        let estimate = estimate_gas_budget_from_gas_cost(
+            simulation_result.effects.gas_cost_summary(),
+            reference_gas_price,
+        );
         resolved_transaction.gas_data_mut().budget = estimate;
         estimate
     };
@@ -111,7 +121,9 @@ async fn resolve_transaction(
             .map_err(anyhow::Error::from)?
             .iter()
             .flat_map(|obj| match obj {
-                sui_types::transaction::InputObjectKind::ImmOrOwnedMoveObject((id, _, _)) => Some(*id),
+                sui_types::transaction::InputObjectKind::ImmOrOwnedMoveObject((id, _, _)) => {
+                    Some(*id)
+                }
                 _ => None,
             })
             .collect_vec();
@@ -127,17 +139,25 @@ async fn resolve_transaction(
 
     let simulation = if parameters.simulate {
         state
-            .simulate_transaction(&parameters.simulate_transaction_parameters, resolved_transaction.clone().try_into()?)?
+            .simulate_transaction(
+                &parameters.simulate_transaction_parameters,
+                resolved_transaction.clone().try_into()?,
+            )?
             .pipe(Some)
     } else {
         None
     };
 
-    ResolveTransactionResponse { transaction: resolved_transaction.try_into()?, simulation }.pipe(Json).pipe(Ok)
+    ResolveTransactionResponse {
+        transaction: resolved_transaction.try_into()?,
+        simulation,
+    }
+    .pipe(Json)
+    .pipe(Ok)
 }
 
 /// Query parameters for the resolve transaction endpoint
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize, JsonSchema)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct ResolveTransactionQueryParameters {
     /// Request that the fully resolved transaction be simulated and have its results sent back in
     /// the response.
@@ -161,13 +181,18 @@ fn called_packages(
     let binary_config = sui_types::execution_config_utils::to_binary_config(protocol_config);
     let mut packages = HashMap::new();
 
-    for move_call in unresolved_transaction.ptb.commands.iter().filter_map(|command| {
-        if let Command::MoveCall(move_call) = command {
-            Some(move_call)
-        } else {
-            None
-        }
-    }) {
+    for move_call in unresolved_transaction
+        .ptb
+        .commands
+        .iter()
+        .filter_map(|command| {
+            if let Command::MoveCall(move_call) = command {
+                Some(move_call)
+            } else {
+                None
+            }
+        })
+    {
         let package = reader
             .inner()
             .get_object(&(move_call.package.into()))
@@ -194,7 +219,10 @@ fn called_packages(
                 format!("unable to normalize package {}: {e}", move_call.package),
             )
         })?;
-        let package = NormalizedPackage { package, normalized_modules };
+        let package = NormalizedPackage {
+            package,
+            normalized_modules,
+        };
 
         packages.insert(move_call.package, package);
     }
@@ -223,20 +251,27 @@ fn resolve_unresolved_transaction(
             budget: unresolved_gas_payment.budget.unwrap_or(max_gas_budget),
         }
     } else {
-        GasData { payment: vec![], owner: sender, price: reference_gas_price, budget: max_gas_budget }
+        GasData {
+            payment: vec![],
+            owner: sender,
+            price: reference_gas_price,
+            budget: max_gas_budget,
+        }
     };
     let expiration = unresolved_transaction.expiration.into();
     let ptb = resolve_ptb(reader, called_packages, unresolved_transaction.ptb)?;
-    Ok(TransactionData::V1(sui_types::transaction::TransactionDataV1 {
-        kind: sui_types::transaction::TransactionKind::ProgrammableTransaction(ptb),
-        sender,
-        gas_data,
-        expiration,
-    }))
+    Ok(TransactionData::V1(
+        sui_types::transaction::TransactionDataV1 {
+            kind: sui_types::transaction::TransactionKind::ProgrammableTransaction(ptb),
+            sender,
+            gas_data,
+            expiration,
+        },
+    ))
 }
 
 /// Response type for the execute transaction endpoint
-#[derive(Debug, serde::Serialize, serde::Deserialize, JsonSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ResolveTransactionResponse {
     pub transaction: Transaction,
     pub simulation: Option<TransactionSimulationResponse>,
@@ -247,7 +282,10 @@ fn resolve_object_reference(
     unresolved_object_reference: unresolved::ObjectReference,
 ) -> Result<ObjectRef> {
     let object_id = unresolved_object_reference.object_id;
-    let object = reader.inner().get_object(&object_id.into()).ok_or_else(|| ObjectNotFoundError::new(object_id))?;
+    let object = reader
+        .inner()
+        .get_object(&object_id.into())
+        .ok_or_else(|| ObjectNotFoundError::new(object_id))?;
     resolve_object_reference_with_object(&object, unresolved_object_reference)
 }
 
@@ -259,7 +297,11 @@ fn resolve_object_reference_with_object(
     object: &sui_types::object::Object,
     unresolved_object_reference: unresolved::ObjectReference,
 ) -> Result<ObjectRef> {
-    let unresolved::ObjectReference { object_id, version, digest } = unresolved_object_reference;
+    let unresolved::ObjectReference {
+        object_id,
+        version,
+        digest,
+    } = unresolved_object_reference;
 
     match object.owner() {
         sui_types::object::Owner::AddressOwner(_) | sui_types::object::Owner::Immutable => {}
@@ -309,12 +351,24 @@ fn resolve_ptb(
         .inputs
         .into_iter()
         .enumerate()
-        .map(|(arg_idx, arg)| resolve_arg(reader, called_packages, &unresolved_ptb.commands, arg, arg_idx))
+        .map(|(arg_idx, arg)| {
+            resolve_arg(
+                reader,
+                called_packages,
+                &unresolved_ptb.commands,
+                arg,
+                arg_idx,
+            )
+        })
         .collect::<Result<_>>()?;
 
     ProgrammableTransaction {
         inputs,
-        commands: unresolved_ptb.commands.into_iter().map(TryInto::try_into).collect::<Result<_, _>>()?,
+        commands: unresolved_ptb
+            .commands
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<_, _>>()?,
     }
     .pipe(Ok)
 }
@@ -326,10 +380,18 @@ fn resolve_arg(
     arg: unresolved::Input,
     arg_idx: usize,
 ) -> Result<CallArg> {
-    use fastcrypto::encoding::{Base64, Encoding};
-    use sui_sdk_types::types::unresolved::InputKind::*;
+    use fastcrypto::encoding::Base64;
+    use fastcrypto::encoding::Encoding;
+    use sui_sdk_transaction_builder::unresolved::InputKind::*;
 
-    let unresolved::Input { kind, value, object_id, version, digest, mutable } = arg;
+    let unresolved::Input {
+        kind,
+        value,
+        object_id,
+        version,
+        digest,
+        mutable,
+    } = arg;
 
     match (kind, value, object_id, version, digest, mutable) {
         // pre serialized BCS input encoded as a base64 string
@@ -354,30 +416,41 @@ fn resolve_arg(
         }
 
         // Literal, unresolved pure argument
-        (Some(Literal), Some(value), None, None, None, None) | (None, Some(value), None, None, None, None) => {
-            CallArg::Pure(literal::resolve_literal(called_packages, commands, arg_idx, value)?)
-        }
+        (Some(Literal), Some(value), None, None, None, None)
+        | (None, Some(value), None, None, None, None) => CallArg::Pure(literal::resolve_literal(
+            called_packages,
+            commands,
+            arg_idx,
+            value,
+        )?),
 
         // Immutable or owned
         (Some(ImmutableOrOwned), None, Some(object_id), version, digest, None) => {
             CallArg::Object(ObjectArg::ImmOrOwnedObject(resolve_object_reference(
                 reader,
-                unresolved::ObjectReference { object_id, version, digest },
+                unresolved::ObjectReference {
+                    object_id,
+                    version,
+                    digest,
+                },
             )?))
         }
 
         // Shared object
-        (Some(Shared), None, Some(object_id), _version, None, _mutable) => {
-            CallArg::Object(resolve_shared_input(reader, called_packages, commands, arg_idx, object_id)?)
-        }
+        (Some(Shared), None, Some(object_id), _version, None, _mutable) => CallArg::Object(
+            resolve_shared_input(reader, called_packages, commands, arg_idx, object_id)?,
+        ),
 
         // Receiving
         (Some(Receiving), None, Some(object_id), version, digest, None) => {
-            CallArg::Object(ObjectArg::Receiving(resolve_object_reference(reader, unresolved::ObjectReference {
-                object_id,
-                version,
-                digest,
-            })?))
+            CallArg::Object(ObjectArg::Receiving(resolve_object_reference(
+                reader,
+                unresolved::ObjectReference {
+                    object_id,
+                    version,
+                    digest,
+                },
+            )?))
         }
 
         // Object, could be Immutable, Owned, Shared, or Receiving
@@ -392,7 +465,12 @@ fn resolve_arg(
             mutable,
         )?),
 
-        _ => return Err(RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "invalid unresolved input argument")),
+        _ => {
+            return Err(RpcServiceError::new(
+                axum::http::StatusCode::BAD_REQUEST,
+                "invalid unresolved input argument",
+            ))
+        }
     }
     .pipe(Ok)
 }
@@ -403,25 +481,36 @@ fn resolve_object(
     commands: &[Command],
     arg_idx: usize,
     object_id: ObjectId,
-    version: Option<sui_sdk_types::types::Version>,
-    digest: Option<sui_sdk_types::types::ObjectDigest>,
+    version: Option<sui_sdk_types::Version>,
+    digest: Option<sui_sdk_types::ObjectDigest>,
     _mutable: Option<bool>,
 ) -> Result<ObjectArg> {
     let id = object_id.into();
-    let object = reader.inner().get_object(&id).ok_or_else(|| ObjectNotFoundError::new(object_id))?;
+    let object = reader
+        .inner()
+        .get_object(&id)
+        .ok_or_else(|| ObjectNotFoundError::new(object_id))?;
 
     match object.owner() {
-        sui_types::object::Owner::Immutable => {
-            resolve_object_reference_with_object(&object, unresolved::ObjectReference { object_id, version, digest })
-                .map(ObjectArg::ImmOrOwnedObject)
-        }
-
-        sui_types::object::Owner::AddressOwner(_) => {
-            let object_ref = resolve_object_reference_with_object(&object, unresolved::ObjectReference {
+        sui_types::object::Owner::Immutable => resolve_object_reference_with_object(
+            &object,
+            unresolved::ObjectReference {
                 object_id,
                 version,
                 digest,
-            })?;
+            },
+        )
+        .map(ObjectArg::ImmOrOwnedObject),
+
+        sui_types::object::Owner::AddressOwner(_) => {
+            let object_ref = resolve_object_reference_with_object(
+                &object,
+                unresolved::ObjectReference {
+                    object_id,
+                    version,
+                    digest,
+                },
+            )?;
 
             if is_input_argument_receiving(called_packages, commands, arg_idx)? {
                 ObjectArg::Receiving(object_ref)
@@ -448,7 +537,10 @@ fn resolve_shared_input(
     object_id: ObjectId,
 ) -> Result<ObjectArg> {
     let id = object_id.into();
-    let object = reader.inner().get_object(&id).ok_or_else(|| ObjectNotFoundError::new(object_id))?;
+    let object = reader
+        .inner()
+        .get_object(&id)
+        .ok_or_else(|| ObjectNotFoundError::new(object_id))?;
     resolve_shared_input_with_object(called_packages, commands, arg_idx, object)
 }
 
@@ -458,14 +550,21 @@ fn is_input_argument_receiving(
     commands: &[Command],
     arg_idx: usize,
 ) -> Result<bool> {
-    let (receiving_package, receiving_module, receiving_struct) = sui_types::transfer::RESOLVED_RECEIVING_STRUCT;
+    let (receiving_package, receiving_module, receiving_struct) =
+        sui_types::transfer::RESOLVED_RECEIVING_STRUCT;
 
     let mut receiving = false;
     for (command, idx) in find_arg_uses(arg_idx, commands) {
         if let (Command::MoveCall(move_call), Some(idx)) = (command, idx) {
             let arg_type = arg_type_of_move_call_input(called_packages, move_call, idx)?;
 
-            if let move_binary_format::normalized::Type::Struct { address, module, name, .. } = arg_type {
+            if let move_binary_format::normalized::Type::Struct {
+                address,
+                module,
+                name,
+                ..
+            } = arg_type
+            {
                 if receiving_package == address
                     && receiving_module == module.as_ref()
                     && receiving_struct == name.as_ref()
@@ -488,7 +587,7 @@ fn is_input_argument_receiving(
 // real type needs to be lookedup from the provided type args in the MoveCall itself
 fn arg_type_of_move_call_input<'a>(
     called_packages: &'a HashMap<ObjectId, NormalizedPackage>,
-    move_call: &sui_sdk_types::types::MoveCall,
+    move_call: &sui_sdk_types::MoveCall,
     idx: usize,
 ) -> Result<&'a move_binary_format::normalized::Type> {
     let function = called_packages
@@ -509,10 +608,12 @@ fn arg_type_of_move_call_input<'a>(
                 ),
             )
         })?;
-    function
-        .parameters
-        .get(idx)
-        .ok_or_else(|| RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "invalid input parameter"))
+    function.parameters.get(idx).ok_or_else(|| {
+        RpcServiceError::new(
+            axum::http::StatusCode::BAD_REQUEST,
+            "invalid input parameter",
+        )
+    })
 }
 
 fn resolve_shared_input_with_object(
@@ -522,17 +623,21 @@ fn resolve_shared_input_with_object(
     object: sui_types::object::Object,
 ) -> Result<ObjectArg> {
     let object_id = object.id();
-    let initial_shared_version =
-        if let sui_types::object::Owner::Shared { initial_shared_version }
-        | sui_types::object::Owner::ConsensusV2 { start_version: initial_shared_version, .. } = object.owner()
-        {
-            *initial_shared_version
-        } else {
-            return Err(RpcServiceError::new(
-                axum::http::StatusCode::BAD_REQUEST,
-                format!("object {object_id} is not a shared or consensus object"),
-            ));
-        };
+    let initial_shared_version = if let sui_types::object::Owner::Shared {
+        initial_shared_version,
+    }
+    | sui_types::object::Owner::ConsensusV2 {
+        start_version: initial_shared_version,
+        ..
+    } = object.owner()
+    {
+        *initial_shared_version
+    } else {
+        return Err(RpcServiceError::new(
+            axum::http::StatusCode::BAD_REQUEST,
+            format!("object {object_id} is not a shared or consensus object"),
+        ));
+    };
     let mut mutable = false;
     for (command, idx) in find_arg_uses(arg_idx, commands) {
         match (command, idx) {
@@ -558,48 +663,71 @@ fn resolve_shared_input_with_object(
         }
     }
 
-    Ok(ObjectArg::SharedObject { id: object_id, initial_shared_version, mutable })
+    Ok(ObjectArg::SharedObject {
+        id: object_id,
+        initial_shared_version,
+        mutable,
+    })
 }
 
 /// Given an particular input argument, find all of its uses.
 ///
 /// The returned iterator contains all commands where the argument is used and an optional index
 /// to indicate where the argument is used in that command.
-fn find_arg_uses(arg_idx: usize, commands: &[Command]) -> impl Iterator<Item = (&Command, Option<usize>)> {
+fn find_arg_uses(
+    arg_idx: usize,
+    commands: &[Command],
+) -> impl Iterator<Item = (&Command, Option<usize>)> {
     fn matches_input_arg(arg: Argument, arg_idx: usize) -> bool {
         matches!(arg, Argument::Input(idx) if idx as usize == arg_idx)
     }
 
     commands.iter().filter_map(move |command| {
         match command {
-            Command::MoveCall(move_call) => {
-                move_call.arguments.iter().position(|elem| matches_input_arg(*elem, arg_idx)).map(Some)
-            }
+            Command::MoveCall(move_call) => move_call
+                .arguments
+                .iter()
+                .position(|elem| matches_input_arg(*elem, arg_idx))
+                .map(Some),
             Command::TransferObjects(transfer_objects) => {
                 if matches_input_arg(transfer_objects.address, arg_idx) {
                     Some(None)
                 } else {
-                    transfer_objects.objects.iter().position(|elem| matches_input_arg(*elem, arg_idx)).map(Some)
+                    transfer_objects
+                        .objects
+                        .iter()
+                        .position(|elem| matches_input_arg(*elem, arg_idx))
+                        .map(Some)
                 }
             }
             Command::SplitCoins(split_coins) => {
                 if matches_input_arg(split_coins.coin, arg_idx) {
                     Some(None)
                 } else {
-                    split_coins.amounts.iter().position(|amount| matches_input_arg(*amount, arg_idx)).map(Some)
+                    split_coins
+                        .amounts
+                        .iter()
+                        .position(|amount| matches_input_arg(*amount, arg_idx))
+                        .map(Some)
                 }
             }
             Command::MergeCoins(merge_coins) => {
                 if matches_input_arg(merge_coins.coin, arg_idx) {
                     Some(None)
                 } else {
-                    merge_coins.coins_to_merge.iter().position(|elem| matches_input_arg(*elem, arg_idx)).map(Some)
+                    merge_coins
+                        .coins_to_merge
+                        .iter()
+                        .position(|elem| matches_input_arg(*elem, arg_idx))
+                        .map(Some)
                 }
             }
             Command::Publish(_) => None,
-            Command::MakeMoveVector(make_move_vector) => {
-                make_move_vector.elements.iter().position(|elem| matches_input_arg(*elem, arg_idx)).map(Some)
-            }
+            Command::MakeMoveVector(make_move_vector) => make_move_vector
+                .elements
+                .iter()
+                .position(|elem| matches_input_arg(*elem, arg_idx))
+                .map(Some),
             Command::Upgrade(upgrade) => matches_input_arg(upgrade.ticket, arg_idx).then_some(None),
         }
         .map(|x| (command, x))
@@ -615,7 +743,10 @@ fn find_arg_uses(arg_idx: usize, commands: &[Command]) -> impl Iterator<Item = (
 ///     overhead
 ///
 /// This gas estimate is computed similarly as in the TypeScript SDK
-fn estimate_gas_budget_from_gas_cost(gas_cost_summary: &GasCostSummary, reference_gas_price: u64) -> u64 {
+fn estimate_gas_budget_from_gas_cost(
+    gas_cost_summary: &GasCostSummary,
+    reference_gas_price: u64,
+) -> u64 {
     const GAS_SAFE_OVERHEAD: u64 = 1000;
 
     let safe_overhead = GAS_SAFE_OVERHEAD * reference_gas_price;
@@ -642,7 +773,9 @@ fn select_gas(
         .filter(|info| !input_objects.contains(&info.object_id))
         .filter_map(|info| reader.inner().get_object(&info.object_id))
         .filter_map(|object| {
-            GasCoin::try_from(&object).ok().map(|coin| (object.compute_object_reference(), coin.value()))
+            GasCoin::try_from(&object)
+                .ok()
+                .map(|coin| (object.compute_object_reference(), coin.value()))
         })
         .take(max_gas_payment_objects as usize);
 

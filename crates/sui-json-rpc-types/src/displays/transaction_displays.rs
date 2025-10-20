@@ -5,11 +5,7 @@ use crate::displays::Pretty;
 use std::fmt::{Display, Formatter};
 
 use crate::{
-    SuiArgument,
-    SuiCallArg,
-    SuiCommand,
-    SuiObjectArg,
-    SuiProgrammableMoveCall,
+    SuiArgument, SuiCallArg, SuiCommand, SuiObjectArg, SuiProgrammableMoveCall,
     SuiProgrammableTransactionBlock,
 };
 use sui_types::transaction::write_sep;
@@ -28,29 +24,43 @@ impl<'a> Display for Pretty<'a, SuiProgrammableTransactionBlock> {
                 match input {
                     SuiCallArg::Pure(v) => {
                         let pure_arg = if let Some(t) = v.value_type() {
-                            format!("{i:<3} Pure Arg: Type: {}, Value: {}", t, v.value().to_json_value())
+                            format!(
+                                "{i:<3} Pure Arg: Type: {}, Value: {}",
+                                t,
+                                v.value().to_json_value()
+                            )
                         } else {
                             format!("{i:<3} Pure Arg: {}", v.value().to_json_value())
                         };
                         builder.push_record(vec![pure_arg]);
                     }
                     SuiCallArg::Object(SuiObjectArg::ImmOrOwnedObject { object_id, .. }) => {
-                        builder.push_record(vec![format!("{i:<3} Imm/Owned Object ID: {}", object_id)]);
+                        builder.push_record(vec![format!(
+                            "{i:<3} Imm/Owned Object ID: {}",
+                            object_id
+                        )]);
                     }
                     SuiCallArg::Object(SuiObjectArg::SharedObject { object_id, .. }) => {
-                        builder.push_record(vec![format!("{i:<3} Shared Object    ID: {}", object_id)]);
+                        builder.push_record(vec![format!(
+                            "{i:<3} Shared Object    ID: {}",
+                            object_id
+                        )]);
                     }
                     SuiCallArg::Object(SuiObjectArg::Receiving { object_id, .. }) => {
-                        builder.push_record(vec![format!("{i:<3} Receiving Object ID: {}", object_id)]);
+                        builder.push_record(vec![format!(
+                            "{i:<3} Receiving Object ID: {}",
+                            object_id
+                        )]);
                     }
                 }
             }
 
             let mut table = builder.build();
             table.with(TablePanel::header("Input Objects"));
-            table.with(
-                TableStyle::rounded().horizontals([HorizontalLine::new(1, TableStyle::modern().get_horizontal())]),
-            );
+            table.with(TableStyle::rounded().horizontals([HorizontalLine::new(
+                1,
+                TableStyle::modern().get_horizontal(),
+            )]));
             write!(f, "\n{}", table)?;
         } else {
             write!(f, "\n  No input objects for this transaction")?;
@@ -67,9 +77,10 @@ impl<'a> Display for Pretty<'a, SuiProgrammableTransactionBlock> {
             }
             let mut table = builder.build();
             table.with(TablePanel::header("Commands"));
-            table.with(
-                TableStyle::rounded().horizontals([HorizontalLine::new(1, TableStyle::modern().get_horizontal())]),
-            );
+            table.with(TableStyle::rounded().horizontals([HorizontalLine::new(
+                1,
+                TableStyle::modern().get_horizontal(),
+            )]));
             write!(f, "\n{}", table)
         } else {
             write!(f, "\n  No commands for this transaction")
@@ -94,13 +105,21 @@ impl<'a> Display for Pretty<'a, SuiCommand> {
             SuiCommand::MoveCall(p) => write!(f, "{}", Pretty(&**p)),
 
             SuiCommand::MergeCoins(target, coins) => {
-                write!(f, "MergeCoins:\n ┌\n │ Target: {}\n │ Coins: \n │   ", Pretty(target))?;
+                write!(
+                    f,
+                    "MergeCoins:\n ┌\n │ Target: {}\n │ Coins: \n │   ",
+                    Pretty(target)
+                )?;
                 write_sep(f, coins.iter().map(Pretty), "\n │   ")?;
                 write!(f, "\n └")
             }
 
             SuiCommand::SplitCoins(coin, amounts) => {
-                write!(f, "SplitCoins:\n ┌\n │ Coin: {}\n │ Amounts: \n │   ", Pretty(coin))?;
+                write!(
+                    f,
+                    "SplitCoins:\n ┌\n │ Coin: {}\n │ Amounts: \n │   ",
+                    Pretty(coin)
+                )?;
                 write_sep(f, amounts.iter().map(Pretty), "\n │   ")?;
                 write!(f, "\n └")
             }
@@ -131,9 +150,19 @@ impl<'a> Display for Pretty<'a, SuiCommand> {
 impl<'a> Display for Pretty<'a, SuiProgrammableMoveCall> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(move_call) = self;
-        let SuiProgrammableMoveCall { package, module, function, type_arguments, arguments } = move_call;
+        let SuiProgrammableMoveCall {
+            package,
+            module,
+            function,
+            type_arguments,
+            arguments,
+        } = move_call;
 
-        write!(f, "MoveCall:\n ┌\n │ Function:  {} \n │ Module:    {}\n │ Package:   {}", function, module, package)?;
+        write!(
+            f,
+            "MoveCall:\n ┌\n │ Function:  {} \n │ Module:    {}\n │ Package:   {}",
+            function, module, package
+        )?;
 
         if !type_arguments.is_empty() {
             write!(f, "\n │ Type Arguments: \n │   ")?;

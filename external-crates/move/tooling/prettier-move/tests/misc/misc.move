@@ -10,10 +10,10 @@
  *
  * @dev We do not provide a function to read the data inside the {Timelock<T>} to prevent capabilities from being used.
  */
-module suitears::timelock {
+module octtears::timelock {
 
     use std::{string::String, type_name::{Self, TypeName}};
-    use one::{
+    use sui::{
         clock::Clock,
         coin::Coin,
         dynamic_field as df,
@@ -23,6 +23,7 @@ module suitears::timelock {
 
     fun calculate_pending_rewards<StakeCoin, RewardCoin>(
         acc: &Account<StakeCoin, RewardCoin>,
+        an_acc: &mut Account<StakeCoin, RewardCoin>,
         stake_factor: u64,
         accrued_rewards_per_share: u256,
     ): u64 {
@@ -133,7 +134,7 @@ module suitears::timelock {
      * @notice Locks the `data` for `unlock_time` milliseconds.
      *
      * @param data An object with the store ability.
-     * @param c The shared `one::clock::Clock` object.
+     * @param c The shared `sui::clock::Clock` object.
      * @patam unlock_time The lock period in milliseconds.
      * @return {Timelock<T>}.
      *
@@ -154,7 +155,7 @@ module suitears::timelock {
      * @notice Unlocks a {Timelock<T>} and returns the locked resource `T`.
      *
      * @param self A {Timelock<T>}
-     * @param c The shared `one::clock::Clock` object.
+     * @param c The shared `sui::clock::Clock` object.
      * @return `T`. An object with the store ability.
      *
      * aborts-if

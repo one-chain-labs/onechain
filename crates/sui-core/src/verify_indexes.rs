@@ -36,7 +36,8 @@ pub fn verify_indexes(store: &dyn AccumulatorStore, indexes: Arc<IndexStore>) ->
 
         // Coin Index Calculation
         if let Some(type_tag) = object.coin_type_maybe() {
-            let info = CoinInfo::from_object(&object).expect("already checked that this is a coin type");
+            let info =
+                CoinInfo::from_object(&object).expect("already checked that this is a coin type");
             let key = CoinIndexKey2::new(owner, type_tag.to_string(), info.balance, object.id());
 
             coin_index.insert(key, info);
@@ -47,9 +48,12 @@ pub fn verify_indexes(store: &dyn AccumulatorStore, indexes: Arc<IndexStore>) ->
 
     // Verify Owner Index
     for (key, info) in indexes.tables().owner_index().unbounded_iter() {
-        let calculated_info = owner_index
-            .remove(&key)
-            .ok_or_else(|| anyhow!("owner_index: found extra, unexpected entry {:?}", (&key, &info)))?;
+        let calculated_info = owner_index.remove(&key).ok_or_else(|| {
+            anyhow!(
+                "owner_index: found extra, unexpected entry {:?}",
+                (&key, &info)
+            )
+        })?;
 
         if calculated_info != info {
             bail!("owner_index: entry {key:?} is different: expected {calculated_info:?} found {info:?}");
@@ -63,9 +67,12 @@ pub fn verify_indexes(store: &dyn AccumulatorStore, indexes: Arc<IndexStore>) ->
 
     // Verify Coin Index
     for (key, info) in indexes.tables().coin_index().unbounded_iter() {
-        let calculated_info = coin_index
-            .remove(&key)
-            .ok_or_else(|| anyhow!("coin_index: found extra, unexpected entry {:?}", (&key, &info)))?;
+        let calculated_info = coin_index.remove(&key).ok_or_else(|| {
+            anyhow!(
+                "coin_index: found extra, unexpected entry {:?}",
+                (&key, &info)
+            )
+        })?;
 
         if calculated_info != info {
             bail!("coin_index: entry {key:?} is different: expected {calculated_info:?} found {info:?}");

@@ -30,18 +30,30 @@ impl<'a> TextBuilder<'a> {
     /// and the newly added text.
     pub fn add(&mut self, text: String, style: Style) {
         let chunk = |string: String| {
-            string.split('\n').map(|x| x.to_string()).map(|x| vec![Span::styled(x, style)]).collect::<Vec<Vec<Span>>>()
+            string
+                .split('\n')
+                .map(|x| x.to_string())
+                .map(|x| vec![Span::styled(x, style)])
+                .collect::<Vec<Vec<Span>>>()
         };
         let last_chunk_ends_with_nl = self
             .chunks
             .last()
-            .map(|last_span| last_span.last().map(|last_span| last_span.content.ends_with('\n')).unwrap_or(false))
+            .map(|last_span| {
+                last_span
+                    .last()
+                    .map(|last_span| last_span.content.ends_with('\n'))
+                    .unwrap_or(false)
+            })
             .unwrap_or(true);
 
         if !last_chunk_ends_with_nl {
             let mut iter = text.splitn(2, '\n');
             iter.next().into_iter().for_each(|line_continuation| {
-                self.chunks.last_mut().unwrap().push(Span::styled(line_continuation.to_string(), style));
+                self.chunks
+                    .last_mut()
+                    .unwrap()
+                    .push(Span::styled(line_continuation.to_string(), style));
             });
             iter.next().into_iter().for_each(|remainder| {
                 self.chunks.extend(chunk(remainder.to_string()));

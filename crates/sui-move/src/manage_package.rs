@@ -43,9 +43,15 @@ pub struct ManagePackage {
 }
 
 impl ManagePackage {
-    pub fn execute(self, package_path: Option<&Path>, build_config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(
+        self,
+        package_path: Option<&Path>,
+        build_config: BuildConfig,
+    ) -> anyhow::Result<()> {
         let build_config = resolve_lock_file_path(build_config, package_path)?;
-        let Some(lock_file) = build_config.lock_file else { bail!(NO_LOCK_FILE) };
+        let Some(lock_file) = build_config.lock_file else {
+            bail!(NO_LOCK_FILE)
+        };
         if !lock_file.exists() {
             bail!(NO_LOCK_FILE)
         };

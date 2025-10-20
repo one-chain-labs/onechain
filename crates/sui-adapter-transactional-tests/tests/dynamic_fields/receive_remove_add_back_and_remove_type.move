@@ -10,7 +10,7 @@
 
 //# publish
 module test::m1 {
-    use one::transfer::Receiving;
+    use sui::transfer::Receiving;
 
     public struct Object has key, store {
         id: UID,
@@ -41,47 +41,47 @@ module test::m1 {
 
     public entry fun test_dof(parent: &mut Object, c1: Receiving<C1>, c2: Receiving<C2>) {
         let c1 = transfer::receive(&mut parent.id, c1);
-        one::dynamic_object_field::add(&mut parent.id, 0, c1);
-        let c1: C1 = one::dynamic_object_field::remove(&mut parent.id, 0);
+        sui::dynamic_object_field::add(&mut parent.id, 0, c1);
+        let c1: C1 = sui::dynamic_object_field::remove(&mut parent.id, 0);
         transfer::public_transfer(c1, @test);
 
         let c2 = transfer::receive(&mut parent.id, c2);
-        one::dynamic_object_field::add(&mut parent.id, 0, c2);
-        let C2 { id } = one::dynamic_object_field::remove(&mut parent.id, 0);
+        sui::dynamic_object_field::add(&mut parent.id, 0, c2);
+        let C2 { id } = sui::dynamic_object_field::remove(&mut parent.id, 0);
         object::delete(id);
     }
 
     public entry fun test_df(parent: &mut Object, c1: Receiving<C1>, c2: Receiving<C2>) {
         let c1 = transfer::receive(&mut parent.id, c1);
-        one::dynamic_field::add(&mut parent.id, 0, c1);
-        let c1: C1 = one::dynamic_field::remove(&mut parent.id, 0);
+        sui::dynamic_field::add(&mut parent.id, 0, c1);
+        let c1: C1 = sui::dynamic_field::remove(&mut parent.id, 0);
         transfer::public_transfer(c1, @test);
 
         let c2 = transfer::receive(&mut parent.id, c2);
-        one::dynamic_field::add(&mut parent.id, 0, c2);
-        let C2 { id } = one::dynamic_field::remove(&mut parent.id, 0);
+        sui::dynamic_field::add(&mut parent.id, 0, c2);
+        let C2 { id } = sui::dynamic_field::remove(&mut parent.id, 0);
         object::delete(id);
     }
 
     // Try to "wash" the receiving object through a dynamic object field and then wrap it in a wrapper object.
     public entry fun test_dof_wrapper(parent: &mut Object, c1: Receiving<C1>, _c2: Receiving<C2>, ctx: &mut TxContext) {
         let c1 = transfer::receive(&mut parent.id, c1);
-        one::dynamic_object_field::add(&mut parent.id, 0, c1);
-        let c1: C1 = one::dynamic_object_field::remove(&mut parent.id, 0);
+        sui::dynamic_object_field::add(&mut parent.id, 0, c1);
+        let c1: C1 = sui::dynamic_object_field::remove(&mut parent.id, 0);
         let w = Wrapper { id: object::new(ctx), value: c1 };
-        one::dynamic_object_field::add(&mut parent.id, 0, w);
-        let w: Wrapper<C1> = one::dynamic_object_field::remove(&mut parent.id, 0);
+        sui::dynamic_object_field::add(&mut parent.id, 0, w);
+        let w: Wrapper<C1> = sui::dynamic_object_field::remove(&mut parent.id, 0);
         transfer::public_transfer(w, @test);
     }
 
     // Try to "wash" the receiving object through a dynamic field and then wrap it in a wrapper object.
     public entry fun test_df_wrapper(parent: &mut Object, c1: Receiving<C1>, _c2: Receiving<C2>, ctx: &mut TxContext) {
         let c1 = transfer::receive(&mut parent.id, c1);
-        one::dynamic_field::add(&mut parent.id, 0, c1);
-        let c1: C1 = one::dynamic_field::remove(&mut parent.id, 0);
+        sui::dynamic_field::add(&mut parent.id, 0, c1);
+        let c1: C1 = sui::dynamic_field::remove(&mut parent.id, 0);
         let w = Wrapper { id: object::new(ctx), value: c1 };
-        one::dynamic_field::add(&mut parent.id, 0, w);
-        let w: Wrapper<C1> = one::dynamic_field::remove(&mut parent.id, 0);
+        sui::dynamic_field::add(&mut parent.id, 0, w);
+        let w: Wrapper<C1> = sui::dynamic_field::remove(&mut parent.id, 0);
         transfer::public_transfer(w, @test);
     }
 }

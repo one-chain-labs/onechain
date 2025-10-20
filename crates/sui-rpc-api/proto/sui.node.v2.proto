@@ -1,17 +1,17 @@
 syntax = "proto3";
 
-package sui.node.v2;
+package oct.node.v2;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-import "sui.types.proto";
+import "oct.types.proto";
 
 //
 // Rpc Node interface
 //
 
-service Node {
-  rpc GetNodeInfo(google.protobuf.Empty) returns (GetNodeInfoResponse);
+service NodeService {
+  rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoResponse);
   rpc GetCommittee(GetCommitteeRequest) returns (GetCommitteeResponse);
 
   rpc GetObject(GetObjectRequest) returns (GetObjectResponse);
@@ -22,9 +22,11 @@ service Node {
   rpc ExecuteTransaction(ExecuteTransactionRequest) returns (ExecuteTransactionResponse);
 }
 
+message GetNodeInfoRequest {}
+
 message GetNodeInfoResponse {
   // The chain identifier of the chain that this Node is on
-  optional sui.types.Digest chain_id = 1;
+  optional oct.types.Digest chain_id = 1;
 
   // Human readable name of the chain that this Node is on
   optional string chain = 2;
@@ -52,119 +54,128 @@ message GetCommitteeRequest {
 }
 
 message GetCommitteeResponse {
-  optional sui.types.ValidatorCommittee committee = 1;
+  optional oct.types.ValidatorCommittee committee = 1;
 }
 
 message GetTransactionRequest {
-  optional sui.types.Digest digest = 1;
+  optional oct.types.Digest digest = 1;
 
   optional GetTransactionOptions options = 3;
 }
 
 message GetTransactionOptions {
-  // Include the sui.types.Transaction message in the response.
+  // Include the oct.types.Transaction message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool transaction = 1;
   // Include the Transaction formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool transaction_bcs = 2;
-  // Include the set of sui.types.UserSignature's in the response.
+  // Include the set of oct.types.UserSignature's in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool signatures = 3;
-  // Include the sui.types.TransactionEffects message in the response.
+  // Include the set of UserSignature's encoded as bytes in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
+  optional bool signatures_bytes = 8;
+  // Include the oct.types.TransactionEffects message in the response.
+  //
+  // Defaults to `false` if not included
   optional bool effects = 4;
   // Include the TransactionEffects formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool effects_bcs = 5;
-  // Include the sui.types.TransactionEvents message in the response.
+  // Include the oct.types.TransactionEvents message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool events = 6;
   // Include the TransactionEvents formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool events_bcs = 7;
 }
 
 message GetTransactionResponse {
   // The digest of this transaction
-  optional sui.types.Digest digest = 1;
-  optional sui.types.Transaction transaction = 2;
-  optional sui.types.Bcs transaction_bcs = 3;
+  optional oct.types.Digest digest = 1;
+  optional oct.types.Transaction transaction = 2;
+  optional oct.types.Bcs transaction_bcs = 3;
   optional UserSignatures signatures = 4;
-  optional sui.types.TransactionEffects effects = 5;
-  optional sui.types.Bcs effects_bcs = 6;
-  optional sui.types.TransactionEvents events = 7;
-  optional sui.types.Bcs events_bcs = 8;
+  optional UserSignaturesBytes signatures_bytes = 11;
+  optional oct.types.TransactionEffects effects = 5;
+  optional oct.types.Bcs effects_bcs = 6;
+  optional oct.types.TransactionEvents events = 7;
+  optional oct.types.Bcs events_bcs = 8;
   optional uint64 checkpoint = 9;
   optional google.protobuf.Timestamp timestamp = 10;
 }
 
 message UserSignatures {
-  repeated sui.types.UserSignature signatures = 1;
+  repeated oct.types.UserSignature signatures = 1;
+}
+
+message UserSignaturesBytes {
+  repeated bytes signatures = 1;
 }
 
 message GetObjectRequest {
-  optional sui.types.ObjectId object_id = 1;
+  optional oct.types.ObjectId object_id = 1;
   optional uint64 version = 2;
 
   optional GetObjectOptions options = 3;
 }
 
 message GetObjectOptions {
-  // Include the sui.types.Object message in the response.
+  // Include the oct.types.Object message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool object = 1;
   // Include the Object formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool object_bcs = 2;
 }
 
 message GetObjectResponse {
-  optional sui.types.ObjectId object_id = 1;
+  optional oct.types.ObjectId object_id = 1;
   optional uint64 version = 2;
   // The digest of this object
-  optional sui.types.Digest digest = 3;
+  optional oct.types.Digest digest = 3;
 
-  optional sui.types.Object object = 4;
-  optional sui.types.Bcs object_bcs = 5;
+  optional oct.types.Object object = 4;
+  optional oct.types.Bcs object_bcs = 5;
 }
 
 message GetCheckpointRequest {
   optional uint64 sequence_number = 1;
-  optional sui.types.Digest digest = 2;
+  optional oct.types.Digest digest = 2;
 
   optional GetCheckpointOptions options = 3;
 }
 
 message GetCheckpointOptions {
-  // Include the sui.types.CheckpointSummary in the response.
+  // Include the oct.types.CheckpointSummary in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool summary = 3;
   // Include the CheckpointSummary formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool summary_bcs = 4;
-  // Include the sui.types.ValidatorAggregatedSignature in the response.
+  // Include the oct.types.ValidatorAggregatedSignature in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool signature = 5;
-  // Include the sui.types.CheckpointContents message in the response.
+  // Include the oct.types.CheckpointContents message in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool contents = 6;
   // Include the CheckpointContents formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool contents_bcs = 7;
 }
 
@@ -172,79 +183,86 @@ message GetCheckpointResponse {
   // The sequence number of this Checkpoint
   optional uint64 sequence_number = 1;
   // The digest of this Checkpoint's CheckpointSummary
-  optional sui.types.Digest digest = 2;
+  optional oct.types.Digest digest = 2;
 
-  optional sui.types.CheckpointSummary summary = 3;
-  optional sui.types.Bcs summary_bcs = 4;
-  optional sui.types.ValidatorAggregatedSignature signature = 5;
-  optional sui.types.CheckpointContents contents = 6;
-  optional sui.types.Bcs contents_bcs = 7;
+  optional oct.types.CheckpointSummary summary = 3;
+  optional oct.types.Bcs summary_bcs = 4;
+  optional oct.types.ValidatorAggregatedSignature signature = 5;
+  optional oct.types.CheckpointContents contents = 6;
+  optional oct.types.Bcs contents_bcs = 7;
 }
 
 message GetFullCheckpointRequest {
   optional uint64 sequence_number = 1;
-  optional sui.types.Digest digest = 2;
+  optional oct.types.Digest digest = 2;
 
   optional GetFullCheckpointOptions options = 3;
 }
 
 message GetFullCheckpointOptions {
-  // Include the sui.types.CheckpointSummary in the response.
+  // Include the oct.types.CheckpointSummary in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool summary = 3;
   // Include the CheckpointSummary formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool summary_bcs = 4;
-  // Include the sui.types.ValidatorAggregatedSignature in the response.
+  // Include the oct.types.ValidatorAggregatedSignature in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool signature = 5;
-  // Include the sui.types.CheckpointContents message in the response.
+  // Include the oct.types.CheckpointContents message in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool contents = 6;
   // Include the CheckpointContents formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool contents_bcs = 7;
 
-  // Include the sui.types.Transaction message in the response.
+  // Include the oct.types.Transaction message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool transaction = 8;
   // Include the Transaction formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool transaction_bcs = 9;
-  // Include the sui.types.TransactionEffects message in the response.
+  // Include the oct.types.TransactionEffects message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool effects = 10;
   // Include the TransactionEffects formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool effects_bcs = 11;
-  // Include the sui.types.TransactionEvents message in the response.
+  // Include the oct.types.TransactionEvents message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool events = 12;
   // Include the TransactionEvents formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool events_bcs = 13;
 
+  // Include the input objects for transactions in the response.
+  //
+  // Defaults to `false` if not included
   optional bool input_objects = 14;
+
+  // Include the output objects for transactions in the response.
+  //
+  // Defaults to `false` if not included
   optional bool output_objects = 15;
 
-  // Include the sui.types.Object message in the response.
+  // Include the oct.types.Object message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool object = 16;
   // Include the Object formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool object_bcs = 17;
 }
 
@@ -252,27 +270,27 @@ message GetFullCheckpointResponse {
   // The sequence number of this Checkpoint
   optional uint64 sequence_number = 1;
   // The digest of this Checkpoint's CheckpointSummary
-  optional sui.types.Digest digest = 2;
+  optional oct.types.Digest digest = 2;
 
-  optional sui.types.CheckpointSummary summary = 3;
-  optional sui.types.Bcs summary_bcs = 4;
-  optional sui.types.ValidatorAggregatedSignature signature = 5;
-  optional sui.types.CheckpointContents contents = 6;
-  optional sui.types.Bcs contents_bcs = 7;
+  optional oct.types.CheckpointSummary summary = 3;
+  optional oct.types.Bcs summary_bcs = 4;
+  optional oct.types.ValidatorAggregatedSignature signature = 5;
+  optional oct.types.CheckpointContents contents = 6;
+  optional oct.types.Bcs contents_bcs = 7;
 
   repeated FullCheckpointTransaction transactions = 8;
 }
 
 message FullCheckpointTransaction {
   // The digest of this transaction
-  optional sui.types.Digest digest = 1;
-  optional sui.types.Transaction transaction = 2;
-  optional sui.types.Bcs transaction_bcs = 3;
+  optional oct.types.Digest digest = 1;
+  optional oct.types.Transaction transaction = 2;
+  optional oct.types.Bcs transaction_bcs = 3;
 
-  optional sui.types.TransactionEffects effects = 5;
-  optional sui.types.Bcs effects_bcs = 6;
-  optional sui.types.TransactionEvents events = 7;
-  optional sui.types.Bcs events_bcs = 8;
+  optional oct.types.TransactionEffects effects = 5;
+  optional oct.types.Bcs effects_bcs = 6;
+  optional oct.types.TransactionEvents events = 7;
+  optional oct.types.Bcs events_bcs = 8;
 
   optional FullCheckpointObjects input_objects = 11;
   optional FullCheckpointObjects output_objects = 12;
@@ -283,19 +301,19 @@ message FullCheckpointObjects {
 }
 
 message FullCheckpointObject {
-  optional sui.types.ObjectId object_id = 1;
+  optional oct.types.ObjectId object_id = 1;
   optional uint64 version = 2;
   // The digest of this object
-  optional sui.types.Digest digest = 3;
+  optional oct.types.Digest digest = 3;
 
-  optional sui.types.Object object = 4;
-  optional sui.types.Bcs object_bcs = 5;
+  optional oct.types.Object object = 4;
+  optional oct.types.Bcs object_bcs = 5;
 }
 
 message BalanceChange {
-  optional sui.types.Address address = 1;
-  optional sui.types.TypeTag coin_type = 2;
-  optional sui.types.I128 amount = 3;
+  optional oct.types.Address address = 1;
+  optional oct.types.TypeTag coin_type = 2;
+  optional oct.types.I128 amount = 3;
 }
 
 message BalanceChanges {
@@ -304,7 +322,7 @@ message BalanceChanges {
 
 message EffectsFinality {
   oneof finality {
-    sui.types.ValidatorAggregatedSignature certified = 1;
+    oct.types.ValidatorAggregatedSignature certified = 1;
     uint64 checkpointed = 2;
     google.protobuf.Empty quorum_executed = 3;
   }
@@ -312,41 +330,42 @@ message EffectsFinality {
 
 message ExecuteTransactionResponse {
   optional EffectsFinality finality = 1;
-  optional sui.types.TransactionEffects effects = 2;
-  optional sui.types.Bcs effects_bcs = 3;
-  optional sui.types.TransactionEvents events = 4;
-  optional sui.types.Bcs events_bcs = 5;
+  optional oct.types.TransactionEffects effects = 2;
+  optional oct.types.Bcs effects_bcs = 3;
+  optional oct.types.TransactionEvents events = 4;
+  optional oct.types.Bcs events_bcs = 5;
   optional BalanceChanges balance_changes = 6;
 }
 
 message ExecuteTransactionRequest {
-  optional sui.types.Transaction transaction = 1;
-  optional sui.types.Bcs transaction_bcs = 2;
-  repeated sui.types.UserSignature signatures = 3;
+  optional oct.types.Transaction transaction = 1;
+  optional oct.types.Bcs transaction_bcs = 2;
+  optional UserSignatures signatures = 3;
+  optional UserSignaturesBytes signatures_bytes = 4;
 
-  optional ExecuteTransactionOptions options = 4;
+  optional ExecuteTransactionOptions options = 5;
 }
 
 message ExecuteTransactionOptions {
-  // Include the sui.types.TransactionEffects message in the response.
+  // Include the oct.types.TransactionEffects message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool effects = 4;
   // Include the TransactionEffects formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool effects_bcs = 5;
-  // Include the sui.types.TransactionEvents message in the response.
+  // Include the oct.types.TransactionEvents message in the response.
   //
-  // Defaults to true if not included
+  // Defaults to `false` if not included
   optional bool events = 6;
   // Include the TransactionEvents formatted as BCS in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool events_bcs = 7;
 
   // Include the BalanceChanges in the response.
   //
-  // Defaults to false if not included
+  // Defaults to `false` if not included
   optional bool balance_changes = 8;
 }

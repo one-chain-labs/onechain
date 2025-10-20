@@ -4,11 +4,11 @@
 
 #[test_only]
 #[allow(unused_use)]
-module one::authenticator_state_tests {
+module oct::authenticator_state_tests {
     use std::string::String;
 
-    use one::test_scenario;
-    use one::authenticator_state::{
+    use sui::test_scenario;
+    use sui::authenticator_state::{
         Self,
         AuthenticatorState,
         create_active_jwk,

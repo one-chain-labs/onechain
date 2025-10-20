@@ -6,7 +6,7 @@
 /// with SUI.
 module examples::sword {
     use examples::gem::GEM;
-    use one::token::{Self, Token, ActionRequest};
+    use sui::token::{Self, Token, ActionRequest};
 
     /// Trying to purchase a sword with an incorrect amount.
     const EWrongAmount: u64 = 0;
@@ -25,10 +25,10 @@ module examples::sword {
 }
 
 /// Module that defines the in-game currency: GEMs which can be purchased with
-/// SUI and used to buy swords (in the `sword` module).
+/// OCT and used to buy swords (in the `sword` module).
 module examples::gem {
     use std::{option::none, string::{Self, String}};
-    use one::{
+    use sui::{
         balance::{Self, Balance},
         coin::{Self, Coin, TreasuryCap},
         oct::OCT,

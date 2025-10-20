@@ -3,7 +3,8 @@
 use crate::TypedStoreError;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{borrow::Borrow, collections::BTreeMap, error::Error, ops::RangeBounds};
+use std::ops::RangeBounds;
+use std::{borrow::Borrow, collections::BTreeMap, error::Error};
 
 pub trait Map<'a, K, V>
 where
@@ -20,11 +21,16 @@ where
     fn contains_key(&self, key: &K) -> Result<bool, Self::Error>;
 
     /// Returns true if the map contains a value for the specified key.
-    fn multi_contains_keys<J>(&self, keys: impl IntoIterator<Item = J>) -> Result<Vec<bool>, Self::Error>
+    fn multi_contains_keys<J>(
+        &self,
+        keys: impl IntoIterator<Item = J>,
+    ) -> Result<Vec<bool>, Self::Error>
     where
         J: Borrow<K>,
     {
-        keys.into_iter().map(|key| self.contains_key(key.borrow())).collect()
+        keys.into_iter()
+            .map(|key| self.contains_key(key.borrow()))
+            .collect()
     }
 
     /// Returns the value for the given key from the map, if it exists.
@@ -56,7 +62,8 @@ where
     fn unbounded_iter(&'a self) -> Self::Iterator;
 
     /// Returns an iterator visiting each key-value pair within the specified bounds in the map.
-    fn iter_with_bounds(&'a self, lower_bound: Option<K>, upper_bound: Option<K>) -> Self::Iterator;
+    fn iter_with_bounds(&'a self, lower_bound: Option<K>, upper_bound: Option<K>)
+        -> Self::Iterator;
 
     /// Similar to `iter_with_bounds` but allows specifying inclusivity/exclusivity of ranges explicitly.
     /// TODO: find better name
@@ -66,7 +73,11 @@ where
     fn safe_iter(&'a self) -> Self::SafeIterator;
 
     // Same as `iter_with_bounds` but performs status check.
-    fn safe_iter_with_bounds(&'a self, lower_bound: Option<K>, upper_bound: Option<K>) -> Self::SafeIterator;
+    fn safe_iter_with_bounds(
+        &'a self,
+        lower_bound: Option<K>,
+        upper_bound: Option<K>,
+    ) -> Self::SafeIterator;
 
     // Same as `range_iter` but performs status check.
     fn safe_range_iter(&'a self, range: impl RangeBounds<K>) -> Self::SafeIterator;
@@ -86,11 +97,16 @@ where
     }
 
     /// Returns a vector of raw values corresponding to the keys provided, non-atomically.
-    fn multi_get_raw_bytes<J>(&self, keys: impl IntoIterator<Item = J>) -> Result<Vec<Option<Vec<u8>>>, Self::Error>
+    fn multi_get_raw_bytes<J>(
+        &self,
+        keys: impl IntoIterator<Item = J>,
+    ) -> Result<Vec<Option<Vec<u8>>>, Self::Error>
     where
         J: Borrow<K>,
     {
-        keys.into_iter().map(|key| self.get_raw_bytes(key.borrow())).collect()
+        keys.into_iter()
+            .map(|key| self.get_raw_bytes(key.borrow()))
+            .collect()
     }
 
     /// Returns a vector of values corresponding to the keys provided, non-atomically.
@@ -106,12 +122,17 @@ where
     }
 
     /// Inserts key-value pairs, non-atomically.
-    fn multi_insert<J, U>(&self, key_val_pairs: impl IntoIterator<Item = (J, U)>) -> Result<(), Self::Error>
+    fn multi_insert<J, U>(
+        &self,
+        key_val_pairs: impl IntoIterator<Item = (J, U)>,
+    ) -> Result<(), Self::Error>
     where
         J: Borrow<K>,
         U: Borrow<V>,
     {
-        key_val_pairs.into_iter().try_for_each(|(key, value)| self.insert(key.borrow(), value.borrow()))
+        key_val_pairs
+            .into_iter()
+            .try_for_each(|(key, value)| self.insert(key.borrow(), value.borrow()))
     }
 
     /// Removes keys, non-atomically.
@@ -119,7 +140,8 @@ where
     where
         J: Borrow<K>,
     {
-        keys.into_iter().try_for_each(|key| self.remove(key.borrow()))
+        keys.into_iter()
+            .try_for_each(|key| self.remove(key.borrow()))
     }
 
     /// Try to catch up with primary when running as secondary

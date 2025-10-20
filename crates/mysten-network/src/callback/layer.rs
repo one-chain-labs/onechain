@@ -32,6 +32,9 @@ where
     type Service = Callback<S, M>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        Callback { inner, make_callback_handler: self.make_handler.clone() }
+        Callback {
+            inner,
+            make_callback_handler: self.make_handler.clone(),
+        }
     }
 }

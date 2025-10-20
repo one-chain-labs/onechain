@@ -1,19 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    types::{
-        CheckpointResponse,
-        FullCheckpointObject,
-        FullCheckpointResponse,
-        FullCheckpointTransaction,
-        GetCheckpointOptions,
-        GetFullCheckpointOptions,
-    },
-    Result,
-    RpcService,
-};
-use sui_sdk_types::types::{CheckpointContents, CheckpointDigest, CheckpointSequenceNumber, SignedCheckpointSummary};
+use crate::types::CheckpointResponse;
+use crate::types::FullCheckpointObject;
+use crate::types::FullCheckpointResponse;
+use crate::types::FullCheckpointTransaction;
+use crate::types::GetCheckpointOptions;
+use crate::types::GetFullCheckpointOptions;
+use crate::Result;
+use crate::RpcService;
+use sui_sdk_types::CheckpointContents;
+use sui_sdk_types::CheckpointDigest;
+use sui_sdk_types::CheckpointSequenceNumber;
+use sui_sdk_types::SignedCheckpointSummary;
 use tap::Pipe;
 
 impl RpcService {
@@ -22,7 +21,10 @@ impl RpcService {
         checkpoint: Option<CheckpointId>,
         options: GetCheckpointOptions,
     ) -> Result<CheckpointResponse> {
-        let SignedCheckpointSummary { checkpoint, signature } = match checkpoint {
+        let SignedCheckpointSummary {
+            checkpoint,
+            signature,
+        } = match checkpoint {
             Some(checkpoint_id @ CheckpointId::SequenceNumber(s)) => {
                 let oldest_checkpoint = self.reader.inner().get_lowest_available_checkpoint()?;
                 if s < oldest_checkpoint {
@@ -32,32 +34,46 @@ impl RpcService {
                     ));
                 }
 
-                self.reader.inner().get_checkpoint_by_sequence_number(s).ok_or(CheckpointNotFoundError(checkpoint_id))?
+                self.reader
+                    .inner()
+                    .get_checkpoint_by_sequence_number(s)
+                    .ok_or(CheckpointNotFoundError(checkpoint_id))?
             }
-            Some(checkpoint_id @ CheckpointId::Digest(d)) => {
-                self.reader.inner().get_checkpoint_by_digest(&d.into()).ok_or(CheckpointNotFoundError(checkpoint_id))?
-            }
+            Some(checkpoint_id @ CheckpointId::Digest(d)) => self
+                .reader
+                .inner()
+                .get_checkpoint_by_digest(&d.into())
+                .ok_or(CheckpointNotFoundError(checkpoint_id))?,
             None => self.reader.inner().get_latest_checkpoint()?,
         }
         .into_inner()
         .try_into()?;
 
-        let (contents, contents_bcs) = if options.include_contents() || options.include_contents_bcs() {
-            let contents: CheckpointContents = self
-                .reader
-                .inner()
-                .get_checkpoint_contents_by_sequence_number(checkpoint.sequence_number)
-                .ok_or(CheckpointNotFoundError(CheckpointId::SequenceNumber(checkpoint.sequence_number)))?
-                .try_into()?;
+        let (contents, contents_bcs) =
+            if options.include_contents() || options.include_contents_bcs() {
+                let contents: CheckpointContents = self
+                    .reader
+                    .inner()
+                    .get_checkpoint_contents_by_sequence_number(checkpoint.sequence_number)
+                    .ok_or(CheckpointNotFoundError(CheckpointId::SequenceNumber(
+                        checkpoint.sequence_number,
+                    )))?
+                    .try_into()?;
 
-            let contents_bcs = options.include_contents_bcs().then(|| bcs::to_bytes(&contents)).transpose()?;
+                let contents_bcs = options
+                    .include_contents_bcs()
+                    .then(|| bcs::to_bytes(&contents))
+                    .transpose()?;
 
-            (options.include_contents().then_some(contents), contents_bcs)
-        } else {
-            (None, None)
-        };
+                (options.include_contents().then_some(contents), contents_bcs)
+            } else {
+                (None, None)
+            };
 
-        let summary_bcs = options.include_summary_bcs().then(|| bcs::to_bytes(&checkpoint)).transpose()?;
+        let summary_bcs = options
+            .include_summary_bcs()
+            .then(|| bcs::to_bytes(&checkpoint))
+            .transpose()?;
 
         CheckpointResponse {
             sequence_number: checkpoint.sequence_number,
@@ -78,7 +94,10 @@ impl RpcService {
     ) -> Result<FullCheckpointResponse> {
         let verified_summary = match checkpoint {
             CheckpointId::SequenceNumber(s) => {
-                let oldest_checkpoint = self.reader.inner().get_lowest_available_checkpoint_objects()?;
+                let oldest_checkpoint = self
+                    .reader
+                    .inner()
+                    .get_lowest_available_checkpoint_objects()?;
                 if s < oldest_checkpoint {
                     return Err(crate::RpcServiceError::new(
                         axum::http::StatusCode::GONE,
@@ -86,11 +105,16 @@ impl RpcService {
                     ));
                 }
 
-                self.reader.inner().get_checkpoint_by_sequence_number(s).ok_or(CheckpointNotFoundError(checkpoint))?
+                self.reader
+                    .inner()
+                    .get_checkpoint_by_sequence_number(s)
+                    .ok_or(CheckpointNotFoundError(checkpoint))?
             }
-            CheckpointId::Digest(d) => {
-                self.reader.inner().get_checkpoint_by_digest(&d.into()).ok_or(CheckpointNotFoundError(checkpoint))?
-            }
+            CheckpointId::Digest(d) => self
+                .reader
+                .inner()
+                .get_checkpoint_by_digest(&d.into())
+                .ok_or(CheckpointNotFoundError(checkpoint))?,
         };
 
         let checkpoint_contents = self
@@ -99,15 +123,27 @@ impl RpcService {
             .get_checkpoint_contents_by_digest(&verified_summary.content_digest)
             .ok_or(CheckpointNotFoundError(checkpoint))?;
 
-        let sui_types::full_checkpoint_content::CheckpointData { checkpoint_summary, checkpoint_contents, transactions } =
-            self.reader.inner().get_checkpoint_data(verified_summary, checkpoint_contents)?;
+        let sui_types::full_checkpoint_content::CheckpointData {
+            checkpoint_summary,
+            checkpoint_contents,
+            transactions,
+        } = self
+            .reader
+            .inner()
+            .get_checkpoint_data(verified_summary, checkpoint_contents)?;
 
         let sequence_number = checkpoint_summary.sequence_number;
         let digest = checkpoint_summary.digest().to_owned().into();
         let (summary, signature) = checkpoint_summary.into_data_and_sig();
 
-        let summary_bcs = options.include_summary_bcs().then(|| bcs::to_bytes(&summary)).transpose()?;
-        let contents_bcs = options.include_contents_bcs().then(|| bcs::to_bytes(&checkpoint_contents)).transpose()?;
+        let summary_bcs = options
+            .include_summary_bcs()
+            .then(|| bcs::to_bytes(&summary))
+            .transpose()?;
+        let contents_bcs = options
+            .include_contents_bcs()
+            .then(|| bcs::to_bytes(&checkpoint_contents))
+            .transpose()?;
 
         let transactions = transactions
             .into_iter()
@@ -117,10 +153,16 @@ impl RpcService {
         FullCheckpointResponse {
             sequence_number,
             digest,
-            summary: options.include_summary().then(|| summary.try_into()).transpose()?,
+            summary: options
+                .include_summary()
+                .then(|| summary.try_into())
+                .transpose()?,
             summary_bcs,
             signature: options.include_signature().then(|| signature.into()),
-            contents: options.include_contents().then(|| checkpoint_contents.try_into()).transpose()?,
+            contents: options
+                .include_contents()
+                .then(|| checkpoint_contents.try_into())
+                .transpose()?,
             contents_bcs,
             transactions,
         }
@@ -140,23 +182,49 @@ fn transaction_to_checkpoint_transaction(
 ) -> Result<FullCheckpointTransaction> {
     let digest = transaction.digest().to_owned().into();
     let transaction = transaction.into_data().into_inner().intent_message.value;
-    let transaction_bcs = options.include_transaction_bcs().then(|| bcs::to_bytes(&transaction)).transpose()?;
-    let transaction = options.include_transaction().then(|| transaction.try_into()).transpose()?;
-    let effects_bcs = options.include_effects_bcs().then(|| bcs::to_bytes(&effects)).transpose()?;
-    let effects = options.include_effects().then(|| effects.try_into()).transpose()?;
-    let events_bcs = options.include_events_bcs().then(|| events.as_ref().map(bcs::to_bytes)).flatten().transpose()?;
-    let events = options.include_events().then(|| events.map(TryInto::try_into)).flatten().transpose()?;
+    let transaction_bcs = options
+        .include_transaction_bcs()
+        .then(|| bcs::to_bytes(&transaction))
+        .transpose()?;
+    let transaction = options
+        .include_transaction()
+        .then(|| transaction.try_into())
+        .transpose()?;
+    let effects_bcs = options
+        .include_effects_bcs()
+        .then(|| bcs::to_bytes(&effects))
+        .transpose()?;
+    let effects = options
+        .include_effects()
+        .then(|| effects.try_into())
+        .transpose()?;
+    let events_bcs = options
+        .include_events_bcs()
+        .then(|| events.as_ref().map(bcs::to_bytes))
+        .flatten()
+        .transpose()?;
+    let events = options
+        .include_events()
+        .then(|| events.map(TryInto::try_into))
+        .flatten()
+        .transpose()?;
 
     let input_objects = options
         .include_input_objects()
         .then(|| {
-            input_objects.into_iter().map(|object| object_to_object_response(object, options)).collect::<Result<_>>()
+            input_objects
+                .into_iter()
+                .map(|object| object_to_object_response(object, options))
+                .collect::<Result<_>>()
         })
         .transpose()?;
     let output_objects = options
         .include_output_objects()
         .then(|| {
-            output_objects.into_iter().map(|object| object_to_object_response(object, options)).collect::<Result<_>>()
+            output_objects
+                .into_iter()
+                .map(|object| object_to_object_response(object, options))
+                .collect::<Result<_>>()
         })
         .transpose()?;
 
@@ -182,25 +250,31 @@ fn object_to_object_response(
     let version = object.version().value();
     let digest = object.digest().into();
 
-    let object_bcs = options.include_object_bcs().then(|| bcs::to_bytes(&object)).transpose()?;
-    let object = options.include_object().then(|| object.try_into()).transpose()?;
+    let object_bcs = options
+        .include_object_bcs()
+        .then(|| bcs::to_bytes(&object))
+        .transpose()?;
+    let object = options
+        .include_object()
+        .then(|| object.try_into())
+        .transpose()?;
 
-    FullCheckpointObject { object_id, version, digest, object, object_bcs }.pipe(Ok)
+    FullCheckpointObject {
+        object_id,
+        version,
+        digest,
+        object,
+        object_bcs,
+    }
+    .pipe(Ok)
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, schemars::JsonSchema)]
-#[schemars(untagged)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CheckpointId {
-    #[schemars(title = "SequenceNumber", example = "CheckpointSequenceNumber::default")]
     /// Sequence number or height of a Checkpoint
-    SequenceNumber(#[schemars(with = "crate::rest::_schemars::U64")] CheckpointSequenceNumber),
-    #[schemars(title = "Digest", example = "example_digest")]
+    SequenceNumber(CheckpointSequenceNumber),
     /// Base58 encoded 32-byte digest of a Checkpoint
     Digest(CheckpointDigest),
-}
-
-fn example_digest() -> CheckpointDigest {
-    "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S".parse().unwrap()
 }
 
 impl<'de> serde::Deserialize<'de> for CheckpointId {
@@ -215,7 +289,9 @@ impl<'de> serde::Deserialize<'de> for CheckpointId {
         } else if let Ok(d) = raw.parse::<CheckpointDigest>() {
             Ok(Self::Digest(d))
         } else {
-            Err(serde::de::Error::custom(format!("unrecognized checkpoint-id {raw}")))
+            Err(serde::de::Error::custom(format!(
+                "unrecognized checkpoint-id {raw}"
+            )))
         }
     }
 }

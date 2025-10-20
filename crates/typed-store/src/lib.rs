@@ -1,7 +1,12 @@
 // Copyright (c) 2021, Facebook, Inc. and its affiliates
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-#![warn(future_incompatible, nonstandard_style, rust_2018_idioms, rust_2021_compatibility)]
+#![warn(
+    future_incompatible,
+    nonstandard_style,
+    rust_2018_idioms,
+    rust_2021_compatibility
+)]
 
 // Re-export rocksdb so that consumers can use the version of rocksdb via typed-store
 pub use rocksdb;
@@ -76,7 +81,7 @@ pub type StoreError = typed_store_error::TypedStoreError;
 /// config.table1.options.create_if_missing(true);
 /// config.table1.options.set_write_buffer_size(123456);
 ///
-/// let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").keep();
+/// let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
 ///
 /// // We can then open the DB with the configs
 /// let _ = Tables::open_tables_read_write(primary_path, MetricConf::default(), None, Some(config.build()));
@@ -122,7 +127,7 @@ pub type StoreError = typed_store_error::TypedStoreError;
 /// #[tokio::main]
 /// async fn main() -> Result<(), Error> {
 ///
-/// use typed_store::rocks::MetricConf;let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").keep();
+/// use typed_store::rocks::MetricConf;let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
 /// let _ = Tables::open_tables_read_write(primary_path.clone(), typed_store::rocks::MetricConf::default(), None, None);
 ///
 /// // Get the read only handle

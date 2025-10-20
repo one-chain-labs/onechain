@@ -8,10 +8,8 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::{TryFrom, TryInto},
-    fmt::{Display, Formatter},
-};
+use std::convert::{TryFrom, TryInto};
+use std::fmt::{Display, Formatter};
 
 use crate::{
     balance::Balance,
@@ -69,7 +67,7 @@ mod checked {
         }
     }
 
-    /// Rust version of the Move sui::coin::Coin<Sui::oct::OCT> type
+    /// Rust version of the Move one::coin::Coin<Sui::oct::OCT> type
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct GasCoin(pub Coin);
 
@@ -93,7 +91,9 @@ mod checked {
 
         /// Return `true` if `s` is the type of a gas balance (i.e., 0x2::balance::Balance<0x2::oct::OCT>)
         pub fn is_gas_balance(s: &StructTag) -> bool {
-            Balance::is_balance(s) && s.type_params.len() == 1 && GAS::is_gas_type(&s.type_params[0])
+            Balance::is_balance(s)
+                && s.type_params.len() == 1
+                && GAS::is_gas_type(&s.type_params[0])
         }
 
         pub fn id(&self) -> &ObjectID {

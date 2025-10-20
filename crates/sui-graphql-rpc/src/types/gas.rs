@@ -1,19 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_graphql::{connection::Connection, *};
+use async_graphql::connection::Connection;
+use async_graphql::*;
 use sui_types::{
     effects::{TransactionEffects as NativeTransactionEffects, TransactionEffectsAPI},
     gas::GasCostSummary as NativeGasCostSummary,
     transaction::GasData,
 };
 
+use super::{address::Address, big_int::BigInt, object::Object, sui_address::SuiAddress};
 use super::{
-    address::Address,
-    big_int::BigInt,
     cursor::Page,
-    object::{self, Object, ObjectFilter, ObjectKey},
-    sui_address::SuiAddress,
+    object::{self, ObjectFilter, ObjectKey},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,7 +47,10 @@ pub(crate) struct GasEffects {
 impl GasInput {
     /// Address of the owner of the gas object(s) used
     async fn gas_sponsor(&self) -> Option<Address> {
-        Some(Address { address: self.owner, checkpoint_viewed_at: self.checkpoint_viewed_at })
+        Some(Address {
+            address: self.owner,
+            checkpoint_viewed_at: self.checkpoint_viewed_at,
+        })
     }
 
     /// Objects used to pay for a transaction's execution and storage
@@ -68,9 +70,19 @@ impl GasInput {
         // still be viewable.
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
-        let filter = ObjectFilter { object_keys: Some(self.payment_obj_keys.clone()), ..Default::default() };
+        let filter = ObjectFilter {
+            object_keys: Some(self.payment_obj_keys.clone()),
+            ..Default::default()
+        };
 
-        Object::paginate(ctx.data_unchecked(), page, filter, self.checkpoint_viewed_at).await.extend()
+        Object::paginate(
+            ctx.data_unchecked(),
+            page,
+            filter,
+            self.checkpoint_viewed_at,
+        )
+        .await
+        .extend()
     }
 
     /// An unsigned integer specifying the number of native tokens per gas unit this transaction
@@ -116,9 +128,13 @@ impl GasCostSummary {
 #[Object]
 impl GasEffects {
     async fn gas_object(&self, ctx: &Context<'_>) -> Result<Option<Object>> {
-        Object::query(ctx, self.object_id, Object::at_version(self.object_version, self.checkpoint_viewed_at))
-            .await
-            .extend()
+        Object::query(
+            ctx,
+            self.object_id,
+            Object::at_version(self.object_version, self.checkpoint_viewed_at),
+        )
+        .await
+        .extend()
     }
 
     async fn gas_summary(&self) -> Option<&GasCostSummary> {
@@ -153,7 +169,10 @@ impl GasInput {
             payment_obj_keys: s
                 .payment
                 .iter()
-                .map(|o| ObjectKey { object_id: o.0.into(), version: o.1.value().into() })
+                .map(|o| ObjectKey {
+                    object_id: o.0.into(),
+                    version: o.1.value().into(),
+                })
                 .collect(),
             checkpoint_viewed_at,
         }

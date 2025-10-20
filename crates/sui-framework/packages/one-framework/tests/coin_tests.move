@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only, allow(deprecated_usage)]
-module one::coin_tests {
-    use one::coin::{Self, Coin};
-    use one::pay;
-    use one::url;
-    use one::test_scenario;
-    use one::deny_list;
+module oct::coin_tests {
+    use sui::coin::{Self, Coin};
+    use sui::pay;
+    use sui::url;
+    use sui::test_scenario;
+    use sui::deny_list;
 
     public struct COIN_TESTS has drop {}
 
@@ -20,7 +20,7 @@ module one::coin_tests {
         contains_next_epoch: bool,
         ctx: &TxContext,
     ) {
-        use one::coin::{
+        use sui::coin::{
             deny_list_v2_contains_next_epoch as contains_next_epoch,
             deny_list_v2_contains_current_epoch as contains_current_epoch,
         };
@@ -34,7 +34,7 @@ module one::coin_tests {
         paused_next_epoch: bool,
         ctx: &TxContext,
     ) {
-        use one::coin::{
+        use sui::coin::{
             deny_list_v2_is_global_pause_enabled_next_epoch as is_global_pause_enabled_next_epoch,
             deny_list_v2_is_global_pause_enabled_current_epoch
                 as is_global_pause_enabled_current_epoch,
@@ -214,7 +214,7 @@ module one::coin_tests {
 
     #[test]
     fun deny_list_v2() {
-        use one::coin::{
+        use sui::coin::{
             deny_list_v2_add as add,
             deny_list_v2_remove as remove,
         };
@@ -289,7 +289,7 @@ module one::coin_tests {
 
     #[test]
     fun deny_list_v2_global_pause() {
-        use one::coin::{
+        use sui::coin::{
             deny_list_v2_add as add,
             deny_list_v2_remove as remove,
             deny_list_v2_enable_global_pause as enable_global_pause,
@@ -366,7 +366,7 @@ module one::coin_tests {
 
     #[test]
     fun deny_list_v2_double_add() {
-        use one::coin::{
+        use sui::coin::{
             deny_list_v2_add as add,
             deny_list_v2_remove as remove,
         };
@@ -404,7 +404,7 @@ module one::coin_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = one::coin::EGlobalPauseNotAllowed)]
+    #[test, expected_failure(abort_code = sui::coin::EGlobalPauseNotAllowed)]
     fun deny_list_v2_global_pause_not_allowed_enable() {
         let mut scenario = test_scenario::begin(@0);
         deny_list::create_for_test(scenario.ctx());
@@ -426,7 +426,7 @@ module one::coin_tests {
         abort 0
     }
 
-    #[test, expected_failure(abort_code = one::coin::EGlobalPauseNotAllowed)]
+    #[test, expected_failure(abort_code = sui::coin::EGlobalPauseNotAllowed)]
     fun deny_list_v2_global_pause_not_allowed_disable() {
         let mut scenario = test_scenario::begin(@0);
         deny_list::create_for_test(scenario.ctx());
@@ -513,7 +513,7 @@ module one::coin_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = one::coin::EGlobalPauseNotAllowed)]
+    #[test, expected_failure(abort_code = sui::coin::EGlobalPauseNotAllowed)]
     fun migrate_regulated_currency_to_v2_disallow_global_pause() {
         let mut scenario = test_scenario::begin(@0);
         deny_list::create_for_test(scenario.ctx());
@@ -564,7 +564,7 @@ module one::coin_tests {
 
     #[test]
     fun deny_list_v2_add_remove() {
-        use one::coin::{
+        use sui::coin::{
             deny_list_v2_add as add,
             deny_list_v2_remove as remove,
         };

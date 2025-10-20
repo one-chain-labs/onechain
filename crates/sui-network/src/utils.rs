@@ -37,6 +37,10 @@ fn build_network_impl(
         .start(router)
         .unwrap();
 
-    println!("starting network {} {}", network.local_addr(), network.peer_id(),);
+    println!(
+        "starting network {} {}",
+        network.local_addr(),
+        network.peer_id(),
+    );
     (network, keypair)
 }

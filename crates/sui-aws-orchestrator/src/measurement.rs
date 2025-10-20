@@ -101,7 +101,13 @@ impl Measurement {
             })
             .unwrap_or_default();
 
-        Self { timestamp, buckets, sum, count, squared_sum }
+        Self {
+            timestamp,
+            buckets,
+            sum,
+            count,
+            squared_sum,
+        }
     }
 
     /// Compute the tps.
@@ -122,13 +128,21 @@ impl Measurement {
     /// `stdev = sqrt( squared_sum / count - avg^2 )`
     pub fn stdev_latency(&self) -> Duration {
         // Compute `squared_sum / count`.
-        let first_term = if self.count == 0 { 0.0 } else { self.squared_sum.as_secs_f64() / self.count as f64 };
+        let first_term = if self.count == 0 {
+            0.0
+        } else {
+            self.squared_sum.as_secs_f64() / self.count as f64
+        };
 
         // Compute `avg^2`.
         let squared_avg = self.average_latency().as_secs_f64().powf(2.0);
 
         // Compute `squared_sum / count - avg^2`.
-        let variance = if squared_avg > first_term { 0.0 } else { first_term - squared_avg };
+        let variance = if squared_avg > first_term {
+            0.0
+        } else {
+            first_term - squared_avg
+        };
 
         // Compute `sqrt( squared_sum / count - avg^2 )`.
         let stdev = variance.sqrt();
@@ -182,7 +196,10 @@ impl<T: BenchmarkType> MeasurementsCollection<T> {
 
     /// Add a new measurement to the collection.
     pub fn add(&mut self, scraper_id: ScraperId, measurement: Measurement) {
-        self.scrapers.entry(scraper_id).or_default().push(measurement);
+        self.scrapers
+            .entry(scraper_id)
+            .or_default()
+            .push(measurement);
     }
 
     /// Return the transaction (input) load of the benchmark.
@@ -192,13 +209,28 @@ impl<T: BenchmarkType> MeasurementsCollection<T> {
 
     /// Aggregate the benchmark duration of multiple data points by taking the max.
     pub fn benchmark_duration(&self) -> Duration {
-        self.scrapers.values().filter_map(|x| x.last()).map(|x| x.timestamp).max().unwrap_or_default()
+        self.scrapers
+            .values()
+            .filter_map(|x| x.last())
+            .map(|x| x.timestamp)
+            .max()
+            .unwrap_or_default()
     }
 
     /// Aggregate the tps of multiple data points by taking the sum.
     pub fn aggregate_tps(&self) -> u64 {
-        let duration = self.scrapers.values().filter_map(|x| x.last()).map(|x| x.timestamp).max().unwrap_or_default();
-        self.scrapers.values().filter_map(|x| x.last()).map(|x| x.tps(&duration)).sum()
+        let duration = self
+            .scrapers
+            .values()
+            .filter_map(|x| x.last())
+            .map(|x| x.timestamp)
+            .max()
+            .unwrap_or_default();
+        self.scrapers
+            .values()
+            .filter_map(|x| x.last())
+            .map(|x| x.tps(&duration))
+            .sum()
     }
 
     /// Aggregate the average latency of multiple data points by taking the average.
@@ -214,7 +246,12 @@ impl<T: BenchmarkType> MeasurementsCollection<T> {
 
     /// Aggregate the stdev latency of multiple data points by taking the max.
     pub fn aggregate_stdev_latency(&self) -> Duration {
-        self.scrapers.values().filter_map(|x| x.last()).map(|x| x.stdev_latency()).max().unwrap_or_default()
+        self.scrapers
+            .values()
+            .filter_map(|x| x.last())
+            .map(|x| x.stdev_latency())
+            .max()
+            .unwrap_or_default()
     }
 
     /// Save the collection of measurements as a json file.
@@ -258,8 +295,7 @@ mod test {
     use std::{collections::HashMap, time::Duration};
 
     use crate::{
-        benchmark::test::TestBenchmarkType,
-        protocol::test_protocol_metrics::TestProtocolMetrics,
+        benchmark::test::TestBenchmarkType, protocol::test_protocol_metrics::TestProtocolMetrics,
         settings::Settings,
     };
 
@@ -289,7 +325,10 @@ mod test {
         };
 
         // squared_sum / count
-        assert_eq!(data.squared_sum.checked_div(data.count as u32), Some(Duration::from_secs_f64(0.75)));
+        assert_eq!(
+            data.squared_sum.checked_div(data.count as u32),
+            Some(Duration::from_secs_f64(0.75))
+        );
         // avg^2
         assert_eq!(data.average_latency().as_secs_f64().powf(2.0), 0.25);
         // sqrt( squared_sum / count - avg^2 )
@@ -331,7 +370,10 @@ mod test {
 
         let measurement = Measurement::from_prometheus::<TestProtocolMetrics>(report);
         let settings = Settings::new_for_test();
-        let mut aggregator = MeasurementsCollection::<TestBenchmarkType>::new(&settings, BenchmarkParameters::default());
+        let mut aggregator = MeasurementsCollection::<TestBenchmarkType>::new(
+            &settings,
+            BenchmarkParameters::default(),
+        );
         let scraper_id = 1;
         aggregator.add(scraper_id, measurement);
 

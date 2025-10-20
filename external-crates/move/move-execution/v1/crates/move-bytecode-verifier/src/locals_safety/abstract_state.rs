@@ -40,10 +40,15 @@ pub(crate) struct AbstractState {
 
 impl AbstractState {
     /// create a new abstract state
-    pub fn new(resolver: &CompiledModule, function_context: &FunctionContext) -> PartialVMResult<Self> {
+    pub fn new(
+        resolver: &CompiledModule,
+        function_context: &FunctionContext,
+    ) -> PartialVMResult<Self> {
         let num_args = function_context.parameters().len();
         let num_locals = num_args + function_context.locals().len();
-        let local_states = (0..num_locals).map(|i| if i < num_args { Available } else { Unavailable }).collect();
+        let local_states = (0..num_locals)
+            .map(|i| if i < num_args { Available } else { Unavailable })
+            .collect();
 
         let all_local_abilities = function_context
             .parameters()
@@ -53,7 +58,11 @@ impl AbstractState {
             .map(|st| resolver.abilities(st, function_context.type_parameters()))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        Ok(Self { current_function: function_context.index(), local_states, all_local_abilities })
+        Ok(Self {
+            current_function: function_context.index(),
+            local_states,
+            all_local_abilities,
+        })
     }
 
     pub fn local_abilities(&self, idx: LocalIndex) -> AbilitySet {
@@ -82,7 +91,10 @@ impl AbstractState {
     }
 
     pub fn error(&self, status: StatusCode, offset: CodeOffset) -> PartialVMError {
-        PartialVMError::new(status).at_code_offset(self.current_function.unwrap_or(FunctionDefinitionIndex(0)), offset)
+        PartialVMError::new(status).at_code_offset(
+            self.current_function.unwrap_or(FunctionDefinitionIndex(0)),
+            offset,
+        )
     }
 
     fn join_(&self, other: &Self) -> Self {
@@ -114,15 +126,27 @@ impl AbstractState {
             })
             .collect();
 
-        Self { current_function, all_local_abilities, local_states }
+        Self {
+            current_function,
+            all_local_abilities,
+            local_states,
+        }
     }
 }
 
 impl AbstractDomain for AbstractState {
     /// attempts to join state to self and returns the result
-    fn join(&mut self, state: &AbstractState, meter: &mut (impl Meter + ?Sized)) -> PartialVMResult<JoinResult> {
+    fn join(
+        &mut self,
+        state: &AbstractState,
+        meter: &mut (impl Meter + ?Sized),
+    ) -> PartialVMResult<JoinResult> {
         meter.add(Scope::Function, JOIN_BASE_COST)?;
-        meter.add_items(Scope::Function, JOIN_PER_LOCAL_COST, state.local_states.len())?;
+        meter.add_items(
+            Scope::Function,
+            JOIN_PER_LOCAL_COST,
+            state.local_states.len(),
+        )?;
         let joined = Self::join_(self, state);
         assert!(self.local_states.len() == joined.local_states.len());
         let locals_unchanged = self

@@ -4,16 +4,12 @@
 use enum_dispatch::enum_dispatch;
 use std::collections::HashMap;
 
-use crate::{
-    base_types::{AuthorityName, EpochId, SuiAddress},
-    committee::{Committee, CommitteeWithNetworkMetadata, NetworkMetadata, StakeUnit},
-    crypto::{AuthorityPublicKey, NetworkPublicKey},
-    multiaddr::Multiaddr,
-};
-use anemo::{
-    types::{PeerAffinity, PeerInfo},
-    PeerId,
-};
+use crate::base_types::{AuthorityName, EpochId, SuiAddress};
+use crate::committee::{Committee, CommitteeWithNetworkMetadata, NetworkMetadata, StakeUnit};
+use crate::crypto::{AuthorityPublicKey, NetworkPublicKey};
+use crate::multiaddr::Multiaddr;
+use anemo::types::{PeerAffinity, PeerInfo};
+use anemo::PeerId;
 use consensus_config::{Authority, Committee as ConsensusCommittee};
 use serde::{Deserialize, Serialize};
 use sui_protocol_config::ProtocolVersion;
@@ -145,7 +141,10 @@ impl EpochStartSystemStateTrait for EpochStartSystemStateV1 {
     }
 
     fn get_validator_addresses(&self) -> Vec<SuiAddress> {
-        self.active_validators.iter().map(|validator| validator.sui_address).collect()
+        self.active_validators
+            .iter()
+            .map(|validator| validator.sui_address)
+            .collect()
     }
 
     fn get_sui_committee_with_network_metadata(&self) -> CommitteeWithNetworkMetadata {
@@ -155,11 +154,14 @@ impl EpochStartSystemStateTrait for EpochStartSystemStateV1 {
             .map(|validator| {
                 (
                     validator.authority_name(),
-                    (validator.voting_power, NetworkMetadata {
-                        network_address: validator.sui_net_address.clone(),
-                        narwhal_primary_address: validator.narwhal_primary_address.clone(),
-                        network_public_key: Some(validator.narwhal_network_pubkey.clone()),
-                    }),
+                    (
+                        validator.voting_power,
+                        NetworkMetadata {
+                            network_address: validator.sui_net_address.clone(),
+                            narwhal_primary_address: validator.narwhal_primary_address.clone(),
+                            network_public_key: Some(validator.narwhal_network_pubkey.clone()),
+                        },
+                    ),
                 )
             })
             .collect();
@@ -184,9 +186,15 @@ impl EpochStartSystemStateTrait for EpochStartSystemStateV1 {
                 // TODO(mysticeti): Add EpochStartValidatorInfoV2 with new field for mysticeti address.
                 address: validator.narwhal_primary_address.clone(),
                 hostname: validator.hostname.clone(),
-                authority_key: consensus_config::AuthorityPublicKey::new(validator.protocol_pubkey.clone()),
-                protocol_key: consensus_config::ProtocolPublicKey::new(validator.narwhal_worker_pubkey.clone()),
-                network_key: consensus_config::NetworkPublicKey::new(validator.narwhal_network_pubkey.clone()),
+                authority_key: consensus_config::AuthorityPublicKey::new(
+                    validator.protocol_pubkey.clone(),
+                ),
+                protocol_key: consensus_config::ProtocolPublicKey::new(
+                    validator.narwhal_worker_pubkey.clone(),
+                ),
+                network_key: consensus_config::NetworkPublicKey::new(
+                    validator.narwhal_network_pubkey.clone(),
+                ),
             });
         }
 
@@ -194,8 +202,10 @@ impl EpochStartSystemStateTrait for EpochStartSystemStateV1 {
         // in the Sui committee returned from get_sui_committee().
         authorities.sort_by(|a1, a2| a1.authority_key.cmp(&a2.authority_key));
 
-        for ((i, mysticeti_authority), sui_authority_name) in
-            authorities.iter().enumerate().zip(self.get_sui_committee().names())
+        for ((i, mysticeti_authority), sui_authority_name) in authorities
+            .iter()
+            .enumerate()
+            .zip(self.get_sui_committee().names())
         {
             if sui_authority_name.0 != mysticeti_authority.authority_key.to_bytes() {
                 error!(
@@ -213,12 +223,23 @@ impl EpochStartSystemStateTrait for EpochStartSystemStateV1 {
             .iter()
             .filter(|validator| validator.authority_name() != excluding_self)
             .map(|validator| {
-                let address = validator.p2p_address.to_anemo_address().into_iter().collect::<Vec<_>>();
+                let address = validator
+                    .p2p_address
+                    .to_anemo_address()
+                    .into_iter()
+                    .collect::<Vec<_>>();
                 let peer_id = PeerId(validator.narwhal_network_pubkey.0.to_bytes());
                 if address.is_empty() {
-                    warn!(?peer_id, "Peer has invalid p2p address: {}", &validator.p2p_address);
+                    warn!(
+                        ?peer_id,
+                        "Peer has invalid p2p address: {}", &validator.p2p_address
+                    );
                 }
-                PeerInfo { peer_id, affinity: PeerAffinity::High, address }
+                PeerInfo {
+                    peer_id,
+                    affinity: PeerAffinity::High,
+                    address,
+                }
             })
             .collect()
     }
@@ -270,15 +291,11 @@ impl EpochStartValidatorInfoV1 {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        base_types::SuiAddress,
-        committee::CommitteeTrait,
-        crypto::{get_key_pair, AuthorityKeyPair, NetworkKeyPair},
-        sui_system_state::epoch_start_sui_system_state::{
-            EpochStartSystemStateTrait,
-            EpochStartSystemStateV1,
-            EpochStartValidatorInfoV1,
-        },
+    use crate::base_types::SuiAddress;
+    use crate::committee::CommitteeTrait;
+    use crate::crypto::{get_key_pair, AuthorityKeyPair, NetworkKeyPair};
+    use crate::sui_system_state::epoch_start_sui_system_state::{
+        EpochStartSystemStateTrait, EpochStartSystemStateV1, EpochStartValidatorInfoV1,
     };
     use fastcrypto::traits::KeyPair;
     use mysten_network::Multiaddr;
@@ -326,12 +343,20 @@ mod test {
         // assert the validators details
         assert_eq!(sui_committee.num_members(), 10);
         assert_eq!(sui_committee.num_members(), consensus_committee.size());
-        assert_eq!(sui_committee.validity_threshold(), consensus_committee.validity_threshold());
-        assert_eq!(sui_committee.quorum_threshold(), consensus_committee.quorum_threshold());
+        assert_eq!(
+            sui_committee.validity_threshold(),
+            consensus_committee.validity_threshold()
+        );
+        assert_eq!(
+            sui_committee.quorum_threshold(),
+            consensus_committee.quorum_threshold()
+        );
         assert_eq!(state.epoch, consensus_committee.epoch());
 
         for (authority_index, consensus_authority) in consensus_committee.authorities() {
-            let sui_authority_name = sui_committee.authority_by_index(authority_index.value() as u32).unwrap();
+            let sui_authority_name = sui_committee
+                .authority_by_index(authority_index.value() as u32)
+                .unwrap();
 
             assert_eq!(
                 consensus_authority.authority_key.to_bytes(),

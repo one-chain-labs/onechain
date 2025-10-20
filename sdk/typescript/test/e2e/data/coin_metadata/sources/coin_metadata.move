@@ -3,8 +3,8 @@
 
 module coin_metadata::test;
 
-use one::coin;
-use one::url;
+use sui::coin;
+use sui::url;
 
 public struct TEST has drop {}
 

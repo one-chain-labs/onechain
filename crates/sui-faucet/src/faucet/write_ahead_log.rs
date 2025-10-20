@@ -4,16 +4,11 @@
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    transaction::TransactionData,
-};
-use typed_store::{
-    rocks::DBMap,
-    traits::{TableSummary, TypedStoreDebug},
-    Map,
-    TypedStoreError,
-};
+use sui_types::base_types::SuiAddress;
+use sui_types::{base_types::ObjectID, transaction::TransactionData};
+use typed_store::traits::{TableSummary, TypedStoreDebug};
+use typed_store::Map;
+use typed_store::{rocks::DBMap, TypedStoreError};
 
 use tracing::info;
 use typed_store::DBMapUtils;
@@ -63,11 +58,22 @@ impl WriteAheadLog {
         if self.log.contains_key(&coin)? {
             // Don't permit multiple writes against the same coin
             // TODO: Use a better error type than `TypedStoreError`.
-            return Err(TypedStoreError::SerializationError(format!("Duplicate WAL entry for coin {coin:?}",)));
+            return Err(TypedStoreError::SerializationError(format!(
+                "Duplicate WAL entry for coin {coin:?}",
+            )));
         }
 
         let uuid = *uuid.as_bytes();
-        self.log.insert(&coin, &Entry { uuid, recipient, tx, retry_count: 0, in_flight: true })
+        self.log.insert(
+            &coin,
+            &Entry {
+                uuid,
+                recipient,
+                tx,
+                retry_count: 0,
+                in_flight: true,
+            },
+        )
     }
 
     /// Check whether `coin` has a pending transaction in the WAL.  Returns `Ok(Some(entry))` if a
@@ -79,7 +85,9 @@ impl WriteAheadLog {
             Err(TypedStoreError::SerializationError(_)) => {
                 // Remove bad log from the store, so we don't crash on start up, this can happen if we update the
                 // WAL Entry and have some leftover Entry from the WAL.
-                self.log.remove(&coin).expect("Coin: {coin:?} unable to be removed from log.");
+                self.log
+                    .remove(&coin)
+                    .expect("Coin: {coin:?} unable to be removed from log.");
                 Ok(None)
             }
             Err(err) => Err(err),
@@ -100,14 +108,23 @@ impl WriteAheadLog {
         Ok(())
     }
 
-    pub(crate) fn set_in_flight(&mut self, coin: ObjectID, bool: bool) -> Result<(), TypedStoreError> {
+    pub(crate) fn set_in_flight(
+        &mut self,
+        coin: ObjectID,
+        bool: bool,
+    ) -> Result<(), TypedStoreError> {
         if let Some(mut entry) = self.log.get(&coin)? {
             entry.in_flight = bool;
             self.log.insert(&coin, &entry)?;
         } else {
-            info!(?coin, "Attempted to set inflight a coin that was not in the WAL.");
+            info!(
+                ?coin,
+                "Attempted to set inflight a coin that was not in the WAL."
+            );
 
-            return Err(TypedStoreError::RocksDBError(format!("Coin object {coin:?} not found in WAL.")));
+            return Err(TypedStoreError::RocksDBError(format!(
+                "Coin object {coin:?} not found in WAL."
+            )));
         }
         Ok(())
     }
@@ -182,7 +199,10 @@ mod tests {
         wal.reserve(uuid, coin.0, recv0, tx0).unwrap();
 
         // Second write fails because it tries to write to the same coin
-        assert!(matches!(wal.reserve(uuid, coin.0, recv1, tx1), Err(TypedStoreError::SerializationError(_)),));
+        assert!(matches!(
+            wal.reserve(uuid, coin.0, recv1, tx1),
+            Err(TypedStoreError::SerializationError(_)),
+        ));
     }
 
     #[tokio::test]

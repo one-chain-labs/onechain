@@ -5,7 +5,7 @@
 	"keywords": [
 		"Ledger",
 		"LedgerWallet",
-		"Sui",
+		"Oct",
 		"NanoS",
 		"Blue",
 		"Hardware Wallet"
@@ -17,12 +17,12 @@
 		"url": "github.com:MystenLabs/sui.git"
 	},
 	"bugs": {
-		"url": "https://github.com/MystenLabs/sui/issues"
+		"url": "https://github.com/one-chain-labs/onechain/issues"
 	},
 	"publishConfig": {
 		"access": "public"
 	},
-	"homepage": "https://github.com/MystenLabs/sui/sdk/ledgerjs-hw-app-sui/#readme",
+	"homepage": "https://github.com/one-chain-labs/onechain/sdk/ledgerjs-hw-app-sui/#readme",
 	"files": [
 		"CHANGELOG.md",
 		"dist",

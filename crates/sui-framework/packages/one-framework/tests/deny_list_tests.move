@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::deny_list_tests {
-    use one::deny_list;
-    use one::test_scenario;
+module oct::deny_list_tests {
+    use sui::deny_list;
+    use sui::test_scenario;
     use std::type_name;
 
     public struct X()
 
-    #[test, expected_failure(abort_code = one::deny_list::EInvalidAddress)]
+    #[test, expected_failure(abort_code = sui::deny_list::EInvalidAddress)]
     fun add_zero() {
         let mut ctx = tx_context::dummy();
         let mut dl = deny_list::new_for_testing(&mut ctx);
@@ -18,7 +18,7 @@ module one::deny_list_tests {
         abort 0 // should not be reached
     }
 
-    #[test, expected_failure(abort_code = one::deny_list::EInvalidAddress)]
+    #[test, expected_failure(abort_code = sui::deny_list::EInvalidAddress)]
     fun remove_zero() {
         let mut ctx = tx_context::dummy();
         let mut dl = deny_list::new_for_testing(&mut ctx);

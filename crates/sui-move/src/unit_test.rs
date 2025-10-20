@@ -12,11 +12,11 @@ use move_vm_runtime::native_extensions::NativeContextExtensions;
 use once_cell::sync::Lazy;
 use std::{cell::RefCell, collections::BTreeMap, path::Path, sync::Arc};
 use sui_move_build::decorate_warnings;
-use sui_move_natives::{object_runtime::ObjectRuntime, test_scenario::InMemoryTestStore, NativesCostTable};
+use sui_move_natives::test_scenario::InMemoryTestStore;
+use sui_move_natives::{object_runtime::ObjectRuntime, NativesCostTable};
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
-    gas_model::tables::initial_cost_schedule_for_unit_tests,
-    in_memory_storage::InMemoryStorage,
+    gas_model::tables::initial_cost_schedule_for_unit_tests, in_memory_storage::InMemoryStorage,
     metrics::LimitsMetrics,
 };
 
@@ -31,7 +31,11 @@ pub struct Test {
 }
 
 impl Test {
-    pub fn execute(self, path: Option<&Path>, build_config: BuildConfig) -> anyhow::Result<UnitTestResult> {
+    pub fn execute(
+        self,
+        path: Option<&Path>,
+        build_config: BuildConfig,
+    ) -> anyhow::Result<UnitTestResult> {
         let compute_coverage = self.test.compute_coverage;
         if !cfg!(debug_assertions) && compute_coverage {
             return Err(anyhow::anyhow!(
@@ -41,7 +45,12 @@ impl Test {
         // find manifest file directory from a given path or (if missing) from current dir
         let rerooted_path = base::reroot_path(path)?;
         let unit_test_config = self.test.unit_test_config();
-        run_move_unit_tests(&rerooted_path, build_config, Some(unit_test_config), compute_coverage)
+        run_move_unit_tests(
+            &rerooted_path,
+            build_config,
+            Some(unit_test_config),
+            compute_coverage,
+        )
     }
 }
 
@@ -66,13 +75,20 @@ pub fn run_move_unit_tests(
     // bind the extension hook if it has not yet been done
     Lazy::force(&SET_EXTENSION_HOOK);
 
-    let config = config.unwrap_or_else(|| UnitTestingConfig::default_with_bound(Some(MAX_UNIT_TEST_INSTRUCTIONS)));
+    let config = config
+        .unwrap_or_else(|| UnitTestingConfig::default_with_bound(Some(MAX_UNIT_TEST_INSTRUCTIONS)));
 
     let result = move_cli::base::test::run_move_unit_tests(
         path,
         build_config,
-        UnitTestingConfig { report_stacktrace_on_abort: true, ..config },
-        sui_move_natives::all_natives(/* silent */ false, &ProtocolConfig::get_for_max_version_UNSAFE()),
+        UnitTestingConfig {
+            report_stacktrace_on_abort: true,
+            ..config
+        },
+        sui_move_natives::all_natives(
+            /* silent */ false,
+            &ProtocolConfig::get_for_max_version_UNSAFE(),
+        ),
         Some(initial_cost_schedule_for_unit_tests()),
         compute_coverage,
         &mut std::io::stdout(),
@@ -101,7 +117,9 @@ fn new_testing_object_and_natives_cost_runtime(ext: &mut NativeContextExtensions
         metrics,
         0, // epoch id
     ));
-    ext.add(NativesCostTable::from_protocol_config(&ProtocolConfig::get_for_max_version_UNSAFE()));
+    ext.add(NativesCostTable::from_protocol_config(
+        &ProtocolConfig::get_for_max_version_UNSAFE(),
+    ));
 
     ext.add(store);
 }

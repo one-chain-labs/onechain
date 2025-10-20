@@ -5,21 +5,9 @@
 use anyhow::{format_err, Result};
 use move_binary_format::{
     file_format::{
-        AbilitySet,
-        CodeOffset,
-        CodeUnit,
-        ConstantPoolIndex,
-        EnumDefinition,
-        EnumDefinitionIndex,
-        FunctionDefinitionIndex,
-        LocalIndex,
-        MemberCount,
-        ModuleHandleIndex,
-        SignatureIndex,
-        StructDefinition,
-        StructDefinitionIndex,
-        TableIndex,
-        VariantTag,
+        AbilitySet, CodeOffset, CodeUnit, ConstantPoolIndex, EnumDefinition, EnumDefinitionIndex,
+        FunctionDefinitionIndex, LocalIndex, MemberCount, ModuleHandleIndex, SignatureIndex,
+        StructDefinition, StructDefinitionIndex, TableIndex, VariantTag,
     },
     CompiledModule,
 };
@@ -126,7 +114,11 @@ pub struct SourceMap {
 
 impl StructSourceMap {
     pub fn new(definition_location: Loc) -> Self {
-        Self { definition_location, type_parameters: Vec::new(), fields: Vec::new() }
+        Self {
+            definition_location,
+            type_parameters: Vec::new(),
+            fields: Vec::new(),
+        }
     }
 
     pub fn add_type_parameter(&mut self, type_name: SourceName) {
@@ -169,7 +161,11 @@ impl StructSourceMap {
 
 impl EnumSourceMap {
     pub fn new(definition_location: Loc) -> Self {
-        Self { definition_location, type_parameters: Vec::new(), variants: Vec::new() }
+        Self {
+            definition_location,
+            type_parameters: Vec::new(),
+            variants: Vec::new(),
+        }
     }
 
     pub fn add_type_parameter(&mut self, type_name: SourceName) {
@@ -188,7 +184,12 @@ impl EnumSourceMap {
         self.variants.get(variant_tag as usize).cloned()
     }
 
-    pub fn dummy_enum_map(&mut self, view: &CompiledModule, enum_def: &EnumDefinition, default_loc: Loc) -> Result<()> {
+    pub fn dummy_enum_map(
+        &mut self,
+        view: &CompiledModule,
+        enum_def: &EnumDefinition,
+        default_loc: Loc,
+    ) -> Result<()> {
         let enum_handle = view.datatype_handle_at(enum_def.enum_handle);
 
         // Add dummy locations for the variants
@@ -264,7 +265,6 @@ impl FunctionSourceMap {
     pub fn add_return_mapping(&mut self, loc: Loc) {
         self.returns.push(loc);
     }
-
     /// Recall that we are using a segment tree. We therefore lookup the location for the code
     /// offset by performing a range query for the largest number less than or equal to the code
     /// offset passed in.
@@ -279,7 +279,10 @@ impl FunctionSourceMap {
                 None
             }
         } else {
-            self.code_map.range((Bound::Unbounded, Bound::Included(&code_offset))).next_back().map(|(_, vl)| *vl)
+            self.code_map
+                .range((Bound::Unbounded, Bound::Included(&code_offset)))
+                .next_back()
+                .map(|(_, vl)| *vl)
         }
     }
 
@@ -293,7 +296,12 @@ impl FunctionSourceMap {
     }
 
     pub fn make_local_name_to_index_map(&self) -> BTreeMap<&String, LocalIndex> {
-        self.parameters.iter().chain(&self.locals).enumerate().map(|(i, (n, _))| (n, i as LocalIndex)).collect()
+        self.parameters
+            .iter()
+            .chain(&self.locals)
+            .enumerate()
+            .map(|(i, (n, _))| (n, i as LocalIndex))
+            .collect()
     }
 
     pub fn dummy_function_map(
@@ -361,14 +369,9 @@ impl SourceMap {
         definition_location: Loc,
         is_native: bool,
     ) -> Result<()> {
-        self.function_map.insert(fdef_idx.0, FunctionSourceMap::new(location, definition_location, is_native)).map_or(
-            Ok(()),
-            |_| {
-                Err(format_err!(
+        self.function_map.insert(fdef_idx.0, FunctionSourceMap::new(location, definition_location, is_native)).map_or(Ok(()), |_| { Err(format_err!(
                     "Multiple functions at same function definition index encountered when constructing source map"
-                ))
-            },
-        )
+                )) })
     }
 
     pub fn add_function_type_parameter_mapping(
@@ -376,10 +379,9 @@ impl SourceMap {
         fdef_idx: FunctionDefinitionIndex,
         name: SourceName,
     ) -> Result<()> {
-        let func_entry = self
-            .function_map
-            .get_mut(&fdef_idx.0)
-            .ok_or_else(|| format_err!("Tried to add function type parameter mapping to undefined function index"))?;
+        let func_entry = self.function_map.get_mut(&fdef_idx.0).ok_or_else(|| {
+            format_err!("Tried to add function type parameter mapping to undefined function index")
+        })?;
         func_entry.add_type_parameter(name);
         Ok(())
     }
@@ -391,7 +393,9 @@ impl SourceMap {
     ) -> Result<SourceName> {
         self.function_map
             .get(&fdef_idx.0)
-            .and_then(|function_source_map| function_source_map.get_type_parameter_name(type_parameter_idx))
+            .and_then(|function_source_map| {
+                function_source_map.get_type_parameter_name(type_parameter_idx)
+            })
             .ok_or_else(|| format_err!("Unable to get function type parameter name"))
     }
 
@@ -425,14 +429,22 @@ impl SourceMap {
 
     /// Given a function definition and a code offset within that function definition, this returns
     /// the location in the source code associated with the instruction at that offset.
-    pub fn get_code_location(&self, fdef_idx: FunctionDefinitionIndex, offset: CodeOffset) -> Result<Loc> {
+    pub fn get_code_location(
+        &self,
+        fdef_idx: FunctionDefinitionIndex,
+        offset: CodeOffset,
+    ) -> Result<Loc> {
         self.function_map
             .get(&fdef_idx.0)
             .and_then(|function_source_map| function_source_map.get_code_location(offset))
             .ok_or_else(|| format_err!("Tried to get code location from undefined function index"))
     }
 
-    pub fn add_local_mapping(&mut self, fdef_idx: FunctionDefinitionIndex, name: SourceName) -> Result<()> {
+    pub fn add_local_mapping(
+        &mut self,
+        fdef_idx: FunctionDefinitionIndex,
+        name: SourceName,
+    ) -> Result<()> {
         let func_entry = self
             .function_map
             .get_mut(&fdef_idx.0)
@@ -441,50 +453,80 @@ impl SourceMap {
         Ok(())
     }
 
-    pub fn add_parameter_mapping(&mut self, fdef_idx: FunctionDefinitionIndex, name: SourceName) -> Result<()> {
-        let func_entry = self
-            .function_map
-            .get_mut(&fdef_idx.0)
-            .ok_or_else(|| format_err!("Tried to add parameter mapping to undefined function index"))?;
+    pub fn add_parameter_mapping(
+        &mut self,
+        fdef_idx: FunctionDefinitionIndex,
+        name: SourceName,
+    ) -> Result<()> {
+        let func_entry = self.function_map.get_mut(&fdef_idx.0).ok_or_else(|| {
+            format_err!("Tried to add parameter mapping to undefined function index")
+        })?;
         func_entry.add_parameter_mapping(name);
         Ok(())
     }
 
-    pub fn add_return_mapping(&mut self, fdef_idx: FunctionDefinitionIndex, loc: Loc) -> Result<()> {
-        let func_entry = self
-            .function_map
-            .get_mut(&fdef_idx.0)
-            .ok_or_else(|| format_err!("Tried to add return mapping to undefined function index"))?;
+    pub fn add_return_mapping(
+        &mut self,
+        fdef_idx: FunctionDefinitionIndex,
+        loc: Loc,
+    ) -> Result<()> {
+        let func_entry = self.function_map.get_mut(&fdef_idx.0).ok_or_else(|| {
+            format_err!("Tried to add return mapping to undefined function index")
+        })?;
         func_entry.add_return_mapping(loc);
         Ok(())
     }
 
-    pub fn get_parameter_or_local_name(&self, fdef_idx: FunctionDefinitionIndex, index: u64) -> Result<SourceName> {
+    pub fn get_parameter_or_local_name(
+        &self,
+        fdef_idx: FunctionDefinitionIndex,
+        index: u64,
+    ) -> Result<SourceName> {
         self.function_map
             .get(&fdef_idx.0)
             .and_then(|function_source_map| function_source_map.get_parameter_or_local_name(index))
             .ok_or_else(|| format_err!("Tried to get local name at undefined function index"))
     }
 
-    pub fn add_top_level_struct_mapping(&mut self, struct_def_idx: StructDefinitionIndex, location: Loc) -> Result<()> {
-        self.struct_map.insert(struct_def_idx.0, StructSourceMap::new(location)).map_or(Ok(()), |_| {
-            Err(format_err!("Multiple structs at same struct definition index encountered when constructing source map"))
-        })
+    pub fn add_top_level_struct_mapping(
+        &mut self,
+        struct_def_idx: StructDefinitionIndex,
+        location: Loc,
+    ) -> Result<()> {
+        self.struct_map.insert(struct_def_idx.0, StructSourceMap::new(location)).map_or(Ok(()), |_| { Err(format_err!(
+                "Multiple structs at same struct definition index encountered when constructing source map"
+                )) })
     }
 
-    pub fn add_top_level_enum_mapping(&mut self, enum_def_idx: EnumDefinitionIndex, location: Loc) -> Result<()> {
-        self.enum_map.insert(enum_def_idx.0, EnumSourceMap::new(location)).map_or(Ok(()), |_| {
-            Err(format_err!("Multiple enums at same struct definition index encountered when constructing source map"))
-        })
+    pub fn add_top_level_enum_mapping(
+        &mut self,
+        enum_def_idx: EnumDefinitionIndex,
+        location: Loc,
+    ) -> Result<()> {
+        self.enum_map.insert(enum_def_idx.0, EnumSourceMap::new(location)).map_or(Ok(()), |_| { Err(format_err!(
+                "Multiple enums at same struct definition index encountered when constructing source map"
+                )) })
     }
 
-    pub fn add_const_mapping(&mut self, const_idx: ConstantPoolIndex, name: ConstantName) -> Result<()> {
-        self.constant_map.insert(name, const_idx.0).map_or(Ok(()), |_| {
-            Err(format_err!("Multiple constans with same name encountered when constructing source map"))
-        })
+    pub fn add_const_mapping(
+        &mut self,
+        const_idx: ConstantPoolIndex,
+        name: ConstantName,
+    ) -> Result<()> {
+        self.constant_map
+            .insert(name, const_idx.0)
+            .map_or(Ok(()), |_| {
+                Err(format_err!(
+                    "Multiple constans with same name encountered when constructing source map"
+                ))
+            })
     }
 
-    pub fn add_struct_field_mapping(&mut self, struct_def_idx: StructDefinitionIndex, location: Loc) -> Result<()> {
+    pub fn add_struct_field_mapping(
+        &mut self,
+        struct_def_idx: StructDefinitionIndex,
+        location: Loc,
+    ) -> Result<()> {
         let struct_entry = self
             .struct_map
             .get_mut(&struct_def_idx.0)
@@ -493,7 +535,11 @@ impl SourceMap {
         Ok(())
     }
 
-    pub fn get_struct_field_name(&self, struct_def_idx: StructDefinitionIndex, field_idx: MemberCount) -> Option<Loc> {
+    pub fn get_struct_field_name(
+        &self,
+        struct_def_idx: StructDefinitionIndex,
+        field_idx: MemberCount,
+    ) -> Option<Loc> {
         self.struct_map
             .get(&struct_def_idx.0)
             .and_then(|struct_source_map| struct_source_map.get_field_location(field_idx))
@@ -504,10 +550,9 @@ impl SourceMap {
         struct_def_idx: StructDefinitionIndex,
         name: SourceName,
     ) -> Result<()> {
-        let struct_entry = self
-            .struct_map
-            .get_mut(&struct_def_idx.0)
-            .ok_or_else(|| format_err!("Tried to add struct type parameter mapping to undefined struct index"))?;
+        let struct_entry = self.struct_map.get_mut(&struct_def_idx.0).ok_or_else(|| {
+            format_err!("Tried to add struct type parameter mapping to undefined struct index")
+        })?;
         struct_entry.add_type_parameter(name);
         Ok(())
     }
@@ -519,12 +564,19 @@ impl SourceMap {
     ) -> Result<SourceName> {
         self.struct_map
             .get(&struct_def_idx.0)
-            .and_then(|struct_source_map| struct_source_map.get_type_parameter_name(type_parameter_idx))
+            .and_then(|struct_source_map| {
+                struct_source_map.get_type_parameter_name(type_parameter_idx)
+            })
             .ok_or_else(|| format_err!("Unable to get struct type parameter name"))
     }
 
-    pub fn get_struct_source_map(&self, struct_def_idx: StructDefinitionIndex) -> Result<&StructSourceMap> {
-        self.struct_map.get(&struct_def_idx.0).ok_or_else(|| format_err!("Unable to get struct source map"))
+    pub fn get_struct_source_map(
+        &self,
+        struct_def_idx: StructDefinitionIndex,
+    ) -> Result<&StructSourceMap> {
+        self.struct_map
+            .get(&struct_def_idx.0)
+            .ok_or_else(|| format_err!("Unable to get struct source map"))
     }
 
     pub fn add_enum_variant_mapping(
@@ -541,10 +593,18 @@ impl SourceMap {
         Ok(())
     }
 
-    pub fn get_enum_field_name(&self, enum_def_idx: EnumDefinitionIndex, variant_tag: VariantTag) -> Option<SourceName> {
+    pub fn get_enum_field_name(
+        &self,
+        enum_def_idx: EnumDefinitionIndex,
+        variant_tag: VariantTag,
+    ) -> Option<SourceName> {
         self.enum_map
             .get(&enum_def_idx.0)
-            .and_then(|enum_source_map| enum_source_map.get_variant_location(variant_tag).map(|x| x.0))
+            .and_then(|enum_source_map| {
+                enum_source_map
+                    .get_variant_location(variant_tag)
+                    .map(|x| x.0)
+            })
     }
 
     pub fn add_enum_type_parameter_mapping(
@@ -552,20 +612,26 @@ impl SourceMap {
         enum_def_idx: EnumDefinitionIndex,
         name: SourceName,
     ) -> Result<()> {
-        let enum_entry = self
-            .enum_map
-            .get_mut(&enum_def_idx.0)
-            .ok_or_else(|| format_err!("Tried to add enum type parameter mapping to undefined enum index"))?;
+        let enum_entry = self.enum_map.get_mut(&enum_def_idx.0).ok_or_else(|| {
+            format_err!("Tried to add enum type parameter mapping to undefined enum index")
+        })?;
         enum_entry.add_type_parameter(name);
         Ok(())
     }
 
-    pub fn get_function_source_map(&self, fdef_idx: FunctionDefinitionIndex) -> Result<&FunctionSourceMap> {
-        self.function_map.get(&fdef_idx.0).ok_or_else(|| format_err!("Unable to get function source map"))
+    pub fn get_function_source_map(
+        &self,
+        fdef_idx: FunctionDefinitionIndex,
+    ) -> Result<&FunctionSourceMap> {
+        self.function_map
+            .get(&fdef_idx.0)
+            .ok_or_else(|| format_err!("Unable to get function source map"))
     }
 
     pub fn get_enum_source_map(&self, enum_def_idx: EnumDefinitionIndex) -> Result<&EnumSourceMap> {
-        self.enum_map.get(&enum_def_idx.0).ok_or_else(|| format_err!("Unable to get enum source map {}", enum_def_idx.0))
+        self.enum_map
+            .get(&enum_def_idx.0)
+            .ok_or_else(|| format_err!("Unable to get enum source map {}", enum_def_idx.0))
     }
 
     pub fn get_enum_type_parameter_name(
@@ -584,7 +650,9 @@ impl SourceMap {
     pub fn dummy_from_view(module: &CompiledModule, default_loc: Loc) -> Result<Self> {
         let module_ident = {
             let module_handle = module.module_handle_at(ModuleHandleIndex::new(0));
-            let module_name = ModuleName(Symbol::from(module.identifier_at(module_handle.name).as_str()));
+            let module_name = ModuleName(Symbol::from(
+                module.identifier_at(module_handle.name).as_str(),
+            ));
             let address = *module.address_identifier_at(module_handle.address);
             ModuleIdent::new(module_name, address)
         };
@@ -612,8 +680,10 @@ impl SourceMap {
         }
 
         for (struct_idx, struct_def) in module.struct_defs().iter().enumerate() {
-            empty_source_map
-                .add_top_level_struct_mapping(StructDefinitionIndex(struct_idx as TableIndex), default_loc)?;
+            empty_source_map.add_top_level_struct_mapping(
+                StructDefinitionIndex(struct_idx as TableIndex),
+                default_loc,
+            )?;
             empty_source_map
                 .struct_map
                 .get_mut(&(struct_idx as TableIndex))
@@ -622,7 +692,10 @@ impl SourceMap {
         }
 
         for (enum_idx, enum_def) in module.enum_defs().iter().enumerate() {
-            empty_source_map.add_top_level_enum_mapping(EnumDefinitionIndex(enum_idx as TableIndex), default_loc)?;
+            empty_source_map.add_top_level_enum_mapping(
+                EnumDefinitionIndex(enum_idx as TableIndex),
+                default_loc,
+            )?;
             empty_source_map
                 .enum_map
                 .get_mut(&(enum_idx as TableIndex))

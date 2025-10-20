@@ -3,12 +3,11 @@
 
 use lru::LruCache;
 use parking_lot::RwLock;
-use std::{num::NonZeroUsize, sync::Arc};
-use sui_types::{
-    base_types::ObjectID,
-    error::{SuiError, SuiResult, UserInputError},
-    storage::{ObjectStore, PackageObject},
-};
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+use sui_types::base_types::ObjectID;
+use sui_types::error::{SuiError, SuiResult, UserInputError};
+use sui_types::storage::{ObjectStore, PackageObject};
 
 pub struct PackageObjectCache {
     cache: RwLock<LruCache<ObjectID, PackageObject>>,
@@ -18,7 +17,9 @@ const CACHE_CAP: usize = 1024 * 1024;
 
 impl PackageObjectCache {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self { cache: RwLock::new(LruCache::new(NonZeroUsize::new(CACHE_CAP).unwrap())) })
+        Arc::new(Self {
+            cache: RwLock::new(LruCache::new(NonZeroUsize::new(CACHE_CAP).unwrap())),
+        })
     }
 
     pub fn get_package_object(
@@ -49,7 +50,11 @@ impl PackageObjectCache {
                 self.cache.write().push(*package_id, p.clone());
                 Ok(Some(p))
             } else {
-                Err(SuiError::UserInputError { error: UserInputError::MoveObjectAsPackage { object_id: *package_id } })
+                Err(SuiError::UserInputError {
+                    error: UserInputError::MoveObjectAsPackage {
+                        object_id: *package_id,
+                    },
+                })
             }
         } else {
             Ok(None)

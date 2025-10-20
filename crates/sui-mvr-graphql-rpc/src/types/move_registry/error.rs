@@ -16,7 +16,9 @@ pub enum MoveRegistryError {
     #[error("Move Registry: External API url is not available so resolution is not on this RPC.")]
     ExternalApiUrlUnavailable,
 
-    #[error("Move Registry: Internal Error, failed to query external API due to an internal error: {0}")]
+    #[error(
+        "Move Registry: Internal Error, failed to query external API due to an internal error: {0}"
+    )]
     FailedToQueryExternalApi(String),
 
     #[error("Move Registry Internal Error: Failed to parse external API's response: {0}")]

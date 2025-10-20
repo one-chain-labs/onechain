@@ -16,7 +16,7 @@ use std::{
     type_name::get as type_name_get,
     vector::{Self as vec, Self as haha}
 };
-use one::{
+use sui::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,

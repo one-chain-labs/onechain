@@ -26,7 +26,11 @@ struct Context<'env> {
 
 impl<'env> Context<'env> {
     fn new(env: &'env CompilationEnv) -> Self {
-        Self { env, is_source_def: false, current_package: None }
+        Self {
+            env,
+            is_source_def: false,
+            current_package: None,
+        }
     }
 }
 
@@ -39,7 +43,10 @@ impl FilterContext for Context<'_> {
         self.is_source_def = is_source_def;
     }
 
-    fn filter_map_module(&mut self, mut module_def: P::ModuleDefinition) -> Option<P::ModuleDefinition> {
+    fn filter_map_module(
+        &mut self,
+        mut module_def: P::ModuleDefinition,
+    ) -> Option<P::ModuleDefinition> {
         if self.should_remove_by_attributes(&module_def.attributes) {
             return None;
         }
@@ -61,13 +68,16 @@ impl FilterContext for Context<'_> {
         use known_attributes::TestingAttribute;
         let flattened_attrs: Vec<_> = attrs.iter().flat_map(test_attributes).collect();
         let is_test_only = flattened_attrs.iter().any(|attr| {
-            matches!(attr.1, TestingAttribute::Test | TestingAttribute::TestOnly | TestingAttribute::RandTest)
+            matches!(
+                attr.1,
+                TestingAttribute::Test | TestingAttribute::TestOnly | TestingAttribute::RandTest
+            )
         });
         is_test_only && !self.env.flags().keep_testing_functions()
             || (!self.is_source_def
-                && flattened_attrs
-                    .iter()
-                    .any(|attr| matches!(attr.1, TestingAttribute::Test | TestingAttribute::RandTest)))
+                && flattened_attrs.iter().any(|attr| {
+                    matches!(attr.1, TestingAttribute::Test | TestingAttribute::RandTest)
+                }))
     }
 }
 
@@ -98,19 +108,24 @@ pub fn program(
 }
 
 fn has_unit_test_module(prog: &P::Program) -> bool {
-    prog.lib_definitions.iter().chain(prog.source_definitions.iter()).any(|pkg| match &pkg.def {
-        P::Definition::Module(mdef) => {
-            mdef.name.0.value == UNIT_TEST_MODULE_NAME
-                && mdef.address.is_some()
-                && match &mdef.address.as_ref().unwrap().value {
-                    // TODO: remove once named addresses have landed in the stdlib
-                    P::LeadingNameAccess_::Name(name) => name.value == STDLIB_ADDRESS_NAME,
-                    P::LeadingNameAccess_::GlobalAddress(name) => name.value == STDLIB_ADDRESS_NAME,
-                    P::LeadingNameAccess_::AnonymousAddress(_) => false,
-                }
-        }
-        _ => false,
-    })
+    prog.lib_definitions
+        .iter()
+        .chain(prog.source_definitions.iter())
+        .any(|pkg| match &pkg.def {
+            P::Definition::Module(mdef) => {
+                mdef.name.0.value == UNIT_TEST_MODULE_NAME
+                    && mdef.address.is_some()
+                    && match &mdef.address.as_ref().unwrap().value {
+                        // TODO: remove once named addresses have landed in the stdlib
+                        P::LeadingNameAccess_::Name(name) => name.value == STDLIB_ADDRESS_NAME,
+                        P::LeadingNameAccess_::GlobalAddress(name) => {
+                            name.value == STDLIB_ADDRESS_NAME
+                        }
+                        P::LeadingNameAccess_::AnonymousAddress(_) => false,
+                    }
+            }
+            _ => false,
+        })
 }
 
 fn check_has_unit_test_module(
@@ -119,12 +134,15 @@ fn check_has_unit_test_module(
     pre_compiled_lib: Option<Arc<FullyCompiledProgram>>,
     prog: &P::Program,
 ) -> bool {
-    let has_unit_test_module =
-        has_unit_test_module(prog) || pre_compiled_lib.is_some_and(|p| has_unit_test_module(&p.parser));
+    let has_unit_test_module = has_unit_test_module(prog)
+        || pre_compiled_lib.is_some_and(|p| has_unit_test_module(&p.parser));
 
     if !has_unit_test_module && compilation_env.flags().is_testing() {
-        if let Some(P::PackageDefinition { def, .. }) =
-            prog.source_definitions.iter().chain(prog.lib_definitions.iter()).next()
+        if let Some(P::PackageDefinition { def, .. }) = prog
+            .source_definitions
+            .iter()
+            .chain(prog.lib_definitions.iter())
+            .next()
         {
             let loc = match def {
                 P::Definition::Module(P::ModuleDefinition { name, .. }) => name.0.loc,
@@ -151,24 +169,47 @@ fn check_has_unit_test_module(
 /// an attempt is made to publish a module that has been compiled in test mode on a VM that is not
 /// running in test mode.
 fn create_test_poison(mloc: Loc) -> P::ModuleMember {
-    let signature =
-        P::FunctionSignature { type_parameters: vec![], parameters: vec![], return_type: sp(mloc, P::Type_::Unit) };
+    let signature = P::FunctionSignature {
+        type_parameters: vec![],
+        parameters: vec![],
+        return_type: sp(mloc, P::Type_::Unit),
+    };
 
-    let leading_name_access = sp(mloc, P::LeadingNameAccess_::Name(sp(mloc, STDLIB_ADDRESS_NAME)));
+    let leading_name_access = sp(
+        mloc,
+        P::LeadingNameAccess_::Name(sp(mloc, STDLIB_ADDRESS_NAME)),
+    );
 
     let mod_name = sp(mloc, UNIT_TEST_MODULE_NAME);
     let fn_name = sp(mloc, "create_signers_for_testing".into());
     let name_path = NamePath {
-        root: P::RootPathEntry { name: leading_name_access, tyargs: None, is_macro: None },
-        entries: vec![PathEntry { name: mod_name, tyargs: None, is_macro: None }, PathEntry {
-            name: fn_name,
+        root: P::RootPathEntry {
+            name: leading_name_access,
             tyargs: None,
             is_macro: None,
-        }],
+        },
+        entries: vec![
+            PathEntry {
+                name: mod_name,
+                tyargs: None,
+                is_macro: None,
+            },
+            PathEntry {
+                name: fn_name,
+                tyargs: None,
+                is_macro: None,
+            },
+        ],
         is_incomplete: false,
     };
-    let args_ = vec![sp(mloc, P::Exp_::Value(sp(mloc, P::Value_::Num("0".into()))))];
-    let nop_call = P::Exp_::Call(sp(mloc, P::NameAccessChain_::Path(name_path)), sp(mloc, args_));
+    let args_ = vec![sp(
+        mloc,
+        P::Exp_::Value(sp(mloc, P::Value_::Num("0".into()))),
+    )];
+    let nop_call = P::Exp_::Call(
+        sp(mloc, P::NameAccessChain_::Path(name_path)),
+        sp(mloc, args_),
+    );
 
     // fun unit_test_poison() { 0x1::UnitTest::create_signers_for_testing(0); () }
     P::ModuleMember::Function(P::Function {
@@ -183,7 +224,10 @@ fn create_test_poison(mloc: Loc) -> P::ModuleMember {
             mloc,
             P::FunctionBody_::Defined((
                 vec![],
-                vec![sp(mloc, P::SequenceItem_::Seq(Box::new(sp(mloc, nop_call))))],
+                vec![sp(
+                    mloc,
+                    P::SequenceItem_::Seq(Box::new(sp(mloc, nop_call))),
+                )],
                 None,
                 Box::new(Some(sp(mloc, P::Exp_::Unit))),
             )),
@@ -196,16 +240,18 @@ fn test_attributes(attrs: &P::Attributes) -> Vec<(Loc, known_attributes::Testing
     attrs
         .value
         .iter()
-        .filter_map(|attr| match KnownAttribute::resolve(attr.value.attribute_name().value)? {
-            KnownAttribute::Testing(test_attr) => Some((attr.loc, test_attr)),
-            KnownAttribute::Verification(_)
-            | KnownAttribute::Native(_)
-            | KnownAttribute::Diagnostic(_)
-            | KnownAttribute::DefinesPrimitive(_)
-            | KnownAttribute::External(_)
-            | KnownAttribute::Syntax(_)
-            | KnownAttribute::Error(_)
-            | KnownAttribute::Deprecation(_) => None,
-        })
+        .filter_map(
+            |attr| match KnownAttribute::resolve(attr.value.attribute_name().value)? {
+                KnownAttribute::Testing(test_attr) => Some((attr.loc, test_attr)),
+                KnownAttribute::Verification(_)
+                | KnownAttribute::Native(_)
+                | KnownAttribute::Diagnostic(_)
+                | KnownAttribute::DefinesPrimitive(_)
+                | KnownAttribute::External(_)
+                | KnownAttribute::Syntax(_)
+                | KnownAttribute::Error(_)
+                | KnownAttribute::Deprecation(_) => None,
+            },
+        )
         .collect()
 }

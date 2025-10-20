@@ -1,16 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    consistency::ConsistentIndexCursor,
-    types::{
-        cursor::{JsonCursor, Page},
-        sui_address::SuiAddress,
-    },
-};
+use crate::consistency::ConsistentIndexCursor;
+use crate::types::cursor::{JsonCursor, Page};
+use crate::types::sui_address::SuiAddress;
 use async_graphql::connection::{Connection, CursorType, Edge};
 
-use super::{big_int::BigInt, validator::Validator};
+use super::big_int::BigInt;
+use super::validator::Validator;
 use async_graphql::*;
 
 /// Representation of `0x3::validator_set::ValidatorSet`.
@@ -79,7 +76,8 @@ impl ValidatorSet {
             return Ok(connection);
         };
 
-        let Some((prev, next, _, cs)) = page.paginate_consistent_indices(validators.len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, _, cs)) =
+            page.paginate_consistent_indices(validators.len(), self.checkpoint_viewed_at)?
         else {
             return Ok(connection);
         };
@@ -90,7 +88,9 @@ impl ValidatorSet {
         for c in cs {
             let mut validator = validators[c.ix].clone();
             validator.checkpoint_viewed_at = c.c;
-            connection.edges.push(Edge::new(c.encode_cursor(), validator));
+            connection
+                .edges
+                .push(Edge::new(c.encode_cursor(), validator));
         }
 
         Ok(connection)

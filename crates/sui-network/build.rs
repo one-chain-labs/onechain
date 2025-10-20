@@ -10,8 +10,11 @@ use tonic_build::manual::{Builder, Method, Service};
 type Result<T> = ::std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 fn main() -> Result<()> {
-    let out_dir =
-        if env::var("DUMP_GENERATED_GRPC").is_ok() { PathBuf::from("") } else { PathBuf::from(env::var("OUT_DIR")?) };
+    let out_dir = if env::var("DUMP_GENERATED_GRPC").is_ok() {
+        PathBuf::from("")
+    } else {
+        PathBuf::from(env::var("OUT_DIR")?)
+    };
 
     let codec_path = "mysten_network::codec::BcsCodec";
 
@@ -120,7 +123,9 @@ fn main() -> Result<()> {
         )
         .build();
 
-    Builder::new().out_dir(&out_dir).compile(&[validator_service]);
+    Builder::new()
+        .out_dir(&out_dir)
+        .compile(&[validator_service]);
 
     build_anemo_services(&out_dir);
 
@@ -202,5 +207,7 @@ fn build_anemo_services(out_dir: &Path) {
         )
         .build();
 
-    anemo_build::manual::Builder::new().out_dir(out_dir).compile(&[discovery, state_sync, randomness]);
+    anemo_build::manual::Builder::new()
+        .out_dir(out_dir)
+        .compile(&[discovery, state_sync, randomness]);
 }

@@ -6,29 +6,25 @@ use mysten_metrics::monitored_scope;
 use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
 use serde::Serialize;
 use sui_protocol_config::ProtocolConfig;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, VersionNumber},
-    committee::EpochId,
-    digests::{ObjectDigest, TransactionDigest},
-    in_memory_storage::InMemoryStorage,
-    storage::{ObjectKey, ObjectStore},
-};
+use sui_types::base_types::{ObjectID, ObjectRef, SequenceNumber, VersionNumber};
+use sui_types::committee::EpochId;
+use sui_types::digests::{ObjectDigest, TransactionDigest};
+use sui_types::in_memory_storage::InMemoryStorage;
+use sui_types::storage::{ObjectKey, ObjectStore};
 use tracing::debug;
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use fastcrypto::hash::MultisetHash;
-use sui_types::{
-    accumulator::Accumulator,
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    error::SuiResult,
-    messages_checkpoint::{CheckpointSequenceNumber, ECMHLiveObjectSetDigest},
-};
+use sui_types::accumulator::Accumulator;
+use sui_types::effects::TransactionEffects;
+use sui_types::effects::TransactionEffectsAPI;
+use sui_types::error::SuiResult;
+use sui_types::messages_checkpoint::{CheckpointSequenceNumber, ECMHLiveObjectSetDigest};
 
-use crate::authority::{authority_per_epoch_store::AuthorityPerEpochStore, authority_store_tables::LiveObject};
+use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
+use crate::authority::authority_store_tables::LiveObject;
 
 pub struct StateAccumulatorMetrics {
     inconsistent_state: IntGauge,
@@ -88,7 +84,10 @@ pub trait AccumulatorStore: ObjectStore + Send + Sync {
         acc: &Accumulator,
     ) -> SuiResult;
 
-    fn iter_live_object_set(&self, include_wrapped_tombstone: bool) -> Box<dyn Iterator<Item = LiveObject> + '_>;
+    fn iter_live_object_set(
+        &self,
+        include_wrapped_tombstone: bool,
+    ) -> Box<dyn Iterator<Item = LiveObject> + '_>;
 
     fn iter_cached_live_object_set_for_testing(
         &self,
@@ -129,7 +128,10 @@ impl AccumulatorStore for InMemoryStorage {
         unreachable!("not used for testing")
     }
 
-    fn iter_live_object_set(&self, _include_wrapped_tombstone: bool) -> Box<dyn Iterator<Item = LiveObject> + '_> {
+    fn iter_live_object_set(
+        &self,
+        _include_wrapped_tombstone: bool,
+    ) -> Box<dyn Iterator<Item = LiveObject> + '_> {
         unreachable!("not used for testing")
     }
 }
@@ -146,7 +148,11 @@ pub struct WrappedObject {
 
 impl WrappedObject {
     pub fn new(id: ObjectID, wrapped_at: SequenceNumber) -> Self {
-        Self { id, wrapped_at, digest: ObjectDigest::OBJECT_DIGEST_WRAPPED }
+        Self {
+            id,
+            wrapped_at,
+            digest: ObjectDigest::OBJECT_DIGEST_WRAPPED,
+        }
     }
 }
 
@@ -183,7 +189,11 @@ where
     acc.insert_all(
         effects
             .iter()
-            .flat_map(|fx| fx.all_changed_objects().into_iter().map(|(oref, _, _)| oref.2))
+            .flat_map(|fx| {
+                fx.all_changed_objects()
+                    .into_iter()
+                    .map(|(oref, _, _)| oref.2)
+            })
             .collect::<Vec<ObjectDigest>>(),
     );
 
@@ -195,7 +205,11 @@ where
             .flat_map(|fx| {
                 fx.wrapped()
                     .iter()
-                    .map(|oref| bcs::to_bytes(&WrappedObject::new(oref.0, oref.1)).unwrap().to_vec())
+                    .map(|oref| {
+                        bcs::to_bytes(&WrappedObject::new(oref.0, oref.1))
+                            .unwrap()
+                            .to_vec()
+                    })
                     .collect::<Vec<Vec<u8>>>()
             })
             .collect::<Vec<Vec<u8>>>(),
@@ -203,9 +217,15 @@ where
 
     let all_unwrapped = effects
         .iter()
-        .flat_map(|fx| fx.unwrapped().into_iter().map(|(oref, _owner)| (*fx.transaction_digest(), oref.0, oref.1)))
+        .flat_map(|fx| {
+            fx.unwrapped()
+                .into_iter()
+                .map(|(oref, _owner)| (*fx.transaction_digest(), oref.0, oref.1))
+        })
         .chain(effects.iter().flat_map(|fx| {
-            fx.unwrapped_then_deleted().into_iter().map(|oref| (*fx.transaction_digest(), oref.0, oref.1))
+            fx.unwrapped_then_deleted()
+                .into_iter()
+                .map(|oref| (*fx.transaction_digest(), oref.0, oref.1))
         }))
         .collect::<Vec<(TransactionDigest, ObjectID, SequenceNumber)>>();
 
@@ -224,7 +244,9 @@ where
     let modified_at_version_keys: Vec<ObjectKey> = effects
         .iter()
         .flat_map(|fx| {
-            fx.modified_at_versions().into_iter().map(|(id, seq_num)| (*fx.transaction_digest(), id, seq_num))
+            fx.modified_at_versions()
+                .into_iter()
+                .map(|(id, seq_num)| (*fx.transaction_digest(), id, seq_num))
         })
         .filter_map(|(tx_digest, id, seq_num)| {
             // unwrapped tx
@@ -243,11 +265,9 @@ where
         .into_iter()
         .zip(modified_at_version_keys)
         .map(|(obj, key)| {
-            obj.unwrap_or_else(|| {
-                panic!("Object for key {:?} from modified_at_versions effects does not exist in objects table", key)
-            })
-            .compute_object_reference()
-            .2
+            obj.unwrap_or_else(|| panic!("Object for key {:?} from modified_at_versions effects does not exist in objects table", key))
+                .compute_object_reference()
+                .2
         })
         .collect();
     acc.remove_all(modified_at_digests);
@@ -262,10 +282,16 @@ where
     let wrapped_objects_to_remove: Vec<WrappedObject> = all_unwrapped
         .iter()
         .filter_map(|(_tx_digest, id, seq_num)| {
-            let objref = store.get_object_ref_prior_to_key_deprecated(id, *seq_num).expect("read cannot fail");
+            let objref = store
+                .get_object_ref_prior_to_key_deprecated(id, *seq_num)
+                .expect("read cannot fail");
 
             objref.map(|(id, version, digest)| {
-                assert!(!protocol_config.loaded_child_objects_fixed() || digest.is_wrapped(), "{:?}", id);
+                assert!(
+                    !protocol_config.loaded_child_objects_fixed() || digest.is_wrapped(),
+                    "{:?}",
+                    id
+                );
                 WrappedObject::new(id, version)
             })
         })
@@ -292,14 +318,22 @@ where
     acc.insert_all(
         effects
             .iter()
-            .flat_map(|fx| fx.all_changed_objects().into_iter().map(|(oref, _, _)| oref.2))
+            .flat_map(|fx| {
+                fx.all_changed_objects()
+                    .into_iter()
+                    .map(|(oref, _, _)| oref.2)
+            })
             .collect::<Vec<ObjectDigest>>(),
     );
 
     // Collect keys from modified_at_versions to remove from the accumulator.
     let modified_at_version_keys: Vec<_> = effects
         .iter()
-        .flat_map(|fx| fx.modified_at_versions().into_iter().map(|(id, version)| ObjectKey(id, version)))
+        .flat_map(|fx| {
+            fx.modified_at_versions()
+                .into_iter()
+                .map(|(id, version)| ObjectKey(id, version))
+        })
         .collect();
 
     let modified_at_digests: Vec<_> = store
@@ -307,11 +341,9 @@ where
         .into_iter()
         .zip(modified_at_version_keys)
         .map(|(obj, key)| {
-            obj.unwrap_or_else(|| {
-                panic!("Object for key {:?} from modified_at_versions effects does not exist in objects table", key)
-            })
-            .compute_object_reference()
-            .2
+            obj.unwrap_or_else(|| panic!("Object for key {:?} from modified_at_versions effects does not exist in objects table", key))
+                .compute_object_reference()
+                .2
         })
         .collect();
     acc.remove_all(modified_at_digests);
@@ -326,7 +358,11 @@ fn accumulate_effects_v3(effects: Vec<TransactionEffects>) -> Accumulator {
     acc.insert_all(
         effects
             .iter()
-            .flat_map(|fx| fx.all_changed_objects().into_iter().map(|(object_ref, _, _)| object_ref.2))
+            .flat_map(|fx| {
+                fx.all_changed_objects()
+                    .into_iter()
+                    .map(|(object_ref, _, _)| object_ref.2)
+            })
             .collect::<Vec<ObjectDigest>>(),
     );
 
@@ -334,7 +370,11 @@ fn accumulate_effects_v3(effects: Vec<TransactionEffects>) -> Accumulator {
     acc.remove_all(
         effects
             .iter()
-            .flat_map(|fx| fx.old_object_metadata().into_iter().map(|(object_ref, _owner)| object_ref.2))
+            .flat_map(|fx| {
+                fx.old_object_metadata()
+                    .into_iter()
+                    .map(|(object_ref, _owner)| object_ref.2)
+            })
             .collect::<Vec<ObjectDigest>>(),
     );
 
@@ -354,8 +394,15 @@ impl StateAccumulator {
         }
     }
 
-    pub fn new_for_tests(store: Arc<dyn AccumulatorStore>, epoch_store: &Arc<AuthorityPerEpochStore>) -> Self {
-        Self::new(store, epoch_store, StateAccumulatorMetrics::new(&Registry::new()))
+    pub fn new_for_tests(
+        store: Arc<dyn AccumulatorStore>,
+        epoch_store: &Arc<AuthorityPerEpochStore>,
+    ) -> Self {
+        Self::new(
+            store,
+            epoch_store,
+            StateAccumulatorMetrics::new(&Registry::new()),
+        )
     }
 
     pub fn metrics(&self) -> Arc<StateAccumulatorMetrics> {
@@ -391,7 +438,9 @@ impl StateAccumulator {
         epoch_store.insert_state_hash_for_checkpoint(&checkpoint_seq_num, &acc)?;
         debug!("Accumulated checkpoint {}", checkpoint_seq_num);
 
-        epoch_store.checkpoint_state_notify_read.notify(&checkpoint_seq_num, &acc);
+        epoch_store
+            .checkpoint_state_notify_read
+            .notify(&checkpoint_seq_num, &acc);
 
         Ok(acc)
     }
@@ -408,7 +457,9 @@ impl StateAccumulator {
                 Ok(())
             }
             StateAccumulator::V2(impl_v2) => {
-                impl_v2.accumulate_running_root(epoch_store, checkpoint_seq_num, checkpoint_acc).await
+                impl_v2
+                    .accumulate_running_root(epoch_store, checkpoint_seq_num, checkpoint_acc)
+                    .await
             }
         }
     }
@@ -419,18 +470,31 @@ impl StateAccumulator {
         last_checkpoint_of_epoch: CheckpointSequenceNumber,
     ) -> SuiResult<Accumulator> {
         match self {
-            StateAccumulator::V1(impl_v1) => impl_v1.accumulate_epoch(epoch_store, last_checkpoint_of_epoch).await,
-            StateAccumulator::V2(impl_v2) => impl_v2.accumulate_epoch(epoch_store, last_checkpoint_of_epoch),
+            StateAccumulator::V1(impl_v1) => {
+                impl_v1
+                    .accumulate_epoch(epoch_store, last_checkpoint_of_epoch)
+                    .await
+            }
+            StateAccumulator::V2(impl_v2) => {
+                impl_v2.accumulate_epoch(epoch_store, last_checkpoint_of_epoch)
+            }
         }
     }
 
-    pub fn accumulate_cached_live_object_set_for_testing(&self, include_wrapped_tombstone: bool) -> Accumulator {
+    pub fn accumulate_cached_live_object_set_for_testing(
+        &self,
+        include_wrapped_tombstone: bool,
+    ) -> Accumulator {
         match self {
             StateAccumulator::V1(impl_v1) => Self::accumulate_live_object_set_impl(
-                impl_v1.store.iter_cached_live_object_set_for_testing(include_wrapped_tombstone),
+                impl_v1
+                    .store
+                    .iter_cached_live_object_set_for_testing(include_wrapped_tombstone),
             ),
             StateAccumulator::V2(impl_v2) => Self::accumulate_live_object_set_impl(
-                impl_v2.store.iter_cached_live_object_set_for_testing(include_wrapped_tombstone),
+                impl_v2
+                    .store
+                    .iter_cached_live_object_set_for_testing(include_wrapped_tombstone),
             ),
         }
     }
@@ -438,17 +502,25 @@ impl StateAccumulator {
     /// Returns the result of accumulating the live object set, without side effects
     pub fn accumulate_live_object_set(&self, include_wrapped_tombstone: bool) -> Accumulator {
         match self {
-            StateAccumulator::V1(impl_v1) => {
-                Self::accumulate_live_object_set_impl(impl_v1.store.iter_live_object_set(include_wrapped_tombstone))
-            }
-            StateAccumulator::V2(impl_v2) => {
-                Self::accumulate_live_object_set_impl(impl_v2.store.iter_live_object_set(include_wrapped_tombstone))
-            }
+            StateAccumulator::V1(impl_v1) => Self::accumulate_live_object_set_impl(
+                impl_v1
+                    .store
+                    .iter_live_object_set(include_wrapped_tombstone),
+            ),
+            StateAccumulator::V2(impl_v2) => Self::accumulate_live_object_set_impl(
+                impl_v2
+                    .store
+                    .iter_live_object_set(include_wrapped_tombstone),
+            ),
         }
     }
 
     /// Accumulates given effects and returns the accumulator without side effects.
-    pub fn accumulate_effects(&self, effects: Vec<TransactionEffects>, protocol_config: &ProtocolConfig) -> Accumulator {
+    pub fn accumulate_effects(
+        &self,
+        effects: Vec<TransactionEffects>,
+        protocol_config: &ProtocolConfig,
+    ) -> Accumulator {
         match self {
             StateAccumulator::V1(impl_v1) => impl_v1.accumulate_effects(effects, protocol_config),
             StateAccumulator::V2(impl_v2) => impl_v2.accumulate_effects(effects, protocol_config),
@@ -469,12 +541,18 @@ impl StateAccumulator {
                 acc.insert(object.compute_object_reference().2);
             }
             LiveObject::Wrapped(key) => {
-                acc.insert(bcs::to_bytes(&WrappedObject::new(key.0, key.1)).expect("Failed to serialize WrappedObject"));
+                acc.insert(
+                    bcs::to_bytes(&WrappedObject::new(key.0, key.1))
+                        .expect("Failed to serialize WrappedObject"),
+                );
             }
         }
     }
 
-    pub fn digest_live_object_set(&self, include_wrapped_tombstone: bool) -> ECMHLiveObjectSetDigest {
+    pub fn digest_live_object_set(
+        &self,
+        include_wrapped_tombstone: bool,
+    ) -> ECMHLiveObjectSetDigest {
         let acc = self.accumulate_live_object_set(include_wrapped_tombstone);
         acc.digest().into()
     }
@@ -484,7 +562,11 @@ impl StateAccumulator {
         epoch_store: Arc<AuthorityPerEpochStore>,
         last_checkpoint_of_epoch: CheckpointSequenceNumber,
     ) -> SuiResult<ECMHLiveObjectSetDigest> {
-        Ok(self.accumulate_epoch(epoch_store, last_checkpoint_of_epoch).await?.digest().into())
+        Ok(self
+            .accumulate_epoch(epoch_store, last_checkpoint_of_epoch)
+            .await?
+            .digest()
+            .into())
     }
 }
 
@@ -514,7 +596,15 @@ impl StateAccumulatorV1 {
             .store
             .get_root_state_accumulator_for_highest_epoch()?
             .map(|(epoch, (checkpoint, acc))| {
-                (epoch, (checkpoint.checked_add(1).expect("Overflowed u64 for epoch ID"), acc))
+                (
+                    epoch,
+                    (
+                        checkpoint
+                            .checked_add(1)
+                            .expect("Overflowed u64 for epoch ID"),
+                        acc,
+                    ),
+                )
             })
             .unwrap_or((0, (0, Accumulator::default())));
 
@@ -528,11 +618,15 @@ impl StateAccumulatorV1 {
             .into_iter()
             .unzip::<_, _, Vec<_>, Vec<_>>();
 
-        let remaining_checkpoints: Vec<_> =
-            (next_to_accumulate..=last_checkpoint_of_epoch).filter(|seq_num| !checkpoints.contains(seq_num)).collect();
+        let remaining_checkpoints: Vec<_> = (next_to_accumulate..=last_checkpoint_of_epoch)
+            .filter(|seq_num| !checkpoints.contains(seq_num))
+            .collect();
 
         if !remaining_checkpoints.is_empty() {
-            debug!("Awaiting accumulation of checkpoints {:?} for epoch {} accumulation", remaining_checkpoints, epoch);
+            debug!(
+                "Awaiting accumulation of checkpoints {:?} for epoch {} accumulation",
+                remaining_checkpoints, epoch
+            );
         }
 
         let mut remaining_accumulators = epoch_store
@@ -548,12 +642,20 @@ impl StateAccumulatorV1 {
             root_state_accumulator.union(&acc);
         }
 
-        self.store.insert_state_accumulator_for_epoch(epoch, &last_checkpoint_of_epoch, &root_state_accumulator)?;
+        self.store.insert_state_accumulator_for_epoch(
+            epoch,
+            &last_checkpoint_of_epoch,
+            &root_state_accumulator,
+        )?;
 
         Ok(root_state_accumulator)
     }
 
-    pub fn accumulate_effects(&self, effects: Vec<TransactionEffects>, protocol_config: &ProtocolConfig) -> Accumulator {
+    pub fn accumulate_effects(
+        &self,
+        effects: Vec<TransactionEffects>,
+        protocol_config: &ProtocolConfig,
+    ) -> Accumulator {
         accumulate_effects(&*self.store, effects, protocol_config)
     }
 }
@@ -570,7 +672,10 @@ impl StateAccumulatorV2 {
         checkpoint_acc: Option<Accumulator>,
     ) -> SuiResult {
         let _scope = monitored_scope("AccumulateRunningRoot");
-        tracing::info!("accumulating running root for checkpoint {}", checkpoint_seq_num);
+        tracing::info!(
+            "accumulating running root for checkpoint {}",
+            checkpoint_seq_num
+        );
 
         // For the last checkpoint of the epoch, this function will be called once by the
         // checkpoint builder, and again by checkpoint executor.
@@ -578,15 +683,25 @@ impl StateAccumulatorV2 {
         // Normally this is fine, since the notify_read_running_root(checkpoint_seq_num - 1) will
         // work normally. But if there is only one checkpoint in the epoch, that call will hang
         // forever, since the previous checkpoint belongs to the previous epoch.
-        if epoch_store.get_running_root_accumulator(&checkpoint_seq_num)?.is_some() {
-            debug!("accumulate_running_root {:?} {:?} already exists", epoch_store.epoch(), checkpoint_seq_num);
+        if epoch_store
+            .get_running_root_accumulator(&checkpoint_seq_num)?
+            .is_some()
+        {
+            debug!(
+                "accumulate_running_root {:?} {:?} already exists",
+                epoch_store.epoch(),
+                checkpoint_seq_num
+            );
             return Ok(());
         }
 
         let mut running_root = if checkpoint_seq_num == 0 {
             // we're at genesis and need to start from scratch
             Accumulator::default()
-        } else if epoch_store.get_highest_running_root_accumulator()?.is_none() {
+        } else if epoch_store
+            .get_highest_running_root_accumulator()?
+            .is_none()
+        {
             // we're at the beginning of a new epoch and need to
             // bootstrap from the previous epoch's root state hash. Because this
             // should only occur at beginning of epoch, we shouldn't have to worry
@@ -595,7 +710,9 @@ impl StateAccumulatorV2 {
                 self.store.get_root_state_accumulator_for_highest_epoch()?
             {
                 if last_checkpoint_prev_epoch != checkpoint_seq_num - 1 {
-                    epoch_store.notify_read_running_root(checkpoint_seq_num - 1).await?
+                    epoch_store
+                        .notify_read_running_root(checkpoint_seq_num - 1)
+                        .await?
                 } else {
                     assert_eq!(
                         prev_epoch + 1,
@@ -607,11 +724,19 @@ impl StateAccumulatorV2 {
             } else {
                 // Rare edge case where we manage to somehow lag in checkpoint execution from genesis
                 // such that the end of epoch checkpoint is built before we execute any checkpoints.
-                assert_eq!(epoch_store.epoch(), 0, "Expected epoch to be 0 if previous root state hash does not exist");
-                epoch_store.notify_read_running_root(checkpoint_seq_num - 1).await?
+                assert_eq!(
+                    epoch_store.epoch(),
+                    0,
+                    "Expected epoch to be 0 if previous root state hash does not exist"
+                );
+                epoch_store
+                    .notify_read_running_root(checkpoint_seq_num - 1)
+                    .await?
             }
         } else {
-            epoch_store.notify_read_running_root(checkpoint_seq_num - 1).await?
+            epoch_store
+                .notify_read_running_root(checkpoint_seq_num - 1)
+                .await?
         };
 
         let checkpoint_acc = checkpoint_acc.unwrap_or_else(|| {
@@ -622,7 +747,10 @@ impl StateAccumulatorV2 {
         });
         running_root.union(&checkpoint_acc);
         epoch_store.insert_running_root_accumulator(&checkpoint_seq_num, &running_root)?;
-        debug!("Accumulated checkpoint {} to running root accumulator", checkpoint_seq_num,);
+        debug!(
+            "Accumulated checkpoint {} to running root accumulator",
+            checkpoint_seq_num,
+        );
         Ok(())
     }
 
@@ -636,7 +764,11 @@ impl StateAccumulatorV2 {
             .get_running_root_accumulator(&last_checkpoint_of_epoch)?
             .expect("Expected running root accumulator to exist up to last checkpoint of epoch");
 
-        self.store.insert_state_accumulator_for_epoch(epoch_store.epoch(), &last_checkpoint_of_epoch, &running_root)?;
+        self.store.insert_state_accumulator_for_epoch(
+            epoch_store.epoch(),
+            &last_checkpoint_of_epoch,
+            &running_root,
+        )?;
         debug!(
             "Finalized root state hash for epoch {} (up to checkpoint {})",
             epoch_store.epoch(),
@@ -645,7 +777,11 @@ impl StateAccumulatorV2 {
         Ok(running_root.clone())
     }
 
-    pub fn accumulate_effects(&self, effects: Vec<TransactionEffects>, protocol_config: &ProtocolConfig) -> Accumulator {
+    pub fn accumulate_effects(
+        &self,
+        effects: Vec<TransactionEffects>,
+        protocol_config: &ProtocolConfig,
+    ) -> Accumulator {
         accumulate_effects(&*self.store, effects, protocol_config)
     }
 }

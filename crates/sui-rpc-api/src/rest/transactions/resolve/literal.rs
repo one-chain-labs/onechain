@@ -4,21 +4,20 @@
 use std::collections::HashMap;
 
 use super::NormalizedPackage;
-use crate::{Result, RpcServiceError};
+use crate::Result;
+use crate::RpcServiceError;
 use move_binary_format::normalized::Type;
-use sui_sdk_types::types::{unresolved::Value, Command, ObjectId};
-use sui_types::{
-    base_types::{
-        ObjectID,
-        STD_ASCII_MODULE_NAME,
-        STD_ASCII_STRUCT_NAME,
-        STD_OPTION_MODULE_NAME,
-        STD_OPTION_STRUCT_NAME,
-        STD_UTF8_MODULE_NAME,
-        STD_UTF8_STRUCT_NAME,
-    },
-    MOVE_STDLIB_ADDRESS,
-};
+use sui_sdk_transaction_builder::unresolved::Value;
+use sui_sdk_types::Command;
+use sui_sdk_types::ObjectId;
+use sui_types::base_types::ObjectID;
+use sui_types::base_types::STD_ASCII_MODULE_NAME;
+use sui_types::base_types::STD_ASCII_STRUCT_NAME;
+use sui_types::base_types::STD_OPTION_MODULE_NAME;
+use sui_types::base_types::STD_OPTION_STRUCT_NAME;
+use sui_types::base_types::STD_UTF8_MODULE_NAME;
+use sui_types::base_types::STD_UTF8_STRUCT_NAME;
+use sui_types::MOVE_STDLIB_ADDRESS;
 
 pub(super) fn resolve_literal(
     called_packages: &HashMap<ObjectId, NormalizedPackage>,
@@ -73,7 +72,8 @@ fn determine_literal_type(
             }
             (Command::MakeMoveVector(make_move_vector), Some(_)) => {
                 if let Some(ty) = &make_move_vector.type_ {
-                    let ty = sui_types::sui_sdk_types_conversions::type_tag_sdk_to_core(ty.clone())?;
+                    let ty =
+                        sui_types::sui_sdk_types_conversions::type_tag_sdk_to_core(ty.clone())?;
                     set_type(&mut literal_type, ty.into())?;
                 } else {
                     return Err(RpcServiceError::new(
@@ -90,11 +90,16 @@ fn determine_literal_type(
             | (Command::Upgrade(_), _)
             | (Command::MergeCoins(_), _)
             | (Command::SplitCoins(_), None) => {
-                return Err(RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "invalid use of literal"));
+                return Err(RpcServiceError::new(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "invalid use of literal",
+                ));
             }
 
             // bug in find_arg_uses
-            (Command::MakeMoveVector(_), None) | (Command::Publish(_), _) | (Command::MoveCall(_), None) => {
+            (Command::MakeMoveVector(_), None)
+            | (Command::Publish(_), _)
+            | (Command::MoveCall(_), None) => {
                 return Err(RpcServiceError::new(
                     axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                     "error determining type of literal",
@@ -103,8 +108,12 @@ fn determine_literal_type(
         }
     }
 
-    literal_type
-        .ok_or_else(|| RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "unable to determine type of literal"))
+    literal_type.ok_or_else(|| {
+        RpcServiceError::new(
+            axum::http::StatusCode::BAD_REQUEST,
+            "unable to determine type of literal",
+        )
+    })
 }
 
 fn resolve_literal_to_type(buf: &mut Vec<u8>, type_: &Type, value: &Value) -> Result<()> {
@@ -119,8 +128,12 @@ fn resolve_literal_to_type(buf: &mut Vec<u8>, type_: &Type, value: &Value) -> Re
         Type::Address => resolve_as_address(buf, value),
 
         // 0x1::ascii::String and 0x1::string::String
-        Type::Struct { address, module, name, type_arguments }
-            if address == &MOVE_STDLIB_ADDRESS
+        Type::Struct {
+            address,
+            module,
+            name,
+            type_arguments,
+        } if address == &MOVE_STDLIB_ADDRESS
                 // 0x1::ascii::String
             && ((module.as_ref() == STD_ASCII_MODULE_NAME
                 && name.as_ref() == STD_ASCII_STRUCT_NAME)
@@ -133,13 +146,19 @@ fn resolve_literal_to_type(buf: &mut Vec<u8>, type_: &Type, value: &Value) -> Re
         }
 
         // Option<T>
-        Type::Struct { address, module, name, type_arguments }
-            if address == &MOVE_STDLIB_ADDRESS
-                && module.as_ref() == STD_OPTION_MODULE_NAME
-                && name.as_ref() == STD_OPTION_STRUCT_NAME
-                && type_arguments.len() == 1 =>
+        Type::Struct {
+            address,
+            module,
+            name,
+            type_arguments,
+        } if address == &MOVE_STDLIB_ADDRESS
+            && module.as_ref() == STD_OPTION_MODULE_NAME
+            && name.as_ref() == STD_OPTION_STRUCT_NAME
+            && type_arguments.len() == 1 =>
         {
-            let ty = type_arguments.first().expect("length of type_arguments is 1");
+            let ty = type_arguments
+                .first()
+                .expect("length of type_arguments is 1");
 
             resolve_as_option(buf, ty, value)
         }
@@ -147,12 +166,14 @@ fn resolve_literal_to_type(buf: &mut Vec<u8>, type_: &Type, value: &Value) -> Re
         // Vec<T>
         Type::Vector(ty) => resolve_as_vector(buf, ty, value),
 
-        Type::Signer | Type::Struct { .. } | Type::TypeParameter(_) | Type::Reference(_) | Type::MutableReference(_) => {
-            Err(RpcServiceError::new(
-                axum::http::StatusCode::BAD_REQUEST,
-                format!("literal cannot be resolved into type {type_}"),
-            ))
-        }
+        Type::Signer
+        | Type::Struct { .. }
+        | Type::TypeParameter(_)
+        | Type::Reference(_)
+        | Type::MutableReference(_) => Err(RpcServiceError::new(
+            axum::http::StatusCode::BAD_REQUEST,
+            format!("literal cannot be resolved into type {type_}"),
+        )),
     }
 }
 
@@ -160,7 +181,10 @@ fn resolve_as_bool(buf: &mut Vec<u8>, value: &Value) -> Result<()> {
     let b: bool = match value {
         Value::Bool(b) => *b,
         Value::String(s) => s.parse().map_err(|e| {
-            RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, format!("literal cannot be resolved as bool: {e}"))
+            RpcServiceError::new(
+                axum::http::StatusCode::BAD_REQUEST,
+                format!("literal cannot be resolved as bool: {e}"),
+            )
         })?,
         Value::Null | Value::Number(_) | Value::Array(_) => {
             return Err(RpcServiceError::new(
@@ -185,21 +209,30 @@ where
         Value::Number(n) => T::try_from(*n).map_err(|e| {
             RpcServiceError::new(
                 axum::http::StatusCode::BAD_REQUEST,
-                format!("literal cannot be resolved as {}: {e}", std::any::type_name::<T>()),
+                format!(
+                    "literal cannot be resolved as {}: {e}",
+                    std::any::type_name::<T>()
+                ),
             )
         })?,
 
         Value::String(s) => s.parse().map_err(|e| {
             RpcServiceError::new(
                 axum::http::StatusCode::BAD_REQUEST,
-                format!("literal cannot be resolved as {}: {e}", std::any::type_name::<T>()),
+                format!(
+                    "literal cannot be resolved as {}: {e}",
+                    std::any::type_name::<T>()
+                ),
             )
         })?,
 
         Value::Null | Value::Bool(_) | Value::Array(_) => {
             return Err(RpcServiceError::new(
                 axum::http::StatusCode::BAD_REQUEST,
-                format!("literal cannot be resolved into type {}", std::any::type_name::<T>()),
+                format!(
+                    "literal cannot be resolved into type {}",
+                    std::any::type_name::<T>()
+                ),
             ))
         }
     };
@@ -213,7 +246,10 @@ fn resolve_as_address(buf: &mut Vec<u8>, value: &Value) -> Result<()> {
     let address = match value {
         // parse as ObjectID to handle the case where 0x is present or missing
         Value::String(s) => s.parse::<ObjectID>().map_err(|e| {
-            RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, format!("literal cannot be resolved as bool: {e}"))
+            RpcServiceError::new(
+                axum::http::StatusCode::BAD_REQUEST,
+                format!("literal cannot be resolved as bool: {e}"),
+            )
         })?,
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::Array(_) => {
             return Err(RpcServiceError::new(
@@ -330,10 +366,26 @@ mod test {
     fn resolve_number() {
         let test_cases = [
             // U8 Successful cases
-            (Type::U8, Value::Number(u8::MAX.into()), Some(bcs::to_bytes(&u8::MAX).unwrap())),
-            (Type::U8, Value::Number(u8::MIN.into()), Some(bcs::to_bytes(&u8::MIN).unwrap())),
-            (Type::U8, Value::String(u8::MAX.to_string()), Some(bcs::to_bytes(&u8::MAX).unwrap())),
-            (Type::U8, Value::String(u8::MIN.to_string()), Some(bcs::to_bytes(&u8::MIN).unwrap())),
+            (
+                Type::U8,
+                Value::Number(u8::MAX.into()),
+                Some(bcs::to_bytes(&u8::MAX).unwrap()),
+            ),
+            (
+                Type::U8,
+                Value::Number(u8::MIN.into()),
+                Some(bcs::to_bytes(&u8::MIN).unwrap()),
+            ),
+            (
+                Type::U8,
+                Value::String(u8::MAX.to_string()),
+                Some(bcs::to_bytes(&u8::MAX).unwrap()),
+            ),
+            (
+                Type::U8,
+                Value::String(u8::MIN.to_string()),
+                Some(bcs::to_bytes(&u8::MIN).unwrap()),
+            ),
             // U8 failure cases
             (Type::U8, Value::Bool(true), None),
             (Type::U8, Value::Array(vec![]), None),
@@ -342,10 +394,26 @@ mod test {
             (Type::U8, Value::String(u64::MAX.to_string()), None),
             (Type::U8, Value::Number(u64::MAX), None),
             // U16 Successful cases
-            (Type::U16, Value::Number(u16::MAX.into()), Some(bcs::to_bytes(&u16::MAX).unwrap())),
-            (Type::U16, Value::Number(u16::MIN.into()), Some(bcs::to_bytes(&u16::MIN).unwrap())),
-            (Type::U16, Value::String(u16::MAX.to_string()), Some(bcs::to_bytes(&u16::MAX).unwrap())),
-            (Type::U16, Value::String(u16::MIN.to_string()), Some(bcs::to_bytes(&u16::MIN).unwrap())),
+            (
+                Type::U16,
+                Value::Number(u16::MAX.into()),
+                Some(bcs::to_bytes(&u16::MAX).unwrap()),
+            ),
+            (
+                Type::U16,
+                Value::Number(u16::MIN.into()),
+                Some(bcs::to_bytes(&u16::MIN).unwrap()),
+            ),
+            (
+                Type::U16,
+                Value::String(u16::MAX.to_string()),
+                Some(bcs::to_bytes(&u16::MAX).unwrap()),
+            ),
+            (
+                Type::U16,
+                Value::String(u16::MIN.to_string()),
+                Some(bcs::to_bytes(&u16::MIN).unwrap()),
+            ),
             // U16 failure cases
             (Type::U16, Value::Bool(true), None),
             (Type::U16, Value::Array(vec![]), None),
@@ -354,10 +422,26 @@ mod test {
             (Type::U16, Value::String(u64::MAX.to_string()), None),
             (Type::U16, Value::Number(u64::MAX), None),
             // U32 Successful cases
-            (Type::U32, Value::Number(u32::MAX.into()), Some(bcs::to_bytes(&u32::MAX).unwrap())),
-            (Type::U32, Value::Number(u32::MIN.into()), Some(bcs::to_bytes(&u32::MIN).unwrap())),
-            (Type::U32, Value::String(u32::MAX.to_string()), Some(bcs::to_bytes(&u32::MAX).unwrap())),
-            (Type::U32, Value::String(u32::MIN.to_string()), Some(bcs::to_bytes(&u32::MIN).unwrap())),
+            (
+                Type::U32,
+                Value::Number(u32::MAX.into()),
+                Some(bcs::to_bytes(&u32::MAX).unwrap()),
+            ),
+            (
+                Type::U32,
+                Value::Number(u32::MIN.into()),
+                Some(bcs::to_bytes(&u32::MIN).unwrap()),
+            ),
+            (
+                Type::U32,
+                Value::String(u32::MAX.to_string()),
+                Some(bcs::to_bytes(&u32::MAX).unwrap()),
+            ),
+            (
+                Type::U32,
+                Value::String(u32::MIN.to_string()),
+                Some(bcs::to_bytes(&u32::MIN).unwrap()),
+            ),
             // U32 failure cases
             (Type::U32, Value::Bool(true), None),
             (Type::U32, Value::Array(vec![]), None),
@@ -366,10 +450,26 @@ mod test {
             (Type::U32, Value::String(u64::MAX.to_string()), None),
             (Type::U32, Value::Number(u64::MAX), None),
             // U64 Successful cases
-            (Type::U64, Value::Number(u64::MAX), Some(bcs::to_bytes(&u64::MAX).unwrap())),
-            (Type::U64, Value::Number(u64::MIN), Some(bcs::to_bytes(&u64::MIN).unwrap())),
-            (Type::U64, Value::String(u64::MAX.to_string()), Some(bcs::to_bytes(&u64::MAX).unwrap())),
-            (Type::U64, Value::String(u64::MIN.to_string()), Some(bcs::to_bytes(&u64::MIN).unwrap())),
+            (
+                Type::U64,
+                Value::Number(u64::MAX),
+                Some(bcs::to_bytes(&u64::MAX).unwrap()),
+            ),
+            (
+                Type::U64,
+                Value::Number(u64::MIN),
+                Some(bcs::to_bytes(&u64::MIN).unwrap()),
+            ),
+            (
+                Type::U64,
+                Value::String(u64::MAX.to_string()),
+                Some(bcs::to_bytes(&u64::MAX).unwrap()),
+            ),
+            (
+                Type::U64,
+                Value::String(u64::MIN.to_string()),
+                Some(bcs::to_bytes(&u64::MIN).unwrap()),
+            ),
             // U64 failure cases
             (Type::U64, Value::Bool(true), None),
             (Type::U64, Value::Array(vec![]), None),
@@ -377,21 +477,57 @@ mod test {
             (Type::U64, Value::String("foo".into()), None),
             (Type::U64, Value::String(u128::MAX.to_string()), None),
             // U128 Successful cases
-            (Type::U128, Value::Number(u64::MAX), Some(bcs::to_bytes(&u128::from(u64::MAX)).unwrap())),
-            (Type::U128, Value::Number(u64::MIN), Some(bcs::to_bytes(&u128::MIN).unwrap())),
-            (Type::U128, Value::String(u128::MAX.to_string()), Some(bcs::to_bytes(&u128::MAX).unwrap())),
-            (Type::U128, Value::String(u128::MIN.to_string()), Some(bcs::to_bytes(&u128::MIN).unwrap())),
+            (
+                Type::U128,
+                Value::Number(u64::MAX),
+                Some(bcs::to_bytes(&u128::from(u64::MAX)).unwrap()),
+            ),
+            (
+                Type::U128,
+                Value::Number(u64::MIN),
+                Some(bcs::to_bytes(&u128::MIN).unwrap()),
+            ),
+            (
+                Type::U128,
+                Value::String(u128::MAX.to_string()),
+                Some(bcs::to_bytes(&u128::MAX).unwrap()),
+            ),
+            (
+                Type::U128,
+                Value::String(u128::MIN.to_string()),
+                Some(bcs::to_bytes(&u128::MIN).unwrap()),
+            ),
             // U128 failure cases
             (Type::U128, Value::Bool(true), None),
             (Type::U128, Value::Array(vec![]), None),
             (Type::U128, Value::Null, None),
             (Type::U128, Value::String("foo".into()), None),
-            (Type::U128, Value::String(U256::max_value().to_string()), None),
+            (
+                Type::U128,
+                Value::String(U256::max_value().to_string()),
+                None,
+            ),
             // U256 Successful cases
-            (Type::U256, Value::Number(u64::MAX), Some(bcs::to_bytes(&U256::from(u64::MAX)).unwrap())),
-            (Type::U256, Value::Number(u64::MIN), Some(bcs::to_bytes(&U256::zero()).unwrap())),
-            (Type::U256, Value::String(U256::max_value().to_string()), Some(bcs::to_bytes(&U256::max_value()).unwrap())),
-            (Type::U256, Value::String(U256::zero().to_string()), Some(bcs::to_bytes(&U256::zero()).unwrap())),
+            (
+                Type::U256,
+                Value::Number(u64::MAX),
+                Some(bcs::to_bytes(&U256::from(u64::MAX)).unwrap()),
+            ),
+            (
+                Type::U256,
+                Value::Number(u64::MIN),
+                Some(bcs::to_bytes(&U256::zero()).unwrap()),
+            ),
+            (
+                Type::U256,
+                Value::String(U256::max_value().to_string()),
+                Some(bcs::to_bytes(&U256::max_value()).unwrap()),
+            ),
+            (
+                Type::U256,
+                Value::String(U256::zero().to_string()),
+                Some(bcs::to_bytes(&U256::zero()).unwrap()),
+            ),
             // U256 failure cases
             (Type::U256, Value::Bool(true), None),
             (Type::U256, Value::Array(vec![]), None),
@@ -466,10 +602,26 @@ mod test {
 
         let test_cases = [
             // string Successful cases
-            (utf8(), Value::String("foo".into()), Some(bcs::to_bytes(&"foo").unwrap())),
-            (ascii(), Value::String("foo".into()), Some(bcs::to_bytes(&"foo").unwrap())),
-            (utf8(), Value::String("".into()), Some(bcs::to_bytes(&"").unwrap())),
-            (ascii(), Value::String("".into()), Some(bcs::to_bytes(&"").unwrap())),
+            (
+                utf8(),
+                Value::String("foo".into()),
+                Some(bcs::to_bytes(&"foo").unwrap()),
+            ),
+            (
+                ascii(),
+                Value::String("foo".into()),
+                Some(bcs::to_bytes(&"foo").unwrap()),
+            ),
+            (
+                utf8(),
+                Value::String("".into()),
+                Some(bcs::to_bytes(&"").unwrap()),
+            ),
+            (
+                ascii(),
+                Value::String("".into()),
+                Some(bcs::to_bytes(&"").unwrap()),
+            ),
             // String failure cases
             (utf8(), Value::Bool(true), None),
             (utf8(), Value::Array(vec![]), None),
@@ -505,9 +657,21 @@ mod test {
                 Some(bcs::to_bytes(&Some(AccountAddress::TWO)).unwrap()),
             ),
             (option_type(Type::Address), Value::Null, Some(vec![0])),
-            (option_type(Type::U64), Value::Number(u64::MIN), Some(bcs::to_bytes(&Some(u64::MIN)).unwrap())),
-            (option_type(Type::U64), Value::String(u64::MAX.to_string()), Some(bcs::to_bytes(&Some(u64::MAX)).unwrap())),
-            (option_type(Type::Bool), Value::Bool(true), Some(bcs::to_bytes(&Some(true)).unwrap())),
+            (
+                option_type(Type::U64),
+                Value::Number(u64::MIN),
+                Some(bcs::to_bytes(&Some(u64::MIN)).unwrap()),
+            ),
+            (
+                option_type(Type::U64),
+                Value::String(u64::MAX.to_string()),
+                Some(bcs::to_bytes(&Some(u64::MAX)).unwrap()),
+            ),
+            (
+                option_type(Type::Bool),
+                Value::Bool(true),
+                Some(bcs::to_bytes(&Some(true)).unwrap()),
+            ),
             (option_type(Type::Bool), Value::Null, Some(vec![0])),
             // Option failure cases
             (option_type(Type::Bool), Value::Number(0), None),
@@ -534,7 +698,11 @@ mod test {
                 ]),
                 Some(bcs::to_bytes(&vec![AccountAddress::TWO, AccountAddress::ONE]).unwrap()),
             ),
-            (vector_type(Type::U8), Value::Array(vec![Value::Number(9)]), Some(vec![1, 9])),
+            (
+                vector_type(Type::U8),
+                Value::Array(vec![Value::Number(9)]),
+                Some(vec![1, 9]),
+            ),
             (vector_type(Type::U8), Value::Array(vec![]), Some(vec![0])),
             (
                 vector_type(vector_type(Type::U8)),
@@ -554,7 +722,10 @@ mod test {
             (vector_type(Type::U64), Value::Number(0), None),
             (
                 vector_type(Type::Address),
-                Value::Array(vec![Value::String(AccountAddress::TWO.to_canonical_string(true)), Value::Number(5)]),
+                Value::Array(vec![
+                    Value::String(AccountAddress::TWO.to_canonical_string(true)),
+                    Value::Number(5),
+                ]),
                 None,
             ),
         ];

@@ -27,7 +27,7 @@ This template uses `testnet` by default, so we'll need to set up a testnet
 environment in the CLI:
 
 ```bash
-sui client new-env --alias testnet --rpc https://fullnode.testnet.sui.io:443
+sui client new-env --alias testnet --rpc https://rpc-testnet.onelabs.cc:443
 sui client switch --env testnet
 ```
 
@@ -50,7 +50,7 @@ We can ensure we have some Sui in our new wallet by requesting Sui from the
 faucet (make sure to replace the address with your address):
 
 ```bash
-curl --location --request POST 'https://faucet-testnet.onelabs.cc/gas' \
+curl --location --request POST 'https://faucet.testnet.sui.io/gas' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "FixedAmountRequest": {

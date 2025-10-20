@@ -8,7 +8,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use mysten_metrics::spawn_logged_monitored_task;
-use tokio::time::{Duration, MissedTickBehavior};
+use tokio::time::Duration;
+use tokio::time::MissedTickBehavior;
 use tracing::{error_span, info, Instrument};
 
 pub mod eth_bridge_status;
@@ -44,7 +45,10 @@ impl BridgeWatchDog {
         let span = error_span!("observable", name);
         loop {
             info!("Running observable {}", name);
-            observable.observe_and_report().instrument(span.clone()).await;
+            observable
+                .observe_and_report()
+                .instrument(span.clone())
+                .await;
             interval.tick().await;
         }
     }

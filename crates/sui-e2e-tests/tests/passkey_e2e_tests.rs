@@ -8,34 +8,31 @@ use passkey_types::{
     ctap2::Aaguid,
     rand::random_vec,
     webauthn::{
-        AttestationConveyancePreference,
-        CredentialCreationOptions,
-        CredentialRequestOptions,
-        PublicKeyCredentialCreationOptions,
-        PublicKeyCredentialParameters,
-        PublicKeyCredentialRequestOptions,
-        PublicKeyCredentialRpEntity,
-        PublicKeyCredentialType,
-        PublicKeyCredentialUserEntity,
-        UserVerificationRequirement,
+        AttestationConveyancePreference, CredentialCreationOptions, CredentialRequestOptions,
+        PublicKeyCredentialCreationOptions, PublicKeyCredentialParameters,
+        PublicKeyCredentialRequestOptions, PublicKeyCredentialRpEntity, PublicKeyCredentialType,
+        PublicKeyCredentialUserEntity, UserVerificationRequirement,
     },
-    Bytes,
-    Passkey,
+    Bytes, Passkey,
 };
 use shared_crypto::intent::{Intent, IntentMessage};
 use std::net::SocketAddr;
 use sui_core::authority_client::AuthorityAPI;
 use sui_macros::sim_test;
 use sui_test_transaction_builder::TestTransactionBuilder;
+use sui_types::crypto::Signature;
+use sui_types::error::UserInputError;
+use sui_types::error::{SuiError, SuiResult};
+use sui_types::signature::GenericSignature;
+use sui_types::transaction::Transaction;
 use sui_types::{
     base_types::SuiAddress,
-    crypto::{PublicKey, Signature, SignatureScheme},
-    error::{SuiError, SuiResult, UserInputError},
+    crypto::{PublicKey, SignatureScheme},
     passkey_authenticator::{to_signing_message, PasskeyAuthenticator},
-    signature::GenericSignature,
-    transaction::{Transaction, TransactionData},
+    transaction::TransactionData,
 };
-use test_cluster::{TestCluster, TestClusterBuilder};
+use test_cluster::TestCluster;
+use test_cluster::TestClusterBuilder;
 use url::Url;
 
 struct MyUserValidationMethod {}
@@ -125,9 +122,14 @@ async fn create_credential_and_sign_test_tx(
         },
     };
     let my_webauthn_credential = my_client.register(&origin, request, None).await.unwrap();
-    let verifying_key =
-        p256::ecdsa::VerifyingKey::from_public_key_der(my_webauthn_credential.response.public_key.unwrap().as_slice())
-            .unwrap();
+    let verifying_key = p256::ecdsa::VerifyingKey::from_public_key_der(
+        my_webauthn_credential
+            .response
+            .public_key
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
 
     // Derive compact pubkey from DER format.
     let encoded_point = verifying_key.to_encoded_point(false);
@@ -138,20 +140,28 @@ async fn create_credential_and_sign_test_tx(
     pk_bytes.extend_from_slice(x.unwrap());
     let pk = PublicKey::try_from_bytes(SignatureScheme::PasskeyAuthenticator, &pk_bytes).unwrap();
 
-    // Compute OneChain address as sender, fund gas and make a test transaction.
+    // Compute sui address as sender, fund gas and make a test transaction.
     let sender = match sender {
         Some(s) => s,
         None => SuiAddress::from(&pk),
     };
     let rgp = test_cluster.get_reference_gas_price().await;
-    let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), sender).await;
-    let tx_data = TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
+    let gas = test_cluster
+        .fund_address_and_return_gas(rgp, Some(20000000000), sender)
+        .await;
+    let tx_data = TestTransactionBuilder::new(sender, gas, rgp)
+        .transfer_oct(None, SuiAddress::ZERO)
+        .build();
     let intent_msg = IntentMessage::new(Intent::sui_transaction(), tx_data);
 
     // Compute the challenge = blake2b_hash(intent_msg(tx)) for passkey credential request.
     // If change_intent, mangle the intent bytes. If change_tx, mangle the hashed tx bytes.
     let passkey_challenge = if change_intent {
-        to_signing_message(&IntentMessage::new(Intent::personal_message(), intent_msg.value.clone())).to_vec()
+        to_signing_message(&IntentMessage::new(
+            Intent::personal_message(),
+            intent_msg.value.clone(),
+        ))
+        .to_vec()
     } else if change_tx {
         random_vec(32)
     } else {
@@ -173,7 +183,10 @@ async fn create_credential_and_sign_test_tx(
         },
     };
 
-    let authenticated_cred = my_client.authenticate(&origin, credential_request, None).await.unwrap();
+    let authenticated_cred = my_client
+        .authenticate(&origin, credential_request, None)
+        .await
+        .unwrap();
 
     // Parse signature from der format in response and normalize it to lower s.
     let sig_bytes_der = authenticated_cred.response.signature.as_slice();
@@ -219,7 +232,12 @@ async fn test_passkey_feature_deny() {
     let response = create_credential_and_sign_test_tx(&test_cluster, None, false, false).await;
     let tx = make_good_passkey_tx(response);
     let err = execute_tx(tx, &test_cluster).await.unwrap_err();
-    assert!(matches!(err, SuiError::UserInputError { error: UserInputError::Unsupported(..) }));
+    assert!(matches!(
+        err,
+        SuiError::UserInputError {
+            error: UserInputError::Unsupported(..)
+        }
+    ));
 }
 
 #[sim_test]
@@ -248,7 +266,12 @@ async fn test_passkey_fails_mismatched_challenge() {
     let tx = Transaction::from_generic_sig_data(response.intent_msg.value, vec![sig]);
     let res = execute_tx(tx, &test_cluster).await;
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid challenge".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid challenge".to_string()
+        }
+    );
 
     // Tweak tx_digest bytes in challenge that is sent to passkey.
     let response = create_credential_and_sign_test_tx(&test_cluster, None, false, true).await;
@@ -263,7 +286,12 @@ async fn test_passkey_fails_mismatched_challenge() {
     let tx = Transaction::from_generic_sig_data(response.intent_msg.value, vec![sig]);
     let res = execute_tx(tx, &test_cluster).await;
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Invalid challenge".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Invalid challenge".to_string()
+        }
+    );
 }
 
 #[sim_test]
@@ -287,14 +315,21 @@ async fn test_passkey_fails_to_verify_sig() {
     let tx = Transaction::from_generic_sig_data(response.intent_msg.value, vec![sig]);
     let res = execute_tx(tx, &test_cluster).await;
     let err = res.unwrap_err();
-    assert_eq!(err, SuiError::InvalidSignature { error: "Fails to verify".to_string() });
+    assert_eq!(
+        err,
+        SuiError::InvalidSignature {
+            error: "Fails to verify".to_string()
+        }
+    );
 }
 
 #[sim_test]
 async fn test_passkey_fails_wrong_author() {
     let test_cluster = TestClusterBuilder::new().build().await;
     // Modify sender that receives gas and construct test txn.
-    let response = create_credential_and_sign_test_tx(&test_cluster, Some(SuiAddress::ZERO), false, false).await;
+    let response =
+        create_credential_and_sign_test_tx(&test_cluster, Some(SuiAddress::ZERO), false, false)
+            .await;
     let sig = GenericSignature::PasskeyAuthenticator(
         PasskeyAuthenticator::new_for_testing(
             response.authenticator_data,

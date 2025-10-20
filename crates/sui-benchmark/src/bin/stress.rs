@@ -5,20 +5,27 @@ use anyhow::{anyhow, Context, Result};
 use clap::*;
 
 use prometheus::Registry;
-use rand::{seq::SliceRandom, Rng};
+use rand::seq::SliceRandom;
+use rand::Rng;
 use sui_protocol_config::Chain;
 use tokio::time::sleep;
 
-use std::{sync::Arc, time::Duration};
-use sui_benchmark::drivers::{bench_driver::BenchDriver, driver::Driver, BenchmarkCmp, BenchmarkStats};
+use std::sync::Arc;
+use std::time::Duration;
+use sui_benchmark::drivers::bench_driver::BenchDriver;
+use sui_benchmark::drivers::driver::Driver;
+use sui_benchmark::drivers::BenchmarkCmp;
+use sui_benchmark::drivers::BenchmarkStats;
 use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
 
-use sui_benchmark::{benchmark_setup::Env, options::Opts};
+use sui_benchmark::benchmark_setup::Env;
+use sui_benchmark::options::Opts;
 
 use sui_benchmark::workloads::workload_configuration::WorkloadConfiguration;
 
 use sui_benchmark::system_state_observer::SystemStateObserver;
-use tokio::{runtime::Builder, sync::Barrier};
+use tokio::runtime::Builder;
+use tokio::sync::Barrier;
 
 /// To spin up a local cluster and direct some load
 /// at it with 50/50 shared and owned traffic, use
@@ -73,7 +80,9 @@ async fn main() -> Result<()> {
     let _guard = config.with_env().init();
 
     let registry_service = mysten_metrics::start_prometheus_server(
-        format!("{}:{}", opts.client_metric_host, opts.client_metric_port).parse().unwrap(),
+        format!("{}:{}", opts.client_metric_host, opts.client_metric_port)
+            .parse()
+            .unwrap(),
     );
     let registry: Registry = registry_service.default_registry();
     mysten_metrics::init_metrics(&registry);
@@ -106,7 +115,8 @@ async fn main() -> Result<()> {
     const START_DELAY_INTERVAL: Duration = Duration::from_secs(2);
     const START_DELAY_MAX_JITTER_MS: u64 = 2000;
     if opts.staggered_start_max_multiplier > 0 {
-        let delay = START_DELAY_INTERVAL * rand::thread_rng().gen_range(0..opts.staggered_start_max_multiplier)
+        let delay = START_DELAY_INTERVAL
+            * rand::thread_rng().gen_range(0..opts.staggered_start_max_multiplier)
             + Duration::from_millis(rand::thread_rng().gen_range(0..START_DELAY_MAX_JITTER_MS));
         sleep(delay).await;
     }
@@ -123,8 +133,12 @@ async fn main() -> Result<()> {
     let registry_clone = registry.clone();
     let handle = std::thread::spawn(move || {
         client_runtime.block_on(async move {
-            let workloads =
-                WorkloadConfiguration::configure(bench_setup.bank, &opts, system_state_observer.clone()).await?;
+            let workloads = WorkloadConfiguration::configure(
+                bench_setup.bank,
+                &opts,
+                system_state_observer.clone(),
+            )
+            .await?;
             let interval = opts.run_duration;
             // We only show continuous progress in stderr
             // if benchmark is running in unbounded mode,
@@ -133,7 +147,14 @@ async fn main() -> Result<()> {
             let show_progress = interval.is_unbounded();
             let driver = BenchDriver::new(opts.stat_collection_interval, stress_stat_collection);
             driver
-                .run(bench_setup.proxies, workloads, system_state_observer, &registry_clone, show_progress, interval)
+                .run(
+                    bench_setup.proxies,
+                    workloads,
+                    system_state_observer,
+                    &registry_clone,
+                    show_progress,
+                    interval,
+                )
                 .await
         })
     });
@@ -142,8 +163,14 @@ async fn main() -> Result<()> {
         Err(anyhow!("Failed to join client runtime: {:?}", err))
     } else {
         // send signal to stop the server runtime
-        bench_setup.shutdown_notifier.send(()).expect("Failed to stop server runtime");
-        bench_setup.server_handle.join().expect("Failed to join the server handle");
+        bench_setup
+            .shutdown_notifier
+            .send(())
+            .expect("Failed to stop server runtime");
+        bench_setup
+            .server_handle
+            .join()
+            .expect("Failed to join the server handle");
         match joined {
             Ok(result) => match result {
                 Ok((benchmark_stats, stress_stats)) => {
@@ -160,9 +187,15 @@ async fn main() -> Result<()> {
                     if !prev_benchmark_stats_path.is_empty() {
                         let data = std::fs::read_to_string(&prev_benchmark_stats_path)?;
                         let prev_stats: BenchmarkStats = serde_json::from_str(&data)?;
-                        let cmp = BenchmarkCmp { new: &benchmark_stats, old: &prev_stats };
+                        let cmp = BenchmarkCmp {
+                            new: &benchmark_stats,
+                            old: &prev_stats,
+                        };
                         let cmp_table = cmp.to_table();
-                        eprintln!("Benchmark Comparison Report[{}]:", prev_benchmark_stats_path);
+                        eprintln!(
+                            "Benchmark Comparison Report[{}]:",
+                            prev_benchmark_stats_path
+                        );
                         eprintln!("{}", cmp_table);
                     }
                     if !curr_benchmark_stats_path.is_empty() {

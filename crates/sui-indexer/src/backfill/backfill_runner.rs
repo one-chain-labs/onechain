@@ -1,13 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    backfill::{backfill_instances::get_backfill_task, backfill_task::BackfillTask, BackfillTaskKind},
-    config::BackFillConfig,
-    database::ConnectionPool,
-};
+use crate::backfill::backfill_instances::get_backfill_task;
+use crate::backfill::backfill_task::BackfillTask;
+use crate::backfill::BackfillTaskKind;
+use crate::config::BackFillConfig;
+use crate::database::ConnectionPool;
 use futures::StreamExt;
-use std::{collections::BTreeSet, ops::RangeInclusive, sync::Arc, time::Instant};
+use std::collections::BTreeSet;
+use std::ops::RangeInclusive;
+use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 

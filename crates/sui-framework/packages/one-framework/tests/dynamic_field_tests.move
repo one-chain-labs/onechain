@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::dynamic_field_tests {
-    use one::dynamic_field::{add, exists_with_type, borrow, borrow_mut, remove};
-    use one::test_scenario;
+module oct::dynamic_field_tests {
+    use sui::dynamic_field::{add, exists_with_type, borrow, borrow_mut, remove};
+    use sui::test_scenario;
 
     #[test]
     fun simple_all_functions() {
@@ -44,7 +44,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
     fun add_duplicate() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -55,7 +55,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
     fun add_duplicate_mismatched_type() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -66,7 +66,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
     fun borrow_missing() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -76,7 +76,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldTypeMismatch)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldTypeMismatch)]
     fun borrow_wrong_type() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -87,7 +87,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
     fun borrow_mut_missing() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -97,7 +97,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldTypeMismatch)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldTypeMismatch)]
     fun borrow_mut_wrong_type() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -108,7 +108,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
     fun remove_missing() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);
@@ -118,7 +118,7 @@ module one::dynamic_field_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = one::dynamic_field::EFieldTypeMismatch)]
+    #[expected_failure(abort_code = sui::dynamic_field::EFieldTypeMismatch)]
     fun remove_wrong_type() {
         let sender = @0x0;
         let mut scenario = test_scenario::begin(sender);

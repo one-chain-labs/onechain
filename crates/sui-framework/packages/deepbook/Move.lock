@@ -11,12 +11,12 @@ dependencies = [
 ]
 
 [[move.package]]
-id = "MoveStdlib"
+name = "MoveStdlib"
 source = { local = "../move-stdlib" }
 
 [[move.package]]
-id = "One"
-source = { local = "../one-framework" }
+name = "Sui"
+source = { local = "../sui-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },

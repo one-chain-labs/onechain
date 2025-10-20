@@ -20,8 +20,11 @@ use crate::{
 const TRANSFER_MODULE_NAME: &IdentStr = ident_str!("transfer");
 const RECEIVING_STRUCT_NAME: &IdentStr = ident_str!("Receiving");
 
-pub const RESOLVED_RECEIVING_STRUCT: (&AccountAddress, &IdentStr, &IdentStr) =
-    (&SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE_NAME, RECEIVING_STRUCT_NAME);
+pub const RESOLVED_RECEIVING_STRUCT: (&AccountAddress, &IdentStr, &IdentStr) = (
+    &SUI_FRAMEWORK_ADDRESS,
+    TRANSFER_MODULE_NAME,
+    RECEIVING_STRUCT_NAME,
+);
 
 /// Rust version of the Move sui::transfer::Receiving type
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -32,7 +35,10 @@ pub struct Receiving {
 
 impl Receiving {
     pub fn new(id: ObjectID, version: SequenceNumber) -> Self {
-        Self { id: ID::new(id), version }
+        Self {
+            id: ID::new(id),
+            version,
+        }
     }
 
     pub fn to_bcs_bytes(&self) -> Vec<u8> {

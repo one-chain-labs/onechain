@@ -1,28 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::PathBuf;
+
 use crate::test_adapter::{FakeID, SuiTestAdapter};
 use anyhow::{bail, ensure};
-use clap::{self, Args, Parser};
+use clap;
+use clap::{Args, Parser};
 use move_compiler::editions::Flavor;
-use move_core_types::{
-    parsing::{
-        parser::{parse_u256, parse_u64, Parser as MoveCLParser},
-        values::{ParsableValue, ParsedValue, ValueToken},
-    },
-    runtime_value::{MoveStruct, MoveValue},
-    u256::U256,
+use move_core_types::parsing::{
+    parser::Parser as MoveCLParser,
+    parser::{parse_u256, parse_u64},
+    values::ValueToken,
+    values::{ParsableValue, ParsedValue},
 };
+use move_core_types::runtime_value::{MoveStruct, MoveValue};
+use move_core_types::u256::U256;
 use move_symbol_pool::Symbol;
 use move_transactional_test_runner::tasks::{RunCommand, SyntaxChoice};
 use sui_graphql_rpc::test_infra::cluster::SnapshotLagConfig;
-use sui_types::{
-    base_types::{SequenceNumber, SuiAddress},
-    move_package::UpgradePolicy,
-    object::{Object, Owner},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{Argument, CallArg, ObjectArg},
-};
+use sui_types::base_types::{SequenceNumber, SuiAddress};
+use sui_types::move_package::UpgradePolicy;
+use sui_types::object::{Object, Owner};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{Argument, CallArg, ObjectArg};
 
 pub const SUI_ARGS_LONG: &str = "sui-args";
 
@@ -74,6 +75,13 @@ pub struct SuiInitArgs {
     /// the indexer.
     #[clap(long = "epochs-to-keep")]
     pub epochs_to_keep: Option<u64>,
+    /// Dir for simulacrum to write checkpoint files to. To be passed to the offchain indexer and
+    /// reader.
+    #[clap(long)]
+    pub data_ingestion_path: Option<PathBuf>,
+    /// URL for the Sui REST API. To be passed to the offchain indexer and reader.
+    #[clap(long)]
+    pub rest_api_url: Option<String>,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -225,23 +233,27 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::FromArgMatches
 {
     fn from_arg_matches(matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
         Ok(match matches.subcommand() {
-            Some(("view-object", matches)) => SuiSubcommand::ViewObject(ViewObjectCommand::from_arg_matches(matches)?),
+            Some(("view-object", matches)) => {
+                SuiSubcommand::ViewObject(ViewObjectCommand::from_arg_matches(matches)?)
+            }
             Some(("transfer-object", matches)) => {
                 SuiSubcommand::TransferObject(TransferObjectCommand::from_arg_matches(matches)?)
             }
-            Some(("consensus-commit-prologue", matches)) => {
-                SuiSubcommand::ConsensusCommitPrologue(ConsensusCommitPrologueCommand::from_arg_matches(matches)?)
-            }
-            Some(("programmable", matches)) => {
-                SuiSubcommand::ProgrammableTransaction(ProgrammableTransactionCommand::from_arg_matches(matches)?)
-            }
+            Some(("consensus-commit-prologue", matches)) => SuiSubcommand::ConsensusCommitPrologue(
+                ConsensusCommitPrologueCommand::from_arg_matches(matches)?,
+            ),
+            Some(("programmable", matches)) => SuiSubcommand::ProgrammableTransaction(
+                ProgrammableTransactionCommand::from_arg_matches(matches)?,
+            ),
             Some(("upgrade", matches)) => {
                 SuiSubcommand::UpgradePackage(UpgradePackageCommand::from_arg_matches(matches)?)
             }
             Some(("stage-package", matches)) => {
                 SuiSubcommand::StagePackage(StagePackageCommand::from_arg_matches(matches)?)
             }
-            Some(("set-address", matches)) => SuiSubcommand::SetAddress(SetAddressCommand::from_arg_matches(matches)?),
+            Some(("set-address", matches)) => {
+                SuiSubcommand::SetAddress(SetAddressCommand::from_arg_matches(matches)?)
+            }
             Some(("create-checkpoint", matches)) => {
                 SuiSubcommand::CreateCheckpoint(CreateCheckpointCommand::from_arg_matches(matches)?)
             }
@@ -255,12 +267,18 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::FromArgMatches
                 SuiSubcommand::SetRandomState(SetRandomStateCommand::from_arg_matches(matches)?)
             }
             Some(("view-checkpoint", _)) => SuiSubcommand::ViewCheckpoint,
-            Some(("run-graphql", matches)) => SuiSubcommand::RunGraphql(RunGraphqlCommand::from_arg_matches(matches)?),
-            Some(("bench", matches)) => {
-                SuiSubcommand::Bench(RunCommand::from_arg_matches(matches)?, ExtraRunArgs::from_arg_matches(matches)?)
+            Some(("run-graphql", matches)) => {
+                SuiSubcommand::RunGraphql(RunGraphqlCommand::from_arg_matches(matches)?)
             }
+            Some(("bench", matches)) => SuiSubcommand::Bench(
+                RunCommand::from_arg_matches(matches)?,
+                ExtraRunArgs::from_arg_matches(matches)?,
+            ),
             _ => {
-                return Err(clap::Error::raw(clap::error::ErrorKind::InvalidSubcommand, "Invalid submcommand"));
+                return Err(clap::Error::raw(
+                    clap::error::ErrorKind::InvalidSubcommand,
+                    "Invalid submcommand",
+                ));
             }
         })
     }
@@ -289,7 +307,9 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::CommandFactory
             .subcommand(SetRandomStateCommand::command().name("set-random-state"))
             .subcommand(clap::Command::new("view-checkpoint"))
             .subcommand(RunGraphqlCommand::command().name("run-graphql"))
-            .subcommand(RunCommand::<ExtraValueArgs>::augment_args(ExtraRunArgs::command()).name("bench"))
+            .subcommand(
+                RunCommand::<ExtraValueArgs>::augment_args(ExtraRunArgs::command()).name("bench"),
+            )
     }
 
     fn command_for_update() -> clap::Command {
@@ -297,7 +317,10 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::CommandFactory
     }
 }
 
-impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::Parser for SuiSubcommand<ExtraValueArgs, ExtraRunArgs> {}
+impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::Parser
+    for SuiSubcommand<ExtraValueArgs, ExtraRunArgs>
+{
+}
 
 #[derive(Clone, Debug)]
 pub enum SuiExtraValueArgs {
@@ -446,8 +469,15 @@ impl SuiValue {
     ) -> anyhow::Result<ObjectArg> {
         let obj = Self::resolve_object(fake_id, version, test_adapter)?;
         let id = obj.id();
-        if let Owner::Shared { initial_shared_version } = obj.owner {
-            Ok(ObjectArg::SharedObject { id, initial_shared_version, mutable: false })
+        if let Owner::Shared {
+            initial_shared_version,
+        } = obj.owner
+        {
+            Ok(ObjectArg::SharedObject {
+                id,
+                initial_shared_version,
+                mutable: false,
+            })
         } else {
             bail!("{fake_id} is not a shared object.")
         }
@@ -461,10 +491,17 @@ impl SuiValue {
         let obj = Self::resolve_object(fake_id, version, test_adapter)?;
         let id = obj.id();
         match obj.owner {
-            Owner::Shared { initial_shared_version }
-            | Owner::ConsensusV2 { start_version: initial_shared_version, .. } => {
-                Ok(ObjectArg::SharedObject { id, initial_shared_version, mutable: true })
+            Owner::Shared {
+                initial_shared_version,
             }
+            | Owner::ConsensusV2 {
+                start_version: initial_shared_version,
+                ..
+            } => Ok(ObjectArg::SharedObject {
+                id,
+                initial_shared_version,
+                mutable: true,
+            }),
             Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => {
                 let obj_ref = obj.compute_object_reference();
                 Ok(ObjectArg::ImmOrOwnedObject(obj_ref))
@@ -474,7 +511,9 @@ impl SuiValue {
 
     pub(crate) fn into_call_arg(self, test_adapter: &SuiTestAdapter) -> anyhow::Result<CallArg> {
         Ok(match self {
-            SuiValue::Object(fake_id, version) => CallArg::Object(Self::object_arg(fake_id, version, test_adapter)?),
+            SuiValue::Object(fake_id, version) => {
+                CallArg::Object(Self::object_arg(fake_id, version, test_adapter)?)
+            }
             SuiValue::MoveValue(v) => CallArg::Pure(v.simple_serialize().unwrap()),
             SuiValue::Receiving(fake_id, version) => {
                 CallArg::Object(Self::receiving_arg(fake_id, version, test_adapter)?)
@@ -533,9 +572,13 @@ impl ParsableValue for SuiExtraValueArgs {
 
     fn concrete_vector(elems: Vec<Self::ConcreteValue>) -> anyhow::Result<Self::ConcreteValue> {
         if !elems.is_empty() && matches!(elems[0], SuiValue::Object(_, _)) {
-            Ok(SuiValue::ObjVec(elems.into_iter().map(SuiValue::assert_object).collect()))
+            Ok(SuiValue::ObjVec(
+                elems.into_iter().map(SuiValue::assert_object).collect(),
+            ))
         } else {
-            Ok(SuiValue::MoveValue(MoveValue::Vector(elems.into_iter().map(SuiValue::assert_move_value).collect())))
+            Ok(SuiValue::MoveValue(MoveValue::Vector(
+                elems.into_iter().map(SuiValue::assert_move_value).collect(),
+            )))
         }
     }
 
@@ -574,9 +617,9 @@ fn parse_fake_id(s: &str) -> anyhow::Result<FakeID> {
 
 fn parse_policy(x: &str) -> anyhow::Result<u8> {
     Ok(match x {
-        "compatible" => UpgradePolicy::COMPATIBLE,
-        "additive" => UpgradePolicy::ADDITIVE,
-        "dep_only" => UpgradePolicy::DEP_ONLY,
-        _ => bail!("Invalid upgrade policy {x}. Policy must be one of 'compatible', 'additive', or 'dep_only'"),
+            "compatible" => UpgradePolicy::COMPATIBLE,
+            "additive" => UpgradePolicy::ADDITIVE,
+            "dep_only" => UpgradePolicy::DEP_ONLY,
+        _ => bail!("Invalid upgrade policy {x}. Policy must be one of 'compatible', 'additive', or 'dep_only'")
     })
 }

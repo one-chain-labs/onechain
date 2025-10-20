@@ -34,8 +34,14 @@ pub(crate) struct MoveEnumVariant {
 impl MoveEnum {
     /// The module this enum was originally defined in.
     pub(crate) async fn module(&self, ctx: &Context<'_>) -> Result<MoveModule> {
-        let Some(module) =
-            MoveModule::query(ctx, self.defining_id, &self.module, self.checkpoint_viewed_at).await.extend()?
+        let Some(module) = MoveModule::query(
+            ctx,
+            self.defining_id,
+            &self.module,
+            self.checkpoint_viewed_at,
+        )
+        .await
+        .extend()?
         else {
             return Err(Error::Internal(format!(
                 "Failed to load module for enum: {}::{}::{}",
@@ -86,7 +92,12 @@ impl MoveEnumVariant {
 }
 
 impl MoveEnum {
-    pub(crate) fn new(module: String, name: String, def: DataDef, checkpoint_viewed_at: u64) -> Result<Self, Error> {
+    pub(crate) fn new(
+        module: String,
+        name: String,
+        def: DataDef,
+        checkpoint_viewed_at: u64,
+    ) -> Result<Self, Error> {
         let type_parameters = def
             .type_params
             .into_iter()
@@ -99,7 +110,10 @@ impl MoveEnum {
         let MoveData::Enum(variants) = def.data else {
             // This should never happen, as the data should always be an enum if we're calling
             // this function. So signal an internal error if it does.
-            return Err(Error::Internal(format!("Expected enum data, but got: {:?}", def.data)));
+            return Err(Error::Internal(format!(
+                "Expected enum data, but got: {:?}",
+                def.data
+            )));
         };
         let variants = variants
             .into_iter()
@@ -107,7 +121,10 @@ impl MoveEnum {
                 name,
                 fields: signatures
                     .into_iter()
-                    .map(|(name, signature)| MoveField { name, type_: signature.into() })
+                    .map(|(name, signature)| MoveField {
+                        name,
+                        type_: signature.into(),
+                    })
                     .collect(),
             })
             .collect();

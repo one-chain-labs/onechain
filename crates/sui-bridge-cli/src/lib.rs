@@ -3,51 +3,43 @@
 
 use anyhow::anyhow;
 use clap::*;
-use ethers::{
-    providers::Middleware,
-    types::{Address as EthAddress, U256},
-};
-use fastcrypto::{
-    encoding::{Encoding, Hex},
-    hash::{HashFunction, Keccak256},
-};
+use ethers::providers::Middleware;
+use ethers::types::Address as EthAddress;
+use ethers::types::U256;
+use fastcrypto::encoding::Encoding;
+use fastcrypto::encoding::Hex;
+use fastcrypto::hash::{HashFunction, Keccak256};
 use move_core_types::ident_str;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use shared_crypto::intent::{Intent, IntentMessage};
-use std::{path::PathBuf, str::FromStr, sync::Arc};
-use sui_bridge::{
-    abi::{eth_sui_bridge, EthBridgeCommittee, EthSuiBridge},
-    crypto::BridgeAuthorityPublicKeyBytes,
-    error::BridgeResult,
-    sui_client::SuiBridgeClient,
-    types::{
-        AddTokensOnEvmAction,
-        AddTokensOnSuiAction,
-        AssetPriceUpdateAction,
-        BlocklistCommitteeAction,
-        BlocklistType,
-        BridgeAction,
-        EmergencyAction,
-        EmergencyActionType,
-        EvmContractUpgradeAction,
-        LimitUpdateAction,
-    },
-    utils::{get_eth_signer_client, EthSigner},
+use shared_crypto::intent::Intent;
+use shared_crypto::intent::IntentMessage;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+use sui_bridge::abi::EthBridgeCommittee;
+use sui_bridge::abi::{eth_sui_bridge, EthSuiBridge};
+use sui_bridge::crypto::BridgeAuthorityPublicKeyBytes;
+use sui_bridge::error::BridgeResult;
+use sui_bridge::sui_client::SuiBridgeClient;
+use sui_bridge::types::BridgeAction;
+use sui_bridge::types::{
+    AddTokensOnEvmAction, AddTokensOnSuiAction, AssetPriceUpdateAction, BlocklistCommitteeAction,
+    BlocklistType, EmergencyAction, EmergencyActionType, EvmContractUpgradeAction,
+    LimitUpdateAction,
 };
+use sui_bridge::utils::{get_eth_signer_client, EthSigner};
 use sui_config::Config;
 use sui_json_rpc_types::SuiObjectDataOptions;
 use sui_keys::keypair_file::read_key;
 use sui_sdk::SuiClientBuilder;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    bridge::{BridgeChainId, BRIDGE_MODULE_NAME},
-    crypto::{Signature, SuiKeyPair},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{ObjectArg, Transaction, TransactionData},
-    TypeTag,
-    BRIDGE_PACKAGE_ID,
-};
+use sui_types::base_types::SuiAddress;
+use sui_types::base_types::{ObjectID, ObjectRef};
+use sui_types::bridge::{BridgeChainId, BRIDGE_MODULE_NAME};
+use sui_types::crypto::{Signature, SuiKeyPair};
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use sui_types::transaction::{ObjectArg, Transaction, TransactionData};
+use sui_types::{TypeTag, BRIDGE_PACKAGE_ID};
 use tracing::info;
 
 pub const SEPOLIA_BRIDGE_PROXY_ADDR: &str = "0xAE68F87938439afEEDd6552B0E83D2CbC2473623";
@@ -222,18 +214,29 @@ pub enum GovernanceClientCommands {
 pub fn make_action(chain_id: BridgeChainId, cmd: &GovernanceClientCommands) -> BridgeAction {
     match cmd {
         GovernanceClientCommands::EmergencyButton { nonce, action_type } => {
-            BridgeAction::EmergencyAction(EmergencyAction { nonce: *nonce, chain_id, action_type: *action_type })
-        }
-        GovernanceClientCommands::UpdateCommitteeBlocklist { nonce, blocklist_type, pubkeys_hex } => {
-            BridgeAction::BlocklistCommitteeAction(BlocklistCommitteeAction {
+            BridgeAction::EmergencyAction(EmergencyAction {
                 nonce: *nonce,
                 chain_id,
-                blocklist_type: *blocklist_type,
-                members_to_update: pubkeys_hex.clone(),
+                action_type: *action_type,
             })
         }
-        GovernanceClientCommands::UpdateLimit { nonce, sending_chain, new_usd_limit } => {
-            let sending_chain_id = BridgeChainId::try_from(*sending_chain).expect("Invalid sending chain id");
+        GovernanceClientCommands::UpdateCommitteeBlocklist {
+            nonce,
+            blocklist_type,
+            pubkeys_hex,
+        } => BridgeAction::BlocklistCommitteeAction(BlocklistCommitteeAction {
+            nonce: *nonce,
+            chain_id,
+            blocklist_type: *blocklist_type,
+            members_to_update: pubkeys_hex.clone(),
+        }),
+        GovernanceClientCommands::UpdateLimit {
+            nonce,
+            sending_chain,
+            new_usd_limit,
+        } => {
+            let sending_chain_id =
+                BridgeChainId::try_from(*sending_chain).expect("Invalid sending chain id");
             BridgeAction::LimitUpdateAction(LimitUpdateAction {
                 nonce: *nonce,
                 chain_id,
@@ -241,15 +244,22 @@ pub fn make_action(chain_id: BridgeChainId, cmd: &GovernanceClientCommands) -> B
                 new_usd_limit: *new_usd_limit,
             })
         }
-        GovernanceClientCommands::UpdateAssetPrice { nonce, token_id, new_usd_price } => {
-            BridgeAction::AssetPriceUpdateAction(AssetPriceUpdateAction {
-                nonce: *nonce,
-                chain_id,
-                token_id: *token_id,
-                new_usd_price: *new_usd_price,
-            })
-        }
-        GovernanceClientCommands::AddTokensOnSui { nonce, token_ids, token_type_names, token_prices } => {
+        GovernanceClientCommands::UpdateAssetPrice {
+            nonce,
+            token_id,
+            new_usd_price,
+        } => BridgeAction::AssetPriceUpdateAction(AssetPriceUpdateAction {
+            nonce: *nonce,
+            chain_id,
+            token_id: *token_id,
+            new_usd_price: *new_usd_price,
+        }),
+        GovernanceClientCommands::AddTokensOnSui {
+            nonce,
+            token_ids,
+            token_type_names,
+            token_prices,
+        } => {
             assert_eq!(token_ids.len(), token_type_names.len());
             assert_eq!(token_ids.len(), token_prices.len());
             BridgeAction::AddTokensOnSuiAction(AddTokensOnSuiAction {
@@ -304,9 +314,16 @@ pub fn make_action(chain_id: BridgeChainId, cmd: &GovernanceClientCommands) -> B
 }
 
 fn encode_call_data(function_selector: &str, params: &[String]) -> Vec<u8> {
-    let left = function_selector.find('(').expect("Invalid function selector, no left parentheses");
-    let right = function_selector.find(')').expect("Invalid function selector, no right parentheses");
-    let param_types = function_selector[left + 1..right].split(',').map(|x| x.trim()).collect::<Vec<&str>>();
+    let left = function_selector
+        .find('(')
+        .expect("Invalid function selector, no left parentheses");
+    let right = function_selector
+        .find(')')
+        .expect("Invalid function selector, no right parentheses");
+    let param_types = function_selector[left + 1..right]
+        .split(',')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>();
 
     assert_eq!(param_types.len(), params.len(), "Invalid number of params");
 
@@ -315,7 +332,9 @@ fn encode_call_data(function_selector: &str, params: &[String]) -> Vec<u8> {
     for (param, param_type) in params.iter().zip(param_types.iter()) {
         match param_type.to_lowercase().as_str() {
             "uint256" => {
-                tokens.push(ethers::abi::Token::Uint(ethers::types::U256::from_dec_str(param).expect("Invalid U256")));
+                tokens.push(ethers::abi::Token::Uint(
+                    ethers::types::U256::from_dec_str(param).expect("Invalid U256"),
+                ));
             }
             "bool" => {
                 tokens.push(ethers::abi::Token::Bool(match param.as_str() {
@@ -337,10 +356,15 @@ fn encode_call_data(function_selector: &str, params: &[String]) -> Vec<u8> {
     call_data
 }
 
-pub fn select_contract_address(config: &LoadedBridgeCliConfig, cmd: &GovernanceClientCommands) -> EthAddress {
+pub fn select_contract_address(
+    config: &LoadedBridgeCliConfig,
+    cmd: &GovernanceClientCommands,
+) -> EthAddress {
     match cmd {
         GovernanceClientCommands::EmergencyButton { .. } => config.eth_bridge_proxy_address,
-        GovernanceClientCommands::UpdateCommitteeBlocklist { .. } => config.eth_bridge_committee_proxy_address,
+        GovernanceClientCommands::UpdateCommitteeBlocklist { .. } => {
+            config.eth_bridge_committee_proxy_address
+        }
         GovernanceClientCommands::UpdateLimit { .. } => config.eth_bridge_limiter_proxy_address,
         GovernanceClientCommands::UpdateAssetPrice { .. } => config.eth_bridge_config_proxy_address,
         GovernanceClientCommands::UpgradeEVMContract { proxy_address, .. } => *proxy_address,
@@ -394,10 +418,15 @@ pub struct LoadedBridgeCliConfig {
 impl LoadedBridgeCliConfig {
     pub async fn load(cli_config: BridgeCliConfig) -> anyhow::Result<Self> {
         if cli_config.eth_key_path.is_none() && cli_config.sui_key_path.is_none() {
-            return Err(anyhow!("At least one of `sui_key_path` or `eth_key_path` must be provided"));
+            return Err(anyhow!(
+                "At least one of `sui_key_path` or `eth_key_path` must be provided"
+            ));
         }
-        let sui_key =
-            if let Some(sui_key_path) = &cli_config.sui_key_path { Some(read_key(sui_key_path, false)?) } else { None };
+        let sui_key = if let Some(sui_key_path) = &cli_config.sui_key_path {
+            Some(read_key(sui_key_path, false)?)
+        } else {
+            None
+        };
         let eth_key = if let Some(eth_key_path) = &cli_config.eth_key_path {
             let eth_key = read_key(eth_key_path, true)?;
             Some(eth_key)
@@ -429,14 +458,15 @@ impl LoadedBridgeCliConfig {
         let sui_bridge = EthSuiBridge::new(cli_config.eth_bridge_proxy_address, provider.clone());
         let eth_bridge_committee_proxy_address: EthAddress = sui_bridge.committee().call().await?;
         let eth_bridge_limiter_proxy_address: EthAddress = sui_bridge.limiter().call().await?;
-        let eth_committee = EthBridgeCommittee::new(eth_bridge_committee_proxy_address, provider.clone());
+        let eth_committee =
+            EthBridgeCommittee::new(eth_bridge_committee_proxy_address, provider.clone());
         let eth_bridge_committee_proxy_address: EthAddress = sui_bridge.committee().call().await?;
         let eth_bridge_config_proxy_address: EthAddress = eth_committee.config().call().await?;
 
         let eth_address = eth_signer.address();
         let eth_chain_id = provider.get_chainid().await?;
         let sui_address = SuiAddress::from(&sui_key.public());
-        println!("Using OneChain address: {:?}", sui_address);
+        println!("Using Sui address: {:?}", sui_address);
         println!("Using Eth address: {:?}", eth_address);
         println!("Using Eth chain: {:?}", eth_chain_id);
 
@@ -463,13 +493,22 @@ impl LoadedBridgeCliConfig {
     ) -> anyhow::Result<(SuiKeyPair, SuiAddress, ObjectRef)> {
         let pubkey = self.sui_key.public();
         let sui_client_address = SuiAddress::from(&pubkey);
-        let sui_sdk_client = SuiClientBuilder::default().build(self.sui_rpc_url.clone()).await?;
-        let gases = sui_sdk_client.coin_read_api().get_coins(sui_client_address, None, None, None).await?.data;
+        let sui_sdk_client = SuiClientBuilder::default()
+            .build(self.sui_rpc_url.clone())
+            .await?;
+        let gases = sui_sdk_client
+            .coin_read_api()
+            .get_coins(sui_client_address, None, None, None)
+            .await?
+            .data;
         // TODO: is 5 Sui a good number?
         let gas = gases
             .into_iter()
             .find(|coin| coin.balance >= 5_000_000_000)
-            .ok_or(anyhow!("Did not find gas object with enough balance for {}", sui_client_address))?;
+            .ok_or(anyhow!(
+                "Did not find gas object with enough balance for {}",
+                sui_client_address
+            ))?;
         println!("Using Gas object: {}", gas.coin_object_id);
         Ok((self.sui_key.copy(), sui_client_address, gas.object_ref()))
     }
@@ -507,35 +546,59 @@ pub enum BridgeClientCommands {
 }
 
 impl BridgeClientCommands {
-    pub async fn handle(self, config: &LoadedBridgeCliConfig, sui_bridge_client: SuiBridgeClient) -> anyhow::Result<()> {
+    pub async fn handle(
+        self,
+        config: &LoadedBridgeCliConfig,
+        sui_bridge_client: SuiBridgeClient,
+    ) -> anyhow::Result<()> {
         match self {
-            BridgeClientCommands::DepositNativeEtherOnEth { ether_amount, target_chain, sui_recipient_address } => {
-                let eth_sui_bridge =
-                    EthSuiBridge::new(config.eth_bridge_proxy_address, Arc::new(config.eth_signer().clone()));
+            BridgeClientCommands::DepositNativeEtherOnEth {
+                ether_amount,
+                target_chain,
+                sui_recipient_address,
+            } => {
+                let eth_sui_bridge = EthSuiBridge::new(
+                    config.eth_bridge_proxy_address,
+                    Arc::new(config.eth_signer().clone()),
+                );
                 // Note: even with f64 there may still be loss of precision even there are a lot of 0s
                 let int_part = ether_amount.trunc() as u64;
                 let frac_part = ether_amount.fract();
                 let int_wei = U256::from(int_part) * U256::exp10(18);
                 let frac_wei = U256::from((frac_part * 1_000_000_000_000_000_000f64) as u64);
                 let amount = int_wei + frac_wei;
-                let eth_tx =
-                    eth_sui_bridge.bridge_eth(sui_recipient_address.to_vec().into(), target_chain).value(amount);
+                let eth_tx = eth_sui_bridge
+                    .bridge_eth(sui_recipient_address.to_vec().into(), target_chain)
+                    .value(amount);
                 let pending_tx = eth_tx.send().await.unwrap();
                 let tx_receipt = pending_tx.await.unwrap().unwrap();
                 info!(
-                    "Deposited {ether_amount} Ethers to {:?} (target chain {target_chain}). Receipt: {:?}",
-                    sui_recipient_address, tx_receipt,
+                    "Deposited {ether_amount} Ethers to {:?} (target chain {target_chain}). Receipt: {:?}", sui_recipient_address, tx_receipt,
                 );
                 Ok(())
             }
             BridgeClientCommands::ClaimOnEth { seq_num, dry_run } => {
-                claim_on_eth(seq_num, config, sui_bridge_client, dry_run).await.map_err(|e| anyhow!("{:?}", e))
+                claim_on_eth(seq_num, config, sui_bridge_client, dry_run)
+                    .await
+                    .map_err(|e| anyhow!("{:?}", e))
             }
-            BridgeClientCommands::DepositOnSui { coin_object_id, coin_type, target_chain, recipient_address } => {
+            BridgeClientCommands::DepositOnSui {
+                coin_object_id,
+                coin_type,
+                target_chain,
+                recipient_address,
+            } => {
                 let target_chain = BridgeChainId::try_from(target_chain).expect("Invalid chain id");
                 let coin_type = TypeTag::from_str(&coin_type).expect("Invalid coin type");
-                deposit_on_sui(coin_object_id, coin_type, target_chain, recipient_address, config, sui_bridge_client)
-                    .await
+                deposit_on_sui(
+                    coin_object_id,
+                    coin_type,
+                    target_chain,
+                    recipient_address,
+                    config,
+                    sui_bridge_client,
+                )
+                .await
             }
         }
     }
@@ -551,8 +614,14 @@ async fn deposit_on_sui(
 ) -> anyhow::Result<()> {
     let target_chain = target_chain as u8;
     let sui_client = sui_bridge_client.sui_client();
-    let bridge_object_arg = sui_bridge_client.get_mutable_bridge_object_arg_must_succeed().await;
-    let rgp = sui_client.governance_api().get_reference_gas_price().await.unwrap();
+    let bridge_object_arg = sui_bridge_client
+        .get_mutable_bridge_object_arg_must_succeed()
+        .await;
+    let rgp = sui_client
+        .governance_api()
+        .get_reference_gas_price()
+        .await
+        .unwrap();
     let sender = SuiAddress::from(&config.sui_key.public());
     let gas_obj_ref = sui_client
         .coin_read_api()
@@ -572,7 +641,9 @@ async fn deposit_on_sui(
     let mut builder = ProgrammableTransactionBuilder::new();
     let arg_target_chain = builder.pure(target_chain).unwrap();
     let arg_target_address = builder.pure(recipient_address.as_bytes()).unwrap();
-    let arg_token = builder.obj(ObjectArg::ImmOrOwnedObject(coin_obj_ref)).unwrap();
+    let arg_token = builder
+        .obj(ObjectArg::ImmOrOwnedObject(coin_obj_ref))
+        .unwrap();
     let arg_bridge = builder.obj(bridge_object_arg).unwrap();
 
     builder.programmable_move_call(
@@ -583,8 +654,12 @@ async fn deposit_on_sui(
         vec![arg_bridge, arg_target_chain, arg_target_address, arg_token],
     );
     let pt = builder.finish();
-    let tx_data = TransactionData::new_programmable(sender, vec![gas_obj_ref], pt, 500_000_000, rgp);
-    let sig = Signature::new_secure(&IntentMessage::new(Intent::sui_transaction(), tx_data.clone()), &config.sui_key);
+    let tx_data =
+        TransactionData::new_programmable(sender, vec![gas_obj_ref], pt, 500_000_000, rgp);
+    let sig = Signature::new_secure(
+        &IntentMessage::new(Intent::sui_transaction(), tx_data.clone()),
+        &config.sui_key,
+    );
     let signed_tx = Transaction::from_data(tx_data, vec![sig]);
     let tx_digest = *signed_tx.digest();
     info!(?tx_digest, "Sending deposit transction to Sui.");
@@ -596,7 +671,10 @@ async fn deposit_on_sui(
         return Err(anyhow!("Transaction {:?} failed: {:?}", tx_digest, resp));
     }
     let events = resp.events.unwrap();
-    info!(?tx_digest, "Deposit transaction succeeded. Events: {:?}", events);
+    info!(
+        ?tx_digest,
+        "Deposit transaction succeeded. Events: {:?}", events
+    );
     Ok(())
 }
 
@@ -607,29 +685,46 @@ async fn claim_on_eth(
     dry_run: bool,
 ) -> BridgeResult<()> {
     let sui_chain_id = sui_bridge_client.get_bridge_summary().await?.chain_id;
-    let parsed_message = sui_bridge_client.get_parsed_token_transfer_message(sui_chain_id, seq_num).await?;
+    let parsed_message = sui_bridge_client
+        .get_parsed_token_transfer_message(sui_chain_id, seq_num)
+        .await?;
     if parsed_message.is_none() {
         println!("No record found for seq_num: {seq_num}, chain id: {sui_chain_id}");
         return Ok(());
     }
     let parsed_message = parsed_message.unwrap();
-    let sigs = sui_bridge_client.get_token_transfer_action_onchain_signatures_until_success(sui_chain_id, seq_num).await;
+    let sigs = sui_bridge_client
+        .get_token_transfer_action_onchain_signatures_until_success(sui_chain_id, seq_num)
+        .await;
     if sigs.is_none() {
         println!("No signatures found for seq_num: {seq_num}, chain id: {sui_chain_id}");
         return Ok(());
     }
-    let signatures = sigs.unwrap().into_iter().map(|sig: Vec<u8>| ethers::types::Bytes::from(sig)).collect::<Vec<_>>();
+    let signatures = sigs
+        .unwrap()
+        .into_iter()
+        .map(|sig: Vec<u8>| ethers::types::Bytes::from(sig))
+        .collect::<Vec<_>>();
 
-    let eth_sui_bridge = EthSuiBridge::new(config.eth_bridge_proxy_address, Arc::new(config.eth_signer().clone()));
+    let eth_sui_bridge = EthSuiBridge::new(
+        config.eth_bridge_proxy_address,
+        Arc::new(config.eth_signer().clone()),
+    );
     let message = eth_sui_bridge::Message::from(parsed_message);
     let tx = eth_sui_bridge.transfer_bridged_tokens_with_signatures(signatures, message);
     if dry_run {
         let tx = tx.tx;
         let resp = config.eth_signer.estimate_gas(&tx, None).await;
-        println!("Sui to Eth bridge transfer claim dry run result: {:?}", resp);
+        println!(
+            "Sui to Eth bridge transfer claim dry run result: {:?}",
+            resp
+        );
     } else {
         let eth_claim_tx_receipt = tx.send().await.unwrap().await.unwrap().unwrap();
-        println!("Sui to Eth bridge transfer claimed: {:?}", eth_claim_tx_receipt);
+        println!(
+            "Sui to Eth bridge transfer claimed: {:?}",
+            eth_claim_tx_receipt
+        );
     }
     Ok(())
 }
@@ -642,7 +737,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_encode_call_data() {
-        let abi_json = std::fs::read_to_string("../sui-bridge/abi/tests/mock_sui_bridge_v2.json").unwrap();
+        let abi_json =
+            std::fs::read_to_string("../sui-bridge/abi/tests/mock_sui_bridge_v2.json").unwrap();
         let abi: ethers::abi::Abi = serde_json::from_str(&abi_json).unwrap();
 
         let function_selector = "initializeV2Params(uint256,bool,string)";
@@ -659,10 +755,13 @@ mod tests {
 
         // Decode the data excluding the selector
         let tokens = function.decode_input(&call_data[4..]).unwrap();
-        assert_eq!(tokens, vec![
-            ethers::abi::Token::Uint(ethers::types::U256::from_dec_str("420").unwrap()),
-            ethers::abi::Token::Bool(false),
-            ethers::abi::Token::String("hello".to_string())
-        ])
+        assert_eq!(
+            tokens,
+            vec![
+                ethers::abi::Token::Uint(ethers::types::U256::from_dec_str("420").unwrap()),
+                ethers::abi::Token::Bool(false),
+                ethers::abi::Token::String("hello".to_string())
+            ]
+        )
     }
 }

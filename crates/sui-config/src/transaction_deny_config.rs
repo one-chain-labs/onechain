@@ -29,7 +29,7 @@ pub struct TransactionDenyConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     package_deny_list: Vec<ObjectID>,
 
-    /// A list of OneChain addresses that are not allowed to be used as the sender or sponsor.
+    /// A list of sui addresses that are not allowed to be used as the sender or sponsor.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     address_deny_list: Vec<SuiAddress>,
 
@@ -77,15 +77,18 @@ pub struct TransactionDenyConfig {
 
 impl TransactionDenyConfig {
     pub fn get_object_deny_set(&self) -> &HashSet<ObjectID> {
-        self.object_deny_set.get_or_init(|| self.object_deny_list.iter().cloned().collect())
+        self.object_deny_set
+            .get_or_init(|| self.object_deny_list.iter().cloned().collect())
     }
 
     pub fn get_package_deny_set(&self) -> &HashSet<ObjectID> {
-        self.package_deny_set.get_or_init(|| self.package_deny_list.iter().cloned().collect())
+        self.package_deny_set
+            .get_or_init(|| self.package_deny_list.iter().cloned().collect())
     }
 
     pub fn get_address_deny_set(&self) -> &HashSet<SuiAddress> {
-        self.address_deny_set.get_or_init(|| self.address_deny_list.iter().cloned().collect())
+        self.address_deny_set
+            .get_or_init(|| self.address_deny_list.iter().cloned().collect())
     }
 
     pub fn package_publish_disabled(&self) -> bool {

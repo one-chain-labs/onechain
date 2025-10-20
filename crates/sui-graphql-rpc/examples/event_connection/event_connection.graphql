@@ -1,7 +1,7 @@
 {
   events(
     filter: {
-      eventType: "0x3164fcf73eb6b41ff3d2129346141bd68469964c2d95a5b1533e8d16e6ea6e13::Market::ChangePriceEvent<0x2::oct::OCT>"
+      eventType: "0x3164fcf73eb6b41ff3d2129346141bd68469964c2d95a5b1533e8d16e6ea6e13::Market::ChangePriceEvent<0x2::sui::SUI>"
     }
   ) {
     nodes {
@@ -9,14 +9,16 @@
         name
         package { digest }
       }
-      type {
-        repr
-      }
       sender {
         address
       }
       timestamp
-      json
+      contents {
+        type {
+          repr
+        }
+        json
+      }
       bcs
     }
   }

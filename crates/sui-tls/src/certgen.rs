@@ -4,7 +4,8 @@
 use fastcrypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use pkcs8::EncodePrivateKey;
 use rcgen::{CertificateParams, KeyPair};
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::PrivateKeyDer;
 
 pub struct SelfSignedCertificate {
     inner: rcgen::Certificate,
@@ -57,17 +58,23 @@ fn generate_cert(keypair: &KeyPair, server_name: &str) -> rcgen::Certificate {
     CertificateParams::new(vec![server_name.to_owned()])
         .unwrap()
         .self_signed(keypair)
-        .expect("unreachable! from_params should only fail if the key is incompatible with params.algo")
+        .expect(
+            "unreachable! from_params should only fail if the key is incompatible with params.algo",
+        )
 }
 
-pub(crate) fn public_key_from_certificate(certificate: &CertificateDer) -> Result<Ed25519PublicKey, anyhow::Error> {
+pub(crate) fn public_key_from_certificate(
+    certificate: &CertificateDer,
+) -> Result<Ed25519PublicKey, anyhow::Error> {
     use fastcrypto::traits::ToFromBytes;
     use x509_parser::{certificate::X509Certificate, prelude::FromDer};
 
-    let cert = X509Certificate::from_der(certificate.as_ref()).map_err(|e| rustls::Error::General(e.to_string()))?;
+    let cert = X509Certificate::from_der(certificate.as_ref())
+        .map_err(|e| rustls::Error::General(e.to_string()))?;
     let spki = cert.1.public_key();
-    let public_key_bytes = <ed25519::pkcs8::PublicKeyBytes as pkcs8::DecodePublicKey>::from_public_key_der(spki.raw)
-        .map_err(|e| rustls::Error::General(format!("invalid ed25519 public key: {e}")))?;
+    let public_key_bytes =
+        <ed25519::pkcs8::PublicKeyBytes as pkcs8::DecodePublicKey>::from_public_key_der(spki.raw)
+            .map_err(|e| rustls::Error::General(format!("invalid ed25519 public key: {e}")))?;
 
     let public_key = Ed25519PublicKey::from_bytes(public_key_bytes.as_ref())?;
 

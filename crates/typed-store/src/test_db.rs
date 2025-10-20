@@ -12,8 +12,7 @@ use std::{
 
 use crate::{
     rocks::{be_fix_int_ser, errors::typed_store_err_from_bcs_err},
-    Map,
-    TypedStoreError,
+    Map, TypedStoreError,
 };
 use bincode::Options;
 use collectable::TryExtend;
@@ -40,7 +39,6 @@ impl<K, V> TestDB<K, V> {
             _phantom: PhantomData,
         }
     }
-
     pub fn batch(&self) -> TestDBWriteBatch {
         TestDBWriteBatch::default()
     }
@@ -79,7 +77,9 @@ impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iterator for TestDBIter<'a, K
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut out: Option<Self::Item> = None;
-        let config = bincode::DefaultOptions::new().with_big_endian().with_fixint_encoding();
+        let config = bincode::DefaultOptions::new()
+            .with_big_endian()
+            .with_fixint_encoding();
         self.with_mut(|fields| {
             let resp = match fields.direction {
                 Direction::Forward => fields.iter.next(),
@@ -186,7 +186,9 @@ impl<'a, K: DeserializeOwned> Iterator for TestDBKeys<'a, K> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut out: Option<Self::Item> = None;
         self.with_mut(|fields| {
-            let config = bincode::DefaultOptions::new().with_big_endian().with_fixint_encoding();
+            let config = bincode::DefaultOptions::new()
+                .with_big_endian()
+                .with_fixint_encoding();
             if let Some((raw_key, _)) = fields.iter.next() {
                 let key: K = config.deserialize(raw_key).ok().unwrap();
                 out = Some(Ok(key));
@@ -218,8 +220,8 @@ where
 {
     type Error = TypedStoreError;
     type Iterator = std::iter::Empty<(K, V)>;
-    type Keys = TestDBKeys<'a, K>;
     type SafeIterator = TestDBIter<'a, K, V>;
+    type Keys = TestDBKeys<'a, K>;
     type Values = TestDBValues<'a, V>;
 
     fn contains_key(&self, key: &K) -> Result<bool, Self::Error> {
@@ -265,7 +267,8 @@ where
 
     fn delete_file_in_range(&self, from: &K, to: &K) -> Result<(), TypedStoreError> {
         let mut locked = self.rows.write().unwrap();
-        locked.retain(|k, _| k < &be_fix_int_ser(from).unwrap() || k >= &be_fix_int_ser(to).unwrap());
+        locked
+            .retain(|k, _| k < &be_fix_int_ser(from).unwrap() || k >= &be_fix_int_ser(to).unwrap());
         Ok(())
     }
 
@@ -284,7 +287,11 @@ where
         unimplemented!("unimplemented API");
     }
 
-    fn iter_with_bounds(&'a self, _lower_bound: Option<K>, _upper_bound: Option<K>) -> Self::Iterator {
+    fn iter_with_bounds(
+        &'a self,
+        _lower_bound: Option<K>,
+        _upper_bound: Option<K>,
+    ) -> Self::Iterator {
         unimplemented!("unimplemented API");
     }
 
@@ -302,7 +309,11 @@ where
         .build()
     }
 
-    fn safe_iter_with_bounds(&'a self, _lower_bound: Option<K>, _upper_bound: Option<K>) -> Self::SafeIterator {
+    fn safe_iter_with_bounds(
+        &'a self,
+        _lower_bound: Option<K>,
+        _upper_bound: Option<K>,
+    ) -> Self::SafeIterator {
         unimplemented!("unimplemented API");
     }
 
@@ -359,9 +370,21 @@ where
     }
 }
 
-pub type DeleteBatchPayload = (Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>, String, Vec<Vec<u8>>);
-pub type DeleteRangePayload = (Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>, String, (Vec<u8>, Vec<u8>));
-pub type InsertBatchPayload = (Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>, String, Vec<(Vec<u8>, Vec<u8>)>);
+pub type DeleteBatchPayload = (
+    Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>,
+    String,
+    Vec<Vec<u8>>,
+);
+pub type DeleteRangePayload = (
+    Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>,
+    String,
+    (Vec<u8>, Vec<u8>),
+);
+pub type InsertBatchPayload = (
+    Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>,
+    String,
+    Vec<(Vec<u8>, Vec<u8>)>,
+);
 type DBAndName = (Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>, String);
 
 pub enum WriteBatchOp {
@@ -404,7 +427,9 @@ impl TestDBWriteBatch {
                     name.clone(),
                     DBLockedBuilder {
                         db: db.clone(),
-                        db_guard_builder: |db: &Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>| db.write().unwrap(),
+                        db_guard_builder: |db: &Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>| {
+                            db.write().unwrap()
+                        },
                     }
                     .build(),
                 );
@@ -442,7 +467,6 @@ impl TestDBWriteBatch {
         });
         Ok(())
     }
-
     /// Deletes a set of keys given as an iterator
     pub fn delete_batch<J: Borrow<K>, K: Serialize, V>(
         &mut self,
@@ -452,19 +476,29 @@ impl TestDBWriteBatch {
         self.ops.push_back(WriteBatchOp::DeleteBatch((
             db.rows.clone(),
             db.name.clone(),
-            purged_vals.into_iter().map(|key| be_fix_int_ser(&key.borrow()).unwrap()).collect(),
+            purged_vals
+                .into_iter()
+                .map(|key| be_fix_int_ser(&key.borrow()).unwrap())
+                .collect(),
         )));
         Ok(())
     }
-
     /// Deletes a range of keys between `from` (inclusive) and `to` (non-inclusive)
-    pub fn delete_range<K: Serialize, V>(&mut self, db: &TestDB<K, V>, from: &K, to: &K) -> Result<(), TypedStoreError> {
+    pub fn delete_range<K: Serialize, V>(
+        &mut self,
+        db: &TestDB<K, V>,
+        from: &K,
+        to: &K,
+    ) -> Result<(), TypedStoreError> {
         let raw_from = be_fix_int_ser(from).unwrap();
         let raw_to = be_fix_int_ser(to).unwrap();
-        self.ops.push_back(WriteBatchOp::DeleteRange((db.rows.clone(), db.name.clone(), (raw_from, raw_to))));
+        self.ops.push_back(WriteBatchOp::DeleteRange((
+            db.rows.clone(),
+            db.name.clone(),
+            (raw_from, raw_to),
+        )));
         Ok(())
     }
-
     /// inserts a range of (key, value) pairs given as an iterator
     pub fn insert_batch<J: Borrow<K>, K: Serialize, U: Borrow<V>, V: Serialize>(
         &mut self,
@@ -476,7 +510,12 @@ impl TestDBWriteBatch {
             db.name.clone(),
             new_vals
                 .into_iter()
-                .map(|(key, value)| (be_fix_int_ser(&key.borrow()).unwrap(), bcs::to_bytes(&value.borrow()).unwrap()))
+                .map(|(key, value)| {
+                    (
+                        be_fix_int_ser(&key.borrow()).unwrap(),
+                        bcs::to_bytes(&value.borrow()).unwrap(),
+                    )
+                })
                 .collect(),
         )));
         Ok(())
@@ -490,35 +529,54 @@ mod test {
     #[test]
     fn test_contains_key() {
         let db = TestDB::open();
-        db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
-        assert!(db.contains_key(&123456789).expect("Failed to call contains key"));
-        assert!(!db.contains_key(&000000000).expect("Failed to call contains key"));
+        db.insert(&123456789, &"123456789".to_string())
+            .expect("Failed to insert");
+        assert!(db
+            .contains_key(&123456789)
+            .expect("Failed to call contains key"));
+        assert!(!db
+            .contains_key(&000000000)
+            .expect("Failed to call contains key"));
     }
 
     #[test]
     fn test_get() {
         let db = TestDB::open();
-        db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
-        assert_eq!(Some("123456789".to_string()), db.get(&123456789).expect("Failed to get"));
+        db.insert(&123456789, &"123456789".to_string())
+            .expect("Failed to insert");
+        assert_eq!(
+            Some("123456789".to_string()),
+            db.get(&123456789).expect("Failed to get")
+        );
         assert_eq!(None, db.get(&000000000).expect("Failed to get"));
     }
 
     #[test]
     fn test_get_raw() {
         let db = TestDB::open();
-        db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
+        db.insert(&123456789, &"123456789".to_string())
+            .expect("Failed to insert");
 
-        let val_bytes = db.get_raw_bytes(&123456789).expect("Failed to get_raw_bytes").unwrap();
+        let val_bytes = db
+            .get_raw_bytes(&123456789)
+            .expect("Failed to get_raw_bytes")
+            .unwrap();
 
         assert_eq!(bcs::to_bytes(&"123456789".to_string()).unwrap(), val_bytes);
-        assert_eq!(None, db.get_raw_bytes(&000000000).expect("Failed to get_raw_bytes"));
+        assert_eq!(
+            None,
+            db.get_raw_bytes(&000000000)
+                .expect("Failed to get_raw_bytes")
+        );
     }
 
     #[test]
     fn test_multi_get() {
         let db = TestDB::open();
-        db.insert(&123, &"123".to_string()).expect("Failed to insert");
-        db.insert(&456, &"456".to_string()).expect("Failed to insert");
+        db.insert(&123, &"123".to_string())
+            .expect("Failed to insert");
+        db.insert(&456, &"456".to_string())
+            .expect("Failed to insert");
 
         let result = db.multi_get([123, 456, 789]).expect("Failed to multi get");
 
@@ -531,7 +589,8 @@ mod test {
     #[test]
     fn test_remove() {
         let db = TestDB::open();
-        db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
+        db.insert(&123456789, &"123456789".to_string())
+            .expect("Failed to insert");
         assert!(db.get(&123456789).expect("Failed to get").is_some());
 
         db.remove(&123456789).expect("Failed to remove");
@@ -541,7 +600,8 @@ mod test {
     #[test]
     fn test_iter() {
         let db = TestDB::open();
-        db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
+        db.insert(&123456789, &"123456789".to_string())
+            .expect("Failed to insert");
 
         let mut iter = db.safe_iter();
         assert_eq!(Some(Ok((123456789, "123456789".to_string()))), iter.next());
@@ -566,7 +626,8 @@ mod test {
     fn test_keys() {
         let db = TestDB::open();
 
-        db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
+        db.insert(&123456789, &"123456789".to_string())
+            .expect("Failed to insert");
 
         let mut keys = db.keys();
         assert_eq!(Some(Ok(123456789)), keys.next());
@@ -577,7 +638,8 @@ mod test {
     fn test_values() {
         let db = TestDB::open();
 
-        db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
+        db.insert(&123456789, &"123456789".to_string())
+            .expect("Failed to insert");
 
         let mut values = db.values();
         assert_eq!(Some(Ok("123456789".to_string())), values.next());
@@ -589,7 +651,8 @@ mod test {
         let db = TestDB::open();
         let keys_vals = (1..100).map(|i| (i, i.to_string()));
         let mut wb = db.batch();
-        wb.insert_batch(&db, keys_vals.clone()).expect("Failed to batch insert");
+        wb.insert_batch(&db, keys_vals.clone())
+            .expect("Failed to batch insert");
         wb.write().expect("Failed to execute batch");
         for (k, v) in keys_vals {
             let val = db.get(&k).expect("Failed to get inserted key");
@@ -606,8 +669,10 @@ mod test {
         let keys_vals_2 = (1000..1100).map(|i| (i, i.to_string()));
 
         let mut wb = db_cf_1.batch();
-        wb.insert_batch(&db_cf_1, keys_vals_1.clone()).expect("Failed to batch insert");
-        wb.insert_batch(&db_cf_2, keys_vals_2.clone()).expect("Failed to batch insert");
+        wb.insert_batch(&db_cf_1, keys_vals_1.clone())
+            .expect("Failed to batch insert");
+        wb.insert_batch(&db_cf_2, keys_vals_2.clone())
+            .expect("Failed to batch insert");
         wb.write().expect("Failed to execute batch");
         for (k, v) in keys_vals_1 {
             let val = db_cf_1.get(&k).expect("Failed to get inserted key");
@@ -626,11 +691,13 @@ mod test {
 
         let keys_vals = (1..100).map(|i| (i, i.to_string()));
         let mut wb = db.batch();
-        wb.insert_batch(&db, keys_vals).expect("Failed to batch insert");
+        wb.insert_batch(&db, keys_vals)
+            .expect("Failed to batch insert");
 
         // delete the odd-index keys
         let deletion_keys = (1..100).step_by(2);
-        wb.delete_batch(&db, deletion_keys).expect("Failed to batch delete");
+        wb.delete_batch(&db, deletion_keys)
+            .expect("Failed to batch delete");
 
         wb.write().expect("Failed to execute batch");
 
@@ -646,9 +713,11 @@ mod test {
         // Note that the last element is (100, "100".to_owned()) here
         let keys_vals = (0..101).map(|i| (i, i.to_string()));
         let mut wb = db.batch();
-        wb.insert_batch(&db, keys_vals).expect("Failed to batch insert");
+        wb.insert_batch(&db, keys_vals)
+            .expect("Failed to batch insert");
 
-        wb.delete_range(&db, &50, &100).expect("Failed to delete range");
+        wb.delete_range(&db, &50, &100)
+            .expect("Failed to delete range");
 
         wb.write().expect("Failed to execute batch");
 
@@ -672,7 +741,8 @@ mod test {
 
         let keys_vals = (0..101).map(|i| (i, i.to_string()));
         let mut wb = db.batch();
-        wb.insert_batch(&db, keys_vals).expect("Failed to batch insert");
+        wb.insert_batch(&db, keys_vals)
+            .expect("Failed to batch insert");
 
         wb.write().expect("Failed to execute batch");
 
@@ -701,7 +771,8 @@ mod test {
 
         let keys_vals = (0..101).map(|i| (i, i.to_string()));
         let mut wb = db.batch();
-        wb.insert_batch(&db, keys_vals).expect("Failed to batch insert");
+        wb.insert_batch(&db, keys_vals)
+            .expect("Failed to batch insert");
 
         wb.write().expect("Failed to execute batch");
 
@@ -723,7 +794,8 @@ mod test {
         // Create kv pairs
         let keys_vals = (0..101).map(|i| (i, i.to_string()));
 
-        db.multi_insert(keys_vals.clone()).expect("Failed to multi-insert");
+        db.multi_insert(keys_vals.clone())
+            .expect("Failed to multi-insert");
 
         for (k, v) in keys_vals {
             let val = db.get(&k).expect("Failed to get inserted key");
@@ -739,7 +811,8 @@ mod test {
         // Create kv pairs
         let keys_vals = (0..101).map(|i| (i, i.to_string()));
 
-        db.multi_insert(keys_vals.clone()).expect("Failed to multi-insert");
+        db.multi_insert(keys_vals.clone())
+            .expect("Failed to multi-insert");
 
         // Check insertion
         for (k, v) in keys_vals.clone() {
@@ -748,7 +821,8 @@ mod test {
         }
 
         // Remove 50 items
-        db.multi_remove(keys_vals.clone().map(|kv| kv.0).take(50)).expect("Failed to multi-remove");
+        db.multi_remove(keys_vals.clone().map(|kv| kv.0).take(50))
+            .expect("Failed to multi-remove");
         assert_eq!(db.safe_iter().count(), 101 - 50);
 
         // Check that the remaining are present

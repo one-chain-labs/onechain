@@ -1,7 +1,7 @@
 // valid, ASCII and UTF strings is allowed
 
 module a::m {
-    use one::tx_context;
+    use sui::tx_context;
     use std::ascii;
     use std::string;
 
@@ -24,6 +24,6 @@ module a::m {
     }
 }
 
-module one::tx_context {
+module oct::tx_context {
     struct TxContext has drop {}
 }

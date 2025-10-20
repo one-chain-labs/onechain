@@ -60,11 +60,20 @@ impl AccountData {
         let coins = (0..NUM_GAS_OBJECTS)
             .map(|_| {
                 let gas_object_id = ObjectID::random();
-                Object::with_id_owner_gas_for_testing(gas_object_id, account.address, initial_balance)
+                Object::with_id_owner_gas_for_testing(
+                    gas_object_id,
+                    account.address,
+                    initial_balance,
+                )
             })
             .collect();
         let initial_balances = (0..NUM_GAS_OBJECTS).map(|_| initial_balance).collect();
-        Self { account, coins, initial_balances, balance_creation_amt: initial_balance }
+        Self {
+            account,
+            coins,
+            initial_balances,
+            balance_creation_amt: initial_balance,
+        }
     }
 }
 
@@ -90,7 +99,8 @@ impl AccountCurrent {
             self.initial_data.balance_creation_amt,
         );
         exec.add_object(gas_object.clone());
-        self.current_balances.push(self.initial_data.balance_creation_amt);
+        self.current_balances
+            .push(self.initial_data.balance_creation_amt);
         self.current_coins.push(gas_object.clone());
         gas_object
     }
@@ -99,7 +109,6 @@ impl AccountCurrent {
 impl Arbitrary for Account {
     type Parameters = ();
     type Strategy = fn() -> Account;
-
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         Account::new_random as Self::Strategy
     }
@@ -108,7 +117,8 @@ impl Arbitrary for Account {
 impl AccountData {
     /// Returns a [`Strategy`] that creates `AccountData` instances.
     pub fn strategy(balance_strategy: impl Strategy<Value = u64>) -> impl Strategy<Value = Self> {
-        (any::<Account>(), balance_strategy)
-            .prop_map(|(account, balance)| AccountData::new_with_account_and_balance(Arc::new(account), balance))
+        (any::<Account>(), balance_strategy).prop_map(|(account, balance)| {
+            AccountData::new_with_account_and_balance(Arc::new(account), balance)
+        })
     }
 }

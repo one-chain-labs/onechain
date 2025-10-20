@@ -54,7 +54,7 @@ public fun deposit_sui(ls: &mut LockedStake, sui: Balance<OCT>) {
 }
 
 /// Take `amount` of SUI from the sui balance, stakes it, and puts the stake object
-/// back into the staked oct vec map.
+/// back into the staked sui vec map.
 public fun stake(
     ls: &mut LockedStake,
     sui_system: &mut SuiSystemState,

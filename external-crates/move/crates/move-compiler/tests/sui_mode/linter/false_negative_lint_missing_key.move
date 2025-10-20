@@ -1,5 +1,5 @@
 module a::trigger_lint_cases {
-    use one::object::UID;
+    use sui::object::UID;
 
     // False negative cases (should trigger warning but might not):
 
@@ -24,7 +24,7 @@ module a::trigger_lint_cases {
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

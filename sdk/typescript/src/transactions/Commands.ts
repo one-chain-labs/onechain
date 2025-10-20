@@ -16,7 +16,7 @@ export type TransactionArgument =
 export type TransactionInput = CallArg;
 
 // Keep in sync with constants in
-// crates/sui-framework/packages/sui-framework/sources/package.move
+// crates/sui-framework/packages/one-framework/sources/package.move
 export enum UpgradePolicy {
 	COMPATIBLE = 0,
 	ADDITIVE = 128,

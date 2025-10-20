@@ -8,13 +8,8 @@ use fastcrypto::traits::KeyPair;
 use mysten_metrics::spawn_monitored_task;
 use mysten_network::server::SUI_TLS_SERVER_NAME;
 use prometheus::{
-    register_histogram_with_registry,
-    register_int_counter_vec_with_registry,
-    register_int_counter_with_registry,
-    Histogram,
-    IntCounter,
-    IntCounterVec,
-    Registry,
+    register_histogram_with_registry, register_int_counter_vec_with_registry,
+    register_int_counter_with_registry, Histogram, IntCounter, IntCounterVec, Registry,
 };
 use std::{
     io,
@@ -26,32 +21,27 @@ use sui_network::{
     api::{Validator, ValidatorServer},
     tonic,
 };
+use sui_types::messages_consensus::{ConsensusTransaction, ConsensusTransactionKind};
+use sui_types::messages_grpc::{
+    HandleCertificateRequestV3, HandleCertificateResponseV3, HandleTransactionResponseV2,
+};
+use sui_types::messages_grpc::{
+    HandleCertificateResponseV2, HandleTransactionResponse, ObjectInfoRequest, ObjectInfoResponse,
+    SubmitCertificateResponse, SystemStateRequest, TransactionInfoRequest, TransactionInfoResponse,
+};
+use sui_types::messages_grpc::{
+    HandleSoftBundleCertificatesRequestV3, HandleSoftBundleCertificatesResponseV3,
+};
+use sui_types::multiaddr::Multiaddr;
+use sui_types::sui_system_state::SuiSystemState;
+use sui_types::traffic_control::{ClientIdSource, PolicyConfig, RemoteFirewallConfig, Weight};
+use sui_types::{effects::TransactionEffectsAPI, messages_grpc::HandleTransactionRequestV2};
+use sui_types::{error::*, transaction::*};
 use sui_types::{
-    effects::TransactionEffectsAPI,
-    error::*,
     fp_ensure,
-    messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
-    messages_consensus::{ConsensusTransaction, ConsensusTransactionKind},
-    messages_grpc::{
-        HandleCertificateRequestV3,
-        HandleCertificateResponseV2,
-        HandleCertificateResponseV3,
-        HandleSoftBundleCertificatesRequestV3,
-        HandleSoftBundleCertificatesResponseV3,
-        HandleTransactionRequestV2,
-        HandleTransactionResponse,
-        HandleTransactionResponseV2,
-        ObjectInfoRequest,
-        ObjectInfoResponse,
-        SubmitCertificateResponse,
-        SystemStateRequest,
-        TransactionInfoRequest,
-        TransactionInfoResponse,
+    messages_checkpoint::{
+        CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2,
     },
-    multiaddr::Multiaddr,
-    sui_system_state::SuiSystemState,
-    traffic_control::{ClientIdSource, PolicyConfig, RemoteFirewallConfig, Weight},
-    transaction::*,
 };
 use tap::TapFallible;
 use tokio::task::JoinHandle;
@@ -59,10 +49,19 @@ use tonic::metadata::{Ascii, MetadataValue};
 use tracing::{error, error_span, info, Instrument};
 
 use crate::{
-    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
-    consensus_adapter::{ConnectionMonitorStatusForTests, ConsensusAdapter, ConsensusAdapterMetrics},
+    authority::authority_per_epoch_store::AuthorityPerEpochStore,
     mysticeti_adapter::LazyMysticetiClient,
-    traffic_controller::{metrics::TrafficControllerMetrics, parse_ip, policies::TrafficTally, TrafficController},
+};
+use crate::{
+    authority::AuthorityState,
+    consensus_adapter::{ConsensusAdapter, ConsensusAdapterMetrics},
+    traffic_controller::parse_ip,
+    traffic_controller::policies::TrafficTally,
+    traffic_controller::TrafficController,
+};
+use crate::{
+    consensus_adapter::ConnectionMonitorStatusForTests,
+    traffic_controller::metrics::TrafficControllerMetrics,
 };
 use nonempty::{nonempty, NonEmpty};
 use sui_config::local_ip_utils::new_local_tcp_address_for_testing;
@@ -81,15 +80,19 @@ pub struct AuthorityServerHandle {
 impl AuthorityServerHandle {
     pub async fn join(self) -> Result<(), io::Error> {
         // Note that dropping `self.complete` would terminate the server.
-        self.handle.await?.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        self.handle
+            .await?
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         Ok(())
     }
 
     pub async fn kill(self) -> Result<(), io::Error> {
-        self.tx_cancellation
-            .send(())
-            .map_err(|_e| io::Error::new(io::ErrorKind::Other, "could not send cancellation signal!"))?;
-        self.handle.await?.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        self.tx_cancellation.send(()).map_err(|_e| {
+            io::Error::new(io::ErrorKind::Other, "could not send cancellation signal!")
+        })?;
+        self.handle
+            .await?
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         Ok(())
     }
 
@@ -113,7 +116,12 @@ impl AuthorityServer {
         let address = new_local_tcp_address_for_testing();
         let metrics = Arc::new(ValidatorServiceMetrics::new_for_tests());
 
-        Self { address, state, consensus_adapter, metrics }
+        Self {
+            address,
+            state,
+            consensus_adapter,
+            metrics,
+        }
     }
 
     pub fn new_for_test(state: Arc<AuthorityState>) -> Self {
@@ -136,7 +144,10 @@ impl AuthorityServer {
         self.spawn_with_bind_address_for_test(address).await
     }
 
-    pub async fn spawn_with_bind_address_for_test(self, address: Multiaddr) -> Result<AuthorityServerHandle, io::Error> {
+    pub async fn spawn_with_bind_address_for_test(
+        self,
+        address: Multiaddr,
+    ) -> Result<AuthorityServerHandle, io::Error> {
         let tls_config = sui_tls::create_rustls_server_config(
             self.state.config.network_key_pair().copy().private(),
             SUI_TLS_SERVER_NAME.to_string(),
@@ -369,9 +380,13 @@ impl ValidatorService {
             state,
             consensus_adapter,
             metrics: validator_metrics,
-            traffic_controller: policy_config
-                .clone()
-                .map(|policy| Arc::new(TrafficController::init(policy, traffic_controller_metrics, firewall_config))),
+            traffic_controller: policy_config.clone().map(|policy| {
+                Arc::new(TrafficController::init(
+                    policy,
+                    traffic_controller_metrics,
+                    firewall_config,
+                ))
+            }),
             client_id_source: policy_config.map(|policy| policy.client_id_source),
         }
     }
@@ -381,7 +396,13 @@ impl ValidatorService {
         consensus_adapter: Arc<ConsensusAdapter>,
         metrics: Arc<ValidatorServiceMetrics>,
     ) -> Self {
-        Self { state, consensus_adapter, metrics, traffic_controller: None, client_id_source: None }
+        Self {
+            state,
+            consensus_adapter,
+            metrics,
+            traffic_controller: None,
+            client_id_source: None,
+        }
     }
 
     pub fn validator_state(&self) -> &Arc<AuthorityState> {
@@ -410,7 +431,13 @@ impl ValidatorService {
         &self,
         request: tonic::Request<Transaction>,
     ) -> WrappedServiceResponse<HandleTransactionResponse> {
-        let Self { state, consensus_adapter, metrics, traffic_controller: _, client_id_source: _ } = self.clone();
+        let Self {
+            state,
+            consensus_adapter,
+            metrics,
+            traffic_controller: _,
+            client_id_source: _,
+        } = self.clone();
         let transaction = request.into_inner();
         let epoch_store = state.load_epoch_store_one_call_per_task();
 
@@ -430,10 +457,15 @@ impl ValidatorService {
             state.check_system_overload_at_signing(),
         );
         if let Err(error) = overload_check_res {
-            metrics.num_rejected_tx_during_overload.with_label_values(&[error.as_ref()]).inc();
+            metrics
+                .num_rejected_tx_during_overload
+                .with_label_values(&[error.as_ref()])
+                .inc();
             // TODO: consider change the behavior for other types of overload errors.
             match error {
-                SuiError::ValidatorOverloadedRetryAfter { .. } => validator_pushback_error = Some(error),
+                SuiError::ValidatorOverloadedRetryAfter { .. } => {
+                    validator_pushback_error = Some(error)
+                }
                 _ => return Err(error.into()),
             }
         }
@@ -451,11 +483,15 @@ impl ValidatorService {
         // Enable Trace Propagation across spans/processes using tx_digest
         let span = error_span!("validator_state_process_tx", ?tx_digest);
 
-        let info = state.handle_transaction(&epoch_store, transaction.clone()).instrument(span).await.tap_err(|e| {
-            if let SuiError::ValidatorHaltedAtEpochEnd = e {
-                metrics.num_rejected_tx_in_epoch_boundary.inc();
-            }
-        })?;
+        let info = state
+            .handle_transaction(&epoch_store, transaction.clone())
+            .instrument(span)
+            .await
+            .tap_err(|e| {
+                if let SuiError::ValidatorHaltedAtEpochEnd = e {
+                    metrics.num_rejected_tx_in_epoch_boundary.inc();
+                }
+            })?;
 
         if let Some(error) = validator_pushback_error {
             // TODO: right now, we still sign the txn, but just don't return it. We can also skip signing
@@ -470,10 +506,19 @@ impl ValidatorService {
         &self,
         request: tonic::Request<HandleTransactionRequestV2>,
     ) -> WrappedServiceResponse<HandleTransactionResponseV2> {
-        let Self { state, consensus_adapter, metrics, traffic_controller: _, client_id_source: _ } = self.clone();
+        let Self {
+            state,
+            consensus_adapter,
+            metrics,
+            traffic_controller: _,
+            client_id_source: _,
+        } = self.clone();
         let epoch_store = state.load_epoch_store_one_call_per_task();
         if !epoch_store.protocol_config().mysticeti_fastpath() {
-            return Err(SuiError::UnsupportedFeatureError { error: "Mysticeti fastpath".to_string() }.into());
+            return Err(SuiError::UnsupportedFeatureError {
+                error: "Mysticeti fastpath".to_string(),
+            }
+            .into());
         }
 
         let HandleTransactionRequestV2 {
@@ -493,7 +538,10 @@ impl ValidatorService {
             state.check_system_overload_at_signing(),
         );
         if let Err(error) = overload_check_res {
-            metrics.num_rejected_tx_during_overload.with_label_values(&[error.as_ref()]).inc();
+            metrics
+                .num_rejected_tx_during_overload
+                .with_label_values(&[error.as_ref()])
+                .inc();
             return Err(error.into());
         }
 
@@ -509,18 +557,23 @@ impl ValidatorService {
         let tx_digest = transaction.digest();
         let span = error_span!("validator_state_process_tx_v2", ?tx_digest);
 
-        let tx_output =
-            state.handle_transaction_v2(&epoch_store, transaction.clone()).instrument(span).await.tap_err(|e| {
+        let tx_output = state
+            .handle_transaction_v2(&epoch_store, transaction.clone())
+            .instrument(span)
+            .await
+            .tap_err(|e| {
                 if let SuiError::ValidatorHaltedAtEpochEnd = e {
                     metrics.num_rejected_tx_in_epoch_boundary.inc();
                 }
             })?;
         // Fetch remaining fields if the transaction has been executed.
         if let Some((effects, events)) = tx_output {
-            let input_objects =
-                include_input_objects.then(|| state.get_transaction_input_objects(&effects)).and_then(Result::ok);
-            let output_objects =
-                include_output_objects.then(|| state.get_transaction_output_objects(&effects)).and_then(Result::ok);
+            let input_objects = include_input_objects
+                .then(|| state.get_transaction_input_objects(&effects))
+                .and_then(Result::ok);
+            let output_objects = include_output_objects
+                .then(|| state.get_transaction_output_objects(&effects))
+                .and_then(Result::ok);
 
             return Ok((
                 tonic::Response::new(HandleTransactionResponseV2 {
@@ -537,7 +590,10 @@ impl ValidatorService {
         let _latency_metric_guard = metrics.handle_transaction_consensus_latency.start_timer();
         let span = error_span!("handle_transaction_v2", tx_digest = ?transaction.digest());
         self.handle_submit_to_consensus(
-            nonempty![ConsensusTransaction::new_user_transaction_message(&self.state.name, transaction.into())],
+            nonempty![ConsensusTransaction::new_user_transaction_message(
+                &self.state.name,
+                transaction.into()
+            )],
             include_events,
             include_input_objects,
             include_output_objects,
@@ -550,8 +606,10 @@ impl ValidatorService {
         .map(|(resp, spam_weight)| {
             (
                 tonic::Response::new(
-                    resp.expect("handle_submit_to_consensus should not return none with wait_for_effects=true")
-                        .remove(0),
+                    resp.expect(
+                        "handle_submit_to_consensus should not return none with wait_for_effects=true",
+                    )
+                    .remove(0),
                 ),
                 spam_weight,
             )
@@ -575,9 +633,14 @@ impl ValidatorService {
     ) -> Result<(Option<Vec<HandleCertificateResponseV3>>, Weight), tonic::Status> {
         // Validate if cert can be executed
         // Fullnode does not serve handle_certificate call.
-        fp_ensure!(!self.state.is_fullnode(epoch_store), SuiError::FullNodeCantHandleCertificate.into());
+        fp_ensure!(
+            !self.state.is_fullnode(epoch_store),
+            SuiError::FullNodeCantHandleCertificate.into()
+        );
 
-        let shared_object_tx = certificates.iter().any(|cert| cert.contains_shared_object());
+        let shared_object_tx = certificates
+            .iter()
+            .any(|cert| cert.contains_shared_object());
 
         let metrics = if certificates.len() == 1 {
             if wait_for_effects {
@@ -591,7 +654,9 @@ impl ValidatorService {
             }
         } else {
             // `soft_bundle_validity_check` ensured that all certificates contain shared objects.
-            &self.metrics.handle_soft_bundle_certificates_consensus_latency
+            &self
+                .metrics
+                .handle_soft_bundle_certificates_consensus_latency
         };
 
         let _metrics_guard = metrics.start_timer();
@@ -602,7 +667,10 @@ impl ValidatorService {
         if certificates.len() == 1 {
             let tx_digest = *certificates[0].digest();
 
-            if let Some(signed_effects) = self.state.get_signed_effects_and_maybe_resign(&tx_digest, epoch_store)? {
+            if let Some(signed_effects) = self
+                .state
+                .get_signed_effects_and_maybe_resign(&tx_digest, epoch_store)?
+            {
                 let events = if include_events {
                     if let Some(digest) = signed_effects.events_digest() {
                         Some(self.state.get_transaction_events(digest)?)
@@ -635,7 +703,10 @@ impl ValidatorService {
                 self.state.check_system_overload_at_execution(),
             );
             if let Err(error) = overload_check_res {
-                self.metrics.num_rejected_cert_during_overload.with_label_values(&[error.as_ref()]).inc();
+                self.metrics
+                    .num_rejected_cert_during_overload
+                    .with_label_values(&[error.as_ref()])
+                    .inc();
                 return Err(error.into());
             }
         }
@@ -649,10 +720,14 @@ impl ValidatorService {
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?
         };
-        let consensus_transactions = NonEmpty::collect(verified_certificates.iter().map(|certificate| {
-            ConsensusTransaction::new_certificate_message(&self.state.name, certificate.clone().into())
-        }))
-        .unwrap();
+        let consensus_transactions =
+            NonEmpty::collect(verified_certificates.iter().map(|certificate| {
+                ConsensusTransaction::new_certificate_message(
+                    &self.state.name,
+                    certificate.clone().into(),
+                )
+            }))
+            .unwrap();
 
         let (responses, weight) = self
             .handle_submit_to_consensus(
@@ -671,7 +746,8 @@ impl ValidatorService {
                 responses
                     .into_iter()
                     .map(|response| {
-                        let signed_effects = self.state.sign_effects(response.effects, epoch_store)?;
+                        let signed_effects =
+                            self.state.sign_effects(response.effects, epoch_store)?;
                         Ok(HandleCertificateResponseV3 {
                             effects: signed_effects.into_inner(),
                             events: response.events,
@@ -713,9 +789,9 @@ impl ValidatorService {
             // For certs with owned objects this will return without waiting for certificate to be sequenced.
             // For uncertified transactions this will wait for fast path processing.
             // First do quick dirty non-async check.
-            if !epoch_store
-                .all_external_consensus_messages_processed(consensus_transactions.iter().map(|tx| tx.key()))?
-            {
+            if !epoch_store.all_external_consensus_messages_processed(
+                consensus_transactions.iter().map(|tx| tx.key()),
+            )? {
                 let _metrics_guard = self.metrics.consensus_latency.start_timer();
                 self.consensus_adapter.submit_batch(
                     &consensus_transactions,
@@ -743,7 +819,10 @@ impl ValidatorService {
                 })
                 .collect::<Vec<_>>();
             if !certificates_without_shared_objects.is_empty() {
-                self.state.enqueue_certificates_for_execution(certificates_without_shared_objects, epoch_store);
+                self.state.enqueue_certificates_for_execution(
+                    certificates_without_shared_objects,
+                    epoch_store,
+                );
             }
             return Ok((None, Weight::zero()));
         }
@@ -829,17 +908,25 @@ impl ValidatorService {
         certificate.validity_check(epoch_store.protocol_config(), epoch_store.epoch())?;
 
         let span = error_span!("submit_certificate", tx_digest = ?certificate.digest());
-        self.handle_certificates(nonempty![certificate], true, false, false, false, &epoch_store, false)
-            .instrument(span)
-            .await
-            .map(|(executed, spam_weight)| {
-                (
-                    tonic::Response::new(SubmitCertificateResponse {
-                        executed: executed.map(|mut x| x.remove(0)).map(Into::into),
-                    }),
-                    spam_weight,
-                )
-            })
+        self.handle_certificates(
+            nonempty![certificate],
+            true,
+            false,
+            false,
+            false,
+            &epoch_store,
+            false,
+        )
+        .instrument(span)
+        .await
+        .map(|(executed, spam_weight)| {
+            (
+                tonic::Response::new(SubmitCertificateResponse {
+                    executed: executed.map(|mut x| x.remove(0)).map(Into::into),
+                }),
+                spam_weight,
+            )
+        })
     }
 
     async fn handle_certificate_v2_impl(
@@ -851,19 +938,29 @@ impl ValidatorService {
         certificate.validity_check(epoch_store.protocol_config(), epoch_store.epoch())?;
 
         let span = error_span!("handle_certificate", tx_digest = ?certificate.digest());
-        self.handle_certificates(nonempty![certificate], true, false, false, false, &epoch_store, true)
-            .instrument(span)
-            .await
-            .map(|(resp, spam_weight)| {
-                (
-                    tonic::Response::new(
-                        resp.expect("handle_certificate should not return none with wait_for_effects=true")
-                            .remove(0)
-                            .into(),
-                    ),
-                    spam_weight,
-                )
-            })
+        self.handle_certificates(
+            nonempty![certificate],
+            true,
+            false,
+            false,
+            false,
+            &epoch_store,
+            true,
+        )
+        .instrument(span)
+        .await
+        .map(|(resp, spam_weight)| {
+            (
+                tonic::Response::new(
+                    resp.expect(
+                        "handle_certificate should not return none with wait_for_effects=true",
+                    )
+                    .remove(0)
+                    .into(),
+                ),
+                spam_weight,
+            )
+        })
     }
 
     async fn handle_certificate_v3_impl(
@@ -872,7 +969,9 @@ impl ValidatorService {
     ) -> WrappedServiceResponse<HandleCertificateResponseV3> {
         let epoch_store = self.state.load_epoch_store_one_call_per_task();
         let request = request.into_inner();
-        request.certificate.validity_check(epoch_store.protocol_config(), epoch_store.epoch())?;
+        request
+            .certificate
+            .validity_check(epoch_store.protocol_config(), epoch_store.epoch())?;
 
         let span = error_span!("handle_certificate_v3", tx_digest = ?request.certificate.digest());
         self.handle_certificates(
@@ -889,7 +988,10 @@ impl ValidatorService {
         .map(|(resp, spam_weight)| {
             (
                 tonic::Response::new(
-                    resp.expect("handle_certificate should not return none with wait_for_effects=true").remove(0),
+                    resp.expect(
+                        "handle_certificate should not return none with wait_for_effects=true",
+                    )
+                    .remove(0),
                 ),
                 spam_weight,
             )
@@ -912,7 +1014,10 @@ impl ValidatorService {
         // without having to upgrade the entire network.
         fp_ensure!(
             protocol_config.soft_bundle() && node_config.enable_soft_bundle,
-            SuiError::UnsupportedFeatureError { error: "Soft Bundle".to_string() }.into()
+            SuiError::UnsupportedFeatureError {
+                error: "Soft Bundle".to_string()
+            }
+            .into()
         );
 
         // Enforce these checks per [SIP-19](https://github.com/sui-foundation/sips/blob/main/sips/sip-19.md):
@@ -924,7 +1029,9 @@ impl ValidatorService {
         fp_ensure!(
             certificates.len() as u64 <= protocol_config.max_soft_bundle_size(),
             SuiError::UserInputError {
-                error: UserInputError::TooManyTransactionsInSoftBundle { limit: protocol_config.max_soft_bundle_size() }
+                error: UserInputError::TooManyTransactionsInSoftBundle {
+                    limit: protocol_config.max_soft_bundle_size()
+                }
             }
             .into()
         );
@@ -932,11 +1039,15 @@ impl ValidatorService {
         // We set the soft bundle max size to be half of the consensus max transactions in block size. We do this to account for
         // serialization overheads and to ensure that the soft bundle is not too large when is attempted to be posted via consensus.
         // Although half the block size is on the extreme side, it's should be good enough for now.
-        let soft_bundle_max_size_bytes = protocol_config.consensus_max_transactions_in_block_bytes() / 2;
+        let soft_bundle_max_size_bytes =
+            protocol_config.consensus_max_transactions_in_block_bytes() / 2;
         fp_ensure!(
             total_size_bytes <= soft_bundle_max_size_bytes,
             SuiError::UserInputError {
-                error: UserInputError::SoftBundleTooLarge { size: total_size_bytes, limit: soft_bundle_max_size_bytes },
+                error: UserInputError::SoftBundleTooLarge {
+                    size: total_size_bytes,
+                    limit: soft_bundle_max_size_bytes,
+                },
             }
             .into()
         );
@@ -946,11 +1057,17 @@ impl ValidatorService {
             let tx_digest = *certificate.digest();
             fp_ensure!(
                 certificate.contains_shared_object(),
-                SuiError::UserInputError { error: UserInputError::NoSharedObjectError { digest: tx_digest } }.into()
+                SuiError::UserInputError {
+                    error: UserInputError::NoSharedObjectError { digest: tx_digest }
+                }
+                .into()
             );
             fp_ensure!(
                 !self.state.is_tx_already_executed(&tx_digest),
-                SuiError::UserInputError { error: UserInputError::AlreadyExecutedError { digest: tx_digest } }.into()
+                SuiError::UserInputError {
+                    error: UserInputError::AlreadyExecutedError { digest: tx_digest }
+                }
+                .into()
             );
             if let Some(gas) = gas_price {
                 fp_ensure!(
@@ -975,7 +1092,10 @@ impl ValidatorService {
         // already being processed by another actor, and we could not know it.
         fp_ensure!(
             !epoch_store.is_any_tx_certs_consensus_message_processed(certificates.iter())?,
-            SuiError::UserInputError { error: UserInputError::CertificateAlreadyProcessed }.into()
+            SuiError::UserInputError {
+                error: UserInputError::CertificateAlreadyProcessed
+            }
+            .into()
         );
 
         Ok(())
@@ -993,26 +1113,39 @@ impl ValidatorService {
         };
         let request = request.into_inner();
 
-        let certificates =
-            NonEmpty::from_vec(request.certificates).ok_or_else(|| SuiError::NoCertificateProvidedError)?;
+        let certificates = NonEmpty::from_vec(request.certificates)
+            .ok_or_else(|| SuiError::NoCertificateProvidedError)?;
         let mut total_size_bytes = 0;
         for certificate in &certificates {
             // We need to check this first because we haven't verified the cert signature.
-            total_size_bytes += certificate.validity_check(epoch_store.protocol_config(), epoch_store.epoch())? as u64;
+            total_size_bytes += certificate
+                .validity_check(epoch_store.protocol_config(), epoch_store.epoch())?
+                as u64;
         }
 
-        self.metrics.handle_soft_bundle_certificates_count.observe(certificates.len() as f64);
+        self.metrics
+            .handle_soft_bundle_certificates_count
+            .observe(certificates.len() as f64);
 
-        self.metrics.handle_soft_bundle_certificates_size_bytes.observe(total_size_bytes as f64);
+        self.metrics
+            .handle_soft_bundle_certificates_size_bytes
+            .observe(total_size_bytes as f64);
 
         // Now that individual certificates are valid, we check if the bundle is valid.
-        self.soft_bundle_validity_check(&certificates, &epoch_store, total_size_bytes).await?;
+        self.soft_bundle_validity_check(&certificates, &epoch_store, total_size_bytes)
+            .await?;
 
         info!(
             "Received Soft Bundle with {} certificates, from {}, tx digests are [{}], total size [{}]bytes",
             certificates.len(),
-            client_addr.map(|x| x.to_string()).unwrap_or_else(|| "unknown".to_string()),
-            certificates.iter().map(|x| x.digest().to_string()).collect::<Vec<_>>().join(", "),
+            client_addr
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+            certificates
+                .iter()
+                .map(|x| x.digest().to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
             total_size_bytes
         );
 
@@ -1030,7 +1163,9 @@ impl ValidatorService {
         .await
         .map(|(resp, spam_weight)| {
             (
-                tonic::Response::new(HandleSoftBundleCertificatesResponseV3 { responses: resp.unwrap_or_default() }),
+                tonic::Response::new(HandleSoftBundleCertificatesResponseV3 {
+                    responses: resp.unwrap_or_default(),
+                }),
                 spam_weight,
             )
         })
@@ -1076,11 +1211,18 @@ impl ValidatorService {
         &self,
         _request: tonic::Request<SystemStateRequest>,
     ) -> WrappedServiceResponse<SuiSystemState> {
-        let response = self.state.get_object_cache_reader().get_sui_system_state_object_unsafe()?;
+        let response = self
+            .state
+            .get_object_cache_reader()
+            .get_sui_system_state_object_unsafe()?;
         Ok((tonic::Response::new(response), Weight::one()))
     }
 
-    fn get_client_ip_addr<T>(&self, request: &tonic::Request<T>, source: &ClientIdSource) -> Option<IpAddr> {
+    fn get_client_ip_addr<T>(
+        &self,
+        request: &tonic::Request<T>,
+        source: &ClientIdSource,
+    ) -> Option<IpAddr> {
         match source {
             ClientIdSource::SocketAddr => {
                 let socket_addr: Option<SocketAddr> = request.remote_addr();
@@ -1108,7 +1250,8 @@ impl ValidatorService {
                 let do_header_parse = |op: &MetadataValue<Ascii>| {
                     match op.to_str() {
                         Ok(header_val) => {
-                            let header_contents = header_val.split(',').map(str::trim).collect::<Vec<_>>();
+                            let header_contents =
+                                header_val.split(',').map(str::trim).collect::<Vec<_>>();
                             if *num_hops == 0 {
                                 error!(
                                     "x-forwarded-for: 0 specified. x-forwarded-for contents: {:?}. Please assign nonzero value for \
@@ -1132,7 +1275,8 @@ impl ValidatorService {
                                 self.metrics.client_id_source_config_mismatch.inc();
                                 return None;
                             }
-                            let Some(client_ip) = header_contents.get(contents_len - num_hops) else {
+                            let Some(client_ip) = header_contents.get(contents_len - num_hops)
+                            else {
                                 error!(
                                     "x-forwarded-for header value of {:?} contains {} values, but {} hops were specificed. \
                                     Expected at least {} values. Skipping traffic controller request handling.",
@@ -1191,7 +1335,11 @@ impl ValidatorService {
     ) -> Result<tonic::Response<T>, tonic::Status> {
         let (error, spam_weight, unwrapped_response) = match wrapped_response {
             Ok((result, spam_weight)) => (None, spam_weight.clone(), Ok(result)),
-            Err(status) => (Some(SuiError::from(status.clone())), Weight::zero(), Err(status.clone())),
+            Err(status) => (
+                Some(SuiError::from(status.clone())),
+                Weight::zero(),
+                Err(status.clone()),
+            ),
         };
 
         if let Some(traffic_controller) = self.traffic_controller.clone() {
@@ -1215,8 +1363,10 @@ fn make_tonic_request_for_testing<T>(message: T) -> tonic::Request<T> {
     // simulate a TCP connection, which would have added extensions to
     // the request object that would be used downstream
     let mut request = tonic::Request::new(message);
-    let tcp_connect_info =
-        TcpConnectInfo { local_addr: None, remote_addr: Some(SocketAddr::new([127, 0, 0, 1].into(), 0)) };
+    let tcp_connect_info = TcpConnectInfo {
+        local_addr: None,
+        remote_addr: Some(SocketAddr::new([127, 0, 0, 1].into(), 0)),
+    };
     request.extensions_mut().insert(tcp_connect_info);
     request
 }
@@ -1224,7 +1374,9 @@ fn make_tonic_request_for_testing<T>(message: T) -> tonic::Request<T> {
 // TODO: refine error matching here
 fn normalize(err: SuiError) -> Weight {
     match err {
-        SuiError::UserInputError { error: UserInputError::IncorrectUserSignature { .. } } => Weight::one(),
+        SuiError::UserInputError {
+            error: UserInputError::IncorrectUserSignature { .. },
+        } => Weight::one(),
         SuiError::InvalidSignature { .. }
         | SuiError::SignerSignatureAbsent { .. }
         | SuiError::SignerSignatureNumberMismatch { .. }

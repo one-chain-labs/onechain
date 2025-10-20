@@ -3,7 +3,7 @@
 
 const SUI_NS_NAME_REGEX =
 	/^(?!.*(^(?!@)|[-.@])($|[-.@]))(?:[a-z0-9-]{0,63}(?:\.[a-z0-9-]{0,63})*)?@[a-z0-9-]{0,63}$/i;
-const SUI_NS_DOMAIN_REGEX = /^(?!.*(^|[-.])($|[-.]))(?:[a-z0-9-]{0,63}\.)+oct$/i;
+const SUI_NS_DOMAIN_REGEX = /^(?!.*(^|[-.])($|[-.]))(?:[a-z0-9-]{0,63}\.)+sui$/i;
 const MAX_SUI_NS_NAME_LENGTH = 235;
 
 export function isValidSuiNSName(name: string): boolean {
@@ -24,19 +24,19 @@ export function normalizeSuiNSName(name: string, format: 'at' | 'dot' = 'at'): s
 
 	if (lowerCase.includes('@')) {
 		if (!SUI_NS_NAME_REGEX.test(lowerCase)) {
-			throw new Error(`Invalid OtcNS name ${name}`);
+			throw new Error(`Invalid SuiNS name ${name}`);
 		}
 		const [labels, domain] = lowerCase.split('@');
 		parts = [...(labels ? labels.split('.') : []), domain];
 	} else {
 		if (!SUI_NS_DOMAIN_REGEX.test(lowerCase)) {
-			throw new Error(`Invalid OtcNS name ${name}`);
+			throw new Error(`Invalid SuiNS name ${name}`);
 		}
 		parts = lowerCase.split('.').slice(0, -1);
 	}
 
 	if (format === 'dot') {
-		return `${parts.join('.')}.oct`;
+		return `${parts.join('.')}.sui`;
 	}
 
 	return `${parts.slice(0, -1).join('.')}@${parts[parts.length - 1]}`;

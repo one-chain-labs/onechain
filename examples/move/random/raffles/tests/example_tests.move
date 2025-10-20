@@ -5,7 +5,7 @@
 module raffles::tests;
 
 use raffles::{example1, example2};
-use one::{
+use sui::{
     clock,
     coin::{Self, Coin},
     random::{Self, update_randomness_state_for_testing, Random},
@@ -14,7 +14,7 @@ use one::{
 };
 
 fun mint(addr: address, amount: u64, scenario: &mut ts::Scenario) {
-    transfer::public_transfer(coin::mint_for_testing<OCT>(amount, scenario.ctx()), addr);
+    transfer::public_transfer(coin::mint_for_testing<SUI>(amount, scenario.ctx()), addr);
     scenario.next_tx(addr);
 }
 

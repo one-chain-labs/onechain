@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [[move.package]]
-id = "MoveStdlib"
+name = "MoveStdlib"
 source = { local = "../move-stdlib" }
 
 [move.toolchain-version]

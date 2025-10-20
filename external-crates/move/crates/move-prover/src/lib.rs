@@ -37,13 +37,24 @@ pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> 
     run_move_prover(&mut error_writer, options)
 }
 
-pub fn run_move_prover<W: WriteColor>(error_writer: &mut W, options: Options) -> anyhow::Result<()> {
+pub fn run_move_prover<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+) -> anyhow::Result<()> {
     let now = Instant::now();
     // Run the model builder.
     let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
     let env = run_model_builder_with_options(
-        vec![PackagePaths { name: None, paths: options.move_sources.clone(), named_address_map: addrs.clone() }],
-        vec![PackagePaths { name: None, paths: options.move_deps.clone(), named_address_map: addrs }],
+        vec![PackagePaths {
+            name: None,
+            paths: options.move_sources.clone(),
+            named_address_map: addrs.clone(),
+        }],
+        vec![PackagePaths {
+            name: None,
+            paths: options.move_deps.clone(),
+            named_address_map: addrs,
+        }],
         options.model_builder.clone(),
         None,
     )?;
@@ -74,7 +85,12 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     let now = timer.unwrap_or_else(Instant::now);
 
     let build_duration = now.elapsed();
-    check_errors(env, &options, error_writer, "exiting with model building errors")?;
+    check_errors(
+        env,
+        &options,
+        error_writer,
+        "exiting with model building errors",
+    )?;
     env.report_diag(error_writer, options.prover.report_severity);
 
     // Add the prover options as an extension to the environment, so they can be accessed
@@ -98,7 +114,12 @@ pub fn run_move_prover_with_model<W: WriteColor>(
 
     // Report durations.
     info!("{:.3}s build", build_duration.as_secs_f64(),);
-    check_errors(env, &options, error_writer, "exiting with verification errors")
+    check_errors(
+        env,
+        &options,
+        error_writer,
+        "exiting with verification errors",
+    )
 }
 
 pub fn check_errors<W: WriteColor>(
@@ -118,10 +139,12 @@ pub fn check_errors<W: WriteColor>(
 /// Create bytecode and process it.
 pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> FunctionTargetsHolder {
     let mut targets = FunctionTargetsHolder::default();
-    let output_dir =
-        Path::new(&options.output_path).parent().expect("expect the parent directory of the output path to exist");
-    let output_prefix =
-        options.move_sources.first().map_or("bytecode", |s| Path::new(s).file_name().unwrap().to_str().unwrap());
+    let output_dir = Path::new(&options.output_path)
+        .parent()
+        .expect("expect the parent directory of the output path to exist");
+    let output_prefix = options.move_sources.first().map_or("bytecode", |s| {
+        Path::new(s).file_name().unwrap().to_str().unwrap()
+    });
 
     // Add function targets for all functions in the environment.
     for module_env in env.get_modules() {
@@ -145,7 +168,11 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
     };
 
     if options.prover.dump_bytecode {
-        let dump_file_base = output_dir.join(output_prefix).into_os_string().into_string().unwrap();
+        let dump_file_base = output_dir
+            .join(output_prefix)
+            .into_os_string()
+            .into_string()
+            .unwrap();
         pipeline.run_with_dump(env, &mut targets, &dump_file_base, options.prover.dump_cfg)
     } else {
         pipeline.run(env, &mut targets);

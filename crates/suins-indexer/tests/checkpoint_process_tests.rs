@@ -6,10 +6,10 @@ use sui_types::full_checkpoint_content::CheckpointData;
 use suins_indexer::indexer::SuinsIndexer;
 
 /// Test ids.
-const TEST_REGISTRY_TABLE_ID: &str = "0xb120c0d55432630fce61f7854795a3463deb6e3b443cc4ae72e1282073ff56e4";
+const TEST_REGISTRY_TABLE_ID: &str =
+    "0xb120c0d55432630fce61f7854795a3463deb6e3b443cc4ae72e1282073ff56e4";
 const TEST_NAME_RECORD_TYPE: &str = "0x2::dynamic_field::Field<0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93::domain::Domain,0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93::name_record::NameRecord>";
-const TEST_SUBDOMAIN_REGISTRATION_TYPE: &str =
-    "0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93::subdomain_registration::SubDomainRegistration";
+const TEST_SUBDOMAIN_REGISTRATION_TYPE: &str = "0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93::subdomain_registration::SubDomainRegistration";
 
 /// For our test policy, we have a few checkpoints that contain some data additions, deletions, replacements
 ///
@@ -51,7 +51,10 @@ fn process_22279365_checkpoint() {
     let addition = updates.first().unwrap();
     assert_eq!(addition.name, "new.test.sui".to_string());
     assert_eq!(addition.parent, "test.sui".to_string());
-    assert_eq!(addition.nft_id, "0xa4891f3754b203ef230a5e2a08822c835c808eab71e2bc6ca33a73cec9728376".to_string());
+    assert_eq!(
+        addition.nft_id,
+        "0xa4891f3754b203ef230a5e2a08822c835c808eab71e2bc6ca33a73cec9728376".to_string()
+    );
     assert_eq!(addition.expiration_timestamp_ms, 0);
     assert_eq!(addition.subdomain_wrapper_id, None);
 }
@@ -68,7 +71,10 @@ fn process_22279496_checkpoint() {
     let addition = updates.first().unwrap();
     assert_eq!(addition.name, "new.test.sui".to_string());
     assert_eq!(addition.parent, "test.sui".to_string());
-    assert_eq!(addition.nft_id, "0x87f04a4ffa1713e0a7e3a9e5ebf56f0ab24ce0bba87b17eb11a7532cb381bd58".to_string());
+    assert_eq!(
+        addition.nft_id,
+        "0x87f04a4ffa1713e0a7e3a9e5ebf56f0ab24ce0bba87b17eb11a7532cb381bd58".to_string()
+    );
     assert_eq!(addition.expiration_timestamp_ms, 1706213544456);
     assert_eq!(
         addition.subdomain_wrapper_id,
@@ -87,12 +93,18 @@ fn process_22279944_checkpoint() {
 
     let addition = updates.first().unwrap();
     assert_eq!(addition.name, "remove.test.sui".to_string());
-    assert_eq!(addition.nft_id, "0x7c230e1a4cd7b708232a713a138f4c950e7f579b61d01b988f06d7dc53e99211".to_string());
+    assert_eq!(
+        addition.nft_id,
+        "0x7c230e1a4cd7b708232a713a138f4c950e7f579b61d01b988f06d7dc53e99211".to_string()
+    );
     assert_eq!(
         addition.subdomain_wrapper_id,
         Some("0x9ca93181d093598b55787e82f69296819e9f779f25f1cc5226d2cd4d07126790".to_string())
     );
-    assert_eq!(addition.field_id, "0x79b123c73d073ba73c9e6f0817e63270d716db3c7945ecde477b22df7d026e43".to_string())
+    assert_eq!(
+        addition.field_id,
+        "0x79b123c73d073ba73c9e6f0817e63270d716db3c7945ecde477b22df7d026e43".to_string()
+    )
 }
 
 #[test]
@@ -106,13 +118,19 @@ fn process_22280030_checkpoint() {
 
     let addition = updates.first().unwrap();
     assert_eq!(addition.name, "remove.test.sui".to_string());
-    assert_eq!(addition.nft_id, "0xdd513860269b0768c6ed77ddaf48cd579ba0c2995e793eab182d6ab861818250".to_string());
+    assert_eq!(
+        addition.nft_id,
+        "0xdd513860269b0768c6ed77ddaf48cd579ba0c2995e793eab182d6ab861818250".to_string()
+    );
     assert_eq!(
         addition.subdomain_wrapper_id,
         Some("0x48de1a7eef5956c4f3478849654abd94dcf5b206c631328c50518091b0eee9b0".to_string())
     );
 
-    assert_eq!(addition.field_id, "0x79b123c73d073ba73c9e6f0817e63270d716db3c7945ecde477b22df7d026e43".to_string())
+    assert_eq!(
+        addition.field_id,
+        "0x79b123c73d073ba73c9e6f0817e63270d716db3c7945ecde477b22df7d026e43".to_string()
+    )
 }
 
 /// Reads a checkpoint from a given file in the `/tests/data` directory.

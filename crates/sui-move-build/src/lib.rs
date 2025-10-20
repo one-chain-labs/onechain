@@ -28,11 +28,17 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
 };
 use move_package::{
-    compilation::{build_plan::BuildPlan, compiled_package::CompiledPackage as MoveCompiledPackage},
+    compilation::{
+        build_plan::BuildPlan, compiled_package::CompiledPackage as MoveCompiledPackage,
+    },
     package_hooks::{PackageHooks, PackageIdentifier},
-    resolution::resolution_graph::{Package, ResolvedGraph},
-    source_package::parsed_manifest::{OnChainInfo, PackageName, SourceManifest},
+    resolution::resolution_graph::ResolvedGraph,
+    source_package::parsed_manifest::PackageName,
     BuildConfig as MoveBuildConfig,
+};
+use move_package::{
+    resolution::resolution_graph::Package, source_package::parsed_manifest::OnChainInfo,
+    source_package::parsed_manifest::SourceManifest,
 };
 use move_symbol_pool::Symbol;
 use serde_reflection::Registry;
@@ -43,10 +49,7 @@ use sui_types::{
     error::{SuiError, SuiResult},
     is_system_package,
     move_package::{FnInfo, FnInfoKey, FnInfoMap, MovePackage},
-    BRIDGE_ADDRESS,
-    DEEPBOOK_ADDRESS,
-    MOVE_STDLIB_ADDRESS,
-    SUI_FRAMEWORK_ADDRESS,
+    BRIDGE_ADDRESS, DEEPBOOK_ADDRESS, MOVE_STDLIB_ADDRESS, SUI_FRAMEWORK_ADDRESS,
     SUI_SYSTEM_ADDRESS,
 };
 use sui_verifier::verifier as sui_bytecode_verifier;
@@ -85,11 +88,14 @@ impl BuildConfig {
     pub fn new_for_testing() -> Self {
         move_package::package_hooks::register_package_hooks(Box::new(SuiPackageHooks));
         let mut build_config: Self = Default::default();
-        let install_dir = tempfile::tempdir().unwrap().keep();
+        let install_dir = tempfile::tempdir().unwrap().into_path();
         let lock_file = install_dir.join("Move.lock");
         build_config.config.install_dir = Some(install_dir);
         build_config.config.lock_file = Some(lock_file);
-        build_config.config.lint_flag.set(move_compiler::linters::LintLevel::None);
+        build_config
+            .config
+            .lint_flag
+            .set(move_compiler::linters::LintLevel::None);
         build_config.config.silence_warnings = true;
         build_config
     }
@@ -101,7 +107,10 @@ impl BuildConfig {
     {
         let mut build_config = Self::new_for_testing();
         for (addr_name, obj_id) in dep_original_addresses {
-            build_config.config.additional_named_addresses.insert(addr_name.into(), AccountAddress::from(obj_id));
+            build_config
+                .config
+                .additional_named_addresses
+                .insert(addr_name.into(), AccountAddress::from(obj_id));
         }
         build_config
     }
@@ -139,7 +148,8 @@ impl BuildConfig {
                     // with errors present don't even try decorating warnings output to avoid
                     // clutter
                     assert!(!error_diags.is_empty());
-                    let diags_buf = report_diagnostics_to_buffer(&files, error_diags, /* color */ true);
+                    let diags_buf =
+                        report_diagnostics_to_buffer(&files, error_diags, /* color */ true);
                     if let Err(err) = std::io::stderr().write_all(&diags_buf) {
                         anyhow::bail!("Cannot output compiler diagnostics: {}", err);
                     }
@@ -157,20 +167,33 @@ impl BuildConfig {
         let run_bytecode_verifier = self.run_bytecode_verifier;
         let chain_id = self.chain_id.clone();
         let resolution_graph = self.resolution_graph(path, chain_id.clone())?;
-        build_from_resolution_graph(resolution_graph, run_bytecode_verifier, print_diags_to_stderr, chain_id)
+        build_from_resolution_graph(
+            resolution_graph,
+            run_bytecode_verifier,
+            print_diags_to_stderr,
+            chain_id,
+        )
     }
 
-    pub fn resolution_graph(mut self, path: &Path, chain_id: Option<String>) -> SuiResult<ResolvedGraph> {
+    pub fn resolution_graph(
+        mut self,
+        path: &Path,
+        chain_id: Option<String>,
+    ) -> SuiResult<ResolvedGraph> {
         if let Some(err_msg) = set_sui_flavor(&mut self.config) {
             return Err(SuiError::ModuleBuildFailure { error: err_msg });
         }
 
         if self.print_diags_to_stderr {
-            self.config.resolution_graph_for_package(path, chain_id, &mut std::io::stderr())
+            self.config
+                .resolution_graph_for_package(path, chain_id, &mut std::io::stderr())
         } else {
-            self.config.resolution_graph_for_package(path, chain_id, &mut std::io::sink())
+            self.config
+                .resolution_graph_for_package(path, chain_id, &mut std::io::sink())
         }
-        .map_err(|err| SuiError::ModuleBuildFailure { error: format!("{:?}", err) })
+        .map_err(|err| SuiError::ModuleBuildFailure {
+            error: format!("{:?}", err),
+        })
     }
 }
 
@@ -178,7 +201,8 @@ impl BuildConfig {
 /// (optionally report diagnostics themselves if files argument is provided).
 pub fn decorate_warnings(warning_diags: Diagnostics, files: Option<&MappedFiles>) {
     let any_linter_warnings = warning_diags.any_with_prefix(LINT_WARNING_PREFIX);
-    let (filtered_diags_num, unique) = warning_diags.filtered_source_diags_with_prefix(LINT_WARNING_PREFIX);
+    let (filtered_diags_num, unique) =
+        warning_diags.filtered_source_diags_with_prefix(LINT_WARNING_PREFIX);
     if let Some(f) = files {
         report_warnings(f, warning_diags);
     }
@@ -218,18 +242,31 @@ pub fn build_from_resolution_graph(
     // `CompiledPackage`
     let mut bytecode_deps = vec![];
     for (name, pkg) in resolution_graph.package_table.iter() {
-        if !pkg.get_sources(&resolution_graph.build_options).unwrap().is_empty() {
+        if !pkg
+            .get_sources(&resolution_graph.build_options)
+            .unwrap()
+            .is_empty()
+        {
             continue;
         }
-        let modules = pkg.get_bytecodes_bytes().map_err(|error| SuiError::ModuleDeserializationFailure {
-            error: format!("Deserializing bytecode dependency for package {}: {:?}", name, error),
-        })?;
+        let modules =
+            pkg.get_bytecodes_bytes()
+                .map_err(|error| SuiError::ModuleDeserializationFailure {
+                    error: format!(
+                        "Deserializing bytecode dependency for package {}: {:?}",
+                        name, error
+                    ),
+                })?;
         for module in modules {
-            let module = CompiledModule::deserialize_with_defaults(module.as_ref()).map_err(|error| {
-                SuiError::ModuleDeserializationFailure {
-                    error: format!("Deserializing bytecode dependency for package {}: {:?}", name, error),
-                }
-            })?;
+            let module =
+                CompiledModule::deserialize_with_defaults(module.as_ref()).map_err(|error| {
+                    SuiError::ModuleDeserializationFailure {
+                        error: format!(
+                            "Deserializing bytecode dependency for package {}: {:?}",
+                            name, error
+                        ),
+                    }
+                })?;
             bytecode_deps.push((*name, module));
         }
     }
@@ -242,7 +279,11 @@ pub fn build_from_resolution_graph(
     // write build failure diagnostics to stderr, convert `error` to `String` using `Debug`
     // format to include anyhow's error context chain.
     let (package, fn_info) = match result {
-        Err(error) => return Err(SuiError::ModuleBuildFailure { error: format!("{:?}", error) }),
+        Err(error) => {
+            return Err(SuiError::ModuleBuildFailure {
+                error: format!("{:?}", error),
+            })
+        }
         Ok((package, fn_info)) => (package, fn_info),
     };
     let compiled_modules = package.root_modules_map();
@@ -251,13 +292,21 @@ pub fn build_from_resolution_graph(
             .verifier_config(/* signing_limits */ None);
 
         for m in compiled_modules.iter_modules() {
-            move_bytecode_verifier::verify_module_unmetered(m)
-                .map_err(|err| SuiError::ModuleVerificationFailure { error: err.to_string() })?;
+            move_bytecode_verifier::verify_module_unmetered(m).map_err(|err| {
+                SuiError::ModuleVerificationFailure {
+                    error: err.to_string(),
+                }
+            })?;
             sui_bytecode_verifier::sui_verify_module_unmetered(m, &fn_info, &verifier_config)?;
         }
-        // TODO(https://github.com/MystenLabs/sui/issues/69): Run Move linker
+        // TODO(https://github.com/one-chain-labs/onechain/issues/69): Run Move linker
     }
-    Ok(CompiledPackage { package, published_at, dependency_ids, bytecode_deps })
+    Ok(CompiledPackage {
+        package,
+        published_at,
+        dependency_ids,
+        bytecode_deps,
+    })
 }
 
 impl CompiledPackage {
@@ -272,7 +321,11 @@ impl CompiledPackage {
     /// Note: these are not topologically sorted by dependency--use `get_dependency_sorted_modules` to produce a list of modules suitable
     /// for publishing or static analysis
     pub fn into_modules(self) -> Vec<CompiledModule> {
-        self.package.root_compiled_units.into_iter().map(|m| m.unit.module).collect()
+        self.package
+            .root_compiled_units
+            .into_iter()
+            .map(|m| m.unit.module)
+            .collect()
     }
 
     /// Return all of the bytecode modules that this package depends on (both directly and transitively)
@@ -288,14 +341,20 @@ impl CompiledPackage {
     /// Return all of the bytecode modules in this package and the modules of its direct and transitive dependencies.
     /// Note: these are not topologically sorted by dependency.
     pub fn get_modules_and_deps(&self) -> impl Iterator<Item = &CompiledModule> {
-        self.package.all_modules().map(|m| &m.unit.module).chain(self.bytecode_deps.iter().map(|(_, m)| m))
+        self.package
+            .all_modules()
+            .map(|m| &m.unit.module)
+            .chain(self.bytecode_deps.iter().map(|(_, m)| m))
     }
 
     /// Return the bytecode modules in this package, topologically sorted in dependency order.
     /// Optionally include dependencies that have not been published (are at address 0x0), if
     /// `with_unpublished_deps` is true. This is the function to call if you would like to publish
     /// or statically analyze the modules.
-    pub fn get_dependency_sorted_modules(&self, with_unpublished_deps: bool) -> Vec<CompiledModule> {
+    pub fn get_dependency_sorted_modules(
+        &self,
+        with_unpublished_deps: bool,
+    ) -> Vec<CompiledModule> {
         let all_modules = Modules::new(self.get_modules_and_deps());
 
         // SAFETY: package built successfully
@@ -304,16 +363,27 @@ impl CompiledPackage {
         if with_unpublished_deps {
             // For each transitive dependent module, if they are not to be published, they must have
             // a non-zero address (meaning they are already published on-chain).
-            modules.filter(|module| module.address() == &AccountAddress::ZERO).cloned().collect()
+            modules
+                .filter(|module| module.address() == &AccountAddress::ZERO)
+                .cloned()
+                .collect()
         } else {
             // Collect all module IDs from the current package to be published (module names are not
             // sufficient as we may have modules with the same names in user code and in Sui
             // framework which would result in the latter being pulled into a set of modules to be
             // published).
-            let self_modules: HashSet<_> =
-                self.package.root_modules_map().iter_modules().iter().map(|m| m.self_id()).collect();
+            let self_modules: HashSet<_> = self
+                .package
+                .root_modules_map()
+                .iter_modules()
+                .iter()
+                .map(|m| m.self_id())
+                .collect();
 
-            modules.filter(|module| self_modules.contains(&module.self_id())).cloned().collect()
+            modules
+                .filter(|module| self_modules.contains(&module.self_id()))
+                .cloned()
+                .collect()
         }
     }
 
@@ -346,32 +416,40 @@ impl CompiledPackage {
 
     /// Return the base64-encoded representation of the bytecode modules in this package, topologically sorted in dependency order
     pub fn get_package_base64(&self, with_unpublished_deps: bool) -> Vec<Base64> {
-        self.get_package_bytes(with_unpublished_deps).iter().map(|b| Base64::from_bytes(b)).collect()
+        self.get_package_bytes(with_unpublished_deps)
+            .iter()
+            .map(|b| Base64::from_bytes(b))
+            .collect()
     }
 
     /// Get bytecode modules from DeepBook that are used by this package
     pub fn get_deepbook_modules(&self) -> impl Iterator<Item = &CompiledModule> {
-        self.get_modules_and_deps().filter(|m| *m.self_id().address() == DEEPBOOK_ADDRESS)
+        self.get_modules_and_deps()
+            .filter(|m| *m.self_id().address() == DEEPBOOK_ADDRESS)
     }
 
     /// Get bytecode modules from DeepBook that are used by this package
     pub fn get_bridge_modules(&self) -> impl Iterator<Item = &CompiledModule> {
-        self.get_modules_and_deps().filter(|m| *m.self_id().address() == BRIDGE_ADDRESS)
+        self.get_modules_and_deps()
+            .filter(|m| *m.self_id().address() == BRIDGE_ADDRESS)
     }
 
     /// Get bytecode modules from the Sui System that are used by this package
     pub fn get_sui_system_modules(&self) -> impl Iterator<Item = &CompiledModule> {
-        self.get_modules_and_deps().filter(|m| *m.self_id().address() == SUI_SYSTEM_ADDRESS)
+        self.get_modules_and_deps()
+            .filter(|m| *m.self_id().address() == SUI_SYSTEM_ADDRESS)
     }
 
     /// Get bytecode modules from the Sui Framework that are used by this package
     pub fn get_sui_framework_modules(&self) -> impl Iterator<Item = &CompiledModule> {
-        self.get_modules_and_deps().filter(|m| *m.self_id().address() == SUI_FRAMEWORK_ADDRESS)
+        self.get_modules_and_deps()
+            .filter(|m| *m.self_id().address() == SUI_FRAMEWORK_ADDRESS)
     }
 
     /// Get bytecode modules from the Move stdlib that are used by this package
     pub fn get_stdlib_modules(&self) -> impl Iterator<Item = &CompiledModule> {
-        self.get_modules_and_deps().filter(|m| *m.self_id().address() == MOVE_STDLIB_ADDRESS)
+        self.get_modules_and_deps()
+            .filter(|m| *m.self_id().address() == MOVE_STDLIB_ADDRESS)
     }
 
     /// Generate layout schemas for all types declared by this package, as well as
@@ -462,7 +540,10 @@ impl CompiledPackage {
         })
     }
 
-    pub fn verify_unpublished_dependencies(&self, unpublished_deps: &BTreeSet<Symbol>) -> SuiResult<()> {
+    pub fn verify_unpublished_dependencies(
+        &self,
+        unpublished_deps: &BTreeSet<Symbol>,
+    ) -> SuiResult<()> {
         if unpublished_deps.is_empty() {
             return Ok(());
         }
@@ -472,10 +553,16 @@ impl CompiledPackage {
             .deps_compiled_units
             .iter()
             .filter_map(|(p, m)| {
-                if !unpublished_deps.contains(p) || m.unit.module.address() == &AccountAddress::ZERO {
+                if !unpublished_deps.contains(p) || m.unit.module.address() == &AccountAddress::ZERO
+                {
                     return None;
                 }
-                Some(format!(" - {}::{} in dependency {}", m.unit.module.address(), m.unit.name, p))
+                Some(format!(
+                    " - {}::{} in dependency {}",
+                    m.unit.module.address(),
+                    m.unit.name,
+                    p
+                ))
             })
             .collect::<Vec<String>>();
 
@@ -484,7 +571,9 @@ impl CompiledPackage {
         }
 
         let mut error_message = vec![];
-        error_message.push("The following modules in package dependencies set a non-zero self-address:".into());
+        error_message.push(
+            "The following modules in package dependencies set a non-zero self-address:".into(),
+        );
         error_message.extend(errors);
         error_message.push(
             "If these packages really are unpublished, their self-addresses should be set \
@@ -494,7 +583,9 @@ impl CompiledPackage {
                 .into(),
         );
 
-        Err(SuiError::ModulePublishFailure { error: error_message.join("\n") })
+        Err(SuiError::ModulePublishFailure {
+            error: error_message.join("\n"),
+        })
     }
 
     pub fn published_dependency_ids(&self) -> Vec<ObjectID> {
@@ -504,9 +595,16 @@ impl CompiledPackage {
 
 impl Default for BuildConfig {
     fn default() -> Self {
-        let config =
-            MoveBuildConfig { default_flavor: Some(move_compiler::editions::Flavor::Sui), ..MoveBuildConfig::default() };
-        BuildConfig { config, run_bytecode_verifier: true, print_diags_to_stderr: false, chain_id: None }
+        let config = MoveBuildConfig {
+            default_flavor: Some(move_compiler::editions::Flavor::Sui),
+            ..MoveBuildConfig::default()
+        };
+        BuildConfig {
+            config,
+            run_bytecode_verifier: true,
+            print_diags_to_stderr: false,
+            chain_id: None,
+        }
     }
 }
 
@@ -541,8 +639,13 @@ impl PackageHooks for SuiPackageHooks {
         Ok(())
     }
 
-    fn custom_resolve_pkg_id(&self, manifest: &SourceManifest) -> anyhow::Result<PackageIdentifier> {
-        if (!cfg!(debug_assertions) || cfg!(test)) && manifest.package.edition == Some(Edition::DEVELOPMENT) {
+    fn custom_resolve_pkg_id(
+        &self,
+        manifest: &SourceManifest,
+    ) -> anyhow::Result<PackageIdentifier> {
+        if (!cfg!(debug_assertions) || cfg!(test))
+            && manifest.package.edition == Some(Edition::DEVELOPMENT)
+        {
             return Err(Edition::DEVELOPMENT.unknown_edition_error());
         }
         Ok(manifest.package.name)
@@ -601,17 +704,32 @@ pub fn gather_published_ids(
             Err(PublishedAtError::Invalid(value)) => {
                 invalid.insert(*name, value);
             }
-            Err(PublishedAtError::Conflict { id_lock, id_manifest }) => {
+            Err(PublishedAtError::Conflict {
+                id_lock,
+                id_manifest,
+            }) => {
                 conflicting.insert(*name, (id_lock, id_manifest));
             }
         };
     }
 
-    (published_at, PackageDependencies { published, unpublished, invalid, conflicting })
+    (
+        published_at,
+        PackageDependencies {
+            published,
+            unpublished,
+            invalid,
+            conflicting,
+        },
+    )
 }
 
 pub fn published_at_property(package: &Package) -> Result<ObjectID, PublishedAtError> {
-    let Some(value) = package.source_package.package.custom_properties.get(&Symbol::from(PUBLISHED_AT_MANIFEST_FIELD))
+    let Some(value) = package
+        .source_package
+        .package
+        .custom_properties
+        .get(&Symbol::from(PUBLISHED_AT_MANIFEST_FIELD))
     else {
         return Err(PublishedAtError::NotPresent);
     };
@@ -641,7 +759,9 @@ pub fn check_unpublished_dependencies(unpublished: &BTreeSet<Symbol>) -> Result<
             .into(),
     );
 
-    Err(SuiError::ModulePublishFailure { error: error_messages.join("\n") })
+    Err(SuiError::ModulePublishFailure {
+        error: error_messages.join("\n"),
+    })
 }
 
 pub fn check_invalid_dependencies(invalid: &BTreeMap<Symbol, String>) -> Result<(), SuiError> {
@@ -660,5 +780,7 @@ pub fn check_invalid_dependencies(invalid: &BTreeMap<Symbol, String>) -> Result<
         })
         .collect::<Vec<_>>();
 
-    Err(SuiError::ModulePublishFailure { error: error_messages.join("\n") })
+    Err(SuiError::ModulePublishFailure {
+        error: error_messages.join("\n"),
+    })
 }

@@ -1,27 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{
-        hash_map::{DefaultHasher, RandomState},
-        HashMap,
-    },
-    error::Error,
-    fmt,
-    hash::{BuildHasher, Hash, Hasher},
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::collections::hash_map::{DefaultHasher, RandomState};
+use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
+use std::hash::{BuildHasher, Hash, Hasher};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio::{
-    sync::{Mutex, OwnedMutexGuard, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock, TryLockError},
-    task::JoinHandle,
-    time::Instant,
+use tokio::sync::{
+    Mutex, OwnedMutexGuard, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock, TryLockError,
 };
+use tokio::task::JoinHandle;
+use tokio::time::Instant;
 use tracing::info;
 
 use mysten_metrics::spawn_monitored_task;
@@ -110,8 +104,11 @@ impl<K: Hash + Eq + Send + Sync + 'static, L: Lock + 'static> LockTable<K, L> {
     ) -> Self {
         let num_shards = if cfg!(msim) { 4 } else { num_shards };
 
-        let lock_table: Arc<Vec<RwLock<InnerLockTable<K, L>>>> =
-            Arc::new((0..num_shards).map(|_| RwLock::new(HashMap::new())).collect());
+        let lock_table: Arc<Vec<RwLock<InnerLockTable<K, L>>>> = Arc::new(
+            (0..num_shards)
+                .map(|_| RwLock::new(HashMap::new()))
+                .collect(),
+        );
         let cloned = lock_table.clone();
         let stop = Arc::new(AtomicBool::new(false));
         let stop_cloned = stop.clone();
@@ -142,7 +139,12 @@ impl<K: Hash + Eq + Send + Sync + 'static, L: Lock + 'static> LockTable<K, L> {
     }
 
     pub fn new(num_shards: usize) -> Self {
-        Self::new_with_cleanup(num_shards, Duration::from_secs(10), Duration::from_secs(10), 10_000)
+        Self::new_with_cleanup(
+            num_shards,
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            10_000,
+        )
     }
 
     pub fn size(&self) -> usize {
@@ -244,7 +246,9 @@ impl<K: Hash + Eq + Send + Sync + 'static, L: Lock + 'static> LockTable<K, L> {
     pub fn try_acquire_lock(&self, k: K) -> Result<L::Guard, TryAcquireLockError> {
         let lock_idx = self.get_lock_idx(&k);
         let element = {
-            let map = self.lock_table[lock_idx].try_read().map_err(|_| TryAcquireLockError::LockTableLocked)?;
+            let map = self.lock_table[lock_idx]
+                .try_read()
+                .map_err(|_| TryAcquireLockError::LockTableLocked)?;
             map.get(&k).cloned()
         };
         if let Some(element) = element {
@@ -253,7 +257,9 @@ impl<K: Hash + Eq + Send + Sync + 'static, L: Lock + 'static> LockTable<K, L> {
         } else {
             // element doesn't exist
             let element = {
-                let mut map = self.lock_table[lock_idx].try_write().map_err(|_| TryAcquireLockError::LockTableLocked)?;
+                let mut map = self.lock_table[lock_idx]
+                    .try_write()
+                    .map_err(|_| TryAcquireLockError::LockTableLocked)?;
                 map.entry(k)
                     .or_insert_with(|| {
                         self.size.fetch_add(1, Ordering::SeqCst);
@@ -300,14 +306,19 @@ async fn test_mutex_table_concurrent_in_same_bucket() {
         });
     }
     sleep(Duration::from_millis(50)).await;
-    let jane = timeout(Duration::from_secs(1), mutex_table.acquire_lock("jane".to_string())).await;
+    let jane = timeout(
+        Duration::from_secs(1),
+        mutex_table.acquire_lock("jane".to_string()),
+    )
+    .await;
     jane.unwrap();
 }
 
 #[tokio::test]
 async fn test_mutex_table() {
     // Disable bg cleanup with Duration.MAX for initial delay
-    let mutex_table = MutexTable::<String>::new_with_cleanup(1, Duration::from_secs(10), Duration::MAX, 1000);
+    let mutex_table =
+        MutexTable::<String>::new_with_cleanup(1, Duration::from_secs(10), Duration::MAX, 1000);
     let john1 = mutex_table.try_acquire_lock("john".to_string());
     assert!(john1.is_ok());
     let john2 = mutex_table.try_acquire_lock("john".to_string());
@@ -335,13 +346,21 @@ async fn test_mutex_table() {
 
 #[tokio::test]
 async fn test_acquire_locks() {
-    let mutex_table = RwLockTable::<String>::new_with_cleanup(1, Duration::from_secs(10), Duration::MAX, 1000);
+    let mutex_table =
+        RwLockTable::<String>::new_with_cleanup(1, Duration::from_secs(10), Duration::MAX, 1000);
     let object_1 = "object 1".to_string();
     let object_2 = "object 2".to_string();
     let object_3 = "object 3".to_string();
 
     // ensure even with duplicate objects we succeed acquiring their locks
-    let objects = vec![object_1.clone(), object_2.clone(), object_2, object_1.clone(), object_3, object_1];
+    let objects = vec![
+        object_1.clone(),
+        object_2.clone(),
+        object_2,
+        object_1.clone(),
+        object_3,
+        object_1,
+    ];
 
     let locks = mutex_table.acquire_locks(objects.clone().into_iter()).await;
     assert_eq!(locks.len(), 3);
@@ -357,7 +376,8 @@ async fn test_acquire_locks() {
 
 #[tokio::test]
 async fn test_read_locks() {
-    let mutex_table = RwLockTable::<String>::new_with_cleanup(1, Duration::from_secs(10), Duration::MAX, 1000);
+    let mutex_table =
+        RwLockTable::<String>::new_with_cleanup(1, Duration::from_secs(10), Duration::MAX, 1000);
     let lock = "lock".to_string();
     let locks1 = mutex_table.acquire_read_locks(vec![lock.clone()]).await;
     assert!(mutex_table.try_acquire_lock(lock.clone()).is_err());
@@ -369,7 +389,12 @@ async fn test_read_locks() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn test_mutex_table_bg_cleanup() {
-    let mutex_table = MutexTable::<String>::new_with_cleanup(1, Duration::from_secs(5), Duration::from_secs(1), 1000);
+    let mutex_table = MutexTable::<String>::new_with_cleanup(
+        1,
+        Duration::from_secs(5),
+        Duration::from_secs(1),
+        1000,
+    );
     let lock1 = mutex_table.try_acquire_lock("lock1".to_string());
     let lock2 = mutex_table.try_acquire_lock("lock2".to_string());
     let lock3 = mutex_table.try_acquire_lock("lock3".to_string());
@@ -410,7 +435,8 @@ async fn test_mutex_table_bg_cleanup() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn test_mutex_table_bg_cleanup_with_size_threshold() {
     // set up the table to never trigger cleanup because of time period but only size threshold
-    let mutex_table = MutexTable::<String>::new_with_cleanup(1, Duration::MAX, Duration::from_secs(1), 5);
+    let mutex_table =
+        MutexTable::<String>::new_with_cleanup(1, Duration::MAX, Duration::from_secs(1), 5);
     let lock1 = mutex_table.try_acquire_lock("lock1".to_string());
     let lock2 = mutex_table.try_acquire_lock("lock2".to_string());
     let lock3 = mutex_table.try_acquire_lock("lock3".to_string());

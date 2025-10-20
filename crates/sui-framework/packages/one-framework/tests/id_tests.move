@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::id_tests {
+module oct::id_tests {
     const EIdBytesMismatch: u64 = 0;
 
     public struct Object has key {

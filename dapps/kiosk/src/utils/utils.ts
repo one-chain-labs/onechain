@@ -3,7 +3,7 @@
 
 import { KioskListing, KioskOwnerCap } from '@mysten/kiosk';
 import { SuiObjectResponse } from '@mysten/sui/client';
-import { MIST_PER_OCT, normalizeSuiAddress } from '@mysten/sui/utils';
+import { MIST_PER_SUI, normalizeSuiAddress } from '@mysten/sui/utils';
 
 // Parse the display of a list of objects into a simple {object_id: display} map
 // to use throughout the app.
@@ -35,7 +35,7 @@ export const processKioskListings = (data: KioskListing[]): Record<string, Kiosk
 
 export const mistToSui = (mist: bigint | string | undefined) => {
 	if (!mist) return 0;
-	return Number(mist || 0) / Number(MIST_PER_OCT);
+	return Number(mist || 0) / Number(MIST_PER_SUI);
 };
 
 export const formatSui = (amount: number) => {

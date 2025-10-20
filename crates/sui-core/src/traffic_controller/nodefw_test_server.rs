@@ -7,19 +7,12 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json,
-    Router,
+    Json, Router,
 };
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
-use tokio::{
-    sync::{Mutex, Notify},
-    task::JoinHandle,
-};
+use std::time::{Duration, SystemTime};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use tokio::sync::{Mutex, Notify};
+use tokio::task::JoinHandle;
 
 #[derive(Clone)]
 struct AppState {
@@ -38,7 +31,9 @@ impl NodeFwTestServer {
         Self {
             server_handle: None,
             shutdown_signal: Arc::new(Notify::new()),
-            state: AppState { blocklist: Arc::new(Mutex::new(HashMap::new())) },
+            state: AppState {
+                blocklist: Arc::new(Mutex::new(HashMap::new())),
+            },
         }
     }
 
@@ -56,7 +51,9 @@ impl NodeFwTestServer {
             axum::serve(listener, app).await.unwrap();
         });
 
-        tokio::spawn(Self::periodically_remove_expired_addresses(app_state.blocklist.clone()));
+        tokio::spawn(Self::periodically_remove_expired_addresses(
+            app_state.blocklist.clone(),
+        ));
 
         self.server_handle = Some(handle);
     }
@@ -71,10 +68,14 @@ impl NodeFwTestServer {
     async fn list_addresses(State(state): State<AppState>) -> impl IntoResponse {
         let blocklist = state.blocklist.lock().await;
         let block_addresses = blocklist.keys().cloned().collect();
-        Json(BlockAddresses { addresses: block_addresses })
+        Json(BlockAddresses {
+            addresses: block_addresses,
+        })
     }
 
-    async fn periodically_remove_expired_addresses(blocklist: Arc<Mutex<HashMap<BlockAddress, SystemTime>>>) {
+    async fn periodically_remove_expired_addresses(
+        blocklist: Arc<Mutex<HashMap<BlockAddress, SystemTime>>>,
+    ) {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             let mut blocklist = blocklist.lock().await;
@@ -84,10 +85,16 @@ impl NodeFwTestServer {
     }
 
     /// Endpoint handler to block addresses
-    async fn block_addresses(State(state): State<AppState>, Json(addresses): Json<BlockAddresses>) -> impl IntoResponse {
+    async fn block_addresses(
+        State(state): State<AppState>,
+        Json(addresses): Json<BlockAddresses>,
+    ) -> impl IntoResponse {
         let mut blocklist = state.blocklist.lock().await;
         for addr in addresses.addresses.iter() {
-            blocklist.insert(addr.clone(), SystemTime::now() + Duration::from_secs(addr.ttl));
+            blocklist.insert(
+                addr.clone(),
+                SystemTime::now() + Duration::from_secs(addr.ttl),
+            );
         }
         (StatusCode::CREATED, "created")
     }

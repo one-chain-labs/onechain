@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module one::test_random {
+module oct::test_random {
     use std::hash;
 
     // Internally, the pseudorandom generator uses a hash chain over Sha3-256

@@ -1,7 +1,7 @@
 // invalid, object must have UID as first field not some other field
 
 module a::m {
-    use one::object;
+    use sui::object;
     struct S has key {
         flag: bool,
         id: object::UID,
@@ -13,7 +13,7 @@ module a::m {
     }
 }
 
-module one::object {
+module oct::object {
     struct UID has store {
         id: address,
     }

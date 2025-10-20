@@ -4,17 +4,16 @@
 use nonempty::NonEmpty;
 use shared_crypto::intent::Intent;
 
-use crate::{
-    committee::EpochId,
-    digests::ZKLoginInputsDigest,
-    error::{SuiError, SuiResult},
-    signature::VerifyParams,
-    transaction::{SenderSignedData, TransactionDataAPI},
-};
+use crate::committee::EpochId;
+use crate::digests::ZKLoginInputsDigest;
+use crate::error::{SuiError, SuiResult};
+use crate::signature::VerifyParams;
+use crate::transaction::{SenderSignedData, TransactionDataAPI};
 use lru::LruCache;
 use parking_lot::RwLock;
 use prometheus::IntCounter;
-use std::{hash::Hash, sync::Arc};
+use std::hash::Hash;
+use std::sync::Arc;
 
 // Cache up to 20000 verified certs. We will need to tune this number in the future - a decent
 // guess to start with is that it should be 10-20 times larger than peak transactions per second,
@@ -35,7 +34,9 @@ impl<D: Hash + Eq + Copy> VerifiedDigestCache<D> {
         cache_evictions_counter: IntCounter,
     ) -> Self {
         Self {
-            inner: RwLock::new(LruCache::new(std::num::NonZeroUsize::new(VERIFIED_CERTIFICATE_CACHE_SIZE).unwrap())),
+            inner: RwLock::new(LruCache::new(
+                std::num::NonZeroUsize::new(VERIFIED_CERTIFICATE_CACHE_SIZE).unwrap(),
+            )),
             cache_hits_counter,
             cache_misses_counter,
             cache_evictions_counter,
@@ -121,10 +122,13 @@ pub fn verify_sender_signed_data_message_signatures(
 
     // 2. One signature per signer is required.
     let signers: NonEmpty<_> = txn.intent_message().value.signers();
-    fp_ensure!(txn.inner().tx_signatures.len() == signers.len(), SuiError::SignerSignatureNumberMismatch {
-        actual: txn.inner().tx_signatures.len(),
-        expected: signers.len()
-    });
+    fp_ensure!(
+        txn.inner().tx_signatures.len() == signers.len(),
+        SuiError::SignerSignatureNumberMismatch {
+            actual: txn.inner().tx_signatures.len(),
+            expected: signers.len()
+        }
+    );
 
     // 3. Each signer must provide a signature.
     let present_sigs = txn.get_signer_sig_mapping(verify_params.verify_legacy_zklogin_address)?;

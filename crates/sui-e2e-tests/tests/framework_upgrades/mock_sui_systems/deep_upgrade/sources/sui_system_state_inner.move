@@ -1,20 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::sui_system_state_inner {
+module oct_system::sui_system_state_inner {
     use std::vector;
 
-    use one::balance::{Self, Balance};
-    use one::oct::OCT;
-    use one::tx_context::TxContext;
-    use one::bag::{Self, Bag};
-    use one::table::{Self, Table};
-    use one::object::ID;
+    use sui::balance::{Self, Balance};
+    use sui::oct::OCT;
+    use sui::tx_context::TxContext;
+    use sui::bag::{Self, Bag};
+    use sui::table::{Self, Table};
+    use sui::object::ID;
 
     use one_system::validator::{Validator, ValidatorV2};
     use one_system::validator_wrapper::ValidatorWrapper;
     use one_system::validator_wrapper;
-    use one::object;
+    use sui::object;
     use one_system::validator;
 
     const SYSTEM_STATE_VERSION_V1: u64 = 18446744073709551605;  // u64::MAX - 10

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { fromBase64, toBase58 } from '@mysten/bcs';
-import nacl from 'tweetnacl';
+import { ed25519 } from '@noble/curves/ed25519';
 import { describe, expect, it } from 'vitest';
 
 import { decodeSuiPrivateKey } from '../../../src/cryptography/keypair';
@@ -13,7 +13,7 @@ import { verifyPersonalMessageSignature, verifyTransactionSignature } from '../.
 const VALID_SECRET_KEY = 'mdqVWeFekT7pqy5T49+tV12jO0m+ESW7ki4zSU9JiCg=';
 const PRIVATE_KEY_SIZE = 32;
 
-// Test case generated against rust keytool cli. See https://github.com/MystenLabs/sui/blob/edd2cd31e0b05d336b1b03b6e79a67d8dd00d06b/crates/sui/src/unit_tests/keytool_tests.rs#L165
+// Test case generated against rust keytool cli. See https://github.com/one-chain-labs/onechain/blob/edd2cd31e0b05d336b1b03b6e79a67d8dd00d06b/crates/sui/src/unit_tests/keytool_tests.rs#L165
 const TEST_CASES = [
 	[
 		'film crazy soon outside stand loop subway crumble thrive popular green nuclear struggle pistol arm wife phrase warfare march wheat nephew ask sunny firm',
@@ -75,11 +75,7 @@ describe('ed25519-keypair', () => {
 		const keypair = new Ed25519Keypair();
 		const signData = new TextEncoder().encode('hello world');
 		const signature = await keypair.sign(signData);
-		const isValid = nacl.sign.detached.verify(
-			signData,
-			signature,
-			keypair.getPublicKey().toRawBytes(),
-		);
+		const isValid = ed25519.verify(signature, signData, keypair.getPublicKey().toRawBytes());
 		expect(isValid).toBeTruthy();
 		expect(keypair.getPublicKey().verify(signData, signature));
 	});
@@ -89,11 +85,7 @@ describe('ed25519-keypair', () => {
 
 		const signData = new TextEncoder().encode('hello world');
 		const signature = await keypair.sign(signData);
-		const isValid = nacl.sign.detached.verify(
-			signData,
-			signature,
-			keypair.getPublicKey().toRawBytes(),
-		);
+		const isValid = ed25519.verify(signature, signData, keypair.getPublicKey().toRawBytes());
 		expect(isValid).toBeTruthy();
 	});
 

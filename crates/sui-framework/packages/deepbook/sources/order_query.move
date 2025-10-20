@@ -4,7 +4,7 @@
 module deepbook::order_query {
     use std::option::{some, none};
     use deepbook::critbit::CritbitTree;
-    use one::linked_table;
+    use sui::linked_table;
     use deepbook::critbit;
     use deepbook::clob_v2;
     use deepbook::clob_v2::{Order, Pool, TickLevel};

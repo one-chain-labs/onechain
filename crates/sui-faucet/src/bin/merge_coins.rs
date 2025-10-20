@@ -7,18 +7,16 @@ use sui_faucet::FaucetError;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::wallet_context::WalletContext;
-use sui_types::{
-    base_types::ObjectID,
-    gas_coin::GasCoin,
-    quorum_driver_types::ExecuteTransactionRequestType,
-    transaction::Transaction,
-};
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
+use sui_types::{base_types::ObjectID, gas_coin::GasCoin, transaction::Transaction};
 use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let mut wallet = create_wallet_context(60)?;
-    let active_address = wallet.active_address().map_err(|err| FaucetError::Wallet(err.to_string()))?;
+    let active_address = wallet
+        .active_address()
+        .map_err(|err| FaucetError::Wallet(err.to_string()))?;
     println!("SimpleFaucet::new with active address: {active_address}");
 
     // Example scripts
@@ -38,14 +36,26 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn _split_coins_equally(gas_coin: &str, mut wallet: WalletContext, count: u64) -> Result<(), anyhow::Error> {
-    let active_address = wallet.active_address().map_err(|err| FaucetError::Wallet(err.to_string()))?;
+async fn _split_coins_equally(
+    gas_coin: &str,
+    mut wallet: WalletContext,
+    count: u64,
+) -> Result<(), anyhow::Error> {
+    let active_address = wallet
+        .active_address()
+        .map_err(|err| FaucetError::Wallet(err.to_string()))?;
     let client = wallet.get_client().await?;
     let coin_object_id = ObjectID::from_str(gas_coin).unwrap();
-    let tx_data =
-        client.transaction_builder().split_coin_equal(active_address, coin_object_id, count, None, 50000000000).await?;
+    let tx_data = client
+        .transaction_builder()
+        .split_coin_equal(active_address, coin_object_id, count, None, 50000000000)
+        .await?;
 
-    let signature = wallet.config.keystore.sign_secure(&active_address, &tx_data, Intent::sui_transaction()).unwrap();
+    let signature = wallet
+        .config
+        .keystore
+        .sign_secure(&active_address, &tx_data, Intent::sui_transaction())
+        .unwrap();
     let tx = Transaction::from_data(tx_data, vec![signature]);
     let resp = client
         .quorum_driver_api()
@@ -61,7 +71,9 @@ async fn _split_coins_equally(gas_coin: &str, mut wallet: WalletContext, count: 
 }
 
 async fn _merge_coins(gas_coin: &str, mut wallet: WalletContext) -> Result<(), anyhow::Error> {
-    let active_address = wallet.active_address().map_err(|err| FaucetError::Wallet(err.to_string()))?;
+    let active_address = wallet
+        .active_address()
+        .map_err(|err| FaucetError::Wallet(err.to_string()))?;
     let client = wallet.get_client().await?;
     // Pick a gas coin here that isn't in use by the faucet otherwise there will be some contention.
     let small_coins = wallet
@@ -79,17 +91,25 @@ async fn _merge_coins(gas_coin: &str, mut wallet: WalletContext) -> Result<(), a
     for chunk in small_coins.chunks(254) {
         let total_balance: u64 = chunk.iter().map(|coin| coin.0.balance.value()).sum();
 
-        let mut coin_vector = chunk.iter().map(|coin| *coin.id()).collect::<Vec<ObjectID>>();
+        let mut coin_vector = chunk
+            .iter()
+            .map(|coin| *coin.id())
+            .collect::<Vec<ObjectID>>();
 
         // prepend big gas coin instance to vector
         coin_vector.insert(0, ObjectID::from_str(gas_coin).unwrap());
         let target = vec![active_address];
         let target_amount = vec![total_balance];
 
-        let tx_data =
-            client.transaction_builder().pay_oct(active_address, coin_vector, target, target_amount, 1000000).await?;
-        let signature =
-            wallet.config.keystore.sign_secure(&active_address, &tx_data, Intent::sui_transaction()).unwrap();
+        let tx_data = client
+            .transaction_builder()
+            .pay_oct(active_address, coin_vector, target, target_amount, 1000000)
+            .await?;
+        let signature = wallet
+            .config
+            .keystore
+            .sign_secure(&active_address, &tx_data, Intent::sui_transaction())
+            .unwrap();
         let tx = Transaction::from_data(tx_data, vec![signature]);
         client
             .quorum_driver_api()

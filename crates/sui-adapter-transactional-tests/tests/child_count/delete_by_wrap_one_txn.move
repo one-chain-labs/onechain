@@ -9,24 +9,24 @@
 //# publish
 
 module test::m {
-    use one::dynamic_object_field as ofield;
+    use sui::dynamic_object_field as ofield;
 
     public struct S has key, store {
-        id: one::object::UID,
+        id: sui::object::UID,
     }
 
     public struct R has key {
-        id: one::object::UID,
+        id: sui::object::UID,
         s: S,
     }
 
     public entry fun test_wrap(ctx: &mut TxContext) {
-        let mut id = one::object::new(ctx);
-        let child = S { id: one::object::new(ctx) };
+        let mut id = sui::object::new(ctx);
+        let child = S { id: sui::object::new(ctx) };
         ofield::add(&mut id, 0, child);
         let parent = S { id };
-        let r = R { id: one::object::new(ctx), s: parent };
-        one::transfer::transfer(r, tx_context::sender(ctx))
+        let r = R { id: sui::object::new(ctx), s: parent };
+        sui::transfer::transfer(r, tx_context::sender(ctx))
     }
 }
 

@@ -8,7 +8,7 @@ mod get_object;
 mod get_reference_gas_price;
 mod multi_get_objects;
 mod multi_get_transaction_blocks;
-mod pay_sui;
+mod pay_oct;
 mod query_transactions;
 mod rpc_command_processor;
 mod validation;
@@ -18,14 +18,14 @@ use anyhow::Result;
 use async_trait::async_trait;
 use core::default::Default;
 use std::time::Duration;
-use sui_types::{base_types::SuiAddress, digests::TransactionDigest, messages_checkpoint::CheckpointSequenceNumber};
+use sui_types::{
+    base_types::SuiAddress, digests::TransactionDigest,
+    messages_checkpoint::CheckpointSequenceNumber,
+};
 
 use crate::load_test::LoadTestConfig;
 pub use rpc_command_processor::{
-    load_addresses_from_file,
-    load_digests_from_file,
-    load_objects_from_file,
-    RpcCommandProcessor,
+    load_addresses_from_file, load_digests_from_file, load_objects_from_file, RpcCommandProcessor,
 };
 use sui_types::base_types::ObjectID;
 
@@ -39,7 +39,11 @@ pub struct SignerInfo {
 
 impl SignerInfo {
     pub fn new(encoded_keypair: String) -> Self {
-        Self { encoded_keypair, gas_payment: None, gas_budget: None }
+        Self {
+            encoded_keypair,
+            gas_payment: None,
+            gas_budget: None,
+        }
     }
 }
 
@@ -63,11 +67,17 @@ pub struct Command {
 
 impl Command {
     pub fn new_dry_run() -> Self {
-        Self { data: CommandData::DryRun(DryRun {}), ..Default::default() }
+        Self {
+            data: CommandData::DryRun(DryRun {}),
+            ..Default::default()
+        }
     }
 
     pub fn new_pay_oct() -> Self {
-        Self { data: CommandData::PayOct(PayOct {}), ..Default::default() }
+        Self {
+            data: CommandData::PayOct(PayOct {}),
+            ..Default::default()
+        }
     }
 
     pub fn new_get_checkpoints(
@@ -89,34 +99,64 @@ impl Command {
         }
     }
 
-    pub fn new_query_transaction_blocks(address_type: AddressQueryType, addresses: Vec<SuiAddress>) -> Self {
-        let query_transactions = QueryTransactionBlocks { address_type, addresses };
-        Self { data: CommandData::QueryTransactionBlocks(query_transactions), ..Default::default() }
+    pub fn new_query_transaction_blocks(
+        address_type: AddressQueryType,
+        addresses: Vec<SuiAddress>,
+    ) -> Self {
+        let query_transactions = QueryTransactionBlocks {
+            address_type,
+            addresses,
+        };
+        Self {
+            data: CommandData::QueryTransactionBlocks(query_transactions),
+            ..Default::default()
+        }
     }
 
     pub fn new_multi_get_transaction_blocks(digests: Vec<TransactionDigest>) -> Self {
         let multi_get_transaction_blocks = MultiGetTransactionBlocks { digests };
-        Self { data: CommandData::MultiGetTransactionBlocks(multi_get_transaction_blocks), ..Default::default() }
+        Self {
+            data: CommandData::MultiGetTransactionBlocks(multi_get_transaction_blocks),
+            ..Default::default()
+        }
     }
 
     pub fn new_multi_get_objects(object_ids: Vec<ObjectID>) -> Self {
         let multi_get_objects = MultiGetObjects { object_ids };
-        Self { data: CommandData::MultiGetObjects(multi_get_objects), ..Default::default() }
+        Self {
+            data: CommandData::MultiGetObjects(multi_get_objects),
+            ..Default::default()
+        }
     }
 
     pub fn new_get_object(object_ids: Vec<ObjectID>, chunk_size: usize) -> Self {
-        let get_object = GetObject { object_ids, chunk_size };
-        Self { data: CommandData::GetObject(get_object), ..Default::default() }
+        let get_object = GetObject {
+            object_ids,
+            chunk_size,
+        };
+        Self {
+            data: CommandData::GetObject(get_object),
+            ..Default::default()
+        }
     }
 
     pub fn new_get_all_balances(addresses: Vec<SuiAddress>, chunk_size: usize) -> Self {
-        let get_all_balances = GetAllBalances { addresses, chunk_size };
-        Self { data: CommandData::GetAllBalances(get_all_balances), ..Default::default() }
+        let get_all_balances = GetAllBalances {
+            addresses,
+            chunk_size,
+        };
+        Self {
+            data: CommandData::GetAllBalances(get_all_balances),
+            ..Default::default()
+        }
     }
 
     pub fn new_get_reference_gas_price(num_repeats: usize) -> Self {
         let get_reference_gas_price = GetReferenceGasPrice { num_repeats };
-        Self { data: CommandData::GetReferenceGasPrice(get_reference_gas_price), ..Default::default() }
+        Self {
+            data: CommandData::GetReferenceGasPrice(get_reference_gas_price),
+            ..Default::default()
+        }
     }
 
     pub fn with_repeat_n_times(mut self, num: usize) -> Self {
