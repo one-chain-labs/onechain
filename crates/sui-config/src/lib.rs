@@ -23,7 +23,7 @@ pub use node::{ConsensusConfig, ExecutionCacheConfig, NodeConfig};
 use sui_types::multiaddr::Multiaddr;
 
 const SUI_DIR: &str = ".one";
-pub const SUI_CONFIG_DIR: &str = "sui_config";
+pub const SUI_CONFIG_DIR: &str = "one_config";
 pub const SUI_NETWORK_CONFIG: &str = "network.yaml";
 pub const SUI_FULLNODE_CONFIG: &str = "fullnode.yaml";
 pub const SUI_CLIENT_CONFIG: &str = "client.yaml";
