@@ -4,10 +4,10 @@
 /// A storable handler for Balances in general. Is used in the `Coin`
 /// module to allow balance operations and can be used to implement
 /// custom coins with `Supply` and `Balance`s.
-module oct::balance;
+module one::balance;
 
 /// Allows calling `.into_coin()` on a `Balance` to turn it into a coin.
-public use fun sui::coin::from_balance as Balance.into_coin;
+public use fun one::coin::from_balance as Balance.into_coin;
 
 /// For when trying to destroy a non-zero balance.
 const ENonZero: u64 = 0;
@@ -94,7 +94,7 @@ public fun destroy_zero<T>(balance: Balance<T>) {
 }
 
 const SUI_TYPE_NAME: vector<u8> =
-    b"0000000000000000000000000000000000000000000000000000000000000002::oct::OCT";
+    b"0000000000000000000000000000000000000000000000000000000000000002::one::SUI";
 
 #[allow(unused_function)]
 /// CAUTION: this function creates a `Balance` without increasing the supply.

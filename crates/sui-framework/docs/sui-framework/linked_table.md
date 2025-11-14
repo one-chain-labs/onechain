@@ -2,7 +2,7 @@
 title: Module `0x2::linked_table`
 ---
 
-Similar to <code>sui::table</code> but the values are linked together, allowing for ordered insertion and
+Similar to <code>one::table</code> but the values are linked together, allowing for ordered insertion and
 removal
 
 
@@ -228,7 +228,7 @@ Returns the key for the last element in the table, or None if the table is empty
 
 Inserts a key-value pair at the front of the table, i.e. the newly inserted pair will be
 the first element in the table
-Aborts with <code>sui::dynamic_field::EFieldAlreadyExists</code> if the table already has an entry with
+Aborts with <code>one::dynamic_field::EFieldAlreadyExists</code> if the table already has an entry with
 that key <code>k: K</code>.
 
 
@@ -271,7 +271,7 @@ that key <code>k: K</code>.
 
 Inserts a key-value pair at the back of the table, i.e. the newly inserted pair will be
 the last element in the table
-Aborts with <code>sui::dynamic_field::EFieldAlreadyExists</code> if the table already has an entry with
+Aborts with <code>one::dynamic_field::EFieldAlreadyExists</code> if the table already has an entry with
 that key <code>k: K</code>.
 
 
@@ -313,7 +313,7 @@ that key <code>k: K</code>.
 ## Function `borrow`
 
 Immutable borrows the value associated with the key in the table <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<a href="../sui-framework/linked_table.md#0x2_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
@@ -340,7 +340,7 @@ that key <code>k: K</code>.
 ## Function `borrow_mut`
 
 Mutably borrows the value associated with the key in the table <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<b>mut</b> <a href="../sui-framework/linked_table.md#0x2_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
@@ -371,7 +371,7 @@ that key <code>k: K</code>.
 
 Borrows the key for the previous entry of the specified key <code>k: K</code> in the table
 <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<a href="../sui-framework/linked_table.md#0x2_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>. Returns None if the entry does not have a predecessor.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>
 
 
@@ -399,7 +399,7 @@ that key <code>k: K</code>
 
 Borrows the key for the next entry of the specified key <code>k: K</code> in the table
 <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<a href="../sui-framework/linked_table.md#0x2_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>. Returns None if the entry does not have a predecessor.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>
 
 
@@ -427,7 +427,7 @@ that key <code>k: K</code>
 
 Removes the key-value pair in the table <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<b>mut</b> <a href="../sui-framework/linked_table.md#0x2_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code> and returns the value.
 This splices the element out of the ordering.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>. Note: this is also what happens when the table is empty.
 
 

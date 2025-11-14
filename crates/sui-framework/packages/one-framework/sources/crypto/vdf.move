@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::vdf;
+module one::vdf;
 
 #[allow(unused_const)]
 const EInvalidInput: u64 = 0;

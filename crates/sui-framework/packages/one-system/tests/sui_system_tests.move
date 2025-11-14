@@ -7,18 +7,18 @@
 
 #[test_only]
 module oct_system::sui_system_tests {
-    use sui::test_scenario::{Self, Scenario};
-    use sui::oct::OCT;
-    use sui::coin::Self;
+    use one::test_scenario::{Self, Scenario};
+    use one::oct::OCT;
+    use one::coin::Self;
     use one_system::governance_test_utils::{add_validator_full_flow, advance_epoch, remove_validator, set_up_sui_system_state, create_sui_system_state_for_testing, stake_with, unstake};
     use one_system::one_system::SuiSystemState;
     use one_system::sui_system_state_inner;
     use one_system::validator::{Self, Validator};
     use one_system::validator_set;
     use one_system::validator_cap::UnverifiedValidatorOperationCap;
-    use sui::balance;
-    use sui::test_utils::{assert_eq, destroy};
-    use sui::url;
+    use one::balance;
+    use one::test_utils::{assert_eq, destroy};
+    use one::url;
 
     #[test]
     fun test_report_validator() {
@@ -1124,7 +1124,7 @@ module oct_system::sui_system_tests {
 
         advance_epoch(scenario);
 
-        sui::test_utils::destroy(sui);
+        one::test_utils::destroy(sui);
         scenario_val.end();
     }
 

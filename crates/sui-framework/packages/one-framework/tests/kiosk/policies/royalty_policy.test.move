@@ -3,10 +3,10 @@
 
 #[test_only]
 /// A `TransferPolicy` Rule which implements percentage-based royalty fee.
-module oct::royalty_policy {
-    use sui::oct::OCT;
-    use sui::coin::{Self, Coin};
-    use sui::transfer_policy::{
+module one::royalty_policy {
+    use one::oct::OCT;
+    use one::coin::{Self, Coin};
+    use one::transfer_policy::{
         Self as policy,
         TransferPolicy,
         TransferPolicyCap,
@@ -59,12 +59,12 @@ module oct::royalty_policy {
 }
 
 #[test_only]
-module oct::royalty_policy_tests {
-    use sui::coin;
-    use sui::oct::OCT;
-    use sui::royalty_policy;
-    use sui::transfer_policy as policy;
-    use sui::transfer_policy_tests as test;
+module one::royalty_policy_tests {
+    use one::coin;
+    use one::oct::OCT;
+    use one::royalty_policy;
+    use one::transfer_policy as policy;
+    use one::transfer_policy_tests as test;
 
     #[test]
     fun test_default_flow() {
@@ -88,7 +88,7 @@ module oct::royalty_policy_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::royalty_policy::EIncorrectArgument)]
+    #[expected_failure(abort_code = one::royalty_policy::EIncorrectArgument)]
     fun test_incorrect_config() {
         let ctx = &mut tx_context::dummy();
         let (mut policy, cap) = test::prepare(ctx);
@@ -98,7 +98,7 @@ module oct::royalty_policy_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::royalty_policy::EInsufficientAmount)]
+    #[expected_failure(abort_code = one::royalty_policy::EInsufficientAmount)]
     fun test_insufficient_amount() {
         let ctx = &mut tx_context::dummy();
         let (mut policy, cap) = test::prepare(ctx);

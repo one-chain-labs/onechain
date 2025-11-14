@@ -23,7 +23,7 @@ Each of these policies, in the order listed, is a superset of the previous one i
 
 When you publish a package, by default it adopts the most relaxed, compatible policy. You can publish a package as part of a transaction that can change the policy before the transaction successfully completes, making the package available on chain for the first time at the desired policy level, rather than at the default one.
 
-You can change the current policy by calling one of the functions in `sui::package` (`only_additive_upgrades`, `only_dep_upgrades`, `make_immutable`) on the package's `UpgradeCap` and a policy can become only more restrictive. For example, after you call `sui::package::only_dep_upgrades` to restrict the policy to become additive, calling `sui::package::only_additive_upgrades` on the `UpgradeCap` of the same package results in an error.
+You can change the current policy by calling one of the functions in `one::package` (`only_additive_upgrades`, `only_dep_upgrades`, `make_immutable`) on the package's `UpgradeCap` and a policy can become only more restrictive. For example, after you call `one::package::only_dep_upgrades` to restrict the policy to become additive, calling `one::package::only_additive_upgrades` on the `UpgradeCap` of the same package results in an error.
 
 ## Upgrade overview {#upgrade-overview}
 
@@ -41,7 +41,7 @@ Package upgrades must occur end-to-end in a single transaction and are composed 
 While step 2 is a built-in command, steps 1 and 3 are implemented as Move functions. The Sui framework provides their most basic implementation:
 
 ```move
-module sui::package {
+module one::package {
     public fun authorize_upgrade(
         cap: &mut UpgradeCap,
         policy: u8,
@@ -67,7 +67,7 @@ Any pair of functions that produces an `UpgradeTicket` from an `UpgradeCap` and 
 The `UpgradeCap` is the central type responsible for coordinating package upgrades.
 
 ```move
-module sui::package {
+module one::package {
     struct UpgradeCap has key, store {
         id: UID,
         package: ID,
@@ -93,7 +93,7 @@ And its API guarantees the following properties:
 ## UpgradeTicket {#upgradeticket}
 
 ```move
-module sui::package {
+module one::package {
     struct UpgradeTicket {
         cap: ID,
         package: ID,
@@ -139,7 +139,7 @@ BUILDING test
 ## UpgradeReceipt {#upgradereceipt}
 
 ```move
-module sui::package {
+module one::package {
     struct UpgradeReceipt {
         cap: ID,
         package: ID,
@@ -182,9 +182,9 @@ In the `sources` folder, create a source file named `day_of_week.move`. Copy and
 
 ```move
 module policy::day_of_week {
-    use sui::object::{Self, UID};
-    use sui::package;
-    use sui::tx_context::TxContext;
+    use one::object::{Self, UID};
+    use one::package;
+    use one::tx_context::TxContext;
 
     struct UpgradeCap has key, store {
         id: UID,
@@ -246,9 +246,9 @@ public fun authorize_upgrade(
 }
 ```
 
-The signature of a custom `authorize_upgrade` can be different from the signature of `sui::package::authorize_upgrade` as long as it returns an `UpgradeTicket`.
+The signature of a custom `authorize_upgrade` can be different from the signature of `one::package::authorize_upgrade` as long as it returns an `UpgradeTicket`.
 
-Finally, provide implementations of `commit_upgrade` and `make_immutable` that delegate to their respective functions in `sui::package`:
+Finally, provide implementations of `commit_upgrade` and `make_immutable` that delegate to their respective functions in `one::package`:
 
 ```move
 public fun commit_upgrade(
@@ -269,9 +269,9 @@ The final code in your `day_of_week.move` file should resemble the following:
 
 ```move
 module policy::day_of_week {
-    use sui::object::{Self, UID};
-    use sui::package;
-    use sui::tx_context::TxContext;
+    use one::object::{Self, UID};
+    use one::package;
+    use one::tx_context::TxContext;
 
     struct UpgradeCap has key, store {
         id: UID,
@@ -295,7 +295,7 @@ module policy::day_of_week {
 
     fun week_day(ctx: &TxContext): u8 {
         let days_since_unix_epoch =
-            sui::tx_context::epoch_timestamp_ms(ctx) / MS_IN_DAY;
+            one::tx_context::epoch_timestamp_ms(ctx) / MS_IN_DAY;
         // The unix epoch (1st Jan 1970) was a Thursday so shift days
         // since the epoch by 3 so that 0 = Monday.
         ((days_since_unix_epoch + 3) % 7 as u8)
@@ -424,7 +424,7 @@ Array [
 
 </details>
 
-Following best practices, use the Sui Client CLI to call `sui::package::make_immutable` on the `UpgradeCap` to make the policy immutable.
+Following best practices, use the Sui Client CLI to call `one::package::make_immutable` on the `UpgradeCap` to make the policy immutable.
 
 ```bash
 sui client call --gas-budget 10000000 \
@@ -512,7 +512,7 @@ In the `example/sources` directory, create an `example.move` file with the follo
 module example::example {
     struct Event has copy, drop { x: u64 }
     entry fun nudge() {
-        sui::event::emit(Event { x: 41 })
+        one::event::emit(Event { x: 41 })
     }
 }
 ```

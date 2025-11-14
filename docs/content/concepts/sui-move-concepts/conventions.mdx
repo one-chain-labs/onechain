@@ -129,8 +129,8 @@ Name the functions that create objects as `new`.
 ```move
 module conventions::object {
 
-    use sui::object::{Self, UID};
-    use sui::tx_context::TxContext;
+    use one::object::{Self, UID};
+    use one::tx_context::TxContext;
 
     struct Object has key, store {
         id: UID
@@ -151,9 +151,9 @@ Library modules that share objects should provide two functions: one to create t
 ```move
 module conventions::profile {
 
-    use sui::object::{Self, UID};
-    use sui::tx_context::TxContext;
-    use sui::transfer::share_object;
+    use one::object::{Self, UID};
+    use one::tx_context::TxContext;
+    use one::transfer::share_object;
 
     struct Profile has key {
         id: UID
@@ -180,7 +180,7 @@ module conventions::profile {
 
     use std::string::String;
 
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Profile has key {
         id: UID,
@@ -207,7 +207,7 @@ Design your modules around one object or data structure. A variant structure sho
 ```move
 module conventions::wallet {
 
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Wallet has key, store {
         id: UID,
@@ -217,7 +217,7 @@ module conventions::wallet {
 
 module conventions::claw_back_wallet {
 
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Wallet has key {
         id: UID,
@@ -249,7 +249,7 @@ module conventions::profile {
 
     use std::string::String;
 
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Profile has key, store {
         id: UID,
@@ -268,9 +268,9 @@ Provide functions to delete objects. Destroy empty objects with the function `de
 ```move
 module conventions::wallet {
 
-    use sui::object::{Self, UID};
-    use sui::balance::{Self, Balance};
-    use sui::sui::SUI;
+    use one::object::{Self, UID};
+    use one::balance::{Self, Balance};
+    use one::oct::OCT;
 
     struct Wallet<Value> has key, store {
         id: UID,
@@ -300,10 +300,10 @@ Keep your functions pure to maintain composability. Do not use `transfer::transf
 ```move
 module conventions::amm {
 
-    use sui::transfer;
-    use sui::coin::Coin;
-    use sui::object::UID;
-    use sui::tx_context::{Self, TxContext};
+    use one::transfer;
+    use one::coin::Coin;
+    use one::object::UID;
+    use one::tx_context::{Self, TxContext};
 
     struct Pool has key {
         id: UID
@@ -342,8 +342,8 @@ Pass the `Coin` object by value with the right amount directly because it's bett
 ```move
 module conventions::amm {
 
-    use sui::coin::Coin;
-    use sui::object::UID;
+    use one::coin::Coin;
+    use one::object::UID;
 
     struct Pool has key {
         id: UID
@@ -370,12 +370,12 @@ To maintain composability, use capabilities instead of addresses for access cont
 ```move
 module conventions::access_control {
 
-    use sui::sui::SUI;
-    use sui::object::UID;
-    use sui::balance::Balance;
-    use sui::coin::{Self, Coin};
-    use sui::table::{Self, Table};
-    use sui::tx_context::{Self, TxContext};
+    use one::oct::OCT;
+    use one::object::UID;
+    use one::balance::Balance;
+    use one::coin::{Self, Coin};
+    use one::table::{Self, Table};
+    use one::tx_context::{Self, TxContext};
 
     struct Account has key, store {
         id: UID,
@@ -418,12 +418,12 @@ If your dApp data has a one to one relationship, it's best to use owned objects.
 ```move
 module conventions::vesting_wallet {
 
-    use sui::sui::SUI;
-    use sui::coin::Coin;
-    use sui::object::UID;
-    use sui::table::Table;
-    use sui::balance::Balance;
-    use sui::tx_context::TxContext;
+    use one::oct::OCT;
+    use one::coin::Coin;
+    use one::object::UID;
+    use one::table::Table;
+    use one::balance::Balance;
+    use one::tx_context::TxContext;
 
     struct OwnedWallet has key {
         id: UID,
@@ -466,7 +466,7 @@ module conventions::social_network {
 
     use std::string::String;
 
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Account has key {
         id: UID,

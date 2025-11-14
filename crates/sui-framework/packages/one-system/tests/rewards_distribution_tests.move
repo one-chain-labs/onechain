@@ -3,8 +3,8 @@
 
 #[test_only]
 module oct_system::rewards_distribution_tests {
-    use sui::balance;
-    use sui::test_scenario::{Self, Scenario};
+    use one::balance;
+    use one::test_scenario::{Self, Scenario};
     use one_system::one_system::SuiSystemState;
     use one_system::validator_cap::UnverifiedValidatorOperationCap;
     use one_system::governance_test_utils::{
@@ -19,8 +19,8 @@ module oct_system::rewards_distribution_tests {
         stake_with,
         total_oct_balance, unstake
     };
-    use sui::test_utils::assert_eq;
-    use sui::address;
+    use one::test_utils::assert_eq;
+    use one::address;
 
     const VALIDATOR_ADDR_1: address = @0x1;
     const VALIDATOR_ADDR_2: address = @0x2;

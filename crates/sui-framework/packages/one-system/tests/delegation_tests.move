@@ -3,14 +3,14 @@
 
 #[test_only]
 module oct_system::stake_tests {
-    use sui::coin;
-    use sui::test_scenario;
+    use one::coin;
+    use one::test_scenario;
     use one_system::one_system::SuiSystemState;
     use one_system::staking_pool::{Self, StakedOct, PoolTokenExchangeRate};
-    use sui::test_utils::assert_eq;
+    use one::test_utils::assert_eq;
     use one_system::validator_set;
-    use sui::test_utils;
-    use sui::table::Table;
+    use one::test_utils;
+    use one::table::Table;
 
     use one_system::governance_test_utils::{
         add_validator,

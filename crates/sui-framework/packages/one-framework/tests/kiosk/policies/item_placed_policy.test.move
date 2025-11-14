@@ -4,9 +4,9 @@
 #[test_only]
 /// A Policy that makes sure an item is placed into the `Kiosk` after `purchase`.
 /// `Kiosk` can be any.
-module oct::item_locked_policy {
-    use sui::kiosk::{Self, Kiosk};
-    use sui::transfer_policy::{
+module one::item_locked_policy {
+    use one::kiosk::{Self, Kiosk};
+    use one::transfer_policy::{
         Self as policy,
         TransferPolicy,
         TransferPolicyCap,

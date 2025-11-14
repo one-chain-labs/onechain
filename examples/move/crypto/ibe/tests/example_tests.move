@@ -5,12 +5,12 @@
 module ibe::tests;
 
 use ibe::example;
-use sui::{bcs, bls12381};
+use one::{bcs, bls12381};
 
 #[test_only]
 use std::hash::sha2_256;
 #[test_only]
-use sui::test_utils::assert_eq;
+use one::test_utils::assert_eq;
 
 // This test emulates drand based timelock encryption (using quicknet).
 #[test]

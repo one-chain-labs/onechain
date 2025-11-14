@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// This module provides functionality for generating secure randomness.
-module oct::random;
+module one::random;
 
 use std::bcs;
-use sui::hmac::hmac_sha3_256;
-use sui::versioned::{Self, Versioned};
+use one::hmac::hmac_sha3_256;
+use one::versioned::{Self, Versioned};
 
 // Sender is not @0x0 the system address.
 const ENotSystemAddress: u64 = 0;

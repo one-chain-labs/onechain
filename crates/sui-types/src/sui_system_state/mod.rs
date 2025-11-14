@@ -50,7 +50,7 @@ pub const SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2: u64 = 18446744073709551606; // u
 #[cfg(msim)]
 pub const SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2: u64 = 18446744073709551607; // u64::MAX - 8
 
-/// Rust version of the Move sui::one_system::SuiSystemState type
+/// Rust version of the Move one::one_system::SuiSystemState type
 /// This repreents the object with 0x5 ID.
 /// In Rust, this type should be rarely used since it's just a thin
 /// wrapper used to access the inner object.

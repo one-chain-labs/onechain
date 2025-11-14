@@ -67,7 +67,7 @@ mod checked {
         }
     }
 
-    /// Rust version of the Move one::coin::Coin<Sui::oct::OCT> type
+    /// Rust version of the Move one::coin::Coin<Sui::one::OCT> type
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct GasCoin(pub Coin);
 

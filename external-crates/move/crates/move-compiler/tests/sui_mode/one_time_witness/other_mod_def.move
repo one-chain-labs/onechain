@@ -1,19 +1,19 @@
 // invalid, one-time witness type candidate used in a different module
 
 module a::n {
-    use oct::oct;
-    use sui::tx_context;
+    use one::sui;
+    use one::tx_context;
 
-    fun init(_otw: oct::OCT, _ctx: &mut tx_context::TxContext) {
+    fun init(_otw: one::SUI, _ctx: &mut tx_context::TxContext) {
     }
 
 }
 
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
 }
 
-module oct::oct {
+module one::sui {
     struct SUI has drop {}
 }

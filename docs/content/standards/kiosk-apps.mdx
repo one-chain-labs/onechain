@@ -38,8 +38,8 @@ You can attach custom dynamic fields to your kiosks that anyone can then read (b
 module examples::kiosk_name_ext;
 
 use std::string::String;
-use sui::dynamic_field as df;
-use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
+use one::dynamic_field as df;
+use one::kiosk::{Self, Kiosk, KioskOwnerCap};
 
 /// The dynamic field key for the Kiosk Name Extension
 struct KioskName has copy, store, drop {}
@@ -75,7 +75,7 @@ The `kiosk_extension` module addresses concerns over owner bottlenecks and provi
 ```move
 module example::my_extension;
 
-use sui::kiosk_extension;
+use one::kiosk_extension;
 
 // ...
 ```
@@ -100,7 +100,7 @@ The signature of the `kiosk_extension::add` function requires the app witness, m
 ```move
 module examples::letterbox_ext;
 
-use sui::kiosk_extension;
+use one::kiosk_extension;
 
 // ... dependencies
 

@@ -35,7 +35,7 @@ const DYNAMIC_FIELD_FIELD_STRUCT_NAME: &IdentStr = ident_str!("Field");
 const DYNAMIC_OBJECT_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_object_field");
 const DYNAMIC_OBJECT_FIELD_WRAPPER_STRUCT_NAME: &IdentStr = ident_str!("Wrapper");
 
-/// Rust version of the Move sui::dynamic_field::Field type
+/// Rust version of the Move one::dynamic_field::Field type
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Field<N, V> {
     pub id: UID,
@@ -43,7 +43,7 @@ pub struct Field<N, V> {
     pub value: V,
 }
 
-/// Rust version of the Move sui::dynamic_object_field::Wrapper type
+/// Rust version of the Move one::dynamic_object_field::Wrapper type
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct DOFWrapper<N> {
     pub name: N,
@@ -173,13 +173,13 @@ impl DynamicFieldInfo {
     ) -> SuiResult<(MoveValue, DynamicFieldType, ObjectID)> {
         let name = extract_field_from_move_struct(move_struct, "name").ok_or_else(|| {
             SuiError::ObjectDeserializationError {
-                error: "Cannot extract [name] field from sui::dynamic_field::Field".to_string(),
+                error: "Cannot extract [name] field from one::dynamic_field::Field".to_string(),
             }
         })?;
 
         let value = extract_field_from_move_struct(move_struct, "value").ok_or_else(|| {
             SuiError::ObjectDeserializationError {
-                error: "Cannot extract [value] field from sui::dynamic_field::Field".to_string(),
+                error: "Cannot extract [value] field from one::dynamic_field::Field".to_string(),
             }
         })?;
 
@@ -191,7 +191,7 @@ impl DynamicFieldInfo {
                 _ => None,
             }
             .ok_or_else(|| SuiError::ObjectDeserializationError {
-                error: "Cannot extract [name] field from sui::dynamic_object_field::Wrapper."
+                error: "Cannot extract [name] field from one::dynamic_object_field::Wrapper."
                     .to_string(),
             })?;
             // ID extracted from the wrapper object
@@ -199,7 +199,7 @@ impl DynamicFieldInfo {
                 extract_id_value(value).ok_or_else(|| SuiError::ObjectDeserializationError {
                     error: format!(
                         "Cannot extract dynamic object's object id from \
-                        sui::dynamic_field::Field, {value:?}"
+                        one::dynamic_field::Field, {value:?}"
                     ),
                 })?;
             (name.clone(), DynamicFieldType::DynamicObject, object_id)
@@ -209,7 +209,7 @@ impl DynamicFieldInfo {
                 SuiError::ObjectDeserializationError {
                     error: format!(
                         "Cannot extract dynamic object's object id from \
-                        sui::dynamic_field::Field, {move_struct:?}",
+                        one::dynamic_field::Field, {move_struct:?}",
                     ),
                 }
             })?;

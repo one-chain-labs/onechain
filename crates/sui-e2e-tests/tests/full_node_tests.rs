@@ -9,7 +9,7 @@ use move_core_types::ident_str;
 use rand::rngs::OsRng;
 use std::path::PathBuf;
 use std::sync::Arc;
-use sui::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
+use one::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use sui_config::node::RunWithRange;
 use sui_json_rpc_types::{EventFilter, TransactionFilter};
 use sui_json_rpc_types::{

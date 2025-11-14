@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::object_tests {
-    use sui::address;
+module one::object_tests {
+    use one::address;
 
     const EDifferentAddress: u64 = 0xF000;
     const EDifferentBytes: u64 = 0xF001;

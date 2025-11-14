@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { SVGProps } from 'react';
 
-const SvgTransferSui16 = (props: SVGProps<SVGSVGElement>) => (
+const SvgTransferOct16 = (props: SVGProps<SVGSVGElement>) => (
 	<svg
 		xmlns="http://www.w3.org/2000/svg"
 		width="1em"
@@ -19,4 +19,4 @@ const SvgTransferSui16 = (props: SVGProps<SVGSVGElement>) => (
 		/>
 	</svg>
 );
-export default SvgTransferSui16;
+export default SvgTransferOct16;

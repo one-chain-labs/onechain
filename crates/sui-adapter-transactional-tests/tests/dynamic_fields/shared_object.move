@@ -8,7 +8,7 @@
 //# publish
 
 module test::m {
-    use sui::dynamic_object_field as ofield;
+    use one::dynamic_object_field as ofield;
 
     public struct Outer has key {
         id: UID,

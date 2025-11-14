@@ -10,7 +10,7 @@ module Test::f {
     }
 
     public fun test() {
-        assert!(!sui::types::is_one_time_witness(&F::V));
+        assert!(!one::types::is_one_time_witness(&F::V));
     }
 }
 

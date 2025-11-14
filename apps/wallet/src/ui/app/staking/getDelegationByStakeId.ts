@@ -3,14 +3,14 @@
 
 import type { DelegatedStake } from '@mysten/sui/client';
 
-// Helper function to get the delegation by stakedSuiId
+// Helper function to get the delegation by stakedOctId
 export const getDelegationDataByStakeId = (
 	delegationsStake: DelegatedStake[],
 	stakeSuiId: string,
 ) => {
 	let stake = null;
 	for (const { stakes } of delegationsStake) {
-		stake = stakes.find(({ stakedSuiId }) => stakedSuiId === stakeSuiId) || null;
+		stake = stakes.find(({ stakedOctId }) => stakedOctId === stakeSuiId) || null;
 		if (stake) return stake;
 	}
 

@@ -119,7 +119,7 @@ Creates a new, empty table
 ## Function `add`
 
 Adds a key-value pair to the table <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<b>mut</b> <a href="../sui-framework/table.md#0x2_table_Table">Table</a>&lt;K, V&gt;</code>
-Aborts with <code>sui::dynamic_field::EFieldAlreadyExists</code> if the table already has an entry with
+Aborts with <code>one::dynamic_field::EFieldAlreadyExists</code> if the table already has an entry with
 that key <code>k: K</code>.
 
 
@@ -147,7 +147,7 @@ that key <code>k: K</code>.
 ## Function `borrow`
 
 Immutable borrows the value associated with the key in the table <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<a href="../sui-framework/table.md#0x2_table_Table">Table</a>&lt;K, V&gt;</code>.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
@@ -174,7 +174,7 @@ that key <code>k: K</code>.
 ## Function `borrow_mut`
 
 Mutably borrows the value associated with the key in the table <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<b>mut</b> <a href="../sui-framework/table.md#0x2_table_Table">Table</a>&lt;K, V&gt;</code>.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
@@ -201,7 +201,7 @@ that key <code>k: K</code>.
 ## Function `remove`
 
 Removes the key-value pair in the table <code><a href="../sui-framework/table.md#0x2_table">table</a>: &<b>mut</b> <a href="../sui-framework/table.md#0x2_table_Table">Table</a>&lt;K, V&gt;</code> and returns the value.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 

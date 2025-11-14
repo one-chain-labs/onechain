@@ -27,7 +27,7 @@ import { createValidationSchemaStepOne } from './validation';
 const initialValues = {
 	to: '',
 	amount: '',
-	isPayAllSui: false,
+	isPayAllOct: false,
 	gasBudgetEst: '',
 };
 
@@ -36,7 +36,7 @@ export type FormValues = typeof initialValues;
 export type SubmitProps = {
 	to: string;
 	amount: string;
-	isPayAllSui: boolean;
+	isPayAllOct: boolean;
 	coinIds: string[];
 	coins: CoinStruct[];
 	gasBudgetEst: string;
@@ -101,7 +101,7 @@ function GasBudgetEstimation({
 				amount: values.amount,
 				coinType: SUI_TYPE_ARG,
 				coinDecimals,
-				isPayAllSui: values.isPayAllSui,
+				isPayAllOct: values.isPayAllOct,
 				coins,
 			});
 
@@ -181,7 +181,7 @@ export function SendTokenForm({
 				initialValues={{
 					amount: initialAmount,
 					to: initialTo,
-					isPayAllSui:
+					isPayAllOct:
 						!!initAmountBig && initAmountBig === coinBalance && coinType === SUI_TYPE_ARG,
 					gasBudgetEst: '',
 				}}
@@ -189,7 +189,7 @@ export function SendTokenForm({
 				enableReinitialize
 				validateOnMount
 				validateOnChange
-				onSubmit={async ({ to, amount, isPayAllSui, gasBudgetEst }: FormValues) => {
+				onSubmit={async ({ to, amount, isPayAllOct, gasBudgetEst }: FormValues) => {
 					if (!coins || !suiCoins) return;
 					const coinsIDs = [...coins]
 						.sort((a, b) => Number(b.balance) - Number(a.balance))
@@ -208,7 +208,7 @@ export function SendTokenForm({
 					const data = {
 						to,
 						amount,
-						isPayAllSui,
+						isPayAllOct,
 						coins,
 						coinIds: coinsIDs,
 						gasBudgetEst,
@@ -217,14 +217,14 @@ export function SendTokenForm({
 				}}
 			>
 				{({ isValid, isSubmitting, setFieldValue, values, submitForm, validateField }) => {
-					const newPaySuiAll =
+					const newPayOctAll =
 						parseAmount(values.amount, coinDecimals) === coinBalance && coinType === SUI_TYPE_ARG;
-					if (values.isPayAllSui !== newPaySuiAll) {
-						setFieldValue('isPayAllSui', newPaySuiAll);
+					if (values.isPayAllOct !== newPayOctAll) {
+						setFieldValue('isPayAllOct', newPayOctAll);
 					}
 
 					const hasEnoughBalance =
-						values.isPayAllSui ||
+						values.isPayAllOct ||
 						suiBalance >
 							parseAmount(values.gasBudgetEst, coinDecimals) +
 								parseAmount(coinType === SUI_TYPE_ARG ? values.amount : '0', coinDecimals);
@@ -245,7 +245,7 @@ export function SendTokenForm({
 											type="numberInput"
 											name="amount"
 											placeholder="0.00"
-											prefix={values.isPayAllSui ? '~ ' : ''}
+											prefix={values.isPayAllOct ? '~ ' : ''}
 											actionText="Max"
 											suffix={` ${symbol}`}
 											actionType="button"

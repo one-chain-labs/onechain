@@ -124,7 +124,7 @@ pub struct MovePackage {
 
 // NB: do _not_ add `Serialize` or `Deserialize` to this enum. Convert to u8 first  or use the
 // associated constants before storing in any serialization setting.
-/// Rust representation of upgrade policy constants in `sui::package`.
+/// Rust representation of upgrade policy constants in `one::package`.
 #[repr(u8)]
 #[derive(derive_more::Display, Debug, Clone, Copy)]
 pub enum UpgradePolicy {
@@ -159,7 +159,7 @@ impl TryFrom<u8> for UpgradePolicy {
     }
 }
 
-/// Rust representation of `sui::package::UpgradeCap`.
+/// Rust representation of `one::package::UpgradeCap`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpgradeCap {
     pub id: UID,
@@ -168,7 +168,7 @@ pub struct UpgradeCap {
     pub policy: u8,
 }
 
-/// Rust representation of `sui::package::UpgradeTicket`.
+/// Rust representation of `one::package::UpgradeTicket`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpgradeTicket {
     pub cap: ID,
@@ -177,7 +177,7 @@ pub struct UpgradeTicket {
     pub digest: Vec<u8>,
 }
 
-/// Rust representation of `sui::package::UpgradeReceipt`.
+/// Rust representation of `one::package::UpgradeReceipt`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpgradeReceipt {
     pub cap: ID,

@@ -6,7 +6,7 @@ module e::m {
     use std::ascii::String as ASCII;
     use std::option::Option;
     use std::string::String as UTF8;
-    use sui::object::UID;
+    use one::object::UID;
 
     public struct O has key { id: UID }
 

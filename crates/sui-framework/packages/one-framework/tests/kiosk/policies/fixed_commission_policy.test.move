@@ -4,10 +4,10 @@
 #[test_only]
 /// An example module implementing a fixed commission for the `TransferPolicy`.
 /// Follows the "transfer rules" layout and implements each of the steps.
-module oct::fixed_commission {
-    use sui::oct::OCT;
-    use sui::coin::Coin;
-    use sui::transfer_policy::{
+module one::fixed_commission {
+    use one::oct::OCT;
+    use one::coin::Coin;
+    use one::transfer_policy::{
         Self as policy,
         TransferPolicy,
         TransferRequest,

@@ -55,7 +55,7 @@ input parameter, unless it is passed by immutable reference.
 <dd>
  The clock's timestamp, which is set automatically by a
  system transaction every time consensus commits a
- schedule, or by <code>sui::clock::increment_for_testing</code> during
+ schedule, or by <code>one::clock::increment_for_testing</code> during
  testing.
 </dd>
 </dl>

@@ -15,9 +15,9 @@ module bridge::limiter_tests {
         treasury::{Self, BTC, ETH, USDC, USDT},
     };
 
-    use sui::clock;
-    use sui::test_scenario;
-    use sui::test_utils::{assert_eq, destroy};
+    use one::clock;
+    use one::test_scenario;
+    use one::test_utils::{assert_eq, destroy};
 
     #[test]
     fun test_24_hours_windows() {

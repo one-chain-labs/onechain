@@ -7,10 +7,10 @@
 //
 // This module is not currently accessible from user contracts, and is used only to record the JWK
 // state to the chain for auditability + restore from snapshot purposes.
-module oct::authenticator_state;
+module one::authenticator_state;
 
 use std::string::{Self, String, utf8};
-use sui::dynamic_field;
+use one::dynamic_field;
 
 /// Sender is not @0x0 the system address.
 const ENotSystemAddress: u64 = 0;

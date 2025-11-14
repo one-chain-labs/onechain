@@ -6,7 +6,7 @@
 module random_nft::example;
 
 use std::string;
-use sui::{object::delete, random::{Random, new_generator}};
+use one::{object::delete, random::{Random, new_generator}};
 
 const EInvalidParams: u64 = 0;
 

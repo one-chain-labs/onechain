@@ -70,7 +70,7 @@ After an object `c` has been sent to another object `p`, `p` must then receive `
 To explain further, look at the core of the receiving interface in Move, which is defined in the `transfer` module in the Sui framework:
 
 ```move
-module sui::transfer;
+module one::transfer;
 
 /// Represents the ability to receive an object of type `T`. Cannot be stored.
 public struct Receiving<phantom T: key> has drop { ... }
@@ -98,11 +98,11 @@ public native fun public_receive<T: key + store>(parent: &mut UID, object: Recei
 ...
 ```
 
-Each Receiving argument referring to a sent object of type `T` in a PTB results in exactly one argument with a Move type of `sui::transfer::Receiving<T>`. You can then use this argument to receive the sent object of type `T` with the `transfer::receive` function.
+Each Receiving argument referring to a sent object of type `T` in a PTB results in exactly one argument with a Move type of `one::transfer::Receiving<T>`. You can then use this argument to receive the sent object of type `T` with the `transfer::receive` function.
 
 When you call the `transfer::receive` function, you must pass a mutable reference to the parent object's `UID`. You can't get a mutable reference to the `UID` of an object, though, unless the defining module of the object exposes it. Consequently, the module that defines the type of the parent object that is receiving the child object defines access control policies and other restrictions on receiving objects that are sent to it. See the [authorization example](#receive-shared-example) for a demonstration of this pattern. The fact that the passed-in `UID` actually owns the object referenced by the `Receiving` parameter is dynamically checked and enforced. This allows access to objects that have been sent to, for example, dynamic fields where the ownership chain can only be established dynamically.
 
-Because `sui::transfer::Receiving` has only the `drop` ability, the existence of a `Receiving<T>` argument represents the ability, but not the obligation to receive the object of type `T` specified by the object reference in the PTB `Receiving` argument during that transaction. You can use some, none, or all `Receiving` arguments in a PTB without issue. Any object that corresponds to a `Receiving` argument remains untouched (in particular, its object reference remain the same) unless it is received.
+Because `one::transfer::Receiving` has only the `drop` ability, the existence of a `Receiving<T>` argument represents the ability, but not the obligation to receive the object of type `T` specified by the object reference in the PTB `Receiving` argument during that transaction. You can use some, none, or all `Receiving` arguments in a PTB without issue. Any object that corresponds to a `Receiving` argument remains untouched (in particular, its object reference remain the same) unless it is received.
 
 ## Custom receiving rules
 
@@ -224,8 +224,8 @@ Importantly, the address that coins are to be sent with this `Account` object re
 ```move
 module examples::account;
 
-use sui::dynamic_field as df;
-use sui::coin::{Self, Coin};
+use one::dynamic_field as df;
+use one::coin::{Self, Coin};
 use transfer::Receiving;
 
 const EBalanceDONE: u64 = 1;

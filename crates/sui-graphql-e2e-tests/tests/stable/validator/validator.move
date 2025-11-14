@@ -29,7 +29,7 @@ module P0::m {
     public entry fun new(ctx: &mut TxContext){
         let id = object::new(ctx);
         let w = weight();
-        sui::transfer::public_transfer(
+        one::transfer::public_transfer(
             Big { id, weight: w },
             ctx.sender()
         )

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::tx_context_tests {
+module one::tx_context_tests {
 
     #[test]
     fun test_id_generation() {

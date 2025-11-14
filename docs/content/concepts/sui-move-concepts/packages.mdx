@@ -23,6 +23,6 @@ Using the Sui CLI is useful to get started with upgrades, or in the early stages
 
 ### Making packages immutable
 
-You can make a package _immutable_ when it goes live to mitigate the single-key risk using the Move `sui::package::make_immutable` function to destroy its `UpgradeCap`. Making the package immutable, however, prevents future bug fixes and new features, which might not be practical or desired.
+You can make a package _immutable_ when it goes live to mitigate the single-key risk using the Move `one::package::make_immutable` function to destroy its `UpgradeCap`. Making the package immutable, however, prevents future bug fixes and new features, which might not be practical or desired.
 
 To protect your package from single-key risk on chain, see [Custom Upgrade Policies](./packages/custom-policies.mdx).

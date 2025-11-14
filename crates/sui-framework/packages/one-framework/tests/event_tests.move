@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::event_tests {
-    use sui::event;
-    use sui::test_utils::assert_eq;
+module one::event_tests {
+    use one::event;
+    use one::test_utils::assert_eq;
 
     public struct S1(u64) has copy, drop;
 

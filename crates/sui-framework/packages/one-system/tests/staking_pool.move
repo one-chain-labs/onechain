@@ -3,9 +3,9 @@
 
 #[test_only]
 module oct_system::staking_pool_tests {
-    use sui::test_scenario::{Self, Scenario};
+    use one::test_scenario::{Self, Scenario};
     use one_system::staking_pool::{StakingPool, Self};
-    use sui::balance::{Self};
+    use one::balance::{Self};
 
     #[test]
     fun test_join_fungible_staked_oct_happy() {
@@ -19,8 +19,8 @@ module oct_system::staking_pool_tests {
 
         assert!(fungible_staked_oct_1.value() == 300_000_000_000, 0);
 
-        sui::test_utils::destroy(staking_pool);
-        sui::test_utils::destroy(fungible_staked_oct_1);
+        one::test_utils::destroy(staking_pool);
+        one::test_utils::destroy(fungible_staked_oct_1);
 
         scenario.end();
     }
@@ -37,9 +37,9 @@ module oct_system::staking_pool_tests {
 
         fungible_staked_oct_1.join(fungible_staked_oct_2);
 
-        sui::test_utils::destroy(staking_pool_1);
-        sui::test_utils::destroy(staking_pool_2);
-        sui::test_utils::destroy(fungible_staked_oct_1);
+        one::test_utils::destroy(staking_pool_1);
+        one::test_utils::destroy(staking_pool_2);
+        one::test_utils::destroy(fungible_staked_oct_1);
 
         scenario.end();
     }
@@ -56,9 +56,9 @@ module oct_system::staking_pool_tests {
         assert!(fungible_staked_oct_1.value() == 25_000_000_000, 0);
         assert!(fungible_staked_oct_2.value() == 75_000_000_000, 0);
 
-        sui::test_utils::destroy(staking_pool);
-        sui::test_utils::destroy(fungible_staked_oct_1);
-        sui::test_utils::destroy(fungible_staked_oct_2);
+        one::test_utils::destroy(staking_pool);
+        one::test_utils::destroy(fungible_staked_oct_1);
+        one::test_utils::destroy(fungible_staked_oct_2);
 
         scenario.end();
     }
@@ -73,9 +73,9 @@ module oct_system::staking_pool_tests {
 
         let fungible_staked_oct_2 = fungible_staked_oct_1.split(100_000_000_000 + 1, scenario.ctx());
 
-        sui::test_utils::destroy(staking_pool);
-        sui::test_utils::destroy(fungible_staked_oct_1);
-        sui::test_utils::destroy(fungible_staked_oct_2);
+        one::test_utils::destroy(staking_pool);
+        one::test_utils::destroy(fungible_staked_oct_1);
+        one::test_utils::destroy(fungible_staked_oct_2);
 
         scenario.end();
     }
@@ -90,8 +90,8 @@ module oct_system::staking_pool_tests {
         let staked_oct = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
         let fungible_staked_oct = staking_pool.convert_to_fungible_staked_oct(staked_oct, scenario.ctx());
 
-        sui::test_utils::destroy(staking_pool);
-        sui::test_utils::destroy(fungible_staked_oct);
+        one::test_utils::destroy(staking_pool);
+        one::test_utils::destroy(fungible_staked_oct);
 
         scenario.end();
     }
@@ -108,9 +108,9 @@ module oct_system::staking_pool_tests {
 
         let fungible_staked_oct = staking_pool_2.convert_to_fungible_staked_oct(staked_oct, scenario.ctx());
 
-        sui::test_utils::destroy(staking_pool_1);
-        sui::test_utils::destroy(staking_pool_2);
-        sui::test_utils::destroy(fungible_staked_oct);
+        one::test_utils::destroy(staking_pool_1);
+        one::test_utils::destroy(staking_pool_2);
+        one::test_utils::destroy(fungible_staked_oct);
 
         scenario.end();
     }
@@ -159,10 +159,10 @@ module oct_system::staking_pool_tests {
         assert!(fungible_staked_oct_data.total_supply() == 1_500_000_000, 0);
         assert!(fungible_staked_oct_data.principal_value() == 2_000_000_000, 0);
 
-        sui::test_utils::destroy(staking_pool);
-        // sui::test_utils::destroy(fungible_staked_oct);
-        sui::test_utils::destroy(fungible_staked_oct_1);
-        sui::test_utils::destroy(fungible_staked_oct_2);
+        one::test_utils::destroy(staking_pool);
+        // one::test_utils::destroy(fungible_staked_oct);
+        one::test_utils::destroy(fungible_staked_oct_1);
+        one::test_utils::destroy(fungible_staked_oct_2);
 
         scenario.end();
     }
@@ -240,9 +240,9 @@ module oct_system::staking_pool_tests {
         assert!(staking_pool.pending_stake_withdraw_amount() == 6_000_000_000 - 1, 0);
         assert!(staking_pool.pending_pool_token_withdraw_amount() == 1_500_000_000, 0);
 
-        sui::test_utils::destroy(staking_pool);
-        sui::test_utils::destroy(sui_1);
-        sui::test_utils::destroy(sui_2);
+        one::test_utils::destroy(staking_pool);
+        one::test_utils::destroy(sui_1);
+        one::test_utils::destroy(sui_2);
 
         scenario.end();
     }
@@ -289,9 +289,9 @@ module oct_system::staking_pool_tests {
         assert!(fungible_staked_oct_data.total_supply() == 0, 0);
         assert!(fungible_staked_oct_data.principal_value() == 1, 0);
 
-        sui::test_utils::destroy(staking_pool);
-        sui::test_utils::destroy(staked_oct_1);
-        sui::test_utils::destroy(sui);
+        one::test_utils::destroy(staking_pool);
+        one::test_utils::destroy(staked_oct_1);
+        one::test_utils::destroy(sui);
 
         scenario.end();
     }
@@ -302,9 +302,9 @@ module oct_system::staking_pool_tests {
         scenario: &mut Scenario,
         reward_amount: u64
     ): u64 {
-        use sui::tx_context::{epoch};
-        use sui::coin::{Self};
-        use sui::oct::OCT;
+        use one::tx_context::{epoch};
+        use one::coin::{Self};
+        use one::oct::OCT;
 
         let rewards = coin::mint_for_testing<SUI>(reward_amount, scenario.ctx());
         staking_pool.deposit_rewards(coin::into_balance(rewards));

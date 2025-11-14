@@ -3,10 +3,10 @@
 
 module oct_system::genesis {
     use std::vector;
-    use sui::balance::{Self, Balance};
-    use sui::object::UID;
-    use sui::oct::OCT;
-    use sui::tx_context::{Self, TxContext};
+    use one::balance::{Self, Balance};
+    use one::object::UID;
+    use one::oct::OCT;
+    use one::tx_context::{Self, TxContext};
     use std::option::Option;
 
     use one_system::sui_system;

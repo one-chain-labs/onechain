@@ -7,17 +7,17 @@ module bridge::treasury {
     use std::type_name;
     use std::type_name::TypeName;
 
-    use sui::address;
-    use sui::bag;
-    use sui::bag::Bag;
-    use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
-    use sui::event::emit;
-    use sui::hex;
-    use sui::object_bag::{Self, ObjectBag};
-    use sui::package;
-    use sui::package::UpgradeCap;
-    use sui::vec_map;
-    use sui::vec_map::VecMap;
+    use one::address;
+    use one::bag;
+    use one::bag::Bag;
+    use one::coin::{Self, Coin, TreasuryCap, CoinMetadata};
+    use one::event::emit;
+    use one::hex;
+    use one::object_bag::{Self, ObjectBag};
+    use one::package;
+    use one::package::UpgradeCap;
+    use one::vec_map;
+    use one::vec_map::VecMap;
 
     const EUnsupportedTokenType: u64 = 1;
     const EInvalidUpgradeCap: u64 = 2;

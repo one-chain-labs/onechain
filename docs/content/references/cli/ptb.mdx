@@ -44,7 +44,7 @@ Options:
            --make-move-vec <u64> []
            --make-move-vec <u64> [1, 2, 3, 4]
            --make-move-vec <std::option::Option<u64>> [none,none]
-           --make-move-vec <sui::coin::Coin<sui::sui::SUI>> [gas]
+           --make-move-vec <one::coin::Coin<one::oct::OCT>> [gas]
 
       --merge-coins <INTO_COIN> <[COIN OBJECTS]>
           Merge N coins into the provided coin.
@@ -82,7 +82,7 @@ Options:
           Publish the Move package. It takes as input the folder where the package exists.
 
           Examples:
-           --move-call sui::tx_context::sender
+           --move-call one::tx_context::sender
            --assign sender
            --publish "."
            --assign upgrade_cap
@@ -233,11 +233,11 @@ To call a specific function from a specific package, you can use the following c
 
 ### Publish
 
-Publishing a package is one of the most important commands you need when working with Sui. While the CLI has a standalone `publish` command, PTBs also support publishing and upgrading packages. One main difference is that with `sui client ptb`, you must explicitly transfer the `UpgradeCap` object that is returned when creating a package, or destroy it with a call to [`make_immutable`](/concepts/sui-move-concepts/packages.mdx). Here is an example on how to publish a Move project on chain using the `sui client ptb` command. It makes a call to the `sui::tx_context::sender` to acquire the sender and assigns the result of that call to the `sender` variable, and then calls the publish command. The result of `publish` is bounded to `upgrade_cap` variable, and then this object is transferred to the sender.
+Publishing a package is one of the most important commands you need when working with Sui. While the CLI has a standalone `publish` command, PTBs also support publishing and upgrading packages. One main difference is that with `sui client ptb`, you must explicitly transfer the `UpgradeCap` object that is returned when creating a package, or destroy it with a call to [`make_immutable`](/concepts/sui-move-concepts/packages.mdx). Here is an example on how to publish a Move project on chain using the `sui client ptb` command. It makes a call to the `one::tx_context::sender` to acquire the sender and assigns the result of that call to the `sender` variable, and then calls the publish command. The result of `publish` is bounded to `upgrade_cap` variable, and then this object is transferred to the sender.
 
 ```bash
 sui client ptb \
---move-call sui::tx_context::sender \
+--move-call one::tx_context::sender \
 --assign sender \
 --publish "." \
 --assign upgrade_cap \
@@ -247,19 +247,19 @@ sui client ptb \
 
 ### Split, destroy, and merge coins
 
-The following example showcases how to split a gas coin into multiple coins, make a move call to destroy one or more of the new coins, and finally merge the coins that were not destroyed back into the gas coin. It also showcases how to use framework name resolution (for example, `sui::coin` instead of `0x2::coin`) and how to refer to different values in an array using the `.` syntax.
+The following example showcases how to split a gas coin into multiple coins, make a move call to destroy one or more of the new coins, and finally merge the coins that were not destroyed back into the gas coin. It also showcases how to use framework name resolution (for example, `one::coin` instead of `0x2::coin`) and how to refer to different values in an array using the `.` syntax.
 
 ```bash
 # Split off from gas
 --split-coins gas "[0,1,2,3]"
 --assign coins
---move-call sui::coin::destroy_zero<sui::sui::SUI> coins.0
+--move-call one::coin::destroy_zero<one::oct::OCT> coins.0
 # Can further split a split coin (and through variable bindings/result accesses)
 --split-coins coins.1 "[0,0]"
 --assign zcoins
 # Destroy both new coins
---move-call sui::coin::destroy_zero<sui::sui::SUI> zcoins.0
---move-call sui::coin::destroy_zero<sui::sui::SUI> zcoins.1
+--move-call one::coin::destroy_zero<one::oct::OCT> zcoins.0
+--move-call one::coin::destroy_zero<one::oct::OCT> zcoins.1
 # Can merge the split coins back
 --merge-coins gas "[coins.1, coins.2, coins.3]"
 --gas-budget 10000000

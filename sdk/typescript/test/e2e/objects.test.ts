@@ -33,7 +33,7 @@ describe('Object Reading API', () => {
 			}),
 		);
 		objectInfos.forEach((objectInfo) => {
-			expect(objectInfo.data?.type).to.equal('0x2::coin::Coin<0x2::sui::SUI>');
+			expect(objectInfo.data?.type).to.equal('0x2::coin::Coin<0x2::oct::OCT>');
 		});
 	});
 
@@ -53,7 +53,7 @@ describe('Object Reading API', () => {
 		expect(gasObjects.data.length).to.equal(objectInfos.length);
 
 		objectInfos.forEach((objectInfo) => {
-			expect(objectInfo.data?.type).to.equal('0x2::coin::Coin<0x2::sui::SUI>');
+			expect(objectInfo.data?.type).to.equal('0x2::coin::Coin<0x2::oct::OCT>');
 		});
 	});
 

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::vec_map_tests {
-    use sui::vec_map::{Self, VecMap};
+module one::vec_map_tests {
+    use one::vec_map::{Self, VecMap};
 
     #[test]
     #[expected_failure(abort_code = vec_map::EKeyAlreadyExists)]

@@ -150,24 +150,24 @@ Sui supports the following API operations related to transferring SUI between ad
  - [sui_transferObject](/sui-api-ref#sui_transferObject)
    Because OCT tokens are objects, you can transfer OCT tokens just like any other object. This method requires a gas token, and is useful in niche cases only.
 
- - [sui_payAllSui](/sui-api-ref#sui_payAllSui)
+ - [sui_payAllOct](/sui-api-ref#sui_payAllOct)
    This method accepts an array of OCT token IDs. It merges all existing tokens into one, deducts the gas fee, then sends the merged token to the recipient address.
 
    The method is especially useful if you want to transfer all SUI from an address. To merge together all coins for an address, set the recipient as the same address. This is a native Sui method so is not considered a transaction in Sui.
 
- - [sui_paySui](/sui-api-ref#sui_paySui)
+ - [sui_payOct](/sui-api-ref#sui_payOct)
    This operation accepts an array of OCT token IDs, an array of amounts, and an array of recipient addresses.
 
    The amounts and recipients array map one to one. Even if you use only one recipient address, you must include it for each amount in the amount array.
 
    The operation merges all of the tokens provided into one token object and settles the gas fees. It then splits the token according to the amounts in the amounts array and sends the first token to the first recipient, the second token to the second recipient, and so on. Any remaining SUI on the token stays in the source address.
 
-   The benefits of this method include: no gas fees for merging or splitting tokens, and the abstracted token merge and split. The `sui_paySui` operation is a native function, so the merge and split operations are not considered Sui transactions. The gas fees for them match typical transactions on Sui.You can use this operation to split coins in your own address by setting the recipient as your own address. Note that the total value of the input coins must be greater than the total value of the amounts to send.
+   The benefits of this method include: no gas fees for merging or splitting tokens, and the abstracted token merge and split. The `sui_payOct` operation is a native function, so the merge and split operations are not considered Sui transactions. The gas fees for them match typical transactions on Sui.You can use this operation to split coins in your own address by setting the recipient as your own address. Note that the total value of the input coins must be greater than the total value of the amounts to send.
 
  - [sui_pay](/sui-api-ref#sui_pay)
-   This method is similar to sui_paySui, but it accepts any kind of coin or token instead of only SUI. You must include a gas token, and all of the coins or tokens must be the same type.
+   This method is similar to sui_payOct, but it accepts any kind of coin or token instead of only SUI. You must include a gas token, and all of the coins or tokens must be the same type.
 
- - [sui_transferSui](/sui-api-ref#sui_transferSui)
+ - [sui_transferOct](/sui-api-ref#sui_transferOct)
     This method accepts only one OCT token object and an amount to send to the recipient. It uses the same token for gas fees, so the amount to transfer must be strictly less than the value of the OCT token used.
 
 ## Signing transactions

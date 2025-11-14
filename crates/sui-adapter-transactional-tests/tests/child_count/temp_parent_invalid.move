@@ -10,14 +10,14 @@
 
 module test::m {
     public struct S has key, store {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 
     public entry fun t(ctx: &mut TxContext) {
-        let mut parent = sui::object::new(ctx);
-        let child = S { id: sui::object::new(ctx) };
-        sui::dynamic_object_field::add(&mut parent, 0, child);
-        sui::object::delete(parent);
+        let mut parent = one::object::new(ctx);
+        let child = S { id: one::object::new(ctx) };
+        one::dynamic_object_field::add(&mut parent, 0, child);
+        one::object::delete(parent);
     }
 }
 

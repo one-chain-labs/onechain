@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::bcs_tests {
-    use sui::bcs::{Self, BCS, to_bytes, new};
+module one::bcs_tests {
+    use one::bcs::{Self, BCS, to_bytes, new};
     use std::unit_test::assert_eq;
 
     const U8_MAX: u8 = 0xFF;

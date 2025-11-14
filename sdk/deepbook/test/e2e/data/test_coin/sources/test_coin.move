@@ -3,10 +3,10 @@
 
 module test_coin::test {
     use std::option;
-    use sui::coin;
-    use sui::transfer;
-    use sui::url;
-    use sui::tx_context::{Self, TxContext};
+    use one::coin;
+    use one::transfer;
+    use one::url;
+    use one::tx_context::{Self, TxContext};
 
     public struct TEST has drop {}
 

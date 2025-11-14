@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::ecvrf;
+module one::ecvrf;
 
 #[allow(unused_const)]
 const EInvalidHashLength: u64 = 1;

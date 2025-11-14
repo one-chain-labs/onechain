@@ -3,19 +3,19 @@
 
 #[test_only]
 module oct_system::governance_test_utils {
-    use sui::address;
-    use sui::balance;
-    use sui::oct::OCT;
-    use sui::coin::{Self, Coin};
+    use one::address;
+    use one::balance;
+    use one::oct::OCT;
+    use one::coin::{Self, Coin};
     use one_system::staking_pool::{StakedOct, StakingPool};
-    use sui::test_utils::assert_eq;
+    use one::test_utils::assert_eq;
     use one_system::validator::{Self, Validator};
     use one_system::one_system::{Self, SuiSystemState};
     use one_system::sui_system_state_inner;
     use one_system::stake_subsidy;
-    use sui::test_scenario::{Self, Scenario};
-    use sui::test_utils;
-    use sui::balance::Balance;
+    use one::test_scenario::{Self, Scenario};
+    use one::test_utils;
+    use one::balance::Balance;
 
     const MIST_PER_OCT: u64 = 1_000_000_000;
 

@@ -2,8 +2,8 @@
 title: Module `0x2::dynamic_object_field`
 ---
 
-Similar to <code>sui::dynamic_field</code>, this module allows for the access of dynamic fields. But
-unlike, <code>sui::dynamic_field</code> the values bound to these dynamic fields _must_ be objects
+Similar to <code>one::dynamic_field</code>, this module allows for the access of dynamic fields. But
+unlike, <code>one::dynamic_field</code> the values bound to these dynamic fields _must_ be objects
 themselves. This allows for the objects to still exist within in storage, which may be important
 for external tools. The difference is otherwise not observable from within Move.
 

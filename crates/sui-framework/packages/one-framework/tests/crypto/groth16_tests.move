@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::groth16_tests {
-    use sui::groth16;
-    use sui::groth16::{bls12381, bn254};
+module one::groth16_tests {
+    use one::groth16;
+    use one::groth16::{bls12381, bn254};
 
     #[test]
     fun test_prepare_verifying_key_bls12381() {

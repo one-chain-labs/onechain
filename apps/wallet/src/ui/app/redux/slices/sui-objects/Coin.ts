@@ -6,7 +6,7 @@ import type { SuiMoveObject, SuiObjectData } from '@mysten/sui/client';
 const COIN_TYPE = '0x2::coin::Coin';
 const COIN_TYPE_ARG_REGEX = /^0x2::coin::Coin<(.+)>$/;
 
-export const GAS_TYPE_ARG = '0x2::sui::SUI';
+export const GAS_TYPE_ARG = '0x2::oct::OCT';
 export const GAS_SYMBOL = 'SUI';
 
 // TODO use sdk

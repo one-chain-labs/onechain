@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::kiosk_test_utils {
-    use sui::oct::OCT;
-    use sui::coin::{Self, Coin};
-    use sui::package::{Self, Publisher};
-    use sui::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
-    use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
+module one::kiosk_test_utils {
+    use one::oct::OCT;
+    use one::coin::{Self, Coin};
+    use one::package::{Self, Publisher};
+    use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
+    use one::kiosk::{Self, Kiosk, KioskOwnerCap};
 
     public struct OTW has drop {}
     public struct Asset has key, store { id: UID }

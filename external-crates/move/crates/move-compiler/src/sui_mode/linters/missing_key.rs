@@ -33,7 +33,7 @@ simple_visitor!(
     ) -> bool {
         if first_field_has_id_field_of_type_uid(sdef) && lacks_key_ability(sdef) {
             let uid_msg =
-                "Struct's first field has an 'id' field of type 'sui::object::UID' but is missing the 'key' ability.";
+                "Struct's first field has an 'id' field of type 'one::object::UID' but is missing the 'key' ability.";
             let diagnostic = diag!(MISSING_KEY_ABILITY_DIAG, (sdef.loc, uid_msg));
             self.add_diag(diagnostic);
         }

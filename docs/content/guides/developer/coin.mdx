@@ -9,7 +9,7 @@ Publishing a coin on Sui is similar to publishing a new type. The main differenc
 
 {@inject: examples/move/coin/sources/my_coin.move noComments}
 
-The `Coin<T>` is a generic implementation of a coin on Sui. Access to the `TreasuryCap` provides control over the minting and burning of coins. Further transactions can be sent directly to the `sui::coin::Coin` with `TreasuryCap` object as authorization.
+The `Coin<T>` is a generic implementation of a coin on Sui. Access to the `TreasuryCap` provides control over the minting and burning of coins. Further transactions can be sent directly to the `one::coin::Coin` with `TreasuryCap` object as authorization.
 
 The example module includes a `mint` function. You pass the `TreasuryCap` created from the `init` function to the module's `mint` function. The function then uses the `mint` function from the `Coin` module to create (mint) a coin and then transfer it to an address. 
 
@@ -55,7 +55,7 @@ Behind the scenes, `create_regulated_currency_v2` uses the `create_currency` fun
 
 ## Create tokens
 
-Tokens reuse the `TreasuryCap` defined in the `sui::coin` module and therefore have the same initialization process. The `coin::create_currency` function guarantees the uniqueness of the `TreasuryCap` and forces the creation of a `CoinMetadata` object.
+Tokens reuse the `TreasuryCap` defined in the `one::coin` module and therefore have the same initialization process. The `coin::create_currency` function guarantees the uniqueness of the `TreasuryCap` and forces the creation of a `CoinMetadata` object.
 
 Coin-like functions perform the minting and burning of tokens. Both require the `TreasuryCap`:
 

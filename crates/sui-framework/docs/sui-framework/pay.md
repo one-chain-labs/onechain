@@ -2,7 +2,7 @@
 title: Module `0x2::pay`
 ---
 
-This module provides handy functionality for wallets and <code>sui::Coin</code> management.
+This module provides handy functionality for wallets and <code>one::Coin</code> management.
 
 
 -  [Constants](#@Constants_0)

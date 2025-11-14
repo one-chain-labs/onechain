@@ -4,7 +4,7 @@
 /// Module: test_coin
 module test_coin::test_coin {
 
-    use sui::coin;
+    use one::coin;
 
     public struct TEST_COIN has drop {}
 

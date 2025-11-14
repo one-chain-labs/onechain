@@ -8,7 +8,7 @@
 //# publish
 
 module test::m {
-    use sui::dynamic_field as field;
+    use one::dynamic_field as field;
 
     public struct S has key, store {
         id: UID,

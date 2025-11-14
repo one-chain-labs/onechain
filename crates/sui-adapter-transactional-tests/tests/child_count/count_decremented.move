@@ -9,30 +9,30 @@
 //# publish
 
 module test::m {
-    use sui::dynamic_object_field as ofield;
+    use one::dynamic_object_field as ofield;
 
     public struct S has key, store {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 
     public struct R has key, store {
-        id: sui::object::UID,
+        id: one::object::UID,
         s: S,
     }
 
     public entry fun mint(ctx: &mut TxContext) {
-        let id = sui::object::new(ctx);
-        sui::transfer::public_transfer(S { id }, tx_context::sender(ctx))
+        let id = one::object::new(ctx);
+        one::transfer::public_transfer(S { id }, tx_context::sender(ctx))
     }
 
     public entry fun add(parent: &mut S, idx: u64, ctx: &mut TxContext) {
-        let child = S { id: sui::object::new(ctx) };
+        let child = S { id: one::object::new(ctx) };
         ofield::add(&mut parent.id, idx, child);
     }
 
     public entry fun remove(parent: &mut S, idx: u64) {
         let S { id } = ofield::remove(&mut parent.id, idx);
-        sui::object::delete(id)
+        one::object::delete(id)
     }
 
     public entry fun remove_and_add(parent: &mut S, idx: u64) {
@@ -42,7 +42,7 @@ module test::m {
 
     public entry fun remove_and_wrap(parent: &mut S, idx: u64, ctx: &mut TxContext) {
         let child: S = ofield::remove(&mut parent.id, idx);
-        ofield::add(&mut parent.id, idx, R { id: sui::object::new(ctx), s: child })
+        ofield::add(&mut parent.id, idx, R { id: one::object::new(ctx), s: child })
     }
 }
 

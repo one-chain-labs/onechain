@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::hmac;
+module one::hmac;
 
 /// @param key: HMAC key, arbitrary bytes.
 /// @param msg: message to sign, arbitrary bytes.

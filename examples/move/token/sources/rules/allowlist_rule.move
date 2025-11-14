@@ -5,7 +5,7 @@
 /// perform an Action.
 module examples::allowlist_rule;
 
-use sui::{bag::{Self, Bag}, token::{Self, TokenPolicy, TokenPolicyCap, ActionRequest}};
+use one::{bag::{Self, Bag}, token::{Self, TokenPolicy, TokenPolicyCap, ActionRequest}};
 
 /// The `sender` or `recipient` is not on the allowlist.
 const EUserNotAllowed: u64 = 0;

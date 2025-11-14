@@ -53,10 +53,10 @@ Create a new file in the `sources` directory with the name `house_data.move` and
 ```move title='house_data.move'
 module satoshi_flip::house_data {
 
-  use sui::balance::{Self, Balance};
-  use sui::sui::SUI;
-  use sui::coin::{Self, Coin};
-  use sui::package::{Self};
+  use one::balance::{Self, Balance};
+  use one::oct::OCT;
+  use one::coin::{Self, Coin};
+  use one::package::{Self};
 
   // Error codes
   const ECallerNotHouse: u64 = 0;
@@ -260,7 +260,7 @@ In the same `sources` directory, now create a file named `counter_nft.move`. A `
 ```move title='counter_nft.move'
 module satoshi_flip::counter_nft {
 
-  use sui::bcs::{Self};
+  use one::bcs::{Self};
 
   public struct Counter has key {
     id: UID,
@@ -328,13 +328,13 @@ Create the game module. In the `sources` directory, create a new file called `si
 module satoshi_flip::single_player_satoshi {
   use std::string::String;
 
-  use sui::coin::{Self, Coin};
-  use sui::balance::Balance;
-  use sui::sui::SUI;
-  use sui::bls12381::bls12381_min_pk_verify;
-  use sui::event::emit;
-  use sui::hash::{blake2b256};
-  use sui::dynamic_object_field::{Self as dof};
+  use one::coin::{Self, Coin};
+  use one::balance::Balance;
+  use one::oct::OCT;
+  use one::bls12381::bls12381_min_pk_verify;
+  use one::event::emit;
+  use one::hash::{blake2b256};
+  use one::dynamic_object_field::{Self as dof};
 
   use satoshi_flip::counter_nft::Counter;
   use satoshi_flip::house_data::HouseData;

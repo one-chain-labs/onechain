@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::groth16;
+module one::groth16;
 
 #[allow(unused_const)]
 // Error for input is not a valid Arkwork representation of a verifying key.

@@ -484,7 +484,7 @@ export interface SignedTransactionBlockFailedProperties {
 	errorMessage: string;
 }
 
-export interface StakedSuiProperties {
+export interface StakedOctProperties {
 	/**
 	 * The amount of SUI staked.
 	 *
@@ -499,7 +499,7 @@ export interface StakedSuiProperties {
 	validatorAddress: string;
 }
 
-export interface StakedSuiFailedProperties {
+export interface StakedOctFailedProperties {
 	/**
 	 * A message associated with an error event.
 	 */
@@ -891,18 +891,18 @@ export class SignedTransactionBlockFailed implements BaseEvent {
 	}
 }
 
-export class StakedSui implements BaseEvent {
-	event_type = 'staked SUI';
+export class StakedOct implements BaseEvent {
+	event_type = 'staked OCT';
 
-	constructor(public event_properties: StakedSuiProperties) {
+	constructor(public event_properties: StakedOctProperties) {
 		this.event_properties = event_properties;
 	}
 }
 
-export class StakedSuiFailed implements BaseEvent {
-	event_type = 'staked SUI (failed)';
+export class StakedOctFailed implements BaseEvent {
+	event_type = 'staked OCT (failed)';
 
-	constructor(public event_properties: StakedSuiFailedProperties) {
+	constructor(public event_properties: StakedOctFailedProperties) {
 		this.event_properties = event_properties;
 	}
 }
@@ -948,7 +948,7 @@ export class UnpinnedCoin implements BaseEvent {
 }
 
 export class UnstakedSui implements BaseEvent {
-	event_type = 'unstaked SUI';
+	event_type = 'unstaked OCT';
 
 	constructor(public event_properties: UnstakedSuiProperties) {
 		this.event_properties = event_properties;
@@ -1746,7 +1746,7 @@ export class Ampli {
   }
 
   /**
-   * staked SUI
+   * staked OCT
    *
    * [View in Tracking Plan](https://data.amplitude.com/mystenlabs/Sui%20Wallet/events/main/latest/staked%20SUI)
    *
@@ -1758,14 +1758,14 @@ export class Ampli {
    * @param options Amplitude event options.
    */
   stakedSui(
-    properties: StakedSuiProperties,
+    properties: StakedOctProperties,
     options?: EventOptions,
   ) {
-    return this.track(new StakedSui(properties), options);
+    return this.track(new StakedOct(properties), options);
   }
 
   /**
-   * staked SUI (failed)
+   * staked OCT (failed)
    *
    * [View in Tracking Plan](https://data.amplitude.com/mystenlabs/Sui%20Wallet/events/main/latest/staked%20SUI%20(failed))
    *
@@ -1775,10 +1775,10 @@ export class Ampli {
    * @param options Amplitude event options.
    */
   stakedSuiFailed(
-    properties: StakedSuiFailedProperties,
+    properties: StakedOctFailedProperties,
     options?: EventOptions,
   ) {
-    return this.track(new StakedSuiFailed(properties), options);
+    return this.track(new StakedOctFailed(properties), options);
   }
 
   /**
@@ -1873,7 +1873,7 @@ export class Ampli {
   }
 
   /**
-   * unstaked SUI
+   * unstaked OCT
    *
    * [View in Tracking Plan](https://data.amplitude.com/mystenlabs/Sui%20Wallet/events/main/latest/unstaked%20SUI)
    *

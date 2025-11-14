@@ -6,8 +6,8 @@
 //# publish --sender A
 
 module test::coin_in_vec {
-    use sui::coin::Coin;
-    use sui::oct::OCT;
+    use one::coin::Coin;
+    use one::oct::OCT;
 
     public struct Wrapper has key {
         id: UID,

@@ -46,7 +46,7 @@ describe('Test dev inspect', () => {
 		const coin_0 = coins.data[0];
 		const obj = tx.moveCall({
 			target: `${packageId}::serializer_tests::return_struct`,
-			typeArguments: ['0x2::coin::Coin<0x2::sui::SUI>'],
+			typeArguments: ['0x2::coin::Coin<0x2::oct::OCT>'],
 			arguments: [tx.object(coin_0.coinObjectId)],
 		});
 

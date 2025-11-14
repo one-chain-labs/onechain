@@ -21,7 +21,7 @@ import { useCoinMetadata, useGetDelegatedStake } from '@mysten/core';
 import { useSuiClientQuery } from '@mysten/dapp-kit';
 import { ArrowLeft16 } from '@mysten/icons';
 import type { StakeObject } from '@mysten/sui/client';
-import { MIST_PER_SUI, SUI_TYPE_ARG } from '@mysten/sui/utils';
+import { MIST_PER_OCT, SUI_TYPE_ARG } from '@mysten/sui/utils';
 import * as Sentry from '@sentry/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Formik } from 'formik';
@@ -107,7 +107,7 @@ function StakingCard() {
 	const queryClient = useQueryClient();
 	const delegationId = useMemo(() => {
 		if (!stakeData || stakeData.status === 'Pending') return null;
-		return stakeData.stakedSuiId;
+		return stakeData.stakedOctId;
 	}, [stakeData]);
 
 	const navigate = useNavigate();
@@ -153,15 +153,15 @@ function StakingCard() {
 		},
 		onSuccess: (_, { amount, validatorAddress }) => {
 			ampli.stakedSui({
-				stakedAmount: Number(amount / MIST_PER_SUI),
+				stakedAmount: Number(amount / MIST_PER_OCT),
 				validatorAddress: validatorAddress,
 			});
 		},
 	});
 
 	const unStakeToken = useMutation({
-		mutationFn: async ({ stakedSuiId }: { stakedSuiId: string }) => {
-			if (!stakedSuiId || !signer) {
+		mutationFn: async ({ stakedOctId }: { stakedOctId: string }) => {
+			if (!stakedOctId || !signer) {
 				throw new Error('Failed, missing required field.');
 			}
 
@@ -169,7 +169,7 @@ function StakingCard() {
 				name: 'stake',
 			});
 			try {
-				const transactionBlock = createUnstakeTransaction(stakedSuiId);
+				const transactionBlock = createUnstakeTransaction(stakedOctId);
 				return await signer.signAndExecuteTransactionBlock(
 					{
 						transactionBlock,
@@ -210,7 +210,7 @@ function StakingCard() {
 						return;
 					}
 					response = await unStakeToken.mutateAsync({
-						stakedSuiId: stakeSuiIdParams,
+						stakedOctId: stakeSuiIdParams,
 					});
 
 					txDigest = response.digest;
@@ -297,7 +297,7 @@ function StakingCard() {
 
 								{unstake ? (
 									<UnStakeForm
-										stakedSuiId={stakeSuiIdParams!}
+										stakedOctId={stakeSuiIdParams!}
 										coinBalance={totalTokenBalance}
 										coinType={coinType}
 										stakingReward={suiEarned}
@@ -322,7 +322,7 @@ function StakingCard() {
 									<div className="flex-1 mt-7.5">
 										<Collapsible title="Staking Rewards" defaultOpen>
 											<Text variant="pSubtitle" color="steel-dark" weight="normal">
-												Staked SUI starts counting as validator’s stake at the end of the Epoch in
+												Staked OCT starts counting as validator’s stake at the end of the Epoch in
 												which it was staked. Rewards are earned separately for each Epoch and become
 												available at the end of each Epoch.
 											</Text>

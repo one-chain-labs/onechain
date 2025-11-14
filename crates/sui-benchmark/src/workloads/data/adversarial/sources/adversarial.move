@@ -3,12 +3,12 @@
 
 module adversarial::adversarial {
     use std::vector;
-    use sui::bcs;
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer;
-    use sui::event;
-    use sui::dynamic_field::{add, borrow};
+    use one::bcs;
+    use one::object::{Self, UID};
+    use one::tx_context::{Self, TxContext};
+    use one::transfer;
+    use one::event;
+    use one::dynamic_field::{add, borrow};
     use std::string::Self;
     use std::ascii;
 

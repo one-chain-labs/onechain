@@ -22,11 +22,11 @@ export function createStakeTransaction(amount: bigint, validator: string) {
 	return tx;
 }
 
-export function createUnstakeTransaction(stakedSuiId: string) {
+export function createUnstakeTransaction(stakedOctId: string) {
 	const tx = new Transaction();
 	tx.moveCall({
 		target: '0x3::sui_system::request_withdraw_stake',
-		arguments: [tx.object(SUI_SYSTEM_STATE_OBJECT_ID), tx.object(stakedSuiId)],
+		arguments: [tx.object(SUI_SYSTEM_STATE_OBJECT_ID), tx.object(stakedOctId)],
 	});
 	return tx;
 }

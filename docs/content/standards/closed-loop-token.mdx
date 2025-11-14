@@ -2,7 +2,7 @@
 title: Closed-Loop Token
 ---
 
-Using the Closed-Loop Token standard, you can limit the applications that can use the token and set up custom policies for transfers, spends, and conversions. The [`sui::token` module](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui-framework/token.md) in the Sui framework defines the standard.
+Using the Closed-Loop Token standard, you can limit the applications that can use the token and set up custom policies for transfers, spends, and conversions. The [`one::token` module](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui-framework/token.md) in the Sui framework defines the standard.
 
 ## Background and use cases
 
@@ -51,10 +51,10 @@ flowchart LR
 Unlike Coin, which has `key + store` abilities and thus supports wrapping and public transfers, Token has only the `key` ability and cannot be wrapped, stored as a dynamic field, or freely transferred (unless there's a custom policy for that). Due to this restriction, Token **can only be owned by an account** and can't be stored in an application (however, it can be "spent" - see [Spending section](./closed-loop-token/spending.mdx) section).
 
 ```move
-// defined in `sui::coin`
+// defined in `one::coin`
 struct Coin<phantom T> has key, store { id: UID, balance: Balance<T> }
 
-// defined in `sui::token`
+// defined in `one::token`
 struct Token<phantom T> has key { id: UID, balance: Balance<T> }
 ```
 

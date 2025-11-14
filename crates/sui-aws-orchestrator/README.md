@@ -96,7 +96,7 @@ There is support to benchmark either Sui or Narwhal only. To choose which protoc
 
 ```
 // Sui
-use protocol::sui::{SuiBenchmarkType, SuiProtocol};
+use protocol::one::{SuiBenchmarkType, SuiProtocol};
 type Protocol = SuiProtocol;
 type BenchmarkType = SuiBenchmarkType;
 // Narwhal

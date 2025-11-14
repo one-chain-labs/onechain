@@ -11,7 +11,7 @@ and burning of the <code><a href="token.md#0x2_token_Token">Token</a></code>s. A
 companion to existing open-loop (<code>Coin</code>) systems.
 
 ```
-Module:      sui::balance       sui::coin             sui::token
+Module:      one::balance       one::coin             one::token
 Main type:   Balance<T>         Coin<T>               Token<T>
 Capability:  Supply<T>  <---->  TreasuryCap<T> <----> TreasuryCap<T>
 Abilities:   store              key + store           key

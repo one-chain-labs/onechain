@@ -24,9 +24,9 @@ The following code is a close-copy of the `Coin` example from the
 ```move
 module 0x0::template {
     use std::option;
-    use sui::coin;
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+    use one::coin;
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 
     /// The OTW for the Coin
     struct TEMPLATE has drop {}

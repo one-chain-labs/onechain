@@ -275,7 +275,7 @@ export function getRandomAddresses(n: number): string[] {
 		});
 }
 
-export async function paySui(
+export async function payOct(
 	client: SuiClient,
 	signer: Keypair,
 	numRecipients: number = 1,
@@ -295,7 +295,7 @@ export async function paySui(
 		(
 			await client.getCoins({
 				owner: signer.getPublicKey().toSuiAddress(),
-				coinType: '0x2::sui::SUI',
+				coinType: '0x2::oct::OCT',
 			})
 		).data[0].coinObjectId;
 
@@ -320,7 +320,7 @@ export async function paySui(
 	return txn;
 }
 
-export async function executePaySuiNTimes(
+export async function executePayOctNTimes(
 	client: SuiClient,
 	signer: Keypair,
 	nTimes: number,
@@ -331,7 +331,7 @@ export async function executePaySuiNTimes(
 	const txns = [];
 	for (let i = 0; i < nTimes; i++) {
 		// must await here to make sure the txns are executed in order
-		txns.push(await paySui(client, signer, numRecipientsPerTxn, recipients, amounts));
+		txns.push(await payOct(client, signer, numRecipientsPerTxn, recipients, amounts));
 	}
 	return txns;
 }

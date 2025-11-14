@@ -129,7 +129,7 @@ function TransferCoinPage() {
 								coinType={coinType}
 								amount={formData.amount}
 								to={formData.to}
-								approximation={formData.isPayAllSui}
+								approximation={formData.isPayAllOct}
 								gasBudget={formData.gasBudgetEst}
 							/>
 						</Content>

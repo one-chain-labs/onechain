@@ -5,7 +5,7 @@
 
 //# publish
 module Test::M1 {
-    use sui::event;
+    use one::event;
 
     public struct EventA has copy, drop {
         new_value: u64

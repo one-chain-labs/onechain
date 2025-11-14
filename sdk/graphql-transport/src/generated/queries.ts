@@ -162,7 +162,7 @@ export type Address = IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this address. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this address. */
@@ -170,15 +170,15 @@ export type Address = IOwner & {
   /**
    * The coin objects for this address.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this address. */
   defaultSuinsName?: Maybe<Scalars['String']['output']>;
   /** Objects owned by this address, optionally `filter`-ed. */
   objects: MoveObjectConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this address. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this address. */
+  stakedOcts: StakedOctConnection;
   /**
    * The SuinsRegistration NFTs owned by this address. These grant the owner the capability to
    * manage the associated domain.
@@ -253,7 +253,7 @@ export type AddressObjectsArgs = {
 
 
 /** The 32-byte address that is an account address (corresponding to a public key). */
-export type AddressStakedSuisArgs = {
+export type AddressStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -373,7 +373,7 @@ export type Balance = {
   __typename?: 'Balance';
   /** How many coins of this type constitute the balance */
   coinObjectCount?: Maybe<Scalars['UInt53']['output']>;
-  /** Coin type for the balance, such as 0x2::sui::SUI */
+  /** Coin type for the balance, such as 0x2::oct::OCT */
   coinType: MoveType;
   /** Total balance across all coin objects of the coin type */
   totalBalance?: Maybe<Scalars['BigInt']['output']>;
@@ -384,7 +384,7 @@ export type BalanceChange = {
   __typename?: 'BalanceChange';
   /** The signed balance change. */
   amount?: Maybe<Scalars['BigInt']['output']>;
-  /** The inner type of the coin whose balance has changed (e.g. `0x2::sui::SUI`). */
+  /** The inner type of the coin whose balance has changed (e.g. `0x2::oct::OCT`). */
   coinType?: Maybe<MoveType>;
   /** The address or object whose balance has changed. */
   owner?: Maybe<Owner>;
@@ -596,7 +596,7 @@ export type Coin = IMoveObject & IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -608,7 +608,7 @@ export type Coin = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /**
@@ -655,7 +655,7 @@ export type Coin = IMoveObject & IObject & IOwner & {
   dynamicObjectField?: Maybe<DynamicField>;
   /**
    * Determines whether a transaction can transfer this object, using the TransferObjects
-   * transaction command or `sui::transfer::public_transfer`, both of which require the object to
+   * transaction command or `one::transfer::public_transfer`, both of which require the object to
    * have the `key` and `store` abilities.
    */
   hasPublicTransfer: Scalars['Boolean']['output'];
@@ -688,8 +688,8 @@ export type Coin = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
+  stakedOcts: StakedOctConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -788,7 +788,7 @@ export type CoinReceivedTransactionBlocksArgs = {
 
 
 /** Some 0x2::coin::Coin Move object. */
-export type CoinStakedSuisArgs = {
+export type CoinStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -835,7 +835,7 @@ export type CoinMetadata = IMoveObject & IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -845,7 +845,7 @@ export type CoinMetadata = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /**
@@ -896,7 +896,7 @@ export type CoinMetadata = IMoveObject & IObject & IOwner & {
   dynamicObjectField?: Maybe<DynamicField>;
   /**
    * Determines whether a transaction can transfer this object, using the TransferObjects
-   * transaction command or `sui::transfer::public_transfer`, both of which require the object to
+   * transaction command or `one::transfer::public_transfer`, both of which require the object to
    * have the `key` and `store` abilities.
    */
   hasPublicTransfer: Scalars['Boolean']['output'];
@@ -932,8 +932,8 @@ export type CoinMetadata = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
+  stakedOcts: StakedOctConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -1036,7 +1036,7 @@ export type CoinMetadataReceivedTransactionBlocksArgs = {
 
 
 /** The metadata for a coin type. */
-export type CoinMetadataStakedSuisArgs = {
+export type CoinMetadataStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -1323,7 +1323,7 @@ export type Epoch = {
   /** Parameters related to the subsidy that supplements staking rewards */
   systemStakeSubsidy?: Maybe<StakeSubsidy>;
   /**
-   * The value of the `version` field of `0x5`, the `0x3::sui::SuiSystemState` object.  This
+   * The value of the `version` field of `0x5`, the `0x3::one::SuiSystemState` object.  This
    * version changes whenever the fields contained in the system state object (held in a dynamic
    * field attached to `0x5`) change.
    */
@@ -1482,7 +1482,7 @@ export type EventFilter = {
    *
    * Generic types can be queried by either the generic type name, e.g.
    * `0x2::coin::Coin`, or by the full type name, such as
-   * `0x2::coin::Coin<0x2::sui::SUI>`.
+   * `0x2::coin::Coin<0x2::oct::OCT>`.
    */
   eventType?: InputMaybe<Scalars['String']['input']>;
   /** Filter down to events from transactions sent by this address. */
@@ -1658,7 +1658,7 @@ export type IMoveObject = {
    * Dynamic fields on wrapped objects can be accessed by using the same API under the Owner type.
    */
   dynamicObjectField?: Maybe<DynamicField>;
-  /** Determines whether a transaction can transfer this object, using the TransferObjects transaction command or `sui::transfer::public_transfer`, both of which require the object to have the `key` and `store` abilities. */
+  /** Determines whether a transaction can transfer this object, using the TransferObjects transaction command or `one::transfer::public_transfer`, both of which require the object to have the `key` and `store` abilities. */
   hasPublicTransfer: Scalars['Boolean']['output'];
 };
 
@@ -1738,22 +1738,22 @@ export type IObjectReceivedTransactionBlocksArgs = {
  */
 export type IOwner = {
   address: Scalars['SuiAddress']['output'];
-  /** Total balance of all coins with marker type owned by this object or address. If type is not supplied, it defaults to `0x2::sui::SUI`. */
+  /** Total balance of all coins with marker type owned by this object or address. If type is not supplied, it defaults to `0x2::oct::OCT`. */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object or address. */
   balances: BalanceConnection;
   /**
    * The coin objects for this object or address.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this object or address. */
   defaultSuinsName?: Maybe<Scalars['String']['output']>;
   /** Objects owned by this object or address, optionally `filter`-ed. */
   objects: MoveObjectConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object or address. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object or address. */
+  stakedOcts: StakedOctConnection;
   /** The SuinsRegistration NFTs owned by this object or address. These grant the owner the capability to manage the associated domain. */
   suinsRegistrations: SuinsRegistrationConnection;
 };
@@ -1831,7 +1831,7 @@ export type IOwnerObjectsArgs = {
  * object. The same address can only refer to an account or an object, never both, but it is not
  * possible to know which up-front.
  */
-export type IOwnerStakedSuisArgs = {
+export type IOwnerStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -2238,13 +2238,13 @@ export type MoveObject = IMoveObject & IObject & IOwner & {
   asCoin?: Maybe<Coin>;
   /** Attempts to convert the Move object into a `0x2::coin::CoinMetadata`. */
   asCoinMetadata?: Maybe<CoinMetadata>;
-  /** Attempts to convert the Move object into a `0x3::staking_pool::StakedSui`. */
-  asStakedSui?: Maybe<StakedSui>;
+  /** Attempts to convert the Move object into a `0x3::staking_pool::StakedOct`. */
+  asStakedOct?: Maybe<StakedOct>;
   /** Attempts to convert the Move object into a `SuinsRegistration` object. */
   asSuinsRegistration?: Maybe<SuinsRegistration>;
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -2254,7 +2254,7 @@ export type MoveObject = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /**
@@ -2301,7 +2301,7 @@ export type MoveObject = IMoveObject & IObject & IOwner & {
   dynamicObjectField?: Maybe<DynamicField>;
   /**
    * Determines whether a transaction can transfer this object, using the TransferObjects
-   * transaction command or `sui::transfer::public_transfer`, both of which require the object to
+   * transaction command or `one::transfer::public_transfer`, both of which require the object to
    * have the `key` and `store` abilities.
    */
   hasPublicTransfer: Scalars['Boolean']['output'];
@@ -2334,8 +2334,8 @@ export type MoveObject = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
+  stakedOcts: StakedOctConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -2464,7 +2464,7 @@ export type MoveObjectReceivedTransactionBlocksArgs = {
  * The representation of an object as a Move Object, which exposes additional information
  * (content, module that governs it, version, is transferrable, etc.) about this object.
  */
-export type MoveObjectStakedSuisArgs = {
+export type MoveObjectStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -2511,7 +2511,7 @@ export type MovePackage = IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this package. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    *
    * Note that coins owned by a package are inaccessible, because packages are immutable and
    * cannot be owned by an address.
@@ -2529,7 +2529,7 @@ export type MovePackage = IObject & IOwner & {
   /**
    * The coin objects owned by this package.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    *
    * Note that coins owned by a package are inaccessible, because packages are immutable and
    * cannot be owned by an address.
@@ -2611,12 +2611,12 @@ export type MovePackage = IObject & IOwner & {
    */
   receivedTransactionBlocks: TransactionBlockConnection;
   /**
-   * The `0x3::staking_pool::StakedSui` objects owned by this package.
+   * The `0x3::staking_pool::StakedOct` objects owned by this package.
    *
    * Note that objects owned by a package are inaccessible, because packages are immutable and
    * cannot be owned by an address.
    */
-  stakedOcts: StakedSuiConnection;
+  stakedOcts: StakedOctConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -2766,7 +2766,7 @@ export type MovePackageReceivedTransactionBlocksArgs = {
  * A MovePackage is a kind of Move object that represents code that has been published on chain.
  * It exposes information about its modules, type definitions, functions, and dependencies.
  */
-export type MovePackageStakedSuisArgs = {
+export type MovePackageStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -2979,7 +2979,7 @@ export type Object = IObject & IOwner & {
   asMovePackage?: Maybe<MovePackage>;
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -2989,7 +2989,7 @@ export type Object = IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this object. */
@@ -3060,8 +3060,8 @@ export type Object = IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
+  stakedOcts: StakedOctConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -3200,7 +3200,7 @@ export type ObjectReceivedTransactionBlocksArgs = {
  * with fields) with additional metadata detailing its id, version, transaction digest, owner
  * field indicating how this object can be accessed.
  */
-export type ObjectStakedSuisArgs = {
+export type ObjectStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -3293,7 +3293,7 @@ export type ObjectFilter = {
    * name.
    *
    * Generic types can be queried by either the generic type name, e.g. `0x2::coin::Coin`, or by
-   * the full type name, such as `0x2::coin::Coin<0x2::sui::SUI>`.
+   * the full type name, such as `0x2::coin::Coin<0x2::oct::OCT>`.
    */
   type?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3365,7 +3365,7 @@ export type Owner = IOwner & {
   asObject?: Maybe<Object>;
   /**
    * Total balance of all coins with marker type owned by this object or address. If type is not
-   * supplied, it defaults to `0x2::sui::SUI`.
+   * supplied, it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object or address. */
@@ -3373,7 +3373,7 @@ export type Owner = IOwner & {
   /**
    * The coin objects for this object or address.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /** The domain explicitly configured as the default domain pointing to this object or address. */
@@ -3403,8 +3403,8 @@ export type Owner = IOwner & {
   dynamicObjectField?: Maybe<DynamicField>;
   /** Objects owned by this object or address, optionally `filter`-ed. */
   objects: MoveObjectConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object or address. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object or address. */
+  stakedOcts: StakedOctConnection;
   /**
    * The SuinsRegistration NFTs owned by this object or address. These grant the owner the
    * capability to manage the associated domain.
@@ -3512,7 +3512,7 @@ export type OwnerObjectsArgs = {
  * represents either an Address (corresponding to a public key of an account) or an Object, but
  * never both (it is not known up-front whether a given Owner is an Address or an Object).
  */
-export type OwnerStakedSuisArgs = {
+export type OwnerStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -3724,7 +3724,7 @@ export type Query = {
    * The coin objects that exist in the network.
    *
    * The type field is a string of the inner type of the coin by which to filter (e.g.
-   * `0x2::sui::SUI`). If no type is provided, it will default to `0x2::sui::SUI`.
+   * `0x2::oct::OCT`). If no type is provided, it will default to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /**
@@ -4298,15 +4298,15 @@ export type StakeSubsidy = {
   periodLength?: Maybe<Scalars['Int']['output']>;
 };
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSui = IMoveObject & IObject & IOwner & {
-  __typename?: 'StakedSui';
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOct = IMoveObject & IObject & IOwner & {
+  __typename?: 'StakedOct';
   /** The epoch at which this stake became active. */
   activatedEpoch?: Maybe<Epoch>;
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -4316,7 +4316,7 @@ export type StakedSui = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /**
@@ -4376,7 +4376,7 @@ export type StakedSui = IMoveObject & IObject & IOwner & {
   estimatedReward?: Maybe<Scalars['BigInt']['output']>;
   /**
    * Determines whether a transaction can transfer this object, using the TransferObjects
-   * transaction command or `sui::transfer::public_transfer`, both of which require the object to
+   * transaction command or `one::transfer::public_transfer`, both of which require the object to
    * have the `key` and `store` abilities.
    */
   hasPublicTransfer: Scalars['Boolean']['output'];
@@ -4417,8 +4417,8 @@ export type StakedSui = IMoveObject & IObject & IOwner & {
   requestedEpoch?: Maybe<Epoch>;
   /** A stake can be pending, active, or unstaked */
   stakeStatus: StakeStatus;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
+  stakedOcts: StakedOctConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -4443,14 +4443,14 @@ export type StakedSui = IMoveObject & IObject & IOwner & {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiBalanceArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctBalanceArgs = {
   type?: InputMaybe<Scalars['String']['input']>;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiBalancesArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctBalancesArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4458,8 +4458,8 @@ export type StakedSuiBalancesArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiCoinsArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctCoinsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4468,20 +4468,20 @@ export type StakedSuiCoinsArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiDefaultSuinsNameArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctDefaultSuinsNameArgs = {
   format?: InputMaybe<DomainFormat>;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiDynamicFieldArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctDynamicFieldArgs = {
   name: DynamicFieldName;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiDynamicFieldsArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctDynamicFieldsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4489,14 +4489,14 @@ export type StakedSuiDynamicFieldsArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiDynamicObjectFieldArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctDynamicObjectFieldArgs = {
   name: DynamicFieldName;
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiObjectsArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctObjectsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   filter?: InputMaybe<ObjectFilter>;
@@ -4505,8 +4505,8 @@ export type StakedSuiObjectsArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiReceivedTransactionBlocksArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctReceivedTransactionBlocksArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   filter?: InputMaybe<TransactionBlockFilter>;
@@ -4516,8 +4516,8 @@ export type StakedSuiReceivedTransactionBlocksArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiStakedSuisArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -4525,31 +4525,31 @@ export type StakedSuiStakedSuisArgs = {
 };
 
 
-/** Represents a `0x3::staking_pool::StakedSui` Move object on-chain. */
-export type StakedSuiSuinsRegistrationsArgs = {
+/** Represents a `0x3::staking_pool::StakedOct` Move object on-chain. */
+export type StakedOctSuinsRegistrationsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
 };
 
-export type StakedSuiConnection = {
-  __typename?: 'StakedSuiConnection';
+export type StakedOctConnection = {
+  __typename?: 'StakedOctConnection';
   /** A list of edges. */
-  edges: Array<StakedSuiEdge>;
+  edges: Array<StakedOctEdge>;
   /** A list of nodes. */
-  nodes: Array<StakedSui>;
+  nodes: Array<StakedOct>;
   /** Information to aid in pagination. */
   pageInfo: PageInfo;
 };
 
 /** An edge in a connection. */
-export type StakedSuiEdge = {
-  __typename?: 'StakedSuiEdge';
+export type StakedOctEdge = {
+  __typename?: 'StakedOctEdge';
   /** A cursor for use in pagination */
   cursor: Scalars['String']['output'];
   /** The item at the end of the edge */
-  node: StakedSui;
+  node: StakedOct;
 };
 
 /** SUI set aside to account for objects stored on-chain. */
@@ -4572,7 +4572,7 @@ export type SuinsRegistration = IMoveObject & IObject & IOwner & {
   address: Scalars['SuiAddress']['output'];
   /**
    * Total balance of all coins with marker type owned by this object. If type is not supplied,
-   * it defaults to `0x2::sui::SUI`.
+   * it defaults to `0x2::oct::OCT`.
    */
   balance?: Maybe<Balance>;
   /** The balances of all coin types owned by this object. */
@@ -4582,7 +4582,7 @@ export type SuinsRegistration = IMoveObject & IObject & IOwner & {
   /**
    * The coin objects for this object.
    *
-   * `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+   * `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
    */
   coins: CoinConnection;
   /**
@@ -4631,7 +4631,7 @@ export type SuinsRegistration = IMoveObject & IObject & IOwner & {
   dynamicObjectField?: Maybe<DynamicField>;
   /**
    * Determines whether a transaction can transfer this object, using the TransferObjects
-   * transaction command or `sui::transfer::public_transfer`, both of which require the object to
+   * transaction command or `one::transfer::public_transfer`, both of which require the object to
    * have the `key` and `store` abilities.
    */
   hasPublicTransfer: Scalars['Boolean']['output'];
@@ -4664,8 +4664,8 @@ export type SuinsRegistration = IMoveObject & IObject & IOwner & {
    * `afterCheckpoint` and `atCheckpoint` filters.
    */
   receivedTransactionBlocks: TransactionBlockConnection;
-  /** The `0x3::staking_pool::StakedSui` objects owned by this object. */
-  stakedOcts: StakedSuiConnection;
+  /** The `0x3::staking_pool::StakedOct` objects owned by this object. */
+  stakedOcts: StakedOctConnection;
   /**
    * The current status of the object as read from the off-chain store. The possible states are:
    * NOT_INDEXED, the object is loaded from serialized data, such as the contents of a genesis or
@@ -4754,7 +4754,7 @@ export type SuinsRegistrationReceivedTransactionBlocksArgs = {
 };
 
 
-export type SuinsRegistrationStakedSuisArgs = {
+export type SuinsRegistrationStakedOctsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -5693,7 +5693,7 @@ export type GetStakesQueryVariables = Exact<{
 }>;
 
 
-export type GetStakesQuery = { __typename?: 'Query', address?: { __typename?: 'Address', stakedOcts: { __typename?: 'StakedSuiConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'StakedSui', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null }> } } | null };
+export type GetStakesQuery = { __typename?: 'Query', address?: { __typename?: 'Address', stakedOcts: { __typename?: 'StakedOctConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'StakedOct', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null }> } } | null };
 
 export type GetStakesByIdsQueryVariables = Exact<{
   ids: Array<Scalars['SuiAddress']['input']> | Scalars['SuiAddress']['input'];
@@ -5702,9 +5702,9 @@ export type GetStakesByIdsQueryVariables = Exact<{
 }>;
 
 
-export type GetStakesByIdsQuery = { __typename?: 'Query', objects: { __typename?: 'ObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'Object', asMoveObject?: { __typename?: 'MoveObject', asStakedSui?: { __typename?: 'StakedSui', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null } | null } | null }> } };
+export type GetStakesByIdsQuery = { __typename?: 'Query', objects: { __typename?: 'ObjectConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'Object', asMoveObject?: { __typename?: 'MoveObject', asStakedOct?: { __typename?: 'StakedOct', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null } | null } | null }> } };
 
-export type Rpc_Stake_FieldsFragment = { __typename?: 'StakedSui', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null };
+export type Rpc_Stake_FieldsFragment = { __typename?: 'StakedOct', principal?: any | null, stakeStatus: StakeStatus, address: any, estimatedReward?: any | null, activatedEpoch?: { __typename?: 'Epoch', epochId: any, referenceGasPrice?: any | null } | null, requestedEpoch?: { __typename?: 'Epoch', epochId: any } | null, contents?: { __typename?: 'MoveValue', json: any } | null };
 
 export type QueryTransactionBlocksQueryVariables = Exact<{
   first?: InputMaybe<Scalars['Int']['input']>;
@@ -6209,7 +6209,7 @@ export const Rpc_Move_Object_FieldsFragmentDoc = new TypedDocumentString(`
   }
 }`, {"fragmentName":"RPC_MOVE_OBJECT_FIELDS"}) as unknown as TypedDocumentString<Rpc_Move_Object_FieldsFragment, unknown>;
 export const Rpc_Stake_FieldsFragmentDoc = new TypedDocumentString(`
-    fragment RPC_STAKE_FIELDS on StakedSui {
+    fragment RPC_STAKE_FIELDS on StakedOct {
   principal
   activatedEpoch {
     epochId
@@ -6975,7 +6975,7 @@ export const GetAllBalancesDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<GetAllBalancesQuery, GetAllBalancesQueryVariables>;
 export const GetBalanceDocument = new TypedDocumentString(`
-    query getBalance($owner: SuiAddress!, $type: String = "0x2::sui::SUI") {
+    query getBalance($owner: SuiAddress!, $type: String = "0x2::oct::OCT") {
   address(address: $owner) {
     balance(type: $type) {
       coinType {
@@ -7005,7 +7005,7 @@ export const GetCoinMetadataDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<GetCoinMetadataQuery, GetCoinMetadataQueryVariables>;
 export const GetCoinsDocument = new TypedDocumentString(`
-    query getCoins($owner: SuiAddress!, $first: Int, $cursor: String, $type: String = "0x2::sui::SUI") {
+    query getCoins($owner: SuiAddress!, $first: Int, $cursor: String, $type: String = "0x2::oct::OCT") {
   address(address: $owner) {
     address
     coins(first: $first, after: $cursor, type: $type) {
@@ -8225,7 +8225,7 @@ export const GetStakesDocument = new TypedDocumentString(`
     }
   }
 }
-    fragment RPC_STAKE_FIELDS on StakedSui {
+    fragment RPC_STAKE_FIELDS on StakedOct {
   principal
   activatedEpoch {
     epochId
@@ -8253,14 +8253,14 @@ export const GetStakesByIdsDocument = new TypedDocumentString(`
     }
     nodes {
       asMoveObject {
-        asStakedSui {
+        asStakedOct {
           ...RPC_STAKE_FIELDS
         }
       }
     }
   }
 }
-    fragment RPC_STAKE_FIELDS on StakedSui {
+    fragment RPC_STAKE_FIELDS on StakedOct {
   principal
   activatedEpoch {
     epochId

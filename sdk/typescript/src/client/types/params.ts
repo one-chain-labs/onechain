@@ -200,7 +200,7 @@ export interface GetBalanceParams {
 	owner: string;
 	/**
 	 * optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC),
-	 * default to 0x2::sui::SUI if not specified.
+	 * default to 0x2::oct::OCT if not specified.
 	 */
 	coinType?: string | null | undefined;
 }
@@ -219,7 +219,7 @@ export interface GetCoinsParams {
 	owner: string;
 	/**
 	 * optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC),
-	 * default to 0x2::sui::SUI if not specified.
+	 * default to 0x2::oct::OCT if not specified.
 	 */
 	coinType?: string | null | undefined;
 	/** optional paging cursor */
@@ -277,7 +277,7 @@ export interface GetStakesParams {
 }
 /** Return one or more [DelegatedStake]. If a Stake was withdrawn its status will be Unstaked. */
 export interface GetStakesByIdsParams {
-	stakedSuiIds: string[];
+	stakedOctIds: string[];
 }
 /** Return total supply for a coin */
 export interface GetTotalSupplyParams {
@@ -432,12 +432,12 @@ export interface UnsafePayParams {
 }
 /**
  * Send all SUI coins to one recipient. This is for SUI coin only and does not require a separate gas
- * coin object. Specifically, what pay_all_sui does are: 1. accumulate all SUI from input coins and
+ * coin object. Specifically, what pay_all_oct does are: 1. accumulate all SUI from input coins and
  * deposit all SUI to the first input coin 2. transfer the updated first coin to the recipient and also
  * use this first coin as gas coin object. 3. the balance of the first input coin after tx is
  * sum(input_coins) - actual_gas_cost. 4. all other input coins other than the first are deleted.
  */
-export interface UnsafePayAllSuiParams {
+export interface UnsafePayAllOctParams {
 	/** the transaction signer's Sui address */
 	signer: string;
 	/** the Sui coins to be used in this transaction, including the coin for gas payment. */
@@ -449,14 +449,14 @@ export interface UnsafePayAllSuiParams {
 }
 /**
  * Send SUI coins to a list of addresses, following a list of amounts. This is for SUI coin only and
- * does not require a separate gas coin object. Specifically, what pay_sui does are: 1. debit each
+ * does not require a separate gas coin object. Specifically, what pay_oct does are: 1. debit each
  * input_coin to create new coin following the order of amounts and assign it to the corresponding
  * recipient. 2. accumulate all residual SUI from input coins left and deposit all SUI to the first
  * input coin, then use the first input coin as the gas coin object. 3. the balance of the first input
  * coin after tx is sum(input_coins) - sum(amounts) - actual_gas_cost 4. all other input coints other
  * than the first one are deleted.
  */
-export interface UnsafePaySuiParams {
+export interface UnsafePayOctParams {
 	/** the transaction signer's Sui address */
 	signer: string;
 	/** the Sui coins to be used in this transaction, including the coin for gas payment. */
@@ -488,7 +488,7 @@ export interface UnsafePublishParams {
 export interface UnsafeRequestAddStakeParams {
 	/** the transaction signer's Sui address */
 	signer: string;
-	/** Coin<SUI> object to stake */
+	/** Coin<OCT> object to stake */
 	coins: string[];
 	/** stake amount */
 	amount?: string | null | undefined;
@@ -506,7 +506,7 @@ export interface UnsafeRequestAddStakeParams {
 export interface UnsafeRequestWithdrawStakeParams {
 	/** the transaction signer's Sui address */
 	signer: string;
-	/** StakedSui object ID */
+	/** StakedOct object ID */
 	stakedSui: string;
 	/**
 	 * gas object to be used in this transaction, node will pick one from the signer's possession if not
@@ -571,7 +571,7 @@ export interface UnsafeTransferObjectParams {
  * Create an unsigned transaction to send SUI coin object to a Sui address. The SUI object is also used
  * as the gas object.
  */
-export interface UnsafeTransferSuiParams {
+export interface UnsafeTransferOctParams {
 	/** the transaction signer's Sui address */
 	signer: string;
 	/** the Sui coin object to be used in this transaction */

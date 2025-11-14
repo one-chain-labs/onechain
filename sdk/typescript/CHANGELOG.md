@@ -1061,7 +1061,7 @@
 ### Patch Changes
 
 - fcba70206: Add basic formatting utilities
-- ebe6c3945: Support deserializing `paySui` and `payAllSui` transactions
+- ebe6c3945: Support deserializing `payOct` and `payAllOct` transactions
 - e630f6832: Added string option to getCheckpointContents call in SDK to support 0.22.0
 
 ## 0.26.1
@@ -1212,7 +1212,7 @@
 - db22728c1: \* adds dryRunTransaction support
   - adds getGasCostEstimation to the signer-with-provider that estimates the gas cost for a
     transaction
-- 3b510d0fc: adds coin transfer method to framework that uses pay and paySui
+- 3b510d0fc: adds coin transfer method to framework that uses pay and payOct
 
 ## 0.16.0
 

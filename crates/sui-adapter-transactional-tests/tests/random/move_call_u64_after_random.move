@@ -5,7 +5,7 @@
 
 //# publish --sender A
 module test::random {
-    use sui::random::Random;
+    use one::random::Random;
 
     public fun use_random(_random: &Random) {}
     public fun use_value(_value: u64) {}

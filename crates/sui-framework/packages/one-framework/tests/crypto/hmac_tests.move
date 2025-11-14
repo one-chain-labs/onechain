@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::hmac_tests {
-    use sui::hmac;
+module one::hmac_tests {
+    use one::hmac;
 
     #[test]
     fun test_hmac_sha3_256() {

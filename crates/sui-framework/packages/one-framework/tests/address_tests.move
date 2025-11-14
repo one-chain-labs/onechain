@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::address_tests {
-    use sui::address;
+module one::address_tests {
+    use one::address;
 
     #[test]
     fun from_bytes_ok() {
@@ -17,7 +17,7 @@ module oct::address_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::address::EAddressParseError)]
+    #[expected_failure(abort_code = one::address::EAddressParseError)]
     fun from_bytes_too_few_bytes() {
         let mut ctx = tx_context::dummy();
         let uid = object::new(&mut ctx);
@@ -31,7 +31,7 @@ module oct::address_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::address::EAddressParseError)]
+    #[expected_failure(abort_code = one::address::EAddressParseError)]
     fun test_from_bytes_too_many_bytes() {
         let mut ctx = tx_context::dummy();
         let uid = object::new(&mut ctx);
@@ -117,19 +117,19 @@ module oct::address_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::address::EAddressParseError)]
+    #[expected_failure(abort_code = one::address::EAddressParseError)]
     fun from_ascii_string_too_short() {
         address::from_ascii_bytes(&b"0");
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::address::EAddressParseError)]
+    #[expected_failure(abort_code = one::address::EAddressParseError)]
     fun from_ascii_string_too_long() {
         address::from_ascii_bytes(&b"00000000000000000000000000000000000000000000000000000000000000001");
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::address::EAddressParseError)]
+    #[expected_failure(abort_code = one::address::EAddressParseError)]
     fun from_ascii_string_non_hex_character() {
         address::from_ascii_bytes(&b"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffg");
     }

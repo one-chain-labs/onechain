@@ -5,7 +5,7 @@
 
 //# publish
 module tto::M1 {
-    use sui::transfer::Receiving;
+    use one::transfer::Receiving;
 
     public struct A has key, store {
         id: UID,
@@ -37,7 +37,7 @@ module tto::M1 {
 //# run tto::M1::receiver --args receiving(2,1)
 
 //# programmable --inputs receiving(2,1)
-//> sui::transfer::receiving_object_id<tto::M1::B>(Input(0))
+//> one::transfer::receiving_object_id<tto::M1::B>(Input(0))
 
 //# programmable --inputs receiving(2,1)
 //> tto::M1::receiver(Input(0))

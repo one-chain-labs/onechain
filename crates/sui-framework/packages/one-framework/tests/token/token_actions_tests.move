@@ -6,9 +6,9 @@
 /// intended, that the request is well formed and that APIs are usable.
 ///
 /// It also tests custom actions which can be implemented by policy owner.
-module oct::token_actions_tests {
-    use sui::token;
-    use sui::token_test_utils as test;
+module one::token_actions_tests {
+    use one::token;
+    use one::token_test_utils as test;
 
     #[test]
     /// Scenario: perform a transfer operation, and confirm that the request

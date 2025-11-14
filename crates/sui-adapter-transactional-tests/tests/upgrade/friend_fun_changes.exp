@@ -43,8 +43,8 @@ task 7, line 89:
 Owner: Account Address ( A )
 Version: 3
 Contents: V0::base_module::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(6,0),
         },
     },

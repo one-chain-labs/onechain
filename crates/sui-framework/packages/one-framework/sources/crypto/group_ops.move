@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Generic Move and native functions for group operations.
-module oct::group_ops;
+module one::group_ops;
 
-use sui::bcs;
+use one::bcs;
 
 #[allow(unused_const)]
 const ENotSupported: u64 = 0; // Operation is not supported by the network.

@@ -4,18 +4,18 @@
 #[test_only]
 module deepbook::order_query_tests {
     use std::option::{none, some};
-    use sui::clock;
+    use one::clock;
     use deepbook::order_query;
     use deepbook::order_query::iter_bids;
     use deepbook::custodian_v2;
     use deepbook::custodian_v2::{AccountCap, account_owner};
-    use sui::clock::Clock;
-    use sui::coin::mint_for_testing;
+    use one::clock::Clock;
+    use one::coin::mint_for_testing;
     use deepbook::clob_v2;
-    use sui::oct::OCT;
+    use one::oct::OCT;
     use deepbook::clob_v2::{setup_test, USD, mint_account_cap_transfer, Pool};
-    use sui::test_scenario;
-    use sui::test_scenario::{next_tx, end, ctx, Scenario};
+    use one::test_scenario;
+    use one::test_scenario::{next_tx, end, ctx, Scenario};
 
     const CLIENT_ID_ALICE: u64 = 0;
     const FLOAT_SCALING: u64 = 1000000000;

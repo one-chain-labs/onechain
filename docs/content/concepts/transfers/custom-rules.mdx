@@ -8,7 +8,7 @@ Every Sui object must have the `key` ability. The `store` ability, on the other 
 - are transferable by anyone using the `transfer::public_transfer` function; and
 - are able to be wrapped in other objects.
 
-Importantly for custom transfer rules, if the Sui object `Object` does not have the `store` ability, you cannot call the `sui::transfer::public_transfer` function to transfer it. The Move module that defines `Object` is the only entity that can transfer objects of that type using the `sui::transfer::transfer` function. Consequently, the module that defines the object `Object` can define a custom transfer function for `Object` that can take any number of arguments, and enforce any restrictions desired for performing a transfer operation (for example, a fee must be paid in order to transfer the object).
+Importantly for custom transfer rules, if the Sui object `Object` does not have the `store` ability, you cannot call the `one::transfer::public_transfer` function to transfer it. The Move module that defines `Object` is the only entity that can transfer objects of that type using the `one::transfer::transfer` function. Consequently, the module that defines the object `Object` can define a custom transfer function for `Object` that can take any number of arguments, and enforce any restrictions desired for performing a transfer operation (for example, a fee must be paid in order to transfer the object).
 
 ## The store ability and transfer rules
 
@@ -59,4 +59,4 @@ public fun transfer_locked(object: Object) {
 }
 ```
 
-With these rules in place, there are two different custom transfer rules for any object `Object`: either it's unlocked and anyone can transfer it, or it's locked, and it can only be transferred to `0xCAFE`. Importantly, these two ways of transferring `Object` are the only ways of transferring any object of type `Object`. In particular, because `Object` does not have the `store` ability, you cannot transfer it using the `sui::transfer::public_transfer` function. In fact, the only ways of transferring `Object` are using `examples::custom_transfer::transfer_unlocked` and `examples::custom_transfer::transfer_locked`.
+With these rules in place, there are two different custom transfer rules for any object `Object`: either it's unlocked and anyone can transfer it, or it's locked, and it can only be transferred to `0xCAFE`. Importantly, these two ways of transferring `Object` are the only ways of transferring any object of type `Object`. In particular, because `Object` does not have the `store` ability, you cannot transfer it using the `one::transfer::public_transfer` function. In fact, the only ways of transferring `Object` are using `examples::custom_transfer::transfer_unlocked` and `examples::custom_transfer::transfer_locked`.

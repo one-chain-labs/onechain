@@ -5,12 +5,12 @@
 
 module prettier::group_imports;
 
-use sui::{
+use one::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,
     dynamic_object_field as dof,
-    oct::OCT,
+    one::SUI,
     table::{Self, Table},
     table_vec::{Self, TableVec as TV}
 };

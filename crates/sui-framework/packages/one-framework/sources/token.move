@@ -10,7 +10,7 @@
 /// companion to existing open-loop (`Coin`) systems.
 ///
 /// ```
-/// Module:      sui::balance       sui::coin             sui::token
+/// Module:      one::balance       one::coin             one::token
 /// Main type:   Balance<T>         Coin<T>               Token<T>
 /// Capability:  Supply<T>  <---->  TreasuryCap<T> <----> TreasuryCap<T>
 /// Abilities:   store              key + store           key
@@ -19,10 +19,10 @@
 /// The Token system allows for fine-grained control over the actions performed
 /// on the token. And hence it is highly suitable for applications that require
 /// control over the currency which a simple open-loop system can't provide.
-module oct::token;
+module one::token;
 
 use std::{string::String, type_name::{Self, TypeName}};
-use sui::{
+use one::{
     balance::{Self, Balance},
     coin::{Coin, TreasuryCap},
     dynamic_field as df,

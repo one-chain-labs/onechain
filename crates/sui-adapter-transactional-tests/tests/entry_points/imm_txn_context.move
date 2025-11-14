@@ -6,13 +6,13 @@
 //# publish
 module Test::M {
     public struct Obj has key {
-        id: sui::object::UID,
+        id: one::object::UID,
         value: u64
     }
 
     public entry fun mint(ctx: &mut TxContext) {
-        sui::transfer::transfer(
-            Obj { id: sui::object::new(ctx), value: 0 },
+        one::transfer::transfer(
+            Obj { id: one::object::new(ctx), value: 0 },
             tx_context::sender(ctx),
         )
     }

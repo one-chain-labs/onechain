@@ -4,7 +4,7 @@
 #[test_only]
 module bridge::committee_test {
 
-    use sui::vec_map;
+    use one::vec_map;
     use one_system::sui_system;
     use one_system::one_system::SuiSystemState;
 
@@ -19,7 +19,7 @@ module bridge::committee_test {
     use bridge::crypto;
     use bridge::message;
 
-    use sui::{hex, test_scenario, test_utils::{Self, assert_eq}};
+    use one::{hex, test_scenario, test_utils::{Self, assert_eq}};
     use bridge::chain_ids;
     use one_system::governance_test_utils::{
         advance_epoch_with_reward_amounts,

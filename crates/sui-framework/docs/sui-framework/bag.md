@@ -2,7 +2,7 @@
 title: Module `0x2::bag`
 ---
 
-A bag is a heterogeneous map-like collection. The collection is similar to <code>sui::table</code> in that
+A bag is a heterogeneous map-like collection. The collection is similar to <code>one::table</code> in that
 its keys and values are not stored within the <code><a href="../sui-framework/bag.md#0x2_bag_Bag">Bag</a></code> value, but instead are stored using Sui's
 object system. The <code><a href="../sui-framework/bag.md#0x2_bag_Bag">Bag</a></code> struct acts only as a handle into the object system to retrieve those
 keys and values.
@@ -18,8 +18,8 @@ bag::add(&mut bag2, 1, true);
 // bag1 does not equal bag2, despite having the same entries
 assert!(&bag1 != &bag2);
 ```
-At it's core, <code>sui::bag</code> is a wrapper around <code>UID</code> that allows for access to
-<code>sui::dynamic_field</code> while preventing accidentally stranding field values. A <code>UID</code> can be
+At it's core, <code>one::bag</code> is a wrapper around <code>UID</code> that allows for access to
+<code>one::dynamic_field</code> while preventing accidentally stranding field values. A <code>UID</code> can be
 deleted, even if it has dynamic fields associated with it, but a bag, on the other hand, must be
 empty to be destroyed.
 
@@ -124,7 +124,7 @@ Creates a new, empty bag
 ## Function `add`
 
 Adds a key-value pair to the bag <code><a href="../sui-framework/bag.md#0x2_bag">bag</a>: &<b>mut</b> <a href="../sui-framework/bag.md#0x2_bag_Bag">Bag</a></code>
-Aborts with <code>sui::dynamic_field::EFieldAlreadyExists</code> if the bag already has an entry with
+Aborts with <code>one::dynamic_field::EFieldAlreadyExists</code> if the bag already has an entry with
 that key <code>k: K</code>.
 
 
@@ -152,9 +152,9 @@ that key <code>k: K</code>.
 ## Function `borrow`
 
 Immutable borrows the value associated with the key in the bag <code><a href="../sui-framework/bag.md#0x2_bag">bag</a>: &<a href="../sui-framework/bag.md#0x2_bag_Bag">Bag</a></code>.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the bag does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the bag does not have an entry with
 that key <code>k: K</code>.
-Aborts with <code>sui::dynamic_field::EFieldTypeMismatch</code> if the bag has an entry for the key, but
+Aborts with <code>one::dynamic_field::EFieldTypeMismatch</code> if the bag has an entry for the key, but
 the value does not have the specified type.
 
 
@@ -181,9 +181,9 @@ the value does not have the specified type.
 ## Function `borrow_mut`
 
 Mutably borrows the value associated with the key in the bag <code><a href="../sui-framework/bag.md#0x2_bag">bag</a>: &<b>mut</b> <a href="../sui-framework/bag.md#0x2_bag_Bag">Bag</a></code>.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the bag does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the bag does not have an entry with
 that key <code>k: K</code>.
-Aborts with <code>sui::dynamic_field::EFieldTypeMismatch</code> if the bag has an entry for the key, but
+Aborts with <code>one::dynamic_field::EFieldTypeMismatch</code> if the bag has an entry for the key, but
 the value does not have the specified type.
 
 
@@ -210,9 +210,9 @@ the value does not have the specified type.
 ## Function `remove`
 
 Mutably borrows the key-value pair in the bag <code><a href="../sui-framework/bag.md#0x2_bag">bag</a>: &<b>mut</b> <a href="../sui-framework/bag.md#0x2_bag_Bag">Bag</a></code> and returns the value.
-Aborts with <code>sui::dynamic_field::EFieldDoesNotExist</code> if the bag does not have an entry with
+Aborts with <code>one::dynamic_field::EFieldDoesNotExist</code> if the bag does not have an entry with
 that key <code>k: K</code>.
-Aborts with <code>sui::dynamic_field::EFieldTypeMismatch</code> if the bag has an entry for the key, but
+Aborts with <code>one::dynamic_field::EFieldTypeMismatch</code> if the bag has an entry for the key, but
 the value does not have the specified type.
 
 

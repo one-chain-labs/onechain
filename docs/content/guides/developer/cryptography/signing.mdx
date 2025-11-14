@@ -47,7 +47,7 @@ Public key in hex: $PK
 2. Call the verify method in Move. All inputs are represented in bytes in hex format:
 
 ```move
-    use sui::ed25519;
+    use one::ed25519;
 
     let msg = x"$MSG";
     let pk = x"$PK";
@@ -74,7 +74,7 @@ Public key in hex: $PK
 2. Call the verify method in Move.
 
 ```move
-    use sui::ecdsa_k1;
+    use one::ecdsa_k1;
     
     let msg = x"$MSG";
     let pk = x"$PK";
@@ -101,7 +101,7 @@ Public key in hex: $PK
 
 2. Call the ecrecover method in Move and check equality.
 ```move
-    use sui::ecdsa_k1;
+    use one::ecdsa_k1;
 
     let msg = x"$MSG";
     let pk = x"$PK";
@@ -129,7 +129,7 @@ Public key in hex: $PK
 2. Call the verify method in Move.
 
 ```move
-    use sui::ecdsa_r1;
+    use one::ecdsa_r1;
 
     let msg = x"$MSG";
     let pk = x"$PK";
@@ -157,7 +157,7 @@ Public key in hex: $PK
 2. Call the ecrecover method in Move and check equality.
 
 ```move
-    use sui::ecdsa_r1;
+    use one::ecdsa_r1;
 
     let msg = x"$MSG";
     let pk = x"$PK";
@@ -185,7 +185,7 @@ Public key in hex: $PK
 2. Call the verify method in Move.
 
 ```move
-    use sui::bls12381;
+    use one::bls12381;
 
     let msg = x"$MSG";
     let pk = x"$PK";
@@ -212,7 +212,7 @@ Public key in hex: $PK
 2. Call the verify method in Move.
 
 ```move
-    use sui::bls12381;
+    use one::bls12381;
 
     let msg = x"$MSG";
     let pk = x"$PK";

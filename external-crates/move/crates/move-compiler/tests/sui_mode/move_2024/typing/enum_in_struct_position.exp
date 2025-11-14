@@ -30,10 +30,10 @@ error[Sui E02009]: invalid private transfer call
    ┌─ tests/sui_mode/move_2024/typing/enum_in_struct_position.move:30:5
    │
 11 │ public enum Obj has key, store {
-   │                          ----- The object has 'store' so 'sui::transfer::public_transfer' can be called instead
+   │                          ----- The object has 'store' so 'one::transfer::public_transfer' can be called instead
    ·
 29 │ public fun transfer(o: a::m::Obj) {
    │                        --------- The type 'a::m::Obj' is not declared in the current module
 30 │     transfer::transfer(o, @0)
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid private transfer. The function 'sui::transfer::transfer' is restricted to being called in the object's module, 'a::m'
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid private transfer. The function 'one::transfer::transfer' is restricted to being called in the object's module, 'a::m'
 

@@ -109,7 +109,7 @@ module deepbook::math {
         }
     }
 
-    #[test_only] use sui::test_utils::assert_eq;
+    #[test_only] use one::test_utils::assert_eq;
 
     #[test_only]
     fun pow(mut base: u128, mut exponent: u8): u128 {

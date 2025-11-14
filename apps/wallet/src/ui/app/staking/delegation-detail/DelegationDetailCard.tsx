@@ -22,7 +22,7 @@ import { useCoinMetadata, useGetDelegatedStake, useGetValidatorsApy } from '@mys
 import { useSuiClientQuery } from '@mysten/dapp-kit';
 import { ArrowLeft16, StakeAdd16, StakeRemove16 } from '@mysten/icons';
 import type { StakeObject } from '@mysten/sui/client';
-import { MIST_PER_SUI, SUI_TYPE_ARG } from '@mysten/sui/utils';
+import { MIST_PER_OCT, SUI_TYPE_ARG } from '@mysten/sui/utils';
 import BigNumber from 'bignumber.js';
 import { useMemo } from 'react';
 
@@ -92,7 +92,7 @@ export function DelegationDetailCard({ validatorAddress, stakedId }: DelegationD
 		apy: 0,
 	};
 
-	const delegationId = delegationData?.status === 'Active' && delegationData?.stakedSuiId;
+	const delegationId = delegationData?.status === 'Active' && delegationData?.stakedOctId;
 
 	const stakeByValidatorAddress = `/stake/new?${new URLSearchParams({
 		address: validatorAddress,
@@ -224,7 +224,7 @@ export function DelegationDetailCard({ validatorAddress, stakedId }: DelegationD
 									to={stakeByValidatorAddress + '&unstake=true'}
 									onClick={() => {
 										ampli.clickedUnstakeSui({
-											stakedAmount: Number(totalStake / MIST_PER_SUI),
+											stakedAmount: Number(totalStake / MIST_PER_OCT),
 											validatorAddress,
 										});
 									}}

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module oct_system::msim_extra_1 {
-    use sui::object::UID;
-    use sui::tx_context::TxContext;
+    use one::object::UID;
+    use one::tx_context::TxContext;
 
     public struct Type has drop {
         x: u64,

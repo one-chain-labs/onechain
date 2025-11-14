@@ -5,8 +5,8 @@
 module oct_system::voting_power_tests {
     use one_system::governance_test_utils as gtu;
     use one_system::voting_power;
-    use sui::test_scenario;
-    use sui::test_utils;
+    use one::test_scenario;
+    use one::test_utils;
     use one_system::validator::{Self, Validator};
 
     const TOTAL_VOTING_POWER: u64 = 10_000;

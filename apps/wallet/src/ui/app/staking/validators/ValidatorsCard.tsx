@@ -121,7 +121,7 @@ export function ValidatorsCard() {
 										<StakeCard
 											delegationObject={delegation as DelegationObjectWithValidator}
 											currentEpoch={Number(system.epoch)}
-											key={delegation.stakedSuiId}
+											key={delegation.stakedOctId}
 											inactiveValidator
 										/>
 									))}
@@ -155,7 +155,7 @@ export function ValidatorsCard() {
 										<StakeCard
 											delegationObject={delegation as DelegationObjectWithValidator}
 											currentEpoch={Number(system.epoch)}
-											key={delegation.stakedSuiId}
+											key={delegation.stakedOctId}
 										/>
 									))}
 						</div>

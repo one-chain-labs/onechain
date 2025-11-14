@@ -272,7 +272,7 @@ Stores the addresses that are denied for a given core type.
 </dt>
 <dd>
  Set of addresses that are banned for a given type.
- For example with <code>sui::coin::Coin</code>: If addresses A and B are banned from using
+ For example with <code>one::coin::Coin</code>: If addresses A and B are banned from using
  "0...0123::my_coin::MY_COIN", this will be "0...0123::my_coin::MY_COIN" -> {A, B}.
 </dd>
 </dl>
@@ -297,7 +297,7 @@ Trying to create a deny list object when not called by the system address.
 
 <a name="0x2_deny_list_COIN_INDEX"></a>
 
-The index into the deny list vector for the <code>sui::coin::Coin</code> type.
+The index into the deny list vector for the <code>one::coin::Coin</code> type.
 
 
 <pre><code><b>const</b> <a href="../sui-framework/deny_list.md#0x2_deny_list_COIN_INDEX">COIN_INDEX</a>: u64 = 0;
@@ -686,7 +686,7 @@ meaningless to add them to the deny list.
     <b>let</b> <a href="../sui-framework/config.md#0x2_config">config</a> = <a href="../sui-framework/config.md#0x2_config_new">config::new</a>(&<b>mut</b> <a href="../sui-framework/deny_list.md#0x2_deny_list_ConfigWriteCap">ConfigWriteCap</a>(), ctx);
     <b>let</b> config_id = <a href="../sui-framework/object.md#0x2_object_id">object::id</a>(&<a href="../sui-framework/config.md#0x2_config">config</a>);
     ofield::internal_add(&<b>mut</b> <a href="../sui-framework/deny_list.md#0x2_deny_list">deny_list</a>.id, key, <a href="../sui-framework/config.md#0x2_config">config</a>);
-    sui::event::emit(<a href="../sui-framework/deny_list.md#0x2_deny_list_PerTypeConfigCreated">PerTypeConfigCreated</a> { key, config_id });
+    one::event::emit(<a href="../sui-framework/deny_list.md#0x2_deny_list_PerTypeConfigCreated">PerTypeConfigCreated</a> { key, config_id });
 }
 </code></pre>
 

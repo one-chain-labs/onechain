@@ -49,9 +49,9 @@ You can't access wrapped objects by their ID in the object store, you must acces
 
 ```move
 module example::wrapped {
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 
     struct Inner has key, store {
         id: UID,
@@ -128,7 +128,7 @@ One distinction dynamic fields have to wrapped objects is that if a transaction 
 
 :::
 
-Adding a new dynamic field to a parent object also creates a `Field` object, responsible for associating the field name and value with that parent. Unlike other newly created objects, the ID for the resulting instance of `Field` is not created using `sui::object::new`. Instead, it is computed as a hash of the parent object ID and the type and value of the field name, so that you can use it to look-up the `Field` via its parent and name.
+Adding a new dynamic field to a parent object also creates a `Field` object, responsible for associating the field name and value with that parent. Unlike other newly created objects, the ID for the resulting instance of `Field` is not created using `one::object::new`. Instead, it is computed as a hash of the parent object ID and the type and value of the field name, so that you can use it to look-up the `Field` via its parent and name.
 
 When you remove a field, Sui deletes its associated `Field`, and if you add a new field with the same name, Sui creates a new instance with the same ID. Versioning using Lamport timestamps, coupled with dynamic fields being only accessible through their parent object, ensures that (ID, version) pairs are not reused in the process:
 

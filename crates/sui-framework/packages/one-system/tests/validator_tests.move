@@ -3,13 +3,13 @@
 
 #[test_only]
 module oct_system::validator_tests {
-    use sui::bag;
-    use sui::balance;
-    use sui::coin::{Self, Coin};
-    use sui::oct::OCT;
-    use sui::test_scenario;
-    use sui::test_utils;
-    use sui::url;
+    use one::bag;
+    use one::balance;
+    use one::coin::{Self, Coin};
+    use one::oct::OCT;
+    use one::test_scenario;
+    use one::test_utils;
+    use one::url;
     use one_system::staking_pool::StakedOct;
     use one_system::validator::{Self, Validator};
 

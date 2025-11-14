@@ -11,7 +11,7 @@ interface Options {
 	to: string;
 	amount: string;
 	coinDecimals: number;
-	isPayAllSui: boolean;
+	isPayAllOct: boolean;
 	coins: CoinStruct[];
 }
 
@@ -21,11 +21,11 @@ export function createTokenTransferTransaction({
 	coins,
 	coinType,
 	coinDecimals,
-	isPayAllSui,
+	isPayAllOct,
 }: Options) {
 	const tx = new Transaction();
 
-	if (isPayAllSui && coinType === SUI_TYPE_ARG) {
+	if (isPayAllOct && coinType === SUI_TYPE_ARG) {
 		tx.transferObjects([tx.gas], to);
 		tx.setGasPayment(
 			coins

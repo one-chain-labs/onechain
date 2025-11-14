@@ -8,7 +8,7 @@ import { createWalletProviderContextWrapper } from '../test-utils.js';
 
 const MOCK_GET_All_BALANCE_RESULT_DATA = [
 	{
-		coinType: '0x2::sui::SUI',
+		coinType: '0x2::oct::OCT',
 		coinObjectCount: 1,
 		totalBalance: '100000',
 		lockedBalance: {},

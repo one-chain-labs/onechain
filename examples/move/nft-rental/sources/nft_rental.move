@@ -8,7 +8,7 @@
 module nft_rental::rentables_ext;
 
 use kiosk::kiosk_lock_rule::Rule as LockRule;
-use sui::{
+use one::{
     bag,
     balance::{Self, Balance},
     clock::Clock,
@@ -16,7 +16,7 @@ use sui::{
     kiosk::{Kiosk, KioskOwnerCap},
     kiosk_extension,
     package::Publisher,
-    oct::OCT,
+    one::SUI,
     transfer_policy::{Self, TransferPolicy, TransferPolicyCap, has_rule}
 };
 

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module oct_system::stake_subsidy {
-    use sui::balance::Balance;
-    use sui::oct::OCT;
-    use sui::bag::Bag;
-    use sui::bag;
+    use one::balance::Balance;
+    use one::oct::OCT;
+    use one::bag::Bag;
+    use one::bag;
 
     public struct StakeSubsidy has store {
         /// Balance of SUI set aside for stake subsidies that will be drawn down over time.

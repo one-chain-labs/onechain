@@ -125,7 +125,7 @@ export function ValidatorFormDetail({ validatorAddress, unstake }: ValidatorForm
 						!unstake && (
 							<>
 								<Text variant="body" weight="medium" color="steel-darker">
-									Your Staked SUI
+									Your Staked OCT
 								</Text>
 
 								<StakeAmount balance={totalStake} variant="body" />

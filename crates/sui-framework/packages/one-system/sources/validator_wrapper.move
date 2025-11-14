@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module oct_system::validator_wrapper {
-    use sui::versioned::Versioned;
+    use one::versioned::Versioned;
     use one_system::validator::Validator;
-    use sui::versioned;
+    use one::versioned;
 
     const EInvalidVersion: u64 = 0;
 

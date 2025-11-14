@@ -7,7 +7,7 @@ Collections provide a convenient way to work with groups of data. The Sui framew
 
 ## bag
 
-A bag is a heterogeneous map-like collection. The collection is similar to `sui::table` in that its keys and values are not stored within the Bag value, but instead are stored using Sui's object system. The Bag struct acts only as a handle into the object system to retrieve those keys and values. This means that Bag values with exactly the same key-value mapping will not be equal, with ==, at runtime.
+A bag is a heterogeneous map-like collection. The collection is similar to `one::table` in that its keys and values are not stored within the Bag value, but instead are stored using Sui's object system. The Bag struct acts only as a handle into the object system to retrieve those keys and values. This means that Bag values with exactly the same key-value mapping will not be equal, with ==, at runtime.
 
 To learn more, see [Table and Bag](../dynamic-fields/tables-bags.mdx) or the [framework definition](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui-framework/bag.md) on GitHub.
 
@@ -19,25 +19,25 @@ To learn more, see [Dynamic Fields](../dynamic-fields.mdx) or the [framework def
 
 ## dynamic_object_field
 
-Similar to `sui::dynamic_field`, this module allows for the access of dynamic fields. But unlike, `sui::dynamic_field` the values bound to these dynamic fields must be objects themselves. This allows for the objects to still exist within storage, which may be important for external tools. The difference is otherwise not observable from within Move.
+Similar to `one::dynamic_field`, this module allows for the access of dynamic fields. But unlike, `one::dynamic_field` the values bound to these dynamic fields must be objects themselves. This allows for the objects to still exist within storage, which may be important for external tools. The difference is otherwise not observable from within Move.
 
 To learn more, see [Dynamic Fields](../dynamic-fields.mdx) or the [framework definition](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui-framework/dynamic_object_field.md) on GitHub.
 
 ## linked_table
 
-Similar to `sui::table` but the values are linked together, allowing for ordered insertion and removal.
+Similar to `one::table` but the values are linked together, allowing for ordered insertion and removal.
 
 To learn more, see the [framework definition](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui-framework/linked_table.md) on GitHub.
 
 ## object_bag
 
-Similar to `sui::bag`, an `ObjectBag` is a heterogeneous map-like collection. But unlike `sui::bag`, the values bound to these dynamic fields must be objects themselves. This allows for the objects to still exist in storage, which might be important for external tools. The difference is otherwise not observable from within Move.
+Similar to `one::bag`, an `ObjectBag` is a heterogeneous map-like collection. But unlike `one::bag`, the values bound to these dynamic fields must be objects themselves. This allows for the objects to still exist in storage, which might be important for external tools. The difference is otherwise not observable from within Move.
 
 To learn more, see [Table and Bag](../dynamic-fields/tables-bags.mdx) or the [framework definition](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui-framework/object_bag.md) on GitHub.
 
 ## object_table
 
-Similar to `sui::table`, an `ObjectTable<K, V>` is a map-like collection. But unlike `sui::table`, the values bound to these dynamic fields must be objects themselves. This allows for the objects to still exist within in storage, which may be important for external tools. The difference is otherwise not observable from within Move.
+Similar to `one::table`, an `ObjectTable<K, V>` is a map-like collection. But unlike `one::table`, the values bound to these dynamic fields must be objects themselves. This allows for the objects to still exist within in storage, which may be important for external tools. The difference is otherwise not observable from within Move.
 
 To learn more, see [Table and Bag](../dynamic-fields/tables-bags.mdx) or the [framework definition](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui-framework/object_table.md) on GitHub.
 

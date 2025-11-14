@@ -4,7 +4,7 @@
 module locked_stake::locked_stake;
 
 use locked_stake::epoch_time_lock::{Self, EpochTimeLock};
-use one::{balance::{Self, Balance}, coin, oct::OCT, vec_map::{Self, VecMap}};
+use one::{balance::{Self, Balance}, coin, one::SUI, vec_map::{Self, VecMap}};
 use one_system::{staking_pool::StakedOct, one_system::{Self, SuiSystemState}};
 
 const EInsufficientBalance: u64 = 0;

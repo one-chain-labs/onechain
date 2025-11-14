@@ -38,12 +38,12 @@
 /// - `kiosk_extension` is a friend module to `kiosk` and has access to its
 /// internal functions (such as `place_internal` and `lock_internal` to
 /// implement custom authorization scheme for `place` and `lock` respectively).
-module oct::kiosk_extension;
+module one::kiosk_extension;
 
-use sui::bag::{Self, Bag};
-use sui::dynamic_field as df;
-use sui::kiosk::{Kiosk, KioskOwnerCap};
-use sui::transfer_policy::TransferPolicy;
+use one::bag::{Self, Bag};
+use one::dynamic_field as df;
+use one::kiosk::{Kiosk, KioskOwnerCap};
+use one::transfer_policy::TransferPolicy;
 
 /// Trying to add an extension while not being the owner of the Kiosk.
 const ENotOwner: u64 = 0;

@@ -109,7 +109,7 @@ And as this example shows, you can now declare abilities after the struct field 
 You can now nest `use` aliases for more conciseness.
 
 ```move
-use sui::{balance, coin::{Self, Coin}};
+use one::{balance, coin::{Self, Coin}};
 ```
 
 Additionally, the following `use` declarations are now automatically included in every module:
@@ -117,9 +117,9 @@ Additionally, the following `use` declarations are now automatically included in
 ```move
 use std::vector;
 use std::option::{Self, Option};
-use sui::object::{Self, ID, UID};
-use sui::transfer;
-use sui::tx_context::{Self, TxContext};
+use one::object::{Self, ID, UID};
+use one::transfer;
+use one::tx_context::{Self, TxContext};
 ```
 
 ### Automatic referencing in equality

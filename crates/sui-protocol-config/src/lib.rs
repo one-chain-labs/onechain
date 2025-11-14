@@ -54,7 +54,7 @@ const MAX_PROTOCOL_VERSION: u64 = 71;
 //             bucket base or rounding up. The presence of `gas_rounding_step` (or `None`)
 //             decides whether rounding is applied or not.
 // Version 15: Add reordering of user transactions by gas price after consensus.
-//             Add `sui::table_vec::drop` to the framework via a system package upgrade.
+//             Add `one::table_vec::drop` to the framework via a system package upgrade.
 // Version 16: Enabled simplified_unwrap_then_delete feature flag, which allows the execution engine
 //             to no longer consult the object store when generating unwrapped_then_deleted in the
 //             effects; this also allows us to stop including wrapped tombstones in accumulator.
@@ -80,10 +80,10 @@ const MAX_PROTOCOL_VERSION: u64 = 71;
 // Version 24: Re-enable simple gas conservation checks.
 //             Package publish/upgrade number in a single transaction limited.
 //             JWK / authenticator state flags.
-// Version 25: Add sui::table_vec::swap and sui::table_vec::swap_remove to system packages.
+// Version 25: Add one::table_vec::swap and one::table_vec::swap_remove to system packages.
 // Version 26: New gas model version.
 //             Add support for receiving objects off of other objects in devnet only.
-// Version 28: Add sui::zklogin::verify_zklogin_id and related functions to sui framework.
+// Version 28: Add one::zklogin::verify_zklogin_id and related functions to sui framework.
 //             Enable transaction effects v2 in devnet.
 // Version 29: Add verify_legacy_zklogin_address flag to sui framework, this add ability to verify
 //             transactions from a legacy zklogin address.
@@ -97,9 +97,9 @@ const MAX_PROTOCOL_VERSION: u64 = 71;
 // Version 31: Add support for shared object deletion in devnet only.
 //             Add support for getting object ID referenced by receiving object in sui framework.
 //             Create new execution layer version, and preserve previous behavior in v1.
-//             Update semantics of `sui::transfer::receive` and add `sui::transfer::public_receive`.
+//             Update semantics of `one::transfer::receive` and add `one::transfer::public_receive`.
 // Version 32: Add delete functions for VerifiedID and VerifiedIssuer.
-//             Add sui::token module to sui framework.
+//             Add one::token module to sui framework.
 //             Enable transfer to object in testnet.
 //             Enable Narwhal CertificateV2 on mainnet
 //             Make critbit tree and order getters public in deepbook.

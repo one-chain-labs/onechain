@@ -5,17 +5,17 @@ module axelar::validators {
     use std::string::{Self, String};
     use std::vector;
 
-    use sui::table::{Self, Table};
-    use sui::address;
-    use sui::bcs;
-    use sui::dynamic_field as df;
-    use sui::ecdsa_k1 as ecdsa;
-    use sui::event;
-    use sui::hash;
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::TxContext;
-    use sui::vec_map:: {Self, VecMap};
+    use one::table::{Self, Table};
+    use one::address;
+    use one::bcs;
+    use one::dynamic_field as df;
+    use one::ecdsa_k1 as ecdsa;
+    use one::event;
+    use one::hash;
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::TxContext;
+    use one::vec_map:: {Self, VecMap};
 
     use axelar::channel::{Self, ApprovedCall};
     use axelar::utils::{normalize_signature, operators_hash};

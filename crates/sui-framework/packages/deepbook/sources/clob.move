@@ -5,13 +5,13 @@
 module deepbook::clob {
     use std::type_name::{Self, TypeName};
 
-    use sui::balance::{Self, Balance};
-    use sui::clock::{Self, Clock};
-    use sui::coin::{Self, Coin, join};
-    use sui::event;
-    use sui::linked_table::{Self, LinkedTable};
-    use sui::oct::OCT;
-    use sui::table::{Self, Table, contains, add, borrow_mut};
+    use one::balance::{Self, Balance};
+    use one::clock::{Self, Clock};
+    use one::coin::{Self, Coin, join};
+    use one::event;
+    use one::linked_table::{Self, LinkedTable};
+    use one::oct::OCT;
+    use one::table::{Self, Table, contains, add, borrow_mut};
 
     use deepbook::critbit::{Self, CritbitTree, is_empty, borrow_mut_leaf_by_index, min_leaf, remove_leaf_by_index, max_leaf, next_leaf, previous_leaf, borrow_leaf_by_index, borrow_leaf_by_key, find_leaf, insert_leaf};
     use deepbook::custodian::{Self, Custodian, AccountCap};
@@ -1339,7 +1339,7 @@ module deepbook::clob {
 
     // Note that open orders and quotes can be directly accessed by loading in the entire Pool.
 
-    #[test_only] use sui::test_scenario::{Self, Scenario};
+    #[test_only] use one::test_scenario::{Self, Scenario};
 
     #[test_only] public struct USD {}
 

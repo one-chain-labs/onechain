@@ -92,12 +92,12 @@ The total supply of Sui denominated in Mist (10 Billion * 10^9)
 
 
 
-<a name="0x2_sui_TOTAL_SUPPLY_SUI"></a>
+<a name="0x2_sui_TOTAL_SUPPLY_OCT"></a>
 
 The total supply of Sui denominated in whole Sui tokens (10 Billion)
 
 
-<pre><code><b>const</b> <a href="../sui-framework/sui.md#0x2_sui_TOTAL_SUPPLY_SUI">TOTAL_SUPPLY_SUI</a>: u64 = 10000000000;
+<pre><code><b>const</b> <a href="../sui-framework/sui.md#0x2_sui_TOTAL_SUPPLY_OCT">TOTAL_SUPPLY_OCT</a>: u64 = 10000000000;
 </code></pre>
 
 
@@ -110,7 +110,7 @@ Register the <code><a href="../sui-framework/sui.md#0x2_sui_SUI">SUI</a></code> 
 This should be called only once during genesis creation.
 
 
-<pre><code><b>fun</b> <a href="../sui-framework/sui.md#0x2_sui_new">new</a>(ctx: &<b>mut</b> <a href="../sui-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../sui-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../sui-framework/sui.md#0x2_sui_SUI">sui::SUI</a>&gt;
+<pre><code><b>fun</b> <a href="../sui-framework/sui.md#0x2_sui_new">new</a>(ctx: &<b>mut</b> <a href="../sui-framework/tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>): <a href="../sui-framework/balance.md#0x2_balance_Balance">balance::Balance</a>&lt;<a href="../sui-framework/sui.md#0x2_sui_SUI">one::SUI</a>&gt;
 </code></pre>
 
 
@@ -151,7 +151,7 @@ This should be called only once during genesis creation.
 
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="../sui-framework/transfer.md#0x2_transfer">transfer</a>(c: <a href="../sui-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../sui-framework/sui.md#0x2_sui_SUI">sui::SUI</a>&gt;, recipient: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="../sui-framework/transfer.md#0x2_transfer">transfer</a>(c: <a href="../sui-framework/coin.md#0x2_coin_Coin">coin::Coin</a>&lt;<a href="../sui-framework/sui.md#0x2_sui_SUI">one::SUI</a>&gt;, recipient: <b>address</b>)
 </code></pre>
 
 

@@ -357,7 +357,7 @@ Trying to split a coin more times than its balance allows.
 
 <a name="0x2_coin_DENY_LIST_COIN_INDEX"></a>
 
-The index into the deny list vector for the <code>sui::coin::Coin</code> type.
+The index into the deny list vector for the <code>one::coin::Coin</code> type.
 
 
 <pre><code><b>const</b> <a href="../sui-framework/coin.md#0x2_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>: u64 = 0;
@@ -851,7 +851,7 @@ type, ensuring that there's only one <code><a href="../sui-framework/coin.md#0x2
     ctx: &<b>mut</b> TxContext,
 ): (<a href="../sui-framework/coin.md#0x2_coin_TreasuryCap">TreasuryCap</a>&lt;T&gt;, <a href="../sui-framework/coin.md#0x2_coin_CoinMetadata">CoinMetadata</a>&lt;T&gt;) {
     // Make sure there's only one instance of the type T
-    <b>assert</b>!(sui::types::is_one_time_witness(&witness), <a href="../sui-framework/coin.md#0x2_coin_EBadWitness">EBadWitness</a>);
+    <b>assert</b>!(one::types::is_one_time_witness(&witness), <a href="../sui-framework/coin.md#0x2_coin_EBadWitness">EBadWitness</a>);
 
     (
         <a href="../sui-framework/coin.md#0x2_coin_TreasuryCap">TreasuryCap</a> {
