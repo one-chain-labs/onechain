@@ -562,7 +562,6 @@ impl SuiNode {
 
         info!("creating checkpoint store");
 
-        let checkpoint_store = CheckpointStore::new(&config.db_path().join("checkpoints"));
         checkpoint_store.insert_genesis_checkpoint(
             genesis.checkpoint(),
             genesis.checkpoint_contents().clone(),
