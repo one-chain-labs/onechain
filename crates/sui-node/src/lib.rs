@@ -2127,10 +2127,7 @@ pub async fn build_http_server(
         rpc_service.into_router().await
     };
 
-    router = router
-        .merge(rpc_router)
-        .route("/health", axum::routing::get(health_check_handler))
-        .route_layer(axum::Extension(state));
+    router = router.merge(rpc_router);
 
     let listener = tokio::net::TcpListener::bind(&config.json_rpc_address)
         .await
