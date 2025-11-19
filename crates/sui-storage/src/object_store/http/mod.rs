@@ -14,11 +14,12 @@ use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 
 use crate::object_store::ObjectStoreGetExt;
 use anyhow::{anyhow, Context, Result};
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use futures::{StreamExt, TryStreamExt};
+use futures::{stream, StreamExt, TryStreamExt};
 use object_store::path::Path;
 use object_store::{Error, GetResult, GetResultPayload, ObjectMeta};
-use reqwest::header::{HeaderMap, CONTENT_LENGTH, ETAG, LAST_MODIFIED};
+use reqwest::header::{HeaderMap, CONTENT_LENGTH, DATE, ETAG, LAST_MODIFIED};
 use reqwest::{Client, Method};
 
 // http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
@@ -78,7 +79,25 @@ async fn get(
 ) -> Result<GetResult> {
     let request = client.request(Method::GET, url);
     let response = request.send().await.context("failed to get")?;
-    let meta = header_meta(location, response.headers()).context("Failed to get header")?;
+    let headers = response.headers().clone();
+
+    if headers.get(CONTENT_LENGTH).is_none() {
+        let bytes = response
+            .bytes()
+            .await
+            .context("failed to buffer response without content length")?;
+        let size = bytes.len();
+        let meta = header_meta(location, &headers, Some(size)).context("Failed to get header")?;
+        let stream = stream::once(async move { Ok::<Bytes, Error>(bytes) }).boxed();
+        return Ok(GetResult {
+            range: 0..size,
+            payload: GetResultPayload::Stream(stream),
+            meta,
+            attributes: object_store::Attributes::new(),
+        });
+    }
+
+    let meta = header_meta(location, &headers, None).context("Failed to get header")?;
     let stream = response
         .bytes_stream()
         .map_err(|source| Error::Generic {
@@ -94,33 +113,50 @@ async fn get(
     })
 }
 
-fn header_meta(location: &Path, headers: &HeaderMap) -> Result<ObjectMeta> {
-    let last_modified = headers
-        .get(LAST_MODIFIED)
-        .context("Missing last modified")?;
+fn header_meta(
+    location: &Path,
+    headers: &HeaderMap,
+    size_override: Option<usize>,
+) -> Result<ObjectMeta> {
+    let last_modified = parse_last_modified(headers)?;
+    let size = match size_override {
+        Some(size) => size,
+        None => parse_content_length(headers)?,
+    };
 
-    let content_length = headers
-        .get(CONTENT_LENGTH)
-        .context("Missing content length")?;
-
-    let last_modified = last_modified.to_str().context("bad header")?;
-    let last_modified = DateTime::parse_from_rfc2822(last_modified)
-        .context("invalid last modified")?
-        .with_timezone(&Utc);
-
-    let content_length = content_length.to_str().context("bad header")?;
-    let content_length = content_length.parse().context("invalid content length")?;
-
-    let e_tag = headers.get(ETAG).context("missing etag")?;
-    let e_tag = e_tag.to_str().context("bad header")?;
+    let e_tag = headers
+        .get(ETAG)
+        .map(|value| value.to_str().context("bad header"))
+        .transpose()?;
 
     Ok(ObjectMeta {
         location: location.clone(),
         last_modified,
-        size: content_length,
-        e_tag: Some(e_tag.to_string()),
+        size,
+        e_tag: e_tag.map(|value| value.to_string()),
         version: None,
     })
+}
+
+fn parse_last_modified(headers: &HeaderMap) -> Result<DateTime<Utc>> {
+    if let Some(value) = headers.get(LAST_MODIFIED).or_else(|| headers.get(DATE)) {
+        let value = value.to_str().context("bad header")?;
+        let parsed = DateTime::parse_from_rfc2822(value)
+            .context("invalid last modified")?
+            .with_timezone(&Utc);
+        return Ok(parsed);
+    }
+
+    Ok(Utc::now())
+}
+
+fn parse_content_length(headers: &HeaderMap) -> Result<usize> {
+    let header = headers
+        .get(CONTENT_LENGTH)
+        .context("Missing content length")?;
+    let header = header.to_str().context("bad header")?;
+    let parsed = header.parse().context("invalid content length")?;
+    Ok(parsed)
 }
 
 #[cfg(test)]
