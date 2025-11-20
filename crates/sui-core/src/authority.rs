@@ -826,7 +826,7 @@ pub struct AuthorityState {
     pub validator_tx_finalizer: Option<Arc<ValidatorTxFinalizer<NetworkAuthorityClient>>>,
 
     /// The chain identifier is derived from the digest of the genesis checkpoint.
-    chain_identifier: ChainIdentifier,
+    pub chain_identifier: ChainIdentifier,
 }
 
 /// The authority state encapsulates all state, drives execution, and ensures safety.

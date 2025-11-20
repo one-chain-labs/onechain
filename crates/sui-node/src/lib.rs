@@ -2155,46 +2155,6 @@ pub struct Threshold {
     pub threshold_seconds: Option<u32>,
 }
 
-async fn health_check_handler(
-    axum::extract::Query(Threshold { threshold_seconds }): axum::extract::Query<Threshold>,
-    axum::Extension(state): axum::Extension<Arc<AuthorityState>>,
-) -> impl axum::response::IntoResponse {
-    if let Some(threshold_seconds) = threshold_seconds {
-        // Attempt to get the latest checkpoint
-        let summary = match state
-            .get_checkpoint_store()
-            .get_highest_executed_checkpoint()
-        {
-            Ok(Some(summary)) => summary,
-            Ok(None) => {
-                warn!("Highest executed checkpoint not found");
-                return (axum::http::StatusCode::SERVICE_UNAVAILABLE, "down");
-            }
-            Err(err) => {
-                warn!("Failed to retrieve highest executed checkpoint: {:?}", err);
-                return (axum::http::StatusCode::SERVICE_UNAVAILABLE, "down");
-            }
-        };
-
-        // Calculate the threshold time based on the provided threshold_seconds
-        let latest_chain_time = summary.timestamp();
-        let threshold =
-            std::time::SystemTime::now() - Duration::from_secs(threshold_seconds as u64);
-
-        // Check if the latest checkpoint is within the threshold
-        if latest_chain_time < threshold {
-            warn!(
-                ?latest_chain_time,
-                ?threshold,
-                "failing healthcheck due to checkpoint lag"
-            );
-            return (axum::http::StatusCode::SERVICE_UNAVAILABLE, "down");
-        }
-    }
-    // if health endpoint is responding and no threshold is given, respond success
-    (axum::http::StatusCode::OK, "up")
-}
-
 #[cfg(not(test))]
 fn max_tx_per_checkpoint(protocol_config: &ProtocolConfig) -> usize {
     protocol_config.max_transactions_per_checkpoint() as usize
