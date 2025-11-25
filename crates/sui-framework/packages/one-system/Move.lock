@@ -15,8 +15,8 @@ name = "MoveStdlib"
 source = { local = "../move-stdlib" }
 
 [[move.package]]
-name = "Sui"
-source = { local = "../sui-framework" }
+name = "One"
+source = { local = "../one-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
