@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
+manifest_digest = "2EAF8167A08A9A616367BE999CBE7C34798F23C6BD081AB61C534F892FC790C7"
 deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
 
 dependencies = [
@@ -11,11 +11,11 @@ dependencies = [
 ]
 
 [[move.package]]
-name = "MoveStdlib"
+id = "MoveStdlib"
 source = { local = "../move-stdlib" }
 
 [[move.package]]
-name = "One"
+id = "One"
 source = { local = "../one-framework" }
 
 dependencies = [
