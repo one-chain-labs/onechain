@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::sui_system {
+module one_system::one_system {
     use std::vector;
 
     use one::balance::Balance;

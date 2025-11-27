@@ -5,7 +5,7 @@
 module bridge::committee_test {
 
     use one::vec_map;
-    use one_system::sui_system;
+    use one_system::one_system;
     use one_system::one_system::SuiSystemState;
 
     use bridge::committee::{

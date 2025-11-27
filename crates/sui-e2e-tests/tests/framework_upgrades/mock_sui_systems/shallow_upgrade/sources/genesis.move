@@ -9,7 +9,7 @@ module one_system::genesis {
     use one::tx_context::{Self, TxContext};
     use std::option::Option;
 
-    use one_system::sui_system;
+    use one_system::one_system;
     use one_system::validator;
 
     public struct GenesisValidatorMetadata has drop, copy {
