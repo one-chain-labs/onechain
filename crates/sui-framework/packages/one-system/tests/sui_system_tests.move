@@ -6,7 +6,7 @@
 // `rewards_distribution_tests`.
 
 #[test_only]
-module oct_system::sui_system_tests {
+module one_system::sui_system_tests {
     use one::test_scenario::{Self, Scenario};
     use one::oct::OCT;
     use one::coin::Self;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct_system::stake_tests {
+module one_system::stake_tests {
     use one::coin;
     use one::test_scenario;
     use one_system::one_system::SuiSystemState;

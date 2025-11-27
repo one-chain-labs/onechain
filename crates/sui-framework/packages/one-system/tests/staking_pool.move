@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct_system::staking_pool_tests {
+module one_system::staking_pool_tests {
     use one::test_scenario::{Self, Scenario};
     use one_system::staking_pool::{StakingPool, Self};
     use one::balance::{Self};

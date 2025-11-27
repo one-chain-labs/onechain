@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct_system::voting_power_tests {
+module one_system::voting_power_tests {
     use one_system::governance_test_utils as gtu;
     use one_system::voting_power;
     use one::test_scenario;

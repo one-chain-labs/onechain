@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct_system::sui_system_state_inner {
+module one_system::sui_system_state_inner {
     use one::balance::{Self, Balance};
     use one::oct::OCT;
     use one::tx_context::TxContext;

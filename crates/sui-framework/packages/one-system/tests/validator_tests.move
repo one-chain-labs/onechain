@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct_system::validator_tests {
+module one_system::validator_tests {
     use one::bag;
     use one::balance;
     use one::coin::{Self, Coin};

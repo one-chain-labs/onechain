@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct_system::genesis {
+module one_system::genesis {
     use std::vector;
     use one::balance::{Self, Balance};
     use one::object::UID;

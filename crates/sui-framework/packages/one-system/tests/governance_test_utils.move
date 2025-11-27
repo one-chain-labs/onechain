@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct_system::governance_test_utils {
+module one_system::governance_test_utils {
     use one::address;
     use one::balance;
     use one::oct::OCT;
