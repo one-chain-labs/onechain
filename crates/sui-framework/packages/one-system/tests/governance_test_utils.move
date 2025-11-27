@@ -198,6 +198,7 @@ module one_system::governance_test_utils {
             net_addr,
             net_addr,
             net_addr,
+            validator,
             1,
             0,
             ctx
@@ -225,6 +226,7 @@ module one_system::governance_test_utils {
             net_addr,
             net_addr,
             net_addr,
+            validator,
             1,
             0,
             ctx

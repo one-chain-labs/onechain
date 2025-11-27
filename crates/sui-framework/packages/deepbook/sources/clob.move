@@ -1360,7 +1360,7 @@ module deepbook::clob {
 
         test_scenario::next_tx(scenario, sender);
         {
-            create_pool_<SUI, USD>(
+            create_pool_<OCT, USD>(
                 taker_fee_rate,
                 maker_rebate_rate,
                 tick_size,

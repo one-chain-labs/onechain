@@ -52,6 +52,7 @@ module one_system::validator_set_tests {
             let stake = validator_set.request_add_stake(
                 @0x1,
                 coin::mint_for_testing(500 * MIST_PER_OCT, ctx1).into_balance(),
+                false,
                 ctx1,
             );
             transfer::public_transfer(stake, @0x1);
@@ -158,6 +159,7 @@ module one_system::validator_set_tests {
         let stake = validator_set.request_add_stake(
             @0x1,
             balance::create_for_testing(MIST_PER_OCT - 1), // 1 MIST lower than the threshold
+            false,
             ctx1,
         );
         transfer::public_transfer(stake, @0x1);
@@ -182,6 +184,7 @@ module one_system::validator_set_tests {
         let stake = validator_set.request_add_stake(
             @0x1,
             balance::create_for_testing(MIST_PER_OCT), // min possible stake
+            false,
             ctx1,
         );
         transfer::public_transfer(stake, @0x1);
@@ -220,6 +223,7 @@ module one_system::validator_set_tests {
             let stake = validator_set.request_add_stake(
                 @0x2,
                 balance::create_for_testing(500 * MIST_PER_OCT),
+                false,
                 ctx,
             );
             transfer::public_transfer(stake, @0x42);
@@ -261,6 +265,7 @@ module one_system::validator_set_tests {
             let stake = validator_set.request_add_stake(
                 @0x2,
                 balance::create_for_testing(500 * MIST_PER_OCT),
+                false,
                 ctx,
             );
             transfer::public_transfer(stake, @0x42);
@@ -355,6 +360,7 @@ module one_system::validator_set_tests {
             let stake = validator_set.request_add_stake(
                 @0x4,
                 balance::create_for_testing(500 * MIST_PER_OCT),
+                false,
                 ctx,
             );
             transfer::public_transfer(stake, @0x42);
@@ -371,10 +377,11 @@ module one_system::validator_set_tests {
         {
             let stake = scenario.take_from_sender<StakedOct>();
             let ctx = scenario.ctx();
-            let withdrawn_balance = validator_set.request_withdraw_stake(
+            let (withdrawn_balance, coin_vesting) = validator_set.request_withdraw_stake(
                 stake,
                 ctx,
             );
+            coin_vesting.destroy_none();
             transfer::public_transfer(withdrawn_balance.into_coin(ctx), @0x42);
         };
 
