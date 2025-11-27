@@ -540,7 +540,6 @@ public fun split(self: &mut StakedOct, split_amount: u64, ctx: &mut TxContext): 
 /// Allows calling `.split_to_sender()` on `StakedOct` to invoke `split_staked_oct`
 public use fun split_staked_oct as StakedOct.split_to_sender;
 
-#[allow(lint(public_entry))]
 /// Split the given StakedOct to the two parts, one with principal `split_amount`,
 /// transfer the newly split part to the sender address.
 public entry fun split_staked_oct(stake: &mut StakedOct, split_amount: u64, ctx: &mut TxContext) {
@@ -550,7 +549,6 @@ public entry fun split_staked_oct(stake: &mut StakedOct, split_amount: u64, ctx:
 /// Allows calling `.join()` on `StakedOct` to invoke `join_staked_oct`
 public use fun join_staked_oct as StakedOct.join;
 
-#[allow(lint(public_entry))]
 /// Consume the staked sui `other` and add its value to `self`.
 /// Aborts if some of the staking parameters are incompatible (pool id, stake activation epoch, etc.)
 public entry fun join_staked_oct(self: &mut StakedOct, other: StakedOct) {
