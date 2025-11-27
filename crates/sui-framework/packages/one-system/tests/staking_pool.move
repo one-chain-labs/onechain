@@ -87,7 +87,7 @@ module one_system::staking_pool_tests {
         let mut staking_pool = staking_pool::new(scenario.ctx());
 
         let sui = balance::create_for_testing(1_000_000_000);
-        let staked_oct = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+        let staked_oct = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, false,scenario.ctx());
         let fungible_staked_oct = staking_pool.convert_to_fungible_staked_oct(staked_oct, scenario.ctx());
 
         one::test_utils::destroy(staking_pool);
@@ -124,7 +124,7 @@ module one_system::staking_pool_tests {
         // setup
 
         let sui = balance::create_for_testing(1_000_000_000);
-        let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+        let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
         assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 0) == 1, 0);
 
@@ -133,7 +133,7 @@ module one_system::staking_pool_tests {
         assert!(latest_exchange_rate.pool_token_amount() == 1_000_000_000, 0);
 
         let sui = balance::create_for_testing(1_000_000_000);
-        let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+        let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
         assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 1_000_000_000) == 2, 0);
 
@@ -176,7 +176,7 @@ module one_system::staking_pool_tests {
         // setup
 
         let sui = balance::create_for_testing(1_000_000_000);
-        let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+        let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
         assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 0) == 1, 0);
 
@@ -185,7 +185,7 @@ module one_system::staking_pool_tests {
         assert!(latest_exchange_rate.pool_token_amount() == 1_000_000_000, 0);
 
         let sui = balance::create_for_testing(1_000_000_000);
-        let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+        let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, false,scenario.ctx());
 
         assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 1_000_000_000) == 2, 0);
 
