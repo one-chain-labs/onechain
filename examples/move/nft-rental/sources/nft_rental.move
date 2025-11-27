@@ -127,7 +127,7 @@ public fun setup_renting<T>(publisher: &Publisher, amount_bp: u64, ctx: &mut TxC
 
     let rental_policy = RentalPolicy<T> {
         id: object::new(ctx),
-        balance: balance::zero<SUI>(),
+        balance: balance::zero<OCT>(),
         amount_bp,
     };
 
@@ -153,7 +153,7 @@ public fun list<T: key + store>(
     kiosk.set_owner(cap, ctx);
     kiosk.list<T>(cap, item_id, 0);
 
-    let coin = coin::zero<SUI>(ctx);
+    let coin = coin::zero<OCT>(ctx);
     let (object, request) = kiosk.purchase<T>(item_id, coin);
 
     let (_item, _paid, _from) = protected_tp.transfer_policy.confirm_request(request);

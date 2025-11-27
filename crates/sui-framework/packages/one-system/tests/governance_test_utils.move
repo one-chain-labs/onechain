@@ -36,7 +36,7 @@ module one_system::governance_test_utils {
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
-            option::some(balance::create_for_testing<SUI>(init_stake_amount_in_sui * MIST_PER_OCT)),
+            option::some(balance::create_for_testing<OCT>(init_stake_amount_in_sui * MIST_PER_OCT)),
             1,
             0,
             true,
@@ -73,7 +73,7 @@ module one_system::governance_test_utils {
         );
 
         let stake_subsidy = stake_subsidy::create(
-            balance::create_for_testing<SUI>(sui_supply_amount * MIST_PER_OCT), // sui_supply
+            balance::create_for_testing<OCT>(sui_supply_amount * MIST_PER_OCT), // sui_supply
             0,   // stake subsidy initial distribution amount
             10,  // stake_subsidy_period_length
             0,   // stake_subsidy_decrease_rate
@@ -83,7 +83,7 @@ module one_system::governance_test_utils {
         one_system::create(
             object::new(ctx), // it doesn't matter what ID sui system state has in tests
             validators,
-            balance::create_for_testing<SUI>(storage_fund_amount * MIST_PER_OCT), // storage_fund
+            balance::create_for_testing<OCT>(storage_fund_amount * MIST_PER_OCT), // storage_fund
             1,   // protocol version
             0,   // chain_start_timestamp_ms
             system_parameters,
@@ -202,7 +202,7 @@ module one_system::governance_test_utils {
             0,
             ctx
         );
-        system_state.request_add_stake(coin::mint_for_testing<SUI>(init_stake_amount * MIST_PER_OCT, ctx), validator, ctx);
+        system_state.request_add_stake(coin::mint_for_testing<OCT>(init_stake_amount * MIST_PER_OCT, ctx), validator, ctx);
         system_state.request_add_validator_for_testing(0, ctx);
         test_scenario::return_shared(system_state);
     }

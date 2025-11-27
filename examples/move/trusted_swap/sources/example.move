@@ -90,7 +90,7 @@ fun successful_swap() {
     let i1 = {
         ts::next_tx(&mut ts, alice);
         let o1 = new(1, 0, ts::ctx(&mut ts));
-        let c1 = coin::mint_for_testing<SUI>(MIN_FEE, ts::ctx(&mut ts));
+        let c1 = coin::mint_for_testing<OCT>(MIN_FEE, ts::ctx(&mut ts));
         let i = object::id(&o1);
         request_swap(o1, c1, custodian, ts::ctx(&mut ts));
         i
@@ -99,7 +99,7 @@ fun successful_swap() {
     let i2 = {
         ts::next_tx(&mut ts, bob);
         let o2 = new(1, 1, ts::ctx(&mut ts));
-        let c2 = coin::mint_for_testing<SUI>(MIN_FEE, ts::ctx(&mut ts));
+        let c2 = coin::mint_for_testing<OCT>(MIN_FEE, ts::ctx(&mut ts));
         let i = object::id(&o2);
         request_swap(o2, c2, custodian, ts::ctx(&mut ts));
         i
@@ -138,7 +138,7 @@ fun swap_too_cheap() {
 
     let mut ts = ts::begin(alice);
     let o1 = new(1, 0, ts::ctx(&mut ts));
-    let c1 = coin::mint_for_testing<SUI>(MIN_FEE - 1, ts::ctx(&mut ts));
+    let c1 = coin::mint_for_testing<OCT>(MIN_FEE - 1, ts::ctx(&mut ts));
     request_swap(o1, c1, custodian, ts::ctx(&mut ts));
 
     abort 1337
@@ -155,14 +155,14 @@ fun swap_different_scarcity() {
     {
         ts::next_tx(&mut ts, alice);
         let o1 = new(1, 0, ts::ctx(&mut ts));
-        let c1 = coin::mint_for_testing<SUI>(MIN_FEE, ts::ctx(&mut ts));
+        let c1 = coin::mint_for_testing<OCT>(MIN_FEE, ts::ctx(&mut ts));
         request_swap(o1, c1, custodian, ts::ctx(&mut ts));
     };
 
     {
         ts::next_tx(&mut ts, bob);
         let o2 = new(0, 1, ts::ctx(&mut ts));
-        let c2 = coin::mint_for_testing<SUI>(MIN_FEE, ts::ctx(&mut ts));
+        let c2 = coin::mint_for_testing<OCT>(MIN_FEE, ts::ctx(&mut ts));
         request_swap(o2, c2, custodian, ts::ctx(&mut ts));
     };
 
@@ -187,14 +187,14 @@ fun swap_same_style() {
     {
         ts::next_tx(&mut ts, alice);
         let o1 = new(1, 0, ts::ctx(&mut ts));
-        let c1 = coin::mint_for_testing<SUI>(MIN_FEE, ts::ctx(&mut ts));
+        let c1 = coin::mint_for_testing<OCT>(MIN_FEE, ts::ctx(&mut ts));
         request_swap(o1, c1, custodian, ts::ctx(&mut ts));
     };
 
     {
         ts::next_tx(&mut ts, bob);
         let o2 = new(1, 0, ts::ctx(&mut ts));
-        let c2 = coin::mint_for_testing<SUI>(MIN_FEE, ts::ctx(&mut ts));
+        let c2 = coin::mint_for_testing<OCT>(MIN_FEE, ts::ctx(&mut ts));
         request_swap(o2, c2, custodian, ts::ctx(&mut ts));
     };
 

@@ -175,7 +175,7 @@ const DIANE: address = @0xD;
 
 #[test_only]
 fun test_coin(ts: &mut Scenario): Coin<OCT> {
-    coin::mint_for_testing<SUI>(42, ts::ctx(ts))
+    coin::mint_for_testing<OCT>(42, ts::ctx(ts))
 }
 
 #[test]

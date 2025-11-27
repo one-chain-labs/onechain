@@ -13,7 +13,7 @@ use one::{
 };
 
 fun mint(addr: address, amount: u64, scenario: &mut ts::Scenario) {
-    transfer::public_transfer(coin::mint_for_testing<SUI>(amount, scenario.ctx()), addr);
+    transfer::public_transfer(coin::mint_for_testing<OCT>(amount, scenario.ctx()), addr);
     scenario.next_tx(addr);
 }
 

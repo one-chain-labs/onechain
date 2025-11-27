@@ -306,7 +306,7 @@ module one_system::staking_pool_tests {
         use one::coin::{Self};
         use one::oct::OCT;
 
-        let rewards = coin::mint_for_testing<SUI>(reward_amount, scenario.ctx());
+        let rewards = coin::mint_for_testing<OCT>(reward_amount, scenario.ctx());
         staking_pool.deposit_rewards(coin::into_balance(rewards));
 
         staking_pool.process_pending_stakes_and_withdraws(scenario.ctx());

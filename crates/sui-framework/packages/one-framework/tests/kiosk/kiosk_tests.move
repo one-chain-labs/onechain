@@ -69,7 +69,7 @@ module one::kiosk_tests {
 
         kiosk.place_and_list(&owner_cap, asset, AMT);
         assert!(kiosk.is_listed(item_id));
-        let payment = coin::mint_for_testing<SUI>(AMT, ctx);
+        let payment = coin::mint_for_testing<OCT>(AMT, ctx);
         let (asset, request) = kiosk.purchase(item_id, payment);
         assert!(!kiosk.is_listed(item_id));
         policy.confirm_request(request);
@@ -161,7 +161,7 @@ module one::kiosk_tests {
         let (policy, _policy_cap) = test::get_policy(ctx);
 
         kiosk.place_and_list(&owner_cap, asset, AMT);
-        let payment = coin::mint_for_testing<SUI>(AMT + 1, ctx);
+        let payment = coin::mint_for_testing<OCT>(AMT + 1, ctx);
         let (_asset, request) = kiosk.purchase(item_id, payment);
         policy.confirm_request(request);
 
@@ -177,7 +177,7 @@ module one::kiosk_tests {
 
         kiosk.place(&owner_cap, asset);
         let purchase_cap = kiosk.list_with_purchase_cap(&owner_cap, item_id, AMT, ctx);
-        let payment = coin::mint_for_testing<SUI>(AMT, ctx);
+        let payment = coin::mint_for_testing<OCT>(AMT, ctx);
         assert!(kiosk.is_listed_exclusively(item_id));
         let (asset, request) = kiosk.purchase_with_cap(purchase_cap, payment);
         assert!(!kiosk.is_listed_exclusively(item_id));

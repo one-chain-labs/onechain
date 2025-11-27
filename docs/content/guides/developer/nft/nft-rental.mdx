@@ -203,7 +203,7 @@ public fun setup_renting<T>(publisher: &Publisher, amount_bp: u64, ctx: &mut TxC
 
   let rental_policy = RentalPolicy<T> {
     id: object::new(ctx),
-    balance: balance::zero<SUI>(),
+    balance: balance::zero<OCT>(),
     amount_bp,
   };
 

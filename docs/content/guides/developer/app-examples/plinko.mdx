@@ -166,7 +166,7 @@ public fun finish_game(game_id: ID, bls_sig: vector<u8>, house_data: &mut HouseD
     // Initializes variables for calculating game outcome.
     let mut trace = vector[];
     // Calculate the stake amount per ball
-    let stake_per_ball = stake.value<SUI>() / num_balls;
+    let stake_per_ball = stake.value<OCT>() / num_balls;
     let mut total_funds_amount: u64 = 0;
 
     // Calculates outcome for each ball based on the extended beacon.
@@ -287,7 +287,7 @@ fun internal_start_game(counter: &mut Counter, num_balls: u64, coin: Coin<OCT>, 
     let new_game = Game {
         id,
         game_start_epoch: ctx.epoch(),
-        stake: coin.into_balance<SUI>(),
+        stake: coin.into_balance<OCT>(),
         player: ctx.sender(),
         vrf_input,
         fee_bp

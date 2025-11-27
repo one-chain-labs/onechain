@@ -13,7 +13,7 @@ module p::m {
     }
 
     public fun mint_shared(ctx: &mut TxContext) {
-        transfer::public_share_object(coin::zero<SUI>(ctx))
+        transfer::public_share_object(coin::zero<OCT>(ctx))
     }
 }
 
