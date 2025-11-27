@@ -114,7 +114,7 @@ Response: {
             "cursor": "eyJ0IjoiMHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyOjpzdWk6OlNVSSIsImMiOjF9",
             "node": {
               "coinType": {
-                "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI"
+                "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT"
               },
               "coinObjectCount": 1,
               "totalBalance": "299999983336400"

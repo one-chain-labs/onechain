@@ -96,7 +96,7 @@ describe('Contract links', () => {
 				[
 				  {
 				    "amount": 100n,
-				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI",
+				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
 				  },
 				]
 			`);
@@ -185,7 +185,7 @@ describe('Contract links', () => {
 				[
 				  {
 				    "amount": 100n,
-				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI",
+				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
 				  },
 				]
 			`);
@@ -314,7 +314,7 @@ describe('Contract links', () => {
 					[
 					  {
 					    "amount": 100n,
-					    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI",
+					    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
 					  },
 					]
 				`);
@@ -374,7 +374,7 @@ describe('Non contract links', () => {
 					[
 					  {
 					    "amount": 100n,
-					    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI",
+					    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
 					  },
 					]
 				`);
@@ -430,7 +430,7 @@ describe('Non contract links', () => {
 		expect(claimLink.assets?.nfts.length).toEqual(0);
 		expect(claimLink.assets?.balances.length).toEqual(1);
 		expect(claimLink.assets?.balances[0].coinType).toEqual(
-			'0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI',
+			'0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT',
 		);
 
 		const claimTx = await claimLink.claimAssets(keypair.toSuiAddress());
@@ -534,7 +534,7 @@ describe('Non contract links', () => {
 				[
 				  {
 				    "amount": 100n,
-				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI",
+				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
 				  },
 				]
 			`);
@@ -601,7 +601,7 @@ describe('Non contract links', () => {
 		expect(createdLinks.links[0].assets).toMatchObject({
 			balances: [
 				{
-					coinType: '0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI',
+					coinType: '0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT',
 					amount: 100n,
 				},
 			],
@@ -622,7 +622,7 @@ describe('Non contract links', () => {
 				[
 				  {
 				    "amount": 100n,
-				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI",
+				    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
 				  },
 				]
 			`);

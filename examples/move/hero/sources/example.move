@@ -5,7 +5,7 @@
 /// associated logic.
 module hero::example;
 
-use one::{balance::{Self, Balance}, coin::{Self, Coin}, event, one::SUI};
+use one::{balance::{Self, Balance}, coin::{Self, Coin}, event, oct::OCT};
 
 /// Our hero!
 public struct Hero has key, store {

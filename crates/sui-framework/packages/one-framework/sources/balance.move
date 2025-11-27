@@ -94,7 +94,7 @@ public fun destroy_zero<T>(balance: Balance<T>) {
 }
 
 const SUI_TYPE_NAME: vector<u8> =
-    b"0000000000000000000000000000000000000000000000000000000000000002::one::SUI";
+    b"0000000000000000000000000000000000000000000000000000000000000002::oct::OCT";
 
 #[allow(unused_function)]
 /// CAUTION: this function creates a `Balance` without increasing the supply.

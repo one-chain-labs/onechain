@@ -16,7 +16,7 @@ use one::{
     kiosk::{Kiosk, KioskOwnerCap},
     kiosk_extension,
     package::Publisher,
-    one::SUI,
+    oct::OCT,
     transfer_policy::{Self, TransferPolicy, TransferPolicyCap, has_rule}
 };
 

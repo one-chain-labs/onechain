@@ -4,7 +4,7 @@
 #[lint_allow(coin_field)]
 module common::identified_payment;
 
-use one::{coin::{Self, Coin}, dynamic_field, event, one::SUI, transfer::Receiving};
+use one::{coin::{Self, Coin}, dynamic_field, event, oct::OCT, transfer::Receiving};
 
 const ENotEarmarkedForSender: u64 = 0;
 

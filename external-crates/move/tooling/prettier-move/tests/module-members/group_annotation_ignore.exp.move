@@ -10,7 +10,7 @@ use one::{
     coin::Coin,
     dynamic_field as df,
     dynamic_object_field as dof,
-    one::SUI,
+    oct::OCT,
     table::{Self, Table},
     table_vec::{Self, TableVec as TV}
 };

@@ -31,7 +31,7 @@ module examples::gem {
     use one::{
         balance::{Self, Balance},
         coin::{Self, Coin, TreasuryCap},
-        one::SUI,
+        oct::OCT,
         token::{Self, Token, ActionRequest},
         tx_context::sender
     };

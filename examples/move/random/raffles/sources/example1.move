@@ -15,7 +15,7 @@ use one::{
     clock::Clock,
     coin::{Self, Coin},
     random::{Random, new_generator},
-    one::SUI
+    oct::OCT
 };
 
 /// Error codes

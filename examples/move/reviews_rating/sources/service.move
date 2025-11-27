@@ -11,7 +11,7 @@ use one::{
     coin::{Self, Coin},
     dynamic_field as df,
     object_table::{Self, ObjectTable},
-    one::SUI
+    oct::OCT
 };
 
 const EInvalidPermission: u64 = 1;
