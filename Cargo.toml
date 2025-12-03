@@ -372,7 +372,7 @@ impl-trait-for-tuples = "0.2.0"
 indexmap = { version = "2.1.0", features = ["serde"] }
 indicatif = "0.17.2"
 inquire = "0.6.0"
-insta = { version = "1.21.1", features = ["redactions", "yaml", "json"] }
+insta = { version = "1.44.3", features = ["redactions", "yaml", "json"] }
 integer-encoding = "3.0.1"
 ipnetwork = "0.20.0"
 itertools = "0.13.0"
