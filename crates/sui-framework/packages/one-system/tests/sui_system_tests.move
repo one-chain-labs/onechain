@@ -674,6 +674,7 @@ module one_system::sui_system_tests {
         scenario.next_tx(new_validator_addr);
         {
             let ctx = scenario.ctx();
+            system_state.execute_update_trusted_validators_action(true, new_validator_addr);
             system_state.request_add_validator_candidate(
                 new_pubkey,
                 vector[33, 219, 38, 23, 242, 109, 116, 235, 225, 192, 219, 45, 40, 124, 162, 25, 33, 68, 52, 41, 123, 9, 98, 11, 184, 150, 214, 62, 60, 210, 121, 62],

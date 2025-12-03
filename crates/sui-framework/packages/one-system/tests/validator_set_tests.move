@@ -215,7 +215,13 @@ module one_system::validator_set_tests {
         let mut scenario_val = test_scenario::begin(@0x1);
         let scenario = &mut scenario_val;
         let ctx1 = scenario.ctx();
+
+        let join_trusted_action = &validator_set.create_update_trusted_validator_action(true, @0x2);
+        validator_set.execute_update_trusted_validators_action(join_trusted_action);
         validator_set.request_add_validator_candidate(validator2, ctx1);
+
+        let update_only_validator_stake = &validator_set.create_update_only_validator_staking_action(@0x2, false);
+        validator_set.execute_update_only_validator_staking_action(update_only_validator_stake);
 
         scenario.next_tx(@0x42);
         {
@@ -257,7 +263,12 @@ module one_system::validator_set_tests {
         let mut scenario_val = test_scenario::begin(@0x1);
         let scenario = &mut scenario_val;
         let ctx1 = scenario.ctx();
+        let join_trusted_action = &validator_set.create_update_trusted_validator_action(true, @0x2);
+        validator_set.execute_update_trusted_validators_action(join_trusted_action);
         validator_set.request_add_validator_candidate(validator2, ctx1);
+
+        let update_only_validator_stake = &validator_set.create_update_only_validator_staking_action(@0x2, false);
+        validator_set.execute_update_only_validator_staking_action(update_only_validator_stake);
 
         scenario.next_tx(@0x42);
         {
@@ -407,7 +418,13 @@ module one_system::validator_set_tests {
         scenario_val.end();
     }
 
-    fun create_validator(addr: address, hint: u8, gas_price: u64, is_initial_validator: bool, ctx: &mut TxContext): Validator {
+    fun create_validator(
+        addr: address,
+        hint: u8,
+        gas_price: u64,
+        is_initial_validator: bool,
+        ctx: &mut TxContext
+    ): Validator {
         let stake_value = hint as u64 * 100 * MIST_PER_OCT;
         let name = hint_to_ascii(hint);
         let validator = validator::new_for_testing(
@@ -486,6 +503,8 @@ module one_system::validator_set_tests {
     fun add_and_activate_validator(validator_set: &mut ValidatorSet, validator: Validator, scenario: &mut Scenario) {
         scenario.next_tx(validator.sui_address());
         let ctx = scenario.ctx();
+        let action = validator_set.create_update_trusted_validator_action(true, validator.sui_address());
+        validator_set.execute_update_trusted_validators_action(&action);
         validator_set.request_add_validator_candidate(validator, ctx);
         validator_set.request_add_validator(0, ctx);
     }

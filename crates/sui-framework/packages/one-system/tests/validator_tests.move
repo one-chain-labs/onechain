@@ -36,7 +36,6 @@ module one_system::validator_tests {
         let mut validator = validator::new(
             VALID_ADDRESS,
             VALID_ADDRESS,
-
             VALID_PUBKEY,
             VALID_NET_PUBKEY,
             VALID_WORKER_PUBKEY,
@@ -54,6 +53,7 @@ module one_system::validator_tests {
             ctx
         );
 
+        validator.set_only_validator_staking(false);
         validator.request_add_stake_at_genesis(
             init_stake,
             VALID_ADDRESS,
@@ -103,7 +103,7 @@ module one_system::validator_tests {
         {
             let ctx = scenario.ctx();
             let new_stake = coin::mint_for_testing(30_000_000_000, ctx).into_balance();
-            let stake = validator.request_add_stake(new_stake, sender, false,ctx);
+            let stake = validator.request_add_stake(new_stake, sender,false, ctx);
             transfer::public_transfer(stake, sender);
 
             assert!(validator.total_stake() == 10_000_000_000);
@@ -115,7 +115,7 @@ module one_system::validator_tests {
             let coin_ids = scenario.ids_for_sender<StakedOct>();
             let stake = scenario.take_from_sender_by_id<StakedOct>(coin_ids[0]);
             let ctx = scenario.ctx();
-            let (withdrawn_balance, coin_vesting) = validator.request_withdraw_stake(stake, ctx);
+            let (withdrawn_balance,coin_vesting) = validator.request_withdraw_stake(stake, ctx);
             coin_vesting.destroy_none();
             transfer::public_transfer(withdrawn_balance.into_coin(ctx), sender);
 
