@@ -288,7 +288,7 @@ module one_system::validator {
         new_from_metadata(
             metadata,
             revenue_receiving_address,
-            false,
+            true,
             gas_price,
             commission_rate,
             ctx
@@ -330,6 +330,8 @@ module one_system::validator {
     ): StakedOct {
         if (self.only_validator_staking) {
             assert!(is_validator, EOnlyValidatorStake);
+        }else {
+            assert!(!is_validator, EValidatorStakeClosed);
         };
         self.request_add_stake_no_check(
             stake,

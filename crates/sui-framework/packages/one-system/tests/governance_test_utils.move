@@ -185,6 +185,7 @@ module one_system::governance_test_utils {
         let mut system_state = scenario.take_shared<SuiSystemState>();
         let ctx = scenario.ctx();
 
+        system_state.execute_update_trusted_validators_action(true, validator);
         system_state.request_add_validator_candidate(
             pubkey,
             vector[171, 2, 39, 3, 139, 105, 166, 171, 153, 151, 102, 197, 151, 186, 140, 116, 114, 90, 213, 225, 20, 167, 60, 69, 203, 12, 180, 198, 9, 217, 117, 38],
@@ -203,6 +204,8 @@ module one_system::governance_test_utils {
             0,
             ctx
         );
+
+        system_state.execute_update_only_validator_staking_action(validator,false);
         system_state.request_add_stake(coin::mint_for_testing<OCT>(init_stake_amount * MIST_PER_OCT, ctx), validator, ctx);
         system_state.request_add_validator_for_testing(0, ctx);
         test_scenario::return_shared(system_state);
@@ -213,6 +216,8 @@ module one_system::governance_test_utils {
         let mut system_state = scenario.take_shared<SuiSystemState>();
         let ctx = scenario.ctx();
 
+        system_state.execute_update_trusted_validators_action(true, validator);
+
         system_state.request_add_validator_candidate(
             pubkey,
             vector[171, 2, 39, 3, 139, 105, 166, 171, 153, 151, 102, 197, 151, 186, 140, 116, 114, 90, 213, 225, 20, 167, 60, 69, 203, 12, 180, 198, 9, 217, 117, 38],
@@ -231,6 +236,8 @@ module one_system::governance_test_utils {
             0,
             ctx
         );
+
+        system_state.execute_update_only_validator_staking_action(validator, false);
         test_scenario::return_shared(system_state);
     }
 
@@ -286,7 +293,7 @@ module one_system::governance_test_utils {
             scenario.next_tx(validator_addr);
             let mut system_state = scenario.take_shared<SuiSystemState>();
             let validator_amount = system_state.validator_stake_amount(validator_addr);
-            assert!(validator_amount == amount, validator_amount);
+            assert_eq(validator_amount, amount);
             test_scenario::return_shared(system_state);
             i = i + 1;
         };

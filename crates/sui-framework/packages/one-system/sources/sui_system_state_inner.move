@@ -562,7 +562,7 @@ module one_system::sui_system_state_inner {
         ctx: &mut TxContext,
     ) : StakedOct {
         let balance = extract_coin_balance(stakes, stake_amount, ctx);
-        self.validators.request_add_stake(*cap.unverified_operation_cap_address(), balance, true,ctx)
+        self.validators.request_add_stake(*cap.unverified_operation_cap_address(), balance, false,ctx)
     }
 
 

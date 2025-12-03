@@ -183,7 +183,7 @@ module one_system::validator_set {
             inactive_validators: table::new(ctx),
             validator_candidates: table::new(ctx),
             at_risk_validators: vec_map::empty(),
-            only_trusted_validator: false,
+            only_trusted_validator: true,
             trusted_validators,
             extra_fields: bag::new(ctx),
         };
