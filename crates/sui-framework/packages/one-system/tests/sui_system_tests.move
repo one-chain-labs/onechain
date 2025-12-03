@@ -201,7 +201,7 @@ module one_system::sui_system_tests {
         let mut system_state = scenario.take_shared<SuiSystemState>();
 
         // Fails here since the commission rate is too high.
-        system_state.request_set_commission_rate(2001, scenario.ctx());
+        system_state.request_set_commission_rate(10001, scenario.ctx());
         test_scenario::return_shared(system_state);
 
         scenario_val.end();
