@@ -1,18 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
 
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
 use simulacrum::Simulacrum;
-use std::num::NonZeroUsize;
 use sui_config::genesis;
 use sui_protocol_config::ProtocolVersion;
-use sui_swarm_config::genesis_config::AccountConfig;
-use sui_swarm_config::network_config_builder::ConfigBuilder;
-use sui_types::storage::{ReadStore, RpcStateReader};
+use sui_swarm_config::{genesis_config::AccountConfig, network_config_builder::ConfigBuilder};
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, SuiAddress, VersionNumber},
     committee::{Committee, EpochId},
@@ -21,24 +18,32 @@ use sui_types::{
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiError, UserInputError},
     messages_checkpoint::{
-        CheckpointContents, CheckpointContentsDigest, CheckpointDigest, CheckpointSequenceNumber,
+        CheckpointContents,
+        CheckpointContentsDigest,
+        CheckpointDigest,
+        CheckpointSequenceNumber,
         VerifiedCheckpoint,
     },
     object::{Object, Owner},
     storage::{
-        load_package_object_from_object_store, BackingPackageStore, ChildObjectResolver,
-        ObjectStore, PackageObject, ParentSync,
+        load_package_object_from_object_store,
+        BackingPackageStore,
+        ChildObjectResolver,
+        ObjectStore,
+        PackageObject,
+        ParentSync,
+        ReadStore,
+        RpcStateReader,
     },
     transaction::VerifiedTransaction,
 };
 use tempfile::tempdir;
-use typed_store::traits::TableSummary;
-use typed_store::traits::TypedStoreDebug;
-use typed_store::DBMapUtils;
-use typed_store::Map;
 use typed_store::{
     metrics::SamplingInterval,
     rocks::{DBMap, MetricConf},
+    traits::{TableSummary, TypedStoreDebug},
+    DBMapUtils,
+    Map,
 };
 
 use super::SimulatorStore;
@@ -137,10 +142,7 @@ impl PersistedStore {
 
         let store = PersistedStore::new(genesis, path);
         let read_only_wrapper = store.read_replica();
-        (
-            Simulacrum::new_with_network_config_store(&config, rng, store),
-            read_only_wrapper,
-        )
+        (Simulacrum::new_with_network_config_store(&config, rng, store), read_only_wrapper)
     }
 
     pub fn new_sim_with_protocol_version_and_accounts<R>(
@@ -187,22 +189,11 @@ impl SimulatorStore for PersistedStore {
     }
 
     fn get_highest_checkpint(&self) -> Option<VerifiedCheckpoint> {
-        self.read_write
-            .checkpoints
-            .unbounded_iter()
-            .skip_to_last()
-            .next()
-            .map(|(_, checkpoint)| checkpoint.into())
+        self.read_write.checkpoints.unbounded_iter().skip_to_last().next().map(|(_, checkpoint)| checkpoint.into())
     }
 
-    fn get_checkpoint_contents(
-        &self,
-        digest: &CheckpointContentsDigest,
-    ) -> Option<CheckpointContents> {
-        self.read_write
-            .checkpoint_contents
-            .get(digest)
-            .expect("Fatal: DB read failed")
+    fn get_checkpoint_contents(&self, digest: &CheckpointContentsDigest) -> Option<CheckpointContents> {
+        self.read_write.checkpoint_contents.get(digest).expect("Fatal: DB read failed")
     }
 
     fn get_committee_by_epoch(&self, epoch: EpochId) -> Option<Committee> {
@@ -214,52 +205,27 @@ impl SimulatorStore for PersistedStore {
     }
 
     fn get_transaction(&self, digest: &TransactionDigest) -> Option<VerifiedTransaction> {
-        self.read_write
-            .transactions
-            .get(digest)
-            .expect("Fatal: DB read failed")
-            .map(|transaction| transaction.into())
+        self.read_write.transactions.get(digest).expect("Fatal: DB read failed").map(|transaction| transaction.into())
     }
 
     fn get_transaction_effects(&self, digest: &TransactionDigest) -> Option<TransactionEffects> {
-        self.read_write
-            .effects
-            .get(digest)
-            .expect("Fatal: DB read failed")
+        self.read_write.effects.get(digest).expect("Fatal: DB read failed")
     }
 
-    fn get_transaction_events(
-        &self,
-        digest: &TransactionEventsDigest,
-    ) -> Option<TransactionEvents> {
-        self.read_write
-            .events
-            .get(digest)
-            .expect("Fatal: DB read failed")
+    fn get_transaction_events(&self, digest: &TransactionEventsDigest) -> Option<TransactionEvents> {
+        self.read_write.events.get(digest).expect("Fatal: DB read failed")
     }
 
-    fn get_transaction_events_by_tx_digest(
-        &self,
-        tx_digest: &TransactionDigest,
-    ) -> Option<TransactionEvents> {
+    fn get_transaction_events_by_tx_digest(&self, tx_digest: &TransactionDigest) -> Option<TransactionEvents> {
         self.read_write
             .events_tx_digest_index
             .get(tx_digest)
             .expect("Fatal: DB read failed")
-            .and_then(|x| {
-                self.read_write
-                    .events
-                    .get(&x)
-                    .expect("Fatal: DB read failed")
-            })
+            .and_then(|x| self.read_write.events.get(&x).expect("Fatal: DB read failed"))
     }
 
     fn get_object(&self, id: &ObjectID) -> Option<Object> {
-        let version = self
-            .read_write
-            .live_objects
-            .get(id)
-            .expect("Fatal: DB read failed")?;
+        let version = self.read_write.live_objects.get(id).expect("Fatal: DB read failed")?;
         self.get_object_at_version(id, version)
     }
 
@@ -283,12 +249,13 @@ impl SimulatorStore for PersistedStore {
     }
 
     fn owned_objects(&self, owner: SuiAddress) -> Box<dyn Iterator<Item = Object> + '_> {
-        Box::new(self.read_write.live_objects
-            .unbounded_iter()
-            .flat_map(|(id, version)| self.get_object_at_version(&id, version))
-            .filter(
-                move |object| matches!(object.owner, Owner::AddressOwner(addr) if addr == owner),
-            ))
+        Box::new(
+            self.read_write
+                .live_objects
+                .unbounded_iter()
+                .flat_map(|(id, version)| self.get_object_at_version(&id, version))
+                .filter(move |object| matches!(object.owner, Owner::AddressOwner(addr) if addr == owner)),
+        )
     }
 
     fn insert_checkpoint(&mut self, checkpoint: VerifiedCheckpoint) {
@@ -303,21 +270,14 @@ impl SimulatorStore for PersistedStore {
     }
 
     fn insert_checkpoint_contents(&mut self, contents: CheckpointContents) {
-        self.read_write
-            .checkpoint_contents
-            .insert(contents.digest(), &contents)
-            .expect("Fatal: DB write failed");
+        self.read_write.checkpoint_contents.insert(contents.digest(), &contents).expect("Fatal: DB write failed");
     }
 
     fn insert_committee(&mut self, committee: Committee) {
         let epoch = committee.epoch as usize;
 
-        let mut committees = self
-            .read_write
-            .epoch_to_committee
-            .get(&())
-            .expect("Fatal: DB read failed")
-            .unwrap_or_default();
+        let mut committees =
+            self.read_write.epoch_to_committee.get(&()).expect("Fatal: DB read failed").unwrap_or_default();
 
         if committees.get(epoch).is_some() {
             return;
@@ -328,10 +288,7 @@ impl SimulatorStore for PersistedStore {
         } else {
             panic!("committee was inserted into EpochCommitteeMap out of order");
         }
-        self.read_write
-            .epoch_to_committee
-            .insert(&(), &committees)
-            .expect("Fatal: DB write failed");
+        self.read_write.epoch_to_committee.insert(&(), &committees).expect("Fatal: DB write failed");
     }
 
     fn insert_executed_transaction(
@@ -357,21 +314,12 @@ impl SimulatorStore for PersistedStore {
     }
 
     fn insert_transaction_effects(&mut self, effects: TransactionEffects) {
-        self.read_write
-            .effects
-            .insert(effects.transaction_digest(), &effects)
-            .expect("Fatal: DB write failed");
+        self.read_write.effects.insert(effects.transaction_digest(), &effects).expect("Fatal: DB write failed");
     }
 
     fn insert_events(&mut self, tx_digest: &TransactionDigest, events: TransactionEvents) {
-        self.read_write
-            .events_tx_digest_index
-            .insert(tx_digest, &events.digest())
-            .expect("Fatal: DB write failed");
-        self.read_write
-            .events
-            .insert(&events.digest(), &events)
-            .expect("Fatal: DB write failed");
+        self.read_write.events_tx_digest_index.insert(tx_digest, &events.digest()).expect("Fatal: DB write failed");
+        self.read_write.events.insert(&events.digest(), &events).expect("Fatal: DB write failed");
     }
 
     fn update_objects(
@@ -380,29 +328,15 @@ impl SimulatorStore for PersistedStore {
         deleted_objects: Vec<(ObjectID, SequenceNumber, ObjectDigest)>,
     ) {
         for (object_id, _, _) in deleted_objects {
-            self.read_write
-                .live_objects
-                .remove(&object_id)
-                .expect("Fatal: DB write failed");
+            self.read_write.live_objects.remove(&object_id).expect("Fatal: DB write failed");
         }
 
         for (object_id, object) in written_objects {
             let version = object.version();
-            self.read_write
-                .live_objects
-                .insert(&object_id, &version)
-                .expect("Fatal: DB write failed");
-            let mut q = self
-                .read_write
-                .objects
-                .get(&object_id)
-                .expect("Fatal: DB read failed")
-                .unwrap_or_default();
+            self.read_write.live_objects.insert(&object_id, &version).expect("Fatal: DB write failed");
+            let mut q = self.read_write.objects.get(&object_id).expect("Fatal: DB read failed").unwrap_or_default();
             q.insert(version, object);
-            self.read_write
-                .objects
-                .insert(&object_id, &q)
-                .expect("Fatal: DB write failed");
+            self.read_write.objects.insert(&object_id, &q).expect("Fatal: DB write failed");
         }
     }
 
@@ -412,10 +346,7 @@ impl SimulatorStore for PersistedStore {
 }
 
 impl BackingPackageStore for PersistedStore {
-    fn get_package_object(
-        &self,
-        package_id: &ObjectID,
-    ) -> sui_types::error::SuiResult<Option<PackageObject>> {
+    fn get_package_object(&self, package_id: &ObjectID) -> sui_types::error::SuiResult<Option<PackageObject>> {
         load_package_object_from_object_store(self, package_id)
     }
 }
@@ -443,8 +374,7 @@ impl ChildObjectResolver for PersistedStore {
 
         if child_object.version() > child_version_upper_bound {
             return Err(SuiError::UnsupportedFeatureError {
-                error: "TODO InMemoryStorage::read_child_object does not yet support bounded reads"
-                    .to_owned(),
+                error: "TODO InMemoryStorage::read_child_object does not yet support bounded reads".to_owned(),
             });
         }
 
@@ -478,9 +408,7 @@ impl GetModule for PersistedStore {
     type Item = CompiledModule;
 
     fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<Self::Item>, Self::Error> {
-        Ok(self
-            .get_module(id)?
-            .map(|bytes| CompiledModule::deserialize_with_defaults(&bytes).unwrap()))
+        Ok(self.get_module(id)?.map(|bytes| CompiledModule::deserialize_with_defaults(&bytes).unwrap()))
     }
 }
 
@@ -490,13 +418,7 @@ impl ModuleResolver for PersistedStore {
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         Ok(self
             .get_package_object(&ObjectID::from(*module_id.address()))?
-            .and_then(|package| {
-                package
-                    .move_package()
-                    .serialized_module_map()
-                    .get(module_id.name().as_str())
-                    .cloned()
-            }))
+            .and_then(|package| package.move_package().serialized_module_map().get(module_id.name().as_str()).cloned()))
     }
 }
 
@@ -505,20 +427,13 @@ impl ObjectStore for PersistedStore {
         SimulatorStore::get_object(self, object_id)
     }
 
-    fn get_object_by_key(
-        &self,
-        object_id: &ObjectID,
-        version: sui_types::base_types::VersionNumber,
-    ) -> Option<Object> {
+    fn get_object_by_key(&self, object_id: &ObjectID, version: sui_types::base_types::VersionNumber) -> Option<Object> {
         self.get_object_at_version(object_id, version)
     }
 }
 
 impl ParentSync for PersistedStore {
-    fn get_latest_parent_entry_ref_deprecated(
-        &self,
-        _object_id: ObjectID,
-    ) -> Option<sui_types::base_types::ObjectRef> {
+    fn get_latest_parent_entry_ref_deprecated(&self, _object_id: ObjectID) -> Option<sui_types::base_types::ObjectRef> {
         panic!("Never called in newer protocol versions")
     }
 }
@@ -537,11 +452,7 @@ impl ObjectStore for PersistedStoreInnerReadOnlyWrapper {
     fn get_object_by_key(&self, object_id: &ObjectID, version: VersionNumber) -> Option<Object> {
         self.sync();
 
-        self.inner
-            .objects
-            .get(object_id)
-            .expect("Fatal: DB read failed")
-            .and_then(|x| x.get(&version).cloned())
+        self.inner.objects.get(object_id).expect("Fatal: DB read failed").and_then(|x| x.get(&version).cloned())
     }
 }
 
@@ -558,27 +469,19 @@ impl ReadStore for PersistedStoreInnerReadOnlyWrapper {
             .skip_to_last()
             .next()
             .map(|(_, checkpoint)| checkpoint.into())
-            .ok_or(SuiError::UserInputError {
-                error: UserInputError::LatestCheckpointSequenceNumberNotFound,
-            })
+            .ok_or(SuiError::UserInputError { error: UserInputError::LatestCheckpointSequenceNumberNotFound })
             .map_err(sui_types::storage::error::Error::custom)
     }
 
-    fn get_highest_verified_checkpoint(
-        &self,
-    ) -> sui_types::storage::error::Result<VerifiedCheckpoint> {
+    fn get_highest_verified_checkpoint(&self) -> sui_types::storage::error::Result<VerifiedCheckpoint> {
         todo!()
     }
 
-    fn get_highest_synced_checkpoint(
-        &self,
-    ) -> sui_types::storage::error::Result<VerifiedCheckpoint> {
+    fn get_highest_synced_checkpoint(&self) -> sui_types::storage::error::Result<VerifiedCheckpoint> {
         todo!()
     }
 
-    fn get_lowest_available_checkpoint(
-        &self,
-    ) -> sui_types::storage::error::Result<CheckpointSequenceNumber> {
+    fn get_lowest_available_checkpoint(&self) -> sui_types::storage::error::Result<CheckpointSequenceNumber> {
         Ok(0)
     }
 
@@ -591,22 +494,12 @@ impl ReadStore for PersistedStoreInnerReadOnlyWrapper {
         sequence_number: CheckpointSequenceNumber,
     ) -> Option<VerifiedCheckpoint> {
         self.sync();
-        self.inner
-            .checkpoints
-            .get(&sequence_number)
-            .expect("Fatal: DB read failed")
-            .map(|checkpoint| checkpoint.into())
+        self.inner.checkpoints.get(&sequence_number).expect("Fatal: DB read failed").map(|checkpoint| checkpoint.into())
     }
 
-    fn get_checkpoint_contents_by_digest(
-        &self,
-        digest: &CheckpointContentsDigest,
-    ) -> Option<CheckpointContents> {
+    fn get_checkpoint_contents_by_digest(&self, digest: &CheckpointContentsDigest) -> Option<CheckpointContents> {
         self.sync();
-        self.inner
-            .checkpoint_contents
-            .get(digest)
-            .expect("Fatal: DB read failed")
+        self.inner.checkpoint_contents.get(digest).expect("Fatal: DB read failed")
     }
 
     fn get_checkpoint_contents_by_sequence_number(
@@ -627,18 +520,12 @@ impl ReadStore for PersistedStoreInnerReadOnlyWrapper {
 
     fn get_transaction_effects(&self, tx_digest: &TransactionDigest) -> Option<TransactionEffects> {
         self.sync();
-        self.inner
-            .effects
-            .get(tx_digest)
-            .expect("Fatal: DB read failed")
+        self.inner.effects.get(tx_digest).expect("Fatal: DB read failed")
     }
 
     fn get_events(&self, event_digest: &TransactionEventsDigest) -> Option<TransactionEvents> {
         self.sync();
-        self.inner
-            .events
-            .get(event_digest)
-            .expect("Fatal: DB read failed")
+        self.inner.events.get(event_digest).expect("Fatal: DB read failed")
     }
 
     fn get_full_checkpoint_contents_by_sequence_number(
@@ -657,15 +544,11 @@ impl ReadStore for PersistedStoreInnerReadOnlyWrapper {
 }
 
 impl RpcStateReader for PersistedStoreInnerReadOnlyWrapper {
-    fn get_lowest_available_checkpoint_objects(
-        &self,
-    ) -> sui_types::storage::error::Result<CheckpointSequenceNumber> {
+    fn get_lowest_available_checkpoint_objects(&self) -> sui_types::storage::error::Result<CheckpointSequenceNumber> {
         Ok(0)
     }
 
-    fn get_chain_identifier(
-        &self,
-    ) -> sui_types::storage::error::Result<sui_types::digests::ChainIdentifier> {
+    fn get_chain_identifier(&self) -> sui_types::storage::error::Result<sui_types::digests::ChainIdentifier> {
         Ok((*self.get_checkpoint_by_sequence_number(0).unwrap().digest()).into())
     }
 
@@ -676,9 +559,7 @@ impl RpcStateReader for PersistedStoreInnerReadOnlyWrapper {
 
 impl PersistedStoreInnerReadOnlyWrapper {
     pub fn sync(&self) {
-        self.inner
-            .try_catch_up_with_primary_all()
-            .expect("Fatal: DB sync failed");
+        self.inner.try_catch_up_with_primary_all().expect("Fatal: DB sync failed");
     }
 }
 
@@ -699,54 +580,29 @@ impl Clone for PersistedStoreInnerReadOnlyWrapper {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rand::{rngs::StdRng, SeedableRng};
+
+    use super::*;
 
     #[tokio::test]
     async fn deterministic_genesis() {
         let rng = StdRng::from_seed([9; 32]);
-        let chain1 = PersistedStore::new_sim_with_protocol_version_and_accounts(
-            rng,
-            0,
-            ProtocolVersion::MAX,
-            vec![],
-            None,
-        );
-        let genesis_checkpoint_digest1 = *chain1
-            .store()
-            .get_checkpoint_by_sequence_number(0)
-            .unwrap()
-            .digest();
+        let chain1 =
+            PersistedStore::new_sim_with_protocol_version_and_accounts(rng, 0, ProtocolVersion::MAX, vec![], None);
+        let genesis_checkpoint_digest1 = *chain1.store().get_checkpoint_by_sequence_number(0).unwrap().digest();
 
         let rng = StdRng::from_seed([9; 32]);
-        let chain2 = PersistedStore::new_sim_with_protocol_version_and_accounts(
-            rng,
-            0,
-            ProtocolVersion::MAX,
-            vec![],
-            None,
-        );
-        let genesis_checkpoint_digest2 = *chain2
-            .store()
-            .get_checkpoint_by_sequence_number(0)
-            .unwrap()
-            .digest();
+        let chain2 =
+            PersistedStore::new_sim_with_protocol_version_and_accounts(rng, 0, ProtocolVersion::MAX, vec![], None);
+        let genesis_checkpoint_digest2 = *chain2.store().get_checkpoint_by_sequence_number(0).unwrap().digest();
 
         assert_eq!(genesis_checkpoint_digest1, genesis_checkpoint_digest2);
 
         // Ensure the committees are different when using different seeds
         let rng = StdRng::from_seed([0; 32]);
-        let chain3 = PersistedStore::new_sim_with_protocol_version_and_accounts(
-            rng,
-            0,
-            ProtocolVersion::MAX,
-            vec![],
-            None,
-        );
+        let chain3 =
+            PersistedStore::new_sim_with_protocol_version_and_accounts(rng, 0, ProtocolVersion::MAX, vec![], None);
 
-        assert_ne!(
-            chain1.store().get_committee_by_epoch(0),
-            chain3.store().get_committee_by_epoch(0),
-        );
+        assert_ne!(chain1.store().get_committee_by_epoch(0), chain3.store().get_committee_by_epoch(0),);
     }
 }

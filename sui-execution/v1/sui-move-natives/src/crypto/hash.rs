@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
+use std::{collections::VecDeque, ops::Mul};
+
 use fastcrypto::hash::{Blake2b256, HashFunction, Keccak256};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
@@ -12,7 +13,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::{collections::VecDeque, ops::Mul};
+
+use crate::NativesCostTable;
 
 const BLAKE_2B256_BLOCK_SIZE: u16 = 128;
 const KECCAK_256_BLOCK_SIZE: u16 = 136;
@@ -45,12 +47,9 @@ fn hash<H: HashFunction<DIGEST_SIZE>, const DIGEST_SIZE: usize>(
                 .mul((((msg_ref.len() + block_size - 1) / block_size) as u64).into())
     );
 
-    Ok(NativeResult::ok(
-        context.gas_used(),
-        smallvec![Value::vector_u8(
-            H::digest(msg.as_bytes_ref().as_slice()).digest
-        )],
-    ))
+    Ok(NativeResult::ok(context.gas_used(), smallvec![Value::vector_u8(
+        H::digest(msg.as_bytes_ref().as_slice()).digest
+    )]))
 }
 
 #[derive(Clone)]
@@ -76,11 +75,7 @@ pub fn keccak256(
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
-    let hash_keccak256_cost_params = &context
-        .extensions()
-        .get::<NativesCostTable>()
-        .hash_keccak256_cost_params
-        .clone();
+    let hash_keccak256_cost_params = &context.extensions().get::<NativesCostTable>().hash_keccak256_cost_params.clone();
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(context, hash_keccak256_cost_params.hash_keccak256_cost_base);
 
@@ -116,16 +111,10 @@ pub fn blake2b256(
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
-    let hash_blake2b256_cost_params = &context
-        .extensions()
-        .get::<NativesCostTable>()
-        .hash_blake2b256_cost_params
-        .clone();
+    let hash_blake2b256_cost_params =
+        &context.extensions().get::<NativesCostTable>().hash_blake2b256_cost_params.clone();
     // Charge the base cost for this oper
-    native_charge_gas_early_exit!(
-        context,
-        hash_blake2b256_cost_params.hash_blake2b256_cost_base
-    );
+    native_charge_gas_early_exit!(context, hash_blake2b256_cost_params.hash_blake2b256_cost_base);
 
     hash::<Blake2b256, 32>(
         context,

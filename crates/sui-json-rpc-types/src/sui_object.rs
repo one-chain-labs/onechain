@@ -1,41 +1,45 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::fmt::Write;
-use std::fmt::{Display, Formatter};
+use std::{
+    cmp::Ordering,
+    collections::BTreeMap,
+    fmt,
+    fmt::{Display, Formatter, Write},
+};
 
 use anyhow::anyhow;
 use colored::Colorize;
 use fastcrypto::encoding::Base64;
 use move_bytecode_utils::module_cache::GetModule;
-use move_core_types::annotated_value::{MoveStructLayout, MoveValue};
-use move_core_types::identifier::Identifier;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    annotated_value::{MoveStructLayout, MoveValue},
+    identifier::Identifier,
+    language_storage::StructTag,
+};
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use serde_with::serde_as;
-use serde_with::DisplayFromStr;
-
+use serde_with::{serde_as, DisplayFromStr};
 use sui_protocol_config::ProtocolConfig;
-use sui_types::base_types::{
-    ObjectDigest, ObjectID, ObjectInfo, ObjectRef, ObjectType, SequenceNumber, SuiAddress,
-    TransactionDigest,
+use sui_types::{
+    base_types::{
+        ObjectDigest,
+        ObjectID,
+        ObjectInfo,
+        ObjectRef,
+        ObjectType,
+        SequenceNumber,
+        SuiAddress,
+        TransactionDigest,
+    },
+    error::{ExecutionError, SuiError, SuiObjectResponseError, SuiResult, UserInputError, UserInputResult},
+    gas_coin::GasCoin,
+    messages_checkpoint::CheckpointSequenceNumber,
+    move_package::{MovePackage, TypeOrigin, UpgradeInfo},
+    object::{Data, MoveObject, Object, ObjectInner, ObjectRead, Owner},
+    sui_serde::{BigInt, SequenceNumber as AsSequenceNumber, SuiStructTag},
 };
-use sui_types::error::{
-    ExecutionError, SuiError, SuiObjectResponseError, SuiResult, UserInputError, UserInputResult,
-};
-use sui_types::gas_coin::GasCoin;
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
-use sui_types::move_package::{MovePackage, TypeOrigin, UpgradeInfo};
-use sui_types::object::{Data, MoveObject, Object, ObjectInner, ObjectRead, Owner};
-use sui_types::sui_serde::BigInt;
-use sui_types::sui_serde::SequenceNumber as AsSequenceNumber;
-use sui_types::sui_serde::SuiStructTag;
 
 use crate::{Page, SuiMoveStruct, SuiMoveValue};
 
@@ -53,17 +57,11 @@ impl SuiObjectResponse {
     }
 
     pub fn new_with_data(data: SuiObjectData) -> Self {
-        Self {
-            data: Some(data),
-            error: None,
-        }
+        Self { data: Some(data), error: None }
     }
 
     pub fn new_with_error(error: SuiObjectResponseError) -> Self {
-        Self {
-            data: None,
-            error: Some(error),
-        }
+        Self { data: None, error: Some(error) }
     }
 }
 
@@ -96,10 +94,7 @@ impl PartialOrd for SuiObjectResponse {
 impl SuiObjectResponse {
     pub fn move_object_bcs(&self) -> Option<&Vec<u8>> {
         match &self.data {
-            Some(SuiObjectData {
-                bcs: Some(SuiRawData::MoveObject(obj)),
-                ..
-            }) => Some(&obj.bcs_bytes),
+            Some(SuiObjectData { bcs: Some(SuiRawData::MoveObject(obj)), .. }) => Some(&obj.bcs_bytes),
             _ => None,
         }
     }
@@ -115,14 +110,7 @@ impl SuiObjectResponse {
         match (&self.data, &self.error) {
             (Some(obj_data), None) => Ok(obj_data.object_id),
             (None, Some(SuiObjectResponseError::NotExists { object_id })) => Ok(*object_id),
-            (
-                None,
-                Some(SuiObjectResponseError::Deleted {
-                    object_id,
-                    version: _,
-                    digest: _,
-                }),
-            ) => Ok(*object_id),
+            (None, Some(SuiObjectResponseError::Deleted { object_id, version: _, digest: _ })) => Ok(*object_id),
             _ => Err(anyhow!("Could not get object_id, something went wrong with SuiObjectResponse construction.")),
         }
     }
@@ -139,15 +127,8 @@ impl TryFrom<SuiObjectResponse> for ObjectInfo {
     type Error = anyhow::Error;
 
     fn try_from(value: SuiObjectResponse) -> Result<Self, Self::Error> {
-        let SuiObjectData {
-            object_id,
-            version,
-            digest,
-            type_,
-            owner,
-            previous_transaction,
-            ..
-        } = value.into_object()?;
+        let SuiObjectData { object_id, version, digest, type_, owner, previous_transaction, .. } =
+            value.into_object()?;
 
         Ok(ObjectInfo {
             object_id,
@@ -217,10 +198,7 @@ impl SuiObjectData {
     }
 
     pub fn object_type(&self) -> anyhow::Result<ObjectType> {
-        self.type_
-            .as_ref()
-            .ok_or_else(|| anyhow!("type is missing for object {:?}", self.object_id))
-            .cloned()
+        self.type_.as_ref().ok_or_else(|| anyhow!("type is missing for object {:?}", self.object_id)).cloned()
     }
 
     pub fn is_gas_coin(&self) -> bool {
@@ -234,43 +212,20 @@ impl SuiObjectData {
 
 impl Display for SuiObjectData {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let type_ = if let Some(type_) = &self.type_ {
-            type_.to_string()
-        } else {
-            "Unknown Type".into()
-        };
+        let type_ = if let Some(type_) = &self.type_ { type_.to_string() } else { "Unknown Type".into() };
         let mut writer = String::new();
-        writeln!(
-            writer,
-            "{}",
-            format!("----- {type_} ({}[{}]) -----", self.object_id, self.version).bold()
-        )?;
+        writeln!(writer, "{}", format!("----- {type_} ({}[{}]) -----", self.object_id, self.version).bold())?;
         if let Some(owner) = &self.owner {
             writeln!(writer, "{}: {}", "Owner".bold().bright_black(), owner)?;
         }
 
-        writeln!(
-            writer,
-            "{}: {}",
-            "Version".bold().bright_black(),
-            self.version
-        )?;
+        writeln!(writer, "{}: {}", "Version".bold().bright_black(), self.version)?;
         if let Some(storage_rebate) = self.storage_rebate {
-            writeln!(
-                writer,
-                "{}: {}",
-                "Storage Rebate".bold().bright_black(),
-                storage_rebate
-            )?;
+            writeln!(writer, "{}: {}", "Storage Rebate".bold().bright_black(), storage_rebate)?;
         }
 
         if let Some(previous_transaction) = self.previous_transaction {
-            writeln!(
-                writer,
-                "{}: {:?}",
-                "Previous Transaction".bold().bright_black(),
-                previous_transaction
-            )?;
+            writeln!(writer, "{}: {:?}", "Previous Transaction".bold().bright_black(), previous_transaction)?;
         }
         if let Some(content) = self.content.as_ref() {
             writeln!(writer, "{}", "----- Data -----".bold())?;
@@ -283,12 +238,9 @@ impl Display for SuiObjectData {
 
 impl TryFrom<&SuiObjectData> for GasCoin {
     type Error = anyhow::Error;
+
     fn try_from(object: &SuiObjectData) -> Result<Self, Self::Error> {
-        match &object
-            .content
-            .as_ref()
-            .ok_or_else(|| anyhow!("Expect object content to not be empty"))?
-        {
+        match &object.content.as_ref().ok_or_else(|| anyhow!("Expect object content to not be empty"))? {
             SuiParsedData::MoveObject(o) => {
                 if GasCoin::type_() == o.type_ {
                     return GasCoin::try_from(&o.fields);
@@ -297,15 +249,13 @@ impl TryFrom<&SuiObjectData> for GasCoin {
             SuiParsedData::Package(_) => {}
         }
 
-        Err(anyhow!(
-            "Gas object type is not a gas coin: {:?}",
-            object.type_
-        ))
+        Err(anyhow!("Gas object type is not a gas coin: {:?}", object.type_))
     }
 }
 
 impl TryFrom<&SuiMoveStruct> for GasCoin {
     type Error = anyhow::Error;
+
     fn try_from(move_struct: &SuiMoveStruct) -> Result<Self, Self::Error> {
         match move_struct {
             SuiMoveStruct::WithFields(fields) | SuiMoveStruct::WithTypes { type_: _, fields } => {
@@ -412,24 +362,18 @@ impl SuiObjectDataOptions {
 impl TryFrom<(ObjectRead, SuiObjectDataOptions)> for SuiObjectResponse {
     type Error = anyhow::Error;
 
-    fn try_from(
-        (object_read, options): (ObjectRead, SuiObjectDataOptions),
-    ) -> Result<Self, Self::Error> {
+    fn try_from((object_read, options): (ObjectRead, SuiObjectDataOptions)) -> Result<Self, Self::Error> {
         match object_read {
-            ObjectRead::NotExists(id) => Ok(SuiObjectResponse::new_with_error(
-                SuiObjectResponseError::NotExists { object_id: id },
-            )),
+            ObjectRead::NotExists(id) => {
+                Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::NotExists { object_id: id }))
+            }
             ObjectRead::Exists(object_ref, o, layout) => {
                 let data = (object_ref, o, layout, options).try_into()?;
                 Ok(SuiObjectResponse::new_with_data(data))
             }
-            ObjectRead::Deleted((object_id, version, digest)) => Ok(
-                SuiObjectResponse::new_with_error(SuiObjectResponseError::Deleted {
-                    object_id,
-                    version,
-                    digest,
-                }),
-            ),
+            ObjectRead::Deleted((object_id, version, digest)) => {
+                Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::Deleted { object_id, version, digest }))
+            }
         }
     }
 }
@@ -437,15 +381,8 @@ impl TryFrom<(ObjectRead, SuiObjectDataOptions)> for SuiObjectResponse {
 impl TryFrom<(ObjectInfo, SuiObjectDataOptions)> for SuiObjectResponse {
     type Error = anyhow::Error;
 
-    fn try_from(
-        (object_info, options): (ObjectInfo, SuiObjectDataOptions),
-    ) -> Result<Self, Self::Error> {
-        let SuiObjectDataOptions {
-            show_type,
-            show_owner,
-            show_previous_transaction,
-            ..
-        } = options;
+    fn try_from((object_info, options): (ObjectInfo, SuiObjectDataOptions)) -> Result<Self, Self::Error> {
+        let SuiObjectDataOptions { show_type, show_owner, show_previous_transaction, .. } = options;
 
         Ok(Self::new_with_data(SuiObjectData {
             object_id: object_info.object_id,
@@ -453,8 +390,7 @@ impl TryFrom<(ObjectInfo, SuiObjectDataOptions)> for SuiObjectResponse {
             digest: object_info.digest,
             type_: show_type.then_some(object_info.type_),
             owner: show_owner.then_some(object_info.owner),
-            previous_transaction: show_previous_transaction
-                .then_some(object_info.previous_transaction),
+            previous_transaction: show_previous_transaction.then_some(object_info.previous_transaction),
             storage_rebate: None,
             display: None,
             content: None,
@@ -463,23 +399,11 @@ impl TryFrom<(ObjectInfo, SuiObjectDataOptions)> for SuiObjectResponse {
     }
 }
 
-impl
-    TryFrom<(
-        ObjectRef,
-        Object,
-        Option<MoveStructLayout>,
-        SuiObjectDataOptions,
-    )> for SuiObjectData
-{
+impl TryFrom<(ObjectRef, Object, Option<MoveStructLayout>, SuiObjectDataOptions)> for SuiObjectData {
     type Error = anyhow::Error;
 
     fn try_from(
-        (object_ref, o, layout, options): (
-            ObjectRef,
-            Object,
-            Option<MoveStructLayout>,
-            SuiObjectDataOptions,
-        ),
+        (object_ref, o, layout, options): (ObjectRef, Object, Option<MoveStructLayout>, SuiObjectDataOptions),
     ) -> Result<Self, Self::Error> {
         let SuiObjectDataOptions {
             show_type,
@@ -492,18 +416,13 @@ impl
         } = options;
 
         let (object_id, version, digest) = object_ref;
-        let type_ = if show_type {
-            Some(Into::<ObjectType>::into(&o))
-        } else {
-            None
-        };
+        let type_ = if show_type { Some(Into::<ObjectType>::into(&o)) } else { None };
 
         let bcs: Option<SuiRawData> = if show_bcs {
             let data = match o.data.clone() {
                 Data::Move(m) => {
-                    let layout = layout.clone().ok_or_else(|| {
-                        anyhow!("Layout is required to convert Move object to json")
-                    })?;
+                    let layout =
+                        layout.clone().ok_or_else(|| anyhow!("Layout is required to convert Move object to json"))?;
                     SuiRawData::try_from_object(m, layout)?
                 }
                 Data::Package(p) => SuiRawData::try_from_package(p)
@@ -519,9 +438,7 @@ impl
         let content: Option<SuiParsedData> = if show_content {
             let data = match o.data {
                 Data::Move(m) => {
-                    let layout = layout.ok_or_else(|| {
-                        anyhow!("Layout is required to convert Move object to json")
-                    })?;
+                    let layout = layout.ok_or_else(|| anyhow!("Layout is required to convert Move object to json"))?;
                     SuiParsedData::try_from_object(m, layout)?
                 }
                 Data::Package(p) => SuiParsedData::try_from_package(p)?,
@@ -537,16 +454,8 @@ impl
             digest,
             type_,
             owner: if show_owner { Some(o.owner) } else { None },
-            storage_rebate: if show_storage_rebate {
-                Some(o.storage_rebate)
-            } else {
-                None
-            },
-            previous_transaction: if show_previous_transaction {
-                Some(o.previous_transaction)
-            } else {
-                None
-            },
+            storage_rebate: if show_storage_rebate { Some(o.storage_rebate) } else { None },
+            previous_transaction: if show_previous_transaction { Some(o.previous_transaction) } else { None },
             content,
             bcs,
             display: None,
@@ -554,14 +463,8 @@ impl
     }
 }
 
-impl
-    TryFrom<(
-        ObjectRef,
-        Object,
-        Option<MoveStructLayout>,
-        SuiObjectDataOptions,
-        Option<DisplayFieldsResponse>,
-    )> for SuiObjectData
+impl TryFrom<(ObjectRef, Object, Option<MoveStructLayout>, SuiObjectDataOptions, Option<DisplayFieldsResponse>)>
+    for SuiObjectData
 {
     type Error = anyhow::Error;
 
@@ -630,21 +533,17 @@ impl TryInto<Object> for SuiObjectData {
                 p.type_origin_table,
                 p.linkage_table,
             )?),
-            _ => Err(anyhow!(
-                "BCS data is required to convert SuiObjectData to Object"
-            ))?,
+            _ => Err(anyhow!("BCS data is required to convert SuiObjectData to Object"))?,
         };
         Ok(ObjectInner {
             data,
-            owner: self
-                .owner
-                .ok_or_else(|| anyhow!("Owner is required to convert SuiObjectData to Object"))?,
-            previous_transaction: self.previous_transaction.ok_or_else(|| {
-                anyhow!("previous_transaction is required to convert SuiObjectData to Object")
-            })?,
-            storage_rebate: self.storage_rebate.ok_or_else(|| {
-                anyhow!("storage_rebate is required to convert SuiObjectData to Object")
-            })?,
+            owner: self.owner.ok_or_else(|| anyhow!("Owner is required to convert SuiObjectData to Object"))?,
+            previous_transaction: self
+                .previous_transaction
+                .ok_or_else(|| anyhow!("previous_transaction is required to convert SuiObjectData to Object"))?,
+            storage_rebate: self
+                .storage_rebate
+                .ok_or_else(|| anyhow!("storage_rebate is required to convert SuiObjectData to Object"))?,
         }
         .into())
     }
@@ -669,29 +568,20 @@ impl SuiObjectRef {
 
 impl Display for SuiObjectRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Object ID: {}, version: {}, digest: {}",
-            self.object_id, self.version, self.digest
-        )
+        write!(f, "Object ID: {}, version: {}, digest: {}", self.object_id, self.version, self.digest)
     }
 }
 
 impl From<ObjectRef> for SuiObjectRef {
     fn from(oref: ObjectRef) -> Self {
-        Self {
-            object_id: oref.0,
-            version: oref.1,
-            digest: oref.2,
-        }
+        Self { object_id: oref.0, version: oref.1, digest: oref.2 }
     }
 }
 
 pub trait SuiData: Sized {
     type ObjectType;
     type PackageType;
-    fn try_from_object(object: MoveObject, layout: MoveStructLayout)
-        -> Result<Self, anyhow::Error>;
+    fn try_from_object(object: MoveObject, layout: MoveStructLayout) -> Result<Self, anyhow::Error>;
     fn try_from_package(package: MovePackage) -> Result<Self, anyhow::Error>;
     fn try_as_move(&self) -> Option<&Self::ObjectType>;
     fn try_into_move(self) -> Option<Self::ObjectType>;
@@ -760,13 +650,8 @@ impl SuiData for SuiParsedData {
     type ObjectType = SuiParsedMoveObject;
     type PackageType = SuiMovePackage;
 
-    fn try_from_object(
-        object: MoveObject,
-        layout: MoveStructLayout,
-    ) -> Result<Self, anyhow::Error> {
-        Ok(Self::MoveObject(SuiParsedMoveObject::try_from_layout(
-            object, layout,
-        )?))
+    fn try_from_object(object: MoveObject, layout: MoveStructLayout) -> Result<Self, anyhow::Error> {
+        Ok(Self::MoveObject(SuiParsedMoveObject::try_from_layout(object, layout)?))
     }
 
     fn try_from_package(package: MovePackage) -> Result<Self, anyhow::Error> {
@@ -775,22 +660,15 @@ impl SuiData for SuiParsedData {
             // this function is only from JSON RPC - it is OK to deserialize with max Move binary
             // version
             let module = move_binary_format::CompiledModule::deserialize_with_defaults(bytecode)
-                .map_err(|error| SuiError::ModuleDeserializationFailure {
-                    error: error.to_string(),
-                })?;
+                .map_err(|error| SuiError::ModuleDeserializationFailure { error: error.to_string() })?;
             let d = move_disassembler::disassembler::Disassembler::from_module_with_max_size(
                 &module,
                 move_ir_types::location::Spanned::unsafe_no_loc(()).loc,
                 *sui_types::move_package::MAX_DISASSEMBLED_MODULE_SIZE,
             )
-            .map_err(|e| SuiError::ObjectSerializationError {
-                error: e.to_string(),
-            })?;
-            let bytecode_str = d
-                .disassemble()
-                .map_err(|e| SuiError::ObjectSerializationError {
-                    error: e.to_string(),
-                })?;
+            .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
+            let bytecode_str =
+                d.disassemble().map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
             disassembled.insert(module.name().to_string(), Value::String(bytecode_str));
         }
 
@@ -835,12 +713,7 @@ impl Display for SuiParsedData {
                 write!(writer, "{}", &o.fields)?;
             }
             SuiParsedData::Package(p) => {
-                write!(
-                    writer,
-                    "{}: {:?}",
-                    "Modules".bold().bright_black(),
-                    p.disassembled.keys()
-                )?;
+                write!(writer, "{}: {:?}", "Modules".bold().bright_black(), p.disassembled.keys())?;
             }
         }
         write!(f, "{}", writer)
@@ -854,28 +727,23 @@ impl SuiParsedData {
             ObjectRead::Exists(_object_ref, o, layout) => {
                 let data = match o.into_inner().data {
                     Data::Move(m) => {
-                        let layout = layout.ok_or_else(|| {
-                            anyhow!("Layout is required to convert Move object to json")
-                        })?;
+                        let layout =
+                            layout.ok_or_else(|| anyhow!("Layout is required to convert Move object to json"))?;
                         SuiParsedData::try_from_object(m, layout)?
                     }
                     Data::Package(p) => SuiParsedData::try_from_package(p)?,
                 };
                 Ok(data)
             }
-            ObjectRead::Deleted((object_id, version, digest)) => Err(anyhow::anyhow!(
-                "Object {} was deleted at version {} with digest {}",
-                object_id,
-                version,
-                digest
-            )),
+            ObjectRead::Deleted((object_id, version, digest)) => {
+                Err(anyhow::anyhow!("Object {} was deleted at version {} with digest {}", object_id, version, digest))
+            }
         }
     }
 }
 
 pub trait SuiMoveObject: Sized {
-    fn try_from_layout(object: MoveObject, layout: MoveStructLayout)
-        -> Result<Self, anyhow::Error>;
+    fn try_from_layout(object: MoveObject, layout: MoveStructLayout) -> Result<Self, anyhow::Error>;
 
     fn try_from(o: MoveObject, resolver: &impl GetModule) -> Result<Self, anyhow::Error> {
         let layout = o.get_layout(resolver)?;
@@ -898,27 +766,22 @@ pub struct SuiParsedMoveObject {
 }
 
 impl SuiMoveObject for SuiParsedMoveObject {
-    fn try_from_layout(
-        object: MoveObject,
-        layout: MoveStructLayout,
-    ) -> Result<Self, anyhow::Error> {
+    fn try_from_layout(object: MoveObject, layout: MoveStructLayout) -> Result<Self, anyhow::Error> {
         let move_struct = object.to_move_struct(&layout)?.into();
 
-        Ok(
-            if let SuiMoveStruct::WithTypes { type_, fields } = move_struct {
-                SuiParsedMoveObject {
-                    type_,
-                    has_public_transfer: object.has_public_transfer(),
-                    fields: SuiMoveStruct::WithFields(fields),
-                }
-            } else {
-                SuiParsedMoveObject {
-                    type_: object.type_().clone().into(),
-                    has_public_transfer: object.has_public_transfer(),
-                    fields: move_struct,
-                }
-            },
-        )
+        Ok(if let SuiMoveStruct::WithTypes { type_, fields } = move_struct {
+            SuiParsedMoveObject {
+                type_,
+                has_public_transfer: object.has_public_transfer(),
+                fields: SuiMoveStruct::WithFields(fields),
+            }
+        } else {
+            SuiParsedMoveObject {
+                type_: object.type_().clone().into(),
+                has_public_transfer: object.has_public_transfer(),
+                fields: move_struct,
+            }
+        })
     }
 
     fn type_(&self) -> &StructTag {
@@ -936,14 +799,10 @@ impl SuiParsedMoveObject {
     }
 }
 
-pub fn type_and_fields_from_move_event_data(
-    event_data: MoveValue,
-) -> SuiResult<(StructTag, serde_json::Value)> {
+pub fn type_and_fields_from_move_event_data(event_data: MoveValue) -> SuiResult<(StructTag, serde_json::Value)> {
     match event_data.into() {
         SuiMoveValue::Struct(move_struct) => match &move_struct {
-            SuiMoveStruct::WithTypes { type_, .. } => {
-                Ok((type_.clone(), move_struct.clone().to_json_value()))
-            }
+            SuiMoveStruct::WithTypes { type_, .. } => Ok((type_.clone(), move_struct.clone().to_json_value())),
             _ => Err(SuiError::ObjectDeserializationError {
                 error: "Found non-type SuiMoveStruct in MoveValue event".to_string(),
             }),
@@ -988,10 +847,7 @@ impl From<MoveObject> for SuiRawMoveObject {
 }
 
 impl SuiMoveObject for SuiRawMoveObject {
-    fn try_from_layout(
-        object: MoveObject,
-        _layout: MoveStructLayout,
-    ) -> Result<Self, anyhow::Error> {
+    fn try_from_layout(object: MoveObject, _layout: MoveStructLayout) -> Result<Self, anyhow::Error> {
         Ok(Self {
             type_: object.type_().clone().into(),
             has_public_transfer: object.has_public_transfer(),
@@ -1037,10 +893,7 @@ impl From<MovePackage> for SuiRawMovePackage {
 }
 
 impl SuiRawMovePackage {
-    pub fn to_move_package(
-        &self,
-        max_move_package_size: u64,
-    ) -> Result<MovePackage, ExecutionError> {
+    pub fn to_move_package(&self, max_move_package_size: u64) -> Result<MovePackage, ExecutionError> {
         MovePackage::new(
             self.id,
             self.version,
@@ -1064,65 +917,41 @@ pub enum SuiPastObjectResponse {
     /// The object exists but not found with this version
     VersionNotFound(ObjectID, SequenceNumber),
     /// The asked object version is higher than the latest
-    VersionTooHigh {
-        object_id: ObjectID,
-        asked_version: SequenceNumber,
-        latest_version: SequenceNumber,
-    },
+    VersionTooHigh { object_id: ObjectID, asked_version: SequenceNumber, latest_version: SequenceNumber },
 }
 
 impl SuiPastObjectResponse {
     /// Returns a reference to the object if there is any, otherwise an Err
     pub fn object(&self) -> UserInputResult<&SuiObjectData> {
         match &self {
-            Self::ObjectDeleted(oref) => Err(UserInputError::ObjectDeleted {
-                object_ref: oref.to_object_ref(),
-            }),
-            Self::ObjectNotExists(id) => Err(UserInputError::ObjectNotFound {
-                object_id: *id,
-                version: None,
-            }),
+            Self::ObjectDeleted(oref) => Err(UserInputError::ObjectDeleted { object_ref: oref.to_object_ref() }),
+            Self::ObjectNotExists(id) => Err(UserInputError::ObjectNotFound { object_id: *id, version: None }),
             Self::VersionFound(o) => Ok(o),
-            Self::VersionNotFound(id, seq_num) => Err(UserInputError::ObjectNotFound {
-                object_id: *id,
-                version: Some(*seq_num),
-            }),
-            Self::VersionTooHigh {
-                object_id,
-                asked_version,
-                latest_version,
-            } => Err(UserInputError::ObjectSequenceNumberTooHigh {
-                object_id: *object_id,
-                asked_version: *asked_version,
-                latest_version: *latest_version,
-            }),
+            Self::VersionNotFound(id, seq_num) => {
+                Err(UserInputError::ObjectNotFound { object_id: *id, version: Some(*seq_num) })
+            }
+            Self::VersionTooHigh { object_id, asked_version, latest_version } => {
+                Err(UserInputError::ObjectSequenceNumberTooHigh {
+                    object_id: *object_id,
+                    asked_version: *asked_version,
+                    latest_version: *latest_version,
+                })
+            }
         }
     }
 
     /// Returns the object value if there is any, otherwise an Err
     pub fn into_object(self) -> UserInputResult<SuiObjectData> {
         match self {
-            Self::ObjectDeleted(oref) => Err(UserInputError::ObjectDeleted {
-                object_ref: oref.to_object_ref(),
-            }),
-            Self::ObjectNotExists(id) => Err(UserInputError::ObjectNotFound {
-                object_id: id,
-                version: None,
-            }),
+            Self::ObjectDeleted(oref) => Err(UserInputError::ObjectDeleted { object_ref: oref.to_object_ref() }),
+            Self::ObjectNotExists(id) => Err(UserInputError::ObjectNotFound { object_id: id, version: None }),
             Self::VersionFound(o) => Ok(o),
-            Self::VersionNotFound(object_id, version) => Err(UserInputError::ObjectNotFound {
-                object_id,
-                version: Some(version),
-            }),
-            Self::VersionTooHigh {
-                object_id,
-                asked_version,
-                latest_version,
-            } => Err(UserInputError::ObjectSequenceNumberTooHigh {
-                object_id,
-                asked_version,
-                latest_version,
-            }),
+            Self::VersionNotFound(object_id, version) => {
+                Err(UserInputError::ObjectNotFound { object_id, version: Some(version) })
+            }
+            Self::VersionTooHigh { object_id, asked_version, latest_version } => {
+                Err(UserInputError::ObjectSequenceNumberTooHigh { object_id, asked_version, latest_version })
+            }
         }
     }
 }
@@ -1202,9 +1031,11 @@ impl SuiObjectDataFilter {
     pub fn and(self, other: Self) -> Self {
         Self::MatchAll(vec![self, other])
     }
+
     pub fn or(self, other: Self) -> Self {
         Self::MatchAny(vec![self, other])
     }
+
     pub fn not(self, other: Self) -> Self {
         Self::MatchNone(vec![self, other])
     }
@@ -1224,9 +1055,7 @@ impl SuiObjectDataFilter {
                 if !s.type_params.is_empty() && s.type_params != obj_tag.type_params {
                     false
                 } else {
-                    obj_tag.address == s.address
-                        && obj_tag.module == s.module
-                        && obj_tag.name == s.name
+                    obj_tag.address == s.address && obj_tag.module == s.module && obj_tag.name == s.name
                 }
             }
             SuiObjectDataFilter::MoveModule { package, module } => {
@@ -1264,17 +1093,11 @@ impl SuiObjectResponseQuery {
     }
 
     pub fn new_with_filter(filter: SuiObjectDataFilter) -> Self {
-        Self {
-            filter: Some(filter),
-            options: None,
-        }
+        Self { filter: Some(filter), options: None }
     }
 
     pub fn new_with_options(options: SuiObjectDataOptions) -> Self {
-        Self {
-            filter: None,
-            options: Some(options),
-        }
+        Self { filter: None, options: Some(options) }
     }
 }
 

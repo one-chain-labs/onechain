@@ -3,28 +3,33 @@
 
 use std::sync::Arc;
 
-use crate::config::ZkLoginConfig;
-use crate::error::Error;
-use crate::server::watermark_task::Watermark;
-use crate::types::base64::Base64;
-use crate::types::dynamic_field::{DynamicField, DynamicFieldName};
-use crate::types::epoch::Epoch;
-use crate::types::sui_address::SuiAddress;
-use crate::types::type_filter::ExactTypeFilter;
 use async_graphql::*;
 use im::hashmap::HashMap as ImHashMap;
-use shared_crypto::intent::{
-    AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage,
+use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage};
+use sui_types::{
+    authenticator_state::{ActiveJwk, AuthenticatorStateInner},
+    crypto::ToFromBytes,
+    dynamic_field::{DynamicFieldType, Field},
+    signature::{GenericSignature, VerifyParams},
+    signature_verification::VerifiedDigestCache,
+    transaction::TransactionData,
+    TypeTag,
+    SUI_AUTHENTICATOR_STATE_ADDRESS,
 };
-use sui_types::authenticator_state::{ActiveJwk, AuthenticatorStateInner};
-use sui_types::crypto::ToFromBytes;
-use sui_types::dynamic_field::{DynamicFieldType, Field};
-use sui_types::signature::GenericSignature;
-use sui_types::signature::VerifyParams;
-use sui_types::signature_verification::VerifiedDigestCache;
-use sui_types::transaction::TransactionData;
-use sui_types::{TypeTag, SUI_AUTHENTICATOR_STATE_ADDRESS};
 use tracing::warn;
+
+use crate::{
+    config::ZkLoginConfig,
+    error::Error,
+    server::watermark_task::Watermark,
+    types::{
+        base64::Base64,
+        dynamic_field::{DynamicField, DynamicFieldName},
+        epoch::Epoch,
+        sui_address::SuiAddress,
+        type_filter::ExactTypeFilter,
+    },
+};
 
 /// An enum that specifies the intent scope to be used to parse the bytes for signature
 /// verification.
@@ -58,9 +63,7 @@ pub(crate) async fn verify_zklogin_signature(
 
     // get current epoch from db.
     let Some(curr_epoch) = Epoch::query(ctx, None, checkpoint).await? else {
-        return Err(Error::Internal(
-            "Cannot get current epoch from db".to_string(),
-        ));
+        return Err(Error::Internal("Cannot get current epoch from db".to_string()));
     };
     let curr_epoch = curr_epoch.stored.epoch as u64;
 
@@ -69,13 +72,10 @@ pub(crate) async fn verify_zklogin_signature(
     let zklogin_env_native = cfg.env;
 
     // validates and parse the signature as a zklogin signature.
-    let GenericSignature::ZkLoginAuthenticator(zklogin_sig) =
-        GenericSignature::from_bytes(&signature.0)
-            .map_err(|_| Error::Client("Cannot parse generic signature".to_string()))?
+    let GenericSignature::ZkLoginAuthenticator(zklogin_sig) = GenericSignature::from_bytes(&signature.0)
+        .map_err(|_| Error::Client("Cannot parse generic signature".to_string()))?
     else {
-        return Err(Error::Client(
-            "Endpoint only supports zkLogin signature".to_string(),
-        ));
+        return Err(Error::Client("Endpoint only supports zkLogin signature".to_string()));
     };
 
     // fetch on-chain JWKs from dynamic field of system object.
@@ -83,10 +83,7 @@ pub(crate) async fn verify_zklogin_signature(
         ctx,
         SUI_AUTHENTICATOR_STATE_ADDRESS.into(),
         None,
-        DynamicFieldName {
-            type_: ExactTypeFilter(TypeTag::U64),
-            bcs: Base64(bcs::to_bytes(&1u64).unwrap()),
-        },
+        DynamicFieldName { type_: ExactTypeFilter(TypeTag::U64), bcs: Base64(bcs::to_bytes(&1u64).unwrap()) },
         DynamicFieldType::DynamicField,
         checkpoint,
     )
@@ -113,20 +110,13 @@ pub(crate) async fn verify_zklogin_signature(
             }
         }
     }
-    let verify_params = VerifyParams::new(
-        oidc_provider_jwks,
-        vec![],
-        zklogin_env_native,
-        true,
-        true,
-        Some(30),
-    );
+    let verify_params = VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, Some(30));
 
     let bytes = bytes.0;
     match intent_scope {
         ZkLoginIntentScope::TransactionData => {
-            let tx_data: TransactionData = bcs::from_bytes(&bytes)
-                .map_err(|_| Error::Client("Invalid tx data bytes".to_string()))?;
+            let tx_data: TransactionData =
+                bcs::from_bytes(&bytes).map_err(|_| Error::Client("Invalid tx data bytes".to_string()))?;
             let intent_msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
             let sig = GenericSignature::ZkLoginAuthenticator(zklogin_sig);
             match sig.verify_authenticator(
@@ -136,24 +126,14 @@ pub(crate) async fn verify_zklogin_signature(
                 &verify_params,
                 Arc::new(VerifiedDigestCache::new_empty()),
             ) {
-                Ok(_) => Ok(ZkLoginVerifyResult {
-                    success: true,
-                    errors: vec![],
-                }),
-                Err(e) => Ok(ZkLoginVerifyResult {
-                    success: false,
-                    errors: vec![e.to_string()],
-                }),
+                Ok(_) => Ok(ZkLoginVerifyResult { success: true, errors: vec![] }),
+                Err(e) => Ok(ZkLoginVerifyResult { success: false, errors: vec![e.to_string()] }),
             }
         }
         ZkLoginIntentScope::PersonalMessage => {
             let data = PersonalMessage { message: bytes };
             let intent_msg = IntentMessage::new(
-                Intent {
-                    scope: IntentScope::PersonalMessage,
-                    version: IntentVersion::V0,
-                    app_id: AppId::Sui,
-                },
+                Intent { scope: IntentScope::PersonalMessage, version: IntentVersion::V0, app_id: AppId::Sui },
                 data,
             );
 
@@ -165,14 +145,8 @@ pub(crate) async fn verify_zklogin_signature(
                 &verify_params,
                 Arc::new(VerifiedDigestCache::new_empty()),
             ) {
-                Ok(_) => Ok(ZkLoginVerifyResult {
-                    success: true,
-                    errors: vec![],
-                }),
-                Err(e) => Ok(ZkLoginVerifyResult {
-                    success: false,
-                    errors: vec![e.to_string()],
-                }),
+                Ok(_) => Ok(ZkLoginVerifyResult { success: true, errors: vec![] }),
+                Err(e) => Ok(ZkLoginVerifyResult { success: false, errors: vec![e.to_string()] }),
             }
         }
     }

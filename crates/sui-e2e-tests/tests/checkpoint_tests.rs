@@ -1,14 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::time::Duration;
-use sui_macros::register_fail_point;
-use sui_macros::register_fail_point_if;
-use sui_macros::sim_test;
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+        Mutex,
+    },
+    time::Duration,
+};
+
+use sui_macros::{register_fail_point, register_fail_point_if, sim_test};
 use sui_test_transaction_builder::make_transfer_oct_transaction;
 use test_cluster::TestClusterBuilder;
 
@@ -19,19 +21,12 @@ async fn basic_checkpoints_integration_test() {
     let digest = *tx.digest();
     test_cluster.execute_transaction(tx).await;
 
-    for _ in 0..600 {
-        let all_included = test_cluster
-            .swarm
-            .validator_node_handles()
-            .into_iter()
-            .all(|handle| {
-                handle.with(|node| {
-                    node.state()
-                        .epoch_store_for_testing()
-                        .is_transaction_executed_in_checkpoint(&digest)
-                        .unwrap()
-                })
-            });
+    for _ in 0 .. 600 {
+        let all_included = test_cluster.swarm.validator_node_handles().into_iter().all(|handle| {
+            handle.with(|node| {
+                node.state().epoch_store_for_testing().is_transaction_executed_in_checkpoint(&digest).unwrap()
+            })
+        });
         if all_included {
             // success
             return;
@@ -65,17 +60,10 @@ async fn test_checkpoint_split_brain() {
 
     register_fail_point_if("cp_execution_nondeterminism", || true);
 
-    let test_cluster = TestClusterBuilder::new()
-        .with_num_validators(committee_size)
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().with_num_validators(committee_size).build().await;
 
     let tx = make_transfer_oct_transaction(&test_cluster.wallet, None, None).await;
-    test_cluster
-        .wallet
-        .execute_transaction_may_fail(tx)
-        .await
-        .ok();
+    test_cluster.wallet.execute_transaction_may_fail(tx).await.ok();
 
     // provide enough time for validators to detect split brain
     tokio::time::sleep(Duration::from_secs(20)).await;

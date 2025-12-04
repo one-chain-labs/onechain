@@ -27,10 +27,7 @@ pub async fn run_benchmark(
     benchmark_args: BenchmarkArgs,
     indexer_config: IndexerConfig,
 ) -> anyhow::Result<()> {
-    let BenchmarkArgs {
-        ingestion_path,
-        pipeline,
-    } = benchmark_args;
+    let BenchmarkArgs { ingestion_path, pipeline } = benchmark_args;
 
     let ingestion_data = read_ingestion_data(&ingestion_path).await?;
     let first_checkpoint = *ingestion_data.keys().next().unwrap();
@@ -46,21 +43,11 @@ pub async fn run_benchmark(
         ..Default::default()
     };
 
-    let client_args = ClientArgs {
-        remote_store_url: None,
-        local_ingestion_path: Some(ingestion_path.clone()),
-    };
+    let client_args = ClientArgs { remote_store_url: None, local_ingestion_path: Some(ingestion_path.clone()) };
 
     let cur_time = Instant::now();
 
-    start_indexer(
-        db_args,
-        indexer_args,
-        client_args,
-        indexer_config,
-        false, /* with_genesis */
-    )
-    .await?;
+    start_indexer(db_args, indexer_args, client_args, indexer_config, false /* with_genesis */).await?;
 
     let elapsed = Instant::now().duration_since(cur_time);
     println!("Indexed {} transactions in {:?}", num_transactions, elapsed);

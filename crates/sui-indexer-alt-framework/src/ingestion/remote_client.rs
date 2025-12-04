@@ -1,11 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ingestion::client::{FetchError, FetchResult, IngestionClientTrait};
-use crate::ingestion::Result as IngestionResult;
 use reqwest::{Client, StatusCode};
 use tracing::{debug, error};
 use url::Url;
+
+use crate::ingestion::{
+    client::{FetchError, FetchResult, IngestionClientTrait},
+    Result as IngestionResult,
+};
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
 pub enum HttpError {
@@ -24,10 +27,7 @@ pub(crate) struct RemoteIngestionClient {
 
 impl RemoteIngestionClient {
     pub(crate) fn new(url: Url) -> IngestionResult<Self> {
-        Ok(Self {
-            url,
-            client: Client::builder().build()?,
-        })
+        Ok(Self { url, client: Client::builder().build()? })
     }
 }
 
@@ -44,20 +44,14 @@ impl IngestionClientTrait for RemoteIngestionClient {
     /// - issues getting a full response.
     async fn fetch(&self, checkpoint: u64) -> FetchResult {
         // SAFETY: The path being joined is statically known to be valid.
-        let url = self
-            .url
-            .join(&format!("/{checkpoint}.chk"))
-            .expect("Unexpected invalid URL");
+        let url = self.url.join(&format!("/{checkpoint}.chk")).expect("Unexpected invalid URL");
 
         let response = self
             .client
             .get(url)
             .send()
             .await
-            .map_err(|e| FetchError::Transient {
-                reason: "request",
-                error: e.into(),
-            })?;
+            .map_err(|e| FetchError::Transient { reason: "request", error: e.into() })?;
 
         match response.status() {
             code if code.is_success() => {
@@ -65,10 +59,7 @@ impl IngestionClientTrait for RemoteIngestionClient {
                 // checkpoint from them is considered a transient error -- the store being
                 // fetched from needs to be corrected, and ingestion will keep retrying it
                 // until it is.
-                response.bytes().await.map_err(|e| FetchError::Transient {
-                    reason: "bytes",
-                    error: e.into(),
-                })
+                response.bytes().await.map_err(|e| FetchError::Transient { reason: "bytes", error: e.into() })
             }
 
             // Treat 404s as a special case so we can match on this error type.
@@ -78,23 +69,20 @@ impl IngestionClientTrait for RemoteIngestionClient {
             }
 
             // Timeouts are a client error but they are usually transient.
-            code @ StatusCode::REQUEST_TIMEOUT => Err(FetchError::Transient {
-                reason: "timeout",
-                error: status_code_to_error(code),
-            }),
+            code @ StatusCode::REQUEST_TIMEOUT => {
+                Err(FetchError::Transient { reason: "timeout", error: status_code_to_error(code) })
+            }
 
             // Rate limiting is also a client error, but the backoff will eventually widen the
             // interval appropriately.
-            code @ StatusCode::TOO_MANY_REQUESTS => Err(FetchError::Transient {
-                reason: "too_many_requests",
-                error: status_code_to_error(code),
-            }),
+            code @ StatusCode::TOO_MANY_REQUESTS => {
+                Err(FetchError::Transient { reason: "too_many_requests", error: status_code_to_error(code) })
+            }
 
             // Assume that if the server is facing difficulties, it will recover eventually.
-            code if code.is_server_error() => Err(FetchError::Transient {
-                reason: "server_error",
-                error: status_code_to_error(code),
-            }),
+            code if code.is_server_error() => {
+                Err(FetchError::Transient { reason: "server_error", error: status_code_to_error(code) })
+            }
 
             // For everything else, assume it's a permanent error and don't retry.
             code => {
@@ -107,25 +95,27 @@ impl IngestionClientTrait for RemoteIngestionClient {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
-    use crate::ingestion::client::IngestionClient;
-    use crate::ingestion::error::Error;
-    use crate::ingestion::test_utils::test_checkpoint_data;
-    use crate::metrics::tests::test_metrics;
-    use axum::http::StatusCode;
     use std::sync::{Arc, Mutex};
+
+    use axum::http::StatusCode;
     use tokio_util::sync::CancellationToken;
     use wiremock::{
         matchers::{method, path_regex},
-        Mock, MockServer, Request, Respond, ResponseTemplate,
+        Mock,
+        MockServer,
+        Request,
+        Respond,
+        ResponseTemplate,
+    };
+
+    use super::*;
+    use crate::{
+        ingestion::{client::IngestionClient, error::Error, test_utils::test_checkpoint_data},
+        metrics::tests::test_metrics,
     };
 
     pub(crate) async fn respond_with(server: &MockServer, response: impl Respond + 'static) {
-        Mock::given(method("GET"))
-            .and(path_regex(r"/\d+.chk"))
-            .respond_with(response)
-            .mount(server)
-            .await;
+        Mock::given(method("GET")).and(path_regex(r"/\d+.chk")).respond_with(response).mount(server).await;
     }
 
     pub(crate) fn status(code: StatusCode) -> ResponseTemplate {
@@ -153,10 +143,7 @@ pub(crate) mod tests {
         respond_with(&server, status(StatusCode::NOT_FOUND)).await;
 
         let client = remote_test_client(server.uri());
-        let error = client
-            .fetch(42, &CancellationToken::new())
-            .await
-            .unwrap_err();
+        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
 
         assert!(matches!(error, Error::NotFound(42)));
     }
@@ -167,10 +154,7 @@ pub(crate) mod tests {
         respond_with(&server, status(StatusCode::IM_A_TEAPOT)).await;
 
         let client = remote_test_client(server.uri());
-        let error = client
-            .fetch(42, &CancellationToken::new())
-            .await
-            .unwrap_err();
+        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
 
         assert_http_error(error, 42, StatusCode::IM_A_TEAPOT);
     }
@@ -220,9 +204,7 @@ pub(crate) mod tests {
                 (1, _) => status(StatusCode::MOVED_PERMANENTLY).append_header("Location", "/0.chk"),
 
                 // Set-up checkpoint 0 as an infinite redirect loop.
-                (_, "/0.chk") => {
-                    status(StatusCode::MOVED_PERMANENTLY).append_header("Location", r.url.as_str())
-                }
+                (_, "/0.chk") => status(StatusCode::MOVED_PERMANENTLY).append_header("Location", r.url.as_str()),
 
                 // Subsequently, requests will fail with a permanent error, this is what we expect
                 // to see.
@@ -232,10 +214,7 @@ pub(crate) mod tests {
         .await;
 
         let client = remote_test_client(server.uri());
-        let error = client
-            .fetch(42, &CancellationToken::new())
-            .await
-            .unwrap_err();
+        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
 
         assert_http_error(error, 42, StatusCode::IM_A_TEAPOT);
     }
@@ -260,10 +239,7 @@ pub(crate) mod tests {
         .await;
 
         let client = remote_test_client(server.uri());
-        let error = client
-            .fetch(42, &CancellationToken::new())
-            .await
-            .unwrap_err();
+        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
 
         assert_http_error(error, 42, StatusCode::IM_A_TEAPOT);
     }

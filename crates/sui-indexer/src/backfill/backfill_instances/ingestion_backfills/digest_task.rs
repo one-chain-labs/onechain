@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::backfill::backfill_instances::ingestion_backfills::IngestionBackfillTrait;
-use crate::database::ConnectionPool;
 use sui_types::full_checkpoint_content::CheckpointData;
 use tracing::info;
+
+use crate::{backfill::backfill_instances::ingestion_backfills::IngestionBackfillTrait, database::ConnectionPool};
 
 /// Dummy backfill that only prints the sequence number and checkpoint of the digest. Intended to
 /// benchmark backfill performance.

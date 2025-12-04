@@ -1,11 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::Once;
-use std::time::Duration;
-use std::time::Instant;
+use std::{
+    sync::{Arc, Mutex, Once},
+    time::{Duration, Instant},
+};
 
 use tracing::{error, info};
 

@@ -1,18 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    future::Future,
+    hash::{Hash, Hasher},
+    mem,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    task::{Context, Poll},
+};
+
 use futures::future::{join_all, Either};
-use parking_lot::Mutex;
-use parking_lot::MutexGuard;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
-use std::future::Future;
-use std::hash::{Hash, Hasher};
-use std::mem;
-use std::pin::Pin;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
-use std::task::{Context, Poll};
+use parking_lot::{Mutex, MutexGuard};
 use tokio::sync::oneshot;
 
 type Registrations<V> = Vec<oneshot::Sender<V>>;
@@ -24,12 +24,9 @@ pub struct NotifyRead<K, V> {
 
 impl<K: Eq + Hash + Clone, V: Clone> NotifyRead<K, V> {
     pub fn new() -> Self {
-        let pending = (0..255).map(|_| Default::default()).collect();
+        let pending = (0 .. 255).map(|_| Default::default()).collect();
         let count_pending = Default::default();
-        Self {
-            pending,
-            count_pending,
-        }
+        Self { pending, count_pending }
     }
 
     /// Asynchronously notifies waiters and return number of remaining pending registration
@@ -38,9 +35,7 @@ impl<K: Eq + Hash + Clone, V: Clone> NotifyRead<K, V> {
         let Some(registrations) = registrations else {
             return self.count_pending.load(Ordering::Relaxed);
         };
-        let rem = self
-            .count_pending
-            .fetch_sub(registrations.len(), Ordering::Relaxed);
+        let rem = self.count_pending.fetch_sub(registrations.len(), Ordering::Relaxed);
         for registration in registrations {
             registration.send(value.clone()).ok();
         }
@@ -51,10 +46,7 @@ impl<K: Eq + Hash + Clone, V: Clone> NotifyRead<K, V> {
         self.count_pending.fetch_add(1, Ordering::Relaxed);
         let (sender, receiver) = oneshot::channel();
         self.register(key, sender);
-        Registration {
-            this: self,
-            registration: Some((key.clone(), receiver)),
-        }
+        Registration { this: self, registration: Some((key.clone(), receiver)) }
     }
 
     pub fn register_all(&self, keys: &[K]) -> Vec<Registration<K, V>> {
@@ -63,30 +55,21 @@ impl<K: Eq + Hash + Clone, V: Clone> NotifyRead<K, V> {
         for key in keys.iter() {
             let (sender, receiver) = oneshot::channel();
             self.register(key, sender);
-            let registration = Registration {
-                this: self,
-                registration: Some((key.clone(), receiver)),
-            };
+            let registration = Registration { this: self, registration: Some((key.clone(), receiver)) };
             registrations.push(registration);
         }
         registrations
     }
 
     fn register(&self, key: &K, sender: oneshot::Sender<V>) {
-        self.pending(key)
-            .entry(key.clone())
-            .or_default()
-            .push(sender);
+        self.pending(key).entry(key.clone()).or_default().push(sender);
     }
 
     fn pending(&self, key: &K) -> MutexGuard<HashMap<K, Registrations<V>>> {
         let mut state = DefaultHasher::new();
         key.hash(&mut state);
         let hash = state.finish();
-        let pending = self
-            .pending
-            .get((hash % self.pending.len() as u64) as usize)
-            .unwrap();
+        let pending = self.pending.get((hash % self.pending.len() as u64) as usize).unwrap();
         pending.lock()
     }
 
@@ -108,8 +91,7 @@ impl<K: Eq + Hash + Clone, V: Clone> NotifyRead<K, V> {
             }
             !delete
         });
-        self.count_pending
-            .fetch_sub(count_deleted, Ordering::Relaxed);
+        self.count_pending.fetch_sub(count_deleted, Ordering::Relaxed);
         if registrations.is_empty() {
             pending.remove(key);
         }
@@ -122,14 +104,11 @@ impl<K: Eq + Hash + Clone + Unpin, V: Clone + Unpin> NotifyRead<K, V> {
 
         let results = fetch(keys);
 
-        let results = results
-            .into_iter()
-            .zip(registrations)
-            .map(|(a, r)| match a {
-                // Note that Some() clause also drops registration that is already fulfilled
-                Some(ready) => Either::Left(futures::future::ready(ready)),
-                None => Either::Right(r),
-            });
+        let results = results.into_iter().zip(registrations).map(|(a, r)| match a {
+            // Note that Some() clause also drops registration that is already fulfilled
+            Some(ready) => Either::Left(futures::future::ready(ready)),
+            None => Either::Right(r),
+        });
 
         join_all(results).await
     }
@@ -146,11 +125,8 @@ impl<'a, K: Eq + Hash + Clone + Unpin, V: Clone + Unpin> Future for Registration
     type Output = V;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let receiver = self
-            .registration
-            .as_mut()
-            .map(|(_key, receiver)| receiver)
-            .expect("poll can not be called after drop");
+        let receiver =
+            self.registration.as_mut().map(|(_key, receiver)| receiver).expect("poll can not be called after drop");
         let poll = Pin::new(receiver).poll(cx);
         if poll.is_ready() {
             // When polling complete we no longer need to cancel
@@ -177,8 +153,9 @@ impl<K: Eq + Hash + Clone, V: Clone> Default for NotifyRead<K, V> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::future::join_all;
+
+    use super::*;
 
     #[tokio::test]
     pub async fn test_notify_read() {

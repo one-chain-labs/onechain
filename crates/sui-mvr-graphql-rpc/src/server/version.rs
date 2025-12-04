@@ -22,10 +22,7 @@ pub(crate) async fn set_version_middleware(
 ) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
-    headers.insert(
-        VERSION_HEADER.clone(),
-        HeaderValue::from_static(version.full),
-    );
+    headers.insert(VERSION_HEADER.clone(), HeaderValue::from_static(version.full));
     response
 }
 
@@ -33,17 +30,18 @@ pub(crate) async fn set_version_middleware(
 mod tests {
     use std::net::SocketAddr;
 
+    use axum::{body::Body, middleware, routing::get, Router};
+    use http::StatusCode;
+    use mysten_metrics;
+    use tokio_util::sync::CancellationToken;
+    use tower::ServiceExt;
+
     use super::*;
     use crate::{
         config::{ConnectionConfig, ServiceConfig, Version},
         metrics::Metrics,
         server::builder::AppState,
     };
-    use axum::{body::Body, middleware, routing::get, Router};
-    use http::StatusCode;
-    use mysten_metrics;
-    use tokio_util::sync::CancellationToken;
-    use tower::ServiceExt;
 
     fn metrics() -> Metrics {
         let binding_address: SocketAddr = "0.0.0.0:9185".parse().unwrap();
@@ -68,17 +66,11 @@ mod tests {
         Router::new()
             .route("/", get(|| async { "Hello, Versioning!" }))
             .route("/graphql", get(|| async { "Hello, Versioning!" }))
-            .layer(middleware::from_fn_with_state(
-                state.version,
-                set_version_middleware,
-            ))
+            .layer(middleware::from_fn_with_state(state.version, set_version_middleware))
     }
 
     fn graphql_request() -> Request<Body> {
-        Request::builder()
-            .uri("/graphql")
-            .body(Body::empty())
-            .unwrap()
+        Request::builder().uri("/graphql").body(Body::empty()).unwrap()
     }
 
     fn plain_request() -> Request<Body> {
@@ -91,10 +83,7 @@ mod tests {
         let service = service();
         let response = service.oneshot(graphql_request()).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(
-            response.headers().get(&VERSION_HEADER),
-            Some(&HeaderValue::from_static(version.full))
-        );
+        assert_eq!(response.headers().get(&VERSION_HEADER), Some(&HeaderValue::from_static(version.full)));
     }
 
     #[tokio::test]
@@ -103,9 +92,6 @@ mod tests {
         let service = service();
         let response = service.oneshot(plain_request()).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(
-            response.headers().get(&VERSION_HEADER),
-            Some(&HeaderValue::from_static(version.full))
-        );
+        assert_eq!(response.headers().get(&VERSION_HEADER), Some(&HeaderValue::from_static(version.full)));
     }
 }

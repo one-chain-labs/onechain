@@ -13,13 +13,12 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
+use super::{Handler, SequentialConfig};
 use crate::{
     metrics::IndexerMetrics,
     pipeline::{logging::WatermarkLogger, IndexedCheckpoint, WARN_PENDING_WATERMARKS},
     watermarks::CommitterWatermark,
 };
-
-use super::{Handler, SequentialConfig};
 
 /// The committer task gathers rows into batches and writes them to the database.
 ///
@@ -372,11 +371,7 @@ pub(super) fn committer<H: Handler + 'static>(
 //
 // - It is at or before the `next_checkpoint` expected by the committer.
 // - It is at least `checkpoint_lag` checkpoints before the last checkpoint in the buffer.
-fn can_process_pending<T>(
-    next_checkpoint: u64,
-    checkpoint_lag: u64,
-    pending: &BTreeMap<u64, T>,
-) -> bool {
+fn can_process_pending<T>(next_checkpoint: u64, checkpoint_lag: u64, pending: &BTreeMap<u64, T>) -> bool {
     let Some((&first, _)) = pending.first_key_value() else {
         return false;
     };

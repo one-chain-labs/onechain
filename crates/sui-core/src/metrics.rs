@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::VecDeque,
+    default::Default,
+    sync::atomic::{AtomicU64, Ordering},
+};
+
 use parking_lot::Mutex;
-use std::collections::VecDeque;
-use std::default::Default;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use tokio::time::Duration;
-use tokio::time::Instant;
+use tokio::time::{Duration, Instant};
 
 pub struct LatencyObserver {
     data: Mutex<LatencyObserverInner>,
@@ -22,10 +23,7 @@ struct LatencyObserverInner {
 
 impl LatencyObserver {
     pub fn new() -> Self {
-        Self {
-            data: Mutex::new(LatencyObserverInner::default()),
-            latency_ms: AtomicU64::new(u64::MAX),
-        }
+        Self { data: Mutex::new(LatencyObserverInner::default()), latency_ms: AtomicU64::new(u64::MAX) }
     }
 
     pub fn report(&self, latency: Duration) {
@@ -136,7 +134,7 @@ impl RateTracker {
             return;
         }
 
-        for bin_index in (self.global_bin_index + 1)..=current_bin_index {
+        for bin_index in (self.global_bin_index + 1) ..= current_bin_index {
             // Time has elapsed from global_bin_index to current_bin_index. Clear all the buffer
             // counter associated with them.
             let index_in_buffer = bin_index as usize % self.total_bins;
@@ -148,12 +146,10 @@ impl RateTracker {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use rand::rngs::StdRng;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{rngs::StdRng, Rng, SeedableRng};
     use tokio::time::advance;
+
+    use super::*;
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
     pub async fn test_rate_tracker_basic() {
@@ -183,10 +179,10 @@ mod tests {
     pub async fn test_rate_tracker_window() {
         let seed = [0; 32];
         let mut rng = StdRng::from_seed(seed);
-        let random_windows: Vec<u64> = (0..10).map(|_| rng.gen_range(1..=60)).collect();
+        let random_windows: Vec<u64> = (0 .. 10).map(|_| rng.gen_range(1 ..= 60)).collect();
         for window in random_windows {
             let mut tracker = RateTracker::new(Duration::from_secs(window));
-            for _ in 0..23 {
+            for _ in 0 .. 23 {
                 tracker.record();
             }
             assert_eq!(tracker.rate(), 23.0 / window as f64);
@@ -200,14 +196,14 @@ mod tests {
     pub async fn test_rate_tracker_rolling_window() {
         let mut tracker = RateTracker::new(Duration::from_secs(1));
         // Generate event every 100ms.
-        for i in 0..10 {
+        for i in 0 .. 10 {
             tracker.record();
             assert_eq!(tracker.rate(), (i + 1) as f64);
             advance(Duration::from_millis(100)).await;
         }
 
         // Generate event every 50ms.
-        for i in 0..10 {
+        for i in 0 .. 10 {
             tracker.record();
             advance(Duration::from_millis(50)).await;
             tracker.record();
@@ -216,7 +212,7 @@ mod tests {
         }
 
         // Rate gradually returns to 0.
-        for i in 0..10 {
+        for i in 0 .. 10 {
             assert_eq!(tracker.rate(), 20.0 - (i as f64 + 1.0) * 2.0);
             advance(Duration::from_millis(100)).await;
         }

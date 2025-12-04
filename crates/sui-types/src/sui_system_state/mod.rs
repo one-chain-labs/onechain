@@ -1,28 +1,35 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::base_types::ObjectID;
-use crate::committee::CommitteeWithNetworkMetadata;
-use crate::dynamic_field::{
-    get_dynamic_field_from_store, get_dynamic_field_object_from_store, Field,
-};
-use crate::error::SuiError;
-use crate::object::{MoveObject, Object};
-use crate::storage::ObjectStore;
-use crate::sui_system_state::epoch_start_sui_system_state::EpochStartSystemState;
-use crate::sui_system_state::sui_system_state_inner_v2::SuiSystemStateInnerV2;
-use crate::versioned::Versioned;
-use crate::{id::UID, MoveTypeTagTrait, SUI_SYSTEM_ADDRESS, SUI_SYSTEM_STATE_OBJECT_ID};
+use std::fmt;
+
 use anyhow::Result;
 use enum_dispatch::enum_dispatch;
 use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::fmt;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
 
-use self::sui_system_state_inner_v1::{SuiSystemStateInnerV1, ValidatorV1};
-use self::sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary};
+use self::{
+    sui_system_state_inner_v1::{SuiSystemStateInnerV1, ValidatorV1},
+    sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
+};
+use crate::{
+    base_types::ObjectID,
+    committee::CommitteeWithNetworkMetadata,
+    dynamic_field::{get_dynamic_field_from_store, get_dynamic_field_object_from_store, Field},
+    error::SuiError,
+    id::UID,
+    object::{MoveObject, Object},
+    storage::ObjectStore,
+    sui_system_state::{
+        epoch_start_sui_system_state::EpochStartSystemState,
+        sui_system_state_inner_v2::SuiSystemStateInnerV2,
+    },
+    versioned::Versioned,
+    MoveTypeTagTrait,
+    SUI_SYSTEM_ADDRESS,
+    SUI_SYSTEM_STATE_OBJECT_ID,
+};
 
 pub mod epoch_start_sui_system_state;
 pub mod sui_system_state_inner_v1;
@@ -33,8 +40,11 @@ pub mod sui_system_state_summary;
 mod simtest_sui_system_state_inner;
 #[cfg(msim)]
 use self::simtest_sui_system_state_inner::{
-    SimTestSuiSystemStateInnerDeepV2, SimTestSuiSystemStateInnerShallowV2,
-    SimTestSuiSystemStateInnerV1, SimTestValidatorDeepV2, SimTestValidatorV1,
+    SimTestSuiSystemStateInnerDeepV2,
+    SimTestSuiSystemStateInnerShallowV2,
+    SimTestSuiSystemStateInnerV1,
+    SimTestValidatorDeepV2,
+    SimTestValidatorV1,
 };
 
 const SUI_SYSTEM_STATE_WRAPPER_STRUCT_NAME: &IdentStr = ident_str!("SuiSystemState");
@@ -86,32 +96,17 @@ impl SuiSystemStateWrapper {
         let old_field_object = get_dynamic_field_object_from_store(object_store, id, &self.version)
             .expect("Dynamic field object of wrapper should always be present in the object store");
         let mut new_field_object = old_field_object.clone();
-        let move_object = new_field_object
-            .data
-            .try_as_move_mut()
-            .expect("Dynamic field object must be a Move object");
+        let move_object = new_field_object.data.try_as_move_mut().expect("Dynamic field object must be a Move object");
         match self.version {
             1 => {
-                Self::advance_epoch_safe_mode_impl::<SuiSystemStateInnerV1>(
-                    move_object,
-                    params,
-                    protocol_config,
-                );
+                Self::advance_epoch_safe_mode_impl::<SuiSystemStateInnerV1>(move_object, params, protocol_config);
             }
             2 => {
-                Self::advance_epoch_safe_mode_impl::<SuiSystemStateInnerV2>(
-                    move_object,
-                    params,
-                    protocol_config,
-                );
+                Self::advance_epoch_safe_mode_impl::<SuiSystemStateInnerV2>(move_object, params, protocol_config);
             }
             #[cfg(msim)]
             SUI_SYSTEM_STATE_SIM_TEST_V1 => {
-                Self::advance_epoch_safe_mode_impl::<SimTestSuiSystemStateInnerV1>(
-                    move_object,
-                    params,
-                    protocol_config,
-                );
+                Self::advance_epoch_safe_mode_impl::<SimTestSuiSystemStateInnerV1>(move_object, params, protocol_config);
             }
             #[cfg(msim)]
             SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2 => {
@@ -221,9 +216,7 @@ impl SuiSystemState {
     }
 }
 
-pub fn get_sui_system_state_wrapper(
-    object_store: &dyn ObjectStore,
-) -> Result<SuiSystemStateWrapper, SuiError> {
+pub fn get_sui_system_state_wrapper(object_store: &dyn ObjectStore) -> Result<SuiSystemStateWrapper, SuiError> {
     let wrapper = object_store
         .get_object(&SUI_SYSTEM_STATE_OBJECT_ID)
         // Don't panic here on None because object_store is a generic store.
@@ -231,9 +224,7 @@ pub fn get_sui_system_state_wrapper(
             SuiError::SuiSystemStateReadError("SuiSystemStateWrapper object not found".to_owned())
         })?;
     let move_object = wrapper.data.try_as_move().ok_or_else(|| {
-        SuiError::SuiSystemStateReadError(
-            "SuiSystemStateWrapper object must be a Move object".to_owned(),
-        )
+        SuiError::SuiSystemStateReadError("SuiSystemStateWrapper object must be a Move object".to_owned())
     })?;
     let result = bcs::from_bytes::<SuiSystemStateWrapper>(move_object.contents())
         .map_err(|err| SuiError::SuiSystemStateReadError(err.to_string()))?;
@@ -245,72 +236,59 @@ pub fn get_sui_system_state(object_store: &dyn ObjectStore) -> Result<SuiSystemS
     let id = wrapper.id.id.bytes;
     match wrapper.version {
         1 => {
-            let result: SuiSystemStateInnerV1 =
-                get_dynamic_field_from_store(object_store, id, &wrapper.version).map_err(
-                    |err| {
-                        SuiError::DynamicFieldReadError(format!(
-                            "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
-                            id, wrapper.version, err
-                        ))
-                    },
-                )?;
+            let result: SuiSystemStateInnerV1 = get_dynamic_field_from_store(object_store, id, &wrapper.version)
+                .map_err(|err| {
+                    SuiError::DynamicFieldReadError(format!(
+                        "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
+                        id, wrapper.version, err
+                    ))
+                })?;
             Ok(SuiSystemState::V1(result))
         }
         2 => {
-            let result: SuiSystemStateInnerV2 =
-                get_dynamic_field_from_store(object_store, id, &wrapper.version).map_err(
-                    |err| {
-                        SuiError::DynamicFieldReadError(format!(
-                            "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
-                            id, wrapper.version, err
-                        ))
-                    },
-                )?;
+            let result: SuiSystemStateInnerV2 = get_dynamic_field_from_store(object_store, id, &wrapper.version)
+                .map_err(|err| {
+                    SuiError::DynamicFieldReadError(format!(
+                        "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
+                        id, wrapper.version, err
+                    ))
+                })?;
             Ok(SuiSystemState::V2(result))
         }
         #[cfg(msim)]
         SUI_SYSTEM_STATE_SIM_TEST_V1 => {
-            let result: SimTestSuiSystemStateInnerV1 =
-                get_dynamic_field_from_store(object_store, id, &wrapper.version).map_err(
-                    |err| {
-                        SuiError::DynamicFieldReadError(format!(
-                            "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
-                            id, wrapper.version, err
-                        ))
-                    },
-                )?;
+            let result: SimTestSuiSystemStateInnerV1 = get_dynamic_field_from_store(object_store, id, &wrapper.version)
+                .map_err(|err| {
+                    SuiError::DynamicFieldReadError(format!(
+                        "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
+                        id, wrapper.version, err
+                    ))
+                })?;
             Ok(SuiSystemState::SimTestV1(result))
         }
         #[cfg(msim)]
         SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2 => {
             let result: SimTestSuiSystemStateInnerShallowV2 =
-                get_dynamic_field_from_store(object_store, id, &wrapper.version).map_err(
-                    |err| {
-                        SuiError::DynamicFieldReadError(format!(
-                            "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
-                            id, wrapper.version, err
-                        ))
-                    },
-                )?;
+                get_dynamic_field_from_store(object_store, id, &wrapper.version).map_err(|err| {
+                    SuiError::DynamicFieldReadError(format!(
+                        "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
+                        id, wrapper.version, err
+                    ))
+                })?;
             Ok(SuiSystemState::SimTestShallowV2(result))
         }
         #[cfg(msim)]
         SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2 => {
             let result: SimTestSuiSystemStateInnerDeepV2 =
-                get_dynamic_field_from_store(object_store, id, &wrapper.version).map_err(
-                    |err| {
-                        SuiError::DynamicFieldReadError(format!(
-                            "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
-                            id, wrapper.version, err
-                        ))
-                    },
-                )?;
+                get_dynamic_field_from_store(object_store, id, &wrapper.version).map_err(|err| {
+                    SuiError::DynamicFieldReadError(format!(
+                        "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
+                        id, wrapper.version, err
+                    ))
+                })?;
             Ok(SuiSystemState::SimTestDeepV2(result))
         }
-        _ => Err(SuiError::SuiSystemStateReadError(format!(
-            "Unsupported SuiSystemState version: {}",
-            wrapper.version
-        ))),
+        _ => Err(SuiError::SuiSystemStateReadError(format!("Unsupported SuiSystemState version: {}", wrapper.version))),
     }
 }
 
@@ -326,55 +304,45 @@ pub fn get_validator_from_table<K>(
 where
     K: MoveTypeTagTrait + Serialize + DeserializeOwned + fmt::Debug,
 {
-    let field: ValidatorWrapper = get_dynamic_field_from_store(object_store, table_id, key)
-        .map_err(|err| {
-            SuiError::SuiSystemStateReadError(format!(
-                "Failed to load validator wrapper from table: {:?}",
-                err
-            ))
-        })?;
+    let field: ValidatorWrapper = get_dynamic_field_from_store(object_store, table_id, key).map_err(|err| {
+        SuiError::SuiSystemStateReadError(format!("Failed to load validator wrapper from table: {:?}", err))
+    })?;
     let versioned = field.inner;
     let version = versioned.version;
     match version {
         1 => {
-            let validator: ValidatorV1 =
-                get_dynamic_field_from_store(object_store, versioned.id.id.bytes, &version)
-                    .map_err(|err| {
-                        SuiError::SuiSystemStateReadError(format!(
-                            "Failed to load inner validator from the wrapper: {:?}",
-                            err
-                        ))
-                    })?;
+            let validator: ValidatorV1 = get_dynamic_field_from_store(object_store, versioned.id.id.bytes, &version)
+                .map_err(|err| {
+                    SuiError::SuiSystemStateReadError(format!(
+                        "Failed to load inner validator from the wrapper: {:?}",
+                        err
+                    ))
+                })?;
             Ok(validator.into_sui_validator_summary())
         }
         #[cfg(msim)]
         SUI_SYSTEM_STATE_SIM_TEST_V1 => {
             let validator: SimTestValidatorV1 =
-                get_dynamic_field_from_store(object_store, versioned.id.id.bytes, &version)
-                    .map_err(|err| {
-                        SuiError::SuiSystemStateReadError(format!(
-                            "Failed to load inner validator from the wrapper: {:?}",
-                            err
-                        ))
-                    })?;
+                get_dynamic_field_from_store(object_store, versioned.id.id.bytes, &version).map_err(|err| {
+                    SuiError::SuiSystemStateReadError(format!(
+                        "Failed to load inner validator from the wrapper: {:?}",
+                        err
+                    ))
+                })?;
             Ok(validator.into_sui_validator_summary())
         }
         #[cfg(msim)]
         SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2 => {
             let validator: SimTestValidatorDeepV2 =
-                get_dynamic_field_from_store(object_store, versioned.id.id.bytes, &version)
-                    .map_err(|err| {
-                        SuiError::SuiSystemStateReadError(format!(
-                            "Failed to load inner validator from the wrapper: {:?}",
-                            err
-                        ))
-                    })?;
+                get_dynamic_field_from_store(object_store, versioned.id.id.bytes, &version).map_err(|err| {
+                    SuiError::SuiSystemStateReadError(format!(
+                        "Failed to load inner validator from the wrapper: {:?}",
+                        err
+                    ))
+                })?;
             Ok(validator.into_sui_validator_summary())
         }
-        _ => Err(SuiError::SuiSystemStateReadError(format!(
-            "Unsupported Validator version: {}",
-            version
-        ))),
+        _ => Err(SuiError::SuiSystemStateReadError(format!("Unsupported Validator version: {}", version))),
     }
 }
 
@@ -388,14 +356,10 @@ where
     ValidatorType: Serialize + DeserializeOwned,
 {
     let mut validators = vec![];
-    for i in 0..table_size {
-        let validator: ValidatorType = get_dynamic_field_from_store(&object_store, table_id, &i)
-            .map_err(|err| {
-                SuiError::SuiSystemStateReadError(format!(
-                    "Failed to load validator from table: {:?}",
-                    err
-                ))
-            })?;
+    for i in 0 .. table_size {
+        let validator: ValidatorType = get_dynamic_field_from_store(&object_store, table_id, &i).map_err(|err| {
+            SuiError::SuiSystemStateReadError(format!("Failed to load validator from table: {:?}", err))
+        })?;
         validators.push(validator);
     }
     Ok(validators)
@@ -418,10 +382,7 @@ impl PoolTokenExchangeRate {
     }
 
     pub fn new(sui_amount: u64, pool_token_amount: u64) -> Self {
-        Self {
-            sui_amount,
-            pool_token_amount,
-        }
+        Self { sui_amount, pool_token_amount }
     }
 }
 
@@ -445,11 +406,12 @@ pub struct AdvanceEpochParams {
 
 #[cfg(msim)]
 pub mod advance_epoch_result_injection {
+    use std::cell::RefCell;
+
     use crate::{
         committee::EpochId,
         error::{ExecutionError, ExecutionErrorKind},
     };
-    use std::cell::RefCell;
 
     thread_local! {
         /// Override the result of advance_epoch in the range [start, end).
@@ -469,10 +431,7 @@ pub mod advance_epoch_result_injection {
     ) -> Result<(), ExecutionError> {
         if let Some((start, end)) = OVERRIDE.with(|o| *o.borrow()) {
             if current_epoch >= start && current_epoch < end {
-                return Err::<(), ExecutionError>(ExecutionError::new(
-                    ExecutionErrorKind::FunctionNotFound,
-                    None,
-                ));
+                return Err::<(), ExecutionError>(ExecutionError::new(ExecutionErrorKind::FunctionNotFound, None));
             }
         }
         result

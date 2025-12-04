@@ -1,12 +1,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::HashMap,
+    fs,
+    io::{Read, Write},
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
+
 use anyhow::anyhow;
 use async_trait::async_trait;
+use clap::{Parser, Subcommand};
+use log::info;
 use move_core_types::account_address::AccountAddress;
+use object_store::{parse_url, path::Path};
+use serde_json::{json, Value};
+use sui_config::genesis::Genesis;
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponseOptions};
-
+use sui_package_resolver::{Package, PackageStore, Resolver, Result as ResolverResult};
 use sui_rpc_api::CheckpointData;
+use sui_sdk::SuiClientBuilder;
 use sui_types::{
     base_types::ObjectID,
     committee::Committee,
@@ -17,22 +32,6 @@ use sui_types::{
     messages_checkpoint::{CertifiedCheckpointSummary, CheckpointSummary, EndOfEpochData},
     object::{bounded_visitor::BoundedVisitor, Data, Object},
 };
-
-use sui_config::genesis::Genesis;
-
-use sui_package_resolver::Result as ResolverResult;
-use sui_package_resolver::{Package, PackageStore, Resolver};
-use sui_sdk::SuiClientBuilder;
-
-use clap::{Parser, Subcommand};
-use std::{collections::HashMap, fs, io::Write, path::PathBuf, str::FromStr, sync::Mutex};
-use std::{io::Read, sync::Arc};
-
-use log::info;
-use object_store::parse_url;
-use object_store::path::Path;
-use serde_json::json;
-use serde_json::Value;
 use url::Url;
 
 /// A light client for the Sui blockchain
@@ -54,10 +53,7 @@ struct RemotePackageStore {
 
 impl RemotePackageStore {
     pub fn new(config: Config) -> Self {
-        Self {
-            config,
-            cache: Mutex::new(HashMap::new()),
-        }
+        Self { config, cache: Mutex::new(HashMap::new()) }
     }
 }
 
@@ -145,9 +141,7 @@ async fn query_last_checkpoint_of_epoch(config: &Config, epoch_id: u64) -> anyho
 
     // Parse the JSON response to get the last checkpoint of the epoch
     let v: Value = serde_json::from_str(resp.as_str()).expect("Incorrect JSON response");
-    let checkpoint_number = v["data"]["epoch"]["checkpoints"]["nodes"][0]["sequenceNumber"]
-        .as_u64()
-        .unwrap();
+    let checkpoint_number = v["data"]["epoch"]["checkpoints"]["nodes"][0]["sequenceNumber"].as_u64().unwrap();
 
     Ok(checkpoint_number)
 }
@@ -211,24 +205,18 @@ fn write_checkpoint_general(
     }
     checkpoint_path.push(format!("{}.yaml", summary.sequence_number));
     let mut writer = fs::File::create(checkpoint_path.clone())?;
-    let bytes =
-        bcs::to_bytes(&summary).map_err(|_| anyhow!("Unable to serialize checkpoint summary"))?;
+    let bytes = bcs::to_bytes(&summary).map_err(|_| anyhow!("Unable to serialize checkpoint summary"))?;
     writer.write_all(&bytes)?;
     Ok(())
 }
 
-fn write_checkpoint_list(
-    config: &Config,
-    checkpoints_list: &CheckpointsList,
-) -> anyhow::Result<()> {
+fn write_checkpoint_list(config: &Config, checkpoints_list: &CheckpointsList) -> anyhow::Result<()> {
     // Write the checkpoint list to a file
     let mut checkpoints_path = config.checkpoint_summary_dir.clone();
     checkpoints_path.push("checkpoints.yaml");
     let mut writer = fs::File::create(checkpoints_path.clone())?;
     let bytes = serde_yaml::to_vec(&checkpoints_list)?;
-    writer
-        .write_all(&bytes)
-        .map_err(|_| anyhow!("Unable to serialize checkpoint list"))
+    writer.write_all(&bytes).map_err(|_| anyhow!("Unable to serialize checkpoint list"))
 }
 
 async fn download_checkpoint_summary(
@@ -253,66 +241,49 @@ async fn download_checkpoint_summary(
 async fn sync_checkpoint_list_to_latest(config: &Config) -> anyhow::Result<()> {
     // Get the local checkpoint list
     let mut checkpoints_list: CheckpointsList = read_checkpoint_list(config)?;
-    let latest_in_list = checkpoints_list
-        .checkpoints
-        .last()
-        .ok_or(anyhow!("Empty checkpoint list"))?;
+    let latest_in_list = checkpoints_list.checkpoints.last().ok_or(anyhow!("Empty checkpoint list"))?;
 
     // Download the latest in list checkpoint
     let summary = download_checkpoint_summary(config, *latest_in_list).await?;
     let mut last_epoch = summary.epoch();
 
     // Download the very latest checkpoint
-    let client = SuiClientBuilder::default()
-        .build(config.full_node_url.as_str())
-        .await
-        .expect("Cannot connect to full node");
+    let client =
+        SuiClientBuilder::default().build(config.full_node_url.as_str()).await.expect("Cannot connect to full node");
 
-    let latest_seq = client
-        .read_api()
-        .get_latest_checkpoint_sequence_number()
-        .await?;
+    let latest_seq = client.read_api().get_latest_checkpoint_sequence_number().await?;
     let latest = download_checkpoint_summary(config, latest_seq).await?;
 
     // Sequentially record all the missing end of epoch checkpoints numbers
     while last_epoch + 1 < latest.epoch() {
         let target_epoch = last_epoch + 1;
-        let target_last_checkpoint_number =
-            query_last_checkpoint_of_epoch(config, target_epoch).await?;
+        let target_last_checkpoint_number = query_last_checkpoint_of_epoch(config, target_epoch).await?;
 
         // Add to the list
-        checkpoints_list
-            .checkpoints
-            .push(target_last_checkpoint_number);
+        checkpoints_list.checkpoints.push(target_last_checkpoint_number);
         write_checkpoint_list(config, &checkpoints_list)?;
 
         // Update
         last_epoch = target_epoch;
 
-        println!(
-            "Last Epoch: {} Last Checkpoint: {}",
-            target_epoch, target_last_checkpoint_number
-        );
+        println!("Last Epoch: {} Last Checkpoint: {}", target_epoch, target_last_checkpoint_number);
     }
 
     Ok(())
 }
 
 async fn check_and_sync_checkpoints(config: &Config) -> anyhow::Result<()> {
-    sync_checkpoint_list_to_latest(config)
-        .await
-        .map_err(|e| anyhow!(format!("Cannot refresh list: {e}")))?;
+    sync_checkpoint_list_to_latest(config).await.map_err(|e| anyhow!(format!("Cannot refresh list: {e}")))?;
 
     // Get the local checkpoint list
-    let checkpoints_list: CheckpointsList = read_checkpoint_list(config)
-        .map_err(|e| anyhow!(format!("Cannot read checkpoint list: {e}")))?;
+    let checkpoints_list: CheckpointsList =
+        read_checkpoint_list(config).map_err(|e| anyhow!(format!("Cannot read checkpoint list: {e}")))?;
 
     // Load the genesis committee
     let mut genesis_path = config.checkpoint_summary_dir.clone();
     genesis_path.push(&config.genesis_filename);
-    let genesis_committee = Genesis::load(&genesis_path)?
-        .committee()
-        .map_err(|e| anyhow!(format!("Cannot load Genesis: {e}")))?;
+    let genesis_committee =
+        Genesis::load(&genesis_path)?.committee().map_err(|e| anyhow!(format!("Cannot load Genesis: {e}")))?;
 
     // Check the signatures of all checkpoints
     // And download any missing ones
@@ -325,8 +296,7 @@ async fn check_and_sync_checkpoints(config: &Config) -> anyhow::Result<()> {
 
         // If file exists read the file otherwise download it from the server
         let summary = if checkpoint_path.exists() {
-            read_checkpoint(config, *ckp_id)
-                .map_err(|e| anyhow!(format!("Cannot read checkpoint: {e}")))?
+            read_checkpoint(config, *ckp_id).map_err(|e| anyhow!(format!("Cannot read checkpoint: {e}")))?
         } else {
             // Download the checkpoint from the server
             let summary = download_checkpoint_summary(config, *ckp_id)
@@ -339,44 +309,26 @@ async fn check_and_sync_checkpoints(config: &Config) -> anyhow::Result<()> {
         };
 
         // Print the id of the checkpoint and the epoch number
-        println!(
-            "Epoch: {} Checkpoint ID: {}",
-            summary.epoch(),
-            summary.digest()
-        );
+        println!("Epoch: {} Checkpoint ID: {}", summary.epoch(), summary.digest());
 
         // Extract the new committee information
-        if let Some(EndOfEpochData {
-            next_epoch_committee,
-            ..
-        }) = &summary.end_of_epoch_data
-        {
+        if let Some(EndOfEpochData { next_epoch_committee, .. }) = &summary.end_of_epoch_data {
             let next_committee = next_epoch_committee.iter().cloned().collect();
-            prev_committee =
-                Committee::new(summary.epoch().checked_add(1).unwrap(), next_committee);
+            prev_committee = Committee::new(summary.epoch().checked_add(1).unwrap(), next_committee);
         } else {
-            return Err(anyhow!(
-                "Expected all checkpoints to be end-of-epoch checkpoints"
-            ));
+            return Err(anyhow!("Expected all checkpoints to be end-of-epoch checkpoints"));
         }
     }
 
     Ok(())
 }
 
-async fn get_full_checkpoint(
-    config: &Config,
-    checkpoint_number: u64,
-) -> anyhow::Result<CheckpointData> {
-    let url = Url::parse(&config.object_store_url)
-        .map_err(|_| anyhow!("Cannot parse object store URL"))?;
+async fn get_full_checkpoint(config: &Config, checkpoint_number: u64) -> anyhow::Result<CheckpointData> {
+    let url = Url::parse(&config.object_store_url).map_err(|_| anyhow!("Cannot parse object store URL"))?;
     let (dyn_store, _store_path) = parse_url(&url).unwrap();
     let path = Path::from(format!("{}.chk", checkpoint_number));
     info!("Request full checkpoint: {}", path);
-    let response = dyn_store
-        .get(&path)
-        .await
-        .map_err(|_| anyhow!("Cannot get full checkpoint from object store"))?;
+    let response = dyn_store.get(&path).await.map_err(|_| anyhow!("Cannot get full checkpoint from object store"))?;
     let bytes = response.bytes().await?;
     let (_, full_checkpoint) = bcs::from_bytes::<(u8, CheckpointData)>(&bytes)?;
     Ok(full_checkpoint)
@@ -407,10 +359,7 @@ fn extract_verified_effects_and_events(
 
     // Check the events are all correct.
     let events_digest = matching_tx.events.as_ref().map(|events| events.digest());
-    anyhow::ensure!(
-        events_digest.as_ref() == matching_tx.effects.events_digest(),
-        "Events digest does not match"
-    );
+    anyhow::ensure!(events_digest.as_ref() == matching_tx.effects.events_digest(), "Events digest does not match");
 
     // Since we do not check objects we do not return them
     Ok((matching_tx.effects.clone(), matching_tx.events.clone()))
@@ -420,10 +369,8 @@ async fn get_verified_effects_and_events(
     config: &Config,
     tid: TransactionDigest,
 ) -> anyhow::Result<(TransactionEffects, Option<TransactionEvents>)> {
-    let sui_mainnet: sui_sdk::SuiClient = SuiClientBuilder::default()
-        .build(config.full_node_url.as_str())
-        .await
-        .unwrap();
+    let sui_mainnet: sui_sdk::SuiClient =
+        SuiClientBuilder::default().build(config.full_node_url.as_str()).await.unwrap();
     let read_api = sui_mainnet.read_api();
 
     info!("Getting effects and events for TID: {}", tid);
@@ -437,19 +384,14 @@ async fn get_verified_effects_and_events(
         .ok_or(anyhow!("Transaction not found"))?;
 
     // Download the full checkpoint for this sequence number
-    let full_check_point = get_full_checkpoint(config, seq)
-        .await
-        .map_err(|e| anyhow!(format!("Cannot get full checkpoint: {e}")))?;
+    let full_check_point =
+        get_full_checkpoint(config, seq).await.map_err(|e| anyhow!(format!("Cannot get full checkpoint: {e}")))?;
 
     // Load the list of stored checkpoints
     let checkpoints_list: CheckpointsList = read_checkpoint_list(config)?;
 
     // find the stored checkpoint before the seq checkpoint
-    let prev_ckp_id = checkpoints_list
-        .checkpoints
-        .iter()
-        .filter(|ckp_id| **ckp_id < seq)
-        .last();
+    let prev_ckp_id = checkpoints_list.checkpoints.iter().filter(|ckp_id| **ckp_id < seq).last();
 
     let committee = if let Some(prev_ckp_id) = prev_ckp_id {
         // Read it from the store
@@ -465,9 +407,7 @@ async fn get_verified_effects_and_events(
         let current_committee = prev_ckp
             .end_of_epoch_data
             .as_ref()
-            .ok_or(anyhow!(
-                "Expected all checkpoints to be end-of-epoch checkpoints"
-            ))?
+            .ok_or(anyhow!("Expected all checkpoints to be end-of-epoch checkpoints"))?
             .next_epoch_committee
             .iter()
             .cloned()
@@ -479,9 +419,7 @@ async fn get_verified_effects_and_events(
         // Since we did not find a small committee checkpoint we use the genesis
         let mut genesis_path = config.checkpoint_summary_dir.clone();
         genesis_path.push(&config.genesis_filename);
-        Genesis::load(&genesis_path)?
-            .committee()
-            .map_err(|e| anyhow!(format!("Cannot load Genesis: {e}")))?
+        Genesis::load(&genesis_path)?.committee().map_err(|e| anyhow!(format!("Cannot load Genesis: {e}")))?
     };
 
     info!("Extracting effects and events for TID: {}", tid);
@@ -490,23 +428,15 @@ async fn get_verified_effects_and_events(
 }
 
 async fn get_verified_object(config: &Config, id: ObjectID) -> anyhow::Result<Object> {
-    let sui_client: Arc<sui_sdk::SuiClient> = Arc::new(
-        SuiClientBuilder::default()
-            .build(config.full_node_url.as_str())
-            .await
-            .unwrap(),
-    );
+    let sui_client: Arc<sui_sdk::SuiClient> =
+        Arc::new(SuiClientBuilder::default().build(config.full_node_url.as_str()).await.unwrap());
 
     info!("Getting object: {}", id);
 
     let read_api = sui_client.read_api();
-    let object_json = read_api
-        .get_object_with_options(id, SuiObjectDataOptions::bcs_lossless())
-        .await
-        .expect("Cannot get object");
-    let object = object_json
-        .into_object()
-        .expect("Cannot make into object data");
+    let object_json =
+        read_api.get_object_with_options(id, SuiObjectDataOptions::bcs_lossless()).await.expect("Cannot get object");
+    let object = object_json.into_object().expect("Cannot make into object data");
     let object: Object = object.try_into().expect("Cannot reconstruct object");
 
     // Need to authenticate this object
@@ -533,46 +463,31 @@ pub async fn main() {
     // Command line arguments and config loading
     let args = Args::parse();
 
-    let path = args
-        .config
-        .unwrap_or_else(|| panic!("Need a config file path"));
-    let reader = fs::File::open(path.clone())
-        .unwrap_or_else(|_| panic!("Unable to load config from {}", path.display()));
+    let path = args.config.unwrap_or_else(|| panic!("Need a config file path"));
+    let reader =
+        fs::File::open(path.clone()).unwrap_or_else(|_| panic!("Unable to load config from {}", path.display()));
     let config: Config = serde_yaml::from_reader(reader).unwrap();
 
     // Print config parameters
-    println!(
-        "Checkpoint Dir: {}",
-        config.checkpoint_summary_dir.display()
-    );
+    println!("Checkpoint Dir: {}", config.checkpoint_summary_dir.display());
 
     let remote_package_store = RemotePackageStore::new(config.clone());
     let resolver = Resolver::new(remote_package_store);
 
     match args.command {
         Some(SCommands::Transaction { tid }) => {
-            let (effects, events) = get_verified_effects_and_events(
-                &config,
-                TransactionDigest::from_str(&tid).unwrap(),
-            )
-            .await
-            .unwrap();
+            let (effects, events) =
+                get_verified_effects_and_events(&config, TransactionDigest::from_str(&tid).unwrap()).await.unwrap();
 
             let exec_digests = effects.execution_digests();
-            println!(
-                "Executed TID: {} Effects: {}",
-                exec_digests.transaction, exec_digests.effects
-            );
+            println!("Executed TID: {} Effects: {}", exec_digests.transaction, exec_digests.effects);
 
             if events.is_some() {
                 for event in events.as_ref().unwrap().data.iter() {
-                    let type_layout = resolver
-                        .type_layout(event.type_.clone().into())
-                        .await
-                        .unwrap();
+                    let type_layout = resolver.type_layout(event.type_.clone().into()).await.unwrap();
 
-                    let result = BoundedVisitor::deserialize_value(&event.contents, &type_layout)
-                        .expect("Cannot deserialize");
+                    let result =
+                        BoundedVisitor::deserialize_value(&event.contents, &type_layout).expect("Cannot deserialize");
 
                     println!(
                         "Event:\n - Package: {}\n - Module: {}\n - Sender: {}\n - Type: {}\n{}",
@@ -594,14 +509,10 @@ pub async fn main() {
             if let Data::Move(move_object) = &object.data {
                 let object_type = move_object.type_().clone();
 
-                let type_layout = resolver
-                    .type_layout(object_type.clone().into())
-                    .await
-                    .unwrap();
+                let type_layout = resolver.type_layout(object_type.clone().into()).await.unwrap();
 
                 let result =
-                    BoundedVisitor::deserialize_value(move_object.contents(), &type_layout)
-                        .expect("Cannot deserialize");
+                    BoundedVisitor::deserialize_value(move_object.contents(), &type_layout).expect("Cannot deserialize");
 
                 let (oid, version, hash) = object.compute_object_reference();
                 println!(
@@ -617,9 +528,7 @@ pub async fn main() {
         }
 
         Some(SCommands::Sync {}) => {
-            check_and_sync_checkpoints(&config)
-                .await
-                .expect("Failed to sync checkpoints");
+            check_and_sync_checkpoints(&config).await.expect("Failed to sync checkpoints");
         }
         _ => {}
     }
@@ -628,10 +537,11 @@ pub async fn main() {
 // Make a test namespace
 #[cfg(test)]
 mod tests {
+    use std::path::{Path, PathBuf};
+
     use sui_types::messages_checkpoint::FullCheckpointContents;
 
     use super::*;
-    use std::path::{Path, PathBuf};
 
     async fn read_full_checkpoint(checkpoint_path: &PathBuf) -> anyhow::Result<CheckpointData> {
         let mut reader = fs::File::open(checkpoint_path.clone())?;
@@ -643,13 +553,9 @@ mod tests {
 
     // clippy ignore dead-code
     #[allow(dead_code)]
-    async fn write_full_checkpoint(
-        checkpoint_path: &Path,
-        checkpoint: &CheckpointData,
-    ) -> anyhow::Result<()> {
+    async fn write_full_checkpoint(checkpoint_path: &Path, checkpoint: &CheckpointData) -> anyhow::Result<()> {
         let mut writer = fs::File::create(checkpoint_path)?;
-        let bytes = bcs::to_bytes(&checkpoint)
-            .map_err(|_| anyhow!("Unable to serialize checkpoint summary"))?;
+        let bytes = bcs::to_bytes(&checkpoint).map_err(|_| anyhow!("Unable to serialize checkpoint summary"))?;
         writer.write_all(&bytes)?;
         Ok(())
     }
@@ -663,16 +569,12 @@ mod tests {
         let mut buffer = vec![0; metadata.len() as usize];
         reader.read_exact(&mut buffer).unwrap();
         let checkpoint: Envelope<CheckpointSummary, AuthorityQuorumSignInfo<true>> =
-            bcs::from_bytes(&buffer)
-                .map_err(|_| anyhow!("Unable to parse checkpoint file"))
-                .unwrap();
+            bcs::from_bytes(&buffer).map_err(|_| anyhow!("Unable to parse checkpoint file")).unwrap();
 
         let prev_committee = checkpoint
             .end_of_epoch_data
             .as_ref()
-            .ok_or(anyhow!(
-                "Expected all checkpoints to be end-of-epoch checkpoints"
-            ))
+            .ok_or(anyhow!("Expected all checkpoints to be end-of-epoch checkpoints"))
             .unwrap()
             .next_epoch_committee
             .iter()
@@ -749,12 +651,7 @@ mod tests {
     async fn test_checkpoint_bad_events() {
         let (committee, mut full_checkpoint) = read_data().await;
 
-        let event = full_checkpoint.transactions[4]
-            .events
-            .as_ref()
-            .unwrap()
-            .data[0]
-            .clone();
+        let event = full_checkpoint.transactions[4].events.as_ref().unwrap().data[0].clone();
 
         for t in &mut full_checkpoint.transactions {
             if let Some(events) = &mut t.events {

@@ -37,10 +37,7 @@ async fn main() -> Result<(), anyhow::Error> {
     println!("Sui mainnet version: {}", sui_mainnet.api_version());
 
     println!("rpc methods: {:?}", sui_testnet.available_rpc_methods());
-    println!(
-        "available subscriptions: {:?}",
-        sui_testnet.available_subscriptions()
-    );
+    println!("available subscriptions: {:?}", sui_testnet.available_subscriptions());
 
     Ok(())
 }

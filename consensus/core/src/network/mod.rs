@@ -68,12 +68,7 @@ pub(crate) trait NetworkClient: Send + Sync + Sized + 'static {
     const SUPPORT_STREAMING: bool;
 
     /// Sends a serialized SignedBlock to a peer.
-    async fn send_block(
-        &self,
-        peer: AuthorityIndex,
-        block: &VerifiedBlock,
-        timeout: Duration,
-    ) -> ConsensusResult<()>;
+    async fn send_block(&self, peer: AuthorityIndex, block: &VerifiedBlock, timeout: Duration) -> ConsensusResult<()>;
 
     /// Subscribes to blocks from a peer after last_received round.
     async fn subscribe_blocks(
@@ -138,11 +133,7 @@ pub(crate) trait NetworkService: Send + Sync + 'static {
     /// A stream of newly proposed blocks is returned to the peer.
     /// The stream continues until the end of epoch, peer unsubscribes, or a network error / crash
     /// occurs.
-    async fn handle_subscribe_blocks(
-        &self,
-        peer: AuthorityIndex,
-        last_received: Round,
-    ) -> ConsensusResult<BlockStream>;
+    async fn handle_subscribe_blocks(&self, peer: AuthorityIndex, last_received: Round) -> ConsensusResult<BlockStream>;
 
     /// Handles the request to fetch blocks by references from the peer.
     async fn handle_fetch_blocks(
@@ -167,10 +158,7 @@ pub(crate) trait NetworkService: Send + Sync + 'static {
     ) -> ConsensusResult<Vec<Bytes>>;
 
     /// Handles the request to get the latest received & accepted rounds of all authorities.
-    async fn handle_get_latest_rounds(
-        &self,
-        peer: AuthorityIndex,
-    ) -> ConsensusResult<(Vec<Round>, Vec<Round>)>;
+    async fn handle_get_latest_rounds(&self, peer: AuthorityIndex) -> ConsensusResult<(Vec<Round>, Vec<Round>)>;
 }
 
 /// An `AuthorityNode` holds a `NetworkManager` until shutdown.

@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::Bytes;
-use sui_types::base_types::MoveObjectType;
-use sui_types::base_types::{ObjectDigest, SequenceNumber, TransactionDigest};
-use sui_types::coin::Coin;
-use sui_types::crypto::{default_hash, Signable};
-use sui_types::error::SuiError;
-use sui_types::move_package::MovePackage;
-use sui_types::object::{Data, MoveObject, Object, ObjectInner, Owner};
-use sui_types::storage::ObjectKey;
+use serde_with::{serde_as, Bytes};
+use sui_types::{
+    base_types::{MoveObjectType, ObjectDigest, SequenceNumber, TransactionDigest},
+    coin::Coin,
+    crypto::{default_hash, Signable},
+    error::SuiError,
+    move_package::MovePackage,
+    object::{Data, MoveObject, Object, ObjectInner, Owner},
+    storage::ObjectKey,
+};
 
 pub type ObjectContentDigest = ObjectDigest;
 
@@ -65,6 +65,7 @@ impl StoreObjectWrapper {
             _ => panic!("object should have been migrated to latest version at read time"),
         }
     }
+
     pub fn into_inner(self) -> StoreObject {
         match self {
             Self::V1(v1) => v1,
@@ -143,6 +144,7 @@ impl StoreMoveObjectWrapper {
             _ => panic!("object should have been migrated to latest version at read time"),
         }
     }
+
     pub fn into_inner(self) -> StoreMoveObject {
         match self {
             Self::V1(v1) => v1,
@@ -201,27 +203,17 @@ pub fn get_store_object_pair(object: Object, indirect_objects_threshold: usize) 
     let data = match object.data {
         Data::Package(package) => StoreData::Package(package),
         Data::Move(move_obj) => {
-            if indirect_objects_threshold > 0
-                && move_obj.contents().len() >= indirect_objects_threshold
-            {
+            if indirect_objects_threshold > 0 && move_obj.contents().len() >= indirect_objects_threshold {
                 let has_public_transfer = move_obj.has_public_transfer();
                 let version = move_obj.version();
                 let (type_, contents) = move_obj.into_inner();
-                let move_object = StoreMoveObject {
-                    type_,
-                    has_public_transfer,
-                    contents,
-                    ref_count: 1,
-                };
+                let move_object = StoreMoveObject { type_, has_public_transfer, contents, ref_count: 1 };
                 let digest = move_object.digest();
                 indirect_object = Some(move_object);
                 StoreData::IndirectObject(IndirectObjectMetadata { version, digest })
             } else if move_obj.type_().is_gas_coin() {
                 StoreData::Coin(
-                    Coin::from_bcs_bytes(move_obj.contents())
-                        .expect("failed to deserialize coin")
-                        .balance
-                        .value(),
+                    Coin::from_bcs_bytes(move_obj.contents()).expect("failed to deserialize coin").balance.value(),
                 )
             } else {
                 StoreData::Move(move_obj)
@@ -234,10 +226,7 @@ pub fn get_store_object_pair(object: Object, indirect_objects_threshold: usize) 
         previous_transaction: object.previous_transaction,
         storage_rebate: object.storage_rebate,
     };
-    StoreObjectPair(
-        StoreObject::Value(store_object).into(),
-        indirect_object.map(|i| i.into()),
-    )
+    StoreObjectPair(StoreObject::Value(store_object).into(), indirect_object.map(|i| i.into()))
 }
 
 pub(crate) fn try_construct_object(
@@ -267,11 +256,7 @@ pub(crate) fn try_construct_object(
                 u64::MAX,
             )?)
         },
-        _ => {
-            return Err(SuiError::Storage(
-                "corrupted field: inconsistent object representation".to_string(),
-            ))
-        }
+        _ => return Err(SuiError::Storage("corrupted field: inconsistent object representation".to_string())),
     };
 
     Ok(ObjectInner {

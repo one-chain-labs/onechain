@@ -10,14 +10,15 @@ use sui_types::full_checkpoint_content::CheckpointData;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 
-use crate::{metrics::IndexerMetrics, watermarks::CommitterWatermark};
-
-use super::{processor::processor, CommitterConfig, Processor, WatermarkPart, PIPELINE_BUFFER};
-
 use self::{
-    collector::collector, commit_watermark::commit_watermark, committer::committer, pruner::pruner,
+    collector::collector,
+    commit_watermark::commit_watermark,
+    committer::committer,
+    pruner::pruner,
     reader_watermark::reader_watermark,
 };
+use super::{processor::processor, CommitterConfig, Processor, WatermarkPart, PIPELINE_BUFFER};
+use crate::{metrics::IndexerMetrics, watermarks::CommitterWatermark};
 
 mod collector;
 mod commit_watermark;
@@ -59,16 +60,11 @@ pub trait Handler: Processor<Value: FieldCount> {
 
     /// Take a chunk of values and commit them to the database, returning the number of rows
     /// affected.
-    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>)
-        -> anyhow::Result<usize>;
+    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> anyhow::Result<usize>;
 
     /// Clean up data between checkpoints `_from` and `_to_exclusive` (exclusive) in the database, returning
     /// the number of rows affected. This function is optional, and defaults to not pruning at all.
-    async fn prune(
-        _from: u64,
-        _to_exclusive: u64,
-        _conn: &mut db::Connection<'_>,
-    ) -> anyhow::Result<usize> {
+    async fn prune(_from: u64, _to_exclusive: u64, _conn: &mut db::Connection<'_>) -> anyhow::Result<usize> {
         Ok(0)
     }
 }
@@ -129,10 +125,7 @@ impl PrunerConfig {
 
 impl<H: Handler> BatchedRows<H> {
     fn new() -> Self {
-        Self {
-            values: vec![],
-            watermark: vec![],
-        }
+        Self { values: vec![], watermark: vec![] }
     }
 
     /// Number of rows in this batch.
@@ -149,12 +142,7 @@ impl<H: Handler> BatchedRows<H> {
 
 impl Default for PrunerConfig {
     fn default() -> Self {
-        Self {
-            interval_ms: 300_000,
-            delay_ms: 120_000,
-            retention: 4_000_000,
-            max_chunk_size: 2_000,
-        }
+        Self { interval_ms: 300_000, delay_ms: 120_000, retention: 4_000_000, max_chunk_size: 2_000 }
     }
 }
 
@@ -188,17 +176,11 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
     metrics: Arc<IndexerMetrics>,
     cancel: CancellationToken,
 ) -> JoinHandle<()> {
-    let ConcurrentConfig {
-        committer: committer_config,
-        pruner: pruner_config,
-        checkpoint_lag,
-    } = config;
+    let ConcurrentConfig { committer: committer_config, pruner: pruner_config, checkpoint_lag } = config;
 
     let (processor_tx, collector_rx) = mpsc::channel(H::FANOUT + PIPELINE_BUFFER);
-    let (collector_tx, committer_rx) =
-        mpsc::channel(committer_config.write_concurrency + PIPELINE_BUFFER);
-    let (committer_tx, watermark_rx) =
-        mpsc::channel(committer_config.write_concurrency + PIPELINE_BUFFER);
+    let (collector_tx, committer_rx) = mpsc::channel(committer_config.write_concurrency + PIPELINE_BUFFER);
+    let (committer_tx, watermark_rx) = mpsc::channel(committer_config.write_concurrency + PIPELINE_BUFFER);
 
     // The pruner is not connected to the rest of the tasks by channels, so it needs to be
     // explicitly signalled to shutdown when the other tasks shutdown, in addition to listening to
@@ -206,13 +188,7 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
     // cancel on once the committer tasks have shutdown.
     let pruner_cancel = cancel.child_token();
 
-    let processor = processor(
-        handler,
-        checkpoint_rx,
-        processor_tx,
-        metrics.clone(),
-        cancel.clone(),
-    );
+    let processor = processor(handler, checkpoint_rx, processor_tx, metrics.clone(), cancel.clone());
 
     let collector = collector::<H>(
         committer_config.clone(),
@@ -243,12 +219,8 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
         cancel,
     );
 
-    let reader_watermark = reader_watermark::<H>(
-        pruner_config.clone(),
-        db.clone(),
-        metrics.clone(),
-        pruner_cancel.clone(),
-    );
+    let reader_watermark =
+        reader_watermark::<H>(pruner_config.clone(), db.clone(), metrics.clone(), pruner_cancel.clone());
 
     let pruner = pruner::<H>(pruner_config, db, metrics, pruner_cancel.clone());
 

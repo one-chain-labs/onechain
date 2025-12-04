@@ -1,6 +1,7 @@
-use super::types as proto;
 use sui_sdk_types::*;
 use test_strategy::proptest;
+
+use super::types as proto;
 
 macro_rules! protobuf_roundtrip_test {
     ($type:ident, $proto:ty) => {
@@ -40,8 +41,5 @@ protobuf_roundtrip_test!(TransactionEffects, proto::TransactionEffects);
 protobuf_roundtrip_test!(TransactionEvents, proto::TransactionEvents);
 protobuf_roundtrip_test!(Object, proto::Object);
 protobuf_roundtrip_test!(UserSignature, proto::UserSignature);
-protobuf_roundtrip_test!(
-    ValidatorAggregatedSignature,
-    proto::ValidatorAggregatedSignature
-);
+protobuf_roundtrip_test!(ValidatorAggregatedSignature, proto::ValidatorAggregatedSignature);
 protobuf_roundtrip_test!(ExecutionStatus, proto::ExecutionStatus);

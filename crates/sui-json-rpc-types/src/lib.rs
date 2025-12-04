@@ -1,12 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub use balance_changes::*;
 use fastcrypto::encoding::{Base58, Base64};
+pub use object_changes::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-pub use balance_changes::*;
-pub use object_changes::*;
 use serde_with::serde_as;
 pub use sui_checkpoint::*;
 pub use sui_coin::*;
@@ -50,11 +49,7 @@ pub struct Page<T, C> {
 
 impl<T, C> Page<T, C> {
     pub fn empty() -> Self {
-        Self {
-            data: vec![],
-            next_cursor: None,
-            has_next_page: false,
-        }
+        Self { data: vec![], next_cursor: None, has_next_page: false }
     }
 }
 
@@ -84,15 +79,7 @@ impl From<sui_types::dynamic_field::DynamicFieldInfo> for DynamicFieldInfo {
             digest,
         }: sui_types::dynamic_field::DynamicFieldInfo,
     ) -> Self {
-        Self {
-            name,
-            bcs_name: BcsName::new(bcs_name),
-            type_,
-            object_type,
-            object_id,
-            version,
-            digest,
-        }
+        Self { name, bcs_name: BcsName::new(bcs_name), type_, object_type, object_id, version, digest }
     }
 }
 
@@ -167,8 +154,9 @@ enum TaggedBcsName {
 impl From<MaybeTaggedBcsName> for BcsName {
     fn from(name: MaybeTaggedBcsName) -> BcsName {
         let bcs_name = match name {
-            MaybeTaggedBcsName::Tagged(TaggedBcsName::Base58 { bcs_name })
-            | MaybeTaggedBcsName::Base58 { bcs_name } => bcs_name,
+            MaybeTaggedBcsName::Tagged(TaggedBcsName::Base58 { bcs_name }) | MaybeTaggedBcsName::Base58 { bcs_name } => {
+                bcs_name
+            }
             MaybeTaggedBcsName::Tagged(TaggedBcsName::Base64 { bcs_name }) => bcs_name,
         };
 
@@ -188,32 +176,11 @@ mod test {
         let tagged_base58 = r#"{"bcsEncoding":"base58","bcsName":"12VfUX"}"#;
         let tagged_base64 = r#"{"bcsEncoding":"base64","bcsName":"AAECAwQ="}"#;
 
-        println!(
-            "{}",
-            serde_json::to_string(&TaggedBcsName::Base64 {
-                bcs_name: bytes.clone()
-            })
-            .unwrap()
-        );
+        println!("{}", serde_json::to_string(&TaggedBcsName::Base64 { bcs_name: bytes.clone() }).unwrap());
 
-        assert_eq!(
-            bytes,
-            serde_json::from_str::<BcsName>(untagged_base58)
-                .unwrap()
-                .into_bytes()
-        );
-        assert_eq!(
-            bytes,
-            serde_json::from_str::<BcsName>(tagged_base58)
-                .unwrap()
-                .into_bytes()
-        );
-        assert_eq!(
-            bytes,
-            serde_json::from_str::<BcsName>(tagged_base64)
-                .unwrap()
-                .into_bytes()
-        );
+        assert_eq!(bytes, serde_json::from_str::<BcsName>(untagged_base58).unwrap().into_bytes());
+        assert_eq!(bytes, serde_json::from_str::<BcsName>(tagged_base58).unwrap().into_bytes());
+        assert_eq!(bytes, serde_json::from_str::<BcsName>(tagged_base64).unwrap().into_bytes());
 
         // Roundtrip base64
         let name = serde_json::from_str::<BcsName>(tagged_base64).unwrap();

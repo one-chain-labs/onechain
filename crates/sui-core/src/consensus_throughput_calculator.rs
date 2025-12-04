@@ -1,14 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, VecDeque},
+    num::NonZeroU64,
+    sync::Arc,
+};
+
 use arc_swap::ArcSwap;
 use parking_lot::Mutex;
-use std::collections::{BTreeMap, VecDeque};
-use std::num::NonZeroU64;
-use std::sync::Arc;
 use sui_protocol_config::Chain;
-use sui_types::digests::ChainIdentifier;
-use sui_types::messages_consensus::TimestampMs;
+use sui_types::{digests::ChainIdentifier, messages_consensus::TimestampMs};
 use tracing::{debug, warn};
 
 use crate::authority::AuthorityMetrics;
@@ -64,18 +66,9 @@ impl ThroughputProfileRanges {
     pub fn from_chain(chain_id: ChainIdentifier) -> ThroughputProfileRanges {
         let to_profiles = |medium: u64, high: u64| -> Vec<ThroughputProfile> {
             vec![
-                ThroughputProfile {
-                    level: Level::Low,
-                    throughput: 0,
-                },
-                ThroughputProfile {
-                    level: Level::Medium,
-                    throughput: medium,
-                },
-                ThroughputProfile {
-                    level: Level::High,
-                    throughput: high,
-                },
+                ThroughputProfile { level: Level::Low, throughput: 0 },
+                ThroughputProfile { level: Level::Medium, throughput: medium },
+                ThroughputProfile { level: Level::High, throughput: high },
             ]
         };
 
@@ -90,10 +83,7 @@ impl ThroughputProfileRanges {
         let mut p: BTreeMap<u64, ThroughputProfile> = BTreeMap::new();
 
         for profile in profiles {
-            assert!(
-                !p.iter().any(|(_, pr)| pr.level == profile.level),
-                "Attempted to insert profile with same level"
-            );
+            assert!(!p.iter().any(|(_, pr)| pr.level == profile.level), "Attempted to insert profile with same level");
             assert!(
                 p.insert(profile.throughput, *profile).is_none(),
                 "Attempted to insert profile with same throughput"
@@ -101,32 +91,19 @@ impl ThroughputProfileRanges {
         }
 
         // By default the Low profile should exist with throughput 0
-        assert_eq!(
-            *p.get(&0).unwrap(),
-            ThroughputProfile {
-                level: Level::Low,
-                throughput: 0
-            }
-        );
+        assert_eq!(*p.get(&0).unwrap(), ThroughputProfile { level: Level::Low, throughput: 0 });
 
         Self { profiles: p }
     }
 
     pub fn lowest_profile(&self) -> ThroughputProfile {
-        *self
-            .profiles
-            .first_key_value()
-            .expect("Should contain at least one throughput profile")
-            .1
+        *self.profiles.first_key_value().expect("Should contain at least one throughput profile").1
     }
 
     pub fn highest_profile(&self) -> ThroughputProfile {
-        *self
-            .profiles
-            .last_key_value()
-            .expect("Should contain at least one throughput profile")
-            .1
+        *self.profiles.last_key_value().expect("Should contain at least one throughput profile").1
     }
+
     /// Resolves the throughput profile that corresponds to the provided throughput.
     pub fn resolve(&self, current_throughput: u64) -> ThroughputProfile {
         let mut iter = self.profiles.iter();
@@ -145,16 +122,10 @@ impl ThroughputProfileRanges {
 
 impl Default for ThroughputProfileRanges {
     fn default() -> Self {
-        let profiles = vec![
-            ThroughputProfile {
-                level: Level::Low,
-                throughput: 0,
-            },
-            ThroughputProfile {
-                level: Level::High,
-                throughput: 2_000,
-            },
-        ];
+        let profiles = vec![ThroughputProfile { level: Level::Low, throughput: 0 }, ThroughputProfile {
+            level: Level::High,
+            throughput: 2_000,
+        }];
         ThroughputProfileRanges::new(&profiles)
     }
 }
@@ -211,18 +182,15 @@ impl ConsensusThroughputProfiler {
         metrics: Arc<AuthorityMetrics>,
         profile_ranges: ThroughputProfileRanges,
     ) -> Self {
-        let throughput_profile_update_interval = throughput_profile_update_interval
-            .unwrap_or(DEFAULT_THROUGHPUT_PROFILE_UPDATE_INTERVAL_SECS);
-        let throughput_profile_cool_down_threshold = throughput_profile_cool_down_threshold
-            .unwrap_or(DEFAULT_THROUGHPUT_PROFILE_COOL_DOWN_THRESHOLD);
+        let throughput_profile_update_interval =
+            throughput_profile_update_interval.unwrap_or(DEFAULT_THROUGHPUT_PROFILE_UPDATE_INTERVAL_SECS);
+        let throughput_profile_cool_down_threshold =
+            throughput_profile_cool_down_threshold.unwrap_or(DEFAULT_THROUGHPUT_PROFILE_COOL_DOWN_THRESHOLD);
+
+        assert!(throughput_profile_update_interval > 0, "throughput_profile_update_interval should be >= 0");
 
         assert!(
-            throughput_profile_update_interval > 0,
-            "throughput_profile_update_interval should be >= 0"
-        );
-
-        assert!(
-            (0..=30).contains(&throughput_profile_cool_down_threshold),
+            (0 ..= 30).contains(&throughput_profile_cool_down_threshold),
             "Out of bounds provided cool down threshold offset"
         );
 
@@ -259,11 +227,7 @@ impl ConsensusThroughputProfiler {
     // To ensure that we are protected against throughput profile change fluctuations, we update a
     // throughput profile every `throughput_profile_update_interval` seconds based on the provided unix timestamps.
     // The last throughput profile entry is returned.
-    fn update_and_fetch_throughput_profile(
-        &self,
-        throughput: u64,
-        timestamp: TimestampSecs,
-    ) -> ThroughputProfileEntry {
+    fn update_and_fetch_throughput_profile(&self, throughput: u64, timestamp: TimestampSecs) -> ThroughputProfileEntry {
         let last_profile = self.last_throughput_profile.load();
 
         // Skip any processing if provided timestamp is older than the last used one. Also return existing
@@ -276,8 +240,7 @@ impl ConsensusThroughputProfiler {
         let profile = self.profile_ranges.resolve(throughput);
 
         let current_seconds_bucket = timestamp / self.throughput_profile_update_interval;
-        let last_profile_seconds_bucket =
-            last_profile.timestamp / self.throughput_profile_update_interval;
+        let last_profile_seconds_bucket = last_profile.timestamp / self.throughput_profile_update_interval;
 
         // Update only when we minimum time has been passed since last update.
         // We allow the edge case to update on the same bucket when a different profile has been
@@ -287,11 +250,9 @@ impl ConsensusThroughputProfiler {
         {
             if profile < last_profile.profile {
                 // If new profile is smaller than previous one, then make sure the cool down threshold is respected.
-                let min_throughput = last_profile
-                    .profile
-                    .throughput
-                    .saturating_mul(100 - self.throughput_profile_cool_down_threshold)
-                    / 100;
+                let min_throughput =
+                    last_profile.profile.throughput.saturating_mul(100 - self.throughput_profile_cool_down_threshold)
+                        / 100;
                 throughput <= min_throughput
             } else {
                 true
@@ -301,17 +262,11 @@ impl ConsensusThroughputProfiler {
         };
 
         if should_update_profile {
-            let p = ThroughputProfileEntry {
-                profile,
-                timestamp,
-                throughput,
-            };
+            let p = ThroughputProfileEntry { profile, timestamp, throughput };
             debug!("Updating throughput profile to {:?}", p);
             self.last_throughput_profile.store(Arc::new(p));
 
-            self.metrics
-                .consensus_calculated_throughput_profile
-                .set(usize::from(profile.level) as i64);
+            self.metrics.consensus_calculated_throughput_profile.set(usize::from(profile.level) as i64);
 
             p
         } else {
@@ -337,9 +292,8 @@ pub struct ConsensusThroughputCalculator {
 
 impl ConsensusThroughputCalculator {
     pub fn new(observations_window: Option<NonZeroU64>, metrics: Arc<AuthorityMetrics>) -> Self {
-        let observations_window = observations_window
-            .unwrap_or(NonZeroU64::new(DEFAULT_OBSERVATIONS_WINDOW).unwrap())
-            .get();
+        let observations_window =
+            observations_window.unwrap_or(NonZeroU64::new(DEFAULT_OBSERVATIONS_WINDOW).unwrap()).get();
 
         Self {
             observations_window,
@@ -360,7 +314,10 @@ impl ConsensusThroughputCalculator {
             // First check that the timestamp is monotonically incremented - ignore any observation that is not
             // later from previous one (it shouldn't really happen).
             if timestamp_secs < *front_ts {
-                warn!("Ignoring observation of transactions:{} as has earlier timestamp than last observation {}s < {}s", num_of_transactions, timestamp_secs, front_ts);
+                warn!(
+                    "Ignoring observation of transactions:{} as has earlier timestamp than last observation {}s < {}s",
+                    num_of_transactions, timestamp_secs, front_ts
+                );
                 return;
             }
 
@@ -368,14 +325,10 @@ impl ConsensusThroughputCalculator {
             if timestamp_secs == *front_ts {
                 *transactions = transactions.saturating_add(num_of_transactions);
             } else {
-                inner
-                    .observations
-                    .push_front((timestamp_secs, num_of_transactions));
+                inner.observations.push_front((timestamp_secs, num_of_transactions));
             }
         } else {
-            inner
-                .observations
-                .push_front((timestamp_secs, num_of_transactions));
+            inner.observations.push_front((timestamp_secs, num_of_transactions));
         }
 
         // update total number of transactions in the observations list
@@ -402,22 +355,17 @@ impl ConsensusThroughputCalculator {
             inner.last_oldest_timestamp = Some(last_element_ts);
 
             // get the first element's timestamp to calculate the transaction rate
-            let (first_element_ts, _first_element_transactions) = inner
-                .observations
-                .front()
-                .expect("There should be at least on element in the list");
+            let (first_element_ts, _first_element_transactions) =
+                inner.observations.front().expect("There should be at least on element in the list");
 
             let period = first_element_ts.saturating_sub(last_element_ts);
 
             if period > 0 {
                 let current_throughput = inner.total_transactions / period;
 
-                self.metrics
-                    .consensus_calculated_throughput
-                    .set(current_throughput as i64);
+                self.metrics.consensus_calculated_throughput.set(current_throughput as i64);
 
-                self.current_throughput
-                    .store(Arc::new((current_throughput, timestamp_secs)));
+                self.current_throughput.store(Arc::new((current_throughput, timestamp_secs)));
             } else {
                 warn!("Skip calculating throughput as time period is {}. This is very unlikely to happen, should investigate.", period);
             }
@@ -432,42 +380,19 @@ impl ConsensusThroughputCalculator {
 
 #[cfg(test)]
 mod tests {
+    use prometheus::Registry;
+
     use super::*;
     use crate::consensus_throughput_calculator::Level::{High, Low};
-    use prometheus::Registry;
 
     #[test]
     pub fn test_throughput_profile_ranges() {
         let ranges = ThroughputProfileRanges::default();
 
-        assert_eq!(
-            ranges.resolve(0),
-            ThroughputProfile {
-                level: Low,
-                throughput: 0
-            }
-        );
-        assert_eq!(
-            ranges.resolve(1_000),
-            ThroughputProfile {
-                level: Low,
-                throughput: 0
-            }
-        );
-        assert_eq!(
-            ranges.resolve(2_000),
-            ThroughputProfile {
-                level: High,
-                throughput: 2_000
-            }
-        );
-        assert_eq!(
-            ranges.resolve(u64::MAX),
-            ThroughputProfile {
-                level: High,
-                throughput: 2_000
-            }
-        );
+        assert_eq!(ranges.resolve(0), ThroughputProfile { level: Low, throughput: 0 });
+        assert_eq!(ranges.resolve(1_000), ThroughputProfile { level: Low, throughput: 0 });
+        assert_eq!(ranges.resolve(2_000), ThroughputProfile { level: High, throughput: 2_000 });
+        assert_eq!(ranges.resolve(u64::MAX), ThroughputProfile { level: High, throughput: 2_000 });
     }
 
     #[test]
@@ -528,7 +453,7 @@ mod tests {
 
         // Adding observations with same timestamp should fall under the same bucket and won't lead
         // to throughput update.
-        for _ in 0..10 {
+        for _ in 0 .. 10 {
             calculator.add_transactions(2_340, 100);
         }
         assert_eq!(calculator.current_throughput(), (0, 0));
@@ -556,10 +481,7 @@ mod tests {
 
         let ranges = ThroughputProfileRanges::default();
 
-        let calculator = Arc::new(ConsensusThroughputCalculator::new(
-            Some(max_observation_points),
-            metrics.clone(),
-        ));
+        let calculator = Arc::new(ConsensusThroughputCalculator::new(Some(max_observation_points), metrics.clone()));
         let profiler = ConsensusThroughputProfiler::new(
             calculator.clone(),
             Some(throughput_profile_update_interval),
@@ -623,10 +545,7 @@ mod tests {
 
         let ranges = ThroughputProfileRanges::default();
 
-        let calculator = Arc::new(ConsensusThroughputCalculator::new(
-            Some(max_observation_points),
-            metrics.clone(),
-        ));
+        let calculator = Arc::new(ConsensusThroughputCalculator::new(Some(max_observation_points), metrics.clone()));
         let profiler = ConsensusThroughputProfiler::new(
             calculator.clone(),
             Some(throughput_profile_update_interval),
@@ -677,10 +596,7 @@ mod tests {
 
         let ranges = ThroughputProfileRanges::default();
 
-        let calculator = Arc::new(ConsensusThroughputCalculator::new(
-            Some(max_observation_points),
-            metrics.clone(),
-        ));
+        let calculator = Arc::new(ConsensusThroughputCalculator::new(Some(max_observation_points), metrics.clone()));
         let profiler = ConsensusThroughputProfiler::new(
             calculator.clone(),
             Some(throughput_profile_update_window),
@@ -690,7 +606,7 @@ mod tests {
         );
 
         // Adding 4 observations of 3_000 tx/sec, so in the end throughput profile should be flagged as high
-        for i in 1..=4 {
+        for i in 1 ..= 4 {
             calculator.add_transactions(i * 1_000, 3_000);
         }
         assert_eq!(profiler.throughput_level(), (High, 3_000));

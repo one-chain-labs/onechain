@@ -1,19 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use futures::future::try_join_all;
-use std::sync::Arc;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
-use sui_sdk::rpc_types::Checkpoint;
-use sui_sdk::SuiClient;
+use sui_sdk::{rpc_types::Checkpoint, SuiClient};
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
 
-use crate::operations::Operations;
-use crate::types::{
-    Block, BlockHash, BlockIdentifier, BlockResponse, Transaction, TransactionIdentifier,
+use crate::{
+    operations::Operations,
+    types::{Block, BlockHash, BlockIdentifier, BlockResponse, Transaction, TransactionIdentifier},
+    CoinMetadataCache,
+    Error,
 };
-use crate::{CoinMetadataCache, Error};
 
 #[cfg(test)]
 #[path = "unit_tests/balance_changing_tx_tests.rs"]
@@ -32,11 +33,7 @@ impl OnlineServerContext {
         block_provider: Arc<dyn BlockProvider + Send + Sync>,
         coin_metadata_cache: CoinMetadataCache,
     ) -> Self {
-        Self {
-            client: client.clone(),
-            block_provider,
-            coin_metadata_cache,
-        }
+        Self { client: client.clone(), block_provider, coin_metadata_cache }
     }
 
     pub fn blocks(&self) -> &(dyn BlockProvider + Sync + Send) {
@@ -52,10 +49,7 @@ pub trait BlockProvider {
     async fn genesis_block_identifier(&self) -> Result<BlockIdentifier, Error>;
     async fn oldest_block_identifier(&self) -> Result<BlockIdentifier, Error>;
     async fn current_block_identifier(&self) -> Result<BlockIdentifier, Error>;
-    async fn create_block_identifier(
-        &self,
-        checkpoint: CheckpointSequenceNumber,
-    ) -> Result<BlockIdentifier, Error>;
+    async fn create_block_identifier(&self, checkpoint: CheckpointSequenceNumber) -> Result<BlockIdentifier, Error>;
 }
 
 #[derive(Clone)]
@@ -77,11 +71,7 @@ impl BlockProvider for CheckpointBlockProvider {
     }
 
     async fn current_block(&self) -> Result<BlockResponse, Error> {
-        let checkpoint = self
-            .client
-            .read_api()
-            .get_latest_checkpoint_sequence_number()
-            .await?;
+        let checkpoint = self.client.read_api().get_latest_checkpoint_sequence_number().await?;
         self.get_block_by_index(checkpoint).await
     }
 
@@ -94,29 +84,19 @@ impl BlockProvider for CheckpointBlockProvider {
     }
 
     async fn current_block_identifier(&self) -> Result<BlockIdentifier, Error> {
-        let checkpoint = self
-            .client
-            .read_api()
-            .get_latest_checkpoint_sequence_number()
-            .await?;
+        let checkpoint = self.client.read_api().get_latest_checkpoint_sequence_number().await?;
 
         self.create_block_identifier(checkpoint).await
     }
 
-    async fn create_block_identifier(
-        &self,
-        checkpoint: CheckpointSequenceNumber,
-    ) -> Result<BlockIdentifier, Error> {
+    async fn create_block_identifier(&self, checkpoint: CheckpointSequenceNumber) -> Result<BlockIdentifier, Error> {
         self.create_block_identifier(checkpoint).await
     }
 }
 
 impl CheckpointBlockProvider {
     pub fn new(client: SuiClient, coin_metadata_cache: CoinMetadataCache) -> Self {
-        Self {
-            client,
-            coin_metadata_cache,
-        }
+        Self { client, coin_metadata_cache }
     }
 
     async fn create_block_response(&self, checkpoint: Checkpoint) -> Result<BlockResponse, Error> {
@@ -144,8 +124,7 @@ impl CheckpointBlockProvider {
                 for tx in transaction_responses.into_iter() {
                     transactions.push(Transaction {
                         transaction_identifier: TransactionIdentifier { hash: tx.digest },
-                        operations: Operations::try_from_response(tx, &self.coin_metadata_cache)
-                            .await?,
+                        operations: Operations::try_from_response(tx, &self.coin_metadata_cache).await?,
                         related_transactions: vec![],
                         metadata: None,
                     })
@@ -154,11 +133,7 @@ impl CheckpointBlockProvider {
             })
             .collect::<Vec<_>>();
 
-        let transactions = try_join_all(chunks)
-            .await?
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>();
+        let transactions = try_join_all(chunks).await?.into_iter().flatten().collect::<Vec<_>>();
 
         // previous digest should only be None for genesis block.
         if checkpoint.previous_digest.is_none() && index != 0 {
@@ -169,10 +144,7 @@ impl CheckpointBlockProvider {
 
         let parent_block_identifier = checkpoint
             .previous_digest
-            .map(|hash| BlockIdentifier {
-                index: index - 1,
-                hash,
-            })
+            .map(|hash| BlockIdentifier { index: index - 1, hash })
             .unwrap_or_else(|| BlockIdentifier { index, hash });
 
         Ok(BlockResponse {
@@ -187,18 +159,8 @@ impl CheckpointBlockProvider {
         })
     }
 
-    async fn create_block_identifier(
-        &self,
-        seq_number: CheckpointSequenceNumber,
-    ) -> Result<BlockIdentifier, Error> {
-        let checkpoint = self
-            .client
-            .read_api()
-            .get_checkpoint(seq_number.into())
-            .await?;
-        Ok(BlockIdentifier {
-            index: checkpoint.sequence_number,
-            hash: checkpoint.digest,
-        })
+    async fn create_block_identifier(&self, seq_number: CheckpointSequenceNumber) -> Result<BlockIdentifier, Error> {
+        let checkpoint = self.client.read_api().get_checkpoint(seq_number.into()).await?;
+        Ok(BlockIdentifier { index: checkpoint.sequence_number, hash: checkpoint.digest })
     }
 }

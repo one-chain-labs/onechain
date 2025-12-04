@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{BigTableClient, KeyValueStoreReader, KeyValueStoreWriter};
 use anyhow::Result;
 use async_trait::async_trait;
 use sui_data_ingestion_core::ProgressStore;
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+
+use crate::{BigTableClient, KeyValueStoreReader, KeyValueStoreWriter};
 
 pub struct BigTableProgressStore {
     client: BigTableClient,

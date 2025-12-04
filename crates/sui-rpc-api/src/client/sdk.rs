@@ -1,54 +1,62 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use reqwest::header::HeaderValue;
-use reqwest::StatusCode;
-use reqwest::Url;
+use reqwest::{header::HeaderValue, StatusCode, Url};
 use sui_sdk_transaction_builder::unresolved::Transaction as UnresolvedTransaction;
-use sui_sdk_types::Address;
-use sui_sdk_types::CheckpointDigest;
-use sui_sdk_types::CheckpointSequenceNumber;
-use sui_sdk_types::EpochId;
-use sui_sdk_types::Object;
-use sui_sdk_types::ObjectId;
-use sui_sdk_types::SignedCheckpointSummary;
-use sui_sdk_types::SignedTransaction;
-use sui_sdk_types::StructTag;
-use sui_sdk_types::Transaction;
-use sui_sdk_types::TransactionDigest;
-use sui_sdk_types::ValidatorCommittee;
-use sui_sdk_types::Version;
+use sui_sdk_types::{
+    Address,
+    CheckpointDigest,
+    CheckpointSequenceNumber,
+    EpochId,
+    Object,
+    ObjectId,
+    SignedCheckpointSummary,
+    SignedTransaction,
+    StructTag,
+    Transaction,
+    TransactionDigest,
+    ValidatorCommittee,
+    Version,
+};
 use tap::Pipe;
 
-use crate::rest::accounts::AccountOwnedObjectInfo;
-use crate::rest::accounts::ListAccountOwnedObjectsQueryParameters;
-use crate::rest::checkpoints::ListCheckpointsPaginationParameters;
-use crate::rest::coins::CoinInfo;
-use crate::rest::health::Threshold;
-use crate::rest::objects::DynamicFieldInfo;
-use crate::rest::objects::ListDynamicFieldsQueryParameters;
-use crate::rest::system::GasInfo;
-use crate::rest::system::ProtocolConfigResponse;
-use crate::rest::system::SystemStateSummary;
-use crate::rest::system::X_SUI_MAX_SUPPORTED_PROTOCOL_VERSION;
-use crate::rest::system::X_SUI_MIN_SUPPORTED_PROTOCOL_VERSION;
-use crate::rest::transactions::ListTransactionsCursorParameters;
-use crate::rest::transactions::ResolveTransactionQueryParameters;
-use crate::rest::transactions::ResolveTransactionResponse;
-use crate::rest::transactions::TransactionSimulationResponse;
-use crate::types::CheckpointResponse;
-use crate::types::ExecuteTransactionOptions;
-use crate::types::ExecuteTransactionResponse;
-use crate::types::NodeInfo;
-use crate::types::TransactionResponse;
-use crate::types::X_SUI_CHAIN;
-use crate::types::X_SUI_CHAIN_ID;
-use crate::types::X_SUI_CHECKPOINT_HEIGHT;
-use crate::types::X_SUI_CURSOR;
-use crate::types::X_SUI_EPOCH;
-use crate::types::X_SUI_LOWEST_AVAILABLE_CHECKPOINT;
-use crate::types::X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS;
-use crate::types::X_SUI_TIMESTAMP_MS;
+use crate::{
+    rest::{
+        accounts::{AccountOwnedObjectInfo, ListAccountOwnedObjectsQueryParameters},
+        checkpoints::ListCheckpointsPaginationParameters,
+        coins::CoinInfo,
+        health::Threshold,
+        objects::{DynamicFieldInfo, ListDynamicFieldsQueryParameters},
+        system::{
+            GasInfo,
+            ProtocolConfigResponse,
+            SystemStateSummary,
+            X_SUI_MAX_SUPPORTED_PROTOCOL_VERSION,
+            X_SUI_MIN_SUPPORTED_PROTOCOL_VERSION,
+        },
+        transactions::{
+            ListTransactionsCursorParameters,
+            ResolveTransactionQueryParameters,
+            ResolveTransactionResponse,
+            TransactionSimulationResponse,
+        },
+    },
+    types::{
+        CheckpointResponse,
+        ExecuteTransactionOptions,
+        ExecuteTransactionResponse,
+        NodeInfo,
+        TransactionResponse,
+        X_SUI_CHAIN,
+        X_SUI_CHAIN_ID,
+        X_SUI_CHECKPOINT_HEIGHT,
+        X_SUI_CURSOR,
+        X_SUI_EPOCH,
+        X_SUI_LOWEST_AVAILABLE_CHECKPOINT,
+        X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS,
+        X_SUI_TIMESTAMP_MS,
+    },
+};
 
 static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
@@ -63,23 +71,14 @@ impl Client {
         let mut url = Url::parse(url).map_err(Error::from_error)?;
 
         if url.cannot_be_a_base() {
-            return Err(Error::new_message(format!(
-                "provided url '{url}' cannot be used as a base"
-            )));
+            return Err(Error::new_message(format!("provided url '{url}' cannot be used as a base")));
         }
 
         url.set_path("/v2/");
 
-        let inner = reqwest::ClientBuilder::new()
-            .user_agent(USER_AGENT)
-            .http2_prior_knowledge()
-            .build()?;
+        let inner = reqwest::ClientBuilder::new().user_agent(USER_AGENT).http2_prior_knowledge().build()?;
 
-        Self {
-            inner,
-            url: Box::new(url),
-        }
-        .pipe(Ok)
+        Self { inner, url: Box::new(url) }.pipe(Ok)
     }
 
     pub fn url(&self) -> &Url {
@@ -126,29 +125,19 @@ impl Client {
     pub async fn get_object(&self, object_id: ObjectId) -> Result<Response<Object>> {
         let url = self.url().join(&format!("objects/{object_id}"))?;
 
-        let request = self.inner.get(url).query(&crate::types::GetObjectOptions {
-            object: Some(true),
-            object_bcs: None,
-        });
+        let request =
+            self.inner.get(url).query(&crate::types::GetObjectOptions { object: Some(true), object_bcs: None });
 
         self.json::<crate::ObjectResponse>(request)
             .await?
             .try_map(|response| response.object.ok_or("object missing from response"))
     }
 
-    pub async fn get_object_with_version(
-        &self,
-        object_id: ObjectId,
-        version: Version,
-    ) -> Result<Response<Object>> {
-        let url = self
-            .url()
-            .join(&format!("objects/{object_id}/version/{version}"))?;
+    pub async fn get_object_with_version(&self, object_id: ObjectId, version: Version) -> Result<Response<Object>> {
+        let url = self.url().join(&format!("objects/{object_id}/version/{version}"))?;
 
-        let request = self.inner.get(url).query(&crate::types::GetObjectOptions {
-            object: Some(true),
-            object_bcs: None,
-        });
+        let request =
+            self.inner.get(url).query(&crate::types::GetObjectOptions { object: Some(true), object_bcs: None });
 
         self.json::<crate::ObjectResponse>(request)
             .await?
@@ -176,10 +165,7 @@ impl Client {
     }
 
     pub async fn get_reference_gas_price(&self) -> Result<u64> {
-        self.get_gas_info()
-            .await
-            .map(Response::into_inner)
-            .map(|info| info.reference_gas_price)
+        self.get_gas_info().await.map(Response::into_inner).map(|info| info.reference_gas_price)
     }
 
     pub async fn get_current_protocol_config(&self) -> Result<Response<ProtocolConfigResponse>> {
@@ -190,10 +176,7 @@ impl Client {
         self.json(request).await
     }
 
-    pub async fn get_protocol_config(
-        &self,
-        version: u64,
-    ) -> Result<Response<ProtocolConfigResponse>> {
+    pub async fn get_protocol_config(&self, version: u64) -> Result<Response<ProtocolConfigResponse>> {
         let url = self.url().join(&format!("system/protocol/{version}"))?;
 
         let request = self.inner.get(url);
@@ -229,9 +212,7 @@ impl Client {
         &self,
         checkpoint_sequence_number: CheckpointSequenceNumber,
     ) -> Result<Response<CheckpointResponse>> {
-        let url = self
-            .url()
-            .join(&format!("checkpoints/{checkpoint_sequence_number}"))?;
+        let url = self.url().join(&format!("checkpoints/{checkpoint_sequence_number}"))?;
 
         let request = self.inner.get(url);
 
@@ -239,17 +220,11 @@ impl Client {
     }
 
     pub async fn get_latest_checkpoint(&self) -> Result<Response<SignedCheckpointSummary>> {
-        let parameters = ListCheckpointsPaginationParameters {
-            limit: Some(1),
-            start: None,
-            direction: None,
-        };
+        let parameters = ListCheckpointsPaginationParameters { limit: Some(1), start: None, direction: None };
 
         let (mut page, parts) = self.list_checkpoints(&parameters).await?.into_parts();
 
-        let checkpoint = page
-            .pop()
-            .ok_or_else(|| Error::new_message("server returned empty checkpoint list"))?;
+        let checkpoint = page.pop().ok_or_else(|| Error::new_message("server returned empty checkpoint list"))?;
 
         Ok(Response::new(
             SignedCheckpointSummary {
@@ -271,10 +246,7 @@ impl Client {
         self.json(request).await
     }
 
-    pub async fn get_transaction(
-        &self,
-        transaction: &TransactionDigest,
-    ) -> Result<Response<TransactionResponse>> {
+    pub async fn get_transaction(&self, transaction: &TransactionDigest) -> Result<Response<TransactionResponse>> {
         let url = self.url().join(&format!("transactions/{transaction}"))?;
 
         let request = self.inner.get(url);
@@ -320,11 +292,8 @@ impl Client {
 
         let body = bcs::to_bytes(transaction)?;
 
-        let request = self
-            .inner
-            .post(url)
-            .header(reqwest::header::CONTENT_TYPE, crate::rest::APPLICATION_BCS)
-            .body(body);
+        let request =
+            self.inner.post(url).header(reqwest::header::CONTENT_TYPE, crate::rest::APPLICATION_BCS).body(body);
 
         self.json(request).await
     }
@@ -347,19 +316,12 @@ impl Client {
     ) -> Result<Response<ResolveTransactionResponse>> {
         let url = self.url.join("transactions/resolve")?;
 
-        let request = self
-            .inner
-            .post(url)
-            .query(&parameters)
-            .json(unresolved_transaction);
+        let request = self.inner.post(url).query(&parameters).json(unresolved_transaction);
 
         self.json(request).await
     }
 
-    async fn check_response(
-        &self,
-        response: reqwest::Response,
-    ) -> Result<(reqwest::Response, ResponseParts)> {
+    async fn check_response(&self, response: reqwest::Response) -> Result<(reqwest::Response, ResponseParts)> {
         let parts = ResponseParts::from_reqwest_response(&response);
 
         if !response.status().is_success() {
@@ -380,14 +342,8 @@ impl Client {
         Ok(Response::new((), parts))
     }
 
-    async fn json<T: serde::de::DeserializeOwned>(
-        &self,
-        request: reqwest::RequestBuilder,
-    ) -> Result<Response<T>> {
-        let response = request
-            .header(reqwest::header::ACCEPT, crate::rest::APPLICATION_JSON)
-            .send()
-            .await?;
+    async fn json<T: serde::de::DeserializeOwned>(&self, request: reqwest::RequestBuilder) -> Result<Response<T>> {
+        let response = request.header(reqwest::header::ACCEPT, crate::rest::APPLICATION_JSON).send().await?;
 
         let (response, parts) = self.check_response(response).await?;
 
@@ -415,46 +371,24 @@ impl ResponseParts {
     fn from_reqwest_response(response: &reqwest::Response) -> Self {
         let headers = response.headers();
         let status = response.status();
-        let chain_id = headers
-            .get(X_SUI_CHAIN_ID)
-            .map(HeaderValue::as_bytes)
-            .and_then(|s| CheckpointDigest::from_base58(s).ok());
-        let chain = headers
-            .get(X_SUI_CHAIN)
-            .and_then(|h| h.to_str().ok())
-            .map(ToOwned::to_owned);
-        let epoch = headers
-            .get(X_SUI_EPOCH)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok());
-        let checkpoint_height = headers
-            .get(X_SUI_CHECKPOINT_HEIGHT)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok());
-        let timestamp_ms = headers
-            .get(X_SUI_TIMESTAMP_MS)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok());
-        let lowest_available_checkpoint = headers
-            .get(X_SUI_LOWEST_AVAILABLE_CHECKPOINT)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok());
+        let chain_id =
+            headers.get(X_SUI_CHAIN_ID).map(HeaderValue::as_bytes).and_then(|s| CheckpointDigest::from_base58(s).ok());
+        let chain = headers.get(X_SUI_CHAIN).and_then(|h| h.to_str().ok()).map(ToOwned::to_owned);
+        let epoch = headers.get(X_SUI_EPOCH).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok());
+        let checkpoint_height =
+            headers.get(X_SUI_CHECKPOINT_HEIGHT).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok());
+        let timestamp_ms = headers.get(X_SUI_TIMESTAMP_MS).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok());
+        let lowest_available_checkpoint =
+            headers.get(X_SUI_LOWEST_AVAILABLE_CHECKPOINT).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok());
         let lowest_available_checkpoint_objects = headers
             .get(X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS)
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.parse().ok());
-        let cursor = headers
-            .get(X_SUI_CURSOR)
-            .and_then(|h| h.to_str().ok())
-            .map(ToOwned::to_owned);
-        let min_supported_protocol_version = headers
-            .get(X_SUI_MIN_SUPPORTED_PROTOCOL_VERSION)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok());
-        let max_supported_protocol_version = headers
-            .get(X_SUI_MAX_SUPPORTED_PROTOCOL_VERSION)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok());
+        let cursor = headers.get(X_SUI_CURSOR).and_then(|h| h.to_str().ok()).map(ToOwned::to_owned);
+        let min_supported_protocol_version =
+            headers.get(X_SUI_MIN_SUPPORTED_PROTOCOL_VERSION).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok());
+        let max_supported_protocol_version =
+            headers.get(X_SUI_MAX_SUPPORTED_PROTOCOL_VERSION).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok());
 
         Self {
             status,
@@ -539,13 +473,7 @@ struct InnerError {
 
 impl Error {
     fn empty() -> Self {
-        Self {
-            inner: Box::new(InnerError {
-                parts: None,
-                message: None,
-                source: None,
-            }),
-        }
+        Self { inner: Box::new(InnerError { parts: None, message: None, source: None }) }
     }
 
     pub(super) fn from_error<E: Into<BoxError>>(error: E) -> Self {

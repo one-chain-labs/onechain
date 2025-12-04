@@ -11,13 +11,12 @@ use serde::{Deserialize, Serialize};
 use sui_swarm_config::genesis_config::GenesisConfig;
 use sui_types::{base_types::SuiAddress, multiaddr::Multiaddr};
 
+use super::{ProtocolCommands, ProtocolMetrics};
 use crate::{
     benchmark::{BenchmarkParameters, BenchmarkType},
     client::Instance,
     settings::Settings,
 };
-
-use super::{ProtocolCommands, ProtocolMetrics};
 
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SuiBenchmarkType {
@@ -42,9 +41,7 @@ impl FromStr for SuiBenchmarkType {
     type Err = std::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
-            shared_objects_ratio: s.parse::<u16>()?.min(100),
-        })
+        Ok(Self { shared_objects_ratio: s.parse::<u16>()?.min(100) })
     }
 }
 
@@ -66,12 +63,8 @@ impl ProtocolCommands<SuiBenchmarkType> for SuiProtocol {
     }
 
     fn db_directories(&self) -> Vec<PathBuf> {
-        let authorities_db = [&self.working_dir, &sui_config::AUTHORITIES_DB_NAME.into()]
-            .iter()
-            .collect();
-        let consensus_db = [&self.working_dir, &sui_config::CONSENSUS_DB_NAME.into()]
-            .iter()
-            .collect();
+        let authorities_db = [&self.working_dir, &sui_config::AUTHORITIES_DB_NAME.into()].iter().collect();
+        let consensus_db = [&self.working_dir, &sui_config::CONSENSUS_DB_NAME.into()].iter().collect();
         vec![authorities_db, consensus_db]
     }
 
@@ -80,10 +73,7 @@ impl ProtocolCommands<SuiBenchmarkType> for SuiProtocol {
         I: Iterator<Item = &'a Instance>,
     {
         let working_dir = self.working_dir.display();
-        let ips = instances
-            .map(|x| x.main_ip.to_string())
-            .collect::<Vec<_>>()
-            .join(" ");
+        let ips = instances.map(|x| x.main_ip.to_string()).collect::<Vec<_>>().join(" ");
         let genesis = [
             "cargo run --release --bin sui --",
             "genesis",
@@ -91,12 +81,7 @@ impl ProtocolCommands<SuiBenchmarkType> for SuiProtocol {
         ]
         .join(" ");
 
-        [
-            &format!("mkdir -p {working_dir}"),
-            "source $HOME/.cargo/env",
-            &genesis,
-        ]
-        .join(" && ")
+        [&format!("mkdir -p {working_dir}"), "source $HOME/.cargo/env", &genesis].join(" && ")
     }
 
     fn monitor_command<I>(&self, _instances: I) -> Vec<(Instance, String)>
@@ -130,8 +115,7 @@ impl ProtocolCommands<SuiBenchmarkType> for SuiProtocol {
             .into_iter()
             .enumerate()
             .map(|(i, (instance, network_address))| {
-                let validator_config =
-                    sui_config::validator_config_file(network_address.clone(), i);
+                let validator_config = sui_config::validator_config_file(network_address.clone(), i);
                 let config_path: PathBuf = working_dir.join(validator_config);
 
                 let run = [
@@ -158,15 +142,9 @@ impl ProtocolCommands<SuiBenchmarkType> for SuiProtocol {
     where
         I: IntoIterator<Item = Instance>,
     {
-        let genesis_path: PathBuf = [&self.working_dir, &sui_config::SUI_GENESIS_FILENAME.into()]
-            .iter()
-            .collect();
-        let keystore_path: PathBuf = [
-            &self.working_dir,
-            &sui_config::SUI_BENCHMARK_GENESIS_GAS_KEYSTORE_FILENAME.into(),
-        ]
-        .iter()
-        .collect();
+        let genesis_path: PathBuf = [&self.working_dir, &sui_config::SUI_GENESIS_FILENAME.into()].iter().collect();
+        let keystore_path: PathBuf =
+            [&self.working_dir, &sui_config::SUI_BENCHMARK_GENESIS_GAS_KEYSTORE_FILENAME.into()].iter().collect();
 
         let committee_size = parameters.nodes;
         let clients: Vec<_> = instances.into_iter().collect();
@@ -193,9 +171,7 @@ impl ProtocolCommands<SuiBenchmarkType> for SuiProtocol {
                     &format!("--primary-gas-owner-id {gas_address}"),
                     "bench",
                     &format!("--in-flight-ratio 30 --num-workers 24 --target-qps {load_share}"),
-                    &format!(
-                        "--shared-counter {shared_counter} --transfer-object {transfer_objects}"
-                    ),
+                    &format!("--shared-counter {shared_counter} --transfer-object {transfer_objects}"),
                     "--shared-counter-hotness-factor 50",
                     &format!("--client-metric-host 0.0.0.0 --client-metric-port {metrics_port}"),
                 ]
@@ -213,18 +189,12 @@ impl SuiProtocol {
 
     /// Make a new instance of the Sui protocol commands generator.
     pub fn new(settings: &Settings) -> Self {
-        Self {
-            working_dir: [&settings.working_dir, &sui_config::SUI_CONFIG_DIR.into()]
-                .iter()
-                .collect(),
-        }
+        Self { working_dir: [&settings.working_dir, &sui_config::SUI_CONFIG_DIR.into()].iter().collect() }
     }
 
     /// Creates the network addresses in multi address format for the instances. It returns the
     /// Instance and the corresponding address.
-    pub fn resolve_network_addresses(
-        instances: impl IntoIterator<Item = Instance>,
-    ) -> Vec<(Instance, Multiaddr)> {
+    pub fn resolve_network_addresses(instances: impl IntoIterator<Item = Instance>) -> Vec<(Instance, Multiaddr)> {
         let instances: Vec<Instance> = instances.into_iter().collect();
         let ips: Vec<_> = instances.iter().map(|x| x.main_ip.to_string()).collect();
         let genesis_config = GenesisConfig::new_for_benchmarks(&ips);
@@ -241,19 +211,16 @@ impl SuiProtocol {
 
 impl ProtocolMetrics for SuiProtocol {
     const BENCHMARK_DURATION: &'static str = "benchmark_duration";
-    const TOTAL_TRANSACTIONS: &'static str = "latency_s_count";
     const LATENCY_BUCKETS: &'static str = "latency_s";
-    const LATENCY_SUM: &'static str = "latency_s_sum";
     const LATENCY_SQUARED_SUM: &'static str = "latency_squared_s";
+    const LATENCY_SUM: &'static str = "latency_s_sum";
+    const TOTAL_TRANSACTIONS: &'static str = "latency_s_count";
 
     fn nodes_metrics_path<I>(&self, instances: I) -> Vec<(Instance, String)>
     where
         I: IntoIterator<Item = Instance>,
     {
-        let (ips, instances): (Vec<_>, Vec<_>) = instances
-            .into_iter()
-            .map(|x| (x.main_ip.to_string(), x))
-            .unzip();
+        let (ips, instances): (Vec<_>, Vec<_>) = instances.into_iter().map(|x| (x.main_ip.to_string(), x)).unzip();
 
         GenesisConfig::new_for_benchmarks(&ips)
             .validator_config_info
@@ -261,12 +228,8 @@ impl ProtocolMetrics for SuiProtocol {
             .iter()
             .zip(instances)
             .map(|(config, instance)| {
-                let path = format!(
-                    "{}:{}{}",
-                    instance.main_ip,
-                    config.metrics_address.port(),
-                    mysten_metrics::METRICS_ROUTE
-                );
+                let path =
+                    format!("{}:{}{}", instance.main_ip, config.metrics_address.port(), mysten_metrics::METRICS_ROUTE);
                 (instance, path)
             })
             .collect()
@@ -279,12 +242,8 @@ impl ProtocolMetrics for SuiProtocol {
         instances
             .into_iter()
             .map(|instance| {
-                let path = format!(
-                    "{}:{}{}",
-                    instance.main_ip,
-                    Self::CLIENT_METRICS_PORT,
-                    mysten_metrics::METRICS_ROUTE
-                );
+                let path =
+                    format!("{}:{}{}", instance.main_ip, Self::CLIENT_METRICS_PORT, mysten_metrics::METRICS_ROUTE);
                 (instance, path)
             })
             .collect()

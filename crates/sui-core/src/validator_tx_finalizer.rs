@@ -1,27 +1,32 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
-use crate::authority_aggregator::AuthorityAggregator;
-use crate::authority_client::AuthorityAPI;
-use crate::execution_cache::TransactionCacheRead;
+#[cfg(any(msim, test))]
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::{cmp::min, ops::Add, sync::Arc, time::Duration};
+
 use arc_swap::ArcSwap;
 use mysten_metrics::LATENCY_SEC_BUCKETS;
 use prometheus::{
-    register_histogram_with_registry, register_int_counter_with_registry, Histogram, IntCounter,
+    register_histogram_with_registry,
+    register_int_counter_with_registry,
+    Histogram,
+    IntCounter,
     Registry,
 };
-use std::cmp::min;
-use std::ops::Add;
-#[cfg(any(msim, test))]
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
-use std::sync::Arc;
-use std::time::Duration;
-use sui_types::base_types::{AuthorityName, TransactionDigest};
-use sui_types::transaction::VerifiedSignedTransaction;
-use tokio::select;
-use tokio::time::Instant;
+use sui_types::{
+    base_types::{AuthorityName, TransactionDigest},
+    transaction::VerifiedSignedTransaction,
+};
+use tokio::{select, time::Instant};
 use tracing::{debug, error, trace};
+
+use crate::{
+    authority::authority_per_epoch_store::AuthorityPerEpochStore,
+    authority_aggregator::AuthorityAggregator,
+    authority_client::AuthorityAPI,
+    execution_cache::TransactionCacheRead,
+};
 
 struct ValidatorTxFinalizerMetrics {
     num_finalization_attempts: IntCounter,
@@ -73,8 +78,7 @@ impl ValidatorTxFinalizerMetrics {
     fn start_finalization(&self) -> Instant {
         self.num_finalization_attempts.inc();
         #[cfg(any(msim, test))]
-        self.num_finalization_attempts_for_testing
-            .fetch_add(1, Relaxed);
+        self.num_finalization_attempts_for_testing.fetch_add(1, Relaxed);
         Instant::now()
     }
 
@@ -83,8 +87,7 @@ impl ValidatorTxFinalizerMetrics {
         self.num_successful_finalizations.inc();
         self.finalization_latency.observe(latency.as_secs_f64());
         #[cfg(test)]
-        self.num_successful_finalizations_for_testing
-            .fetch_add(1, Relaxed);
+        self.num_successful_finalizations_for_testing.fetch_add(1, Relaxed);
     }
 }
 
@@ -137,11 +140,7 @@ pub struct ValidatorTxFinalizer<C: Clone> {
 }
 
 impl<C: Clone> ValidatorTxFinalizer<C> {
-    pub fn new(
-        agg: Arc<ArcSwap<AuthorityAggregator<C>>>,
-        name: AuthorityName,
-        registry: &Registry,
-    ) -> Self {
+    pub fn new(agg: Arc<ArcSwap<AuthorityAggregator<C>>>, name: AuthorityName, registry: &Registry) -> Self {
         Self {
             agg,
             name,
@@ -151,10 +150,7 @@ impl<C: Clone> ValidatorTxFinalizer<C> {
     }
 
     #[cfg(test)]
-    pub(crate) fn new_for_testing(
-        agg: Arc<ArcSwap<AuthorityAggregator<C>>>,
-        name: AuthorityName,
-    ) -> Self {
+    pub(crate) fn new_for_testing(agg: Arc<ArcSwap<AuthorityAggregator<C>>>, name: AuthorityName) -> Self {
         Self::new(agg, name, &Registry::new())
     }
 
@@ -165,9 +161,7 @@ impl<C: Clone> ValidatorTxFinalizer<C> {
 
     #[cfg(any(msim, test))]
     pub fn num_finalization_attempts_for_testing(&self) -> u64 {
-        self.metrics
-            .num_finalization_attempts_for_testing
-            .load(Relaxed)
+        self.metrics.num_finalization_attempts_for_testing.load(Relaxed)
     }
 }
 
@@ -183,10 +177,7 @@ where
     ) {
         let tx_digest = *tx.digest();
         trace!(?tx_digest, "Tracking signed transaction");
-        match self
-            .delay_and_finalize_tx(cache_read, epoch_store, tx)
-            .await
-        {
+        match self.delay_and_finalize_tx(cache_read, epoch_store, tx).await {
             Ok(did_run) => {
                 if did_run {
                     debug!(?tx_digest, "Transaction finalized");
@@ -220,26 +211,16 @@ where
         }
 
         if epoch_store.is_pending_consensus_certificate(&tx_digest) {
-            trace!(
-                ?tx_digest,
-                "Transaction has been submitted to consensus, no need to help drive finality"
-            );
+            trace!(?tx_digest, "Transaction has been submitted to consensus, no need to help drive finality");
             return Ok(false);
         }
 
-        self.metrics
-            .validator_tx_finalizer_attempt_delay
-            .observe(tx_finalization_delay.as_secs_f64());
+        self.metrics.validator_tx_finalizer_attempt_delay.observe(tx_finalization_delay.as_secs_f64());
         let start_time = self.metrics.start_finalization();
-        debug!(
-            ?tx_digest,
-            "Invoking authority aggregator to finalize transaction"
-        );
+        debug!(?tx_digest, "Invoking authority aggregator to finalize transaction");
         tokio::time::timeout(
             self.config.tx_finalization_timeout,
-            self.agg
-                .load()
-                .execute_transaction_block(tx.into_unsigned().inner(), None),
+            self.agg.load().execute_transaction_block(tx.into_unsigned().inner(), None),
         )
         .await??;
         self.metrics.finalization_succeeded(start_time);
@@ -263,56 +244,70 @@ where
         };
         // TODO: As an optimization, we could also limit the number of validators that would do this.
         let extra_delay = position as u64 * self.config.validator_delay_increments_sec;
-        let delay = self
-            .config
-            .tx_finalization_delay
-            .add(Duration::from_secs(extra_delay));
+        let delay = self.config.tx_finalization_delay.add(Duration::from_secs(extra_delay));
         Some(min(delay, self.config.validator_max_delay))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::authority::test_authority_builder::TestAuthorityBuilder;
-    use crate::authority::AuthorityState;
-    use crate::authority_aggregator::{AuthorityAggregator, AuthorityAggregatorBuilder};
-    use crate::authority_client::AuthorityAPI;
-    use crate::validator_tx_finalizer::ValidatorTxFinalizer;
+    use std::{
+        cmp::min,
+        collections::BTreeMap,
+        iter,
+        net::SocketAddr,
+        num::NonZeroUsize,
+        sync::{
+            atomic::{AtomicBool, Ordering::Relaxed},
+            Arc,
+        },
+    };
+
     use arc_swap::ArcSwap;
     use async_trait::async_trait;
-    use std::cmp::min;
-    use std::collections::BTreeMap;
-    use std::iter;
-    use std::net::SocketAddr;
-    use std::num::NonZeroUsize;
-    use std::sync::atomic::AtomicBool;
-    use std::sync::atomic::Ordering::Relaxed;
-    use std::sync::Arc;
     use sui_macros::sim_test;
     use sui_swarm_config::network_config_builder::ConfigBuilder;
     use sui_test_transaction_builder::TestTransactionBuilder;
-    use sui_types::base_types::{AuthorityName, ObjectID, SuiAddress, TransactionDigest};
-    use sui_types::committee::{CommitteeTrait, StakeUnit};
-    use sui_types::crypto::{get_account_key_pair, AccountKeyPair};
-    use sui_types::effects::{TransactionEffectsAPI, TransactionEvents};
-    use sui_types::error::SuiError;
-    use sui_types::executable_transaction::VerifiedExecutableTransaction;
-    use sui_types::messages_checkpoint::{
-        CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2,
+    use sui_types::{
+        base_types::{AuthorityName, ObjectID, SuiAddress, TransactionDigest},
+        committee::{CommitteeTrait, StakeUnit},
+        crypto::{get_account_key_pair, AccountKeyPair},
+        effects::{TransactionEffectsAPI, TransactionEvents},
+        error::SuiError,
+        executable_transaction::VerifiedExecutableTransaction,
+        messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
+        messages_grpc::{
+            HandleCertificateRequestV3,
+            HandleCertificateResponseV2,
+            HandleCertificateResponseV3,
+            HandleSoftBundleCertificatesRequestV3,
+            HandleSoftBundleCertificatesResponseV3,
+            HandleTransactionResponse,
+            ObjectInfoRequest,
+            ObjectInfoResponse,
+            SystemStateRequest,
+            TransactionInfoRequest,
+            TransactionInfoResponse,
+        },
+        object::Object,
+        sui_system_state::SuiSystemState,
+        transaction::{
+            CertifiedTransaction,
+            SignedTransaction,
+            Transaction,
+            VerifiedCertificate,
+            VerifiedSignedTransaction,
+            VerifiedTransaction,
+        },
+        utils::to_sender_signed_transaction,
     };
-    use sui_types::messages_grpc::{
-        HandleCertificateRequestV3, HandleCertificateResponseV2, HandleCertificateResponseV3,
-        HandleSoftBundleCertificatesRequestV3, HandleSoftBundleCertificatesResponseV3,
-        HandleTransactionResponse, ObjectInfoRequest, ObjectInfoResponse, SystemStateRequest,
-        TransactionInfoRequest, TransactionInfoResponse,
+
+    use crate::{
+        authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
+        authority_aggregator::{AuthorityAggregator, AuthorityAggregatorBuilder},
+        authority_client::AuthorityAPI,
+        validator_tx_finalizer::ValidatorTxFinalizer,
     };
-    use sui_types::object::Object;
-    use sui_types::sui_system_state::SuiSystemState;
-    use sui_types::transaction::{
-        CertifiedTransaction, SignedTransaction, Transaction, VerifiedCertificate,
-        VerifiedSignedTransaction, VerifiedTransaction,
-    };
-    use sui_types::utils::to_sender_signed_transaction;
 
     #[derive(Clone)]
     struct MockAuthorityClient {
@@ -331,12 +326,7 @@ mod tests {
                 return Err(SuiError::TimeoutError);
             }
             let epoch_store = self.authority.epoch_store_for_testing();
-            self.authority
-                .handle_transaction(
-                    &epoch_store,
-                    VerifiedTransaction::new_unchecked(transaction),
-                )
-                .await
+            self.authority.handle_transaction(&epoch_store, VerifiedTransaction::new_unchecked(transaction)).await
         }
 
         async fn handle_certificate_v2(
@@ -348,9 +338,9 @@ mod tests {
             let (effects, _) = self
                 .authority
                 .try_execute_immediately(
-                    &VerifiedExecutableTransaction::new_from_certificate(
-                        VerifiedCertificate::new_unchecked(certificate),
-                    ),
+                    &VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(
+                        certificate,
+                    )),
                     None,
                     &epoch_store,
                 )
@@ -359,15 +349,8 @@ mod tests {
                 None => TransactionEvents::default(),
                 Some(digest) => self.authority.get_transaction_events(digest)?,
             };
-            let signed_effects = self
-                .authority
-                .sign_effects(effects, &epoch_store)?
-                .into_inner();
-            Ok(HandleCertificateResponseV2 {
-                signed_effects,
-                events,
-                fastpath_input_objects: vec![],
-            })
+            let signed_effects = self.authority.sign_effects(effects, &epoch_store)?.into_inner();
+            Ok(HandleCertificateResponseV2 { signed_effects, events, fastpath_input_objects: vec![] })
         }
 
         async fn handle_certificate_v3(
@@ -386,10 +369,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn handle_object_info_request(
-            &self,
-            _request: ObjectInfoRequest,
-        ) -> Result<ObjectInfoResponse, SuiError> {
+        async fn handle_object_info_request(&self, _request: ObjectInfoRequest) -> Result<ObjectInfoResponse, SuiError> {
             unimplemented!()
         }
 
@@ -400,24 +380,15 @@ mod tests {
             unimplemented!()
         }
 
-        async fn handle_checkpoint(
-            &self,
-            _request: CheckpointRequest,
-        ) -> Result<CheckpointResponse, SuiError> {
+        async fn handle_checkpoint(&self, _request: CheckpointRequest) -> Result<CheckpointResponse, SuiError> {
             unimplemented!()
         }
 
-        async fn handle_checkpoint_v2(
-            &self,
-            _request: CheckpointRequestV2,
-        ) -> Result<CheckpointResponseV2, SuiError> {
+        async fn handle_checkpoint_v2(&self, _request: CheckpointRequestV2) -> Result<CheckpointResponseV2, SuiError> {
             unimplemented!()
         }
 
-        async fn handle_system_state_object(
-            &self,
-            _request: SystemStateRequest,
-        ) -> Result<SuiSystemState, SuiError> {
+        async fn handle_system_state_object(&self, _request: SystemStateRequest) -> Result<SuiSystemState, SuiError> {
             unimplemented!()
         }
     }
@@ -436,22 +407,12 @@ mod tests {
         let epoch_store = states[0].epoch_store_for_testing();
         let metrics = finalizer1.metrics.clone();
         let handle = tokio::spawn(async move {
-            finalizer1
-                .track_signed_tx(cache_read, &epoch_store, signed_tx)
-                .await;
+            finalizer1.track_signed_tx(cache_read, &epoch_store, signed_tx).await;
         });
         handle.await.unwrap();
         check_quorum_execution(&auth_agg.load(), &clients, &tx_digest, true);
-        assert_eq!(
-            metrics.num_finalization_attempts_for_testing.load(Relaxed),
-            1
-        );
-        assert_eq!(
-            metrics
-                .num_successful_finalizations_for_testing
-                .load(Relaxed),
-            1
-        );
+        assert_eq!(metrics.num_finalization_attempts_for_testing.load(Relaxed), 1);
+        assert_eq!(metrics.num_successful_finalizations_for_testing.load(Relaxed), 1);
     }
 
     #[tokio::test]
@@ -468,23 +429,14 @@ mod tests {
 
         let metrics = finalizer1.metrics.clone();
         let handle = tokio::spawn(async move {
-            let _ = epoch_store
-                .within_alive_epoch(finalizer1.track_signed_tx(cache_read, &epoch_store, signed_tx))
-                .await;
+            let _ =
+                epoch_store.within_alive_epoch(finalizer1.track_signed_tx(cache_read, &epoch_store, signed_tx)).await;
         });
         states[0].reconfigure_for_testing().await;
         handle.await.unwrap();
         check_quorum_execution(&auth_agg.load(), &clients, &tx_digest, false);
-        assert_eq!(
-            metrics.num_finalization_attempts_for_testing.load(Relaxed),
-            0
-        );
-        assert_eq!(
-            metrics
-                .num_successful_finalizations_for_testing
-                .load(Relaxed),
-            0
-        );
+        assert_eq!(metrics.num_finalization_attempts_for_testing.load(Relaxed), 0);
+        assert_eq!(metrics.num_successful_finalizations_for_testing.load(Relaxed), 0);
     }
 
     #[tokio::test]
@@ -498,11 +450,7 @@ mod tests {
         new_committee.epoch = 100;
         new_auth_agg.committee = Arc::new(new_committee);
         auth_agg.store(Arc::new(new_auth_agg));
-        assert_eq!(
-            finalizer1.auth_agg().load().committee.epoch,
-            100,
-            "AuthorityAggregator not updated"
-        );
+        assert_eq!(finalizer1.auth_agg().load().committee.epoch, 100, "AuthorityAggregator not updated");
     }
 
     #[tokio::test]
@@ -521,27 +469,13 @@ mod tests {
         let metrics = finalizer1.metrics.clone();
         let signed_tx_clone = signed_tx.clone();
         let handle = tokio::spawn(async move {
-            finalizer1
-                .track_signed_tx(cache_read, &epoch_store, signed_tx_clone)
-                .await;
+            finalizer1.track_signed_tx(cache_read, &epoch_store, signed_tx_clone).await;
         });
-        auth_agg
-            .load()
-            .execute_transaction_block(&signed_tx.into_inner().into_unsigned(), None)
-            .await
-            .unwrap();
+        auth_agg.load().execute_transaction_block(&signed_tx.into_inner().into_unsigned(), None).await.unwrap();
         handle.await.unwrap();
         check_quorum_execution(&auth_agg.load(), &clients, &tx_digest, true);
-        assert_eq!(
-            metrics.num_finalization_attempts_for_testing.load(Relaxed),
-            0
-        );
-        assert_eq!(
-            metrics
-                .num_successful_finalizations_for_testing
-                .load(Relaxed),
-            0
-        );
+        assert_eq!(metrics.num_finalization_attempts_for_testing.load(Relaxed), 0);
+        assert_eq!(metrics.num_successful_finalizations_for_testing.load(Relaxed), 0);
     }
 
     #[tokio::test]
@@ -563,34 +497,22 @@ mod tests {
         let metrics = finalizer1.metrics.clone();
         let signed_tx_clone = signed_tx.clone();
         let handle = tokio::spawn(async move {
-            finalizer1
-                .track_signed_tx(cache_read, &epoch_store, signed_tx_clone)
-                .await;
+            finalizer1.track_signed_tx(cache_read, &epoch_store, signed_tx_clone).await;
         });
         handle.await.unwrap();
         check_quorum_execution(&auth_agg.load(), &clients, &tx_digest, false);
-        assert_eq!(
-            metrics.num_finalization_attempts_for_testing.load(Relaxed),
-            1
-        );
-        assert_eq!(
-            metrics
-                .num_successful_finalizations_for_testing
-                .load(Relaxed),
-            0
-        );
+        assert_eq!(metrics.num_finalization_attempts_for_testing.load(Relaxed), 1);
+        assert_eq!(metrics.num_successful_finalizations_for_testing.load(Relaxed), 0);
     }
 
     #[tokio::test]
     async fn test_validator_tx_finalizer_determine_finalization_delay() {
         const COMMITTEE_SIZE: usize = 15;
-        let network_config = ConfigBuilder::new_with_temp_dir()
-            .committee_size(NonZeroUsize::new(COMMITTEE_SIZE).unwrap())
-            .build();
-        let (auth_agg, _) = AuthorityAggregatorBuilder::from_network_config(&network_config)
-            .build_network_clients();
+        let network_config =
+            ConfigBuilder::new_with_temp_dir().committee_size(NonZeroUsize::new(COMMITTEE_SIZE).unwrap()).build();
+        let (auth_agg, _) = AuthorityAggregatorBuilder::from_network_config(&network_config).build_network_clients();
         let auth_agg = Arc::new(auth_agg);
-        let finalizers = (0..COMMITTEE_SIZE)
+        let finalizers = (0 .. COMMITTEE_SIZE)
             .map(|idx| {
                 ValidatorTxFinalizer::new_for_testing(
                     Arc::new(ArcSwap::new(auth_agg.clone())),
@@ -599,15 +521,12 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let config = finalizers[0].config.clone();
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             let tx_digest = TransactionDigest::random();
             let mut delays: Vec<_> = finalizers
                 .iter()
                 .map(|finalizer| {
-                    finalizer
-                        .determine_finalization_delay(&tx_digest)
-                        .map(|delay| delay.as_secs())
-                        .unwrap()
+                    finalizer.determine_finalization_delay(&tx_digest).map(|delay| delay.as_secs()).unwrap()
                 })
                 .collect();
             delays.sort();
@@ -616,8 +535,7 @@ mod tests {
                     *delay,
                     min(
                         config.validator_max_delay.as_secs(),
-                        config.tx_finalization_delay.as_secs()
-                            + idx as u64 * config.validator_delay_increments_sec
+                        config.tx_finalization_delay.as_secs() + idx as u64 * config.validator_delay_increments_sec
                     )
                 );
             }
@@ -636,32 +554,22 @@ mod tests {
             .with_objects(iter::once(gas_object))
             .build();
         let mut authority_states = vec![];
-        for idx in 0..4 {
-            let state = TestAuthorityBuilder::new()
-                .with_network_config(&network_config, idx)
-                .build()
-                .await;
+        for idx in 0 .. 4 {
+            let state = TestAuthorityBuilder::new().with_network_config(&network_config, idx).build().await;
             authority_states.push(state);
         }
         let clients: BTreeMap<_, _> = authority_states
             .iter()
             .map(|state| {
-                (
-                    state.name,
-                    MockAuthorityClient {
-                        authority: state.clone(),
-                        inject_fault: Arc::new(AtomicBool::new(false)),
-                    },
-                )
+                (state.name, MockAuthorityClient {
+                    authority: state.clone(),
+                    inject_fault: Arc::new(AtomicBool::new(false)),
+                })
             })
             .collect();
-        let auth_agg = AuthorityAggregatorBuilder::from_network_config(&network_config)
-            .build_custom_clients(clients.clone());
-        (
-            authority_states,
-            Arc::new(ArcSwap::new(Arc::new(auth_agg))),
-            clients,
-        )
+        let auth_agg =
+            AuthorityAggregatorBuilder::from_network_config(&network_config).build_custom_clients(clients.clone());
+        (authority_states, Arc::new(ArcSwap::new(Arc::new(auth_agg))), clients)
     }
 
     async fn create_tx(
@@ -671,25 +579,13 @@ mod tests {
         keypair: &AccountKeyPair,
         gas_object_id: ObjectID,
     ) -> VerifiedSignedTransaction {
-        let gas_object_ref = state
-            .get_object(&gas_object_id)
-            .await
-            .unwrap()
-            .compute_object_reference();
-        let tx_data = TestTransactionBuilder::new(
-            sender,
-            gas_object_ref,
-            state.reference_gas_price_for_testing().unwrap(),
-        )
-        .transfer_oct(None, sender)
-        .build();
+        let gas_object_ref = state.get_object(&gas_object_id).await.unwrap().compute_object_reference();
+        let tx_data =
+            TestTransactionBuilder::new(sender, gas_object_ref, state.reference_gas_price_for_testing().unwrap())
+                .transfer_oct(None, sender)
+                .build();
         let tx = to_sender_signed_transaction(tx_data, keypair);
-        let response = clients
-            .get(&state.name)
-            .unwrap()
-            .handle_transaction(tx.clone(), None)
-            .await
-            .unwrap();
+        let response = clients.get(&state.name).unwrap().handle_transaction(tx.clone(), None).await.unwrap();
         VerifiedSignedTransaction::new_unchecked(SignedTransaction::new_from_data_and_sig(
             tx.into_data(),
             response.status.into_signed_for_testing(),
@@ -706,10 +602,7 @@ mod tests {
         let executed_weight: StakeUnit = clients
             .iter()
             .filter_map(|(name, client)| {
-                client
-                    .authority
-                    .is_tx_already_executed(tx_digest)
-                    .then_some(auth_agg.committee.weight(name))
+                client.authority.is_tx_already_executed(tx_digest).then_some(auth_agg.committee.weight(name))
             })
             .sum();
         assert_eq!(executed_weight >= quorum, expected);

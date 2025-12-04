@@ -1,12 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use mysten_metrics::histogram::Histogram as MystenHistogram;
-use prometheus::{
-    register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge,
-    Registry,
-};
 use std::sync::Arc;
+
+use mysten_metrics::histogram::Histogram as MystenHistogram;
+use prometheus::{register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge, Registry};
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
 use tap::Pipe;
 
@@ -36,9 +34,7 @@ impl Metrics {
 
     pub fn set_highest_verified_checkpoint(&self, sequence_number: CheckpointSequenceNumber) {
         if let Some(inner) = &self.0 {
-            inner
-                .highest_verified_checkpoint
-                .set(sequence_number as i64);
+            inner.highest_verified_checkpoint.set(sequence_number as i64);
         }
     }
 
@@ -50,10 +46,7 @@ impl Metrics {
 
     pub fn checkpoint_summary_age_metrics(&self) -> Option<(&Histogram, &MystenHistogram)> {
         if let Some(inner) = &self.0 {
-            return Some((
-                &inner.checkpoint_summary_age,
-                &inner.checkpoint_summary_age_ms,
-            ));
+            return Some((&inner.checkpoint_summary_age, &inner.checkpoint_summary_age_ms));
         }
         None
     }

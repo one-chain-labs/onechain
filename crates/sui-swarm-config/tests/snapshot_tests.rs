@@ -16,28 +16,34 @@
 // 1. Run `cargo insta test --review` under `./sui-config`.
 // 2. Review, accept or reject changes.
 
+use std::num::NonZeroUsize;
+
 use fastcrypto::traits::KeyPair;
 use insta::assert_yaml_snapshot;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-use std::num::NonZeroUsize;
-use sui_config::genesis::{GenesisCeremonyParameters, TokenDistributionScheduleBuilder};
-use sui_config::node::{DEFAULT_COMMISSION_RATE, DEFAULT_VALIDATOR_GAS_PRICE};
-use sui_genesis_builder::validator_info::ValidatorInfo;
-use sui_genesis_builder::Builder;
-use sui_swarm_config::genesis_config::GenesisConfig;
-use sui_types::base_types::SuiAddress;
-use sui_types::crypto::{
-    generate_proof_of_possession, get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair,
-    NetworkKeyPair, SuiKeyPair,
+use rand::{rngs::StdRng, SeedableRng};
+use sui_config::{
+    genesis::{GenesisCeremonyParameters, TokenDistributionScheduleBuilder},
+    node::{DEFAULT_COMMISSION_RATE, DEFAULT_VALIDATOR_GAS_PRICE},
 };
-use sui_types::multiaddr::Multiaddr;
+use sui_genesis_builder::{validator_info::ValidatorInfo, Builder};
+use sui_swarm_config::genesis_config::GenesisConfig;
+use sui_types::{
+    base_types::SuiAddress,
+    crypto::{
+        generate_proof_of_possession,
+        get_key_pair_from_rng,
+        AccountKeyPair,
+        AuthorityKeyPair,
+        NetworkKeyPair,
+        SuiKeyPair,
+    },
+    multiaddr::Multiaddr,
+};
 
 #[test]
 #[cfg_attr(msim, ignore)]
 fn genesis_config_snapshot_matches() {
-    let ed_kp1: SuiKeyPair =
-        SuiKeyPair::Ed25519(get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1);
+    let ed_kp1: SuiKeyPair = SuiKeyPair::Ed25519(get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1);
     let fake_addr: SuiAddress = (&ed_kp1.public()).into();
 
     let mut genesis_config = GenesisConfig::for_local_testing();
@@ -51,9 +57,7 @@ fn genesis_config_snapshot_matches() {
 #[test]
 fn populated_genesis_snapshot_matches() {
     let genesis_config = GenesisConfig::for_local_testing();
-    let (_account_keys, allocations) = genesis_config
-        .generate_accounts(StdRng::from_seed([0; 32]))
-        .unwrap();
+    let (_account_keys, allocations) = genesis_config.generate_accounts(StdRng::from_seed([0; 32])).unwrap();
     let mut rng = StdRng::from_seed([0; 32]);
     let key: AuthorityKeyPair = get_key_pair_from_rng(&mut rng).1;
     let worker_key: NetworkKeyPair = get_key_pair_from_rng(&mut rng).1;
@@ -90,16 +94,11 @@ fn populated_genesis_snapshot_matches() {
     let genesis = Builder::new()
         .with_token_distribution_schedule(token_distribution_schedule)
         .add_validator(validator, pop)
-        .with_parameters(GenesisCeremonyParameters {
-            chain_start_timestamp_ms: 10,
-            ..GenesisCeremonyParameters::new()
-        })
+        .with_parameters(GenesisCeremonyParameters { chain_start_timestamp_ms: 10, ..GenesisCeremonyParameters::new() })
         .add_validator_signature(&key)
         .build();
     assert_yaml_snapshot!(genesis.sui_system_wrapper_object());
-    assert_yaml_snapshot!(genesis
-        .sui_system_object()
-        .into_genesis_version_for_tooling());
+    assert_yaml_snapshot!(genesis.sui_system_object().into_genesis_version_for_tooling());
     assert_yaml_snapshot!(genesis.clock());
     // Serialized `genesis` is not static and cannot be snapshot tested.
 }
@@ -107,17 +106,18 @@ fn populated_genesis_snapshot_matches() {
 #[test]
 #[cfg_attr(msim, ignore)]
 fn network_config_snapshot_matches() {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use std::path::PathBuf;
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        path::PathBuf,
+    };
+
     use sui_swarm_config::network_config_builder::ConfigBuilder;
 
     let temp_dir = tempfile::tempdir().unwrap();
     let committee_size = 7;
     let rng = StdRng::from_seed([0; 32]);
-    let mut network_config = ConfigBuilder::new(temp_dir)
-        .committee_size(NonZeroUsize::new(committee_size).unwrap())
-        .rng(rng)
-        .build();
+    let mut network_config =
+        ConfigBuilder::new(temp_dir).committee_size(NonZeroUsize::new(committee_size).unwrap()).rng(rng).build();
     // TODO: Inject static temp path and port numbers, instead of clearing them.
     for validator_config in &mut network_config.validator_configs {
         validator_config.db_path = PathBuf::from("/tmp/foo/");

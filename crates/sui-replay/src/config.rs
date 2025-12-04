@@ -3,11 +3,12 @@
 
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
-use crate::types::ReplayEngineError;
 use http::Uri;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tracing::info;
+
+use crate::types::ReplayEngineError;
 
 pub const DEFAULT_CONFIG_PATH: &str = "~/.sui-replay/network-config.yaml";
 
@@ -38,11 +39,9 @@ impl ReplayableNetworkConfigSet {
     pub fn load_config(path: String) -> Result<Self, ReplayEngineError> {
         let path = shellexpand::tilde(&path).to_string();
         let path = PathBuf::from_str(&path).unwrap();
-        ReplayableNetworkConfigSet::from_file(path.clone()).map_err(|err| {
-            ReplayEngineError::UnableToOpenYamlFile {
-                path: path.as_os_str().to_string_lossy().to_string(),
-                err: err.to_string(),
-            }
+        ReplayableNetworkConfigSet::from_file(path.clone()).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
+            path: path.as_os_str().to_string_lossy().to_string(),
+            err: err.to_string(),
         })
     }
 
@@ -50,27 +49,23 @@ impl ReplayableNetworkConfigSet {
         let path = override_path.unwrap_or_else(|| DEFAULT_CONFIG_PATH.to_string());
         let path = shellexpand::tilde(&path).to_string();
         let path = PathBuf::from_str(&path).unwrap();
-        self.to_file(path.clone())
-            .map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
-                path: path.as_os_str().to_string_lossy().to_string(),
-                err: err.to_string(),
-            })?;
+        self.to_file(path.clone()).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
+            path: path.as_os_str().to_string_lossy().to_string(),
+            err: err.to_string(),
+        })?;
         Ok(path)
     }
 
     pub fn from_file(path: PathBuf) -> Result<Self, ReplayEngineError> {
-        let file =
-            File::open(path.clone()).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
-                path: path.as_os_str().to_string_lossy().to_string(),
-                err: err.to_string(),
-            })?;
+        let file = File::open(path.clone()).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
+            path: path.as_os_str().to_string_lossy().to_string(),
+            err: err.to_string(),
+        })?;
         let reader = BufReader::new(file);
         let mut config: ReplayableNetworkConfigSet =
-            serde_yaml::from_reader(reader).map_err(|err| {
-                ReplayEngineError::UnableToOpenYamlFile {
-                    path: path.as_os_str().to_string_lossy().to_string(),
-                    err: err.to_string(),
-                }
+            serde_yaml::from_reader(reader).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
+                path: path.as_os_str().to_string_lossy().to_string(),
+                err: err.to_string(),
             })?;
         config.path = Some(path);
         Ok(config)
@@ -79,16 +74,13 @@ impl ReplayableNetworkConfigSet {
     pub fn to_file(&self, path: PathBuf) -> Result<(), ReplayEngineError> {
         let prefix = path.parent().unwrap();
         std::fs::create_dir_all(prefix).unwrap();
-        let file =
-            File::create(path.clone()).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
-                path: path.as_os_str().to_string_lossy().to_string(),
-                err: err.to_string(),
-            })?;
-        serde_yaml::to_writer(file, self).map_err(|err| {
-            ReplayEngineError::UnableToWriteYamlFile {
-                path: path.as_os_str().to_string_lossy().to_string(),
-                err: err.to_string(),
-            }
+        let file = File::create(path.clone()).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
+            path: path.as_os_str().to_string_lossy().to_string(),
+            err: err.to_string(),
+        })?;
+        serde_yaml::to_writer(file, self).map_err(|err| ReplayEngineError::UnableToWriteYamlFile {
+            path: path.as_os_str().to_string_lossy().to_string(),
+            err: err.to_string(),
         })?;
         Ok(())
     }
@@ -125,10 +117,7 @@ impl Default for ReplayableNetworkConfigSet {
                 .to_string(),
         };
 
-        Self {
-            path: None,
-            base_network_configs: vec![testnet, devnet, mainnet],
-        }
+        Self { path: None, base_network_configs: vec![testnet, devnet, mainnet] }
     }
 }
 
@@ -138,10 +127,7 @@ pub fn default_full_node_address() -> String {
 }
 
 pub fn url_from_str(s: &str) -> Result<Uri, ReplayEngineError> {
-    Uri::from_str(s).map_err(|e| ReplayEngineError::InvalidUrl {
-        err: e.to_string(),
-        url: s.to_string(),
-    })
+    Uri::from_str(s).map_err(|e| ReplayEngineError::InvalidUrl { err: e.to_string(), url: s.to_string() })
 }
 
 /// If rpc_url is provided, use it. Otherwise, load the network config from the config file.
@@ -154,9 +140,8 @@ pub fn get_rpc_url(
         return Ok(url);
     }
 
-    let config_path = config_path
-        .map(|p| p.to_str().unwrap().to_string())
-        .unwrap_or_else(|| DEFAULT_CONFIG_PATH.to_string());
+    let config_path =
+        config_path.map(|p| p.to_str().unwrap().to_string()).unwrap_or_else(|| DEFAULT_CONFIG_PATH.to_string());
     let chain = chain.unwrap_or_else(|| "mainnet".to_string());
     info!(
         "RPC URL not provided. Loading network config for {:?} from config file {:?}. \
@@ -165,10 +150,7 @@ pub fn get_rpc_url(
     );
     let url = ReplayableNetworkConfigSet::load_config(config_path)?
         .get_base_config(&chain)
-        .ok_or(anyhow::anyhow!(format!(
-            "Unable to find network config for {:?}",
-            chain
-        )))?
+        .ok_or(anyhow::anyhow!(format!("Unable to find network config for {:?}", chain)))?
         .public_full_node
         .clone();
     Ok(url)

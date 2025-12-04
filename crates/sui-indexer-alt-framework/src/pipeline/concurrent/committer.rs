@@ -10,13 +10,12 @@ use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
+use super::{BatchedRows, Handler};
 use crate::{
     metrics::{CheckpointLagMetricReporter, IndexerMetrics},
     pipeline::{Break, CommitterConfig, WatermarkPart},
     task::TrySpawnStreamExt,
 };
-
-use super::{BatchedRows, Handler};
 
 /// If the committer needs to retry a commit, it will wait this long initially.
 const INITIAL_RETRY_INTERVAL: Duration = Duration::from_millis(100);
@@ -52,150 +51,125 @@ pub(super) fn committer<H: Handler + 'static>(
         );
 
         match ReceiverStream::new(rx)
-            .try_for_each_spawned(
-                config.write_concurrency,
-                |BatchedRows { values, watermark }| {
-                    let values = Arc::new(values);
-                    let tx = tx.clone();
+            .try_for_each_spawned(config.write_concurrency, |BatchedRows { values, watermark }| {
+                let values = Arc::new(values);
+                let tx = tx.clone();
+                let db = db.clone();
+                let metrics = metrics.clone();
+                let cancel = cancel.clone();
+                let checkpoint_lag_reporter = checkpoint_lag_reporter.clone();
+
+                // Repeatedly try to get a connection to the DB and write the batch. Use an
+                // exponential backoff in case the failure is due to contention over the DB
+                // connection pool.
+                let backoff = ExponentialBackoff {
+                    initial_interval: INITIAL_RETRY_INTERVAL,
+                    current_interval: INITIAL_RETRY_INTERVAL,
+                    max_interval: MAX_RETRY_INTERVAL,
+                    max_elapsed_time: None,
+                    ..Default::default()
+                };
+
+                let highest_checkpoint = watermark.iter().map(|w| w.checkpoint()).max();
+                let highest_checkpoint_timestamp = watermark.iter().map(|w| w.timestamp_ms()).max();
+
+                use backoff::Error as BE;
+                let commit = move || {
+                    let values = values.clone();
                     let db = db.clone();
                     let metrics = metrics.clone();
-                    let cancel = cancel.clone();
                     let checkpoint_lag_reporter = checkpoint_lag_reporter.clone();
+                    async move {
+                        if values.is_empty() {
+                            return Ok(());
+                        }
 
-                    // Repeatedly try to get a connection to the DB and write the batch. Use an
-                    // exponential backoff in case the failure is due to contention over the DB
-                    // connection pool.
-                    let backoff = ExponentialBackoff {
-                        initial_interval: INITIAL_RETRY_INTERVAL,
-                        current_interval: INITIAL_RETRY_INTERVAL,
-                        max_interval: MAX_RETRY_INTERVAL,
-                        max_elapsed_time: None,
-                        ..Default::default()
-                    };
+                        metrics.total_committer_batches_attempted.with_label_values(&[H::NAME]).inc();
 
-                    let highest_checkpoint = watermark.iter().map(|w| w.checkpoint()).max();
-                    let highest_checkpoint_timestamp =
-                        watermark.iter().map(|w| w.timestamp_ms()).max();
+                        let guard = metrics.committer_commit_latency.with_label_values(&[H::NAME]).start_timer();
 
-                    use backoff::Error as BE;
-                    let commit = move || {
-                        let values = values.clone();
-                        let db = db.clone();
-                        let metrics = metrics.clone();
-                        let checkpoint_lag_reporter = checkpoint_lag_reporter.clone();
-                        async move {
-                            if values.is_empty() {
-                                return Ok(());
-                            }
+                        let mut conn = db.connect().await.map_err(|e| {
+                            warn!(pipeline = H::NAME, "Committed failed to get connection for DB");
 
-                            metrics
-                                .total_committer_batches_attempted
-                                .with_label_values(&[H::NAME])
-                                .inc();
+                            metrics.total_committer_batches_failed.with_label_values(&[H::NAME]).inc();
 
-                            let guard = metrics
-                                .committer_commit_latency
-                                .with_label_values(&[H::NAME])
-                                .start_timer();
+                            BE::transient(Break::Err(e))
+                        })?;
 
-                            let mut conn = db.connect().await.map_err(|e| {
-                                warn!(
+                        let affected = H::commit(values.as_slice(), &mut conn).await;
+                        let elapsed = guard.stop_and_record();
+
+                        match affected {
+                            Ok(affected) => {
+                                debug!(
                                     pipeline = H::NAME,
-                                    "Committed failed to get connection for DB"
+                                    elapsed_ms = elapsed * 1000.0,
+                                    affected,
+                                    committed = values.len(),
+                                    "Wrote batch",
                                 );
 
+                                checkpoint_lag_reporter.report_lag(
+                                    // unwrap is safe because we would have returned if values is empty.
+                                    highest_checkpoint.unwrap(),
+                                    highest_checkpoint_timestamp.unwrap(),
+                                );
+
+                                metrics.total_committer_batches_succeeded.with_label_values(&[H::NAME]).inc();
+
                                 metrics
-                                    .total_committer_batches_failed
+                                    .total_committer_rows_committed
                                     .with_label_values(&[H::NAME])
-                                    .inc();
+                                    .inc_by(values.len() as u64);
 
-                                BE::transient(Break::Err(e))
-                            })?;
+                                metrics
+                                    .total_committer_rows_affected
+                                    .with_label_values(&[H::NAME])
+                                    .inc_by(affected as u64);
 
-                            let affected = H::commit(values.as_slice(), &mut conn).await;
-                            let elapsed = guard.stop_and_record();
+                                metrics.committer_tx_rows.with_label_values(&[H::NAME]).observe(affected as f64);
 
-                            match affected {
-                                Ok(affected) => {
-                                    debug!(
-                                        pipeline = H::NAME,
-                                        elapsed_ms = elapsed * 1000.0,
-                                        affected,
-                                        committed = values.len(),
-                                        "Wrote batch",
-                                    );
+                                Ok(())
+                            }
 
-                                    checkpoint_lag_reporter.report_lag(
-                                        // unwrap is safe because we would have returned if values is empty.
-                                        highest_checkpoint.unwrap(),
-                                        highest_checkpoint_timestamp.unwrap(),
-                                    );
+                            Err(e) => {
+                                warn!(
+                                    pipeline = H::NAME,
+                                    elapsed_ms = elapsed * 1000.0,
+                                    committed = values.len(),
+                                    "Error writing batch: {e}",
+                                );
 
-                                    metrics
-                                        .total_committer_batches_succeeded
-                                        .with_label_values(&[H::NAME])
-                                        .inc();
+                                metrics.total_committer_batches_failed.with_label_values(&[H::NAME]).inc();
 
-                                    metrics
-                                        .total_committer_rows_committed
-                                        .with_label_values(&[H::NAME])
-                                        .inc_by(values.len() as u64);
-
-                                    metrics
-                                        .total_committer_rows_affected
-                                        .with_label_values(&[H::NAME])
-                                        .inc_by(affected as u64);
-
-                                    metrics
-                                        .committer_tx_rows
-                                        .with_label_values(&[H::NAME])
-                                        .observe(affected as f64);
-
-                                    Ok(())
-                                }
-
-                                Err(e) => {
-                                    warn!(
-                                        pipeline = H::NAME,
-                                        elapsed_ms = elapsed * 1000.0,
-                                        committed = values.len(),
-                                        "Error writing batch: {e}",
-                                    );
-
-                                    metrics
-                                        .total_committer_batches_failed
-                                        .with_label_values(&[H::NAME])
-                                        .inc();
-
-                                    Err(BE::transient(Break::Err(e)))
-                                }
+                                Err(BE::transient(Break::Err(e)))
                             }
                         }
-                    };
+                    }
+                };
 
-                    async move {
-                        tokio::select! {
-                            _ = cancel.cancelled() => {
-                                return Err(Break::Cancel);
-                            }
-
-                            // Double check that the commit actually went through, (this backoff should
-                            // not produce any permanent errors, but if it does, we need to shutdown
-                            // the pipeline).
-                            commit = backoff::future::retry(backoff, commit) => {
-                                let () = commit?;
-                            }
-                        };
-
-                        if !skip_watermark && tx.send(watermark).await.is_err() {
-                            info!(pipeline = H::NAME, "Watermark closed channel");
+                async move {
+                    tokio::select! {
+                        _ = cancel.cancelled() => {
                             return Err(Break::Cancel);
                         }
 
-                        Ok(())
+                        // Double check that the commit actually went through, (this backoff should
+                        // not produce any permanent errors, but if it does, we need to shutdown
+                        // the pipeline).
+                        commit = backoff::future::retry(backoff, commit) => {
+                            let () = commit?;
+                        }
+                    };
+
+                    if !skip_watermark && tx.send(watermark).await.is_err() {
+                        info!(pipeline = H::NAME, "Watermark closed channel");
+                        return Err(Break::Cancel);
                     }
-                },
-            )
+
+                    Ok(())
+                }
+            })
             .await
         {
             Ok(()) => {

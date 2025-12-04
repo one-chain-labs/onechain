@@ -1,25 +1,31 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::base_types::VersionNumber;
-use crate::committee::EpochId;
-use crate::inner_temporary_store::WrittenObjects;
-use crate::storage::{
-    get_module, get_module_by_id, load_package_object_from_object_store, PackageObject,
-};
-use crate::transaction::TransactionDataAPI;
-use crate::transaction::{InputObjectKind, InputObjects, ObjectReadResult, Transaction};
-use crate::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber},
-    error::{SuiError, SuiResult},
-    object::{Object, Owner},
-    storage::{BackingPackageStore, ChildObjectResolver, ObjectStore, ParentSync},
-};
+use std::collections::BTreeMap;
+
 use better_any::{Tid, TidAble};
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
-use std::collections::BTreeMap;
+
+use crate::{
+    base_types::{ObjectID, ObjectRef, SequenceNumber, VersionNumber},
+    committee::EpochId,
+    error::{SuiError, SuiResult},
+    inner_temporary_store::WrittenObjects,
+    object::{Object, Owner},
+    storage::{
+        get_module,
+        get_module_by_id,
+        load_package_object_from_object_store,
+        BackingPackageStore,
+        ChildObjectResolver,
+        ObjectStore,
+        PackageObject,
+        ParentSync,
+    },
+    transaction::{InputObjectKind, InputObjects, ObjectReadResult, Transaction, TransactionDataAPI},
+};
 
 // TODO: We should use AuthorityTemporaryStore instead.
 // Keeping this functionally identical to AuthorityTemporaryStore is a pain.
@@ -55,8 +61,7 @@ impl ChildObjectResolver for InMemoryStorage {
         }
         if child_object.version() > child_version_upper_bound {
             return Err(SuiError::UnsupportedFeatureError {
-                error: "TODO InMemoryStorage::read_child_object does not yet support bounded reads"
-                    .to_owned(),
+                error: "TODO InMemoryStorage::read_child_object does not yet support bounded reads".to_owned(),
             });
         }
         Ok(Some(child_object))
@@ -112,16 +117,7 @@ impl ObjectStore for InMemoryStorage {
     }
 
     fn get_object_by_key(&self, object_id: &ObjectID, version: VersionNumber) -> Option<Object> {
-        self.persistent
-            .get(object_id)
-            .and_then(|obj| {
-                if obj.version() == version {
-                    Some(obj)
-                } else {
-                    None
-                }
-            })
-            .cloned()
+        self.persistent.get(object_id).and_then(|obj| if obj.version() == version { Some(obj) } else { None }).cloned()
     }
 }
 
@@ -131,16 +127,7 @@ impl ObjectStore for &mut InMemoryStorage {
     }
 
     fn get_object_by_key(&self, object_id: &ObjectID, version: VersionNumber) -> Option<Object> {
-        self.persistent
-            .get(object_id)
-            .and_then(|obj| {
-                if obj.version() == version {
-                    Some(obj)
-                } else {
-                    None
-                }
-            })
-            .cloned()
+        self.persistent.get(object_id).and_then(|obj| if obj.version() == version { Some(obj) } else { None }).cloned()
     }
 }
 
@@ -168,9 +155,7 @@ impl InMemoryStorage {
             let obj: Object = match kind {
                 InputObjectKind::MovePackage(id)
                 | InputObjectKind::ImmOrOwnedMoveObject((id, _, _))
-                | InputObjectKind::SharedMoveObject { id, .. } => {
-                    self.get_object(&id).unwrap().clone()
-                }
+                | InputObjectKind::SharedMoveObject { id, .. } => self.get_object(&id).unwrap().clone(),
             };
 
             input_objects.push(ObjectReadResult::new(kind, obj.into()));

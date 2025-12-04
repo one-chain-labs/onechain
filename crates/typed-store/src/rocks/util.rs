@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use rocksdb::{CompactionDecision, MergeOperands};
 use std::cmp::Ordering;
+
+use rocksdb::{CompactionDecision, MergeOperands};
 
 /// custom rocksdb merge operator used for storing objects with reference counts
 /// important: reference count field must be 64-bit integer and must be last in struct declaration
@@ -58,21 +59,9 @@ mod tests {
     #[test]
     fn deserialize_ref_count_value_test() {
         assert_eq!(deserialize_ref_count_value(&[]), (None, 0));
-        assert_eq!(
-            deserialize_ref_count_value(b"\x01\0\0\0\0\0\0\0"),
-            (None, 1)
-        );
-        assert_eq!(
-            deserialize_ref_count_value(b"\xff\xff\xff\xff\xff\xff\xff\xff"),
-            (None, -1)
-        );
-        assert_eq!(
-            deserialize_ref_count_value(b"\xfe\xff\xff\xff\xff\xff\xff\xff"),
-            (None, -2)
-        );
-        assert_eq!(
-            deserialize_ref_count_value(b"test\x04\0\0\0\0\0\0\0"),
-            (Some(b"test".as_ref()), 4)
-        );
+        assert_eq!(deserialize_ref_count_value(b"\x01\0\0\0\0\0\0\0"), (None, 1));
+        assert_eq!(deserialize_ref_count_value(b"\xff\xff\xff\xff\xff\xff\xff\xff"), (None, -1));
+        assert_eq!(deserialize_ref_count_value(b"\xfe\xff\xff\xff\xff\xff\xff\xff"), (None, -2));
+        assert_eq!(deserialize_ref_count_value(b"test\x04\0\0\0\0\0\0\0"), (Some(b"test".as_ref()), 4));
     }
 }

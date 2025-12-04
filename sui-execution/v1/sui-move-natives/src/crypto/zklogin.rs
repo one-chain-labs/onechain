@@ -1,20 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use fastcrypto::error::FastCryptoError;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::gas_algebra::InternalGas;
-use move_core_types::u256::U256;
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas, u256::U256, vm_status::StatusCode};
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
-use move_vm_types::natives::function::PartialVMError;
-use move_vm_types::values::VectorRef;
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+    loaded_data::runtime_types::Type,
+    natives::function::{NativeResult, PartialVMError},
+    pop_arg,
+    values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 pub const INVALID_INPUT: u64 = 0;
 
@@ -45,21 +45,16 @@ pub fn check_zklogin_id_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
-    let check_zklogin_id_cost_params = &context
-        .extensions()
-        .get::<NativesCostTable>()
-        .check_zklogin_id_cost_params
-        .clone();
+    let check_zklogin_id_cost_params =
+        &context.extensions().get::<NativesCostTable>().check_zklogin_id_cost_params.clone();
 
     // Charge the base cost for this operation
     native_charge_gas_early_exit!(
         context,
         check_zklogin_id_cost_params
             .check_zklogin_id_cost_base
-            .ok_or_else(
-                || PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Gas cost for check_zklogin_id not available".to_string())
-            )?
+            .ok_or_else(|| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("Gas cost for check_zklogin_id not available".to_string()))?
     );
 
     debug_assert!(ty_args.is_empty());
@@ -93,10 +88,7 @@ pub fn check_zklogin_id_internal(
     );
 
     match result {
-        Ok(result) => Ok(NativeResult::ok(
-            context.gas_used(),
-            smallvec![Value::bool(result)],
-        )),
+        Ok(result) => Ok(NativeResult::ok(context.gas_used(), smallvec![Value::bool(result)])),
         Err(_) => Ok(NativeResult::err(context.gas_used(), INVALID_INPUT)),
     }
 }
@@ -147,21 +139,16 @@ pub fn check_zklogin_issuer_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
-    let check_zklogin_issuer_cost_params = &context
-        .extensions()
-        .get::<NativesCostTable>()
-        .check_zklogin_issuer_cost_params
-        .clone();
+    let check_zklogin_issuer_cost_params =
+        &context.extensions().get::<NativesCostTable>().check_zklogin_issuer_cost_params.clone();
 
     // Charge the base cost for this operation
     native_charge_gas_early_exit!(
         context,
         check_zklogin_issuer_cost_params
             .check_zklogin_issuer_cost_base
-            .ok_or_else(
-                || PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Gas cost for check_zklogin_issuer not available".to_string())
-            )?
+            .ok_or_else(|| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("Gas cost for check_zklogin_issuer not available".to_string()))?
     );
 
     debug_assert!(ty_args.is_empty());
@@ -179,19 +166,12 @@ pub fn check_zklogin_issuer_internal(
     let result = check_issuer_internal(&address, &address_seed, &issuer.as_bytes_ref());
 
     match result {
-        Ok(result) => Ok(NativeResult::ok(
-            context.gas_used(),
-            smallvec![Value::bool(result)],
-        )),
+        Ok(result) => Ok(NativeResult::ok(context.gas_used(), smallvec![Value::bool(result)])),
         Err(_) => Ok(NativeResult::err(context.gas_used(), INVALID_INPUT)),
     }
 }
 
-fn check_issuer_internal(
-    address: &AccountAddress,
-    address_seed: &U256,
-    issuer: &[u8],
-) -> Result<bool, FastCryptoError> {
+fn check_issuer_internal(address: &AccountAddress, address_seed: &U256, issuer: &[u8]) -> Result<bool, FastCryptoError> {
     match fastcrypto_zkp::bn254::zk_login_api::verify_zk_login_iss(
         &address.into_bytes(),
         &address_seed.to_string(),

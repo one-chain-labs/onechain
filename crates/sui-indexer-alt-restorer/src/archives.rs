@@ -4,11 +4,12 @@
 use std::num::NonZeroUsize;
 
 use prometheus::Registry;
-use tracing::info;
-
 use sui_archival::reader::{ArchiveReader, ArchiveReaderMetrics};
-use sui_config::node::ArchiveReaderConfig;
-use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
+use sui_config::{
+    node::ArchiveReaderConfig,
+    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
+};
+use tracing::info;
 
 use crate::Args;
 
@@ -41,13 +42,7 @@ impl ArchivalCheckpointInfo {
         archive_reader.sync_manifest_once().await?;
         let manifest = archive_reader.get_manifest().await?;
         let next_checkpoint_after_epoch = manifest.next_checkpoint_after_epoch(args.start_epoch);
-        info!(
-            epoch = args.start_epoch,
-            checkpoint = next_checkpoint_after_epoch,
-            "Next checkpoint after epoch",
-        );
-        Ok(Self {
-            next_checkpoint_after_epoch,
-        })
+        info!(epoch = args.start_epoch, checkpoint = next_checkpoint_after_epoch, "Next checkpoint after epoch",);
+        Ok(Self { next_checkpoint_after_epoch })
     }
 }

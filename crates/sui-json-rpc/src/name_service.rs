@@ -1,19 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::ident_str;
-use move_core_types::identifier::IdentStr;
-use move_core_types::language_storage::StructTag;
+use std::{fmt, marker::PhantomData, str::FromStr};
+
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::marker::PhantomData;
-use std::str::FromStr;
-use sui_types::base_types::{ObjectID, SuiAddress};
-use sui_types::collection_types::VecMap;
-use sui_types::dynamic_field::Field;
-use sui_types::id::{ID, UID};
-use sui_types::object::{MoveObject, Object};
-use sui_types::TypeTag;
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    collection_types::VecMap,
+    dynamic_field::Field,
+    id::{ID, UID},
+    object::{MoveObject, Object},
+    TypeTag,
+};
 
 const NAME_SERVICE_DOMAIN_MODULE: &IdentStr = ident_str!("domain");
 const NAME_SERVICE_DOMAIN_STRUCT: &IdentStr = ident_str!("Domain");
@@ -73,9 +72,7 @@ impl Domain {
     /// SAFETY: This is a safe operation because we only allow a
     /// domain's label vector size to be >= 2 (see `Domain::from_str`)
     pub fn parent(&self) -> Domain {
-        Domain {
-            labels: self.labels[0..(self.labels.len() - 1)].to_vec(),
-        }
+        Domain { labels: self.labels[0 .. (self.labels.len() - 1)].to_vec() }
     }
 
     pub fn is_subdomain(&self) -> bool {
@@ -120,16 +117,8 @@ pub struct NameServiceConfig {
 }
 
 impl NameServiceConfig {
-    pub fn new(
-        package_address: SuiAddress,
-        registry_id: ObjectID,
-        reverse_registry_id: ObjectID,
-    ) -> Self {
-        Self {
-            package_address,
-            registry_id,
-            reverse_registry_id,
-        }
+    pub fn new(package_address: SuiAddress, registry_id: ObjectID, reverse_registry_id: ObjectID) -> Self {
+        Self { package_address, registry_id, reverse_registry_id }
     }
 
     pub fn record_field_id(&self, domain: &Domain) -> ObjectID {
@@ -145,20 +134,13 @@ impl NameServiceConfig {
     }
 
     pub fn reverse_record_field_id(&self, address: &[u8]) -> ObjectID {
-        sui_types::dynamic_field::derive_dynamic_field_id(
-            self.reverse_registry_id,
-            &TypeTag::Address,
-            address,
-        )
-        .unwrap()
+        sui_types::dynamic_field::derive_dynamic_field_id(self.reverse_registry_id, &TypeTag::Address, address).unwrap()
     }
 
     // Create a config based on the package and object ids published on mainnet
     pub fn mainnet() -> Self {
-        const MAINNET_NS_PACKAGE_ADDRESS: &str =
-            "0xd22b24490e0bae52676651b4f56660a5ff8022a2576e0089f79b3c88d44e08f0";
-        const MAINNET_NS_REGISTRY_ID: &str =
-            "0xe64cd9db9f829c6cc405d9790bd71567ae07259855f4fba6f02c84f52298c106";
+        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0xd22b24490e0bae52676651b4f56660a5ff8022a2576e0089f79b3c88d44e08f0";
+        const MAINNET_NS_REGISTRY_ID: &str = "0xe64cd9db9f829c6cc405d9790bd71567ae07259855f4fba6f02c84f52298c106";
         const MAINNET_NS_REVERSE_REGISTRY_ID: &str =
             "0x2fd099e17a292d2bc541df474f9fafa595653848cbabb2d7a4656ec786a1969f";
 
@@ -171,10 +153,8 @@ impl NameServiceConfig {
 
     // Create a config based on the package and object ids published on testnet
     pub fn testnet() -> Self {
-        const TESTNET_NS_PACKAGE_ADDRESS: &str =
-            "0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93";
-        const TESTNET_NS_REGISTRY_ID: &str =
-            "0xb120c0d55432630fce61f7854795a3463deb6e3b443cc4ae72e1282073ff56e4";
+        const TESTNET_NS_PACKAGE_ADDRESS: &str = "0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93";
+        const TESTNET_NS_REGISTRY_ID: &str = "0xb120c0d55432630fce61f7854795a3463deb6e3b443cc4ae72e1282073ff56e4";
         const TESTNET_NS_REVERSE_REGISTRY_ID: &str =
             "0xcee9dbb070db70936c3a374439a6adb16f3ba97eac5468d2e1e6fff6ed93e465";
 
@@ -200,20 +180,14 @@ impl FromStr for Domain {
         const MAX_DOMAIN_LENGTH: usize = 200;
 
         if s.len() > MAX_DOMAIN_LENGTH {
-            return Err(NameServiceError::ExceedsMaxLength(
-                s.len(),
-                MAX_DOMAIN_LENGTH,
-            ));
+            return Err(NameServiceError::ExceedsMaxLength(s.len(), MAX_DOMAIN_LENGTH));
         }
         let separator = separator(s)?;
 
         let formatted_string = convert_from_new_format(s, &separator)?;
 
-        let labels = formatted_string
-            .split(separator)
-            .rev()
-            .map(validate_label)
-            .collect::<Result<Vec<_>, Self::Err>>()?;
+        let labels =
+            formatted_string.split(separator).rev().map(validate_label).collect::<Result<Vec<_>, Self::Err>>()?;
 
         // A valid domain in our system has at least a TLD and an SLD (len == 2).
         if labels.len() < 2 {
@@ -282,18 +256,14 @@ pub fn validate_label(label: &str) -> Result<&str, NameServiceError> {
     let bytes = label.as_bytes();
     let len = bytes.len();
 
-    if !(MIN_LABEL_LENGTH..=MAX_LABEL_LENGTH).contains(&len) {
-        return Err(NameServiceError::InvalidLength(
-            len,
-            MIN_LABEL_LENGTH,
-            MAX_LABEL_LENGTH,
-        ));
+    if !(MIN_LABEL_LENGTH ..= MAX_LABEL_LENGTH).contains(&len) {
+        return Err(NameServiceError::InvalidLength(len, MIN_LABEL_LENGTH, MAX_LABEL_LENGTH));
     }
 
     for (i, character) in bytes.iter().enumerate() {
         let is_valid_character = match character {
-            b'a'..=b'z' => true,
-            b'0'..=b'9' => true,
+            b'a' ..= b'z' => true,
+            b'0' ..= b'9' => true,
             b'-' if i != 0 && i != len - 1 => true,
             _ => false,
         };

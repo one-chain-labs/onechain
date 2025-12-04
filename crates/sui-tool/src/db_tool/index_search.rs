@@ -1,21 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
-use serde::{de::DeserializeOwned, Serialize};
-use std::{path::PathBuf, str::FromStr};
-use sui_types::digests::TransactionDigest;
-use typed_store::rocks::{DBMap, MetricConf};
-use typed_store::traits::Map;
+use std::{fmt::Debug, path::PathBuf, str::FromStr};
 
-use crate::get_db_entries;
+use anyhow::anyhow;
 use move_core_types::language_storage::ModuleId;
-use std::fmt::Debug;
+use serde::{de::DeserializeOwned, Serialize};
 use sui_core::jsonrpc_index::IndexStoreTables;
 use sui_types::{
     base_types::{ObjectID, SuiAddress, TxSequenceNumber},
-    Identifier, TypeTag,
+    digests::TransactionDigest,
+    Identifier,
+    TypeTag,
 };
+use typed_store::{
+    rocks::{DBMap, MetricConf},
+    traits::Map,
+};
+
+use crate::get_db_entries;
 
 #[derive(Clone, Debug)]
 pub enum SearchRange<T: Serialize + Clone + Debug> {
@@ -45,40 +48,19 @@ pub fn search_index(
 ) -> Result<Vec<(String, String)>, anyhow::Error> {
     let start = start.as_str();
     println!("Opening db at {:?} ...", db_path);
-    let db_read_only_handle =
-        IndexStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default());
+    let db_read_only_handle = IndexStoreTables::get_read_only_handle(db_path, None, None, MetricConf::default());
     match table_name.as_str() {
         "transactions_from_addr" => {
-            get_db_entries!(
-                db_read_only_handle.transactions_from_addr,
-                from_addr_seq,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.transactions_from_addr, from_addr_seq, start, termination)
         }
         "transactions_to_addr" => {
-            get_db_entries!(
-                db_read_only_handle.transactions_to_addr,
-                from_addr_seq,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.transactions_to_addr, from_addr_seq, start, termination)
         }
         "transactions_by_input_object_id" => {
-            get_db_entries!(
-                db_read_only_handle.transactions_by_input_object_id,
-                from_id_seq,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.transactions_by_input_object_id, from_id_seq, start, termination)
         }
         "transactions_by_mutated_object_id" => {
-            get_db_entries!(
-                db_read_only_handle.transactions_by_mutated_object_id,
-                from_id_seq,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.transactions_by_mutated_object_id, from_id_seq, start, termination)
         }
         "transactions_by_move_function" => {
             get_db_entries!(
@@ -89,76 +71,31 @@ pub fn search_index(
             )
         }
         "transaction_order" => {
-            get_db_entries!(
-                db_read_only_handle.transaction_order,
-                u64::from_str,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.transaction_order, u64::from_str, start, termination)
         }
         "transactions_seq" => {
-            get_db_entries!(
-                db_read_only_handle.transactions_seq,
-                TransactionDigest::from_str,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.transactions_seq, TransactionDigest::from_str, start, termination)
         }
         "owner_index" => {
-            get_db_entries!(
-                db_read_only_handle.owner_index,
-                from_addr_oid,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.owner_index, from_addr_oid, start, termination)
         }
         "coin_index" => {
-            get_db_entries!(
-                db_read_only_handle.coin_index,
-                from_addr_str_oid,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.coin_index, from_addr_str_oid, start, termination)
         }
         "dynamic_field_index" => {
-            get_db_entries!(
-                db_read_only_handle.dynamic_field_index,
-                from_oid_oid,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.dynamic_field_index, from_oid_oid, start, termination)
         }
         "event_by_event_module" => {
-            get_db_entries!(
-                db_read_only_handle.event_by_event_module,
-                from_module_id_and_event_id,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.event_by_event_module, from_module_id_and_event_id, start, termination)
         }
         "event_by_move_module" => {
-            get_db_entries!(
-                db_read_only_handle.event_by_move_module,
-                from_module_id_and_event_id,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.event_by_move_module, from_module_id_and_event_id, start, termination)
         }
         "event_order" => {
-            get_db_entries!(
-                db_read_only_handle.event_order,
-                from_event_id,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.event_order, from_event_id, start, termination)
         }
         "event_by_sender" => {
-            get_db_entries!(
-                db_read_only_handle.event_by_sender,
-                from_address_and_event_id,
-                start,
-                termination
-            )
+            get_db_entries!(db_read_only_handle.event_by_sender, from_address_and_event_id, start, termination)
         }
         _ => Err(anyhow!("Invalid or unsupported table: {}", table_name)),
     }
@@ -171,10 +108,7 @@ macro_rules! get_db_entries {
         println!("Searching from key: {:?}", key);
         let termination = match $term {
             SearchRange::ExclusiveLastKey(last_key) => {
-                println!(
-                    "Retrieving all keys up to (but not including) key: {:?}",
-                    key
-                );
+                println!("Retrieving all keys up to (but not including) key: {:?}", key);
                 SearchRange::ExclusiveLastKey($key_converter(last_key.as_str())?)
             }
             SearchRange::Count(count) => {
@@ -197,19 +131,11 @@ where
     K: Serialize + serde::de::DeserializeOwned + Clone + Debug,
     V: serde::Serialize + DeserializeOwned + Clone + Debug,
 {
-    get_entries(db_map, start, termination).map(|entries| {
-        entries
-            .into_iter()
-            .map(|(k, v)| (format!("{:?}", k), format!("{:?}", v)))
-            .collect()
-    })
+    get_entries(db_map, start, termination)
+        .map(|entries| entries.into_iter().map(|(k, v)| (format!("{:?}", k), format!("{:?}", v))).collect())
 }
 
-fn get_entries<K, V>(
-    db_map: &DBMap<K, V>,
-    start: K,
-    termination: SearchRange<K>,
-) -> Result<Vec<(K, V)>, anyhow::Error>
+fn get_entries<K, V>(db_map: &DBMap<K, V>, start: K, termination: SearchRange<K>) -> Result<Vec<(K, V)>, anyhow::Error>
 where
     K: Serialize + serde::de::DeserializeOwned + Clone + std::fmt::Debug,
     V: serde::Serialize + DeserializeOwned + Clone,
@@ -267,16 +193,12 @@ fn from_id_seq(s: &str) -> Result<(ObjectID, TxSequenceNumber), anyhow::Error> {
     Ok((oid, sequence_number))
 }
 
-fn from_id_module_function_txseq(
-    s: &str,
-) -> Result<(ObjectID, String, String, TxSequenceNumber), anyhow::Error> {
+fn from_id_module_function_txseq(s: &str) -> Result<(ObjectID, String, String, TxSequenceNumber), anyhow::Error> {
     // Remove whitespaces
     let s = s.trim();
     let tokens = s.split(',').collect::<Vec<&str>>();
     if tokens.len() != 4 {
-        return Err(anyhow!(
-            "Invalid object id, module name, function name, TX sequence number quad"
-        ));
+        return Err(anyhow!("Invalid object id, module name, function name, TX sequence number quad"));
     }
     let pid = ObjectID::from_str(tokens[0].trim())?;
     let module: Identifier = Identifier::from_str(tokens[1].trim())?;
@@ -326,9 +248,7 @@ fn from_oid_oid(s: &str) -> Result<(ObjectID, ObjectID), anyhow::Error> {
     Ok((oid1, oid2))
 }
 
-fn from_module_id_and_event_id(
-    s: &str,
-) -> Result<(ModuleId, (TxSequenceNumber, usize)), anyhow::Error> {
+fn from_module_id_and_event_id(s: &str) -> Result<(ModuleId, (TxSequenceNumber, usize)), anyhow::Error> {
     // Example: "0x1::Event 1234 5"
     let tokens = s.split(' ').collect::<Vec<&str>>();
     if tokens.len() != 3 {
@@ -342,10 +262,7 @@ fn from_module_id_and_event_id(
     }
     let package = ObjectID::from_str(tokens[0].trim())?;
 
-    Ok((
-        ModuleId::new(package.into(), Identifier::from_str(tokens[1].trim())?),
-        (tx_seq, event_seq),
-    ))
+    Ok((ModuleId::new(package.into(), Identifier::from_str(tokens[1].trim())?), (tx_seq, event_seq)))
 }
 
 fn from_event_id(s: &str) -> Result<(TxSequenceNumber, usize), anyhow::Error> {
@@ -359,9 +276,7 @@ fn from_event_id(s: &str) -> Result<(TxSequenceNumber, usize), anyhow::Error> {
     Ok((tx_seq, event_seq))
 }
 
-fn from_address_and_event_id(
-    s: &str,
-) -> Result<(SuiAddress, (TxSequenceNumber, usize)), anyhow::Error> {
+fn from_address_and_event_id(s: &str) -> Result<(SuiAddress, (TxSequenceNumber, usize)), anyhow::Error> {
     // Example: "0x1 1234 5"
     let tokens = s.split(' ').collect::<Vec<&str>>();
     if tokens.len() != 3 {

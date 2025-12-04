@@ -14,9 +14,7 @@ macro_rules! deny_if_true {
     ($cond:expr, $msg:expr) => {
         if ($cond) {
             return Err(SuiError::UserInputError {
-                error: UserInputError::TransactionDenied {
-                    error: $msg.to_string(),
-                },
+                error: UserInputError::TransactionDenied { error: $msg.to_string() },
             });
         }
     };
@@ -45,10 +43,7 @@ pub fn check_transaction_for_signing(
     Ok(())
 }
 
-fn check_receiving_objects(
-    filter_config: &TransactionDenyConfig,
-    receiving_objects: &[ObjectRef],
-) -> SuiResult {
+fn check_receiving_objects(filter_config: &TransactionDenyConfig, receiving_objects: &[ObjectRef]) -> SuiResult {
     deny_if_true!(
         filter_config.receiving_objects_disabled() && !receiving_objects.is_empty(),
         "Receiving objects is temporarily disabled".to_string()
@@ -67,17 +62,11 @@ fn check_disabled_features(
     tx_data: &TransactionData,
     tx_signatures: &[GenericSignature],
 ) -> SuiResult {
-    deny_if_true!(
-        filter_config.user_transaction_disabled(),
-        "Transaction signing is temporarily disabled"
-    );
+    deny_if_true!(filter_config.user_transaction_disabled(), "Transaction signing is temporarily disabled");
 
     tx_signatures.iter().try_for_each(|s| {
         if let GenericSignature::ZkLoginAuthenticator(z) = s {
-            deny_if_true!(
-                filter_config.zklogin_sig_disabled(),
-                "zkLogin authenticator is temporarily disabled"
-            );
+            deny_if_true!(filter_config.zklogin_sig_disabled(), "zkLogin authenticator is temporarily disabled");
             deny_if_true!(
                 filter_config.zklogin_disabled_providers().contains(
                     &OIDCProvider::from_iss(z.get_iss())
@@ -115,19 +104,13 @@ fn check_signers(filter_config: &TransactionDenyConfig, tx_data: &TransactionDat
     for signer in tx_data.signers() {
         deny_if_true!(
             deny_map.contains(&signer),
-            format!(
-                "Access to account address {:?} is temporarily disabled",
-                signer
-            )
+            format!("Access to account address {:?} is temporarily disabled", signer)
         );
     }
     Ok(())
 }
 
-fn check_input_objects(
-    filter_config: &TransactionDenyConfig,
-    input_object_kinds: &[InputObjectKind],
-) -> SuiResult {
+fn check_input_objects(filter_config: &TransactionDenyConfig, input_object_kinds: &[InputObjectKind]) -> SuiResult {
     let deny_map = filter_config.get_object_deny_set();
     let shared_object_disabled = filter_config.shared_object_disabled();
     if deny_map.is_empty() && !shared_object_disabled {
@@ -136,10 +119,7 @@ fn check_input_objects(
     }
     for input_object_kind in input_object_kinds {
         let id = input_object_kind.object_id();
-        deny_if_true!(
-            deny_map.contains(&id),
-            format!("Access to input object {:?} is temporarily disabled", id)
-        );
+        deny_if_true!(deny_map.contains(&id), format!("Access to input object {:?} is temporarily disabled", id));
         deny_if_true!(
             shared_object_disabled && input_object_kind.is_shared_object(),
             "Usage of shared object in transactions is temporarily disabled"
@@ -173,25 +153,16 @@ fn check_package_dependencies(
                 dependencies.push(*package_id);
             }
             Command::MoveCall(call) => {
-                let package = package_store.get_package_object(&call.package)?.ok_or(
-                    SuiError::UserInputError {
-                        error: UserInputError::ObjectNotFound {
-                            object_id: call.package,
-                            version: None,
-                        },
-                    },
-                )?;
+                let package = package_store.get_package_object(&call.package)?.ok_or(SuiError::UserInputError {
+                    error: UserInputError::ObjectNotFound { object_id: call.package, version: None },
+                })?;
                 // linkage_table maps from the original package ID to the upgraded ID for each
                 // dependency. Here we only check the upgraded (i.e. the latest) ID against the
                 // deny list. This means that we only make sure that the denied package is not
                 // currently used as a dependency. This allows us to deny an older version of
                 // package but permits the use of a newer version.
                 dependencies.extend(
-                    package
-                        .move_package()
-                        .linkage_table()
-                        .values()
-                        .map(|upgrade_info| upgrade_info.upgraded_id),
+                    package.move_package().linkage_table().values().map(|upgrade_info| upgrade_info.upgraded_id),
                 );
                 dependencies.push(package.move_package().id());
             }
@@ -202,10 +173,7 @@ fn check_package_dependencies(
         }
     }
     for dep in dependencies {
-        deny_if_true!(
-            deny_map.contains(&dep),
-            format!("Access to package {:?} is temporarily disabled", dep)
-        );
+        deny_if_true!(deny_map.contains(&dep), format!("Access to package {:?} is temporarily disabled", dep));
     }
     Ok(())
 }

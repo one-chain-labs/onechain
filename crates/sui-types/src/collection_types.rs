@@ -3,8 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::base_types::ObjectID;
-use crate::id::UID;
+use crate::{base_types::ObjectID, id::UID};
 
 /// Rust version of the Move one::vec_map::VecMap type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -14,9 +13,7 @@ pub struct VecMap<K, V> {
 
 impl<K: PartialEq, V> VecMap<K, V> {
     pub fn get(&self, key: &K) -> Option<&V> {
-        self.contents
-            .iter()
-            .find_map(|entry| (&entry.key == key).then_some(&entry.value))
+        self.contents.iter().find_map(|entry| (&entry.key == key).then_some(&entry.value))
     }
 }
 
@@ -41,12 +38,7 @@ pub struct TableVec {
 
 impl Default for TableVec {
     fn default() -> Self {
-        TableVec {
-            contents: Table {
-                id: ObjectID::ZERO,
-                size: 0,
-            },
-        }
+        TableVec { contents: Table { id: ObjectID::ZERO, size: 0 } }
     }
 }
 
@@ -59,10 +51,7 @@ pub struct Table {
 
 impl Default for Table {
     fn default() -> Self {
-        Table {
-            id: ObjectID::ZERO,
-            size: 0,
-        }
+        Table { id: ObjectID::ZERO, size: 0 }
     }
 }
 
@@ -77,12 +66,7 @@ pub struct LinkedTable<K> {
 
 impl<K> Default for LinkedTable<K> {
     fn default() -> Self {
-        LinkedTable {
-            id: ObjectID::ZERO,
-            size: 0,
-            head: None,
-            tail: None,
-        }
+        LinkedTable { id: ObjectID::ZERO, size: 0, head: None, tail: None }
     }
 }
 
@@ -103,10 +87,7 @@ pub struct Bag {
 
 impl Default for Bag {
     fn default() -> Self {
-        Self {
-            id: UID::new(ObjectID::ZERO),
-            size: 0,
-        }
+        Self { id: UID::new(ObjectID::ZERO), size: 0 }
     }
 }
 
@@ -117,23 +98,14 @@ mod tests {
     #[test]
     fn test_vec_map() {
         let vec_map = VecMap {
-            contents: vec![
-                ("key1".to_string(), "value1".to_string()),
-                ("key2".to_string(), "value2".to_string()),
-            ]
-            .into_iter()
-            .map(|(key, value)| super::Entry { key, value })
-            .collect(),
+            contents: vec![("key1".to_string(), "value1".to_string()), ("key2".to_string(), "value2".to_string())]
+                .into_iter()
+                .map(|(key, value)| super::Entry { key, value })
+                .collect(),
         };
 
-        assert_eq!(
-            vec_map.get(&"key1".to_string()),
-            Some(&"value1".to_string())
-        );
-        assert_eq!(
-            vec_map.get(&"key2".to_string()),
-            Some(&"value2".to_string())
-        );
+        assert_eq!(vec_map.get(&"key1".to_string()), Some(&"value1".to_string()));
+        assert_eq!(vec_map.get(&"key2".to_string()), Some(&"value2".to_string()));
         assert_eq!(vec_map.get(&"key3".to_string()), None);
     }
 }

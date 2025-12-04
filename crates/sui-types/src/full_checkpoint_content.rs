@@ -3,17 +3,18 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::base_types::{ObjectID, ObjectRef};
-use crate::effects::{
-    IDOperation, ObjectIn, ObjectOut, TransactionEffects, TransactionEffectsAPI, TransactionEvents,
-};
-use crate::messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents};
-use crate::object::Object;
-use crate::storage::BackingPackageStore;
-use crate::transaction::Transaction;
 use itertools::Either;
 use serde::{Deserialize, Serialize};
 use tap::Pipe;
+
+use crate::{
+    base_types::{ObjectID, ObjectRef},
+    effects::{IDOperation, ObjectIn, ObjectOut, TransactionEffects, TransactionEffectsAPI, TransactionEvents},
+    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents},
+    object::Object,
+    storage::BackingPackageStore,
+    transaction::Transaction,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CheckpointData {

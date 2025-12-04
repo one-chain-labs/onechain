@@ -9,9 +9,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // Enable tracing, configured by environment variables.
-    let _guard = telemetry_subscribers::TelemetryConfig::new()
-        .with_env()
-        .init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
 
     start_rpc(args).await
 }

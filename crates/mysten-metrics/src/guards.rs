@@ -1,10 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use prometheus::IntGauge;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 /// Increments gauge when acquired, decrements when guard drops
 pub struct GaugeGuard<'a>(&'a IntGauge);
@@ -29,10 +32,7 @@ pub trait GaugeGuardFutureExt: Future + Sized {
 
 impl<F: Future> GaugeGuardFutureExt for F {
     fn count_in_flight(self, g: &IntGauge) -> GaugeGuardFuture<Self> {
-        GaugeGuardFuture {
-            f: Box::pin(self),
-            _guard: GaugeGuard::acquire(g),
-        }
+        GaugeGuardFuture { f: Box::pin(self), _guard: GaugeGuard::acquire(g) }
     }
 }
 

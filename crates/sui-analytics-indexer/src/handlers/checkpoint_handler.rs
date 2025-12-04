@@ -3,17 +3,16 @@
 
 use anyhow::Result;
 use fastcrypto::traits::EncodeDecodeBase64;
-use tokio::sync::Mutex;
-
 use sui_data_ingestion_core::Worker;
 use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::effects::TransactionEffectsAPI;
-use sui_types::messages_checkpoint::{CertifiedCheckpointSummary, CheckpointSummary};
-use sui_types::transaction::TransactionDataAPI;
+use sui_types::{
+    effects::TransactionEffectsAPI,
+    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointSummary},
+    transaction::TransactionDataAPI,
+};
+use tokio::sync::Mutex;
 
-use crate::handlers::AnalyticsHandler;
-use crate::tables::CheckpointEntry;
-use crate::FileType;
+use crate::{handlers::AnalyticsHandler, tables::CheckpointEntry, FileType};
 
 pub struct CheckpointHandler {
     state: Mutex<State>,
@@ -28,13 +27,8 @@ impl Worker for CheckpointHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions: checkpoint_transactions,
-            ..
-        } = checkpoint_data;
-        self.process_checkpoint_transactions(checkpoint_summary, checkpoint_transactions)
-            .await;
+        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
+        self.process_checkpoint_transactions(checkpoint_summary, checkpoint_transactions).await;
         Ok(())
     }
 }
@@ -59,12 +53,9 @@ impl AnalyticsHandler<CheckpointEntry> for CheckpointHandler {
 
 impl CheckpointHandler {
     pub fn new() -> Self {
-        CheckpointHandler {
-            state: Mutex::new(State {
-                checkpoints: vec![],
-            }),
-        }
+        CheckpointHandler { state: Mutex::new(State { checkpoints: vec![] }) }
     }
+
     async fn process_checkpoint_transactions(
         &self,
         summary: &CertifiedCheckpointSummary,

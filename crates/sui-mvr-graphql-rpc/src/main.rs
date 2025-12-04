@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use clap::Parser;
-use sui_mvr_graphql_rpc::commands::Command;
-use sui_mvr_graphql_rpc::config::{ServerConfig, ServiceConfig, Version};
-use sui_mvr_graphql_rpc::server::graphiql_server::start_graphiql_server;
-use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
+use sui_mvr_graphql_rpc::{
+    commands::Command,
+    config::{ServerConfig, ServiceConfig, Version},
+    server::graphiql_server::start_graphiql_server,
+};
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 // Define the `GIT_REVISION` const
 bin_version::git_revision!();
@@ -40,41 +40,26 @@ async fn main() {
             let toml = toml::to_string_pretty(&config).expect("Failed to serialize configuration");
 
             if let Some(path) = output {
-                fs::write(&path, toml).unwrap_or_else(|e| {
-                    panic!("Failed to write configuration to {}: {e}", path.display())
-                });
+                fs::write(&path, toml)
+                    .unwrap_or_else(|e| panic!("Failed to write configuration to {}: {e}", path.display()));
             } else {
                 println!("{}", toml);
             }
         }
 
-        Command::StartServer {
-            ide,
-            connection,
-            config,
-            tx_exec_full_node,
-        } => {
+        Command::StartServer { ide, connection, config, tx_exec_full_node } => {
             let service_config = service_config(config);
-            let _guard = telemetry_subscribers::TelemetryConfig::new()
-                .with_env()
-                .init();
+            let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
             let tracker = TaskTracker::new();
             let cancellation_token = CancellationToken::new();
 
             println!("Starting server...");
-            let server_config = ServerConfig {
-                connection,
-                service: service_config,
-                ide,
-                tx_exec_full_node,
-                ..ServerConfig::default()
-            };
+            let server_config =
+                ServerConfig { connection, service: service_config, ide, tx_exec_full_node, ..ServerConfig::default() };
 
             let cancellation_token_clone = cancellation_token.clone();
             let graphql_service_handle = tracker.spawn(async move {
-                start_graphiql_server(&server_config, &VERSION, cancellation_token_clone)
-                    .await
-                    .unwrap();
+                start_graphiql_server(&server_config, &VERSION, cancellation_token_clone).await.unwrap();
             });
 
             // Wait for shutdown signal

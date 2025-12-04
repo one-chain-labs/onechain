@@ -35,11 +35,7 @@ pub(crate) struct BaseCommitterOptions {
 
 impl Default for BaseCommitterOptions {
     fn default() -> Self {
-        Self {
-            wave_length: DEFAULT_WAVE_LENGTH,
-            leader_offset: 0,
-            round_offset: 0,
-        }
+        Self { wave_length: DEFAULT_WAVE_LENGTH, leader_offset: 0, round_offset: 0 }
     }
 }
 
@@ -67,12 +63,7 @@ impl BaseCommitter {
         options: BaseCommitterOptions,
     ) -> Self {
         assert!(options.wave_length >= MINIMUM_WAVE_LENGTH);
-        Self {
-            context,
-            leader_schedule,
-            dag_state,
-            options,
-        }
+        Self { context, leader_schedule, dag_state, options }
     }
 
     /// Apply the direct decision rule to the specified leader to see whether we
@@ -104,9 +95,7 @@ impl BaseCommitter {
             panic!("[{self}] More than one certified block for {leader}")
         }
 
-        leaders_with_enough_support
-            .pop()
-            .unwrap_or(LeaderStatus::Undecided(leader))
+        leaders_with_enough_support.pop().unwrap_or(LeaderStatus::Undecided(leader))
     }
 
     /// Apply the indirect decision rule to the specified leader to see whether
@@ -122,9 +111,7 @@ impl BaseCommitter {
         let anchors = leaders.filter(|x| leader_slot.round + self.options.wave_length <= x.round());
 
         for anchor in anchors {
-            tracing::trace!(
-                "[{self}] Trying to indirect-decide {leader_slot} using anchor {anchor}",
-            );
+            tracing::trace!("[{self}] Trying to indirect-decide {leader_slot} using anchor {anchor}",);
             match anchor {
                 LeaderStatus::Commit(anchor) => {
                     return self.decide_leader_from_anchor(anchor, leader_slot);
@@ -150,11 +137,7 @@ impl BaseCommitter {
             return None;
         }
 
-        Some(Slot::new(
-            round,
-            self.leader_schedule
-                .elect_leader(round, self.options.leader_offset),
-        ))
+        Some(Slot::new(round, self.leader_schedule.elect_leader(round, self.options.leader_offset)))
     }
 
     /// Return the leader round of the specified wave. The leader round is always
@@ -243,12 +226,16 @@ impl BaseCommitter {
                     if let Some(potential_vote) = potential_vote {
                         self.is_vote(&potential_vote, leader_block)
                     } else {
-                        assert!(reference.round <= gc_round, "Block not found in storage: {:?} , and is not below gc_round: {gc_round}", reference);
+                        assert!(
+                            reference.round <= gc_round,
+                            "Block not found in storage: {:?} , and is not below gc_round: {gc_round}",
+                            reference
+                        );
                         false
                     }
                 } else {
-                    let potential_vote = potential_vote
-                        .unwrap_or_else(|| panic!("Block not found in storage: {:?}", reference));
+                    let potential_vote =
+                        potential_vote.unwrap_or_else(|| panic!("Block not found in storage: {:?}", reference));
                     self.is_vote(&potential_vote, leader_block)
                 };
 
@@ -259,18 +246,14 @@ impl BaseCommitter {
             if is_vote {
                 tracing::trace!("[{self}] {reference} is a vote for {leader_block}");
                 if votes_stake_aggregator.add(reference.author, &self.context.committee) {
-                    tracing::trace!(
-                        "[{self}] {potential_certificate} is a certificate for leader {leader_block}"
-                    );
+                    tracing::trace!("[{self}] {potential_certificate} is a certificate for leader {leader_block}");
                     return true;
                 }
             } else {
                 tracing::trace!("[{self}] {reference} is not a vote for {leader_block}",);
             }
         }
-        tracing::trace!(
-            "[{self}] {potential_certificate} is not a certificate for leader {leader_block}"
-        );
+        tracing::trace!("[{self}] {potential_certificate} is not a certificate for leader {leader_block}");
         false
     }
 
@@ -280,27 +263,18 @@ impl BaseCommitter {
     fn decide_leader_from_anchor(&self, anchor: &VerifiedBlock, leader_slot: Slot) -> LeaderStatus {
         // Get the block(s) proposed by the leader. There could be more than one leader block
         // in the slot from a Byzantine authority.
-        let leader_blocks = self
-            .dag_state
-            .read()
-            .get_uncommitted_blocks_at_slot(leader_slot);
+        let leader_blocks = self.dag_state.read().get_uncommitted_blocks_at_slot(leader_slot);
 
         // TODO: Re-evaluate this check once we have a better way to handle/track byzantine authorities.
         if leader_blocks.len() > 1 {
-            tracing::warn!(
-                "Multiple blocks found for leader slot {leader_slot}: {:?}",
-                leader_blocks
-            );
+            tracing::warn!("Multiple blocks found for leader slot {leader_slot}: {:?}", leader_blocks);
         }
 
         // Get all blocks that could be potential certificates for the target leader. These blocks
         // are in the decision round of the target leader and are linked to the anchor.
         let wave = self.wave_number(leader_slot.round);
         let decision_round = self.decision_round(wave);
-        let potential_certificates = self
-            .dag_state
-            .read()
-            .ancestors_at_round(anchor, decision_round);
+        let potential_certificates = self.dag_state.read().ancestors_at_round(anchor, decision_round);
 
         // Use those potential certificates to determine which (if any) of the target leader
         // blocks can be committed.
@@ -329,23 +303,13 @@ impl BaseCommitter {
 
     /// Check whether the specified leader has 2f+1 non-votes (blames) to be directly skipped.
     fn enough_leader_blame(&self, voting_round: Round, leader: AuthorityIndex) -> bool {
-        let voting_blocks = self
-            .dag_state
-            .read()
-            .get_uncommitted_blocks_at_round(voting_round);
+        let voting_blocks = self.dag_state.read().get_uncommitted_blocks_at_round(voting_round);
 
         let mut blame_stake_aggregator = StakeAggregator::<QuorumThreshold>::new();
         for voting_block in &voting_blocks {
             let voter = voting_block.reference().author;
-            if voting_block
-                .ancestors()
-                .iter()
-                .all(|ancestor| ancestor.author != leader)
-            {
-                tracing::trace!(
-                    "[{self}] {voting_block} is a blame for leader {}",
-                    Slot::new(voting_round - 1, leader)
-                );
+            if voting_block.ancestors().iter().all(|ancestor| ancestor.author != leader) {
+                tracing::trace!("[{self}] {voting_block} is a blame for leader {}", Slot::new(voting_round - 1, leader));
                 if blame_stake_aggregator.add(voter, &self.context.committee) {
                     return true;
                 }
@@ -362,17 +326,11 @@ impl BaseCommitter {
     /// Check whether the specified leader has 2f+1 certificates to be directly
     /// committed.
     fn enough_leader_support(&self, decision_round: Round, leader_block: &VerifiedBlock) -> bool {
-        let decision_blocks = self
-            .dag_state
-            .read()
-            .get_uncommitted_blocks_at_round(decision_round);
+        let decision_blocks = self.dag_state.read().get_uncommitted_blocks_at_round(decision_round);
 
         // Quickly reject if there isn't enough stake to support the leader from
         // the potential certificates.
-        let total_stake: Stake = decision_blocks
-            .iter()
-            .map(|b| self.context.committee.stake(b.author()))
-            .sum();
+        let total_stake: Stake = decision_blocks.iter().map(|b| self.context.committee.stake(b.author())).sum();
         if !self.context.committee.reached_quorum(total_stake) {
             tracing::debug!(
                 "Not enough support for {leader_block}. Stake not enough: {total_stake} < {}",
@@ -397,11 +355,7 @@ impl BaseCommitter {
 
 impl Display for BaseCommitter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Committer-L{}-R{}",
-            self.options.leader_offset, self.options.round_offset
-        )
+        write!(f, "Committer-L{}-R{}", self.options.leader_offset, self.options.round_offset)
     }
 }
 
@@ -423,13 +377,7 @@ mod base_committer_builder {
 
     impl BaseCommitterBuilder {
         pub(crate) fn new(context: Arc<Context>, dag_state: Arc<RwLock<DagState>>) -> Self {
-            Self {
-                context,
-                dag_state,
-                wave_length: DEFAULT_WAVE_LENGTH,
-                leader_offset: 0,
-                round_offset: 0,
-            }
+            Self { context, dag_state, wave_length: DEFAULT_WAVE_LENGTH, leader_offset: 0, round_offset: 0 }
         }
 
         #[allow(unused)]
@@ -451,17 +399,10 @@ mod base_committer_builder {
         }
 
         pub(crate) fn build(self) -> BaseCommitter {
-            let options = BaseCommitterOptions {
-                wave_length: DEFAULT_WAVE_LENGTH,
-                leader_offset: 0,
-                round_offset: 0,
-            };
+            let options = BaseCommitterOptions { wave_length: DEFAULT_WAVE_LENGTH, leader_offset: 0, round_offset: 0 };
             BaseCommitter::new(
                 self.context.clone(),
-                Arc::new(LeaderSchedule::new(
-                    self.context,
-                    LeaderSwapTable::default(),
-                )),
+                Arc::new(LeaderSchedule::new(self.context, LeaderSwapTable::default())),
                 self.dag_state,
                 options,
             )

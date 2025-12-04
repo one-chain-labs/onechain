@@ -1,28 +1,37 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_graphql::connection::{Connection, CursorType, Edge};
-use async_graphql::*;
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    *,
+};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use move_core_types::language_storage::TypeTag;
-use sui_indexer::models::objects::StoredHistoryObject;
-use sui_indexer::types::OwnerType;
-use sui_types::dynamic_field::visitor::{Field, FieldVisitor};
-use sui_types::dynamic_field::{derive_dynamic_field_id, DynamicFieldInfo, DynamicFieldType};
-
-use super::available_range::AvailableRange;
-use super::cursor::{Page, Target};
-use super::object::{self, Object, ObjectKind};
-use super::type_filter::ExactTypeFilter;
-use super::{
-    base64::Base64, move_object::MoveObject, move_value::MoveValue, sui_address::SuiAddress,
+use sui_indexer::{models::objects::StoredHistoryObject, types::OwnerType};
+use sui_types::dynamic_field::{
+    derive_dynamic_field_id,
+    visitor::{Field, FieldVisitor},
+    DynamicFieldInfo,
+    DynamicFieldType,
 };
-use crate::consistency::{build_objects_query, View};
-use crate::data::package_resolver::PackageResolver;
-use crate::data::{Db, QueryExecutor};
-use crate::error::Error;
-use crate::filter;
-use crate::raw_query::RawQuery;
+
+use super::{
+    available_range::AvailableRange,
+    base64::Base64,
+    cursor::{Page, Target},
+    move_object::MoveObject,
+    move_value::MoveValue,
+    object::{self, Object, ObjectKind},
+    sui_address::SuiAddress,
+    type_filter::ExactTypeFilter,
+};
+use crate::{
+    consistency::{build_objects_query, View},
+    data::{package_resolver::PackageResolver, Db, QueryExecutor},
+    error::Error,
+    filter,
+    raw_query::RawQuery,
+};
 
 pub(crate) struct DynamicField {
     pub super_: MoveObject,
@@ -68,18 +77,11 @@ impl DynamicField {
             ))
         })?;
 
-        let Field {
-            name_layout,
-            name_bytes,
-            ..
-        } = FieldVisitor::deserialize(self.super_.native.contents(), &layout)
+        let Field { name_layout, name_bytes, .. } = FieldVisitor::deserialize(self.super_.native.contents(), &layout)
             .map_err(|e| Error::Internal(e.to_string()))
             .extend()?;
 
-        Ok(Some(MoveValue::new(
-            name_layout.into(),
-            Base64::from(name_bytes.to_owned()),
-        )))
+        Ok(Some(MoveValue::new(name_layout.into(), Base64::from(name_bytes.to_owned()))))
     }
 
     /// The returned dynamic field is an object if its return type is `MoveObject`,
@@ -97,14 +99,10 @@ impl DynamicField {
             ))
         })?;
 
-        let Field {
-            kind,
-            value_layout,
-            value_bytes,
-            ..
-        } = FieldVisitor::deserialize(self.super_.native.contents(), &layout)
-            .map_err(|e| Error::Internal(e.to_string()))
-            .extend()?;
+        let Field { kind, value_layout, value_bytes, .. } =
+            FieldVisitor::deserialize(self.super_.native.contents(), &layout)
+                .map_err(|e| Error::Internal(e.to_string()))
+                .extend()?;
 
         if kind == DynamicFieldType::DynamicObject {
             let df_object_id: SuiAddress = bcs::from_bytes(value_bytes)
@@ -145,9 +143,7 @@ impl DynamicField {
     ) -> Result<Option<DynamicField>, Error> {
         let type_ = match kind {
             DynamicFieldType::DynamicField => name.type_.0,
-            DynamicFieldType::DynamicObject => {
-                DynamicFieldInfo::dynamic_object_field_wrapper(name.type_.0).into()
-            }
+            DynamicFieldType::DynamicObject => DynamicFieldInfo::dynamic_object_field_wrapper(name.type_.0).into(),
         };
 
         let field_id = derive_dynamic_field_id(parent, &type_, &name.bcs.0)
@@ -188,8 +184,7 @@ impl DynamicField {
         let Some((prev, next, results)) = db
             .execute_repeatable(move |conn| {
                 async move {
-                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await?
-                    else {
+                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await? else {
                         return Ok::<_, diesel::result::Error>(None);
                     };
 
@@ -206,9 +201,7 @@ impl DynamicField {
             })
             .await?
         else {
-            return Err(Error::Client(
-                "Requested data is outside the available range".to_string(),
-            ));
+            return Err(Error::Client("Requested data is outside the available range".to_string()));
         };
 
         let mut conn: Connection<String, DynamicField> = Connection::new(prev, next);
@@ -218,18 +211,10 @@ impl DynamicField {
             // checkpoint found on the cursor.
             let cursor = stored.cursor(checkpoint_viewed_at).encode_cursor();
 
-            let object = Object::try_from_stored_history_object(
-                stored,
-                checkpoint_viewed_at,
-                parent_version,
-            )?;
+            let object = Object::try_from_stored_history_object(stored, checkpoint_viewed_at, parent_version)?;
 
-            let move_ = MoveObject::try_from(&object).map_err(|_| {
-                Error::Internal(format!(
-                    "Failed to deserialize as Move object: {}",
-                    object.address
-                ))
-            })?;
+            let move_ = MoveObject::try_from(&object)
+                .map_err(|_| Error::Internal(format!("Failed to deserialize as Move object: {}", object.address)))?;
 
             let dynamic_field = DynamicField::try_from(move_)?;
             conn.edges.push(Edge::new(cursor, dynamic_field));
@@ -251,8 +236,9 @@ impl TryFrom<MoveObject> for DynamicField {
 
         let native = match &super_.kind {
             ObjectKind::NotIndexed(native) | ObjectKind::Indexed(native, _) => native.clone(),
-            ObjectKind::Serialized(bytes) => bcs::from_bytes(bytes)
-                .map_err(|e| Error::Internal(format!("Failed to deserialize object: {e}")))?,
+            ObjectKind::Serialized(bytes) => {
+                bcs::from_bytes(bytes).map_err(|e| Error::Internal(format!("Failed to deserialize object: {e}")))?
+            }
         };
 
         let Some(object) = native.data.try_as_move() else {

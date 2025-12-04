@@ -3,10 +3,10 @@
 
 use std::time::Duration;
 
-use crate::watermarks::CommitterWatermark;
-
 pub use processor::Processor;
 use serde::{Deserialize, Serialize};
+
+use crate::watermarks::CommitterWatermark;
 
 pub mod concurrent;
 mod logging;
@@ -80,13 +80,7 @@ impl CommitterConfig {
 }
 
 impl<P: Processor> IndexedCheckpoint<P> {
-    fn new(
-        epoch: u64,
-        cp_sequence_number: u64,
-        tx_hi: u64,
-        timestamp_ms: u64,
-        values: Vec<P::Value>,
-    ) -> Self {
+    fn new(epoch: u64, cp_sequence_number: u64, tx_hi: u64, timestamp_ms: u64, values: Vec<P::Value>) -> Self {
         Self {
             watermark: CommitterWatermark {
                 pipeline: P::NAME.into(),
@@ -132,26 +126,15 @@ impl WatermarkPart {
 
     /// Record that `rows` have been taken from this part.
     fn take(&mut self, rows: usize) -> WatermarkPart {
-        debug_assert!(
-            self.batch_rows >= rows,
-            "Can't take more rows than are available"
-        );
+        debug_assert!(self.batch_rows >= rows, "Can't take more rows than are available");
 
         self.batch_rows -= rows;
-        WatermarkPart {
-            watermark: self.watermark.clone(),
-            batch_rows: rows,
-            total_rows: self.total_rows,
-        }
+        WatermarkPart { watermark: self.watermark.clone(), batch_rows: rows, total_rows: self.total_rows }
     }
 }
 
 impl Default for CommitterConfig {
     fn default() -> Self {
-        Self {
-            write_concurrency: 5,
-            collect_interval_ms: 500,
-            watermark_interval_ms: 500,
-        }
+        Self { write_concurrency: 5, collect_interval_ms: 500, watermark_interval_ms: 500 }
     }
 }

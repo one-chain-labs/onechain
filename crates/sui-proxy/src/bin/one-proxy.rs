@@ -1,16 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::env;
+
 use anyhow::Result;
 use clap::Parser;
-use std::env;
-use sui_proxy::config::ProxyConfig;
 use sui_proxy::{
     admin::{
-        app, create_server_cert_default_allow, create_server_cert_enforce_peer,
-        make_reqwest_client, server, Labels,
+        app,
+        create_server_cert_default_allow,
+        create_server_cert_enforce_peer,
+        make_reqwest_client,
+        server,
+        Labels,
     },
-    config::load,
-    histogram_relay, metrics,
+    config::{load, ProxyConfig},
+    histogram_relay,
+    metrics,
 };
 use sui_tls::TlsAcceptor;
 use telemetry_subscribers::TelemetryConfig;
@@ -20,25 +25,14 @@ use tracing::info;
 bin_version::bin_version!();
 
 /// user agent we use when posting to mimir
-static APP_USER_AGENT: &str = const_str::concat!(
-    env!("CARGO_PKG_NAME"),
-    "/",
-    env!("CARGO_PKG_VERSION"),
-    "/",
-    VERSION
-);
+static APP_USER_AGENT: &str = const_str::concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"), "/", VERSION);
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
 #[clap(name = env!("CARGO_BIN_NAME"))]
 #[clap(version = VERSION)]
 struct Args {
-    #[clap(
-        long,
-        short,
-        default_value = "./one-proxy.yaml",
-        help = "Specify the config file path to use"
-    )]
+    #[clap(long, short, default_value = "./one-proxy.yaml", help = "Specify the config file path to use")]
     config: String,
 }
 
@@ -50,10 +44,7 @@ async fn main() -> Result<()> {
 
     let config: ProxyConfig = load(args.config)?;
 
-    info!(
-        "listen on {:?} send to {:?}",
-        config.listen_address, config.remote_write.url
-    );
+    info!("listen on {:?} send to {:?}", config.listen_address, config.remote_write.url);
 
     let listener = std::net::TcpListener::bind(config.listen_address).unwrap();
 
@@ -77,18 +68,11 @@ async fn main() -> Result<()> {
     let histogram_relay = histogram_relay::start_prometheus_server(histogram_listener);
     let registry_service = metrics::start_prometheus_server(metrics_listener);
     let prometheus_registry = registry_service.default_registry();
-    prometheus_registry
-        .register(mysten_metrics::uptime_metric(
-            "one-proxy",
-            VERSION,
-            "unavailable",
-        ))
-        .unwrap();
+    prometheus_registry.register(mysten_metrics::uptime_metric("one-proxy", VERSION, "unavailable")).unwrap();
     let app = app(
         Labels {
             network: config.network,
-            inventory_hostname: env::var("INVENTORY_HOSTNAME")
-                .expect("INVENTORY_HOSTNAME not found in environment"),
+            inventory_hostname: env::var("INVENTORY_HOSTNAME").expect("INVENTORY_HOSTNAME not found in environment"),
         },
         client,
         histogram_relay,

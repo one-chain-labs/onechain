@@ -20,9 +20,7 @@ mod transaction_convert;
 
 impl From<sui_sdk_types::Address> for Address {
     fn from(value: sui_sdk_types::Address) -> Self {
-        Self {
-            address: Some(value.as_bytes().to_vec().into()),
-        }
+        Self { address: Some(value.as_bytes().to_vec().into()) }
     }
 }
 
@@ -30,11 +28,7 @@ impl TryFrom<&Address> for sui_sdk_types::Address {
     type Error = TryFromProtoError;
 
     fn try_from(Address { address }: &Address) -> Result<Self, Self::Error> {
-        let address = address
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("address"))?
-            .as_ref()
-            .try_into()?;
+        let address = address.as_ref().ok_or_else(|| TryFromProtoError::missing("address"))?.as_ref().try_into()?;
 
         Ok(Self::new(address))
     }
@@ -46,9 +40,7 @@ impl TryFrom<&Address> for sui_sdk_types::Address {
 
 impl From<sui_sdk_types::ObjectId> for ObjectId {
     fn from(value: sui_sdk_types::ObjectId) -> Self {
-        Self {
-            object_id: Some(value.as_bytes().to_vec().into()),
-        }
+        Self { object_id: Some(value.as_bytes().to_vec().into()) }
     }
 }
 
@@ -56,11 +48,8 @@ impl TryFrom<&ObjectId> for sui_sdk_types::ObjectId {
     type Error = TryFromProtoError;
 
     fn try_from(ObjectId { object_id }: &ObjectId) -> Result<Self, Self::Error> {
-        let object_id = object_id
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("object_id"))?
-            .as_ref()
-            .try_into()?;
+        let object_id =
+            object_id.as_ref().ok_or_else(|| TryFromProtoError::missing("object_id"))?.as_ref().try_into()?;
 
         Ok(Self::new(object_id))
     }
@@ -72,9 +61,7 @@ impl TryFrom<&ObjectId> for sui_sdk_types::ObjectId {
 
 impl From<sui_sdk_types::Digest> for Digest {
     fn from(value: sui_sdk_types::Digest) -> Self {
-        Self {
-            digest: Some(value.as_bytes().to_vec().into()),
-        }
+        Self { digest: Some(value.as_bytes().to_vec().into()) }
     }
 }
 
@@ -82,11 +69,7 @@ impl TryFrom<&Digest> for sui_sdk_types::Digest {
     type Error = TryFromProtoError;
 
     fn try_from(Digest { digest }: &Digest) -> Result<Self, Self::Error> {
-        let digest = digest
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("digest"))?
-            .as_ref()
-            .try_into()?;
+        let digest = digest.as_ref().ok_or_else(|| TryFromProtoError::missing("digest"))?.as_ref().try_into()?;
 
         Ok(Self::new(digest))
     }
@@ -125,10 +108,7 @@ impl_digest_proto!(EffectsAuxiliaryDataDigest);
 
 pub fn timestamp_ms_to_proto(timestamp_ms: u64) -> prost_types::Timestamp {
     let timestamp = std::time::Duration::from_millis(timestamp_ms);
-    prost_types::Timestamp {
-        seconds: timestamp.as_secs() as i64,
-        nanos: timestamp.subsec_nanos() as i32,
-    }
+    prost_types::Timestamp { seconds: timestamp.as_secs() as i64, nanos: timestamp.subsec_nanos() as i32 }
 }
 
 pub fn proto_to_timestamp_ms(timestamp: prost_types::Timestamp) -> Result<u64, TryFromProtoError> {
@@ -144,9 +124,7 @@ pub fn proto_to_timestamp_ms(timestamp: prost_types::Timestamp) -> Result<u64, T
 
 impl Bcs {
     pub fn serialize<T: serde::Serialize>(value: &T) -> Result<Self, bcs::Error> {
-        bcs::to_bytes(value).map(|bcs| Self {
-            bcs: Some(bcs.into()),
-        })
+        bcs::to_bytes(value).map(|bcs| Self { bcs: Some(bcs.into()) })
     }
 
     pub fn deserialize<'de, T: serde::Deserialize<'de>>(&'de self) -> Result<T, bcs::Error> {
@@ -156,29 +134,19 @@ impl Bcs {
 
 impl From<Vec<u8>> for Bcs {
     fn from(value: Vec<u8>) -> Self {
-        Self {
-            bcs: Some(value.into()),
-        }
+        Self { bcs: Some(value.into()) }
     }
 }
 
 impl From<&Bcs> for Vec<u8> {
     fn from(value: &Bcs) -> Self {
-        value
-            .bcs
-            .as_ref()
-            .map(|bytes| bytes.to_vec())
-            .unwrap_or_default()
+        value.bcs.as_ref().map(|bytes| bytes.to_vec()).unwrap_or_default()
     }
 }
 
 impl From<Bcs> for Vec<u8> {
     fn from(value: Bcs) -> Self {
-        value
-            .bcs
-            .as_ref()
-            .map(|bytes| bytes.to_vec())
-            .unwrap_or_default()
+        value.bcs.as_ref().map(|bytes| bytes.to_vec()).unwrap_or_default()
     }
 }
 
@@ -206,9 +174,7 @@ impl From<Bcs> for prost::bytes::Bytes {
 
 impl From<u128> for U128 {
     fn from(value: u128) -> Self {
-        Self {
-            bytes: Some(value.to_le_bytes().to_vec().into()),
-        }
+        Self { bytes: Some(value.to_le_bytes().to_vec().into()) }
     }
 }
 
@@ -226,9 +192,7 @@ impl TryFrom<&U128> for u128 {
 
 impl From<i128> for I128 {
     fn from(value: i128) -> Self {
-        Self {
-            bytes: Some(value.to_le_bytes().to_vec().into()),
-        }
+        Self { bytes: Some(value.to_le_bytes().to_vec().into()) }
     }
 }
 

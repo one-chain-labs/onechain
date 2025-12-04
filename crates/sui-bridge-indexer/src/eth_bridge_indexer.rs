@@ -1,42 +1,46 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Error;
 use async_trait::async_trait;
-use ethers::prelude::Transaction;
-use ethers::providers::{Http, Middleware, Provider, StreamExt, Ws};
-use ethers::types::{Address as EthAddress, Block, Filter, Log, H256};
+use ethers::{
+    prelude::Transaction,
+    providers::{Http, Middleware, Provider, StreamExt, Ws},
+    types::{Address as EthAddress, Block, Filter, Log, H256},
+};
+use mysten_metrics::spawn_monitored_task;
 use prometheus::IntGauge;
-use sui_bridge::error::BridgeError;
-use sui_bridge::eth_client::EthClient;
-use sui_bridge::eth_syncer::EthSyncer;
-use sui_bridge::metered_eth_provider::MeteredEthHttpProvier;
-use sui_bridge::retry_with_max_elapsed_time;
-use sui_indexer_builder::Task;
+use sui_bridge::{
+    abi::{EthBridgeCommitteeEvents, EthBridgeConfigEvents, EthBridgeEvent, EthBridgeLimiterEvents, EthSuiBridgeEvents},
+    error::BridgeError,
+    eth_client::EthClient,
+    eth_syncer::EthSyncer,
+    metered_eth_provider::MeteredEthHttpProvier,
+    metrics::BridgeMetrics,
+    retry_with_max_elapsed_time,
+    types::{EthEvent, RawEthLog},
+};
+use sui_indexer_builder::{
+    indexer_builder::{DataMapper, DataSender, Datasource},
+    metrics::IndexerMetricProvider,
+    Task,
+};
 use tap::tap::TapFallible;
-use tokio::select;
-use tokio::task::JoinHandle;
+use tokio::{select, task::JoinHandle};
 use tracing::{info, warn};
 
-use mysten_metrics::spawn_monitored_task;
-use sui_bridge::abi::{
-    EthBridgeCommitteeEvents, EthBridgeConfigEvents, EthBridgeEvent, EthBridgeLimiterEvents,
-    EthSuiBridgeEvents,
-};
-
-use crate::metrics::BridgeIndexerMetrics;
 use crate::{
-    BridgeDataSource, GovernanceAction, GovernanceActionType, ProcessedTxnData, TokenTransfer,
-    TokenTransferData, TokenTransferStatus,
+    metrics::BridgeIndexerMetrics,
+    BridgeDataSource,
+    GovernanceAction,
+    GovernanceActionType,
+    ProcessedTxnData,
+    TokenTransfer,
+    TokenTransferData,
+    TokenTransferStatus,
 };
-use sui_bridge::metrics::BridgeMetrics;
-use sui_bridge::types::{EthEvent, RawEthLog};
-use sui_indexer_builder::indexer_builder::{DataMapper, DataSender, Datasource};
-use sui_indexer_builder::metrics::IndexerMetricProvider;
 
 #[derive(Debug)]
 pub struct RawEthData {
@@ -64,13 +68,7 @@ impl EthSubscriptionDatasource {
         metrics: Box<dyn IndexerMetricProvider>,
         genesis_block: u64,
     ) -> Result<Self, anyhow::Error> {
-        Ok(Self {
-            addresses: eth_sui_bridge_contract_addresses,
-            eth_client,
-            eth_ws_url,
-            metrics,
-            genesis_block,
-        })
+        Ok(Self { addresses: eth_sui_bridge_contract_addresses, eth_client, eth_ws_url, metrics, genesis_block })
     }
 }
 #[async_trait]
@@ -80,10 +78,7 @@ impl Datasource<RawEthData> for EthSubscriptionDatasource {
         task: Task,
         data_sender: DataSender<RawEthData>,
     ) -> Result<JoinHandle<Result<(), Error>>, Error> {
-        assert!(
-            task.is_live_task,
-            "EthSubscriptionDatasource only supports live tasks"
-        );
+        assert!(task.is_live_task, "EthSubscriptionDatasource only supports live tasks");
         let filter = Filter::new()
             .address(self.addresses.clone())
             .from_block(task.start_checkpoint)
@@ -149,32 +144,19 @@ impl Datasource<RawEthData> for EthSubscriptionDatasource {
 }
 
 impl EthSubscriptionDatasource {
-    async fn handle_log(
-        task_name: &str,
-        log: Log,
-        eth_ws_client: &Provider<Ws>,
-        data_sender: &DataSender<RawEthData>,
-    ) {
-        tracing::info!(
-            task_name,
-            "EthSubscriptionDatasource retrieved log: {:?}",
-            log
-        );
+    async fn handle_log(task_name: &str, log: Log, eth_ws_client: &Provider<Ws>, data_sender: &DataSender<RawEthData>) {
+        tracing::info!(task_name, "EthSubscriptionDatasource retrieved log: {:?}", log);
         // TODO: enable a shared cache for blocks that can be used by both the subscription and finalized sync
         let mut cached_blocks: HashMap<u64, Block<H256>> = HashMap::new();
         let raw_log = RawEthLog {
             block_number: log
                 .block_number
-                .ok_or(BridgeError::ProviderError(
-                    "Provider returns log without block_number".into(),
-                ))
+                .ok_or(BridgeError::ProviderError("Provider returns log without block_number".into()))
                 .unwrap()
                 .as_u64(),
             tx_hash: log
                 .transaction_hash
-                .ok_or(BridgeError::ProviderError(
-                    "Provider returns log without transaction_hash".into(),
-                ))
+                .ok_or(BridgeError::ProviderError("Provider returns log without transaction_hash".into()))
                 .unwrap(),
             log,
         };
@@ -184,10 +166,9 @@ impl EthSubscriptionDatasource {
         let block = if let Some(cached_block) = cached_blocks.get(&block_number) {
             cached_block.clone()
         } else {
-            let Ok(Ok(Some(block))) = retry_with_max_elapsed_time!(
-                eth_ws_client.get_block(block_number),
-                Duration::from_secs(30000)
-            ) else {
+            let Ok(Ok(Some(block))) =
+                retry_with_max_elapsed_time!(eth_ws_client.get_block(block_number), Duration::from_secs(30000))
+            else {
                 panic!("Unable to get block from provider");
             };
 
@@ -195,33 +176,16 @@ impl EthSubscriptionDatasource {
             block
         };
 
-        let Ok(Ok(Some(transaction))) = retry_with_max_elapsed_time!(
-            eth_ws_client.get_transaction(raw_log.tx_hash),
-            Duration::from_secs(30000)
-        ) else {
+        let Ok(Ok(Some(transaction))) =
+            retry_with_max_elapsed_time!(eth_ws_client.get_transaction(raw_log.tx_hash), Duration::from_secs(30000))
+        else {
             panic!("Unable to get transaction from provider");
         };
-        tracing::info!(
-            task_name,
-            "Sending data from EthSubscriptionDatasource: {:?}",
-            (raw_log.tx_hash, block_number)
-        );
-        let raw_eth_data = vec![RawEthData {
-            log: raw_log,
-            block,
-            transaction,
-            is_finalized: false,
-        }];
-        data_sender
-            .send((block_number, raw_eth_data))
-            .await
-            .unwrap_or_else(|e| {
-                tracing::error!(
-                    task_name,
-                    "Failed to send data from EthSubscriptionDatasource: {:?}",
-                    e
-                );
-            });
+        tracing::info!(task_name, "Sending data from EthSubscriptionDatasource: {:?}", (raw_log.tx_hash, block_number));
+        let raw_eth_data = vec![RawEthData { log: raw_log, block, transaction, is_finalized: false }];
+        data_sender.send((block_number, raw_eth_data)).await.unwrap_or_else(|e| {
+            tracing::error!(task_name, "Failed to send data from EthSubscriptionDatasource: {:?}", e);
+        });
     }
 }
 
@@ -260,10 +224,8 @@ impl Datasource<RawEthData> for EthFinalizedSyncDatasource {
         task: Task,
         data_sender: DataSender<RawEthData>,
     ) -> Result<JoinHandle<Result<(), Error>>, Error> {
-        let provider = Arc::new(
-            Provider::<Http>::try_from(&self.eth_http_url)?
-                .interval(std::time::Duration::from_millis(2000)),
-        );
+        let provider =
+            Arc::new(Provider::<Http>::try_from(&self.eth_http_url)?.interval(std::time::Duration::from_millis(2000)));
         let progress_metric = self
             .metrics
             .get_tasks_latest_retrieved_checkpoints()
@@ -328,11 +290,7 @@ async fn loop_retrieve_and_process_live_finalized_logs(
 ) -> Result<(), Error> {
     let task_name = task.task_name.clone();
     let starting_checkpoint = task.start_checkpoint;
-    let eth_contracts_to_watch = HashMap::from_iter(
-        addresses
-            .iter()
-            .map(|address| (*address, starting_checkpoint)),
-    );
+    let eth_contracts_to_watch = HashMap::from_iter(addresses.iter().map(|address| (*address, starting_checkpoint)));
     let (_, mut eth_events_rx, _) = EthSyncer::new(client.clone(), eth_contracts_to_watch)
         .run(bridge_metrics.clone())
         .await
@@ -341,25 +299,12 @@ async fn loop_retrieve_and_process_live_finalized_logs(
     // EthSyncer sends items even when there is no matching events.
     // We leverge this to update the progress metric.
     while let Some((_, block, logs)) = eth_events_rx.recv().await {
-        let raw_logs: Vec<RawEthLog> = logs
-            .into_iter()
-            .map(|log| RawEthLog {
-                block_number: block,
-                tx_hash: log.tx_hash,
-                log: log.log,
-            })
-            .collect();
+        let raw_logs: Vec<RawEthLog> =
+            logs.into_iter().map(|log| RawEthLog { block_number: block, tx_hash: log.tx_hash, log: log.log }).collect();
 
-        process_logs(
-            &task_name,
-            raw_logs,
-            provider.clone(),
-            data_sender.clone(),
-            block,
-            true,
-        )
-        .await
-        .expect("Failed to process logs");
+        process_logs(&task_name, raw_logs, provider.clone(), data_sender.clone(), block, true)
+            .await
+            .expect("Failed to process logs");
         progress_metric.set(block as i64);
     }
 
@@ -389,10 +334,7 @@ async fn loop_retrieve_and_process_log_range(
             client.get_raw_events_in_range(addresses.clone(), current_start, current_end),
             Duration::from_secs(30000)
         ) else {
-            panic!(
-                "Unable to get logs from provider for range {} to {}",
-                current_start, current_end
-            );
+            panic!("Unable to get logs from provider for range {} to {}", current_start, current_end);
         };
 
         // Add the logs from this chunk to the total
@@ -402,22 +344,15 @@ async fn loop_retrieve_and_process_log_range(
         current_start = current_end + 1;
     }
 
-    process_logs(
-        &task_name,
-        all_logs,
-        provider.clone(),
-        data_sender.clone(),
-        target_checkpoint,
-        true,
-    )
-    .await
-    .tap_ok(|_| {
-        tracing::info!(task_name, "Finished processing range");
-    })
-    .tap_err(|e| {
-        tracing::error!(task_name, "Failed to process logs: {:?}", e);
-    })
-    .expect("Process logs should not fail");
+    process_logs(&task_name, all_logs, provider.clone(), data_sender.clone(), target_checkpoint, true)
+        .await
+        .tap_ok(|_| {
+            tracing::info!(task_name, "Finished processing range");
+        })
+        .tap_err(|e| {
+            tracing::error!(task_name, "Failed to process logs: {:?}", e);
+        })
+        .expect("Process logs should not fail");
     progress_metric.set(target_checkpoint as i64);
     Ok::<_, Error>(())
 }
@@ -438,10 +373,9 @@ async fn process_logs(
             cached_block.clone()
         } else {
             // TODO: add block query parallelism
-            let Ok(Ok(Some(block))) = retry_with_max_elapsed_time!(
-                provider.get_block(log.block_number),
-                Duration::from_secs(30000)
-            ) else {
+            let Ok(Ok(Some(block))) =
+                retry_with_max_elapsed_time!(provider.get_block(log.block_number), Duration::from_secs(30000))
+            else {
                 panic!("Unable to get block from provider");
             };
 
@@ -449,33 +383,20 @@ async fn process_logs(
             block
         };
 
-        let Ok(Ok(Some(transaction))) = retry_with_max_elapsed_time!(
-            provider.get_transaction(log.tx_hash),
-            Duration::from_secs(30000)
-        ) else {
+        let Ok(Ok(Some(transaction))) =
+            retry_with_max_elapsed_time!(provider.get_transaction(log.tx_hash), Duration::from_secs(30000))
+        else {
             panic!("Unable to get transaction from provider");
         };
 
-        data.push(RawEthData {
-            log,
-            block,
-            transaction,
-            is_finalized,
-        });
+        data.push(RawEthData { log, block, transaction, is_finalized });
     }
     let tx_hashes = data
         .iter()
         .map(|data| (data.log.tx_hash, data.block.number.map(|n| n.as_u64())))
         .collect::<Vec<(H256, Option<u64>)>>();
-    tracing::info!(
-        task_name,
-        "Sending data from EthFinalizedSyncDatasource: {:?}",
-        tx_hashes
-    );
-    data_sender
-        .send((block_height, data))
-        .await
-        .expect("Failed to send data");
+    tracing::info!(task_name, "Sending data from EthFinalizedSyncDatasource: {:?}", tx_hashes);
+    data_sender.send((block_height, data)).await.expect("Failed to send data");
     Ok::<_, Error>(())
 }
 
@@ -487,12 +408,7 @@ pub struct EthDataMapper {
 impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
     fn map(
         &self,
-        RawEthData {
-            log,
-            block,
-            transaction,
-            is_finalized,
-        }: RawEthData,
+        RawEthData { log, block, transaction, is_finalized }: RawEthData,
     ) -> Result<Vec<ProcessedTxnData>, Error> {
         let eth_bridge_event = EthBridgeEvent::try_from_log(log.log());
         if eth_bridge_event.is_none() {
@@ -509,11 +425,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
         match bridge_event {
             EthBridgeEvent::EthSuiBridgeEvents(bridge_event) => match &bridge_event {
                 EthSuiBridgeEvents::TokensDepositedFilter(bridge_event) => {
-                    info!(
-                        "Observed Eth Deposit at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth Deposit at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
                     self.metrics.total_eth_token_deposited.inc();
                     processed_txn_data.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                         chain_id: bridge_event.source_chain_id,
@@ -537,11 +449,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
                 EthSuiBridgeEvents::TokensClaimedFilter(bridge_event) => {
-                    info!(
-                        "Observed Eth Claim at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth Claim at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
                     self.metrics.total_eth_token_transfer_claimed.inc();
                     processed_txn_data.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                         chain_id: bridge_event.source_chain_id,
@@ -558,11 +466,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
                 EthSuiBridgeEvents::EmergencyOperationFilter(f) => {
-                    info!(
-                        "Observed Eth Emergency Operation at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth Emergency Operation at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: Some(f.nonce),
                         data_source: BridgeDataSource::Eth,
@@ -574,11 +478,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
                 EthSuiBridgeEvents::ContractUpgradedFilter(f) => {
-                    info!(
-                        "Observed Eth SuiBridge Upgrade at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth SuiBridge Upgrade at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
 
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: Some(f.nonce.as_u64()),
@@ -600,11 +500,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
             },
             EthBridgeEvent::EthBridgeCommitteeEvents(bridge_event) => match &bridge_event {
                 EthBridgeCommitteeEvents::BlocklistUpdatedFilter(_) => {
-                    info!(
-                        "Observed Eth Blocklist Update at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth Blocklist Update at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
 
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: None,
@@ -617,11 +513,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
                 EthBridgeCommitteeEvents::BlocklistUpdatedV2Filter(f) => {
-                    info!(
-                        "Observed Eth Blocklist Update at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth Blocklist Update at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
 
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: Some(f.nonce),
@@ -650,8 +542,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                         data: serde_json::to_value(bridge_event)?,
                     }));
                 }
-                EthBridgeCommitteeEvents::InitializedFilter(_)
-                | EthBridgeCommitteeEvents::UpgradedFilter(_) => {
+                EthBridgeCommitteeEvents::InitializedFilter(_) | EthBridgeCommitteeEvents::UpgradedFilter(_) => {
                     warn!("Unexpected event {bridge_event:?}.")
                 }
             },
@@ -717,11 +608,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
             },
             EthBridgeEvent::EthBridgeConfigEvents(bridge_event) => match &bridge_event {
                 EthBridgeConfigEvents::TokenPriceUpdatedFilter(_) => {
-                    info!(
-                        "Observed Eth TokenPrices Update at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth TokenPrices Update at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
 
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: None,
@@ -734,11 +621,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
                 EthBridgeConfigEvents::TokenPriceUpdatedV2Filter(f) => {
-                    info!(
-                        "Observed Eth TokenPrices Update at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth TokenPrices Update at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
 
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: Some(f.nonce),
@@ -751,11 +634,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
                 EthBridgeConfigEvents::TokenAddedFilter(_) => {
-                    info!(
-                        "Observed Eth AddSuiTokens at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth AddSuiTokens at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
 
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: None,
@@ -768,11 +647,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
                 EthBridgeConfigEvents::TokensAddedV2Filter(f) => {
-                    info!(
-                        "Observed Eth AddSuiTokens at block: {}, tx_hash: {}",
-                        log.block_number(),
-                        log.tx_hash
-                    );
+                    info!("Observed Eth AddSuiTokens at block: {}, tx_hash: {}", log.block_number(), log.tx_hash);
 
                     processed_txn_data.push(ProcessedTxnData::GovernanceAction(GovernanceAction {
                         nonce: Some(f.nonce),
@@ -802,8 +677,7 @@ impl DataMapper<RawEthData, ProcessedTxnData> for EthDataMapper {
                     }));
                 }
 
-                EthBridgeConfigEvents::InitializedFilter(_)
-                | EthBridgeConfigEvents::UpgradedFilter(_) => {
+                EthBridgeConfigEvents::InitializedFilter(_) | EthBridgeConfigEvents::UpgradedFilter(_) => {
                     warn!("Unexpected event {bridge_event:?}.")
                 }
             },

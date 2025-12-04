@@ -29,10 +29,7 @@ fn test_protocol_overrides() {
         config
     });
 
-    assert_eq!(
-        ProtocolConfig::get_for_max_version_UNSAFE().max_function_definitions(),
-        42
-    );
+    assert_eq!(ProtocolConfig::get_for_max_version_UNSAFE().max_function_definitions(), 42);
 }
 
 // Same as the previous test, to ensure we have test isolation with all the caching that
@@ -46,58 +43,64 @@ fn test_protocol_overrides_2() {
         config
     });
 
-    assert_eq!(
-        ProtocolConfig::get_for_max_version_UNSAFE().max_function_definitions(),
-        43
-    );
+    assert_eq!(ProtocolConfig::get_for_max_version_UNSAFE().max_function_definitions(), 43);
 }
 
 #[cfg(msim)]
 mod sim_only_tests {
 
-    use super::*;
+    use std::{path::PathBuf, sync::Arc};
+
     use fastcrypto::encoding::Base64;
     use move_binary_format::{file_format_common::VERSION_MAX, CompiledModule};
     use move_core_types::ident_str;
-    use std::path::PathBuf;
-    use std::sync::Arc;
     use sui_core::authority::framework_injection;
     use sui_framework::BuiltInFramework;
     use sui_json_rpc_api::WriteApiClient;
     use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
     use sui_macros::*;
     use sui_move_build::{BuildConfig, CompiledPackage};
-    use sui_types::base_types::ConciseableName;
-    use sui_types::base_types::{ObjectID, ObjectRef};
-    use sui_types::effects::{TransactionEffects, TransactionEffectsAPI};
-    use sui_types::id::ID;
-    use sui_types::object::Owner;
-    use sui_types::sui_system_state::{
-        epoch_start_sui_system_state::EpochStartSystemStateTrait, get_validator_from_table,
-        SuiSystemState, SuiSystemStateTrait, SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2,
-        SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2, SUI_SYSTEM_STATE_SIM_TEST_V1,
-    };
-    use sui_types::supported_protocol_versions::SupportedProtocolVersions;
-    use sui_types::transaction::{
-        CallArg, Command, ObjectArg, ProgrammableMoveCall, ProgrammableTransaction,
-        TransactionData, TEST_ONLY_GAS_UNIT_FOR_GENERIC,
-    };
     use sui_types::{
-        base_types::{SequenceNumber, SuiAddress},
+        base_types::{ConciseableName, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
         digests::TransactionDigest,
-        object::Object,
+        effects::{TransactionEffects, TransactionEffectsAPI},
+        id::ID,
+        object::{Object, Owner},
         programmable_transaction_builder::ProgrammableTransactionBuilder,
-        transaction::TransactionKind,
-        MOVE_STDLIB_PACKAGE_ID, SUI_BRIDGE_OBJECT_ID, SUI_FRAMEWORK_PACKAGE_ID,
+        sui_system_state::{
+            epoch_start_sui_system_state::EpochStartSystemStateTrait,
+            get_validator_from_table,
+            SuiSystemState,
+            SuiSystemStateTrait,
+            SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2,
+            SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2,
+            SUI_SYSTEM_STATE_SIM_TEST_V1,
+        },
+        supported_protocol_versions::SupportedProtocolVersions,
+        transaction::{
+            CallArg,
+            Command,
+            ObjectArg,
+            ProgrammableMoveCall,
+            ProgrammableTransaction,
+            TransactionData,
+            TransactionKind,
+            TEST_ONLY_GAS_UNIT_FOR_GENERIC,
+        },
+        MOVE_STDLIB_PACKAGE_ID,
+        SUI_AUTHENTICATOR_STATE_OBJECT_ID,
+        SUI_BRIDGE_OBJECT_ID,
+        SUI_CLOCK_OBJECT_ID,
+        SUI_FRAMEWORK_PACKAGE_ID,
+        SUI_RANDOMNESS_STATE_OBJECT_ID,
         SUI_SYSTEM_PACKAGE_ID,
-    };
-    use sui_types::{
-        SUI_AUTHENTICATOR_STATE_OBJECT_ID, SUI_CLOCK_OBJECT_ID, SUI_RANDOMNESS_STATE_OBJECT_ID,
         SUI_SYSTEM_STATE_OBJECT_ID,
     };
     use test_cluster::TestCluster;
     use tokio::time::{sleep, Duration};
     use tracing::info;
+
+    use super::*;
 
     const START: u64 = ProtocolVersion::MAX.as_u64();
     const FINISH: u64 = ProtocolVersion::MAX_ALLOWED.as_u64();
@@ -108,9 +111,7 @@ mod sim_only_tests {
 
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .build()
             .await;
 
@@ -128,31 +129,18 @@ mod sim_only_tests {
 
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .build()
             .await;
 
         let validator = test_cluster.get_validator_pubkeys()[0].clone();
         test_cluster.stop_node(&validator);
 
-        assert_eq!(
-            test_cluster
-                .wait_for_epoch(Some(1))
-                .await
-                .protocol_version(),
-            FINISH
-        );
+        assert_eq!(test_cluster.wait_for_epoch(Some(1)).await.protocol_version(), FINISH);
         test_cluster.start_node(&validator).await;
 
         test_cluster.wait_for_epoch(Some(2)).await;
-        let validator_handle = test_cluster
-            .swarm
-            .node(&validator)
-            .unwrap()
-            .get_node_handle()
-            .unwrap();
+        let validator_handle = test_cluster.swarm.node(&validator).unwrap().get_node_handle().unwrap();
         validator_handle
             .with_async(|node| async {
                 // give time for restarted node to catch up, reconfig
@@ -194,12 +182,7 @@ mod sim_only_tests {
 
         // verify that the node that didn't support the new version shut itself down.
         for v in test_cluster.swarm.validator_nodes() {
-            if !v
-                .config()
-                .supported_protocol_versions
-                .unwrap()
-                .is_version_supported(ProtocolVersion::new(FINISH))
-            {
+            if !v.config().supported_protocol_versions.unwrap().is_version_supported(ProtocolVersion::new(FINISH)) {
                 assert!(!v.is_running(), "{:?}", v.name().concise());
             } else {
                 assert!(v.is_running(), "{:?}", v.name().concise());
@@ -226,10 +209,7 @@ mod sim_only_tests {
 
         test_cluster.swarm.validator_nodes().for_each(|v| {
             let node_handle = v.get_node_handle().expect("node should be running");
-            node_handle.with(|node| {
-                node.set_override_protocol_upgrade_buffer_stake(0, 0)
-                    .unwrap()
-            });
+            node_handle.with(|node| node.set_override_protocol_upgrade_buffer_stake(0, 0).unwrap());
         });
 
         // upgrade happens with only 3 votes
@@ -259,19 +239,13 @@ mod sim_only_tests {
 
         test_cluster.swarm.validator_nodes().for_each(|v| {
             let node_handle = v.get_node_handle().expect("node should be running");
-            node_handle.with(|node| {
-                node.set_override_protocol_upgrade_buffer_stake(0, 0)
-                    .unwrap()
-            });
+            node_handle.with(|node| node.set_override_protocol_upgrade_buffer_stake(0, 0).unwrap());
         });
 
         // Verify that clearing the override is respected.
         test_cluster.swarm.validator_nodes().for_each(|v| {
             let node_handle = v.get_node_handle().expect("node should be running");
-            node_handle.with(|node| {
-                node.clear_override_protocol_upgrade_buffer_stake(0)
-                    .unwrap()
-            });
+            node_handle.with(|node| node.clear_override_protocol_upgrade_buffer_stake(0).unwrap());
         });
 
         // default buffer stake is in effect, we do not advance to version FINISH.
@@ -416,9 +390,7 @@ mod sim_only_tests {
 
         let cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .build()
             .await;
 
@@ -455,16 +427,13 @@ mod sim_only_tests {
 
         // Call a function from the newly published system package
         assert_eq!(
-            dev_inspect_call(
-                &cluster,
-                ProgrammableMoveCall {
-                    package: sui_extra,
-                    module: "msim_extra_1".to_owned(),
-                    function: "canary".to_owned(),
-                    type_arguments: vec![],
-                    arguments: vec![],
-                }
-            )
+            dev_inspect_call(&cluster, ProgrammableMoveCall {
+                package: sui_extra,
+                module: "msim_extra_1".to_owned(),
+                function: "canary".to_owned(),
+                type_arguments: vec![],
+                arguments: vec![],
+            })
             .await,
             43,
         );
@@ -477,24 +446,19 @@ mod sim_only_tests {
         TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
             .with_objects([sui_system_package_object(from)])
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .build()
             .await
     }
 
     async fn call_canary(cluster: &TestCluster) -> u64 {
-        dev_inspect_call(
-            cluster,
-            ProgrammableMoveCall {
-                package: SUI_SYSTEM_PACKAGE_ID,
-                module: "msim_extra_1".to_owned(),
-                function: "canary".to_owned(),
-                type_arguments: vec![],
-                arguments: vec![],
-            },
-        )
+        dev_inspect_call(cluster, ProgrammableMoveCall {
+            package: SUI_SYSTEM_PACKAGE_ID,
+            module: "msim_extra_1".to_owned(),
+            function: "canary".to_owned(),
+            type_arguments: vec![],
+            arguments: vec![],
+        })
         .await
     }
 
@@ -538,11 +502,7 @@ mod sim_only_tests {
         .clone()
     }
 
-    async fn transfer_obj(
-        cluster: &TestCluster,
-        recipient: SuiAddress,
-        obj: ObjectRef,
-    ) -> ObjectRef {
+    async fn transfer_obj(cluster: &TestCluster, recipient: SuiAddress, obj: ObjectRef) -> ObjectRef {
         execute(cluster, {
             let mut builder = ProgrammableTransactionBuilder::new();
             builder.transfer_object(recipient, obj).unwrap();
@@ -585,22 +545,11 @@ mod sim_only_tests {
         bcs::from_bytes(&return_).unwrap()
     }
 
-    async fn execute_creating(
-        cluster: &TestCluster,
-        ptb: ProgrammableTransaction,
-    ) -> Vec<ObjectRef> {
-        execute(cluster, ptb)
-            .await
-            .created()
-            .iter()
-            .map(|oref| oref.reference.to_object_ref())
-            .collect()
+    async fn execute_creating(cluster: &TestCluster, ptb: ProgrammableTransaction) -> Vec<ObjectRef> {
+        execute(cluster, ptb).await.created().iter().map(|oref| oref.reference.to_object_ref()).collect()
     }
 
-    async fn execute(
-        cluster: &TestCluster,
-        ptb: ProgrammableTransaction,
-    ) -> SuiTransactionBlockEffects {
+    async fn execute(cluster: &TestCluster, ptb: ProgrammableTransaction) -> SuiTransactionBlockEffects {
         let context = &cluster.wallet;
         let (sender, gas_object) = context.get_one_gas_object().await.unwrap().unwrap();
 
@@ -613,11 +562,7 @@ mod sim_only_tests {
             rgp,
         ));
 
-        context
-            .execute_transaction_must_succeed(txn)
-            .await
-            .effects
-            .unwrap()
+        context.execute_transaction_must_succeed(txn).await.effects.unwrap()
     }
 
     async fn expect_upgrade_failed(cluster: &TestCluster) {
@@ -628,28 +573,19 @@ mod sim_only_tests {
         monitor_version_change(&cluster, FINISH /* expected proto version */).await;
     }
 
-    async fn get_framework_upgrade_versions(
-        cluster: &TestCluster,
-    ) -> (Option<SequenceNumber>, Option<SequenceNumber>) {
+    async fn get_framework_upgrade_versions(cluster: &TestCluster) -> (Option<SequenceNumber>, Option<SequenceNumber>) {
         let effects = get_framework_upgrade_effects(cluster, &SUI_SYSTEM_PACKAGE_ID).await;
 
-        let modified_at = effects
-            .modified_at_versions()
-            .iter()
-            .find_map(|(id, v)| (id == &SUI_SYSTEM_PACKAGE_ID).then_some(*v));
+        let modified_at =
+            effects.modified_at_versions().iter().find_map(|(id, v)| (id == &SUI_SYSTEM_PACKAGE_ID).then_some(*v));
 
-        let mutated_to = effects
-            .mutated()
-            .iter()
-            .find_map(|((id, v, _), _)| (id == &SUI_SYSTEM_PACKAGE_ID).then_some(*v));
+        let mutated_to =
+            effects.mutated().iter().find_map(|((id, v, _), _)| (id == &SUI_SYSTEM_PACKAGE_ID).then_some(*v));
 
         (modified_at, mutated_to)
     }
 
-    async fn get_framework_upgrade_effects(
-        cluster: &TestCluster,
-        package: &ObjectID,
-    ) -> TransactionEffects {
+    async fn get_framework_upgrade_effects(cluster: &TestCluster, package: &ObjectID) -> TransactionEffects {
         let node_handle = &cluster.fullnode_handle.sui_node;
 
         node_handle
@@ -668,22 +604,12 @@ mod sim_only_tests {
         let node_handle = &cluster.fullnode_handle.sui_node;
 
         node_handle
-            .with_async(|node| async {
-                node.state()
-                    .get_object_cache_reader()
-                    .get_object(object_id)
-                    .unwrap()
-            })
+            .with_async(|node| async { node.state().get_object_cache_reader().get_object(object_id).unwrap() })
             .await
     }
 
     async fn has_public_transfer(cluster: &TestCluster, object_id: &ObjectID) -> bool {
-        get_object(&cluster, object_id)
-            .await
-            .data
-            .try_as_move()
-            .unwrap()
-            .has_public_transfer()
+        get_object(&cluster, object_id).await.data.try_as_move().unwrap().has_public_transfer()
     }
 
     #[sim_test]
@@ -695,9 +621,7 @@ mod sim_only_tests {
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
             .with_objects([sui_system_package_object("base")])
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, START,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, START))
             .build()
             .await;
 
@@ -713,9 +637,7 @@ mod sim_only_tests {
         });
 
         let test_cluster = TestClusterBuilder::new()
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .with_epoch_duration_ms(40000)
             .build()
             .await;
@@ -746,10 +668,7 @@ mod sim_only_tests {
         // The dissenting node receives the correct framework via state sync and completes the upgrade
         node_handle.with(|node| {
             let committee = node.state().epoch_store_for_testing().committee().clone();
-            assert_eq!(
-                node.state().epoch_store_for_testing().protocol_version(),
-                ProtocolVersion::new(FINISH)
-            );
+            assert_eq!(node.state().epoch_store_for_testing().protocol_version(), ProtocolVersion::new(FINISH));
             assert_eq!(committee.epoch, 2);
         });
     }
@@ -766,9 +685,7 @@ mod sim_only_tests {
 
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(40000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .build()
             .await;
 
@@ -812,12 +729,7 @@ mod sim_only_tests {
             .unwrap()
             .get_node_handle()
             .unwrap()
-            .with(|node| {
-                node.state()
-                    .epoch_store_for_testing()
-                    .epoch_start_state()
-                    .epoch_start_timestamp_ms()
-            });
+            .with(|node| node.state().epoch_store_for_testing().epoch_start_state().epoch_start_timestamp_ms());
 
         // We are going to enter safe mode so set the expectation right.
         test_cluster.set_safe_mode_expected(true);
@@ -850,9 +762,7 @@ mod sim_only_tests {
 
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, START,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, START))
             .with_objects([sui_system_package_object("mock_sui_systems/base")])
             .build()
             .await;
@@ -871,9 +781,7 @@ mod sim_only_tests {
 
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .with_objects([sui_system_package_object("mock_sui_systems/base")])
             .build()
             .await;
@@ -881,19 +789,13 @@ mod sim_only_tests {
         // but the system state object hasn't been upgraded yet.
         let system_state = test_cluster.wait_for_epoch(Some(1)).await;
         assert_eq!(system_state.protocol_version(), FINISH);
-        assert_eq!(
-            system_state.system_state_version(),
-            SUI_SYSTEM_STATE_SIM_TEST_V1
-        );
+        assert_eq!(system_state.system_state_version(), SUI_SYSTEM_STATE_SIM_TEST_V1);
         assert!(matches!(system_state, SuiSystemState::SimTestV1(_)));
 
         // The system state object will be upgraded next time we execute advance_epoch transaction
         // at epoch boundary.
         let system_state = test_cluster.wait_for_epoch(Some(2)).await;
-        assert_eq!(
-            system_state.system_state_version(),
-            SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2
-        );
+        assert_eq!(system_state.system_state_version(), SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2);
         assert!(matches!(system_state, SuiSystemState::SimTestShallowV2(_)));
     }
 
@@ -908,9 +810,7 @@ mod sim_only_tests {
 
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .with_objects([sui_system_package_object("mock_sui_systems/base")])
             .build()
             .await;
@@ -918,20 +818,12 @@ mod sim_only_tests {
         // but the system state object hasn't been upgraded yet.
         let system_state = test_cluster.wait_for_epoch(Some(1)).await;
         assert_eq!(system_state.protocol_version(), FINISH);
-        assert_eq!(
-            system_state.system_state_version(),
-            SUI_SYSTEM_STATE_SIM_TEST_V1
-        );
+        assert_eq!(system_state.system_state_version(), SUI_SYSTEM_STATE_SIM_TEST_V1);
         if let SuiSystemState::SimTestV1(inner) = system_state {
             // Make sure we have 1 inactive validator for latter testing.
             assert_eq!(inner.validators.inactive_validators.size, 1);
             get_validator_from_table(
-                test_cluster
-                    .fullnode_handle
-                    .sui_node
-                    .state()
-                    .get_object_store()
-                    .as_ref(),
+                test_cluster.fullnode_handle.sui_node.state().get_object_store().as_ref(),
                 inner.validators.inactive_validators.id,
                 &ID::new(ObjectID::ZERO),
             )
@@ -943,20 +835,12 @@ mod sim_only_tests {
         // The system state object will be upgraded next time we execute advance_epoch transaction
         // at epoch boundary.
         let system_state = test_cluster.wait_for_epoch(Some(2)).await;
-        assert_eq!(
-            system_state.system_state_version(),
-            SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2
-        );
+        assert_eq!(system_state.system_state_version(), SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2);
         if let SuiSystemState::SimTestDeepV2(inner) = system_state {
             // Make sure we have 1 inactive validator for latter testing.
             assert_eq!(inner.validators.inactive_validators.size, 1);
             get_validator_from_table(
-                test_cluster
-                    .fullnode_handle
-                    .sui_node
-                    .state()
-                    .get_object_store()
-                    .as_ref(),
+                test_cluster.fullnode_handle.sui_node.state().get_object_store().as_ref(),
                 inner.validators.inactive_validators.id,
                 &ID::new(ObjectID::ZERO),
             )
@@ -974,9 +858,7 @@ mod sim_only_tests {
         // The MAX_PROTOCOL_VERSION must not be changed yet when testing this.
         let test_cluster = TestClusterBuilder::new()
             .with_epoch_duration_ms(20000)
-            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(
-                START, FINISH,
-            ))
+            .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(START, FINISH))
             .build()
             .await;
         // TODO: Replace the path with the new framework path when we test it for real.
@@ -1014,25 +896,15 @@ mod sim_only_tests {
     /// Get compiled modules for Sui System, built from fixture `fixture` in the
     /// `framework_upgrades` directory.
     fn sui_system_modules(fixture: &str) -> Vec<CompiledModule> {
-        fixture_package(fixture)
-            .get_sui_system_modules()
-            .cloned()
-            .collect()
+        fixture_package(fixture).get_sui_system_modules().cloned().collect()
     }
 
     /// Like `sui_system_modules`, but package the modules in an `Object`.
     fn sui_system_package_object(fixture: &str) -> Object {
-        Object::new_package(
-            &sui_system_modules(fixture),
-            TransactionDigest::genesis_marker(),
-            u64::MAX,
-            VERSION_MAX,
-            &[
-                BuiltInFramework::get_package_by_id(&MOVE_STDLIB_PACKAGE_ID).genesis_move_package(),
-                BuiltInFramework::get_package_by_id(&SUI_FRAMEWORK_PACKAGE_ID)
-                    .genesis_move_package(),
-            ],
-        )
+        Object::new_package(&sui_system_modules(fixture), TransactionDigest::genesis_marker(), u64::MAX, VERSION_MAX, &[
+            BuiltInFramework::get_package_by_id(&MOVE_STDLIB_PACKAGE_ID).genesis_move_package(),
+            BuiltInFramework::get_package_by_id(&SUI_FRAMEWORK_PACKAGE_ID).genesis_move_package(),
+        ])
         .unwrap()
     }
 

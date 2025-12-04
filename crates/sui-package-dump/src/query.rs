@@ -1,8 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use cynic::Operation;
-use cynic::QueryBuilder;
+use cynic::{Operation, QueryBuilder};
 
 #[cynic::schema("sui")]
 mod schema {}
@@ -48,10 +47,7 @@ pub(crate) mod packages {
         Query::build(Vars {
             first,
             after,
-            filter: Some(MovePackageCheckpointFilter {
-                after_checkpoint,
-                before_checkpoint,
-            }),
+            filter: Some(MovePackageCheckpointFilter { after_checkpoint, before_checkpoint }),
         })
     }
 

@@ -4,13 +4,12 @@
 use async_graphql::*;
 use sui_package_resolver::{DataDef, MoveData};
 
-use crate::error::Error;
-
 use super::{
     move_module::MoveModule,
     open_move_type::{abilities, MoveAbility, OpenMoveType},
     sui_address::SuiAddress,
 };
+use crate::error::Error;
 
 pub(crate) struct MoveStruct {
     defining_id: SuiAddress,
@@ -42,14 +41,8 @@ pub(crate) struct MoveField {
 impl MoveStruct {
     /// The module this struct was originally defined in.
     pub(crate) async fn module(&self, ctx: &Context<'_>) -> Result<MoveModule> {
-        let Some(module) = MoveModule::query(
-            ctx,
-            self.defining_id,
-            &self.module,
-            self.checkpoint_viewed_at,
-        )
-        .await
-        .extend()?
+        let Some(module) =
+            MoveModule::query(ctx, self.defining_id, &self.module, self.checkpoint_viewed_at).await.extend()?
         else {
             return Err(Error::Internal(format!(
                 "Failed to load module for struct: {}::{}::{}",
@@ -94,12 +87,7 @@ impl MoveField {
 }
 
 impl MoveStruct {
-    pub(crate) fn new(
-        module: String,
-        name: String,
-        def: DataDef,
-        checkpoint_viewed_at: u64,
-    ) -> Result<Self, Error> {
+    pub(crate) fn new(module: String, name: String, def: DataDef, checkpoint_viewed_at: u64) -> Result<Self, Error> {
         let type_parameters = def
             .type_params
             .into_iter()
@@ -112,18 +100,9 @@ impl MoveStruct {
         let MoveData::Struct(fields) = def.data else {
             // This should never happen, as the data should always be a struct if we're calling
             // this function. Signal an internal error if it does.
-            return Err(Error::Internal(format!(
-                "Expected struct data, but got: {:?}",
-                def.data
-            )));
+            return Err(Error::Internal(format!("Expected struct data, but got: {:?}", def.data)));
         };
-        let fields = fields
-            .into_iter()
-            .map(|(name, signature)| MoveField {
-                name,
-                type_: signature.into(),
-            })
-            .collect();
+        let fields = fields.into_iter().map(|(name, signature)| MoveField { name, type_: signature.into() }).collect();
 
         Ok(MoveStruct {
             defining_id: SuiAddress::from(def.defining_id),

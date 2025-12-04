@@ -11,10 +11,20 @@ use axum::{extract::Extension, http::StatusCode, routing::get, Router};
 use prometheus::{
     core::{Collector, Desc},
     proto::{Counter, Gauge, LabelPair, Metric, MetricFamily, MetricType, Summary},
-    register_histogram_vec_with_registry, register_histogram_with_registry,
-    register_int_counter_vec_with_registry, register_int_counter_with_registry,
-    register_int_gauge_vec_with_registry, register_int_gauge_with_registry, Histogram,
-    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Registry, TextEncoder,
+    register_histogram_vec_with_registry,
+    register_histogram_with_registry,
+    register_int_counter_vec_with_registry,
+    register_int_counter_with_registry,
+    register_int_gauge_vec_with_registry,
+    register_int_gauge_with_registry,
+    Histogram,
+    HistogramVec,
+    IntCounter,
+    IntCounterVec,
+    IntGauge,
+    IntGaugeVec,
+    Registry,
+    TextEncoder,
 };
 use sui_pg_db::Db;
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -24,33 +34,30 @@ use tracing::{info, warn};
 use crate::{ingestion::error::Error, pipeline::Processor};
 
 /// Histogram buckets for the distribution of checkpoint fetching latencies.
-const INGESTION_LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0,
-];
+const INGESTION_LATENCY_SEC_BUCKETS: &[f64] =
+    &[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0];
 
 /// Histogram buckets for the distribution of checkpoint lag (difference between the system time and
 /// the timestamp in the checkpoint).
 const LAG_SEC_BUCKETS: &[f64] = &[
-    0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9,
-    0.95, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 20.0, 50.0, 100.0, 1000.0,
+    0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 2.0, 3.0,
+    4.0, 5.0, 10.0, 20.0, 50.0, 100.0, 1000.0,
 ];
 
 /// Histogram buckets for the distribution of latencies for processing a checkpoint in the indexer
 /// (without having to call out to other services).
-const PROCESSING_LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0,
-];
+const PROCESSING_LATENCY_SEC_BUCKETS: &[f64] =
+    &[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0];
 
 /// Histogram buckets for the distribution of latencies for writing to the database.
 const DB_UPDATE_LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0,
-    2000.0, 5000.0, 10000.0,
+    0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0,
+    10000.0,
 ];
 
 /// Histogram buckets for the distribution of batch sizes (number of rows) written to the database.
-const BATCH_SIZE_BUCKETS: &[f64] = &[
-    1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0,
-];
+const BATCH_SIZE_BUCKETS: &[f64] =
+    &[1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0];
 
 /// Service to expose prometheus metrics from the indexer.
 pub(crate) struct MetricsService {
@@ -182,11 +189,7 @@ impl MetricsService {
         let metrics = IndexerMetrics::new(&registry);
         registry.register(Box::new(DbConnectionStatsCollector::new(db)))?;
 
-        let service = Self {
-            addr,
-            registry,
-            cancel,
-        };
+        let service = Self { addr, registry, cancel };
 
         Ok((Arc::new(metrics), service))
     }
@@ -194,9 +197,7 @@ impl MetricsService {
     /// Start the service. The service will run until the cancellation token is triggered.
     pub(crate) async fn run(self) -> Result<JoinHandle<()>> {
         let listener = TcpListener::bind(&self.addr).await?;
-        let app = Router::new()
-            .route("/metrics", get(metrics))
-            .layer(Extension(self.registry));
+        let app = Router::new().route("/metrics", get(metrics)).layer(Extension(self.registry));
 
         Ok(tokio::spawn(async move {
             info!("Starting metrics service on {}", self.addr);
@@ -656,17 +657,10 @@ impl IndexerMetrics {
 
     /// Register that we're retrying a checkpoint fetch due to a transient error, logging the
     /// reason and error.
-    pub(crate) fn inc_retry(
-        &self,
-        checkpoint: u64,
-        reason: &str,
-        error: Error,
-    ) -> backoff::Error<Error> {
+    pub(crate) fn inc_retry(&self, checkpoint: u64, reason: &str, error: Error) -> backoff::Error<Error> {
         warn!(checkpoint, reason, "Retrying due to error: {error}");
 
-        self.total_ingested_transient_retries
-            .with_label_values(&[reason])
-            .inc();
+        self.total_ingested_transient_retries.with_label_values(&[reason]).inc();
 
         backoff::Error::transient(error)
     }
@@ -675,49 +669,15 @@ impl IndexerMetrics {
 impl DbConnectionStatsCollector {
     fn new(db: Db) -> Self {
         let desc = vec![
-            (
-                MetricType::GAUGE,
-                desc(
-                    "db_connections",
-                    "Number of connections currently being managed by the pool",
-                ),
-            ),
-            (
-                MetricType::GAUGE,
-                desc(
-                    "db_idle_connections",
-                    "Number of idle connections in the pool",
-                ),
-            ),
+            (MetricType::GAUGE, desc("db_connections", "Number of connections currently being managed by the pool")),
+            (MetricType::GAUGE, desc("db_idle_connections", "Number of idle connections in the pool")),
+            (MetricType::COUNTER, desc("db_connect_direct", "Connections that did not have to wait")),
+            (MetricType::SUMMARY, desc("db_connect_waited", "Connections that had to wait")),
+            (MetricType::COUNTER, desc("db_connect_timed_out", "Connections that timed out waiting for a connection")),
+            (MetricType::COUNTER, desc("db_connections_created", "Connections that have been created in the pool")),
             (
                 MetricType::COUNTER,
-                desc("db_connect_direct", "Connections that did not have to wait"),
-            ),
-            (
-                MetricType::SUMMARY,
-                desc("db_connect_waited", "Connections that had to wait"),
-            ),
-            (
-                MetricType::COUNTER,
-                desc(
-                    "db_connect_timed_out",
-                    "Connections that timed out waiting for a connection",
-                ),
-            ),
-            (
-                MetricType::COUNTER,
-                desc(
-                    "db_connections_created",
-                    "Connections that have been created in the pool",
-                ),
-            ),
-            (
-                MetricType::COUNTER,
-                desc_with_labels(
-                    "db_connections_closed",
-                    "Total connections that were closed",
-                    &["reason"],
-                ),
+                desc_with_labels("db_connections_closed", "Total connections that were closed", &["reason"]),
             ),
         ];
 
@@ -738,30 +698,15 @@ impl Collector for DbConnectionStatsCollector {
             gauge(&self.desc[0].1, state.connections as f64),
             gauge(&self.desc[1].1, state.idle_connections as f64),
             counter(&self.desc[2].1, stats.get_direct as f64),
-            summary(
-                &self.desc[3].1,
-                stats.get_wait_time.as_millis() as f64,
-                stats.get_waited + stats.get_timed_out,
-            ),
+            summary(&self.desc[3].1, stats.get_wait_time.as_millis() as f64, stats.get_waited + stats.get_timed_out),
             counter(&self.desc[4].1, stats.get_timed_out as f64),
             counter(&self.desc[5].1, stats.connections_created as f64),
-            counter_with_labels(
-                &self.desc[6].1,
-                &[
-                    ("reason", "broken", stats.connections_closed_broken as f64),
-                    ("reason", "invalid", stats.connections_closed_invalid as f64),
-                    (
-                        "reason",
-                        "max_lifetime",
-                        stats.connections_closed_max_lifetime as f64,
-                    ),
-                    (
-                        "reason",
-                        "idle_timeout",
-                        stats.connections_closed_idle_timeout as f64,
-                    ),
-                ],
-            ),
+            counter_with_labels(&self.desc[6].1, &[
+                ("reason", "broken", stats.connections_closed_broken as f64),
+                ("reason", "invalid", stats.connections_closed_invalid as f64),
+                ("reason", "max_lifetime", stats.connections_closed_max_lifetime as f64),
+                ("reason", "idle_timeout", stats.connections_closed_idle_timeout as f64),
+            ]),
         ]
     }
 }
@@ -794,15 +739,11 @@ impl CheckpointLagMetricReporter {
 
     pub fn report_lag(&self, cp_sequence_number: u64, checkpoint_timestamp_ms: u64) {
         let lag = chrono::Utc::now().timestamp_millis() - checkpoint_timestamp_ms as i64;
-        self.checkpoint_time_lag_histogram
-            .observe((lag as f64) / 1000.0);
+        self.checkpoint_time_lag_histogram.observe((lag as f64) / 1000.0);
 
-        let prev = self
-            .latest_reported_checkpoint
-            .fetch_max(cp_sequence_number, std::sync::atomic::Ordering::Relaxed);
+        let prev = self.latest_reported_checkpoint.fetch_max(cp_sequence_number, std::sync::atomic::Ordering::Relaxed);
         if cp_sequence_number > prev {
-            self.latest_checkpoint_sequence_number_gauge
-                .set(cp_sequence_number as i64);
+            self.latest_checkpoint_sequence_number_gauge.set(cp_sequence_number as i64);
             self.latest_checkpoint_time_lag_gauge.set(lag);
         }
     }
@@ -812,10 +753,7 @@ impl CheckpointLagMetricReporter {
 async fn metrics(Extension(registry): Extension<Registry>) -> (StatusCode, String) {
     match TextEncoder.encode_to_string(&registry.gather()) {
         Ok(s) => (StatusCode::OK, s),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("unable to encoding metrics: {e}"),
-        ),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("unable to encoding metrics: {e}")),
     }
 }
 
@@ -824,13 +762,8 @@ fn desc(name: &str, help: &str) -> Desc {
 }
 
 fn desc_with_labels(name: &str, help: &str, labels: &[&str]) -> Desc {
-    Desc::new(
-        name.to_string(),
-        help.to_string(),
-        labels.iter().map(|s| s.to_string()).collect(),
-        Default::default(),
-    )
-    .expect("Bad metric description")
+    Desc::new(name.to_string(), help.to_string(), labels.iter().map(|s| s.to_string()).collect(), Default::default())
+        .expect("Bad metric description")
 }
 
 fn gauge(desc: &Desc, value: f64) -> MetricFamily {

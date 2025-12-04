@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use mysten_network::callback::CallbackLayer;
 use reader::StateReader;
 use rest::build_rest_router;
-use std::sync::Arc;
-use sui_types::storage::RpcStateReader;
-use sui_types::transaction_executor::TransactionExecutor;
+use sui_types::{storage::RpcStateReader, transaction_executor::TransactionExecutor};
 use tap::Pipe;
 
 pub mod client;
@@ -26,8 +26,7 @@ pub use config::Config;
 pub use error::{Result, RpcServiceError};
 pub use metrics::RpcMetrics;
 pub use sui_types::full_checkpoint_content::{CheckpointData, CheckpointTransaction};
-pub use types::CheckpointResponse;
-pub use types::ObjectResponse;
+pub use types::{CheckpointResponse, ObjectResponse};
 
 #[derive(Clone)]
 pub struct RpcService {
@@ -80,8 +79,7 @@ impl RpcService {
         let metrics = self.metrics.clone();
 
         let mut router = {
-            let node_service =
-                crate::proto::node::node_service_server::NodeServiceServer::new(self.clone());
+            let node_service = crate::proto::node::node_service_server::NodeServiceServer::new(self.clone());
             // legacy node service
             let node = crate::proto::node::node_server::NodeServer::new(self.clone());
 
@@ -103,12 +101,7 @@ impl RpcService {
                 S::NAME
             }
 
-            health_reporter
-                .set_service_status(
-                    service_name(&node_service),
-                    tonic_health::ServingStatus::Serving,
-                )
-                .await;
+            health_reporter.set_service_status(service_name(&node_service), tonic_health::ServingStatus::Serving).await;
 
             grpc::Services::new()
                 .add_service(health_service)
@@ -123,21 +116,15 @@ impl RpcService {
             router = router.merge(build_rest_router(self.clone()));
         }
 
-        let health_endpoint = axum::Router::new()
-            .route("/health", axum::routing::get(rest::health::health))
-            .with_state(self.clone());
+        let health_endpoint =
+            axum::Router::new().route("/health", axum::routing::get(rest::health::health)).with_state(self.clone());
 
         router
             .merge(health_endpoint)
-            .layer(axum::middleware::map_response_with_state(
-                self,
-                response::append_info_headers,
-            ))
+            .layer(axum::middleware::map_response_with_state(self, response::append_info_headers))
             .pipe(|router| {
                 if let Some(metrics) = metrics {
-                    router.layer(CallbackLayer::new(
-                        metrics::RpcMetricsMakeCallbackHandler::new(metrics),
-                    ))
+                    router.layer(CallbackLayer::new(metrics::RpcMetricsMakeCallbackHandler::new(metrics)))
                 } else {
                     router
                 }
@@ -146,9 +133,7 @@ impl RpcService {
 
     pub async fn start_service(self, socket_address: std::net::SocketAddr) {
         let listener = tokio::net::TcpListener::bind(socket_address).await.unwrap();
-        axum::serve(listener, self.into_router().await)
-            .await
-            .unwrap();
+        axum::serve(listener, self.into_router().await).await.unwrap();
     }
 }
 

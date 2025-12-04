@@ -5,64 +5,76 @@ pub use checked::*;
 
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use std::collections::BTreeSet;
     use std::{
         borrow::Borrow,
-        collections::{BTreeMap, HashMap},
+        collections::{BTreeMap, BTreeSet, HashMap},
         sync::Arc,
     };
 
-    use crate::adapter::new_native_extensions;
-    use crate::error::convert_vm_error;
-    use crate::execution_mode::ExecutionMode;
-    use crate::execution_value::{CommandKind, ObjectContents, TryFromValue, Value};
-    use crate::execution_value::{
-        ExecutionState, InputObjectMetadata, InputValue, ObjectValue, RawValueType, ResultValue,
-        UsageKind,
-    };
-    use crate::gas_charger::GasCharger;
-    use crate::programmable_transactions::linkage_view::LinkageView;
-    use crate::type_resolver::TypeTagResolver;
     use move_binary_format::{
         errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
         file_format::{CodeOffset, FunctionDefinitionIndex, TypeParameterIndex},
         CompiledModule,
     };
-    use move_core_types::resolver::ModuleResolver;
-    use move_core_types::vm_status::StatusCode;
     use move_core_types::{
         account_address::AccountAddress,
         identifier::IdentStr,
         language_storage::{ModuleId, StructTag, TypeTag},
+        resolver::ModuleResolver,
+        vm_status::StatusCode,
     };
-    use move_vm_runtime::native_extensions::NativeContextExtensions;
     use move_vm_runtime::{
         move_vm::MoveVM,
+        native_extensions::NativeContextExtensions,
         session::{LoadedFunctionInstantiation, SerializedReturnValues},
     };
-    use move_vm_types::data_store::DataStore;
-    use move_vm_types::loaded_data::runtime_types::Type;
+    use move_vm_types::{data_store::DataStore, loaded_data::runtime_types::Type};
     use sui_move_natives::object_runtime::{
-        self, get_all_uids, max_event_error, LoadedRuntimeObject, ObjectRuntime, RuntimeResults,
+        self,
+        get_all_uids,
+        max_event_error,
+        LoadedRuntimeObject,
+        ObjectRuntime,
+        RuntimeResults,
     };
     use sui_protocol_config::ProtocolConfig;
-    use sui_types::execution::ExecutionResults;
-    use sui_types::storage::{DenyListResult, PackageObject};
     use sui_types::{
         balance::Balance,
         base_types::{MoveObjectType, ObjectID, SuiAddress, TxContext},
         coin::Coin,
-        error::{ExecutionError, ExecutionErrorKind},
+        error::{command_argument_error, ExecutionError, ExecutionErrorKind},
         event::Event,
-        execution::ExecutionResultsV2,
+        execution::{ExecutionResults, ExecutionResultsV2},
+        execution_status::CommandArgumentError,
         metrics::LimitsMetrics,
         move_package::MovePackage,
         object::{Data, MoveObject, Object, ObjectInner, Owner},
-        storage::BackingPackageStore,
+        storage::{BackingPackageStore, DenyListResult, PackageObject},
         transaction::{Argument, CallArg, ObjectArg},
     };
-    use sui_types::{error::command_argument_error, execution_status::CommandArgumentError};
     use tracing::instrument;
+
+    use crate::{
+        adapter::new_native_extensions,
+        error::convert_vm_error,
+        execution_mode::ExecutionMode,
+        execution_value::{
+            CommandKind,
+            ExecutionState,
+            InputObjectMetadata,
+            InputValue,
+            ObjectContents,
+            ObjectValue,
+            RawValueType,
+            ResultValue,
+            TryFromValue,
+            UsageKind,
+            Value,
+        },
+        gas_charger::GasCharger,
+        programmable_transactions::linkage_view::LinkageView,
+        type_resolver::TypeTagResolver,
+    };
 
     /// Maintains all runtime state specific to programmable transactions
     pub struct ExecutionContext<'vm, 'state, 'a> {
@@ -158,30 +170,19 @@ mod checked {
                 // subtract the max gas budget. This amount is off limits in the programmable transaction,
                 // so to mimic this "off limits" behavior, we act as if the coin has less balance than
                 // it really does
-                let Some(Value::Object(ObjectValue {
-                    contents: ObjectContents::Coin(coin),
-                    ..
-                })) = &mut gas.inner.value
+                let Some(Value::Object(ObjectValue { contents: ObjectContents::Coin(coin), .. })) = &mut gas.inner.value
                 else {
                     invariant_violation!("Gas object should be a populated coin")
                 };
 
                 let max_gas_in_balance = gas_charger.gas_budget();
                 let Some(new_balance) = coin.balance.value().checked_sub(max_gas_in_balance) else {
-                    invariant_violation!(
-                        "Transaction input checker should check that there is enough gas"
-                    );
+                    invariant_violation!("Transaction input checker should check that there is enough gas");
                 };
                 coin.balance = Balance::new(new_balance);
                 gas
             } else {
-                InputValue {
-                    object_metadata: None,
-                    inner: ResultValue {
-                        last_usage_kind: None,
-                        value: None,
-                    },
-                }
+                InputValue { object_metadata: None, inner: ResultValue { last_usage_kind: None, value: None } }
             };
             let native_extensions = new_native_extensions(
                 state_view.as_child_resolver(),
@@ -238,58 +239,37 @@ mod checked {
         pub fn fresh_id(&mut self) -> Result<ObjectID, ExecutionError> {
             let object_id = self.tx_context.fresh_id();
             let object_runtime: &mut ObjectRuntime = self.native_extensions.get_mut();
-            object_runtime
-                .new_id(object_id)
-                .map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))?;
+            object_runtime.new_id(object_id).map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))?;
             Ok(object_id)
         }
 
         /// Delete an ID and update the state
         pub fn delete_id(&mut self, object_id: ObjectID) -> Result<(), ExecutionError> {
             let object_runtime: &mut ObjectRuntime = self.native_extensions.get_mut();
-            object_runtime
-                .delete_id(object_id)
-                .map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))
+            object_runtime.delete_id(object_id).map_err(|e| self.convert_vm_error(e.finish(Location::Undefined)))
         }
 
         /// Set the link context for the session from the linkage information in the MovePackage found
         /// at `package_id`.  Returns the runtime ID of the link context package on success.
-        pub fn set_link_context(
-            &mut self,
-            package_id: ObjectID,
-        ) -> Result<AccountAddress, ExecutionError> {
+        pub fn set_link_context(&mut self, package_id: ObjectID) -> Result<AccountAddress, ExecutionError> {
             if self.linkage_view.has_linkage(package_id) {
                 // Setting same context again, can skip.
-                return Ok(self
-                    .linkage_view
-                    .original_package_id()
-                    .unwrap_or(*package_id));
+                return Ok(self.linkage_view.original_package_id().unwrap_or(*package_id));
             }
 
-            let package = package_for_linkage(&self.linkage_view, package_id)
-                .map_err(|e| self.convert_vm_error(e))?;
+            let package = package_for_linkage(&self.linkage_view, package_id).map_err(|e| self.convert_vm_error(e))?;
 
             self.linkage_view.set_linkage(package.move_package())
         }
 
         /// Load a type using the context's current session.
         pub fn load_type(&mut self, type_tag: &TypeTag) -> VMResult<Type> {
-            load_type(
-                self.vm,
-                &mut self.linkage_view,
-                &self.new_packages,
-                type_tag,
-            )
+            load_type(self.vm, &mut self.linkage_view, &self.new_packages, type_tag)
         }
 
         /// Load a type using the context's current session.
         pub fn load_type_from_struct(&mut self, struct_tag: &StructTag) -> VMResult<Type> {
-            load_type_from_struct(
-                self.vm,
-                &mut self.linkage_view,
-                &self.new_packages,
-                struct_tag,
-            )
+            load_type_from_struct(self.vm, &mut self.linkage_view, &self.new_packages, struct_tag)
         }
 
         /// Takes the user events from the runtime and tags them with the Move module of the function
@@ -313,11 +293,7 @@ mod checked {
             let new_events = events
                 .into_iter()
                 .map(|(ty, tag, value)| {
-                    let layout = self
-                        .vm
-                        .get_runtime()
-                        .type_to_type_layout(&ty)
-                        .map_err(|e| self.convert_vm_error(e))?;
+                    let layout = self.vm.get_runtime().type_to_type_layout(&ty).map_err(|e| self.convert_vm_error(e))?;
                     let Some(bytes) = value.simple_serialize(&layout) else {
                         invariant_violation!("Failed to deserialize already serialized Move value");
                     };
@@ -338,9 +314,9 @@ mod checked {
             arg_idx: usize,
             arg: Argument,
         ) -> Result<V, ExecutionError> {
-            self.by_value_arg_(command_kind, arg)
-                .map_err(|e| command_argument_error(e, arg_idx))
+            self.by_value_arg_(command_kind, arg).map_err(|e| command_argument_error(e, arg_idx))
         }
+
         fn by_value_arg_<V: TryFromValue>(
             &mut self,
             command_kind: CommandKind<'_>,
@@ -363,50 +339,27 @@ mod checked {
                 return Err(CommandArgumentError::InvalidValueUsage);
             }
             // Gas coin cannot be taken by value, except in TransferObjects
-            if matches!(arg, Argument::GasCoin)
-                && !matches!(command_kind, CommandKind::TransferObjects)
-            {
+            if matches!(arg, Argument::GasCoin) && !matches!(command_kind, CommandKind::TransferObjects) {
                 return Err(CommandArgumentError::InvalidGasCoinUsage);
             }
             // Immutable objects cannot be taken by value
-            if matches!(
-                input_metadata_opt,
-                Some(InputObjectMetadata::InputObject {
-                    owner: Owner::Immutable,
-                    ..
-                })
-            ) {
+            if matches!(input_metadata_opt, Some(InputObjectMetadata::InputObject { owner: Owner::Immutable, .. })) {
                 return Err(CommandArgumentError::InvalidObjectByValue);
             }
             if (
                 // this check can be removed after shared_object_deletion feature flag is removed
-                matches!(
-                    input_metadata_opt,
-                    Some(InputObjectMetadata::InputObject {
-                        owner: Owner::Shared { .. },
-                        ..
-                    })
-                ) && !shared_obj_deletion_enabled
+                matches!(input_metadata_opt, Some(InputObjectMetadata::InputObject { owner: Owner::Shared { .. }, .. }))
+                    && !shared_obj_deletion_enabled
             ) {
                 return Err(CommandArgumentError::InvalidObjectByValue);
             }
 
             // Any input object taken by value must be mutable
-            if matches!(
-                input_metadata_opt,
-                Some(InputObjectMetadata::InputObject {
-                    is_mutable_input: false,
-                    ..
-                })
-            ) {
+            if matches!(input_metadata_opt, Some(InputObjectMetadata::InputObject { is_mutable_input: false, .. })) {
                 return Err(CommandArgumentError::InvalidObjectByValue);
             }
 
-            let val = if is_copyable {
-                val_opt.as_ref().unwrap().clone()
-            } else {
-                val_opt.take().unwrap()
-            };
+            let val = if is_copyable { val_opt.as_ref().unwrap().clone() } else { val_opt.take().unwrap() };
             V::try_from_value(val)
         }
 
@@ -415,18 +368,11 @@ mod checked {
         /// restore_arg
         /// Errors if out of bounds, if the argument is borrowed, if it is unavailable (already taken),
         /// or if it is an object that cannot be mutably borrowed (immutable)
-        pub fn borrow_arg_mut<V: TryFromValue>(
-            &mut self,
-            arg_idx: usize,
-            arg: Argument,
-        ) -> Result<V, ExecutionError> {
-            self.borrow_arg_mut_(arg)
-                .map_err(|e| command_argument_error(e, arg_idx))
+        pub fn borrow_arg_mut<V: TryFromValue>(&mut self, arg_idx: usize, arg: Argument) -> Result<V, ExecutionError> {
+            self.borrow_arg_mut_(arg).map_err(|e| command_argument_error(e, arg_idx))
         }
-        fn borrow_arg_mut_<V: TryFromValue>(
-            &mut self,
-            arg: Argument,
-        ) -> Result<V, CommandArgumentError> {
+
+        fn borrow_arg_mut_<V: TryFromValue>(&mut self, arg: Argument) -> Result<V, CommandArgumentError> {
             // mutable borrowing requires unique usage
             if self.arg_is_borrowed(&arg) {
                 return Err(CommandArgumentError::InvalidValueUsage);
@@ -439,20 +385,12 @@ mod checked {
                 // error if taken
                 return Err(CommandArgumentError::InvalidValueUsage);
             };
-            if let Some(InputObjectMetadata::InputObject {
-                is_mutable_input: false,
-                ..
-            }) = input_metadata_opt
-            {
+            if let Some(InputObjectMetadata::InputObject { is_mutable_input: false, .. }) = input_metadata_opt {
                 return Err(CommandArgumentError::InvalidObjectByMutRef);
             }
             // if it is copyable, don't take it as we allow for the value to be copied even if
             // mutably borrowed
-            let val = if is_copyable {
-                val_opt.as_ref().unwrap().clone()
-            } else {
-                val_opt.take().unwrap()
-            };
+            let val = if is_copyable { val_opt.as_ref().unwrap().clone() } else { val_opt.take().unwrap() };
             V::try_from_value(val)
         }
 
@@ -465,14 +403,10 @@ mod checked {
             arg: Argument,
             type_: &Type,
         ) -> Result<V, ExecutionError> {
-            self.borrow_arg_(arg, type_)
-                .map_err(|e| command_argument_error(e, arg_idx))
+            self.borrow_arg_(arg, type_).map_err(|e| command_argument_error(e, arg_idx))
         }
-        fn borrow_arg_<V: TryFromValue>(
-            &mut self,
-            arg: Argument,
-            arg_type: &Type,
-        ) -> Result<V, CommandArgumentError> {
+
+        fn borrow_arg_<V: TryFromValue>(&mut self, arg: Argument, arg_type: &Type) -> Result<V, CommandArgumentError> {
             // immutable borrowing requires the value was not mutably borrowed.
             // If it was copied, that is okay.
             // If it was taken/moved, we will find out below
@@ -526,11 +460,7 @@ mod checked {
         }
 
         /// Transfer the object to a new owner
-        pub fn transfer_object(
-            &mut self,
-            obj: ObjectValue,
-            addr: SuiAddress,
-        ) -> Result<(), ExecutionError> {
+        pub fn transfer_object(&mut self, obj: ObjectValue, addr: SuiAddress) -> Result<(), ExecutionError> {
             self.additional_transfers.push((addr, obj));
             Ok(())
         }
@@ -557,12 +487,7 @@ mod checked {
             new_modules: &[CompiledModule],
             dependencies: impl IntoIterator<Item = &'p MovePackage>,
         ) -> Result<MovePackage, ExecutionError> {
-            previous_package.new_upgraded(
-                storage_id,
-                new_modules,
-                self.protocol_config,
-                dependencies,
-            )
+            previous_package.new_upgraded(storage_id, new_modules, self.protocol_config, dependencies)
         }
 
         /// Add a newly created package to write as an effect of the transaction
@@ -580,14 +505,10 @@ mod checked {
 
         /// Finish a command: clearing the borrows and adding the results to the result vector
         pub fn push_command_results(&mut self, results: Vec<Value>) -> Result<(), ExecutionError> {
-            assert_invariant!(
-                self.borrowed.values().all(|is_mut| !is_mut),
-                "all mut borrows should be restored"
-            );
+            assert_invariant!(self.borrowed.values().all(|is_mut| !is_mut), "all mut borrows should be restored");
             // clear borrow state
             self.borrowed = HashMap::new();
-            self.results
-                .push(results.into_iter().map(ResultValue::new).collect());
+            self.results.push(results.into_iter().map(ResultValue::new).collect());
             Ok(())
         }
 
@@ -629,13 +550,7 @@ mod checked {
                 else {
                     continue;
                 };
-                loaded_runtime_objects.insert(
-                    id,
-                    LoadedRuntimeObject {
-                        version,
-                        is_modified: true,
-                    },
-                );
+                loaded_runtime_objects.insert(id, LoadedRuntimeObject { version, is_modified: true });
                 if let Some(Value::Object(object_value)) = value {
                     add_additional_write(&mut additional_writes, owner, object_value)?;
                 } else if owner.is_shared() {
@@ -647,10 +562,7 @@ mod checked {
             if !Mode::allow_arbitrary_values() {
                 for (i, command_result) in results.iter().enumerate() {
                     for (j, result_value) in command_result.iter().enumerate() {
-                        let ResultValue {
-                            last_usage_kind,
-                            value,
-                        } = result_value;
+                        let ResultValue { last_usage_kind, value } = result_value;
                         match value {
                             None => (),
                             Some(Value::Object(_)) => {
@@ -668,8 +580,7 @@ mod checked {
                                 //   last usage is actually a take instead of a clone
                                 // - Otherwise, an error
                                 if abilities.has_drop()
-                                    || (abilities.has_copy()
-                                        && matches!(last_usage_kind, Some(UsageKind::ByValue)))
+                                    || (abilities.has_copy() && matches!(last_usage_kind, Some(UsageKind::ByValue)))
                                 {
                                 } else {
                                     let msg = if abilities.has_copy() {
@@ -712,10 +623,7 @@ mod checked {
                 mut created_object_ids,
                 deleted_object_ids,
             } = object_runtime.finish()?;
-            assert_invariant!(
-                remaining_events.is_empty(),
-                "Events should be taken after every Move call"
-            );
+            assert_invariant!(remaining_events.is_empty(), "Events should be taken after every Move call");
 
             loaded_runtime_objects.extend(loaded_child_objects);
 
@@ -727,12 +635,7 @@ mod checked {
                 written_objects.insert(id, package_obj);
             }
             for (id, additional_write) in additional_writes {
-                let AdditionalWrite {
-                    recipient,
-                    type_,
-                    has_public_transfer,
-                    bytes,
-                } = additional_write;
+                let AdditionalWrite { recipient, type_, has_public_transfer, bytes } = additional_write;
                 // safe given the invariant that the runtime correctly propagates has_public_transfer
                 let move_object = unsafe {
                     create_written_object(
@@ -755,21 +658,11 @@ mod checked {
 
             for (id, (recipient, ty, value)) in writes {
                 let abilities = vm.get_runtime().get_type_abilities(&ty).map_err(|e| {
-                    convert_vm_error(
-                        e,
-                        vm,
-                        &linkage_view,
-                        protocol_config.resolve_abort_locations_to_package_id(),
-                    )
+                    convert_vm_error(e, vm, &linkage_view, protocol_config.resolve_abort_locations_to_package_id())
                 })?;
                 let has_public_transfer = abilities.has_store();
                 let layout = vm.get_runtime().type_to_type_layout(&ty).map_err(|e| {
-                    convert_vm_error(
-                        e,
-                        vm,
-                        &linkage_view,
-                        protocol_config.resolve_abort_locations_to_package_id(),
-                    )
+                    convert_vm_error(e, vm, &linkage_view, protocol_config.resolve_abort_locations_to_package_id())
                 })?;
                 let Some(bytes) = value.simple_serialize(&layout) else {
                     invariant_violation!("Failed to deserialize already serialized Move value");
@@ -819,8 +712,12 @@ mod checked {
                         return Err(ExecutionError::new(
                             ExecutionErrorKind::SharedObjectOperationNotAllowed,
                             Some(
-                                format!("Shared object operation on {} not allowed: \
-                                         shared objects used by value must be re-shared if not deleted", id).into(),
+                                format!(
+                                    "Shared object operation on {} not allowed: \
+                                         shared objects used by value must be re-shared if not deleted",
+                                    id
+                                )
+                                .into(),
                             ),
                         ));
                     }
@@ -828,10 +725,8 @@ mod checked {
             }
 
             if protocol_config.enable_coin_deny_list_v2() {
-                let DenyListResult {
-                    result,
-                    num_non_gas_coin_owners,
-                } = state_view.check_coin_deny_list(&written_objects);
+                let DenyListResult { result, num_non_gas_coin_owners } =
+                    state_view.check_coin_deny_list(&written_objects);
                 gas_charger.charge_coin_transfers(protocol_config, num_non_gas_coin_owners)?;
                 result?;
             }
@@ -839,13 +734,7 @@ mod checked {
             let user_events = user_events
                 .into_iter()
                 .map(|(module_id, tag, contents)| {
-                    Event::new(
-                        module_id.address(),
-                        module_id.name(),
-                        tx_context.sender(),
-                        tag,
-                        contents,
-                    )
+                    Event::new(module_id.address(), module_id.name(), tx_context.sender(), tag, contents)
                 })
                 .collect();
 
@@ -876,9 +765,7 @@ mod checked {
             use move_core_types::vm_status::StatusCode;
             use sui_types::execution_status::TypeArgumentError;
             match error.major_status() {
-                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH => {
-                    ExecutionErrorKind::TypeArityMismatch.into()
-                }
+                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH => ExecutionErrorKind::TypeArityMismatch.into(),
                 StatusCode::TYPE_RESOLUTION_FAILURE => ExecutionErrorKind::TypeArgumentError {
                     argument_idx: idx as TypeParameterIndex,
                     kind: TypeArgumentError::TypeNotFound,
@@ -908,8 +795,7 @@ mod checked {
             &mut self,
             arg: Argument,
             usage: UsageKind,
-        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError>
-        {
+        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError> {
             self.borrow_mut_impl(arg, Some(usage))
         }
 
@@ -919,8 +805,7 @@ mod checked {
             &mut self,
             arg: Argument,
             update_last_usage: Option<UsageKind>,
-        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError>
-        {
+        ) -> Result<(Option<&InputObjectMetadata>, &mut Option<Value>), CommandArgumentError> {
             let (metadata, result_value) = match arg {
                 Argument::GasCoin => (self.gas.object_metadata.as_ref(), &mut self.gas.inner),
                 Argument::Input(i) => {
@@ -943,10 +828,7 @@ mod checked {
                         return Err(CommandArgumentError::IndexOutOfBounds { idx: i });
                     };
                     let Some(result_value) = command_result.get_mut(j as usize) else {
-                        return Err(CommandArgumentError::SecondaryIndexOutOfBounds {
-                            result_idx: i,
-                            secondary_idx: j,
-                        });
+                        return Err(CommandArgumentError::SecondaryIndexOutOfBounds { result_idx: i, secondary_idx: j });
                     };
                     (None, result_value)
                 }
@@ -984,12 +866,7 @@ mod checked {
             type_arguments: &[Type],
         ) -> VMResult<LoadedFunctionInstantiation> {
             let mut data_store = SuiDataStore::new(&self.linkage_view, &self.new_packages);
-            self.vm.get_runtime().load_function(
-                module_id,
-                function_name,
-                type_arguments,
-                &mut data_store,
-            )
+            self.vm.get_runtime().load_function(module_id, function_name, type_arguments, &mut data_store)
         }
 
         pub(crate) fn make_object_value(
@@ -1011,11 +888,7 @@ mod checked {
             )
         }
 
-        pub fn publish_module_bundle(
-            &mut self,
-            modules: Vec<Vec<u8>>,
-            sender: AccountAddress,
-        ) -> VMResult<()> {
+        pub fn publish_module_bundle(&mut self, modules: Vec<Vec<u8>>, sender: AccountAddress) -> VMResult<()> {
             // TODO: publish_module_bundle() currently doesn't charge gas.
             // Do we want to charge there?
             let mut data_store = SuiDataStore::new(&self.linkage_view, &self.new_packages);
@@ -1030,19 +903,13 @@ mod checked {
 
     impl<'vm, 'state, 'a> TypeTagResolver for ExecutionContext<'vm, 'state, 'a> {
         fn get_type_tag(&self, type_: &Type) -> Result<TypeTag, ExecutionError> {
-            self.vm
-                .get_runtime()
-                .get_type_tag(type_)
-                .map_err(|e| self.convert_vm_error(e))
+            self.vm.get_runtime().get_type_tag(type_).map_err(|e| self.convert_vm_error(e))
         }
     }
 
     /// Fetch the package at `package_id` with a view to using it as a link context.  Produces an error
     /// if the object at that ID does not exist, or is not a package.
-    fn package_for_linkage(
-        linkage_view: &LinkageView,
-        package_id: ObjectID,
-    ) -> VMResult<PackageObject> {
+    fn package_for_linkage(linkage_view: &LinkageView, package_id: ObjectID) -> VMResult<PackageObject> {
         use move_binary_format::errors::PartialVMError;
         use move_core_types::vm_status::StatusCode;
 
@@ -1052,9 +919,7 @@ mod checked {
                 .with_message(format!("Cannot find link context {package_id} in store"))
                 .finish(Location::Undefined)),
             Err(err) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!(
-                    "Error loading link context {package_id} from store: {err}"
-                ))
+                .with_message(format!("Error loading link context {package_id} from store: {err}"))
                 .finish(Location::Undefined)),
         }
     }
@@ -1069,12 +934,7 @@ mod checked {
             Err(PartialVMError::new(code).finish(Location::Undefined))
         }
 
-        let StructTag {
-            address,
-            module,
-            name,
-            type_params,
-        } = struct_tag;
+        let StructTag { address, module, name, type_params } = struct_tag;
 
         // Load the package that the struct is defined in, in storage
         let defining_id = ObjectID::from_address(*address);
@@ -1082,13 +942,11 @@ mod checked {
 
         // Set the defining package as the link context while loading the
         // struct
-        let original_address = linkage_view
-            .set_linkage(package.move_package())
-            .map_err(|e| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(e.to_string())
-                    .finish(Location::Undefined)
-            })?;
+        let original_address = linkage_view.set_linkage(package.move_package()).map_err(|e| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message(e.to_string())
+                .finish(Location::Undefined)
+        })?;
 
         let runtime_id = ModuleId::new(original_address, module.clone());
         let data_store = SuiDataStore::new(linkage_view, new_packages);
@@ -1118,10 +976,7 @@ mod checked {
                 }
             }
 
-            Ok(Type::DatatypeInstantiation(Box::new((
-                idx,
-                loaded_type_params,
-            ))))
+            Ok(Type::DatatypeInstantiation(Box::new((idx, loaded_type_params))))
         }
     }
 
@@ -1144,12 +999,8 @@ mod checked {
             TypeTag::Address => Type::Address,
             TypeTag::Signer => Type::Signer,
 
-            TypeTag::Vector(inner) => {
-                Type::Vector(Box::new(load_type(vm, linkage_view, new_packages, inner)?))
-            }
-            TypeTag::Struct(struct_tag) => {
-                return load_type_from_struct(vm, linkage_view, new_packages, struct_tag)
-            }
+            TypeTag::Vector(inner) => Type::Vector(Box::new(load_type(vm, linkage_view, new_packages, inner)?)),
+            TypeTag::Struct(struct_tag) => return load_type_from_struct(vm, linkage_view, new_packages, struct_tag),
         })
     }
 
@@ -1164,9 +1015,7 @@ mod checked {
         contents: &[u8],
     ) -> Result<ObjectValue, ExecutionError> {
         let contents = if type_.is_coin() {
-            let Ok(coin) = Coin::from_bcs_bytes(contents) else {
-                invariant_violation!("Could not deserialize a coin")
-            };
+            let Ok(coin) = Coin::from_bcs_bytes(contents) else { invariant_violation!("Could not deserialize a coin") };
             ObjectContents::Coin(coin)
         } else {
             ObjectContents::Raw(contents.to_vec())
@@ -1174,12 +1023,7 @@ mod checked {
 
         let tag: StructTag = type_.into();
         let type_ = load_type_from_struct(vm, linkage_view, new_packages, &tag).map_err(|e| {
-            crate::error::convert_vm_error(
-                e,
-                vm,
-                linkage_view,
-                protocol_config.resolve_abort_locations_to_package_id(),
-            )
+            crate::error::convert_vm_error(e, vm, linkage_view, protocol_config.resolve_abort_locations_to_package_id())
         })?;
         let has_public_transfer = if protocol_config.recompute_has_public_transfer_in_execution() {
             let abilities = vm.get_runtime().get_type_abilities(&type_).map_err(|e| {
@@ -1194,12 +1038,7 @@ mod checked {
         } else {
             has_public_transfer
         };
-        Ok(ObjectValue {
-            type_,
-            has_public_transfer,
-            used_in_non_entry_move_call,
-            contents,
-        })
+        Ok(ObjectValue { type_, has_public_transfer, used_in_non_entry_move_call, contents })
     }
 
     pub(crate) fn value_from_object(
@@ -1209,11 +1048,7 @@ mod checked {
         new_packages: &[MovePackage],
         object: &Object,
     ) -> Result<ObjectValue, ExecutionError> {
-        let ObjectInner {
-            data: Data::Move(object),
-            ..
-        } = object.as_inner()
-        else {
+        let ObjectInner { data: Data::Move(object), .. } = object.as_inner() else {
             invariant_violation!("Expected a Move object");
         };
 
@@ -1247,8 +1082,7 @@ mod checked {
         };
         // override_as_immutable ==> Owner::Shared or Owner::ConsensusV2
         assert_invariant!(
-            !override_as_immutable
-                || matches!(obj.owner, Owner::Shared { .. } | Owner::ConsensusV2 { .. }),
+            !override_as_immutable || matches!(obj.owner, Owner::Shared { .. } | Owner::ConsensusV2 { .. }),
             "override_as_immutable should only be set for consensus objects"
         );
         let is_mutable_input = match obj.owner {
@@ -1262,24 +1096,12 @@ mod checked {
         };
         let owner = obj.owner.clone();
         let version = obj.version();
-        let object_metadata = InputObjectMetadata::InputObject {
-            id,
-            is_mutable_input,
-            owner: owner.clone(),
-            version,
-        };
+        let object_metadata = InputObjectMetadata::InputObject { id, is_mutable_input, owner: owner.clone(), version };
         let obj_value = value_from_object(protocol_config, vm, linkage_view, new_packages, obj)?;
         let contained_uids = {
-            let fully_annotated_layout = vm
-                .get_runtime()
-                .type_to_fully_annotated_layout(&obj_value.type_)
-                .map_err(|e| {
-                    convert_vm_error(
-                        e,
-                        vm,
-                        linkage_view,
-                        protocol_config.resolve_abort_locations_to_package_id(),
-                    )
+            let fully_annotated_layout =
+                vm.get_runtime().type_to_fully_annotated_layout(&obj_value.type_).map_err(|e| {
+                    convert_vm_error(e, vm, linkage_view, protocol_config.resolve_abort_locations_to_package_id())
                 })?;
             let mut bytes = vec![];
             obj_value.write_bcs_bytes(&mut bytes);
@@ -1290,11 +1112,7 @@ mod checked {
                 Ok(uids) => uids,
             }
         };
-        let runtime_input = object_runtime::InputObject {
-            contained_uids,
-            owner,
-            version,
-        };
+        let runtime_input = object_runtime::InputObject { contained_uids, owner, version };
         let prev = input_object_map.insert(id, runtime_input);
         // protected by transaction input checker
         assert_invariant!(prev.is_none(), "Duplicate input object {}", id);
@@ -1313,15 +1131,9 @@ mod checked {
     ) -> Result<InputValue, ExecutionError> {
         Ok(match call_arg {
             CallArg::Pure(bytes) => InputValue::new_raw(RawValueType::Any, bytes),
-            CallArg::Object(obj_arg) => load_object_arg(
-                protocol_config,
-                vm,
-                state_view,
-                linkage_view,
-                new_packages,
-                input_object_map,
-                obj_arg,
-            )?,
+            CallArg::Object(obj_arg) => {
+                load_object_arg(protocol_config, vm, state_view, linkage_view, new_packages, input_object_map, obj_arg)?
+            }
         })
     }
 
@@ -1356,9 +1168,7 @@ mod checked {
                 /* imm override */ !mutable,
                 id,
             ),
-            ObjectArg::Receiving((id, version, _)) => {
-                Ok(InputValue::new_receiving_object(id, version))
-            }
+            ObjectArg::Receiving((id, version, _)) => Ok(InputValue::new_receiving_object(id, version)),
         }
     }
 
@@ -1368,25 +1178,14 @@ mod checked {
         owner: Owner,
         object_value: ObjectValue,
     ) -> Result<(), ExecutionError> {
-        let ObjectValue {
-            type_,
-            has_public_transfer,
-            contents,
-            ..
-        } = object_value;
+        let ObjectValue { type_, has_public_transfer, contents, .. } = object_value;
         let bytes = match contents {
             ObjectContents::Coin(coin) => coin.to_bcs_bytes(),
             ObjectContents::Raw(bytes) => bytes,
         };
-        let object_id = MoveObject::id_opt(&bytes).map_err(|e| {
-            ExecutionError::invariant_violation(format!("No id for Raw object bytes. {e}"))
-        })?;
-        let additional_write = AdditionalWrite {
-            recipient: owner,
-            type_,
-            has_public_transfer,
-            bytes,
-        };
+        let object_id = MoveObject::id_opt(&bytes)
+            .map_err(|e| ExecutionError::invariant_violation(format!("No id for Raw object bytes. {e}")))?;
+        let additional_write = AdditionalWrite { recipient: owner, type_, has_public_transfer, bytes };
         additional_writes.insert(object_id, additional_write);
         Ok(())
     }
@@ -1401,9 +1200,7 @@ mod checked {
         let Some(AdditionalWrite { bytes, .. }) = additional_writes.get_mut(&gas_id) else {
             invariant_violation!("Gas object cannot be wrapped or destroyed")
         };
-        let Ok(mut coin) = Coin::from_bcs_bytes(bytes) else {
-            invariant_violation!("Gas object must be a coin")
-        };
+        let Ok(mut coin) = Coin::from_bcs_bytes(bytes) else { invariant_violation!("Gas object must be a coin") };
         let Some(new_balance) = coin.balance.value().checked_add(gas_charger.gas_budget()) else {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::CoinBalanceOverflow,
@@ -1430,21 +1227,11 @@ mod checked {
         has_public_transfer: bool,
         contents: Vec<u8>,
     ) -> Result<MoveObject, ExecutionError> {
-        debug_assert_eq!(
-            id,
-            MoveObject::id_opt(&contents).expect("object contents should start with an id")
-        );
-        let old_obj_ver = objects_modified_at
-            .get(&id)
-            .map(|obj: &LoadedRuntimeObject| obj.version);
+        debug_assert_eq!(id, MoveObject::id_opt(&contents).expect("object contents should start with an id"));
+        let old_obj_ver = objects_modified_at.get(&id).map(|obj: &LoadedRuntimeObject| obj.version);
 
         let type_tag = vm.get_runtime().get_type_tag(&type_).map_err(|e| {
-            crate::error::convert_vm_error(
-                e,
-                vm,
-                linkage_view,
-                protocol_config.resolve_abort_locations_to_package_id(),
-            )
+            crate::error::convert_vm_error(e, vm, linkage_view, protocol_config.resolve_abort_locations_to_package_id())
         })?;
 
         let struct_tag = match type_tag {
@@ -1472,14 +1259,8 @@ mod checked {
     }
 
     impl<'state, 'a> SuiDataStore<'state, 'a> {
-        pub(crate) fn new(
-            linkage_view: &'a LinkageView<'state>,
-            new_packages: &'a [MovePackage],
-        ) -> Self {
-            Self {
-                linkage_view,
-                new_packages,
-            }
+        pub(crate) fn new(linkage_view: &'a LinkageView<'state>, new_packages: &'a [MovePackage]) -> Self {
+            Self { linkage_view, new_packages }
         }
 
         fn get_module(&self, module_id: &ModuleId) -> Option<&Vec<u8>> {
@@ -1507,18 +1288,11 @@ mod checked {
             })
         }
 
-        fn defining_module(
-            &self,
-            runtime_id: &ModuleId,
-            struct_: &IdentStr,
-        ) -> PartialVMResult<ModuleId> {
-            self.linkage_view
-                .defining_module(runtime_id, struct_)
-                .map_err(|err| {
-                    PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
-                        "Error finding defining module for {runtime_id}::{struct_}: {err:?}"
-                    ))
-                })
+        fn defining_module(&self, runtime_id: &ModuleId, struct_: &IdentStr) -> PartialVMResult<ModuleId> {
+            self.linkage_view.defining_module(runtime_id, struct_).map_err(|err| {
+                PartialVMError::new(StatusCode::LINKER_ERROR)
+                    .with_message(format!("Error finding defining module for {runtime_id}::{struct_}: {err:?}"))
+            })
         }
 
         fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
@@ -1532,11 +1306,9 @@ mod checked {
                     .finish(Location::Undefined)),
                 Err(err) => {
                     let msg = format!("Unexpected storage error: {:?}", err);
-                    Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(msg)
-                            .finish(Location::Undefined),
-                    )
+                    Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg)
+                        .finish(Location::Undefined))
                 }
             }
         }

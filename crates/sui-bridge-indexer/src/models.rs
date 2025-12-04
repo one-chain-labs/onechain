@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use diesel::data_types::PgTimestamp;
-use diesel::{Identifiable, Insertable, Queryable, Selectable};
-
+use diesel::{data_types::PgTimestamp, Identifiable, Insertable, Queryable, Selectable};
 use sui_indexer_builder::{Task, LIVE_TASK_TARGET_CHECKPOINT};
 
 use crate::schema::{
-    governance_actions, progress_store, sui_error_transactions, sui_progress_store, token_transfer,
+    governance_actions,
+    progress_store,
+    sui_error_transactions,
+    sui_progress_store,
+    token_transfer,
     token_transfer_data,
 };
 

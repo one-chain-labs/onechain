@@ -3,30 +3,31 @@
 
 mod execution;
 use axum::Json;
-pub use execution::ExecuteTransaction;
-pub use execution::SimulateTransaction;
-pub use execution::SimulateTransactionQueryParameters;
-pub use execution::TransactionSimulationResponse;
+pub use execution::{
+    ExecuteTransaction,
+    SimulateTransaction,
+    SimulateTransactionQueryParameters,
+    TransactionSimulationResponse,
+};
 
 mod resolve;
-pub use resolve::ResolveTransaction;
-pub use resolve::ResolveTransactionQueryParameters;
-pub use resolve::ResolveTransactionResponse;
-
-use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
-use sui_sdk_types::CheckpointSequenceNumber;
-use sui_sdk_types::TransactionDigest;
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+};
+pub use resolve::{ResolveTransaction, ResolveTransactionQueryParameters, ResolveTransactionResponse};
+use sui_sdk_types::{CheckpointSequenceNumber, TransactionDigest};
 use tap::Pipe;
 
 use super::{ApiEndpoint, RouteHandler};
-use crate::rest::PageCursor;
-use crate::types::GetTransactionOptions;
-use crate::types::TransactionResponse;
-use crate::Direction;
-use crate::Result;
-use crate::RpcService;
-use crate::RpcServiceError;
+use crate::{
+    rest::PageCursor,
+    types::{GetTransactionOptions, TransactionResponse},
+    Direction,
+    Result,
+    RpcService,
+    RpcServiceError,
+};
 
 pub struct GetTransaction;
 
@@ -49,9 +50,7 @@ async fn get_transaction(
     Query(options): Query<GetTransactionOptions>,
     State(state): State<RpcService>,
 ) -> Result<Json<TransactionResponse>> {
-    state
-        .get_transaction(transaction_digest, &options)
-        .map(Json)
+    state.get_transaction(transaction_digest, &options).map(Json)
 }
 
 #[derive(Debug)]
@@ -91,25 +90,15 @@ async fn list_transactions(
     Query(cursor): Query<ListTransactionsCursorParameters>,
     Query(options): Query<GetTransactionOptions>,
     State(state): State<RpcService>,
-) -> Result<(
-    PageCursor<TransactionCursor>,
-    Json<Vec<TransactionResponse>>,
-)> {
-    let latest_checkpoint = state
-        .reader
-        .inner()
-        .get_latest_checkpoint()?
-        .sequence_number;
+) -> Result<(PageCursor<TransactionCursor>, Json<Vec<TransactionResponse>>)> {
+    let latest_checkpoint = state.reader.inner().get_latest_checkpoint()?.sequence_number;
     let oldest_checkpoint = state.reader.inner().get_lowest_available_checkpoint()?;
     let limit = cursor.limit();
     let start = cursor.start(latest_checkpoint);
     let direction = cursor.direction();
 
     if start.checkpoint < oldest_checkpoint {
-        return Err(RpcServiceError::new(
-            StatusCode::GONE,
-            "Old transactions have been pruned",
-        ));
+        return Err(RpcServiceError::new(StatusCode::GONE, "Old transactions have been pruned"));
     }
 
     let mut next_cursor = None;
@@ -120,24 +109,24 @@ async fn list_transactions(
         .map(|entry| {
             let (cursor_info, digest) = entry?;
             next_cursor = cursor_info.next_cursor;
-            state
-                .get_transaction(digest.into(), &options)
-                .map(|mut response| {
-                    response.checkpoint = Some(cursor_info.checkpoint);
-                    response.timestamp_ms = Some(cursor_info.timestamp_ms);
-                    response
-                })
+            state.get_transaction(digest.into(), &options).map(|mut response| {
+                response.checkpoint = Some(cursor_info.checkpoint);
+                response.timestamp_ms = Some(cursor_info.timestamp_ms);
+                response
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
 
     let cursor = next_cursor
-        .and_then(|(checkpoint, index)| {
-            if checkpoint < oldest_checkpoint {
-                None
-            } else {
-                Some(TransactionCursor { checkpoint, index })
-            }
-        })
+        .and_then(
+            |(checkpoint, index)| {
+                if checkpoint < oldest_checkpoint {
+                    None
+                } else {
+                    Some(TransactionCursor { checkpoint, index })
+                }
+            },
+        )
         .pipe(PageCursor);
 
     Ok((cursor, Json(transactions)))
@@ -174,15 +163,9 @@ impl std::str::FromStr for TransactionCursor {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         if let Some((checkpoint, index)) = s.split_once('.') {
-            Self {
-                checkpoint: checkpoint.parse()?,
-                index: Some(index.parse()?),
-            }
+            Self { checkpoint: checkpoint.parse()?, index: Some(index.parse()?) }
         } else {
-            Self {
-                checkpoint: s.parse()?,
-                index: None,
-            }
+            Self { checkpoint: s.parse()?, index: None }
         }
         .pipe(Ok)
     }
@@ -217,16 +200,11 @@ pub struct ListTransactionsCursorParameters {
 
 impl ListTransactionsCursorParameters {
     pub fn limit(&self) -> usize {
-        self.limit
-            .map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE))
-            .unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
+        self.limit.map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE)).unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
     }
 
     pub fn start(&self, default: CheckpointSequenceNumber) -> TransactionCursor {
-        self.start.unwrap_or(TransactionCursor {
-            checkpoint: default,
-            index: None,
-        })
+        self.start.unwrap_or(TransactionCursor { checkpoint: default, index: None })
     }
 
     pub fn direction(&self) -> Direction {

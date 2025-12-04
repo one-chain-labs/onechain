@@ -41,18 +41,9 @@ impl SurferTask {
             .skip(skip_accounts)
             .map(|address| (*address, (None, HashMap::new())))
             .collect();
-        let node = cluster
-            .swarm
-            .all_nodes()
-            .flat_map(|node| node.get_node_handle())
-            .next()
-            .unwrap();
-        let all_live_objects: Vec<_> = node.with(|node| {
-            node.state()
-                .get_accumulator_store()
-                .iter_cached_live_object_set_for_testing(false)
-                .collect()
-        });
+        let node = cluster.swarm.all_nodes().flat_map(|node| node.get_node_handle()).next().unwrap();
+        let all_live_objects: Vec<_> = node
+            .with(|node| node.state().get_accumulator_store().iter_cached_live_object_set_for_testing(false).collect());
         for obj in all_live_objects {
             match obj {
                 LiveObject::Normal(obj) => {
@@ -121,11 +112,7 @@ impl SurferTask {
                     shared_objects.clone(),
                     entry_functions.clone(),
                 );
-                SurferTask {
-                    state,
-                    surf_strategy: surf_strategy.clone(),
-                    exit_rcv: exit_rcv.clone(),
-                }
+                SurferTask { state, surf_strategy: surf_strategy.clone(), exit_rcv: exit_rcv.clone() }
             })
             .collect()
     }

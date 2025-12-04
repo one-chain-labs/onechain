@@ -1,15 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ResponseBody;
-use super::ResponseHandler;
-use http::Response;
-use pin_project_lite::pin_project;
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use http::Response;
+use pin_project_lite::pin_project;
+
+use super::{ResponseBody, ResponseHandler};
 
 pin_project! {
     /// Response future for [`Callback`].
@@ -40,13 +41,7 @@ where
             Ok(response) => {
                 let (head, body) = response.into_parts();
                 handler.on_response(&head);
-                Ok(Response::from_parts(
-                    head,
-                    ResponseBody {
-                        inner: body,
-                        handler,
-                    },
-                ))
+                Ok(Response::from_parts(head, ResponseBody { inner: body, handler }))
             }
             Err(error) => {
                 handler.on_error(&error);

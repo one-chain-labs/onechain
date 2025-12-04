@@ -25,10 +25,7 @@ use memory_stats_noop as memory_stats;
 
 pub mod allocators;
 
-#[cfg(any(
-    any(target_os = "macos", target_os = "ios"),
-    feature = "estimate-heapsize"
-))]
+#[cfg(any(any(target_os = "macos", target_os = "ios"), feature = "estimate-heapsize"))]
 pub mod sizeof;
 
 /// This is a copy of patched crate `malloc_size_of` as a module.
@@ -43,7 +40,6 @@ pub mod external_impls;
 
 pub use allocators::MallocSizeOfExt;
 pub use malloc_size::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
-
 pub use mysten_util_mem_derive::*;
 
 /// Heap size of structure.
@@ -84,9 +80,7 @@ pub struct MemoryAllocationTracker(self::memory_stats::MemoryAllocationTracker);
 impl MemoryAllocationTracker {
     /// Create an instance of an allocation tracker.
     pub fn new() -> Result<Self, MemoryStatsError> {
-        self::memory_stats::MemoryAllocationTracker::new()
-            .map(MemoryAllocationTracker)
-            .map_err(MemoryStatsError)
+        self::memory_stats::MemoryAllocationTracker::new().map(MemoryAllocationTracker).map_err(MemoryStatsError)
     }
 
     /// Create an allocation snapshot.
@@ -98,8 +92,9 @@ impl MemoryAllocationTracker {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod test {
-    use super::{malloc_size, MallocSizeOf, MallocSizeOfExt};
     use std::sync::Arc;
+
+    use super::{malloc_size, MallocSizeOf, MallocSizeOfExt};
 
     #[test]
     fn test_arc() {

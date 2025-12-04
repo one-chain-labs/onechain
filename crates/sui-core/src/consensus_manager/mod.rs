@@ -1,28 +1,34 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
-use crate::consensus_adapter::{BlockStatusReceiver, ConsensusClient};
-use crate::consensus_handler::ConsensusHandlerInitializer;
-use crate::consensus_manager::mysticeti_manager::MysticetiManager;
-use crate::consensus_validator::SuiTxValidator;
-use crate::mysticeti_adapter::LazyMysticetiClient;
+use std::{
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+
 use arc_swap::ArcSwapOption;
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use fastcrypto::traits::KeyPair as _;
 use mysten_metrics::RegistryService;
 use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use sui_config::{ConsensusConfig, NodeConfig};
 use sui_protocol_config::ProtocolVersion;
-use sui_types::committee::EpochId;
-use sui_types::error::SuiResult;
-use sui_types::messages_consensus::ConsensusTransaction;
-use tokio::sync::{Mutex, MutexGuard};
-use tokio::time::{sleep, timeout};
+use sui_types::{committee::EpochId, error::SuiResult, messages_consensus::ConsensusTransaction};
+use tokio::{
+    sync::{Mutex, MutexGuard},
+    time::{sleep, timeout},
+};
 use tracing::info;
+
+use crate::{
+    authority::authority_per_epoch_store::AuthorityPerEpochStore,
+    consensus_adapter::{BlockStatusReceiver, ConsensusClient},
+    consensus_handler::ConsensusHandlerInitializer,
+    consensus_manager::mysticeti_manager::MysticetiManager,
+    consensus_validator::SuiTxValidator,
+    mysticeti_adapter::LazyMysticetiClient,
+};
 
 pub mod mysticeti_manager;
 
@@ -91,9 +97,7 @@ impl ConsensusManager {
         registry_service: &RegistryService,
         consensus_client: Arc<UpdatableConsensusClient>,
     ) -> Self {
-        let metrics = Arc::new(ConsensusManagerMetrics::new(
-            &registry_service.default_registry(),
-        ));
+        let metrics = Arc::new(ConsensusManagerMetrics::new(&registry_service.default_registry()));
         let mysticeti_client = Arc::new(LazyMysticetiClient::new());
         let mysticeti_manager = ProtocolManager::new_mysticeti(
             node_config,
@@ -134,14 +138,7 @@ impl ConsensusManagerTrait for ConsensusManager {
             &self.mysticeti_manager
         };
 
-        protocol_manager
-            .start(
-                node_config,
-                epoch_store,
-                consensus_handler_initializer,
-                tx_validator,
-            )
-            .await
+        protocol_manager.start(node_config, epoch_store, consensus_handler_initializer, tx_validator).await
     }
 
     async fn shutdown(&self) {
@@ -172,9 +169,7 @@ pub struct UpdatableConsensusClient {
 
 impl UpdatableConsensusClient {
     pub fn new() -> Self {
-        Self {
-            client: ArcSwapOption::empty(),
-        }
+        Self { client: ArcSwapOption::empty() }
     }
 
     async fn get(&self) -> Arc<Arc<dyn ConsensusClient>> {
@@ -194,10 +189,7 @@ impl UpdatableConsensusClient {
             return client;
         }
 
-        panic!(
-            "Timed out after {:?} waiting for Consensus to start!",
-            START_TIMEOUT,
-        );
+        panic!("Timed out after {:?} waiting for Consensus to start!", START_TIMEOUT,);
     }
 
     pub fn set(&self, client: Arc<dyn ConsensusClient>) {
@@ -285,9 +277,7 @@ impl<'a> RunningLockGuard<'a> {
     ) -> Option<RunningLockGuard<'a>> {
         let running = running_mutex.lock().await;
         if let Running::True(epoch, version) = *running {
-            tracing::info!(
-                "Shutting down consensus for epoch {epoch:?} & protocol version {version:?}"
-            );
+            tracing::info!("Shutting down consensus for epoch {epoch:?} & protocol version {version:?}");
         } else {
             tracing::warn!("Consensus shutdown was called but consensus is not running");
             return None;
@@ -310,26 +300,22 @@ impl Drop for RunningLockGuard<'_> {
             Running::True(epoch, version) => {
                 tracing::info!("Consensus shutdown for epoch {epoch:?} & protocol version {version:?} is complete - took {} seconds", self.start.elapsed().as_secs_f64());
 
-                self.metrics
-                    .shutdown_latency
-                    .set(self.start.elapsed().as_secs_f64() as i64);
+                self.metrics.shutdown_latency.set(self.start.elapsed().as_secs_f64() as i64);
 
                 *self.state_guard = Running::False;
             }
             // consensus was not running and now will be marked as started
             Running::False => {
                 tracing::info!(
-                "Starting up consensus for epoch {} & protocol version {:?} is complete - took {} seconds",
-                self.epoch.unwrap(),
-                self.protocol_version.unwrap(),
-                self.start.elapsed().as_secs_f64());
+                    "Starting up consensus for epoch {} & protocol version {:?} is complete - took {} seconds",
+                    self.epoch.unwrap(),
+                    self.protocol_version.unwrap(),
+                    self.start.elapsed().as_secs_f64()
+                );
 
-                self.metrics
-                    .start_latency
-                    .set(self.start.elapsed().as_secs_f64() as i64);
+                self.metrics.start_latency.set(self.start.elapsed().as_secs_f64() as i64);
 
-                *self.state_guard =
-                    Running::True(self.epoch.unwrap(), self.protocol_version.unwrap());
+                *self.state_guard = Running::True(self.epoch.unwrap(), self.protocol_version.unwrap());
             }
         }
     }

@@ -9,17 +9,12 @@ use move_core_types::account_address::AccountAddress;
 use serde::de::DeserializeOwned;
 use sui_json_rpc_types::DevInspectArgs;
 use sui_sdk::SuiClient;
-use sui_types::transaction::{TransactionData, TransactionKind};
-use sui_types::{gas_coin::GAS, transaction::TransactionDataAPI, TypeTag};
-
-use super::move_package::{
-    self, MovePackage, MovePackageCheckpointFilter, MovePackageVersionFilter,
+use sui_types::{
+    gas_coin::GAS,
+    transaction::{TransactionData, TransactionDataAPI, TransactionKind},
+    TypeTag,
 };
-use super::move_registry::named_move_package::NamedMovePackage;
-use super::move_registry::named_type::NamedType;
-use super::object::ObjectKey;
-use super::suins_registration::NameService;
-use super::uint53::UInt53;
+
 use super::{
     address::Address,
     available_range::AvailableRange,
@@ -32,23 +27,30 @@ use super::{
     dry_run_result::DryRunResult,
     epoch::{self, Epoch},
     event::{self, Event, EventFilter},
+    move_package::{self, MovePackage, MovePackageCheckpointFilter, MovePackageVersionFilter},
+    move_registry::{named_move_package::NamedMovePackage, named_type::NamedType},
     move_type::MoveType,
-    object::{self, Object, ObjectFilter},
+    object::{self, Object, ObjectFilter, ObjectKey},
     owner::Owner,
     protocol_config::ProtocolConfigs,
     sui_address::SuiAddress,
-    suins_registration::Domain,
+    suins_registration::{Domain, NameService},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
     transaction_metadata::TransactionMetadata,
     type_filter::ExactTypeFilter,
+    uint53::UInt53,
 };
-use crate::connection::ScanConnection;
-use crate::server::watermark_task::Watermark;
-use crate::types::base64::Base64 as GraphQLBase64;
-use crate::types::zklogin_verify_signature::verify_zklogin_signature;
-use crate::types::zklogin_verify_signature::ZkLoginIntentScope;
-use crate::types::zklogin_verify_signature::ZkLoginVerifyResult;
-use crate::{config::ServiceConfig, error::Error, mutation::Mutation};
+use crate::{
+    config::ServiceConfig,
+    connection::ScanConnection,
+    error::Error,
+    mutation::Mutation,
+    server::watermark_task::Watermark,
+    types::{
+        base64::Base64 as GraphQLBase64,
+        zklogin_verify_signature::{verify_zklogin_signature, ZkLoginIntentScope, ZkLoginVerifyResult},
+    },
+};
 
 pub(crate) struct Query;
 pub(crate) type SuiGraphQLSchema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
@@ -65,10 +67,7 @@ impl Query {
         if let Some(id) = chain_id.0 {
             Ok(id.to_string())
         } else {
-            Err(Error::Internal(
-                "Chain identifier not initialized.".to_string(),
-            ))
-            .extend()
+            Err(Error::Internal("Chain identifier not initialized.".to_string())).extend()
         }
     }
 
@@ -76,17 +75,12 @@ impl Query {
     /// that can be tied to a particular checkpoint).
     async fn available_range(&self, ctx: &Context<'_>) -> Result<AvailableRange> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
-        AvailableRange::query(ctx.data_unchecked(), hi_cp)
-            .await
-            .extend()
+        AvailableRange::query(ctx.data_unchecked(), hi_cp).await.extend()
     }
 
     /// Configuration for this RPC service
     async fn service_config(&self, ctx: &Context<'_>) -> Result<ServiceConfig> {
-        ctx.data()
-            .map_err(|_| Error::Internal("Unable to fetch service configuration.".to_string()))
-            .cloned()
-            .extend()
+        ctx.data().map_err(|_| Error::Internal("Unable to fetch service configuration.".to_string())).cloned().extend()
     }
 
     /// Simulate running a transaction to inspect its effects without
@@ -115,24 +109,15 @@ impl Query {
     ) -> Result<DryRunResult> {
         let skip_checks = skip_checks.unwrap_or(false);
 
-        let sui_sdk_client: &Option<SuiClient> = ctx
-            .data()
-            .map_err(|_| Error::Internal("Unable to fetch Sui SDK client".to_string()))
-            .extend()?;
+        let sui_sdk_client: &Option<SuiClient> =
+            ctx.data().map_err(|_| Error::Internal("Unable to fetch Sui SDK client".to_string())).extend()?;
         let sui_sdk_client = sui_sdk_client
             .as_ref()
             .ok_or_else(|| Error::Internal("Sui SDK client not initialized".to_string()))
             .extend()?;
 
         let (sender_address, tx_kind, gas_price, gas_sponsor, gas_budget, gas_objects) =
-            if let Some(TransactionMetadata {
-                sender,
-                gas_price,
-                gas_objects,
-                gas_budget,
-                gas_sponsor,
-            }) = tx_meta
-            {
+            if let Some(TransactionMetadata { sender, gas_price, gas_objects, gas_budget, gas_sponsor }) = tx_meta {
                 // This implies `TransactionKind`
                 let tx_kind = deserialize_tx_data::<TransactionKind>(&tx_bytes)?;
 
@@ -142,9 +127,7 @@ impl Query {
                 let gas_sponsor = gas_sponsor.map(|addr| addr.into());
 
                 let gas_objects = gas_objects.map(|objs| {
-                    objs.into_iter()
-                        .map(|obj| (obj.address.into(), obj.version.into(), obj.digest.into()))
-                        .collect()
+                    objs.into_iter().map(|obj| (obj.address.into(), obj.version.into(), obj.digest.into())).collect()
                 });
 
                 (
@@ -179,13 +162,7 @@ impl Query {
 
         let res = sui_sdk_client
             .read_api()
-            .dev_inspect_transaction_block(
-                sender_address,
-                tx_kind,
-                gas_price,
-                None,
-                Some(dev_inspect_args),
-            )
+            .dev_inspect_transaction_block(sender_address, tx_kind, gas_price, None, Some(dev_inspect_args))
             .await?;
 
         DryRunResult::try_from(res).extend()
@@ -213,21 +190,12 @@ impl Query {
         root_version: Option<UInt53>,
     ) -> Result<Option<Owner>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
-        Ok(Some(Owner {
-            address,
-            checkpoint_viewed_at: hi_cp,
-            root_version: root_version.map(|v| v.into()),
-        }))
+        Ok(Some(Owner { address, checkpoint_viewed_at: hi_cp, root_version: root_version.map(|v| v.into()) }))
     }
 
     /// The object corresponding to the given address at the (optionally) given version.
     /// When no version is given, the latest version is returned.
-    async fn object(
-        &self,
-        ctx: &Context<'_>,
-        address: SuiAddress,
-        version: Option<UInt53>,
-    ) -> Result<Option<Object>> {
+    async fn object(&self, ctx: &Context<'_>, address: SuiAddress, version: Option<UInt53>) -> Result<Option<Object>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
         let key = match version {
             Some(version) => Object::at_version(version.into(), hi_cp),
@@ -266,74 +234,46 @@ impl Query {
     ///
     /// This corresponds to the package with the highest `version` that shares its original ID with
     /// the package at `address`.
-    async fn latest_package(
-        &self,
-        ctx: &Context<'_>,
-        address: SuiAddress,
-    ) -> Result<Option<MovePackage>> {
+    async fn latest_package(&self, ctx: &Context<'_>, address: SuiAddress) -> Result<Option<MovePackage>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
-        MovePackage::query(ctx, address, MovePackage::latest_at(hi_cp))
-            .await
-            .extend()
+        MovePackage::query(ctx, address, MovePackage::latest_at(hi_cp)).await.extend()
     }
 
     /// Look-up an Account by its SuiAddress.
     async fn address(&self, ctx: &Context<'_>, address: SuiAddress) -> Result<Option<Address>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
-        Ok(Some(Address {
-            address,
-            checkpoint_viewed_at: hi_cp,
-        }))
+        Ok(Some(Address { address, checkpoint_viewed_at: hi_cp }))
     }
 
     /// Fetch a structured representation of a concrete type, including its layout information.
     /// Fails if the type is malformed.
     async fn type_(&self, type_: String) -> Result<MoveType> {
-        Ok(TypeTag::from_str(&type_)
-            .map_err(|e| Error::Client(format!("Bad type: {e}")))
-            .extend()?
-            .into())
+        Ok(TypeTag::from_str(&type_).map_err(|e| Error::Client(format!("Bad type: {e}"))).extend()?.into())
     }
 
     /// Fetch epoch information by ID (defaults to the latest epoch).
     async fn epoch(&self, ctx: &Context<'_>, id: Option<UInt53>) -> Result<Option<Epoch>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
-        Epoch::query(ctx, id.map(|id| id.into()), hi_cp)
-            .await
-            .extend()
+        Epoch::query(ctx, id.map(|id| id.into()), hi_cp).await.extend()
     }
 
     /// Fetch checkpoint information by sequence number or digest (defaults to the latest available
     /// checkpoint).
-    async fn checkpoint(
-        &self,
-        ctx: &Context<'_>,
-        id: Option<CheckpointId>,
-    ) -> Result<Option<Checkpoint>> {
+    async fn checkpoint(&self, ctx: &Context<'_>, id: Option<CheckpointId>) -> Result<Option<Checkpoint>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
-        Checkpoint::query(ctx, id.unwrap_or_default(), hi_cp)
-            .await
-            .extend()
+        Checkpoint::query(ctx, id.unwrap_or_default(), hi_cp).await.extend()
     }
 
     /// Fetch a transaction block by its transaction digest.
-    async fn transaction_block(
-        &self,
-        ctx: &Context<'_>,
-        digest: Digest,
-    ) -> Result<Option<TransactionBlock>> {
+    async fn transaction_block(&self, ctx: &Context<'_>, digest: Digest) -> Result<Option<TransactionBlock>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
         let lookup = TransactionBlock::by_digest(digest, hi_cp);
         TransactionBlock::query(ctx, lookup).await.extend()
     }
 
     /// Fetch a list of objects by their IDs and versions.
-    async fn multi_get_objects(
-        &self,
-        ctx: &Context<'_>,
-        keys: Vec<ObjectKey>,
-    ) -> Result<Vec<Object>> {
+    async fn multi_get_objects(&self, ctx: &Context<'_>, keys: Vec<ObjectKey>) -> Result<Vec<Object>> {
         let cfg: &ServiceConfig = ctx.data_unchecked();
         if keys.len() > cfg.limits.max_multi_get_objects_keys as usize {
             return Err(Error::Client(format!(
@@ -365,15 +305,7 @@ impl Query {
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
         let coin = type_.map_or_else(GAS::type_tag, |t| t.0);
-        Coin::paginate(
-            ctx.data_unchecked(),
-            page,
-            coin,
-            /* owner */ None,
-            hi_cp,
-        )
-        .await
-        .extend()
+        Coin::paginate(ctx.data_unchecked(), page, coin, /* owner */ None, hi_cp).await.extend()
     }
 
     // The epochs of the network
@@ -388,9 +320,7 @@ impl Query {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        Epoch::paginate(ctx.data_unchecked(), page, hi_cp)
-            .await
-            .extend()
+        Epoch::paginate(ctx.data_unchecked(), page, hi_cp).await.extend()
     }
 
     /// The checkpoints that exist in the network.
@@ -405,9 +335,7 @@ impl Query {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        Checkpoint::paginate(ctx.data_unchecked(), page, /* epoch */ None, hi_cp)
-            .await
-            .extend()
+        Checkpoint::paginate(ctx.data_unchecked(), page, /* epoch */ None, hi_cp).await.extend()
     }
 
     /// The transaction blocks that exist in the network.
@@ -444,9 +372,7 @@ impl Query {
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
-        TransactionBlock::paginate(ctx, page, filter.unwrap_or_default(), hi_cp, scan_limit)
-            .await
-            .extend()
+        TransactionBlock::paginate(ctx, page, filter.unwrap_or_default(), hi_cp, scan_limit).await.extend()
     }
 
     /// Query events that are emitted in the network.
@@ -464,14 +390,7 @@ impl Query {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        Event::paginate(
-            ctx.data_unchecked(),
-            page,
-            filter.unwrap_or_default(),
-            hi_cp,
-        )
-        .await
-        .extend()
+        Event::paginate(ctx.data_unchecked(), page, filter.unwrap_or_default(), hi_cp).await.extend()
     }
 
     /// The objects that exist in the network.
@@ -487,14 +406,7 @@ impl Query {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        Object::paginate(
-            ctx.data_unchecked(),
-            page,
-            filter.unwrap_or_default(),
-            hi_cp,
-        )
-        .await
-        .extend()
+        Object::paginate(ctx.data_unchecked(), page, filter.unwrap_or_default(), hi_cp).await.extend()
     }
 
     /// The Move packages that exist in the network, optionally filtered to be strictly before
@@ -514,9 +426,7 @@ impl Query {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        MovePackage::paginate_by_checkpoint(ctx.data_unchecked(), page, filter, hi_cp)
-            .await
-            .extend()
+        MovePackage::paginate_by_checkpoint(ctx.data_unchecked(), page, filter, hi_cp).await.extend()
     }
 
     /// Fetch all versions of package at `address` (packages that share this package's original ID),
@@ -535,46 +445,27 @@ impl Query {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        MovePackage::paginate_by_version(ctx.data_unchecked(), page, address, filter, hi_cp)
-            .await
-            .extend()
+        MovePackage::paginate_by_version(ctx.data_unchecked(), page, address, filter, hi_cp).await.extend()
     }
 
     /// Fetch the protocol config by protocol version (defaults to the latest protocol
     /// version known to the GraphQL service).
-    async fn protocol_config(
-        &self,
-        ctx: &Context<'_>,
-        protocol_version: Option<UInt53>,
-    ) -> Result<ProtocolConfigs> {
-        ProtocolConfigs::query(ctx.data_unchecked(), protocol_version.map(|v| v.into()))
-            .await
-            .extend()
+    async fn protocol_config(&self, ctx: &Context<'_>, protocol_version: Option<UInt53>) -> Result<ProtocolConfigs> {
+        ProtocolConfigs::query(ctx.data_unchecked(), protocol_version.map(|v| v.into())).await.extend()
     }
 
     /// Resolves a SuiNS `domain` name to an address, if it has been bound.
-    async fn resolve_suins_address(
-        &self,
-        ctx: &Context<'_>,
-        domain: Domain,
-    ) -> Result<Option<Address>> {
+    async fn resolve_suins_address(&self, ctx: &Context<'_>, domain: Domain) -> Result<Option<Address>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
         Ok(NameService::resolve_to_record(ctx, &domain, hi_cp)
             .await
             .extend()?
             .and_then(|r| r.target_address)
-            .map(|a| Address {
-                address: a.into(),
-                checkpoint_viewed_at: hi_cp,
-            }))
+            .map(|a| Address { address: a.into(), checkpoint_viewed_at: hi_cp }))
     }
 
     /// Fetch a package by its name (using dot move service)
-    async fn package_by_name(
-        &self,
-        ctx: &Context<'_>,
-        name: String,
-    ) -> Result<Option<MovePackage>> {
+    async fn package_by_name(&self, ctx: &Context<'_>, name: String) -> Result<Option<MovePackage>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
 
         NamedMovePackage::query(ctx, &name, hi_cp).await.extend()
@@ -590,15 +481,9 @@ impl Query {
 
     /// The coin metadata associated with the given coin type. Note that if the latest version of
     /// the coin's metadata is wrapped or deleted, it will not be found.
-    async fn coin_metadata(
-        &self,
-        ctx: &Context<'_>,
-        coin_type: ExactTypeFilter,
-    ) -> Result<Option<CoinMetadata>> {
+    async fn coin_metadata(&self, ctx: &Context<'_>, coin_type: ExactTypeFilter) -> Result<Option<CoinMetadata>> {
         let Watermark { hi_cp, .. } = *ctx.data()?;
-        CoinMetadata::query(ctx.data_unchecked(), coin_type.0, hi_cp)
-            .await
-            .extend()
+        CoinMetadata::query(ctx.data_unchecked(), coin_type.0, hi_cp).await.extend()
     }
 
     /// Verify a zkLogin signature based on the provided transaction or personal message
@@ -620,9 +505,7 @@ impl Query {
         intent_scope: ZkLoginIntentScope,
         author: SuiAddress,
     ) -> Result<ZkLoginVerifyResult> {
-        verify_zklogin_signature(ctx, bytes, signature, intent_scope, author)
-            .await
-            .extend()
+        verify_zklogin_signature(ctx, bytes, signature, intent_scope, author).await.extend()
     }
 }
 
@@ -632,17 +515,9 @@ where
 {
     bcs::from_bytes(
         &Base64::decode(tx_bytes)
-            .map_err(|e| {
-                Error::Client(format!(
-                    "Unable to deserialize transaction bytes from Base64: {e}"
-                ))
-            })
+            .map_err(|e| Error::Client(format!("Unable to deserialize transaction bytes from Base64: {e}")))
             .extend()?,
     )
-    .map_err(|e| {
-        Error::Client(format!(
-            "Unable to deserialize transaction bytes as BCS: {e}"
-        ))
-    })
+    .map_err(|e| Error::Client(format!("Unable to deserialize transaction bytes as BCS: {e}")))
     .extend()
 }

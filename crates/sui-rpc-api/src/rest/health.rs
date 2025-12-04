@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use axum::extract::{Query, State};
+
 use super::{ApiEndpoint, RouteHandler};
 use crate::RpcService;
-use axum::extract::{Query, State};
 
 /// Perform a service health check
 ///

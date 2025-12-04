@@ -77,18 +77,15 @@ pub struct TransactionDenyConfig {
 
 impl TransactionDenyConfig {
     pub fn get_object_deny_set(&self) -> &HashSet<ObjectID> {
-        self.object_deny_set
-            .get_or_init(|| self.object_deny_list.iter().cloned().collect())
+        self.object_deny_set.get_or_init(|| self.object_deny_list.iter().cloned().collect())
     }
 
     pub fn get_package_deny_set(&self) -> &HashSet<ObjectID> {
-        self.package_deny_set
-            .get_or_init(|| self.package_deny_list.iter().cloned().collect())
+        self.package_deny_set.get_or_init(|| self.package_deny_list.iter().cloned().collect())
     }
 
     pub fn get_address_deny_set(&self) -> &HashSet<SuiAddress> {
-        self.address_deny_set
-            .get_or_init(|| self.address_deny_list.iter().cloned().collect())
+        self.address_deny_set.get_or_init(|| self.address_deny_list.iter().cloned().collect())
     }
 
     pub fn package_publish_disabled(&self) -> bool {

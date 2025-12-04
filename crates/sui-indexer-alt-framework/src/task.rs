@@ -44,11 +44,7 @@ pub trait TrySpawnStreamExt: Stream {
 }
 
 impl<S: Stream + Sized + 'static> TrySpawnStreamExt for S {
-    async fn try_for_each_spawned<Fut, F, E>(
-        self,
-        limit: impl Into<Option<usize>>,
-        mut f: F,
-    ) -> Result<(), E>
+    async fn try_for_each_spawned<Fut, F, E>(self, limit: impl Into<Option<usize>>, mut f: F) -> Result<(), E>
     where
         Fut: Future<Output = Result<(), E>> + Send + 'static,
         F: FnMut(Self::Item) -> Fut,
@@ -175,7 +171,8 @@ mod tests {
     use std::{
         sync::{
             atomic::{AtomicUsize, Ordering},
-            Arc, Mutex,
+            Arc,
+            Mutex,
         },
         time::Duration,
     };
@@ -187,7 +184,7 @@ mod tests {
     #[tokio::test]
     async fn explicit_sequential_iteration() {
         let actual = Arc::new(Mutex::new(vec![]));
-        let result = stream::iter(0..20)
+        let result = stream::iter(0 .. 20)
             .try_for_each_spawned(1, |i| {
                 let actual = actual.clone();
                 async move {
@@ -201,14 +198,14 @@ mod tests {
         assert!(result.is_ok());
 
         let actual = Arc::try_unwrap(actual).unwrap().into_inner().unwrap();
-        let expect: Vec<_> = (0..20).collect();
+        let expect: Vec<_> = (0 .. 20).collect();
         assert_eq!(expect, actual);
     }
 
     #[tokio::test]
     async fn concurrent_iteration() {
         let actual = Arc::new(AtomicUsize::new(0));
-        let result = stream::iter(0..100)
+        let result = stream::iter(0 .. 100)
             .try_for_each_spawned(16, |i| {
                 let actual = actual.clone();
                 async move {
@@ -228,7 +225,7 @@ mod tests {
     #[tokio::test]
     async fn implicit_unlimited_iteration() {
         let actual = Arc::new(AtomicUsize::new(0));
-        let result = stream::iter(0..100)
+        let result = stream::iter(0 .. 100)
             .try_for_each_spawned(None, |i| {
                 let actual = actual.clone();
                 async move {
@@ -248,7 +245,7 @@ mod tests {
     #[tokio::test]
     async fn explicit_unlimited_iteration() {
         let actual = Arc::new(AtomicUsize::new(0));
-        let result = stream::iter(0..100)
+        let result = stream::iter(0 .. 100)
             .try_for_each_spawned(0, |i| {
                 let actual = actual.clone();
                 async move {
@@ -275,7 +272,7 @@ mod tests {
 
         let jobs = Arc::new(Jobs::default());
 
-        let result = stream::iter(0..32)
+        let result = stream::iter(0 .. 32)
             .try_for_each_spawned(4, |_| {
                 let jobs = jobs.clone();
                 async move {
@@ -298,7 +295,7 @@ mod tests {
     #[tokio::test]
     async fn error_propagation() {
         let actual = Arc::new(Mutex::new(vec![]));
-        let result = stream::iter(0..100)
+        let result = stream::iter(0 .. 100)
             .try_for_each_spawned(None, |i| {
                 let actual = actual.clone();
                 async move {
@@ -315,14 +312,14 @@ mod tests {
         assert!(result.is_err());
 
         let actual = Arc::try_unwrap(actual).unwrap().into_inner().unwrap();
-        let expect: Vec<_> = (0..42).collect();
+        let expect: Vec<_> = (0 .. 42).collect();
         assert_eq!(expect, actual);
     }
 
     #[tokio::test]
     #[should_panic]
     async fn panic_propagation() {
-        let _ = stream::iter(0..100)
+        let _ = stream::iter(0 .. 100)
             .try_for_each_spawned(None, |i| async move {
                 assert!(i < 42);
                 Ok::<(), ()>(())

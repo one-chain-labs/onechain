@@ -1,18 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::checkpoints::CheckpointStore;
-use crate::execution_cache::{ObjectCacheRead, TransactionCacheRead};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
+
 use sui_storage::blob::{Blob, BlobEncoding};
-use sui_types::digests::TransactionDigest;
-use sui_types::effects::TransactionEffectsAPI;
-use sui_types::error::{SuiError, SuiResult, UserInputError};
-use sui_types::full_checkpoint_content::{CheckpointData, CheckpointTransaction};
-use sui_types::messages_checkpoint::VerifiedCheckpoint;
-use sui_types::storage::ObjectKey;
+use sui_types::{
+    digests::TransactionDigest,
+    effects::TransactionEffectsAPI,
+    error::{SuiError, SuiResult, UserInputError},
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
+    messages_checkpoint::VerifiedCheckpoint,
+    storage::ObjectKey,
+};
+
+use crate::{
+    checkpoints::CheckpointStore,
+    execution_cache::{ObjectCacheRead, TransactionCacheRead},
+};
 
 pub(crate) fn load_checkpoint_data(
     checkpoint: VerifiedCheckpoint,
@@ -39,10 +43,7 @@ pub(crate) fn load_checkpoint_data(
         .map(|(effects, &digest)| effects.ok_or(SuiError::TransactionNotFound { digest }))
         .collect::<SuiResult<Vec<_>>>()?;
 
-    let event_digests = effects
-        .iter()
-        .flat_map(|fx| fx.events_digest().copied())
-        .collect::<Vec<_>>();
+    let event_digests = effects.iter().flat_map(|fx| fx.events_digest().copied()).collect::<Vec<_>>();
 
     let events = transaction_cache_reader
         .multi_get_events(&event_digests)
@@ -54,12 +55,9 @@ pub(crate) fn load_checkpoint_data(
     let events: HashMap<_, _> = event_digests.into_iter().zip(events).collect();
     let mut full_transactions = Vec::with_capacity(transactions.len());
     for (tx, fx) in transactions.into_iter().zip(effects) {
-        let events = fx.events_digest().map(|event_digest| {
-            events
-                .get(event_digest)
-                .cloned()
-                .expect("event was already checked to be present")
-        });
+        let events = fx
+            .events_digest()
+            .map(|event_digest| events.get(event_digest).cloned().expect("event was already checked to be present"));
 
         let input_object_keys = fx
             .modified_at_versions()
@@ -73,10 +71,7 @@ pub(crate) fn load_checkpoint_data(
             .zip(&input_object_keys)
             .map(|(object, object_key)| {
                 object.ok_or(SuiError::UserInputError {
-                    error: UserInputError::ObjectNotFound {
-                        object_id: object_key.0,
-                        version: Some(object_key.1),
-                    },
+                    error: UserInputError::ObjectNotFound { object_id: object_key.0, version: Some(object_key.1) },
                 })
             })
             .collect::<SuiResult<Vec<_>>>()?;
@@ -93,10 +88,7 @@ pub(crate) fn load_checkpoint_data(
             .zip(&output_object_keys)
             .map(|(object, object_key)| {
                 object.ok_or(SuiError::UserInputError {
-                    error: UserInputError::ObjectNotFound {
-                        object_id: object_key.0,
-                        version: Some(object_key.1),
-                    },
+                    error: UserInputError::ObjectNotFound { object_id: object_key.0, version: Some(object_key.1) },
                 })
             })
             .collect::<SuiResult<Vec<_>>>()?;
@@ -110,26 +102,16 @@ pub(crate) fn load_checkpoint_data(
         };
         full_transactions.push(full_transaction);
     }
-    let checkpoint_data = CheckpointData {
-        checkpoint_summary: checkpoint.into(),
-        checkpoint_contents,
-        transactions: full_transactions,
-    };
+    let checkpoint_data =
+        CheckpointData { checkpoint_summary: checkpoint.into(), checkpoint_contents, transactions: full_transactions };
     Ok(checkpoint_data)
 }
 
-pub(crate) fn store_checkpoint_locally(
-    path: PathBuf,
-    checkpoint_data: &CheckpointData,
-) -> SuiResult {
+pub(crate) fn store_checkpoint_locally(path: PathBuf, checkpoint_data: &CheckpointData) -> SuiResult {
     let file_name = format!("{}.chk", checkpoint_data.checkpoint_summary.sequence_number);
 
-    std::fs::create_dir_all(&path).map_err(|err| {
-        SuiError::FileIOError(format!(
-            "failed to save full checkpoint content locally {:?}",
-            err
-        ))
-    })?;
+    std::fs::create_dir_all(&path)
+        .map_err(|err| SuiError::FileIOError(format!("failed to save full checkpoint content locally {:?}", err)))?;
 
     Blob::encode(&checkpoint_data, BlobEncoding::Bcs)
         .map_err(|_| SuiError::TransactionSerializationError {

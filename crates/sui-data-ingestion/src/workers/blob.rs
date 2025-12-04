@@ -4,8 +4,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
-use object_store::path::Path;
-use object_store::ObjectStore;
+use object_store::{path::Path, ObjectStore};
 use serde::{Deserialize, Serialize};
 use sui_data_ingestion_core::{create_remote_store_client, Worker};
 use sui_storage::blob::{Blob, BlobEncoding};
@@ -33,15 +32,11 @@ impl BlobWorker {
 #[async_trait]
 impl Worker for BlobWorker {
     type Result = ();
+
     async fn process_checkpoint(&self, checkpoint: &CheckpointData) -> Result<()> {
         let bytes = Blob::encode(checkpoint, BlobEncoding::Bcs)?.to_bytes();
-        let location = Path::from(format!(
-            "{}.chk",
-            checkpoint.checkpoint_summary.sequence_number
-        ));
-        self.remote_store
-            .put(&location, Bytes::from(bytes).into())
-            .await?;
+        let location = Path::from(format!("{}.chk", checkpoint.checkpoint_summary.sequence_number));
+        self.remote_store.put(&location, Bytes::from(bytes).into()).await?;
         Ok(())
     }
 }

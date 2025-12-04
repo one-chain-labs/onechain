@@ -19,17 +19,11 @@ pub struct RpcServiceError {
 
 impl RpcServiceError {
     pub fn new<T: Into<String>>(status: StatusCode, message: T) -> Self {
-        Self {
-            status,
-            message: Some(message.into()),
-        }
+        Self { status, message: Some(message.into()) }
     }
 
     pub fn not_found() -> Self {
-        Self {
-            status: StatusCode::NOT_FOUND,
-            message: None,
-        }
+        Self { status: StatusCode::NOT_FOUND, message: None }
     }
 }
 
@@ -51,45 +45,32 @@ impl From<RpcServiceError> for tonic::Status {
 
 impl From<sui_types::storage::error::Error> for RpcServiceError {
     fn from(value: sui_types::storage::error::Error) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: Some(value.to_string()),
-        }
+        Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: Some(value.to_string()) }
     }
 }
 
 impl From<anyhow::Error> for RpcServiceError {
     fn from(value: anyhow::Error) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: Some(value.to_string()),
-        }
+        Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: Some(value.to_string()) }
     }
 }
 
 impl From<sui_types::sui_sdk_types_conversions::SdkTypeConversionError> for RpcServiceError {
     fn from(value: sui_types::sui_sdk_types_conversions::SdkTypeConversionError) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: Some(value.to_string()),
-        }
+        Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: Some(value.to_string()) }
     }
 }
 
 impl From<bcs::Error> for RpcServiceError {
     fn from(value: bcs::Error) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: Some(value.to_string()),
-        }
+        Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: Some(value.to_string()) }
     }
 }
 
 impl From<sui_types::quorum_driver_types::QuorumDriverError> for RpcServiceError {
     fn from(error: sui_types::quorum_driver_types::QuorumDriverError) -> Self {
         use itertools::Itertools;
-        use sui_types::error::SuiError;
-        use sui_types::quorum_driver_types::QuorumDriverError::*;
+        use sui_types::{error::SuiError, quorum_driver_types::QuorumDriverError::*};
 
         match error {
             InvalidUserSignature(err) => {
@@ -103,21 +84,11 @@ impl From<sui_types::quorum_driver_types::QuorumDriverError> for RpcServiceError
 
                 RpcServiceError::new(StatusCode::BAD_REQUEST, message)
             }
-            QuorumDriverInternalError(err) => {
-                RpcServiceError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
-            }
-            ObjectsDoubleUsed {
-                conflicting_txes,
-                retried_tx_status,
-            } => {
+            QuorumDriverInternalError(err) => RpcServiceError::new(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+            ObjectsDoubleUsed { conflicting_txes, retried_tx_status } => {
                 let new_map = conflicting_txes
                     .into_iter()
-                    .map(|(digest, (pairs, _))| {
-                        (
-                            digest,
-                            pairs.into_iter().map(|(_, obj_ref)| obj_ref).collect(),
-                        )
-                    })
+                    .map(|(digest, (pairs, _))| (digest, pairs.into_iter().map(|(_, obj_ref)| obj_ref).collect()))
                     .collect::<std::collections::BTreeMap<_, Vec<_>>>();
 
                 let message = format!(
@@ -131,10 +102,7 @@ impl From<sui_types::quorum_driver_types::QuorumDriverError> for RpcServiceError
             }
             TimeoutBeforeFinality | FailedWithTransientErrorAfterMaximumAttempts { .. } => {
                 // TODO add a Retry-After header
-                RpcServiceError::new(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "timed-out before finality could be reached",
-                )
+                RpcServiceError::new(StatusCode::SERVICE_UNAVAILABLE, "timed-out before finality could be reached")
             }
             NonRecoverableTransactionError { errors } => {
                 let new_errors: Vec<String> = errors

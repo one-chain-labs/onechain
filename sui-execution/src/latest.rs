@@ -1,11 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::PathBuf;
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use move_binary_format::CompiledModule;
+use move_bytecode_verifier_meter::Meter;
 use move_vm_config::verifier::{MeterConfig, VerifierConfig};
+use move_vm_runtime_latest::move_vm::MoveVM;
+use sui_adapter_latest::{
+    adapter::{new_move_vm, run_metered_move_bytecode_verifier},
+    execution_engine::{execute_genesis_state_update, execute_transaction_to_effects},
+    execution_mode,
+    type_layout_resolver::TypeLayoutResolver,
+};
+use sui_move_natives_latest::all_natives;
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
     base_types::{ObjectRef, SuiAddress, TxContext},
@@ -18,23 +26,12 @@ use sui_types::{
     inner_temporary_store::InnerTemporaryStore,
     layout_resolver::LayoutResolver,
     metrics::{BytecodeVerifierMetrics, LimitsMetrics},
+    storage::BackingStore,
     transaction::{CheckedInputObjects, ProgrammableTransaction, TransactionKind},
 };
-
-use move_bytecode_verifier_meter::Meter;
-use move_vm_runtime_latest::move_vm::MoveVM;
-use sui_adapter_latest::adapter::{new_move_vm, run_metered_move_bytecode_verifier};
-use sui_adapter_latest::execution_engine::{
-    execute_genesis_state_update, execute_transaction_to_effects,
-};
-use sui_adapter_latest::type_layout_resolver::TypeLayoutResolver;
-use sui_move_natives_latest::all_natives;
-use sui_types::storage::BackingStore;
 use sui_verifier_latest::meter::SuiVerifierMeter;
 
-use crate::executor;
-use crate::verifier;
-use sui_adapter_latest::execution_mode;
+use crate::{executor, verifier};
 
 pub(crate) struct Executor(Arc<MoveVM>);
 
@@ -49,11 +46,7 @@ impl Executor {
         silent: bool,
         enable_profiler: Option<PathBuf>,
     ) -> Result<Self, SuiError> {
-        Ok(Executor(Arc::new(new_move_vm(
-            all_natives(silent, protocol_config),
-            protocol_config,
-            enable_profiler,
-        )?)))
+        Ok(Executor(Arc::new(new_move_vm(all_natives(silent, protocol_config), protocol_config, enable_profiler)?)))
     }
 }
 
@@ -79,12 +72,7 @@ impl executor::Executor for Executor {
         transaction_kind: TransactionKind,
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
-    ) -> (
-        InnerTemporaryStore,
-        SuiGasStatus,
-        TransactionEffects,
-        Result<(), ExecutionError>,
-    ) {
+    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<(), ExecutionError>) {
         execute_transaction_to_effects::<execution_mode::Normal>(
             store,
             input_objects,
@@ -119,12 +107,7 @@ impl executor::Executor for Executor {
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
         skip_all_checks: bool,
-    ) -> (
-        InnerTemporaryStore,
-        SuiGasStatus,
-        TransactionEffects,
-        Result<Vec<ExecutionResult>, ExecutionError>,
-    ) {
+    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Vec<ExecutionResult>, ExecutionError>) {
         if skip_all_checks {
             execute_transaction_to_effects::<execution_mode::DevInspect<true>>(
                 store,
@@ -171,15 +154,7 @@ impl executor::Executor for Executor {
         input_objects: CheckedInputObjects,
         pt: ProgrammableTransaction,
     ) -> Result<InnerTemporaryStore, ExecutionError> {
-        execute_genesis_state_update(
-            store,
-            protocol_config,
-            metrics,
-            &self.0,
-            tx_context,
-            input_objects,
-            pt,
-        )
+        execute_genesis_state_update(store, protocol_config, metrics, &self.0, tx_context, input_objects, pt)
     }
 
     fn type_layout_resolver<'r, 'vm: 'r, 'store: 'r>(

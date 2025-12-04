@@ -1,19 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    client_commands::{dry_run_or_execute_or_serialize, Opts, OptsWithGas, SuiClientCommandResult},
-    client_ptb::{
-        ast::{ParsedProgram, Program},
-        builder::PTBBuilder,
-        error::{build_error_reports, PTBError},
-        token::{Lexeme, Token},
-    },
-    displays::Pretty,
-    sp,
-};
-
-use super::{ast::ProgramMetadata, lexer::Lexer, parser::ProgramParser};
 use anyhow::{anyhow, ensure, Error};
 use clap::{arg, Args, ValueHint};
 use move_core_types::account_address::AccountAddress;
@@ -25,6 +12,19 @@ use sui_types::{
     digests::TransactionDigest,
     gas::GasCostSummary,
     transaction::{ProgrammableTransaction, TransactionKind},
+};
+
+use super::{ast::ProgramMetadata, lexer::Lexer, parser::ProgramParser};
+use crate::{
+    client_commands::{dry_run_or_execute_or_serialize, Opts, OptsWithGas, SuiClientCommandResult},
+    client_ptb::{
+        ast::{ParsedProgram, Program},
+        builder::PTBBuilder,
+        error::{build_error_reports, PTBError},
+        token::{Lexeme, Token},
+    },
+    displays::Pretty,
+    sp,
 };
 
 #[derive(Clone, Debug, Args)]
@@ -67,21 +67,19 @@ impl PTB {
         }
 
         // Tokenize and parse to get the program
-        let (program, program_metadata) = match ProgramParser::new(tokens)
-            .map_err(|e| vec![e])
-            .and_then(|parser| parser.parse())
-        {
-            Err(errors) => {
-                let suffix = if errors.len() > 1 { "s" } else { "" };
-                let rendered = build_error_reports(&source_string, errors);
-                eprintln!("Encountered error{suffix} when parsing PTB:");
-                for e in rendered.iter() {
-                    eprintln!("{:?}", e);
+        let (program, program_metadata) =
+            match ProgramParser::new(tokens).map_err(|e| vec![e]).and_then(|parser| parser.parse()) {
+                Err(errors) => {
+                    let suffix = if errors.len() > 1 { "s" } else { "" };
+                    let rendered = build_error_reports(&source_string, errors);
+                    eprintln!("Encountered error{suffix} when parsing PTB:");
+                    for e in rendered.iter() {
+                        eprintln!("{:?}", e);
+                    }
+                    anyhow::bail!("Could not build PTB due to previous error{suffix}");
                 }
-                anyhow::bail!("Could not build PTB due to previous error{suffix}");
-            }
-            Ok(parsed) => parsed,
-        };
+                Ok(parsed) => parsed,
+            };
 
         ensure!(
             !program_metadata.serialize_unsigned_set || !program_metadata.serialize_signed_set,
@@ -89,13 +87,7 @@ impl PTB {
         );
 
         if program_metadata.preview_set {
-            println!(
-                "{}",
-                PTBPreview {
-                    program: &program,
-                    program_metadata: &program_metadata
-                }
-            );
+            println!("{}", PTBPreview { program: &program, program_metadata: &program_metadata });
             return Ok(());
         }
 
@@ -130,14 +122,10 @@ impl PTB {
 
         // the sender is the gas object if gas is provided, otherwise the active address
         let sender = match gas {
-            Some(gas) => context
-                .get_object_owner(&gas)
-                .await
-                .map_err(|_| anyhow!("Could not find owner for gas object ID"))?,
-            None => context
-                .config
-                .active_address
-                .ok_or_else(|| anyhow!("No active address, cannot execute PTB"))?,
+            Some(gas) => {
+                context.get_object_owner(&gas).await.map_err(|_| anyhow!("Could not find owner for gas object ID"))?
+            }
+            None => context.config.active_address.ok_or_else(|| anyhow!("No active address, cannot execute PTB"))?,
         };
 
         // build the tx kind
@@ -157,10 +145,8 @@ impl PTB {
             },
         };
 
-        let transaction_response = dry_run_or_execute_or_serialize(
-            sender, tx_kind, context, None, None, opts.gas, opts.rest,
-        )
-        .await?;
+        let transaction_response =
+            dry_run_or_execute_or_serialize(sender, tx_kind, context, None, None, opts.gas, opts.rest).await?;
 
         let transaction_response = match transaction_response {
             SuiClientCommandResult::DryRun(_) => {
@@ -191,9 +177,10 @@ impl PTB {
         }
 
         let summary = {
-            let effects = transaction_response.effects.as_ref().ok_or_else(|| {
-                anyhow!("Internal error: no transaction effects after PTB was executed.")
-            })?;
+            let effects = transaction_response
+                .effects
+                .as_ref()
+                .ok_or_else(|| anyhow!("Internal error: no transaction effects after PTB was executed."))?;
             Summary {
                 digest: transaction_response.digest,
                 status: effects.status().clone(),
@@ -224,10 +211,7 @@ impl PTB {
         program: Program,
         context: &WalletContext,
         client: SuiClient,
-    ) -> (
-        Result<ProgrammableTransaction, Vec<PTBError>>,
-        Vec<PTBError>,
-    ) {
+    ) -> (Result<ProgrammableTransaction, Vec<PTBError>>, Vec<PTBError>) {
         let starting_addresses = context
             .config
             .keystore
@@ -241,9 +225,7 @@ impl PTB {
 
     /// Exposed for testing
     pub fn parse_ptb_commands(args: Vec<String>) -> Result<ParsedProgram, Vec<PTBError>> {
-        ProgramParser::new(args.iter().map(|s| s.as_str()))
-            .map_err(|e| vec![e])
-            .and_then(|parser| parser.parse())
+        ProgramParser::new(args.iter().map(|s| s.as_str())).map_err(|e| vec![e]).and_then(|parser| parser.parse())
     }
 }
 
@@ -278,13 +260,15 @@ pub fn ptb_description() -> clap::Command {
         .about(
             "Build, preview, and execute programmable transaction blocks. Depending on your \
             shell, you might have to use quotes around arrays or other passed values. \
-            Use --help to see examples for how to use the core functionality of this command.")
-        .arg(arg!(
-                --"assign" <ASSIGN>
-                "Assign a value to a variable name to use later in the PTB."
+            Use --help to see examples for how to use the core functionality of this command.",
         )
-        .long_help(
-            "Assign a value to a variable name to use later in the PTB. \
+        .arg(
+            arg!(
+                    --"assign" <ASSIGN>
+                    "Assign a value to a variable name to use later in the PTB."
+            )
+            .long_help(
+                "Assign a value to a variable name to use later in the PTB. \
             \n If only a name is supplied, the result of \
             the last transaction is bound to that name.\
             \n If a name and value are \
@@ -293,9 +277,10 @@ pub fn ptb_description() -> clap::Command {
             \n --assign MYVAR 100 \
             \n --assign X [100,5000] \
             \n --split-coins gas [1000, 5000, 75000] \
-            \n --assign new_coins # bound new_coins to the result of previous transaction"
+            \n --assign new_coins # bound new_coins to the result of previous transaction",
+            )
+            .value_names(["NAME", "VALUE"]),
         )
-        .value_names(["NAME", "VALUE"]))
         .arg(arg!(
             --"dry-run"
             "Perform a dry run of the PTB instead of executing it."
@@ -316,83 +301,101 @@ pub fn ptb_description() -> clap::Command {
             the transaction. Please note that this incurs a small cost in performance due to the \
             additional dry run call."
         ))
-        .arg(arg!(
-            --"make-move-vec" <MAKE_MOVE_VEC>
-            "Given n-values of the same type, it constructs a vector. For non objects or an empty \
-            vector, the type tag must be specified."
-        )
-        .long_help(
-            "Given n-values of the same type, it constructs a vector. \
+        .arg(
+            arg!(
+                --"make-move-vec" <MAKE_MOVE_VEC>
+                "Given n-values of the same type, it constructs a vector. For non objects or an empty \
+                vector, the type tag must be specified."
+            )
+            .long_help(
+                "Given n-values of the same type, it constructs a vector. \
             For non objects or an empty vector, the type tag must be specified.\
             \n\nExamples:\
             \n --make-move-vec <u64> []\
             \n --make-move-vec <u64> [1, 2, 3, 4]\
             \n --make-move-vec <std::option::Option<u64>> [none,none]\
-            \n --make-move-vec <one::coin::Coin<one::oct::OCT>> [gas]"
-        )
-        .value_names(["TYPE", "[VALUES]"]))
-        .arg(arg!(
-            --"merge-coins" <MERGE_COINS>
-            "Merge N coins into the provided coin."
-        ).long_help(
-            "Merge N coins into the provided coin.\
-            \n\nExamples:\
-            \n --merge-coins @coin_object_id [@coin_obj_id1, @coin_obj_id2]"
+            \n --make-move-vec <one::coin::Coin<one::oct::OCT>> [gas]",
             )
-        .value_names(["INTO_COIN", "[COIN OBJECTS]"]))
-        .arg(arg!(
-            --"move-call" <MOVE_CALL>
-            "Make a move call to a function."
+            .value_names(["TYPE", "[VALUES]"]),
         )
-        .long_help(
-            "Make a move call to a function.\
+        .arg(
+            arg!(
+                --"merge-coins" <MERGE_COINS>
+                "Merge N coins into the provided coin."
+            )
+            .long_help(
+                "Merge N coins into the provided coin.\
+            \n\nExamples:\
+            \n --merge-coins @coin_object_id [@coin_obj_id1, @coin_obj_id2]",
+            )
+            .value_names(["INTO_COIN", "[COIN OBJECTS]"]),
+        )
+        .arg(
+            arg!(
+                --"move-call" <MOVE_CALL>
+                "Make a move call to a function."
+            )
+            .long_help(
+                "Make a move call to a function.\
             \n\nExamples:\
             \n --move-call std::option::is_none <u64> none\
             \n --assign a none\
-            \n --move-call std::option::is_none <u64> a"
+            \n --move-call std::option::is_none <u64> a",
+            )
+            .value_names(["PACKAGE::MODULE::FUNCTION", "TYPE_ARGS", "FUNCTION_ARGS"]),
         )
-        .value_names(["PACKAGE::MODULE::FUNCTION", "TYPE_ARGS", "FUNCTION_ARGS"]))
-        .arg(arg!(
-            --"split-coins" <SPLIT_COINS>
-            "Split the coin into N coins as per the given array of amounts."
-        )
-        .long_help(
-            "Split the coin into N coins as per the given array of amounts.\
+        .arg(
+            arg!(
+                --"split-coins" <SPLIT_COINS>
+                "Split the coin into N coins as per the given array of amounts."
+            )
+            .long_help(
+                "Split the coin into N coins as per the given array of amounts.\
             \n\nExamples:\
             \n --split-coins gas [1000, 5000, 75000]\
             \n --assign new_coins # bounds the result of split-coins command to variable new_coins\
-            \n --split-coins @coin_object_id [100]"
+            \n --split-coins @coin_object_id [100]",
+            )
+            .value_names(["COIN", "[AMOUNT]"]),
         )
-        .value_names(["COIN", "[AMOUNT]"]))
-        .arg(arg!(
-            --"transfer-objects" <TRANSFER_OBJECTS>
-            "Transfer objects to the specified address."
-        )
-        .long_help(
-            "Transfer objects to the specified address.\
+        .arg(
+            arg!(
+                --"transfer-objects" <TRANSFER_OBJECTS>
+                "Transfer objects to the specified address."
+            )
+            .long_help(
+                "Transfer objects to the specified address.\
             \n\nExamples:\
             \n --transfer-objects [obj1, obj2, obj3] @address
             \n --split-coins gas [1000, 5000, 75000]\
             \n --assign new_coins # bound new_coins to result of split-coins to use next\
-            \n --transfer-objects [new_coins.0, new_coins.1, new_coins.2] @to_address"
+            \n --transfer-objects [new_coins.0, new_coins.1, new_coins.2] @to_address",
+            )
+            .value_names(["[OBJECTS]", "TO"]),
         )
-        .value_names(["[OBJECTS]", "TO"]))
-        .arg(arg!(
-            --"publish" <MOVE_PACKAGE_PATH>
-            "Publish the Move package. It takes as input the folder where the package exists."
-        ).long_help(
-            "Publish the Move package. It takes as input the folder where the package exists.\
+        .arg(
+            arg!(
+                --"publish" <MOVE_PACKAGE_PATH>
+                "Publish the Move package. It takes as input the folder where the package exists."
+            )
+            .long_help(
+                "Publish the Move package. It takes as input the folder where the package exists.\
             \n\nExamples:\
             \n --move-call one::tx_context::sender\
             \n --assign sender\
             \n --publish \".\"\
             \n --assign upgrade_cap\
-            \n --transfer-objects sender \"[upgrade_cap]\""
-        ).value_hint(ValueHint::DirPath))
-        .arg(arg!(
-            --"upgrade" <MOVE_PACKAGE_PATH>
-            "Upgrade the Move package. It takes as input the folder where the package exists."
-        ).value_hint(ValueHint::DirPath))
+            \n --transfer-objects sender \"[upgrade_cap]\"",
+            )
+            .value_hint(ValueHint::DirPath),
+        )
+        .arg(
+            arg!(
+                --"upgrade" <MOVE_PACKAGE_PATH>
+                "Upgrade the Move package. It takes as input the folder where the package exists."
+            )
+            .value_hint(ValueHint::DirPath),
+        )
         .arg(arg!(
             --"preview"
             "Preview the list of PTB transactions instead of executing them."

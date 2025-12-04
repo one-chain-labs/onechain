@@ -7,10 +7,16 @@ use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
-use syn::Type::{self};
 use syn::{
-    parse_macro_input, AngleBracketedGenericArguments, Attribute, Generics, ItemStruct, Lit, Meta,
+    parse_macro_input,
+    AngleBracketedGenericArguments,
+    Attribute,
+    Generics,
+    ItemStruct,
+    Lit,
+    Meta,
     PathArguments,
+    Type::{self},
 };
 
 // This is used as default when none is specified
@@ -34,15 +40,9 @@ impl Default for GeneralTableOptions {
 }
 
 // Extracts the field names, field types, inner types (K,V in {map_type_name}<K, V>), and the options attrs
-fn extract_struct_info(
-    input: ItemStruct,
-    allowed_map_type_names: HashSet<String>,
-) -> ExtractedStructInfo {
+fn extract_struct_info(input: ItemStruct, allowed_map_type_names: HashSet<String>) -> ExtractedStructInfo {
     // There must only be one map type used for all entries
-    let allowed_strs: Vec<_> = allowed_map_type_names
-        .iter()
-        .map(|s| format!("{s}<K, V>"))
-        .collect();
+    let allowed_strs: Vec<_> = allowed_map_type_names.iter().map(|s| format!("{s}<K, V>")).collect();
     let allowed_strs = allowed_strs.join(" or ");
     let mut deprecated_cfs = vec![];
 
@@ -67,12 +67,11 @@ fn extract_struct_info(
         let ty = &f.ty;
         if let Type::Path(p) = ty {
             let type_info = &p.path.segments.first().unwrap();
-            let inner_type =
-                if let PathArguments::AngleBracketed(angle_bracket_type) = &type_info.arguments {
-                    angle_bracket_type.clone()
-                } else {
-                    panic!("All struct members must be of type {allowed_strs}");
-                };
+            let inner_type = if let PathArguments::AngleBracketed(angle_bracket_type) = &type_info.arguments {
+                angle_bracket_type.clone()
+            } else {
+                panic!("All struct members must be of type {allowed_strs}");
+            };
 
             let type_str = format!("{}", &type_info.ident);
             // Rough way to check that this is map_type_name
@@ -106,8 +105,7 @@ fn extract_struct_info(
     });
 
     let (field_info, inner_types_with_opts): (Vec<_>, Vec<_>) = info.unzip();
-    let (field_names, cf_names, simple_field_type_names): (Vec<_>, Vec<_>, Vec<_>) =
-        field_info.into_iter().multiunzip();
+    let (field_names, cf_names, simple_field_type_names): (Vec<_>, Vec<_>, Vec<_>) = field_info.into_iter().multiunzip();
 
     // Check for homogeneous types
     if let Some(first) = simple_field_type_names.first() {
@@ -156,10 +154,12 @@ fn get_options_override_function(attr: &Attribute) -> syn::Result<String> {
 
     let fn_name = match val.lit {
         Lit::Str(fn_name) => fn_name,
-        _ => return Err(syn::Error::new_spanned(
-            meta,
-            format!("Expected function name in format `#[{DB_OPTIONS_CUSTOM_FUNCTION} = {{function_name}}]`"),
-        ))
+        _ => {
+            return Err(syn::Error::new_spanned(
+                meta,
+                format!("Expected function name in format `#[{DB_OPTIONS_CUSTOM_FUNCTION} = {{function_name}}]`"),
+            ))
+        }
     };
     Ok(fn_name.value())
 }
@@ -191,12 +191,8 @@ pub fn derive_dbmap_utils_general(input: TokenStream) -> TokenStream {
     let generics = &input.generics;
     let generics_names = extract_generics_names(generics);
 
-    let allowed_types_with_post_process_fn: BTreeMap<_, _> =
-        [("SallyColumn", ""), ("DBMap", "")].into_iter().collect();
-    let allowed_strs = allowed_types_with_post_process_fn
-        .keys()
-        .map(|s| s.to_string())
-        .collect();
+    let allowed_types_with_post_process_fn: BTreeMap<_, _> = [("SallyColumn", ""), ("DBMap", "")].into_iter().collect();
+    let allowed_strs = allowed_types_with_post_process_fn.keys().map(|s| s.to_string()).collect();
 
     // TODO: use `parse_quote` over `parse()`
     let ExtractedStructInfo {
@@ -208,15 +204,11 @@ pub fn derive_dbmap_utils_general(input: TokenStream) -> TokenStream {
         deprecated_cfs,
     } = extract_struct_info(input.clone(), allowed_strs);
 
-    let (key_names, value_names): (Vec<_>, Vec<_>) = inner_types
-        .iter()
-        .map(|q| (q.args.first().unwrap(), q.args.last().unwrap()))
-        .unzip();
+    let (key_names, value_names): (Vec<_>, Vec<_>) =
+        inner_types.iter().map(|q| (q.args.first().unwrap(), q.args.last().unwrap())).unzip();
 
     // This is the actual name of the type which was found
-    let post_process_fn_str = allowed_types_with_post_process_fn
-        .get(&simple_field_type_name_str.as_str())
-        .unwrap();
+    let post_process_fn_str = allowed_types_with_post_process_fn.get(&simple_field_type_name_str.as_str()).unwrap();
     let post_process_fn: proc_macro2::TokenStream = post_process_fn_str.parse().unwrap();
 
     let default_options_override_fn_names: Vec<proc_macro2::TokenStream> = derived_table_options
@@ -227,20 +219,17 @@ pub fn derive_dbmap_utils_general(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let generics_bounds =
-        "std::fmt::Debug + serde::Serialize + for<'de> serde::de::Deserialize<'de>";
+    let generics_bounds = "std::fmt::Debug + serde::Serialize + for<'de> serde::de::Deserialize<'de>";
     let generics_bounds_token: proc_macro2::TokenStream = generics_bounds.parse().unwrap();
 
     let config_struct_name_str = format!("{name}Configurator");
     let config_struct_name: proc_macro2::TokenStream = config_struct_name_str.parse().unwrap();
 
     let intermediate_db_map_struct_name_str = format!("{name}IntermediateDBMapStructPrimary");
-    let intermediate_db_map_struct_name: proc_macro2::TokenStream =
-        intermediate_db_map_struct_name_str.parse().unwrap();
+    let intermediate_db_map_struct_name: proc_macro2::TokenStream = intermediate_db_map_struct_name_str.parse().unwrap();
 
     let secondary_db_map_struct_name_str = format!("{name}ReadOnly");
-    let secondary_db_map_struct_name: proc_macro2::TokenStream =
-        secondary_db_map_struct_name_str.parse().unwrap();
+    let secondary_db_map_struct_name: proc_macro2::TokenStream = secondary_db_map_struct_name_str.parse().unwrap();
 
     TokenStream::from(quote! {
 
@@ -606,32 +595,19 @@ pub fn derive_sallydb_general(input: TokenStream) -> TokenStream {
     let generics = &input.generics;
     let generics_names = extract_generics_names(generics);
 
-    let allowed_types_with_post_process_fn: BTreeMap<_, _> =
-        [("SallyColumn", "")].into_iter().collect();
-    let allowed_strs = allowed_types_with_post_process_fn
-        .keys()
-        .map(|s| s.to_string())
-        .collect();
+    let allowed_types_with_post_process_fn: BTreeMap<_, _> = [("SallyColumn", "")].into_iter().collect();
+    let allowed_strs = allowed_types_with_post_process_fn.keys().map(|s| s.to_string()).collect();
 
     // TODO: use `parse_quote` over `parse()`
     // TODO: Eventually this should return a Vec<Vec<GeneralTableOptions>> to capture default table options for each column type i.e. RockDB, TestDB, etc
-    let ExtractedStructInfo {
-        field_names,
-        inner_types,
-        derived_table_options,
-        simple_field_type_name_str,
-        ..
-    } = extract_struct_info(input.clone(), allowed_strs);
+    let ExtractedStructInfo { field_names, inner_types, derived_table_options, simple_field_type_name_str, .. } =
+        extract_struct_info(input.clone(), allowed_strs);
 
-    let (key_names, value_names): (Vec<_>, Vec<_>) = inner_types
-        .iter()
-        .map(|q| (q.args.first().unwrap(), q.args.last().unwrap()))
-        .unzip();
+    let (key_names, value_names): (Vec<_>, Vec<_>) =
+        inner_types.iter().map(|q| (q.args.first().unwrap(), q.args.last().unwrap())).unzip();
 
     // This is the actual name of the type which was found
-    let post_process_fn_str = allowed_types_with_post_process_fn
-        .get(&simple_field_type_name_str.as_str())
-        .unwrap();
+    let post_process_fn_str = allowed_types_with_post_process_fn.get(&simple_field_type_name_str.as_str()).unwrap();
     let post_process_fn: proc_macro2::TokenStream = post_process_fn_str.parse().unwrap();
 
     let default_options_override_fn_names: Vec<proc_macro2::TokenStream> = derived_table_options
@@ -642,21 +618,17 @@ pub fn derive_sallydb_general(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let generics_bounds =
-        "std::fmt::Debug + serde::Serialize + for<'de> serde::de::Deserialize<'de>";
+    let generics_bounds = "std::fmt::Debug + serde::Serialize + for<'de> serde::de::Deserialize<'de>";
     let generics_bounds_token: proc_macro2::TokenStream = generics_bounds.parse().unwrap();
 
     let config_struct_name_str = format!("{name}SallyConfigurator");
-    let sally_config_struct_name: proc_macro2::TokenStream =
-        config_struct_name_str.parse().unwrap();
+    let sally_config_struct_name: proc_macro2::TokenStream = config_struct_name_str.parse().unwrap();
 
     let intermediate_db_map_struct_name_str = format!("{name}Primary");
-    let intermediate_db_map_struct_name: proc_macro2::TokenStream =
-        intermediate_db_map_struct_name_str.parse().unwrap();
+    let intermediate_db_map_struct_name: proc_macro2::TokenStream = intermediate_db_map_struct_name_str.parse().unwrap();
 
     let secondary_db_map_struct_name_str = format!("{name}ReadOnly");
-    let secondary_db_map_struct_name: proc_macro2::TokenStream =
-        secondary_db_map_struct_name_str.parse().unwrap();
+    let secondary_db_map_struct_name: proc_macro2::TokenStream = secondary_db_map_struct_name_str.parse().unwrap();
 
     TokenStream::from(quote! {
 

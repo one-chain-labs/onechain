@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ApiEndpoint, RouteHandler};
-use crate::reader::StateReader;
-use crate::Result;
-use crate::{rest::PageCursor, RpcService, RpcServiceError};
-use axum::extract::Query;
-use axum::extract::{Path, State};
-use axum::Json;
+use axum::{
+    extract::{Path, Query, State},
+    Json,
+};
 use sui_sdk_types::{Address, ObjectId, StructTag, Version};
 use sui_types::sui_sdk_types_conversions::struct_tag_core_to_sdk;
 use tap::Pipe;
+
+use super::{ApiEndpoint, RouteHandler};
+use crate::{reader::StateReader, rest::PageCursor, Result, RpcService, RpcServiceError};
 
 pub struct ListAccountObjects;
 
@@ -33,10 +33,7 @@ async fn list_account_objects(
     Query(parameters): Query<ListAccountOwnedObjectsQueryParameters>,
     State(state): State<StateReader>,
 ) -> Result<(PageCursor<ObjectId>, Json<Vec<AccountOwnedObjectInfo>>)> {
-    let indexes = state
-        .inner()
-        .indexes()
-        .ok_or_else(RpcServiceError::not_found)?;
+    let indexes = state.inner().indexes().ok_or_else(RpcServiceError::not_found)?;
     let limit = parameters.limit();
     let start = parameters.start();
 
@@ -73,9 +70,7 @@ pub struct ListAccountOwnedObjectsQueryParameters {
 
 impl ListAccountOwnedObjectsQueryParameters {
     pub fn limit(&self) -> usize {
-        self.limit
-            .map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE))
-            .unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
+        self.limit.map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE)).unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
     }
 
     pub fn start(&self) -> Option<sui_types::base_types::ObjectID> {

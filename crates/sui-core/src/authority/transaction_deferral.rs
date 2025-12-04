@@ -22,52 +22,29 @@ pub enum DeferralKey {
 
 impl DeferralKey {
     pub fn new_for_randomness(deferred_from_round: Round) -> Self {
-        Self::Randomness {
-            deferred_from_round,
-        }
+        Self::Randomness { deferred_from_round }
     }
 
     pub fn new_for_consensus_round(future_round: Round, deferred_from_round: Round) -> Self {
-        Self::ConsensusRound {
-            future_round,
-            deferred_from_round,
-        }
+        Self::ConsensusRound { future_round, deferred_from_round }
     }
 
     pub fn full_range_for_randomness() -> (Self, Self) {
-        (
-            Self::Randomness {
-                deferred_from_round: 0,
-            },
-            Self::Randomness {
-                deferred_from_round: u64::MAX,
-            },
-        )
+        (Self::Randomness { deferred_from_round: 0 }, Self::Randomness { deferred_from_round: u64::MAX })
     }
 
     // Returns a range of deferral keys that are deferred up to the given consensus round.
     pub fn range_for_up_to_consensus_round(consensus_round: Round) -> (Self, Self) {
-        (
-            Self::ConsensusRound {
-                future_round: 0,
-                deferred_from_round: 0,
-            },
-            Self::ConsensusRound {
-                future_round: consensus_round.checked_add(1).unwrap(),
-                deferred_from_round: 0,
-            },
-        )
+        (Self::ConsensusRound { future_round: 0, deferred_from_round: 0 }, Self::ConsensusRound {
+            future_round: consensus_round.checked_add(1).unwrap(),
+            deferred_from_round: 0,
+        })
     }
 
     pub fn deferred_from_round(&self) -> Round {
         match self {
-            Self::Randomness {
-                deferred_from_round,
-            } => *deferred_from_round,
-            Self::ConsensusRound {
-                deferred_from_round,
-                ..
-            } => *deferred_from_round,
+            Self::Randomness { deferred_from_round } => *deferred_from_round,
+            Self::ConsensusRound { deferred_from_round, .. } => *deferred_from_round,
         }
     }
 }
@@ -84,11 +61,7 @@ pub fn transaction_deferral_within_limit(
     deferral_key: &DeferralKey,
     max_deferral_rounds_for_congestion_control: u64,
 ) -> bool {
-    if let DeferralKey::ConsensusRound {
-        future_round,
-        deferred_from_round,
-    } = deferral_key
-    {
+    if let DeferralKey::ConsensusRound { future_round, deferred_from_round } = deferral_key {
         return (future_round - deferred_from_round) <= max_deferral_rounds_for_congestion_control;
     }
 
@@ -99,13 +72,14 @@ pub fn transaction_deferral_within_limit(
 
 #[cfg(test)]
 mod object_cost_tests {
-    use super::*;
-    use typed_store::DBMapUtils;
-    use typed_store::Map;
     use typed_store::{
         rocks::{DBMap, MetricConf},
         traits::{TableSummary, TypedStoreDebug},
+        DBMapUtils,
+        Map,
     };
+
+    use super::*;
 
     #[tokio::test]
     async fn test_deferral_key_sort_order() {
@@ -119,16 +93,11 @@ mod object_cost_tests {
         // get a tempdir
         let tempdir = tempfile::tempdir().unwrap();
 
-        let db = TestDB::open_tables_read_write(
-            tempdir.path().to_owned(),
-            MetricConf::new("test_db"),
-            None,
-            None,
-        );
+        let db = TestDB::open_tables_read_write(tempdir.path().to_owned(), MetricConf::new("test_db"), None, None);
 
-        for _ in 0..10000 {
-            let future_round = rand::thread_rng().gen_range(0..u64::MAX);
-            let current_round = rand::thread_rng().gen_range(0..u64::MAX);
+        for _ in 0 .. 10000 {
+            let future_round = rand::thread_rng().gen_range(0 .. u64::MAX);
+            let current_round = rand::thread_rng().gen_range(0 .. u64::MAX);
 
             let key = DeferralKey::new_for_consensus_round(future_round, current_round);
             db.deferred_certs.insert(&key, &()).unwrap();
@@ -159,40 +128,25 @@ mod object_cost_tests {
         // get a tempdir
         let tempdir = tempfile::tempdir().unwrap();
 
-        let db = TestDB::open_tables_read_write(
-            tempdir.path().to_owned(),
-            MetricConf::new("test_db"),
-            None,
-            None,
-        );
+        let db = TestDB::open_tables_read_write(tempdir.path().to_owned(), MetricConf::new("test_db"), None, None);
 
         // All future rounds are between 100 and 300.
         let min_future_round = 100;
         let max_future_round = 300;
-        for _ in 0..10000 {
-            let future_round = rand::thread_rng().gen_range(min_future_round..=max_future_round);
-            let current_round = rand::thread_rng().gen_range(0..u64::MAX);
+        for _ in 0 .. 10000 {
+            let future_round = rand::thread_rng().gen_range(min_future_round ..= max_future_round);
+            let current_round = rand::thread_rng().gen_range(0 .. u64::MAX);
 
-            db.deferred_certs
-                .insert(
-                    &DeferralKey::new_for_consensus_round(future_round, current_round),
-                    &(),
-                )
-                .unwrap();
+            db.deferred_certs.insert(&DeferralKey::new_for_consensus_round(future_round, current_round), &()).unwrap();
             // Add a randomness deferral txn to make sure that it won't show up when fetching deferred consensus round txs.
-            db.deferred_certs
-                .insert(&DeferralKey::new_for_randomness(current_round), &())
-                .unwrap();
+            db.deferred_certs.insert(&DeferralKey::new_for_randomness(current_round), &()).unwrap();
         }
 
         // Fetch all deferred transactions up to consensus round 200.
         let (min, max) = DeferralKey::range_for_up_to_consensus_round(200);
         let mut previous_future_round = 0;
         let mut result_count = 0;
-        for result in db
-            .deferred_certs
-            .safe_iter_with_bounds(Some(min), Some(max))
-        {
+        for result in db.deferred_certs.safe_iter_with_bounds(Some(min), Some(max)) {
             let (key, _) = result.unwrap();
             match key {
                 DeferralKey::Randomness { .. } => {

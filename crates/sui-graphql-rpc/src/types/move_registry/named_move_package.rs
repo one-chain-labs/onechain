@@ -5,19 +5,15 @@ use std::str::FromStr;
 
 use async_graphql::Context;
 
+use super::{
+    error::MoveRegistryError,
+    on_chain::{AppInfo, AppRecord, VersionedName},
+};
 use crate::{
     config::{MoveRegistryConfig, ResolutionType},
     data::move_registry_data_loader::MoveRegistryDataLoader,
     error::Error,
-    types::{
-        chain_identifier::ChainIdentifier, move_object::MoveObject, move_package::MovePackage,
-        object::Object,
-    },
-};
-
-use super::{
-    error::MoveRegistryError,
-    on_chain::{AppInfo, AppRecord, VersionedName},
+    types::{chain_identifier::ChainIdentifier, move_object::MoveObject, move_package::MovePackage, object::Object},
 };
 
 pub(crate) struct NamedMovePackage;
@@ -34,12 +30,8 @@ impl NamedMovePackage {
         let versioned = VersionedName::from_str(name)?;
 
         match config.resolution_type {
-            ResolutionType::Internal => {
-                query_internal(ctx, config, versioned, checkpoint_viewed_at).await
-            }
-            ResolutionType::External => {
-                query_external(ctx, config, versioned, checkpoint_viewed_at).await
-            }
+            ResolutionType::Internal => query_internal(ctx, config, versioned, checkpoint_viewed_at).await,
+            ResolutionType::External => query_external(ctx, config, versioned, checkpoint_viewed_at).await,
         }
     }
 }
@@ -50,13 +42,12 @@ async fn query_internal(
     versioned: VersionedName,
     checkpoint_viewed_at: u64,
 ) -> Result<Option<MovePackage>, Error> {
-    let df_id = versioned.name.to_dynamic_field_id(config).map_err(|e| {
-        Error::Internal(format!("Failed to convert name to dynamic field id: {}", e))
-    })?;
+    let df_id = versioned
+        .name
+        .to_dynamic_field_id(config)
+        .map_err(|e| Error::Internal(format!("Failed to convert name to dynamic field id: {}", e)))?;
 
-    let Some(df) =
-        MoveObject::query(ctx, df_id.into(), Object::latest_at(checkpoint_viewed_at)).await?
-    else {
+    let Some(df) = MoveObject::query(ctx, df_id.into(), Object::latest_at(checkpoint_viewed_at)).await? else {
         return Ok(None);
     };
 
@@ -93,13 +84,7 @@ async fn query_external(
         return Ok(None);
     };
 
-    package_from_app_info(
-        ctx,
-        app_info.clone(),
-        versioned.version,
-        checkpoint_viewed_at,
-    )
-    .await
+    package_from_app_info(ctx, app_info.clone(), versioned.version, checkpoint_viewed_at).await
 }
 
 async fn package_from_app_info(

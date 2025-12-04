@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use parking_lot::Mutex;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
 use tokio::sync::{OwnedRwLockWriteGuard, RwLock};
 
 /// This structure contains a cell for a single value.
@@ -19,21 +20,13 @@ pub struct AsyncOnceCell<T> {
 impl<T: Send + Clone> AsyncOnceCell<T> {
     pub fn new() -> Self {
         let value = Arc::new(RwLock::new(None));
-        let writer = value
-            .clone()
-            .try_write_owned()
-            .expect("Write lock can not fail here");
+        let writer = value.clone().try_write_owned().expect("Write lock can not fail here");
         let writer = Mutex::new(Some(writer));
         Self { value, writer }
     }
 
     pub async fn get(&self) -> T {
-        self.value
-            .read()
-            .await
-            .as_ref()
-            .cloned()
-            .expect("Value is available when writer is dropped")
+        self.value.read().await.as_ref().cloned().expect("Value is available when writer is dropped")
     }
 
     /// Sets the value and notifies waiters. Return error if called twice

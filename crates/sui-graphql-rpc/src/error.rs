@@ -24,30 +24,14 @@ pub(crate) fn graphql_error(code: &str, message: impl Into<String>) -> ServerErr
     let mut ext = ErrorExtensionValues::default();
     ext.set("code", code);
 
-    ServerError {
-        message: message.into(),
-        source: None,
-        locations: vec![],
-        path: vec![],
-        extensions: Some(ext),
-    }
+    ServerError { message: message.into(), source: None, locations: vec![], path: vec![], extensions: Some(ext) }
 }
 
-pub(crate) fn graphql_error_at_pos(
-    code: &str,
-    message: impl Into<String>,
-    pos: Pos,
-) -> ServerError {
+pub(crate) fn graphql_error_at_pos(code: &str, message: impl Into<String>, pos: Pos) -> ServerError {
     let mut ext = ErrorExtensionValues::default();
     ext.set("code", code);
 
-    ServerError {
-        message: message.into(),
-        source: None,
-        locations: vec![pos],
-        path: vec![],
-        extensions: Some(ext),
-    }
+    ServerError { message: message.into(), source: None, locations: vec![pos], path: vec![], extensions: Some(ext) }
 }
 
 #[derive(Clone, Debug, thiserror::Error)]

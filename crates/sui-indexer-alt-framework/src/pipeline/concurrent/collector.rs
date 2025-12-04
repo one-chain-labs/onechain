@@ -11,12 +11,11 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
+use super::{BatchedRows, Handler};
 use crate::{
     metrics::{CheckpointLagMetricReporter, IndexerMetrics},
     pipeline::{CommitterConfig, IndexedCheckpoint, WatermarkPart},
 };
-
-use super::{BatchedRows, Handler};
 
 /// Processed values that are waiting to be written to the database. This is an internal type used
 /// by the concurrent collector to hold data it is waiting to send to the committer.
@@ -232,9 +231,8 @@ mod tests {
     use sui_pg_db as db;
     use sui_types::full_checkpoint_content::CheckpointData;
 
-    use crate::pipeline::{concurrent::max_chunk_rows, Processor};
-
     use super::*;
+    use crate::pipeline::{concurrent::max_chunk_rows, Processor};
 
     #[derive(Clone)]
     struct Entry;
@@ -244,15 +242,17 @@ mod tests {
         const FIELD_COUNT: usize = 32;
     }
 
-    use prometheus::Registry;
     use std::time::Duration;
+
+    use prometheus::Registry;
     use tokio::sync::mpsc;
 
     struct TestHandler;
     impl Processor for TestHandler {
         type Value = Entry;
-        const NAME: &'static str = "test_handler";
+
         const FANOUT: usize = 1;
+        const NAME: &'static str = "test_handler";
 
         fn process(&self, _checkpoint: &Arc<CheckpointData>) -> anyhow::Result<Vec<Self::Value>> {
             Ok(vec![])
@@ -262,10 +262,8 @@ mod tests {
     #[async_trait::async_trait]
     impl Handler for TestHandler {
         const MAX_PENDING_ROWS: usize = 10000;
-        async fn commit(
-            _values: &[Self::Value],
-            _conn: &mut db::Connection<'_>,
-        ) -> anyhow::Result<usize> {
+
+        async fn commit(_values: &[Self::Value], _conn: &mut db::Connection<'_>) -> anyhow::Result<usize> {
             tokio::time::sleep(Duration::from_millis(1000)).await;
             Ok(0)
         }
@@ -287,11 +285,8 @@ mod tests {
         let mut pending = BTreeMap::new();
 
         // Add checkpoints 1-5 to received
-        for i in 1..=5 {
-            received.insert(
-                i,
-                IndexedCheckpoint::new(0, i, 0, 0, vec![Entry, Entry, Entry]),
-            );
+        for i in 1 ..= 5 {
+            received.insert(i, IndexedCheckpoint::new(0, i, 0, 0, vec![Entry, Entry, Entry]));
         }
 
         // With lag of 2 and tip at 5, only checkpoints 1-3 should move
@@ -311,13 +306,10 @@ mod tests {
         let mut pending = BTreeMap::new();
 
         // Add checkpoint 10 to pending to establish tip
-        pending.insert(
-            10,
-            PendingCheckpoint::from(IndexedCheckpoint::new(0, 10, 0, 0, vec![Entry])),
-        );
+        pending.insert(10, PendingCheckpoint::from(IndexedCheckpoint::new(0, 10, 0, 0, vec![Entry])));
 
         // Add checkpoints 1-5 to received
-        for i in 1..=5 {
+        for i in 1 ..= 5 {
             received.insert(i, IndexedCheckpoint::new(0, i, 0, 0, vec![Entry]));
         }
 
@@ -335,7 +327,7 @@ mod tests {
         let mut pending = BTreeMap::new();
 
         // Add checkpoints 8-10 to received
-        for i in 8..=10 {
+        for i in 8 ..= 10 {
             received.insert(i, IndexedCheckpoint::new(0, i, 0, 0, vec![Entry]));
         }
 
@@ -406,10 +398,7 @@ mod tests {
             cancel.clone(),
         );
 
-        processor_tx
-            .send(IndexedCheckpoint::new(0, 1, 10, 1000, vec![Entry, Entry]))
-            .await
-            .unwrap();
+        processor_tx.send(IndexedCheckpoint::new(0, 1, 10, 1000, vec![Entry, Entry])).await.unwrap();
 
         tokio::time::sleep(Duration::from_millis(200)).await;
 
@@ -420,9 +409,7 @@ mod tests {
         drop(processor_tx);
 
         // After a short delay, collector should shut down
-        let _ = tokio::time::timeout(Duration::from_millis(500), collector)
-            .await
-            .expect("collector did not shutdown");
+        let _ = tokio::time::timeout(Duration::from_millis(500), collector).await.expect("collector did not shutdown");
 
         cancel.cancel();
     }
@@ -448,24 +435,18 @@ mod tests {
         );
 
         // Send more data than MAX_PENDING_ROWS plus collector channel buffer
-        let data = IndexedCheckpoint::new(
-            0,
-            1,
-            10,
-            1000,
-            vec![
+        let data = IndexedCheckpoint::new(0, 1, 10, 1000, vec![
                 Entry;
                 // Decreasing this number by even 1 would make the test fail.
                 TestHandler::MAX_PENDING_ROWS
                     + max_chunk_rows::<TestHandler>() * collector_channel_size
-            ],
-        );
+            ]);
         processor_tx.send(data).await.unwrap();
 
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Now fill up the processor channel with minimum data to trigger send blocking
-        for _ in 0..processor_channel_size {
+        for _ in 0 .. processor_channel_size {
             let more_data = IndexedCheckpoint::new(0, 2, 11, 1000, vec![Entry]);
             processor_tx.send(more_data).await.unwrap();
         }
@@ -474,10 +455,7 @@ mod tests {
         let even_more_data = IndexedCheckpoint::new(0, 3, 12, 1000, vec![Entry]);
 
         let send_result = processor_tx.try_send(even_more_data);
-        assert!(matches!(
-            send_result,
-            Err(mpsc::error::TrySendError::Full(_))
-        ));
+        assert!(matches!(send_result, Err(mpsc::error::TrySendError::Full(_))));
 
         cancel.cancel();
     }

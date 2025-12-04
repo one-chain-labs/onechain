@@ -68,13 +68,7 @@ impl Commit {
         leader: BlockRef,
         blocks: Vec<BlockRef>,
     ) -> Self {
-        Commit::V1(CommitV1 {
-            index,
-            previous_digest,
-            timestamp_ms,
-            leader,
-            blocks,
-        })
+        Commit::V1(CommitV1 { index, previous_digest, timestamp_ms, leader, blocks })
     }
 
     pub(crate) fn serialize(&self) -> Result<Bytes, bcs::Error> {
@@ -156,11 +150,7 @@ pub(crate) struct TrustedCommit {
 impl TrustedCommit {
     pub(crate) fn new_trusted(commit: Commit, serialized: Bytes) -> Self {
         let digest = Self::compute_digest(&serialized);
-        Self {
-            inner: Arc::new(commit),
-            digest,
-            serialized,
-        }
+        Self { inner: Arc::new(commit), digest, serialized }
     }
 
     #[cfg(test)]
@@ -177,10 +167,7 @@ impl TrustedCommit {
     }
 
     pub(crate) fn reference(&self) -> CommitRef {
-        CommitRef {
-            index: self.index(),
-            digest: self.digest(),
-        }
+        CommitRef { index: self.index(), digest: self.digest() }
     }
 
     pub(crate) fn digest(&self) -> CommitDigest {
@@ -212,9 +199,9 @@ impl Deref for TrustedCommit {
 pub struct CommitDigest([u8; consensus_config::DIGEST_LENGTH]);
 
 impl CommitDigest {
+    pub const MAX: Self = Self([u8::MAX; consensus_config::DIGEST_LENGTH]);
     /// Lexicographic min & max digest.
     pub const MIN: Self = Self([u8::MIN; consensus_config::DIGEST_LENGTH]);
-    pub const MAX: Self = Self([u8::MAX; consensus_config::DIGEST_LENGTH]);
 
     pub fn into_inner(self) -> [u8; consensus_config::DIGEST_LENGTH] {
         self.0
@@ -223,7 +210,7 @@ impl CommitDigest {
 
 impl Hash for CommitDigest {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.0[..8]);
+        state.write(&self.0[.. 8]);
     }
 }
 
@@ -238,20 +225,14 @@ impl fmt::Display for CommitDigest {
         write!(
             f,
             "{}",
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0)
-                .get(0..4)
-                .ok_or(fmt::Error)?
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0).get(0 .. 4).ok_or(fmt::Error)?
         )
     }
 }
 
 impl fmt::Debug for CommitDigest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "{}",
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0)
-        )
+        write!(f, "{}", base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0))
     }
 }
 
@@ -319,34 +300,19 @@ impl CommittedSubDag {
         reputation_scores_desc: Vec<(AuthorityIndex, u64)>,
     ) -> Self {
         assert_eq!(blocks.len(), rejected_transactions_by_block.len());
-        Self {
-            leader,
-            blocks,
-            rejected_transactions_by_block,
-            timestamp_ms,
-            commit_ref,
-            reputation_scores_desc,
-        }
+        Self { leader, blocks, rejected_transactions_by_block, timestamp_ms, commit_ref, reputation_scores_desc }
     }
 }
 
 // Sort the blocks of the sub-dag blocks by round number then authority index. Any
 // deterministic & stable algorithm works.
 pub(crate) fn sort_sub_dag_blocks(blocks: &mut [VerifiedBlock]) {
-    blocks.sort_by(|a, b| {
-        a.round()
-            .cmp(&b.round())
-            .then_with(|| a.author().cmp(&b.author()))
-    })
+    blocks.sort_by(|a, b| a.round().cmp(&b.round()).then_with(|| a.author().cmp(&b.author())))
 }
 
 impl Display for CommittedSubDag {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "CommittedSubDag(leader={}, ref={}, blocks=[",
-            self.leader, self.commit_ref
-        )?;
+        write!(f, "CommittedSubDag(leader={}, ref={}, blocks=[", self.leader, self.commit_ref)?;
         for (idx, block) in self.blocks.iter().enumerate() {
             if idx > 0 {
                 write!(f, ", ")?;
@@ -363,11 +329,7 @@ impl fmt::Debug for CommittedSubDag {
         for block in &self.blocks {
             write!(f, "{}, ", block.reference())?;
         }
-        write!(
-            f,
-            "];{}ms;rs{:?})",
-            self.timestamp_ms, self.reputation_scores_desc
-        )
+        write!(f, "];{}ms;rs{:?})", self.timestamp_ms, self.reputation_scores_desc)
     }
 }
 
@@ -378,15 +340,13 @@ pub fn load_committed_subdag_from_store(
     reputation_scores_desc: Vec<(AuthorityIndex, u64)>,
 ) -> CommittedSubDag {
     let mut leader_block_idx = None;
-    let commit_blocks = store
-        .read_blocks(commit.blocks())
-        .expect("We should have the block referenced in the commit data");
+    let commit_blocks =
+        store.read_blocks(commit.blocks()).expect("We should have the block referenced in the commit data");
     let blocks = commit_blocks
         .into_iter()
         .enumerate()
         .map(|(idx, commit_block_opt)| {
-            let commit_block =
-                commit_block_opt.expect("We should have the block referenced in the commit data");
+            let commit_block = commit_block_opt.expect("We should have the block referenced in the commit data");
             if commit_block.reference() == commit.leader() {
                 leader_block_idx = Some(idx);
             }
@@ -530,7 +490,7 @@ impl CommitRange {
     pub(crate) fn new(range: RangeInclusive<CommitIndex>) -> Self {
         // When end is CommitIndex::MAX, the range can be considered as unbounded
         // so it is ok to saturate at the end.
-        Self(*range.start()..(*range.end()).saturating_add(1))
+        Self(*range.start() .. (*range.end()).saturating_add(1))
     }
 
     // Inclusive
@@ -546,14 +506,11 @@ impl CommitRange {
     pub(crate) fn extend_to(&mut self, other: CommitIndex) {
         let new_end = other.saturating_add(1);
         assert!(self.0.end <= new_end);
-        self.0 = self.0.start..new_end;
+        self.0 = self.0.start .. new_end;
     }
 
     pub(crate) fn size(&self) -> usize {
-        self.0
-            .end
-            .checked_sub(self.0.start)
-            .expect("Range should never have end < start") as usize
+        self.0.end.checked_sub(self.0.start).expect("Range should never have end < start") as usize
     }
 
     /// Check whether the two ranges have the same size.
@@ -569,9 +526,7 @@ impl CommitRange {
 
 impl Ord for CommitRange {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.start()
-            .cmp(&other.start())
-            .then_with(|| self.end().cmp(&other.end()))
+        self.start().cmp(&other.start()).then_with(|| self.end().cmp(&other.end()))
     }
 }
 
@@ -632,9 +587,9 @@ mod tests {
 
         let mut ancestors = genesis_references;
         let mut leader = None;
-        for round in 1..=first_wave_rounds {
+        for round in 1 ..= first_wave_rounds {
             let mut new_ancestors = vec![];
-            for author in 0..num_authorities {
+            for author in 0 .. num_authorities {
                 let base_ts = round as BlockTimestampMs * 1000;
                 let block = VerifiedBlock::new_for_test(
                     TestBlock::new(round, author)
@@ -642,9 +597,7 @@ mod tests {
                         .set_ancestors(ancestors.clone())
                         .build(),
                 );
-                store
-                    .write(WriteBatch::default().blocks(vec![block.clone()]))
-                    .unwrap();
+                store.write(WriteBatch::default().blocks(vec![block.clone()])).unwrap();
                 new_ancestors.push(block.reference());
                 blocks.push(block.reference());
 
@@ -671,10 +624,7 @@ mod tests {
         let subdag = load_committed_subdag_from_store(store.as_ref(), commit.clone(), vec![]);
         assert_eq!(subdag.leader, leader_ref);
         assert_eq!(subdag.timestamp_ms, leader_block.timestamp_ms());
-        assert_eq!(
-            subdag.blocks.len(),
-            (num_authorities * wave_length) as usize + 1
-        );
+        assert_eq!(subdag.blocks.len(), (num_authorities * wave_length) as usize + 1);
         assert_eq!(subdag.commit_ref, commit.reference());
         assert_eq!(subdag.reputation_scores_desc, vec![]);
     }
@@ -682,12 +632,12 @@ mod tests {
     #[tokio::test]
     async fn test_commit_range() {
         telemetry_subscribers::init_for_testing();
-        let mut range1 = CommitRange::new(1..=5);
-        let range2 = CommitRange::new(2..=6);
-        let range3 = CommitRange::new(5..=10);
-        let range4 = CommitRange::new(6..=10);
-        let range5 = CommitRange::new(6..=9);
-        let range6 = CommitRange::new(1..=1);
+        let mut range1 = CommitRange::new(1 ..= 5);
+        let range2 = CommitRange::new(2 ..= 6);
+        let range3 = CommitRange::new(5 ..= 10);
+        let range4 = CommitRange::new(6 ..= 10);
+        let range5 = CommitRange::new(6 ..= 9);
+        let range6 = CommitRange::new(1 ..= 1);
 
         assert_eq!(range1.start(), 1);
         assert_eq!(range1.end(), 5);

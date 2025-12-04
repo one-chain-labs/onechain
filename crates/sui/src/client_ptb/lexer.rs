@@ -1,12 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sp;
-
 use super::{
     error::{Span, Spanned},
     token::{Lexeme, Token as T},
 };
+use crate::sp;
 
 pub struct Lexer<'l, I: Iterator<Item = &'l str>> {
     pub buf: &'l str,
@@ -19,12 +18,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
     pub fn new(mut tokens: I) -> Option<Self> {
         let buf = tokens.next()?;
 
-        Some(Self {
-            buf,
-            tokens,
-            offset: 0,
-            done: None,
-        })
+        Some(Self { buf, tokens, offset: 0, done: None })
     }
 
     /// Returns the next character in the current shell token, along with the byte offset it ends
@@ -42,7 +36,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         loop {
             if let Some((ix, c)) = self.next_char_boundary() {
                 if c.is_whitespace() {
-                    self.buf = &self.buf[ix..];
+                    self.buf = &self.buf[ix ..];
                     self.offset += ix;
                 } else {
                     break;
@@ -64,14 +58,11 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         let rest = self.buf.strip_prefix(patt)?;
 
         let len = self.buf.len() - rest.len();
-        let value = &self.buf[..len];
+        let value = &self.buf[.. len];
         self.offset += len;
         self.buf = rest;
 
-        let span = Span {
-            start,
-            end: self.offset,
-        };
+        let span = Span { start, end: self.offset };
         Some(Spanned { span, value })
     }
 
@@ -87,14 +78,11 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         };
 
         let len = self.buf.len() - rest.len();
-        let value = &self.buf[..len];
+        let value = &self.buf[.. len];
         self.offset += len;
         self.buf = rest;
 
-        let span = Span {
-            start,
-            end: self.offset,
-        };
+        let span = Span { start, end: self.offset };
         Some(Spanned { span, value })
     }
 
@@ -106,10 +94,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         let value = self.tokens.next()?;
         self.offset += value.len() + 1;
 
-        let span = Span {
-            start,
-            end: self.offset,
-        };
+        let span = Span { start, end: self.offset };
         Some(Spanned { span, value })
     }
 
@@ -118,18 +103,15 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         let start = self.offset;
         let (ix, _) = self.next_char_boundary()?;
 
-        let value = &self.buf[..ix];
-        let span = Span {
-            start,
-            end: start + ix,
-        };
+        let value = &self.buf[.. ix];
+        let span = Span { start, end: start + ix };
         Some(Spanned { span, value })
     }
 
     /// Consume the next character in the current shell token, assuming there is one.
     fn bump(&mut self) {
         if let Some((ix, _)) = self.next_char_boundary() {
-            self.buf = &self.buf[ix..];
+            self.buf = &self.buf[ix ..];
             self.offset += ix;
         }
     }
@@ -157,13 +139,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
                     !quote.starts_with(c)
                 }
             })
-            .unwrap_or(Spanned {
-                span: Span {
-                    start: sp.end,
-                    end: sp.end,
-                },
-                value: "",
-            })
+            .unwrap_or(Spanned { span: Span { start: sp.end, end: sp.end }, value: "" })
             .widen(start);
 
         let Some(end) = self.eat_prefix(quote) else {
@@ -193,10 +169,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
 
     /// Span pointing to the current offset in the input.
     fn offset(&self) -> Span {
-        Span {
-            start: self.offset,
-            end: self.offset,
-        }
+        Span { start: self.offset, end: self.offset }
     }
 }
 
@@ -358,22 +331,14 @@ mod tests {
     /// Tokenize the input up to and including the first terminal token.
     fn lex(input: Vec<&str>) -> Vec<Spanned<Lexeme>> {
         let mut lexer = Lexer::new(input.into_iter()).unwrap();
-        let mut lexemes: Vec<_> = (&mut lexer)
-            .take_while(|sp!(_, lex)| !lex.is_terminal())
-            .collect();
+        let mut lexemes: Vec<_> = (&mut lexer).take_while(|sp!(_, lex)| !lex.is_terminal()).collect();
         lexemes.push(lexer.next().unwrap());
         lexemes
     }
 
     #[test]
     fn tokenize_vector() {
-        let vecs = vec![
-            "vector[1,2,3]",
-            "vector[1, 2, 3]",
-            "vector[]",
-            "vector[1]",
-            "vector[1,]",
-        ];
+        let vecs = vec!["vector[1,2,3]", "vector[1, 2, 3]", "vector[]", "vector[1]", "vector[1,]"];
 
         insta::assert_debug_snapshot!(lex(vecs));
     }
@@ -406,14 +371,7 @@ mod tests {
 
     #[test]
     fn tokenize_address() {
-        let addrs = vec![
-            "@0x1",
-            "@0x1_000",
-            "@0x100_000_000",
-            "@0x100_000u64",
-            "@0x1u8",
-            "@0x1_u128",
-        ];
+        let addrs = vec!["@0x1", "@0x1_000", "@0x100_000_000", "@0x100_000u64", "@0x1u8", "@0x1_u128"];
 
         insta::assert_debug_snapshot!(lex(addrs));
     }

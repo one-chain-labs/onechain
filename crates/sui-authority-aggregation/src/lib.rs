@@ -1,16 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::Future;
-use futures::{future::BoxFuture, stream::FuturesUnordered, StreamExt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    time::{Duration, Instant},
+};
+
+use futures::{future::BoxFuture, stream::FuturesUnordered, Future, StreamExt};
 use mysten_metrics::monitored_future;
-
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use sui_types::base_types::ConciseableName;
-use sui_types::committee::{CommitteeTrait, StakeUnit};
-
+use sui_types::{
+    base_types::ConciseableName,
+    committee::{CommitteeTrait, StakeUnit},
+};
 use tokio::time::timeout;
 
 pub type AsyncResult<'a, T, E> = BoxFuture<'a, Result<T, E>>;
@@ -34,18 +36,7 @@ pub enum ReduceOutput<R, S> {
 ///
 /// total_timeout: the maximum amount of total time to wait for results from all authorities, including
 /// time spent prefetching.
-pub async fn quorum_map_then_reduce_with_timeout_and_prefs<
-    'a,
-    C,
-    K,
-    Client: 'a,
-    S,
-    V,
-    R,
-    E,
-    FMap,
-    FReduce,
->(
+pub async fn quorum_map_then_reduce_with_timeout_and_prefs<'a, C, K, Client: 'a, S, V, R, E, FMap, FReduce>(
     committee: Arc<C>,
     authority_clients: Arc<BTreeMap<K, Arc<Client>>>,
     authority_preferences: Option<SigRequestPrefs<K>>,
@@ -53,28 +44,19 @@ pub async fn quorum_map_then_reduce_with_timeout_and_prefs<
     map_each_authority: FMap,
     reduce_result: FReduce,
     total_timeout: Duration,
-) -> Result<
-    (
-        R,
-        FuturesUnordered<impl Future<Output = (K, Result<V, E>)> + 'a>,
-    ),
-    S,
->
+) -> Result<(R, FuturesUnordered<impl Future<Output = (K, Result<V, E>)> + 'a>), S>
 where
     K: Ord + ConciseableName<'a> + Clone + 'a,
     C: CommitteeTrait<K>,
     FMap: FnOnce(K, Arc<Client>) -> AsyncResult<'a, V, E> + Clone + 'a,
     FReduce: Fn(S, K, StakeUnit, Result<V, E>) -> BoxFuture<'a, ReduceOutput<R, S>>,
 {
-    let (preference, prefetch_timeout) = if let Some(SigRequestPrefs {
-        ordering_pref,
-        prefetch_timeout,
-    }) = authority_preferences
-    {
-        (Some(ordering_pref), Some(prefetch_timeout))
-    } else {
-        (None, None)
-    };
+    let (preference, prefetch_timeout) =
+        if let Some(SigRequestPrefs { ordering_pref, prefetch_timeout }) = authority_preferences {
+            (Some(ordering_pref), Some(prefetch_timeout))
+        } else {
+            (None, None)
+        };
     let authorities_shuffled = committee.shuffle_by_stake(preference.as_ref(), None);
     let mut accumulated_state = initial_state;
     let mut total_timeout = total_timeout;
@@ -117,24 +99,18 @@ where
         for authority_name in authorities_shuffled {
             let authority_weight = committee.weight(&authority_name);
             if let Some(result) = authority_to_result.remove(&authority_name) {
-                accumulated_state = match reduce_result(
-                    accumulated_state,
-                    authority_name,
-                    authority_weight,
-                    result,
-                )
-                .await
-                {
-                    // In the first two cases we are told to continue the iteration.
-                    ReduceOutput::Continue(state) => state,
-                    ReduceOutput::Failed(state) => {
-                        return Err(state);
-                    }
-                    ReduceOutput::Success(result) => {
-                        // The reducer tells us that we have the result needed. Just return it.
-                        return Ok((result, responses));
-                    }
-                };
+                accumulated_state =
+                    match reduce_result(accumulated_state, authority_name, authority_weight, result).await {
+                        // In the first two cases we are told to continue the iteration.
+                        ReduceOutput::Continue(state) => state,
+                        ReduceOutput::Failed(state) => {
+                            return Err(state);
+                        }
+                        ReduceOutput::Success(result) => {
+                            // The reducer tells us that we have the result needed. Just return it.
+                            return Ok((result, responses));
+                        }
+                    };
             }
         }
         // if we got here, fallback through the if statement to continue in arrival order on
@@ -145,18 +121,17 @@ where
     // As results become available fold them into the state using FReduce.
     while let Ok(Some((authority_name, result))) = timeout(total_timeout, responses.next()).await {
         let authority_weight = committee.weight(&authority_name);
-        accumulated_state =
-            match reduce_result(accumulated_state, authority_name, authority_weight, result).await {
-                // In the first two cases we are told to continue the iteration.
-                ReduceOutput::Continue(state) => state,
-                ReduceOutput::Failed(state) => {
-                    return Err(state);
-                }
-                ReduceOutput::Success(result) => {
-                    // The reducer tells us that we have the result needed. Just return it.
-                    return Ok((result, responses));
-                }
+        accumulated_state = match reduce_result(accumulated_state, authority_name, authority_weight, result).await {
+            // In the first two cases we are told to continue the iteration.
+            ReduceOutput::Continue(state) => state,
+            ReduceOutput::Failed(state) => {
+                return Err(state);
             }
+            ReduceOutput::Success(result) => {
+                // The reducer tells us that we have the result needed. Just return it.
+                return Ok((result, responses));
+            }
+        }
     }
     // If we have exhausted all authorities and still have not returned a result, return
     // error with the accumulated state.
@@ -177,18 +152,7 @@ where
 /// This function provides a flexible way to communicate with a quorum of authorities, processing and
 /// processing their results into a safe overall result, and also safely allowing operations to continue
 /// past the quorum to ensure all authorities are up to date (up to a timeout).
-pub async fn quorum_map_then_reduce_with_timeout<
-    'a,
-    C,
-    K,
-    Client: 'a,
-    S: 'a,
-    V: 'a,
-    R: 'a,
-    E,
-    FMap,
-    FReduce,
->(
+pub async fn quorum_map_then_reduce_with_timeout<'a, C, K, Client: 'a, S: 'a, V: 'a, R: 'a, E, FMap, FReduce>(
     committee: Arc<C>,
     authority_clients: Arc<BTreeMap<K, Arc<Client>>>,
     // The initial state that will be used to fold in values from authorities.
@@ -201,13 +165,7 @@ pub async fn quorum_map_then_reduce_with_timeout<
     reduce_result: FReduce,
     // The initial timeout applied to all
     initial_timeout: Duration,
-) -> Result<
-    (
-        R,
-        FuturesUnordered<impl Future<Output = (K, Result<V, E>)> + 'a>,
-    ),
-    S,
->
+) -> Result<(R, FuturesUnordered<impl Future<Output = (K, Result<V, E>)> + 'a>), S>
 where
     K: Ord + ConciseableName<'a> + Clone + 'a,
     C: CommitteeTrait<K>,

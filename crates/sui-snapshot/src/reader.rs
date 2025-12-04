@@ -1,42 +1,70 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    FileMetadata, FileType, Manifest, MAGIC_BYTES, MANIFEST_FILE_MAGIC, OBJECT_FILE_MAGIC,
-    OBJECT_ID_BYTES, OBJECT_REF_BYTES, REFERENCE_FILE_MAGIC, SEQUENCE_NUM_BYTES, SHA3_BYTES,
+use std::{
+    collections::BTreeMap,
+    fs,
+    fs::File,
+    io::{BufReader, Read, Seek, SeekFrom},
+    num::NonZeroUsize,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc,
+    },
 };
+
 use anyhow::{anyhow, Context, Result};
 use byteorder::{BigEndian, ReadBytesExt};
 use bytes::{Buf, Bytes};
-use fastcrypto::hash::MultisetHash;
-use fastcrypto::hash::{HashFunction, Sha3_256};
-use futures::future::{AbortRegistration, Abortable};
-use futures::{StreamExt, TryStreamExt};
+use fastcrypto::hash::{HashFunction, MultisetHash, Sha3_256};
+use futures::{
+    future::{AbortRegistration, Abortable},
+    StreamExt,
+    TryStreamExt,
+};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use integer_encoding::VarIntReader;
 use object_store::path::Path;
-use std::collections::BTreeMap;
-use std::fs;
-use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
-use std::num::NonZeroUsize;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
 use sui_config::object_storage_config::ObjectStoreConfig;
-use sui_core::authority::authority_store_tables::{AuthorityPerpetualTables, LiveObject};
-use sui_core::authority::AuthorityStore;
-use sui_storage::blob::{Blob, BlobEncoding};
-use sui_storage::object_store::http::HttpDownloaderBuilder;
-use sui_storage::object_store::util::{copy_file, copy_files, path_to_filesystem};
-use sui_storage::object_store::{ObjectStoreGetExt, ObjectStoreListExt, ObjectStorePutExt};
-use sui_types::accumulator::Accumulator;
-use sui_types::base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use tokio::time::Duration;
-use tokio::time::Instant;
+use sui_core::authority::{
+    authority_store_tables::{AuthorityPerpetualTables, LiveObject},
+    AuthorityStore,
+};
+use sui_storage::{
+    blob::{Blob, BlobEncoding},
+    object_store::{
+        http::HttpDownloaderBuilder,
+        util::{copy_file, copy_files, path_to_filesystem},
+        ObjectStoreGetExt,
+        ObjectStoreListExt,
+        ObjectStorePutExt,
+    },
+};
+use sui_types::{
+    accumulator::Accumulator,
+    base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber},
+};
+use tokio::{
+    sync::Mutex,
+    task::JoinHandle,
+    time::{Duration, Instant},
+};
 use tracing::{error, info};
+
+use crate::{
+    FileMetadata,
+    FileType,
+    Manifest,
+    MAGIC_BYTES,
+    MANIFEST_FILE_MAGIC,
+    OBJECT_FILE_MAGIC,
+    OBJECT_ID_BYTES,
+    OBJECT_REF_BYTES,
+    REFERENCE_FILE_MAGIC,
+    SEQUENCE_NUM_BYTES,
+    SHA3_BYTES,
+};
 
 pub type SnapshotChecksums = (DigestByBucketAndPartition, Accumulator);
 pub type DigestByBucketAndPartition = BTreeMap<u32, BTreeMap<u32, [u8; 32]>>;
@@ -69,15 +97,9 @@ impl StateSnapshotReaderV1 {
         } else {
             remote_store_config.make().map(Arc::new)?
         };
-        let local_object_store: Arc<dyn ObjectStorePutExt> =
-            local_store_config.make().map(Arc::new)?;
-        let local_object_store_list: Arc<dyn ObjectStoreListExt> =
-            local_store_config.make().map(Arc::new)?;
-        let local_staging_dir_root = local_store_config
-            .directory
-            .as_ref()
-            .context("No directory specified")?
-            .clone();
+        let local_object_store: Arc<dyn ObjectStorePutExt> = local_store_config.make().map(Arc::new)?;
+        let local_object_store_list: Arc<dyn ObjectStoreListExt> = local_store_config.make().map(Arc::new)?;
+        let local_staging_dir_root = local_store_config.directory.as_ref().context("No directory specified")?.clone();
         if !skip_reset_local_store {
             let local_epoch_dir_path = local_staging_dir_root.join(&epoch_dir);
             if local_epoch_dir_path.exists() {
@@ -87,26 +109,14 @@ impl StateSnapshotReaderV1 {
         }
         // Download MANIFEST first
         let manifest_file_path = Path::from(epoch_dir.clone()).child("MANIFEST");
-        copy_file(
-            &manifest_file_path,
-            &manifest_file_path,
-            &remote_object_store,
-            &local_object_store,
-        )
-        .await?;
-        let manifest = Self::read_manifest(path_to_filesystem(
-            local_staging_dir_root.clone(),
-            &manifest_file_path,
-        )?)?;
+        copy_file(&manifest_file_path, &manifest_file_path, &remote_object_store, &local_object_store).await?;
+        let manifest = Self::read_manifest(path_to_filesystem(local_staging_dir_root.clone(), &manifest_file_path)?)?;
         let snapshot_version = manifest.snapshot_version();
         if snapshot_version != 1u8 {
             return Err(anyhow!("Unexpected snapshot version: {}", snapshot_version));
         }
         if manifest.address_length() as usize > ObjectID::LENGTH {
-            return Err(anyhow!(
-                "Max possible address length is: {}",
-                ObjectID::LENGTH
-            ));
+            return Err(anyhow!("Max possible address length is: {}", ObjectID::LENGTH));
         }
         if manifest.epoch() != epoch {
             return Err(anyhow!("Download manifest is not for epoch: {}", epoch,));
@@ -116,15 +126,11 @@ impl StateSnapshotReaderV1 {
         for file_metadata in manifest.file_metadata() {
             match file_metadata.file_type {
                 FileType::Object => {
-                    let entry = object_files
-                        .entry(file_metadata.bucket_num)
-                        .or_insert_with(BTreeMap::new);
+                    let entry = object_files.entry(file_metadata.bucket_num).or_insert_with(BTreeMap::new);
                     entry.insert(file_metadata.part_num, file_metadata.clone());
                 }
                 FileType::Reference => {
-                    let entry = ref_files
-                        .entry(file_metadata.bucket_num)
-                        .or_insert_with(BTreeMap::new);
+                    let entry = ref_files.entry(file_metadata.bucket_num).or_insert_with(BTreeMap::new);
                     entry.insert(file_metadata.part_num, file_metadata.clone());
                 }
             }
@@ -133,18 +139,14 @@ impl StateSnapshotReaderV1 {
         let files: Vec<Path> = ref_files
             .values()
             .flat_map(|entry| {
-                let files: Vec<_> = entry
-                    .values()
-                    .map(|file_metadata| file_metadata.file_path(&epoch_dir_path))
-                    .collect();
+                let files: Vec<_> =
+                    entry.values().map(|file_metadata| file_metadata.file_path(&epoch_dir_path)).collect();
                 files
             })
             .collect();
 
         let files_to_download = if skip_reset_local_store {
-            let mut list_stream = local_object_store_list
-                .list_objects(Some(&epoch_dir_path))
-                .await;
+            let mut list_stream = local_object_store_list.list_objects(Some(&epoch_dir_path)).await;
             let mut existing_files = std::collections::HashSet::new();
             while let Some(Ok(meta)) = list_stream.next().await {
                 existing_files.insert(meta.location);
@@ -202,10 +204,8 @@ impl StateSnapshotReaderV1 {
         // references and start building state accumulator and fail early if the state root hash
         // doesn't match but we still need to ensure that objects match references exactly.
         let (sha3_digests, num_part_files) = self.compute_checksum().await?;
-        let accum_handle =
-            sender.map(|sender| self.spawn_accumulation_tasks(sender, num_part_files));
-        self.sync_live_objects(perpetual_db, abort_registration, sha3_digests)
-            .await?;
+        let accum_handle = sender.map(|sender| self.spawn_accumulation_tasks(sender, num_part_files));
+        self.sync_live_objects(perpetual_db, abort_registration, sha3_digests).await?;
         if let Some(handle) = accum_handle {
             handle.await?;
         }
@@ -215,14 +215,9 @@ impl StateSnapshotReaderV1 {
     pub async fn compute_checksum(
         &mut self,
     ) -> Result<(Arc<Mutex<BTreeMap<u32, BTreeMap<u32, [u8; 32]>>>>, usize), anyhow::Error> {
-        let sha3_digests: Arc<Mutex<DigestByBucketAndPartition>> =
-            Arc::new(Mutex::new(BTreeMap::new()));
+        let sha3_digests: Arc<Mutex<DigestByBucketAndPartition>> = Arc::new(Mutex::new(BTreeMap::new()));
 
-        let num_part_files = self
-            .ref_files
-            .values()
-            .map(|part_files| part_files.len())
-            .sum::<usize>();
+        let num_part_files = self.ref_files.values().map(|part_files| part_files.len()).sum::<usize>();
 
         // Generate checksums
         info!("Computing checksums");
@@ -275,13 +270,13 @@ impl StateSnapshotReaderV1 {
         let accum_counter = Arc::new(AtomicU64::new(0));
         let cloned_accum_counter = accum_counter.clone();
         let accum_progress_bar = self.m.add(
-             ProgressBar::new(num_part_files as u64).with_style(
-                 ProgressStyle::with_template(
-                     "[{elapsed_precise}] {wide_bar} {pos} out of {len} ref files accumulated from snapshot ({msg})",
-                 )
-                 .unwrap(),
-             ),
-         );
+            ProgressBar::new(num_part_files as u64).with_style(
+                ProgressStyle::with_template(
+                    "[{elapsed_precise}] {wide_bar} {pos} out of {len} ref files accumulated from snapshot ({msg})",
+                )
+                .unwrap(),
+            ),
+        );
         let cloned_accum_progress_bar = accum_progress_bar.clone();
         tokio::spawn(async move {
             let a_instant = Instant::now();
@@ -290,13 +285,9 @@ impl StateSnapshotReaderV1 {
                     break;
                 }
                 let num_partitions = cloned_accum_counter.load(Ordering::Relaxed);
-                let total_partitions_per_sec =
-                    num_partitions as f64 / a_instant.elapsed().as_secs_f64();
+                let total_partitions_per_sec = num_partitions as f64 / a_instant.elapsed().as_secs_f64();
                 cloned_accum_progress_bar.set_position(num_partitions);
-                cloned_accum_progress_bar.set_message(format!(
-                    "file partitions per sec: {}",
-                    total_partitions_per_sec
-                ));
+                cloned_accum_progress_bar.set_message(format!("file partitions per sec: {}", total_partitions_per_sec));
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         });
@@ -319,9 +310,7 @@ impl StateSnapshotReaderV1 {
                                 .get(bucket)
                                 .expect("No ref files found for bucket: {bucket_num}")
                                 .get(part)
-                                .expect(
-                                    "No ref files found for bucket: {bucket_num}, part: {part_num}",
-                                );
+                                .expect("No ref files found for bucket: {bucket_num}, part: {part_num}");
                             ObjectRefIter::new(
                                 file_metadata,
                                 local_staging_dir_root_clone.clone(),
@@ -368,13 +357,7 @@ impl StateSnapshotReaderV1 {
         let input_files: Vec<_> = self
             .object_files
             .iter()
-            .flat_map(|(bucket, parts)| {
-                parts
-                    .clone()
-                    .into_iter()
-                    .map(|entry| (bucket, entry))
-                    .collect::<Vec<_>>()
-            })
+            .flat_map(|(bucket, parts)| parts.clone().into_iter().map(|entry| (bucket, entry)).collect::<Vec<_>>())
             .collect();
         let obj_progress_bar = self.m.add(
             ProgressBar::new(input_files.len() as u64).with_style(
@@ -450,28 +433,14 @@ impl StateSnapshotReaderV1 {
     // NOTE: export these metadata for indexer restorer
     pub async fn export_metadata(
         &self,
-    ) -> Result<
-        (
-            Vec<(&u32, (u32, FileMetadata))>,
-            Path,
-            Arc<dyn ObjectStoreGetExt>,
-            usize,
-        ),
-        anyhow::Error,
-    > {
+    ) -> Result<(Vec<(&u32, (u32, FileMetadata))>, Path, Arc<dyn ObjectStoreGetExt>, usize), anyhow::Error> {
         let epoch_dir = self.epoch_dir();
         let concurrency = self.concurrency;
         let remote_object_store = self.remote_object_store.clone();
         let input_files: Vec<(&u32, (u32, FileMetadata))> = self
             .object_files
             .iter()
-            .flat_map(|(bucket, parts)| {
-                parts
-                    .clone()
-                    .into_iter()
-                    .map(|entry| (bucket, entry))
-                    .collect::<Vec<_>>()
-            })
+            .flat_map(|(bucket, parts)| parts.clone().into_iter().map(|entry| (bucket, entry)).collect::<Vec<_>>())
             .collect();
         Ok((input_files, epoch_dir, remote_object_store, concurrency))
     }
@@ -482,14 +451,8 @@ impl StateSnapshotReaderV1 {
             .get(&bucket_num)
             .context(format!("No ref files found for bucket: {bucket_num}"))?
             .get(&part_num)
-            .context(format!(
-                "No ref files found for bucket: {bucket_num}, part: {part_num}"
-            ))?;
-        ObjectRefIter::new(
-            file_metadata,
-            self.local_staging_dir_root.clone(),
-            self.epoch_dir(),
-        )
+            .context(format!("No ref files found for bucket: {bucket_num}, part: {part_num}"))?;
+        ObjectRefIter::new(file_metadata, self.local_staging_dir_root.clone(), self.epoch_dir())
     }
 
     fn buckets(&self) -> Result<Vec<u32>> {
@@ -519,15 +482,11 @@ impl StateSnapshotReaderV1 {
         hasher.update(&content_buf);
         let computed_digest = hasher.finalize().digest;
         if computed_digest != sha3_digest {
-            return Err(anyhow!(
-                "Checksum: {:?} don't match: {:?}",
-                computed_digest,
-                sha3_digest
-            ));
+            return Err(anyhow!("Checksum: {:?} don't match: {:?}", computed_digest, sha3_digest));
         }
         manifest_reader.rewind()?;
         manifest_reader.seek(SeekFrom::Start(MAGIC_BYTES as u64))?;
-        let manifest = bcs::from_bytes(&content_buf[MAGIC_BYTES..])?;
+        let manifest = bcs::from_bytes(&content_buf[MAGIC_BYTES ..])?;
         Ok(manifest)
     }
 
@@ -557,12 +516,7 @@ pub async fn download_bytes(
                 break bytes;
             }
             Err(err) => {
-                error!(
-                    "Obj {} .get failed (attempt {}): {}",
-                    file_metadata.file_path(&epoch_dir),
-                    attempts,
-                    err,
-                );
+                error!("Obj {} .get failed (attempt {}): {}", file_metadata.file_path(&epoch_dir), attempts, err,);
                 if timeout > max_timeout {
                     panic!("Failed to get obj file after {} attempts", attempts);
                 } else {
@@ -575,13 +529,8 @@ pub async fn download_bytes(
         }
     };
     let sha3_digest = sha3_digests.lock().await;
-    let bucket_map = sha3_digest
-        .get(bucket)
-        .expect("Bucket not in digest map")
-        .clone();
-    let sha3_digest = *bucket_map
-        .get(part_num)
-        .expect("sha3 digest not in bucket map");
+    let bucket_map = sha3_digest.get(bucket).expect("Bucket not in digest map").clone();
+    let sha3_digest = *bucket_map.get(part_num).expect("sha3 digest not in bucket map");
     (bytes, sha3_digest)
 }
 
@@ -596,10 +545,7 @@ impl ObjectRefIter {
         let mut reader = file_metadata.file_compression.decompress(&file_path)?;
         let magic = reader.read_u32::<BigEndian>()?;
         if magic != REFERENCE_FILE_MAGIC {
-            Err(anyhow!(
-                "Unexpected magic string in REFERENCE file: {:?}",
-                magic
-            ))
+            Err(anyhow!("Unexpected magic string in REFERENCE file: {:?}", magic))
         } else {
             Ok(ObjectRefIter { reader })
         }
@@ -608,11 +554,10 @@ impl ObjectRefIter {
     fn next_ref(&mut self) -> Result<ObjectRef> {
         let mut buf = [0u8; OBJECT_REF_BYTES];
         self.reader.read_exact(&mut buf)?;
-        let object_id = &buf[0..OBJECT_ID_BYTES];
-        let sequence_number = &buf[OBJECT_ID_BYTES..OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES]
-            .reader()
-            .read_u64::<BigEndian>()?;
-        let sha3_digest = &buf[OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES..OBJECT_REF_BYTES];
+        let object_id = &buf[0 .. OBJECT_ID_BYTES];
+        let sequence_number =
+            &buf[OBJECT_ID_BYTES .. OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES].reader().read_u64::<BigEndian>()?;
+        let sha3_digest = &buf[OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES .. OBJECT_REF_BYTES];
         let object_ref: ObjectRef = (
             ObjectID::from_bytes(object_id)?,
             SequenceNumber::from_u64(*sequence_number),
@@ -624,6 +569,7 @@ impl ObjectRefIter {
 
 impl Iterator for ObjectRefIter {
     type Item = ObjectRef;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.next_ref().ok()
     }
@@ -639,10 +585,7 @@ impl LiveObjectIter {
         let mut reader = file_metadata.file_compression.bytes_decompress(bytes)?;
         let magic = reader.read_u32::<BigEndian>()?;
         if magic != OBJECT_FILE_MAGIC {
-            Err(anyhow!(
-                "Unexpected magic string in object file: {:?}",
-                magic
-            ))
+            Err(anyhow!("Unexpected magic string in object file: {:?}", magic))
         } else {
             Ok(LiveObjectIter { reader })
         }
@@ -656,16 +599,14 @@ impl LiveObjectIter {
         let encoding = self.reader.read_u8()?;
         let mut data = vec![0u8; len];
         self.reader.read_exact(&mut data)?;
-        let blob = Blob {
-            data,
-            encoding: BlobEncoding::try_from(encoding)?,
-        };
+        let blob = Blob { data, encoding: BlobEncoding::try_from(encoding)? };
         blob.decode()
     }
 }
 
 impl Iterator for LiveObjectIter {
     type Item = LiveObject;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.next_object().ok()
     }

@@ -1,25 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
-use std::borrow::Cow;
-use std::borrow::Cow::Owned;
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::env;
-use std::fmt::Display;
-use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::{
+    borrow::{Cow, Cow::Owned},
+    cmp::Ordering,
+    collections::BTreeMap,
+    env,
+    fmt::Display,
+    io::Write,
+    sync::{Arc, RwLock},
+};
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::*;
 use colored::Colorize;
-use rustyline::completion::{Completer, Pair};
-use rustyline::error::ReadlineError;
-use rustyline::highlight::Highlighter;
-use rustyline::hint::Hinter;
-use rustyline::validate::Validator;
-use rustyline::{Config, Context, Editor};
+use rustyline::{
+    completion::{Completer, Pair},
+    error::ReadlineError,
+    highlight::Highlighter,
+    hint::Hinter,
+    validate::Validator,
+    Config,
+    Context,
+    Editor,
+};
 use rustyline_derive::Helper;
 use unescape::unescape;
 
@@ -38,20 +43,12 @@ pub struct Shell<P: Display, S, H> {
 impl<P: Display, S: Send, H: AsyncHandler<S>> Shell<P, S, H> {
     pub fn new(prompt: P, state: S, handler: H, mut command: CommandStructure) -> Self {
         // Add help to auto complete
-        let help = CommandStructure {
-            name: "help".to_string(),
-            completions: command.completions.clone(),
-            children: vec![],
-        };
+        let help =
+            CommandStructure { name: "help".to_string(), completions: command.completions.clone(), children: vec![] };
         command.children.push(help);
         command.completions.extend(["help".to_string()]);
 
-        Self {
-            prompt,
-            state,
-            handler,
-            command,
-        }
+        Self { prompt, state, handler, command }
     }
 
     pub async fn run_async(
@@ -59,20 +56,14 @@ impl<P: Display, S: Send, H: AsyncHandler<S>> Shell<P, S, H> {
         out: &mut (dyn Write + Send),
         err: &mut (dyn Write + Send),
     ) -> Result<(), anyhow::Error> {
-        let config = Config::builder()
-            .auto_add_history(true)
-            .history_ignore_space(true)
-            .history_ignore_dups(true)
-            .build();
+        let config =
+            Config::builder().auto_add_history(true).history_ignore_space(true).history_ignore_dups(true).build();
 
         let mut rl = Editor::with_config(config);
 
         let completion_cache = Arc::new(RwLock::new(BTreeMap::new()));
 
-        rl.set_helper(Some(ShellHelper {
-            command: self.command.clone(),
-            completion_cache: completion_cache.clone(),
-        }));
+        rl.set_helper(Some(ShellHelper { command: self.command.clone(), completion_cache: completion_cache.clone() }));
 
         loop {
             // Read a line
@@ -101,7 +92,7 @@ impl<P: Display, S: Send, H: AsyncHandler<S>> Shell<P, S, H> {
                                 continue;
                             }
                             "echo" => {
-                                let line = line.as_slice()[1..line.len()].join(" ");
+                                let line = line.as_slice()[1 .. line.len()].join(" ");
                                 writeln!(out, "{}", line)?;
                                 continue;
                             }
@@ -124,11 +115,7 @@ impl<P: Display, S: Send, H: AsyncHandler<S>> Shell<P, S, H> {
                         continue;
                     }
 
-                    if self
-                        .handler
-                        .handle_async(line, &mut self.state, completion_cache.clone())
-                        .await
-                    {
+                    if self.handler.handle_async(line, &mut self.state, completion_cache.clone()).await {
                         break;
                     };
                 }
@@ -144,8 +131,7 @@ fn split_and_unescape(line: &str) -> Result<Vec<String>, anyhow::Error> {
     let split: Vec<String> = shell_words::split(line)?;
 
     for word in split {
-        let command =
-            unescape(&word).ok_or_else(|| anyhow!("Error: Unhandled escape sequence {word}"))?;
+        let command = unescape(&word).ok_or_else(|| anyhow!("Error: Unhandled escape sequence {word}"))?;
         commands.push(command);
     }
     Ok(commands)
@@ -163,26 +149,18 @@ fn substitute_env_variables(s: String) -> String {
         let var = format!("${key}");
         if s.contains(&var) {
             let result = s.replace(var.as_str(), value.as_str());
-            return if result.contains('$') {
-                substitute_env_variables(result)
-            } else {
-                result
-            };
+            return if result.contains('$') { substitute_env_variables(result) } else { result };
         }
     }
     s
 }
 
 pub fn install_shell_plugins(clap: Command) -> Command {
-    clap.subcommand(
-        Command::new("exit")
-            .alias("quit")
-            .about("Exit the interactive shell"),
-    )
-    .subcommand(Command::new("clear").about("Clear screen"))
-    .subcommand(Command::new("echo").about("Write arguments to the console output"))
-    .subcommand(Command::new("env").about("Print environment"))
-    .subcommand(Command::new("history").about("Print history"))
+    clap.subcommand(Command::new("exit").alias("quit").about("Exit the interactive shell"))
+        .subcommand(Command::new("clear").about("Clear screen"))
+        .subcommand(Command::new("echo").about("Write arguments to the console output"))
+        .subcommand(Command::new("env").about("Print environment"))
+        .subcommand(Command::new("history").about("Print history"))
 }
 
 #[derive(Helper)]
@@ -196,11 +174,7 @@ impl Hinter for ShellHelper {
 }
 
 impl Highlighter for ShellHelper {
-    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
-        &'s self,
-        prompt: &'p str,
-        _default: bool,
-    ) -> Cow<'b, str> {
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(&'s self, prompt: &'p str, _default: bool) -> Cow<'b, str> {
         Owned(prompt.bold().green().to_string())
     }
 }
@@ -209,6 +183,7 @@ impl Validator for ShellHelper {}
 
 impl Completer for ShellHelper {
     type Candidate = Pair;
+
     fn complete(
         &self,
         line: &str,
@@ -232,10 +207,8 @@ impl Completer for ShellHelper {
         }
 
         let completions = command.completions.clone();
-        let cache_key = CacheKey {
-            command: Some(command.name.clone()),
-            flag: previous_tokens.last().cloned().unwrap_or_default(),
-        };
+        let cache_key =
+            CacheKey { command: Some(command.name.clone()), flag: previous_tokens.last().cloned().unwrap_or_default() };
         let mut completion_from_cache = self
             .completion_cache
             .read()
@@ -251,13 +224,7 @@ impl Completer for ShellHelper {
 
         Ok((
             line.len() - last_token.len() - 1,
-            candidates
-                .iter()
-                .map(|cmd| Pair {
-                    display: cmd.to_string(),
-                    replacement: cmd.to_string(),
-                })
-                .collect(),
+            candidates.iter().map(|cmd| Pair { display: cmd.to_string(), replacement: cmd.to_string() }).collect(),
         ))
     }
 }
@@ -294,32 +261,18 @@ impl CommandStructure {
     }
 
     fn from_children(name: &str, children: Vec<CommandStructure>) -> Self {
-        let completions = children
-            .iter()
-            .map(|child| child.name.to_string())
-            .collect();
-        Self {
-            name: name.to_string(),
-            completions,
-            children,
-        }
+        let completions = children.iter().map(|child| child.name.to_string()).collect();
+        Self { name: name.to_string(), completions, children }
     }
 
     fn get_child(&self, name: &str) -> Option<&CommandStructure> {
-        self.children
-            .iter()
-            .find(|&subcommand| subcommand.name == name)
+        self.children.iter().find(|&subcommand| subcommand.name == name)
     }
 }
 
 #[async_trait]
 pub trait AsyncHandler<T: Send> {
-    async fn handle_async(
-        &self,
-        args: Vec<String>,
-        state: &mut T,
-        completion_cache: CompletionCache,
-    ) -> bool;
+    async fn handle_async(&self, args: Vec<String>, state: &mut T, completion_cache: CompletionCache) -> bool;
 }
 
 pub type CompletionCache = Arc<RwLock<BTreeMap<CacheKey, Vec<String>>>>;
@@ -333,16 +286,11 @@ pub struct CacheKey {
 }
 impl CacheKey {
     pub fn new(command: &str, flag: &str) -> Self {
-        Self {
-            command: Some(command.to_string()),
-            flag: flag.to_string(),
-        }
+        Self { command: Some(command.to_string()), flag: flag.to_string() }
     }
+
     pub fn flag(flag: &str) -> Self {
-        Self {
-            command: None,
-            flag: flag.to_string(),
-        }
+        Self { command: None, flag: flag.to_string() }
     }
 }
 impl Eq for CacheKey {}

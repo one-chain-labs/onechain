@@ -22,14 +22,10 @@ pub struct GetBatchSendStatusRequest {
 
 impl FaucetRequest {
     pub fn new_fixed_amount_request(recipient: impl Into<SuiAddress>) -> Self {
-        Self::FixedAmountRequest(FixedAmountRequest {
-            recipient: recipient.into(),
-        })
+        Self::FixedAmountRequest(FixedAmountRequest { recipient: recipient.into() })
     }
 
     pub fn new_get_batch_send_status_request(task_id: impl Into<String>) -> Self {
-        Self::GetBatchSendStatusRequest(GetBatchSendStatusRequest {
-            task_id: task_id.into(),
-        })
+        Self::GetBatchSendStatusRequest(GetBatchSendStatusRequest { task_id: task_id.into() })
     }
 }

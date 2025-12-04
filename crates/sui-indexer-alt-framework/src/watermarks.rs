@@ -61,10 +61,7 @@ pub(crate) struct PrunerWatermark<'p> {
 }
 
 impl StoredWatermark {
-    pub(crate) async fn get(
-        conn: &mut Connection<'_>,
-        pipeline: &'static str,
-    ) -> QueryResult<Option<Self>> {
+    pub(crate) async fn get(conn: &mut Connection<'_>, pipeline: &'static str) -> QueryResult<Option<Self>> {
         watermarks::table
             .select(StoredWatermark::as_select())
             .filter(watermarks::pipeline.eq(pipeline))
@@ -76,10 +73,7 @@ impl StoredWatermark {
 
 impl CommitterWatermark<'static> {
     /// Get the current high watermark for the pipeline.
-    pub(crate) async fn get(
-        conn: &mut Connection<'_>,
-        pipeline: &'static str,
-    ) -> QueryResult<Option<Self>> {
+    pub(crate) async fn get(conn: &mut Connection<'_>, pipeline: &'static str) -> QueryResult<Option<Self>> {
         watermarks::table
             .select(CommitterWatermark::as_select())
             .filter(watermarks::pipeline.eq(pipeline))
@@ -126,10 +120,7 @@ impl<'p> CommitterWatermark<'p> {
 
 impl<'p> ReaderWatermark<'p> {
     pub(crate) fn new(pipeline: impl Into<Cow<'p, str>>, reader_lo: u64) -> Self {
-        ReaderWatermark {
-            pipeline: pipeline.into(),
-            reader_lo: reader_lo as i64,
-        }
+        ReaderWatermark { pipeline: pipeline.into(), reader_lo: reader_lo as i64 }
     }
 
     /// Update the reader low watermark for an existing watermark row, as long as this raises the
@@ -171,12 +162,7 @@ impl PrunerWatermark<'static> {
         ));
 
         watermarks::table
-            .select((
-                watermarks::pipeline,
-                wait_for,
-                watermarks::reader_lo,
-                watermarks::pruner_hi,
-            ))
+            .select((watermarks::pipeline, wait_for, watermarks::reader_lo, watermarks::pruner_hi))
             .filter(watermarks::pipeline.eq(pipeline))
             .first(conn)
             .await

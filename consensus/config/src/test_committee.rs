@@ -6,9 +6,7 @@ use std::net::{TcpListener, TcpStream};
 use mysten_network::Multiaddr;
 use rand::{rngs::StdRng, SeedableRng as _};
 
-use crate::{
-    Authority, AuthorityKeyPair, Committee, Epoch, NetworkKeyPair, ProtocolKeyPair, Stake,
-};
+use crate::{Authority, AuthorityKeyPair, Committee, Epoch, NetworkKeyPair, ProtocolKeyPair, Stake};
 
 /// Creates a committee for local testing, and the corresponding key pairs for the authorities.
 pub fn local_committee_and_keys(
@@ -50,7 +48,7 @@ fn get_available_local_address() -> Multiaddr {
 fn get_available_port(host: &str) -> u16 {
     const MAX_PORT_RETRIES: u32 = 1000;
 
-    for _ in 0..MAX_PORT_RETRIES {
+    for _ in 0 .. MAX_PORT_RETRIES {
         if let Ok(port) = get_ephemeral_port(host) {
             return port;
         }

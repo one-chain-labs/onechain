@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use sui_types::{
+    base_types::{dbg_addr, dbg_object_id},
+    messages_grpc::LayoutGenerationOption,
+};
+
 use super::*;
 use crate::{
     authority::authority_tests::init_state_with_object_id,
     authority_client::{AuthorityAPI, NetworkAuthorityClient},
-};
-use sui_types::{
-    base_types::{dbg_addr, dbg_object_id},
-    messages_grpc::LayoutGenerationOption,
 };
 
 //This is the most basic example of how to test the server logic
@@ -25,19 +26,12 @@ async fn test_simple_request() {
 
     let client = NetworkAuthorityClient::connect(
         server_handle.address(),
-        Some(
-            authority_state
-                .config
-                .network_key_pair()
-                .public()
-                .to_owned(),
-        ),
+        Some(authority_state.config.network_key_pair().public().to_owned()),
     )
     .await
     .unwrap();
 
-    let req =
-        ObjectInfoRequest::latest_object_info_request(object_id, LayoutGenerationOption::Generate);
+    let req = ObjectInfoRequest::latest_object_info_request(object_id, LayoutGenerationOption::Generate);
 
     client.handle_object_info_request(req).await.unwrap();
 }

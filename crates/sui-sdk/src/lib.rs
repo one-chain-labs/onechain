@@ -70,35 +70,40 @@
 //! For detailed examples, please check the APIs docs and the examples folder
 //! in the [main repository](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk/examples).
 
-use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    fmt::{Debug, Formatter},
+    sync::Arc,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use base64::Engine;
-use jsonrpsee::core::client::ClientT;
-use jsonrpsee::http_client::{HeaderMap, HeaderValue, HttpClient, HttpClientBuilder};
-use jsonrpsee::rpc_params;
-use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
-use serde_json::Value;
-
-use move_core_types::language_storage::StructTag;
-pub use sui_json as json;
-use sui_json_rpc_api::{
-    CLIENT_SDK_TYPE_HEADER, CLIENT_SDK_VERSION_HEADER, CLIENT_TARGET_API_VERSION_HEADER,
+use jsonrpsee::{
+    core::client::ClientT,
+    http_client::{HeaderMap, HeaderValue, HttpClient, HttpClientBuilder},
+    rpc_params,
+    ws_client::{WsClient, WsClientBuilder},
 };
+use move_core_types::language_storage::StructTag;
+use serde_json::Value;
+pub use sui_json as json;
+use sui_json_rpc_api::{CLIENT_SDK_TYPE_HEADER, CLIENT_SDK_VERSION_HEADER, CLIENT_TARGET_API_VERSION_HEADER};
 pub use sui_json_rpc_types as rpc_types;
 use sui_json_rpc_types::{
-    ObjectsPage, SuiObjectDataFilter, SuiObjectDataOptions, SuiObjectResponse,
+    ObjectsPage,
+    SuiObjectDataFilter,
+    SuiObjectDataOptions,
+    SuiObjectResponse,
     SuiObjectResponseQuery,
 };
 use sui_transaction_builder::{DataReader, TransactionBuilder};
 pub use sui_types as types;
 use sui_types::base_types::{ObjectID, ObjectInfo, SuiAddress};
 
-use crate::apis::{CoinReadApi, EventApi, GovernanceApi, QuorumDriverApi, ReadApi};
-use crate::error::{Error, SuiRpcResult};
+use crate::{
+    apis::{CoinReadApi, EventApi, GovernanceApi, QuorumDriverApi, ReadApi},
+    error::{Error, SuiRpcResult},
+};
 
 pub mod apis;
 pub mod error;
@@ -213,15 +218,11 @@ impl SuiClientBuilder {
             // in rust, the client version is the same as the target api version
             HeaderValue::from_static(client_version),
         );
-        headers.insert(
-            CLIENT_SDK_VERSION_HEADER,
-            HeaderValue::from_static(client_version),
-        );
+        headers.insert(CLIENT_SDK_VERSION_HEADER, HeaderValue::from_static(client_version));
         headers.insert(CLIENT_SDK_TYPE_HEADER, HeaderValue::from_static("rust"));
 
         if let Some((username, password)) = self.basic_auth {
-            let auth = base64::engine::general_purpose::STANDARD
-                .encode(format!("{}:{}", username, password));
+            let auth = base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", username, password));
             headers.insert(
                 "authorization",
                 // reqwest::header::AUTHORIZATION,
@@ -263,15 +264,7 @@ impl SuiClientBuilder {
         let coin_read_api = CoinReadApi::new(api.clone());
         let governance_api = GovernanceApi::new(api.clone());
 
-        Ok(SuiClient {
-            api,
-            transaction_builder,
-            read_api,
-            coin_read_api,
-            event_api,
-            quorum_driver_api,
-            governance_api,
-        })
+        Ok(SuiClient { api, transaction_builder, read_api, coin_read_api, event_api, quorum_driver_api, governance_api })
     }
 
     /// Returns a [SuiClient] object that is ready to interact with the local
@@ -371,17 +364,12 @@ impl SuiClientBuilder {
     /// Return the server information as a `ServerInfo` structure.
     ///
     /// Fails with an error if it cannot call the RPC discover.
-    async fn get_server_info(
-        http: &HttpClient,
-        ws: &Option<WsClient>,
-    ) -> Result<ServerInfo, Error> {
+    async fn get_server_info(http: &HttpClient, ws: &Option<WsClient>) -> Result<ServerInfo, Error> {
         let rpc_spec: Value = http.request("rpc.discover", rpc_params![]).await?;
         let version = rpc_spec
             .pointer("/info/version")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                Error::DataError("Fail parsing server version from rpc.discover endpoint.".into())
-            })?;
+            .ok_or_else(|| Error::DataError("Fail parsing server version from rpc.discover endpoint.".into()))?;
         let rpc_methods = Self::parse_methods(&rpc_spec)?;
 
         let subscriptions = if let Some(ws) = ws {
@@ -392,28 +380,16 @@ impl SuiClientBuilder {
         } else {
             Vec::new()
         };
-        Ok(ServerInfo {
-            rpc_methods,
-            subscriptions,
-            version: version.to_string(),
-        })
+        Ok(ServerInfo { rpc_methods, subscriptions, version: version.to_string() })
     }
 
     fn parse_methods(server_spec: &Value) -> Result<Vec<String>, Error> {
         let methods = server_spec
             .pointer("/methods")
             .and_then(|methods| methods.as_array())
-            .ok_or_else(|| {
-                Error::DataError(
-                    "Fail parsing server information from rpc.discover endpoint.".into(),
-                )
-            })?;
+            .ok_or_else(|| Error::DataError("Fail parsing server information from rpc.discover endpoint.".into()))?;
 
-        Ok(methods
-            .iter()
-            .flat_map(|method| method["name"].as_str())
-            .map(|s| s.into())
-            .collect())
+        Ok(methods.iter().flat_map(|method| method["name"].as_str()).map(|s| s.into()).collect())
     }
 }
 
@@ -470,11 +446,7 @@ pub(crate) struct RpcClient {
 
 impl Debug for RpcClient {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "RPC client. Http: {:?}, Websocket: {:?}",
-            self.http, self.ws
-        )
+        write!(f, "RPC client. Http: {:?}, Websocket: {:?}", self.http, self.ws)
     }
 }
 
@@ -568,30 +540,16 @@ impl DataReader for ReadApi {
         let mut result = vec![];
         let query = Some(SuiObjectResponseQuery {
             filter: Some(SuiObjectDataFilter::StructType(object_type)),
-            options: Some(
-                SuiObjectDataOptions::new()
-                    .with_previous_transaction()
-                    .with_type()
-                    .with_owner(),
-            ),
+            options: Some(SuiObjectDataOptions::new().with_previous_transaction().with_type().with_owner()),
         });
 
         let mut has_next = true;
         let mut cursor = None;
 
         while has_next {
-            let ObjectsPage {
-                data,
-                next_cursor,
-                has_next_page,
-            } = self
-                .get_owned_objects(address, query.clone(), cursor, None)
-                .await?;
-            result.extend(
-                data.iter()
-                    .map(|r| r.clone().try_into())
-                    .collect::<Result<Vec<_>, _>>()?,
-            );
+            let ObjectsPage { data, next_cursor, has_next_page } =
+                self.get_owned_objects(address, query.clone(), cursor, None).await?;
+            result.extend(data.iter().map(|r| r.clone().try_into()).collect::<Result<Vec<_>, _>>()?);
             cursor = next_cursor;
             has_next = has_next_page;
         }

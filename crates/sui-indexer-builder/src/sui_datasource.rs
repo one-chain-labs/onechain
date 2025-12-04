@@ -1,25 +1,28 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::indexer_builder::{DataSender, Datasource};
-use crate::metrics::IndexerMetricProvider;
-use crate::Task;
+use std::{path::PathBuf, sync::Arc};
+
 use anyhow::Error;
 use async_trait::async_trait;
 use mysten_metrics::{metered_channel, spawn_monitored_task};
 use prometheus::IntGauge;
-use std::path::PathBuf;
-use std::sync::Arc;
-use sui_data_ingestion_core::{
-    DataIngestionMetrics, IndexerExecutor, ProgressStore, ReaderOptions, Worker, WorkerPool,
-};
+use sui_data_ingestion_core::{DataIngestionMetrics, IndexerExecutor, ProgressStore, ReaderOptions, Worker, WorkerPool};
 use sui_sdk::SuiClient;
-use sui_types::full_checkpoint_content::CheckpointData as SuiCheckpointData;
-use sui_types::full_checkpoint_content::CheckpointTransaction;
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::Sender;
-use tokio::task::JoinHandle;
+use sui_types::{
+    full_checkpoint_content::{CheckpointData as SuiCheckpointData, CheckpointTransaction},
+    messages_checkpoint::CheckpointSequenceNumber,
+};
+use tokio::{
+    sync::{oneshot, oneshot::Sender},
+    task::JoinHandle,
+};
+
+use crate::{
+    indexer_builder::{DataSender, Datasource},
+    metrics::IndexerMetricProvider,
+    Task,
+};
 
 const BACKFILL_TASK_INGESTION_READER_BATCH_SIZE: usize = 300;
 const LIVE_TASK_INGESTION_READER_BATCH_SIZE: usize = 10;
@@ -78,10 +81,7 @@ impl Datasource<CheckpointTxnData> for SuiCheckpointDatasource {
                 .parse::<usize>()
                 .unwrap()
         };
-        tracing::info!(
-            "Starting Sui checkpoint data retrieval with batch size {}",
-            ingestion_reader_batch_size
-        );
+        tracing::info!("Starting Sui checkpoint data retrieval with batch size {}", ingestion_reader_batch_size);
         let mut executor = IndexerExecutor::new(progress_store, 1, self.ingestion_metrics.clone());
         let progress_metric = self
             .metrics
@@ -98,10 +98,7 @@ impl Datasource<CheckpointTxnData> for SuiCheckpointDatasource {
                     checkpoint_path,
                     Some(remote_store_url),
                     vec![], // optional remote store access options
-                    ReaderOptions {
-                        batch_size: ingestion_reader_batch_size,
-                        ..Default::default()
-                    },
+                    ReaderOptions { batch_size: ingestion_reader_batch_size, ..Default::default() },
                     exit_receiver,
                 )
                 .await?;
@@ -134,18 +131,11 @@ struct PerTaskInMemProgressStore {
 
 #[async_trait]
 impl ProgressStore for PerTaskInMemProgressStore {
-    async fn load(
-        &mut self,
-        _task_name: String,
-    ) -> Result<CheckpointSequenceNumber, anyhow::Error> {
+    async fn load(&mut self, _task_name: String) -> Result<CheckpointSequenceNumber, anyhow::Error> {
         Ok(self.current_checkpoint)
     }
 
-    async fn save(
-        &mut self,
-        task_name: String,
-        checkpoint_number: CheckpointSequenceNumber,
-    ) -> anyhow::Result<()> {
+    async fn save(&mut self, task_name: String, checkpoint_number: CheckpointSequenceNumber) -> anyhow::Result<()> {
         if checkpoint_number >= self.exit_checkpoint {
             tracing::info!(
                 task_name,
@@ -170,14 +160,8 @@ pub struct IndexerWorker<T> {
 }
 
 impl<T> IndexerWorker<T> {
-    pub fn new(
-        data_sender: metered_channel::Sender<(u64, Vec<T>)>,
-        progress_metric: IntGauge,
-    ) -> Self {
-        Self {
-            data_sender,
-            progress_metric,
-        }
+    pub fn new(data_sender: metered_channel::Sender<(u64, Vec<T>)>, progress_metric: IntGauge) -> Self {
+        Self { data_sender, progress_metric }
     }
 }
 
@@ -197,15 +181,9 @@ impl Worker for IndexerWorker<CheckpointTxnData> {
         let checkpoint_num = checkpoint.checkpoint_summary.sequence_number;
         let timestamp_ms = checkpoint.checkpoint_summary.timestamp_ms;
 
-        let transactions = checkpoint
-            .transactions
-            .clone()
-            .into_iter()
-            .map(|tx| (tx, checkpoint_num, timestamp_ms))
-            .collect();
-        self.data_sender
-            .send((checkpoint_num, transactions))
-            .await?;
+        let transactions =
+            checkpoint.transactions.clone().into_iter().map(|tx| (tx, checkpoint_num, timestamp_ms)).collect();
+        self.data_sender.send((checkpoint_num, transactions)).await?;
         self.progress_metric.set(checkpoint_num as i64);
         Ok(())
     }

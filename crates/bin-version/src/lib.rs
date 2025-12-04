@@ -23,8 +23,7 @@ macro_rules! bin_version {
     () => {
         $crate::git_revision!();
 
-        const VERSION: &str =
-            $crate::_hidden::concat!(env!("CARGO_PKG_VERSION"), "-", GIT_REVISION);
+        const VERSION: &str = $crate::_hidden::concat!(env!("CARGO_PKG_VERSION"), "-", GIT_REVISION);
     };
 }
 
@@ -39,10 +38,7 @@ macro_rules! bin_version {
 macro_rules! git_revision {
     () => {
         const _ASSERT_IS_BINARY: () = {
-            env!(
-                "CARGO_BIN_NAME",
-                "`bin_version!()` must be used from a binary"
-            );
+            env!("CARGO_BIN_NAME", "`bin_version!()` must be used from a binary");
         };
 
         const GIT_REVISION: &str = {

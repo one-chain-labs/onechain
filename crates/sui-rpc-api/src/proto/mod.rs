@@ -32,17 +32,11 @@ impl std::error::Error for TryFromProtoError {}
 
 impl TryFromProtoError {
     pub fn missing(field: &'static str) -> Self {
-        Self {
-            missing_field: Some(field),
-            source: None,
-        }
+        Self { missing_field: Some(field), source: None }
     }
 
     pub fn from_error<E: Into<BoxError>>(error: E) -> Self {
-        Self {
-            missing_field: None,
-            source: Some(error.into()),
-        }
+        Self { missing_field: None, source: Some(error.into()) }
     }
 }
 

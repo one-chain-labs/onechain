@@ -17,18 +17,12 @@ async fn main() -> Result<()> {
     }
     let instance_id = args[1].to_string();
     let network = args[2].to_string();
-    assert!(
-        network == "mainnet" || network == "testnet",
-        "Invalid network name"
-    );
+    assert!(network == "mainnet" || network == "testnet", "Invalid network name");
     let client = BigTableClient::new_local(instance_id).await?;
 
     let (_exit_sender, exit_receiver) = oneshot::channel();
-    let mut executor = IndexerExecutor::new(
-        BigTableProgressStore::new(client.clone()),
-        1,
-        DataIngestionMetrics::new(&Registry::new()),
-    );
+    let mut executor =
+        IndexerExecutor::new(BigTableProgressStore::new(client.clone()), 1, DataIngestionMetrics::new(&Registry::new()));
     let worker_pool = WorkerPool::new(KvWorker { client }, "bigtable".to_string(), 50);
     executor.register(worker_pool).await?;
     executor

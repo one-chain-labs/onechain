@@ -15,10 +15,7 @@ pub enum FaultsType {
     /// Permanently crash the maximum number of nodes from the beginning.
     Permanent { faults: usize },
     /// Progressively crash and recover nodes.
-    CrashRecovery {
-        max_faults: usize,
-        interval: Duration,
-    },
+    CrashRecovery { max_faults: usize, interval: Duration },
 }
 
 impl Default for FaultsType {
@@ -31,10 +28,7 @@ impl Debug for FaultsType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Permanent { faults } => write!(f, "{faults}"),
-            Self::CrashRecovery {
-                max_faults,
-                interval,
-            } => write!(f, "{max_faults}-{}cr", interval.as_secs()),
+            Self::CrashRecovery { max_faults, interval } => write!(f, "{max_faults}-{}cr", interval.as_secs()),
         }
     }
 }
@@ -49,10 +43,9 @@ impl Display for FaultsType {
                     write!(f, "{faults} crashed")
                 }
             }
-            Self::CrashRecovery {
-                max_faults,
-                interval,
-            } => write!(f, "{max_faults} crash-recovery, {}s", interval.as_secs()),
+            Self::CrashRecovery { max_faults, interval } => {
+                write!(f, "{max_faults} crash-recovery, {}s", interval.as_secs())
+            }
         }
     }
 }
@@ -83,17 +76,11 @@ impl Display for CrashRecoveryAction {
 
 impl CrashRecoveryAction {
     pub fn boot(instances: Vec<Instance>) -> Self {
-        Self {
-            boot: instances,
-            kill: Vec::new(),
-        }
+        Self { boot: instances, kill: Vec::new() }
     }
 
     pub fn kill(instances: Vec<Instance>) -> Self {
-        Self {
-            boot: Vec::new(),
-            kill: instances,
-        }
+        Self { boot: Vec::new(), kill: instances }
     }
 
     pub fn no_op() -> Self {
@@ -112,19 +99,16 @@ pub struct CrashRecoverySchedule {
 
 impl CrashRecoverySchedule {
     pub fn new(faults_type: FaultsType, instances: Vec<Instance>) -> Self {
-        Self {
-            faults_type,
-            instances,
-            dead: 0,
-        }
+        Self { faults_type, instances, dead: 0 }
     }
+
     pub fn update(&mut self) -> CrashRecoveryAction {
         match &self.faults_type {
             // Permanently crash the specified number of nodes.
             FaultsType::Permanent { faults } => {
                 if self.dead == 0 {
                     self.dead = *faults;
-                    CrashRecoveryAction::kill(self.instances.clone().drain(0..*faults).collect())
+                    CrashRecoveryAction::kill(self.instances.clone().drain(0 .. *faults).collect())
                 } else {
                     CrashRecoveryAction::no_op()
                 }
@@ -136,7 +120,7 @@ impl CrashRecoverySchedule {
 
                 // Recover all nodes if we already crashed them all.
                 if self.dead == *max_faults {
-                    let instances: Vec<_> = self.instances.clone().drain(0..*max_faults).collect();
+                    let instances: Vec<_> = self.instances.clone().drain(0 .. *max_faults).collect();
                     self.dead = 0;
                     CrashRecoveryAction::boot(instances)
                 }
@@ -150,7 +134,7 @@ impl CrashRecoverySchedule {
                         (2 * min_faults, *max_faults)
                     };
 
-                    let instances: Vec<_> = self.instances.clone().drain(l..h).collect();
+                    let instances: Vec<_> = self.instances.clone().drain(l .. h).collect();
                     self.dead += h - l;
                     CrashRecoveryAction::kill(instances)
                 }
@@ -163,24 +147,15 @@ impl CrashRecoverySchedule {
 mod faults_tests {
     use std::time::Duration;
 
-    use crate::client::Instance;
-
     use super::{CrashRecoverySchedule, FaultsType};
+    use crate::client::Instance;
 
     #[test]
     fn crash_recovery_1_fault() {
         let max_faults = 1;
         let interval = Duration::from_secs(60);
-        let faulty = (0..max_faults)
-            .map(|i| Instance::new_for_test(i.to_string()))
-            .collect();
-        let mut schedule = CrashRecoverySchedule::new(
-            FaultsType::CrashRecovery {
-                max_faults,
-                interval,
-            },
-            faulty,
-        );
+        let faulty = (0 .. max_faults).map(|i| Instance::new_for_test(i.to_string())).collect();
+        let mut schedule = CrashRecoverySchedule::new(FaultsType::CrashRecovery { max_faults, interval }, faulty);
 
         let action = schedule.update();
         assert_eq!(action.boot.len(), 0);
@@ -203,16 +178,8 @@ mod faults_tests {
     fn crash_recovery_2_faults() {
         let max_faults = 2;
         let interval = Duration::from_secs(60);
-        let faulty = (0..max_faults)
-            .map(|i| Instance::new_for_test(i.to_string()))
-            .collect();
-        let mut schedule = CrashRecoverySchedule::new(
-            FaultsType::CrashRecovery {
-                max_faults,
-                interval,
-            },
-            faulty,
-        );
+        let faulty = (0 .. max_faults).map(|i| Instance::new_for_test(i.to_string())).collect();
+        let mut schedule = CrashRecoverySchedule::new(FaultsType::CrashRecovery { max_faults, interval }, faulty);
 
         let action = schedule.update();
         assert_eq!(action.boot.len(), 0);
@@ -234,20 +201,12 @@ mod faults_tests {
     #[test]
     fn crash_recovery() {
         let interval = Duration::from_secs(60);
-        for i in 3..33 {
+        for i in 3 .. 33 {
             let max_faults = i;
             let min_faults = max_faults / 3;
 
-            let instances = (0..max_faults)
-                .map(|i| Instance::new_for_test(i.to_string()))
-                .collect();
-            let mut schedule = CrashRecoverySchedule::new(
-                FaultsType::CrashRecovery {
-                    max_faults,
-                    interval,
-                },
-                instances,
-            );
+            let instances = (0 .. max_faults).map(|i| Instance::new_for_test(i.to_string())).collect();
+            let mut schedule = CrashRecoverySchedule::new(FaultsType::CrashRecovery { max_faults, interval }, instances);
 
             let action = schedule.update();
             assert_eq!(action.boot.len(), 0);

@@ -1,8 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::io::Write;
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 pub trait EnumOrderMap {
     fn order_to_variant_map() -> std::collections::BTreeMap<u64, String>;

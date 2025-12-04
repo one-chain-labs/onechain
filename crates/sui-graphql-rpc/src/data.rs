@@ -15,7 +15,6 @@ use diesel::{
     query_dsl::methods::LimitDsl,
     QueryResult,
 };
-
 use diesel_async::{methods::LoadQuery, scoped_futures::ScopedBoxFuture};
 
 use crate::error::Error;
@@ -39,8 +38,7 @@ pub(crate) struct DataLoader(pub Arc<AGDataLoader<Db>>);
 /// - GB is the GroupBy clause.
 ///
 /// These type parameters should usually be inferred by context.
-pub(crate) type Query<ST, QS, GB> =
-    BoxedSelectStatement<'static, ST, FromClause<QS>, DieselBackend, GB>;
+pub(crate) type Query<ST, QS, GB> = BoxedSelectStatement<'static, ST, FromClause<QS>, DieselBackend, GB>;
 
 /// Interface for accessing relational data written by the Indexer, agnostic of the database
 /// back-end being used.
@@ -57,11 +55,7 @@ pub(crate) trait QueryExecutor {
     /// issue queries over.
     async fn execute<'c, T, U, E>(&self, txn: T) -> Result<U, Error>
     where
-        T: for<'r> FnOnce(
-                &'r mut Self::DbConnection<'_>,
-            ) -> ScopedBoxFuture<'static, 'r, Result<U, E>>
-            + Send
-            + 'c,
+        T: for<'r> FnOnce(&'r mut Self::DbConnection<'_>) -> ScopedBoxFuture<'static, 'r, Result<U, E>> + Send + 'c,
         E: From<diesel::result::Error> + std::error::Error,
         T: Send + 'static,
         U: Send + 'static,
@@ -72,11 +66,7 @@ pub(crate) trait QueryExecutor {
     /// over.
     async fn execute_repeatable<'c, T, U, E>(&self, txn: T) -> Result<U, Error>
     where
-        T: for<'r> FnOnce(
-                &'r mut Self::DbConnection<'_>,
-            ) -> ScopedBoxFuture<'static, 'r, Result<U, E>>
-            + Send
-            + 'c,
+        T: for<'r> FnOnce(&'r mut Self::DbConnection<'_>) -> ScopedBoxFuture<'static, 'r, Result<U, E>> + Send + 'c,
         E: From<diesel::result::Error> + std::error::Error,
         T: Send + 'static,
         U: Send + 'static,

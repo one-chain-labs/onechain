@@ -5,21 +5,21 @@
 //! they should nearly all be tokio::test rather than simtest.
 
 use core::panic;
+use std::{fs::File, num::NonZeroUsize, time::Duration};
+
 use fastcrypto::encoding::Base64;
 use jsonrpsee::{
     core::{client::ClientT, RpcResult},
     rpc_params,
 };
-use std::fs::File;
-use std::num::NonZeroUsize;
-use std::time::Duration;
-use sui_core::authority_client::make_network_authority_clients_with_network_config;
-use sui_core::authority_client::AuthorityAPI;
-use sui_core::traffic_controller::{
-    nodefw_test_server::NodeFwTestServer, TrafficController, TrafficSim,
+use sui_core::{
+    authority_client::{make_network_authority_clients_with_network_config, AuthorityAPI},
+    traffic_controller::{nodefw_test_server::NodeFwTestServer, TrafficController, TrafficSim},
 };
 use sui_json_rpc_types::{
-    SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
+    SuiTransactionBlockEffectsAPI,
+    SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions,
 };
 use sui_macros::sim_test;
 use sui_network::default_mysten_network_config;
@@ -29,9 +29,7 @@ use sui_types::{
     crypto::Ed25519SuiSignature,
     quorum_driver_types::ExecuteTransactionRequestType,
     signature::GenericSignature,
-    traffic_control::{
-        FreqThresholdConfig, PolicyConfig, PolicyType, RemoteFirewallConfig, Weight,
-    },
+    traffic_control::{FreqThresholdConfig, PolicyConfig, PolicyType, RemoteFirewallConfig, Weight},
 };
 use test_cluster::{TestCluster, TestClusterBuilder};
 
@@ -51,10 +49,7 @@ async fn test_validator_traffic_control_noop() -> Result<(), anyhow::Error> {
         .committee_size(NonZeroUsize::new(4).unwrap())
         .with_policy_config(Some(policy_config))
         .build();
-    let test_cluster = TestClusterBuilder::new()
-        .set_network_config(network_config)
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().set_network_config(network_config).build().await;
 
     assert_traffic_control_ok(test_cluster).await
 }
@@ -71,10 +66,7 @@ async fn test_fullnode_traffic_control_noop() -> Result<(), anyhow::Error> {
         dry_run: false,
         ..Default::default()
     };
-    let test_cluster = TestClusterBuilder::new()
-        .with_fullnode_policy_config(Some(policy_config))
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().with_fullnode_policy_config(Some(policy_config)).build().await;
     assert_traffic_control_ok(test_cluster).await
 }
 
@@ -95,10 +87,7 @@ async fn test_validator_traffic_control_ok() -> Result<(), anyhow::Error> {
         .committee_size(NonZeroUsize::new(4).unwrap())
         .with_policy_config(Some(policy_config))
         .build();
-    let test_cluster = TestClusterBuilder::new()
-        .set_network_config(network_config)
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().set_network_config(network_config).build().await;
 
     assert_traffic_control_ok(test_cluster).await
 }
@@ -116,10 +105,7 @@ async fn test_fullnode_traffic_control_ok() -> Result<(), anyhow::Error> {
         dry_run: false,
         ..Default::default()
     };
-    let test_cluster = TestClusterBuilder::new()
-        .with_fullnode_policy_config(Some(policy_config))
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().with_fullnode_policy_config(Some(policy_config)).build().await;
     assert_traffic_control_ok(test_cluster).await
 }
 
@@ -141,10 +127,7 @@ async fn test_validator_traffic_control_dry_run() -> Result<(), anyhow::Error> {
         .committee_size(NonZeroUsize::new(4).unwrap())
         .with_policy_config(Some(policy_config))
         .build();
-    let test_cluster = TestClusterBuilder::new()
-        .set_network_config(network_config)
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().set_network_config(network_config).build().await;
 
     assert_validator_traffic_control_dry_run(test_cluster, n as usize).await
 }
@@ -163,10 +146,7 @@ async fn test_fullnode_traffic_control_dry_run() -> Result<(), anyhow::Error> {
         dry_run: true,
         ..Default::default()
     };
-    let test_cluster = TestClusterBuilder::new()
-        .with_fullnode_policy_config(Some(policy_config))
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().with_fullnode_policy_config(Some(policy_config)).build().await;
 
     let context = test_cluster.wallet;
     let jsonrpc_client = &test_cluster.fullnode_handle.rpc_client;
@@ -187,27 +167,17 @@ async fn test_fullnode_traffic_control_dry_run() -> Result<(), anyhow::Error> {
         ExecuteTransactionRequestType::WaitForLocalExecution
     ];
 
-    let response: SuiTransactionBlockResponse = jsonrpc_client
-        .request("sui_executeTransactionBlock", params.clone())
-        .await
-        .unwrap();
-    let SuiTransactionBlockResponse {
-        digest,
-        confirmed_local_execution,
-        ..
-    } = response;
+    let response: SuiTransactionBlockResponse =
+        jsonrpc_client.request("sui_executeTransactionBlock", params.clone()).await.unwrap();
+    let SuiTransactionBlockResponse { digest, confirmed_local_execution, .. } = response;
     assert_eq!(&digest, tx_digest);
     assert!(confirmed_local_execution.unwrap());
 
     // it should take no more than 4 requests to be added to the blocklist
-    for _ in 0..txn_count {
-        let response: RpcResult<SuiTransactionBlockResponse> = jsonrpc_client
-            .request("sui_getTransactionBlock", rpc_params![*tx_digest])
-            .await;
-        assert!(
-            response.is_ok(),
-            "Expected request to succeed in dry-run mode"
-        );
+    for _ in 0 .. txn_count {
+        let response: RpcResult<SuiTransactionBlockResponse> =
+            jsonrpc_client.request("sui_getTransactionBlock", rpc_params![*tx_digest]).await;
+        assert!(response.is_ok(), "Expected request to succeed in dry-run mode");
     }
     Ok(())
 }
@@ -227,26 +197,20 @@ async fn test_validator_traffic_control_error_blocked() -> Result<(), anyhow::Er
         .with_policy_config(Some(policy_config))
         .build();
     let committee = network_config.committee_with_network();
-    let test_cluster = TestClusterBuilder::new()
-        .set_network_config(network_config)
-        .build()
-        .await;
-    let local_clients = make_network_authority_clients_with_network_config(
-        &committee,
-        &default_mysten_network_config(),
-    );
+    let test_cluster = TestClusterBuilder::new().set_network_config(network_config).build().await;
+    let local_clients = make_network_authority_clients_with_network_config(&committee, &default_mysten_network_config());
     let (_, auth_client) = local_clients.first_key_value().unwrap();
 
     let mut txns = batch_make_transfer_transactions(&test_cluster.wallet, n as usize).await;
     let mut tx = txns.swap_remove(0);
     let signatures = tx.tx_signatures_mut_for_testing();
     signatures.pop();
-    signatures.push(GenericSignature::Signature(
-        sui_types::crypto::Signature::Ed25519SuiSignature(Ed25519SuiSignature::default()),
-    ));
+    signatures.push(GenericSignature::Signature(sui_types::crypto::Signature::Ed25519SuiSignature(
+        Ed25519SuiSignature::default(),
+    )));
 
     // it should take no more than 4 requests to be added to the blocklist
-    for _ in 0..n {
+    for _ in 0 .. n {
         let response = auth_client.handle_transaction(tx.clone(), None).await;
         if let Err(err) = response {
             if err.to_string().contains("Too many requests") {
@@ -268,10 +232,7 @@ async fn test_fullnode_traffic_control_spam_blocked() -> Result<(), anyhow::Erro
         dry_run: false,
         ..Default::default()
     };
-    let test_cluster = TestClusterBuilder::new()
-        .with_fullnode_policy_config(Some(policy_config))
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().with_fullnode_policy_config(Some(policy_config)).build().await;
 
     let context = test_cluster.wallet;
     let jsonrpc_client = &test_cluster.fullnode_handle.rpc_client;
@@ -293,32 +254,22 @@ async fn test_fullnode_traffic_control_spam_blocked() -> Result<(), anyhow::Erro
         ExecuteTransactionRequestType::WaitForLocalExecution
     ];
 
-    let response: SuiTransactionBlockResponse = jsonrpc_client
-        .request("sui_executeTransactionBlock", params.clone())
-        .await
-        .unwrap();
-    let SuiTransactionBlockResponse {
-        digest,
-        confirmed_local_execution,
-        ..
-    } = response;
+    let response: SuiTransactionBlockResponse =
+        jsonrpc_client.request("sui_executeTransactionBlock", params.clone()).await.unwrap();
+    let SuiTransactionBlockResponse { digest, confirmed_local_execution, .. } = response;
     assert_eq!(&digest, tx_digest);
     assert!(confirmed_local_execution.unwrap());
 
     // it should take no more than 4 requests to be added to the blocklist
-    for _ in 0..txn_count {
-        let response: RpcResult<SuiTransactionBlockResponse> = jsonrpc_client
-            .request("sui_getTransactionBlock", rpc_params![*tx_digest])
-            .await;
+    for _ in 0 .. txn_count {
+        let response: RpcResult<SuiTransactionBlockResponse> =
+            jsonrpc_client.request("sui_getTransactionBlock", rpc_params![*tx_digest]).await;
         if let Err(err) = response {
             // TODO: fix validator blocking error handling such that the error message
             // is not misleading. The full error message currently is the following:
             //  Transaction execution failed due to issues with transaction inputs, please
             //  review the errors and try again: Too many requests.
-            assert!(
-                err.to_string().contains("Too many requests"),
-                "Error not due to spam policy"
-            );
+            assert!(err.to_string().contains("Too many requests"), "Error not due to spam policy");
             return Ok(());
         }
     }
@@ -334,10 +285,7 @@ async fn test_fullnode_traffic_control_error_blocked() -> Result<(), anyhow::Err
         dry_run: false,
         ..Default::default()
     };
-    let test_cluster = TestClusterBuilder::new()
-        .with_fullnode_policy_config(Some(policy_config))
-        .build()
-        .await;
+    let test_cluster = TestClusterBuilder::new().with_fullnode_policy_config(Some(policy_config)).build().await;
 
     let jsonrpc_client = &test_cluster.fullnode_handle.rpc_client;
     let context = test_cluster.wallet;
@@ -350,7 +298,7 @@ async fn test_fullnode_traffic_control_error_blocked() -> Result<(), anyhow::Err
     );
 
     // it should take no more than 4 requests to be added to the blocklist
-    for _ in 0..txn_count {
+    for _ in 0 .. txn_count {
         let txn = txns.swap_remove(0);
         let tx_digest = txn.digest();
         let (tx_bytes, _signatures) = txn.to_tx_bytes_and_signatures();
@@ -362,19 +310,14 @@ async fn test_fullnode_traffic_control_error_blocked() -> Result<(), anyhow::Err
             SuiTransactionBlockResponseOptions::new(),
             ExecuteTransactionRequestType::WaitForLocalExecution
         ];
-        let response: RpcResult<SuiTransactionBlockResponse> = jsonrpc_client
-            .request("sui_executeTransactionBlock", params.clone())
-            .await;
+        let response: RpcResult<SuiTransactionBlockResponse> =
+            jsonrpc_client.request("sui_executeTransactionBlock", params.clone()).await;
         if let Err(err) = response {
             if err.to_string().contains("Too many requests") {
                 return Ok(());
             }
         } else {
-            let SuiTransactionBlockResponse {
-                digest,
-                confirmed_local_execution,
-                ..
-            } = response.unwrap();
+            let SuiTransactionBlockResponse { digest, confirmed_local_execution, .. } = response.unwrap();
             assert_eq!(&digest, tx_digest);
             assert!(confirmed_local_execution.unwrap());
         }
@@ -409,23 +352,17 @@ async fn test_validator_traffic_control_error_delegated() -> Result<(), anyhow::
         .with_firewall_config(Some(firewall_config))
         .build();
     let committee = network_config.committee_with_network();
-    let test_cluster = TestClusterBuilder::new()
-        .set_network_config(network_config)
-        .build()
-        .await;
-    let local_clients = make_network_authority_clients_with_network_config(
-        &committee,
-        &default_mysten_network_config(),
-    );
+    let test_cluster = TestClusterBuilder::new().set_network_config(network_config).build().await;
+    let local_clients = make_network_authority_clients_with_network_config(&committee, &default_mysten_network_config());
     let (_, auth_client) = local_clients.first_key_value().unwrap();
 
     let mut txns = batch_make_transfer_transactions(&test_cluster.wallet, n as usize).await;
     let mut tx = txns.swap_remove(0);
     let signatures = tx.tx_signatures_mut_for_testing();
     signatures.pop();
-    signatures.push(GenericSignature::Signature(
-        sui_types::crypto::Signature::Ed25519SuiSignature(Ed25519SuiSignature::default()),
-    ));
+    signatures.push(GenericSignature::Signature(sui_types::crypto::Signature::Ed25519SuiSignature(
+        Ed25519SuiSignature::default(),
+    )));
 
     // start test firewall server
     let mut server = NodeFwTestServer::new();
@@ -434,7 +371,7 @@ async fn test_validator_traffic_control_error_delegated() -> Result<(), anyhow::
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     // it should take no more than 4 requests to be added to the blocklist
-    for _ in 0..n {
+    for _ in 0 .. n {
         let response = auth_client.handle_transaction(tx.clone(), None).await;
         if let Err(err) = response {
             if err.to_string().contains("Too many requests") {
@@ -443,10 +380,7 @@ async fn test_validator_traffic_control_error_delegated() -> Result<(), anyhow::
         }
     }
     let fw_blocklist = server.list_addresses_rpc().await;
-    assert!(
-        !fw_blocklist.is_empty(),
-        "Expected blocklist to be non-empty"
-    );
+    assert!(!fw_blocklist.is_empty(), "Expected blocklist to be non-empty");
     server.stop().await;
     Ok(())
 }
@@ -504,29 +438,19 @@ async fn test_fullnode_traffic_control_spam_delegated() -> Result<(), anyhow::Er
     ];
 
     // it should take no more than 4 requests to be added to the blocklist
-    let response: SuiTransactionBlockResponse = jsonrpc_client
-        .request("sui_executeTransactionBlock", params.clone())
-        .await
-        .unwrap();
-    let SuiTransactionBlockResponse {
-        digest,
-        confirmed_local_execution,
-        ..
-    } = response;
+    let response: SuiTransactionBlockResponse =
+        jsonrpc_client.request("sui_executeTransactionBlock", params.clone()).await.unwrap();
+    let SuiTransactionBlockResponse { digest, confirmed_local_execution, .. } = response;
     assert_eq!(&digest, tx_digest);
     assert!(confirmed_local_execution.unwrap());
 
-    for _ in 0..txn_count {
-        let response: RpcResult<SuiTransactionBlockResponse> = jsonrpc_client
-            .request("sui_getTransactionBlock", rpc_params![*tx_digest])
-            .await;
+    for _ in 0 .. txn_count {
+        let response: RpcResult<SuiTransactionBlockResponse> =
+            jsonrpc_client.request("sui_getTransactionBlock", rpc_params![*tx_digest]).await;
         assert!(response.is_ok(), "Expected request to succeed");
     }
     let fw_blocklist = server.list_addresses_rpc().await;
-    assert!(
-        !fw_blocklist.is_empty(),
-        "Expected blocklist to be non-empty"
-    );
+    assert!(!fw_blocklist.is_empty(), "Expected blocklist to be non-empty");
     server.stop().await;
     Ok(())
 }
@@ -558,14 +482,11 @@ async fn test_traffic_control_dead_mans_switch() -> Result<(), anyhow::Error> {
     // the receive channel (this would cause traffic controller to exit the loop and thus
     // we will never engage the dead mans switch)
     let _tc = TrafficController::init_for_test(policy_config, Some(firewall_config));
-    assert!(
-        !drain_path.exists(),
-        "Expected drain file to not exist after startup unless previously set",
-    );
+    assert!(!drain_path.exists(), "Expected drain file to not exist after startup unless previously set",);
 
     // after n seconds with no traffic, the dead mans switch should be engaged
     let mut drain_enabled = false;
-    for _ in 0..10 {
+    for _ in 0 .. 10 {
         if drain_path.exists() {
             drain_enabled = true;
             break;
@@ -575,11 +496,8 @@ async fn test_traffic_control_dead_mans_switch() -> Result<(), anyhow::Error> {
     assert!(drain_enabled, "Expected drain file to be enabled");
 
     // if we drop traffic controller and re-instantiate, drain file should remain set
-    for _ in 0..3 {
-        assert!(
-            drain_path.exists(),
-            "Expected drain file to be disabled at startup unless previously enabled",
-        );
+    for _ in 0 .. 3 {
+        assert!(drain_path.exists(), "Expected drain file to be disabled at startup unless previously enabled",);
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
     }
 
@@ -763,23 +681,15 @@ async fn assert_traffic_control_ok(mut test_cluster: TestCluster) -> Result<(), 
         SuiTransactionBlockResponseOptions::new(),
         ExecuteTransactionRequestType::WaitForLocalExecution
     ];
-    let response: SuiTransactionBlockResponse = jsonrpc_client
-        .request("sui_executeTransactionBlock", params)
-        .await
-        .unwrap();
+    let response: SuiTransactionBlockResponse =
+        jsonrpc_client.request("sui_executeTransactionBlock", params).await.unwrap();
 
-    let SuiTransactionBlockResponse {
-        digest,
-        confirmed_local_execution,
-        ..
-    } = response;
+    let SuiTransactionBlockResponse { digest, confirmed_local_execution, .. } = response;
     assert_eq!(&digest, tx_digest);
     assert!(confirmed_local_execution.unwrap());
 
-    let _response: SuiTransactionBlockResponse = jsonrpc_client
-        .request("sui_getTransactionBlock", rpc_params![*tx_digest])
-        .await
-        .unwrap();
+    let _response: SuiTransactionBlockResponse =
+        jsonrpc_client.request("sui_getTransactionBlock", rpc_params![*tx_digest]).await.unwrap();
 
     // Test request with ExecuteTransactionRequestType::WaitForEffectsCert
     let (tx_bytes, signatures) = txn.to_tx_bytes_and_signatures();
@@ -789,16 +699,10 @@ async fn assert_traffic_control_ok(mut test_cluster: TestCluster) -> Result<(), 
         SuiTransactionBlockResponseOptions::new().with_effects(),
         ExecuteTransactionRequestType::WaitForEffectsCert
     ];
-    let response: SuiTransactionBlockResponse = jsonrpc_client
-        .request("sui_executeTransactionBlock", params)
-        .await
-        .unwrap();
+    let response: SuiTransactionBlockResponse =
+        jsonrpc_client.request("sui_executeTransactionBlock", params).await.unwrap();
 
-    let SuiTransactionBlockResponse {
-        effects,
-        confirmed_local_execution,
-        ..
-    } = response;
+    let SuiTransactionBlockResponse { effects, confirmed_local_execution, .. } = response;
     assert_eq!(effects.unwrap().transaction_digest(), tx_digest);
     assert!(!confirmed_local_execution.unwrap());
 
@@ -831,27 +735,17 @@ async fn assert_validator_traffic_control_dry_run(
         ExecuteTransactionRequestType::WaitForLocalExecution
     ];
 
-    let response: SuiTransactionBlockResponse = jsonrpc_client
-        .request("sui_executeTransactionBlock", params.clone())
-        .await
-        .unwrap();
-    let SuiTransactionBlockResponse {
-        digest,
-        confirmed_local_execution,
-        ..
-    } = response;
+    let response: SuiTransactionBlockResponse =
+        jsonrpc_client.request("sui_executeTransactionBlock", params.clone()).await.unwrap();
+    let SuiTransactionBlockResponse { digest, confirmed_local_execution, .. } = response;
     assert_eq!(&digest, tx_digest);
     assert!(confirmed_local_execution.unwrap());
 
     // it should take no more than 4 requests to be added to the blocklist
-    for _ in 0..txn_count {
-        let response: RpcResult<SuiTransactionBlockResponse> = jsonrpc_client
-            .request("sui_getTransactionBlock", rpc_params![*tx_digest])
-            .await;
-        assert!(
-            response.is_ok(),
-            "Expected request to succeed in dry-run mode"
-        );
+    for _ in 0 .. txn_count {
+        let response: RpcResult<SuiTransactionBlockResponse> =
+            jsonrpc_client.request("sui_getTransactionBlock", rpc_params![*tx_digest]).await;
+        assert!(response.is_ok(), "Expected request to succeed in dry-run mode");
     }
     Ok(())
 }

@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{TestCaseImpl, TestContext};
 use async_trait::async_trait;
 use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI};
 use sui_sdk::wallet_context::WalletContext;
 use sui_test_transaction_builder::{emit_new_random_u128, publish_basics_package};
 use tracing::info;
+
+use crate::{TestCaseImpl, TestContext};
 
 pub struct RandomBeaconTest;
 
@@ -45,16 +46,8 @@ impl TestCaseImpl for RandomBeaconTest {
 
         // Check that only the expected event was emitted.
         let events = response.events.unwrap();
-        assert_eq!(
-            1,
-            events.data.len(),
-            "Expected 1 event, got {:?}",
-            events.data.len()
-        );
-        assert_eq!(
-            "RandomU128Event".to_string(),
-            events.data[0].type_.name.to_string()
-        );
+        assert_eq!(1, events.data.len(), "Expected 1 event, got {:?}", events.data.len());
+        assert_eq!("RandomU128Event".to_string(), events.data[0].type_.name.to_string());
 
         // Verify fullnode observes the txn
         ctx.let_fullnode_sync(vec![response.digest], 5).await;

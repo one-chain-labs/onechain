@@ -1,11 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::future::BoxFuture;
-use std::collections::HashMap;
-use std::future::Future;
-use std::sync::Arc;
+use std::{collections::HashMap, future::Future, sync::Arc};
 
+use futures::future::BoxFuture;
 pub use sui_proc_macros::*;
 
 /// Evaluates an expression in a new thread which will not be subject to interception of
@@ -41,8 +39,9 @@ fn with_fp_map<T>(func: impl FnOnce(&mut FpMap) -> T) -> T {
 
 #[cfg(not(msim))]
 fn with_fp_map<T>(func: impl FnOnce(&mut FpMap) -> T) -> T {
-    use once_cell::sync::Lazy;
     use std::sync::Mutex;
+
+    use once_cell::sync::Lazy;
 
     static MAP: Lazy<Mutex<FpMap>> = Lazy::new(Default::default);
     let mut map = MAP.lock().unwrap();
@@ -62,10 +61,7 @@ fn get_sync_fp_result(result: Box<dyn std::any::Any + Send + 'static>) {
 fn get_async_fp_result(result: Box<dyn std::any::Any + Send + 'static>) -> BoxFuture<'static, ()> {
     match result.downcast::<BoxFuture<'static, ()>>() {
         Ok(fut) => *fut,
-        Err(err) => panic!(
-            "async failpoint must return BoxFuture<'static, ()> {:?}",
-            err
-        ),
+        Err(err) => panic!("async failpoint must return BoxFuture<'static, ()> {:?}", err),
     }
 }
 
@@ -76,9 +72,7 @@ fn get_fp_if_result(result: Box<dyn std::any::Any + Send + 'static>) -> bool {
     }
 }
 
-fn get_fp_some_result<T: Send + 'static>(
-    result: Box<dyn std::any::Any + Send + 'static>,
-) -> Option<T> {
+fn get_fp_some_result<T: Send + 'static>(result: Box<dyn std::any::Any + Send + 'static>) -> Option<T> {
     match result.downcast::<Option<T>>() {
         Ok(opt) => *opt,
         Err(_) => panic!("failpoint-arg must return Option<T>"),
@@ -120,20 +114,13 @@ pub fn handle_fail_point_arg<T: Send + 'static>(identifier: &'static str) -> Opt
 
 fn register_fail_point_impl(identifier: &'static str, callback: Arc<FpCallback>) {
     with_fp_map(move |map| {
-        assert!(
-            map.insert(identifier, callback).is_none(),
-            "duplicate fail point registration"
-        );
+        assert!(map.insert(identifier, callback).is_none(), "duplicate fail point registration");
     })
 }
 
 fn clear_fail_point_impl(identifier: &'static str) {
     with_fp_map(move |map| {
-        assert!(
-            map.remove(identifier).is_some(),
-            "fail point {:?} does not exist",
-            identifier
-        );
+        assert!(map.remove(identifier).is_some(), "fail point {:?} does not exist", identifier);
     })
 }
 
@@ -149,10 +136,8 @@ pub fn register_fail_point(identifier: &'static str, callback: impl Fn() + Sync 
 
 /// Register an asynchronous fail point. Because it is async it can yield execution of the calling
 /// task, e.g. by sleeping.
-pub fn register_fail_point_async<F>(
-    identifier: &'static str,
-    callback: impl Fn() -> F + Sync + Send + 'static,
-) where
+pub fn register_fail_point_async<F>(identifier: &'static str, callback: impl Fn() -> F + Sync + Send + 'static)
+where
     F: Future<Output = ()> + Send + 'static,
 {
     register_fail_point_impl(
@@ -182,10 +167,7 @@ pub fn register_fail_point_async<F>(
 ///        was_hit = true;
 ///     });
 /// ```
-pub fn register_fail_point_if(
-    identifier: &'static str,
-    callback: impl Fn() -> bool + Sync + Send + 'static,
-) {
+pub fn register_fail_point_if(identifier: &'static str, callback: impl Fn() -> bool + Sync + Send + 'static) {
     register_fail_point_impl(identifier, Arc::new(move || Box::new(callback())));
 }
 
@@ -216,10 +198,7 @@ pub fn register_fail_point_arg<T: Send + 'static>(
     register_fail_point_impl(identifier, Arc::new(move || Box::new(callback())));
 }
 
-pub fn register_fail_points(
-    identifiers: &[&'static str],
-    callback: impl Fn() + Sync + Send + 'static,
-) {
+pub fn register_fail_points(identifiers: &[&'static str], callback: impl Fn() + Sync + Send + 'static) {
     let cb: Arc<FpCallback> = Arc::new(move || {
         callback();
         Box::new(())
@@ -687,10 +666,7 @@ mod test {
                 }
             }
 
-            let mut foo = Foo {
-                a: 1,
-                called: false,
-            };
+            let mut foo = Foo { a: 1, called: false };
 
             *foo.get_a_mut() += 2;
             assert_eq!(foo.a, 3);

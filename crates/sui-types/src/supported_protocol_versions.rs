@@ -3,10 +3,11 @@
 
 use std::ops::RangeInclusive;
 
-use crate::{crypto::DefaultHash, digests::Digest};
 use fastcrypto::hash::HashFunction;
 use serde::{Deserialize, Serialize};
 pub use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+
+use crate::{crypto::DefaultHash, digests::Digest};
 
 /// Models the set of protocol versions supported by a validator.
 /// The `sui-node` binary will always use the SYSTEM_DEFAULT constant, but for testing we need
@@ -18,10 +19,7 @@ pub struct SupportedProtocolVersions {
 }
 
 impl SupportedProtocolVersions {
-    pub const SYSTEM_DEFAULT: Self = Self {
-        min: ProtocolVersion::MIN,
-        max: ProtocolVersion::MAX,
-    };
+    pub const SYSTEM_DEFAULT: Self = Self { min: ProtocolVersion::MIN, max: ProtocolVersion::MAX };
 
     /// Use by VersionedProtocolMessage implementors to describe in which range of versions a
     /// message variant is supported.
@@ -42,7 +40,7 @@ impl SupportedProtocolVersions {
     }
 
     pub fn as_range(&self) -> RangeInclusive<u64> {
-        self.min.as_u64()..=self.max.as_u64()
+        self.min.as_u64() ..= self.max.as_u64()
     }
 
     pub fn truncate_below(self, v: ProtocolVersion) -> Self {
@@ -61,10 +59,7 @@ pub struct SupportedProtocolVersionsWithHashes {
 
 impl SupportedProtocolVersionsWithHashes {
     pub fn get_version_digest(&self, v: ProtocolVersion) -> Option<Digest> {
-        self.versions
-            .iter()
-            .find(|(version, _)| *version == v)
-            .map(|(_, digest)| *digest)
+        self.versions.iter().find(|(version, _)| *version == v).map(|(_, digest)| *digest)
     }
 
     // Ideally this would be in sui-protocol-config, but sui-types depends on sui-protocol-config,
@@ -79,15 +74,7 @@ impl SupportedProtocolVersionsWithHashes {
         Self {
             versions: supported
                 .as_range()
-                .map(|v| {
-                    (
-                        v.into(),
-                        Self::protocol_config_digest(&ProtocolConfig::get_for_version(
-                            v.into(),
-                            chain,
-                        )),
-                    )
-                })
+                .map(|v| (v.into(), Self::protocol_config_digest(&ProtocolConfig::get_for_version(v.into(), chain))))
                 .collect(),
         }
     }

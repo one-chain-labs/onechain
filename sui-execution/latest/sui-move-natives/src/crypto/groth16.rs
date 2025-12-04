@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
+use std::collections::VecDeque;
+
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
@@ -11,7 +12,8 @@ use move_vm_types::{
     values::{self, Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::{object_runtime::ObjectRuntime, NativesCostTable};
 
 pub const INVALID_VERIFYING_KEY: u64 = 0;
 pub const INVALID_CURVE: u64 = 1;
@@ -48,10 +50,7 @@ pub fn prepare_verifying_key_internal(
     // Load the cost parameters from the protocol config
     let (groth16_prepare_verifying_key_cost_params, crypto_invalid_arguments_cost) = {
         let cost_table = &context.extensions().get::<NativesCostTable>();
-        (
-            cost_table.groth16_prepare_verifying_key_cost_params.clone(),
-            cost_table.crypto_invalid_arguments_cost,
-        )
+        (cost_table.groth16_prepare_verifying_key_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
     let bytes = pop_arg!(args, VectorRef);
     let verifying_key = bytes.as_bytes_ref();
@@ -60,13 +59,8 @@ pub fn prepare_verifying_key_internal(
 
     // Load the cost parameters from the protocol config
     let base_cost = match curve {
-        BLS12381 => {
-            groth16_prepare_verifying_key_cost_params
-                .groth16_prepare_verifying_key_bls12381_cost_base
-        }
-        BN254 => {
-            groth16_prepare_verifying_key_cost_params.groth16_prepare_verifying_key_bn254_cost_base
-        }
+        BLS12381 => groth16_prepare_verifying_key_cost_params.groth16_prepare_verifying_key_bls12381_cost_base,
+        BN254 => groth16_prepare_verifying_key_cost_params.groth16_prepare_verifying_key_bn254_cost_base,
         _ => {
             // Charge for failure but dont fail if we run out of gas otherwise the actual error is masked by OUT_OF_GAS error
             context.charge_gas(crypto_invalid_arguments_cost);
@@ -87,15 +81,12 @@ pub fn prepare_verifying_key_internal(
     }
 
     match result {
-        Ok(pvk) => Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::struct_(values::Struct::pack(vec![
-                Value::vector_u8(pvk[0].to_vec()),
-                Value::vector_u8(pvk[1].to_vec()),
-                Value::vector_u8(pvk[2].to_vec()),
-                Value::vector_u8(pvk[3].to_vec())
-            ]))],
-        )),
+        Ok(pvk) => Ok(NativeResult::ok(cost, smallvec![Value::struct_(values::Struct::pack(vec![
+            Value::vector_u8(pvk[0].to_vec()),
+            Value::vector_u8(pvk[1].to_vec()),
+            Value::vector_u8(pvk[2].to_vec()),
+            Value::vector_u8(pvk[3].to_vec())
+        ]))])),
         Err(_) => Ok(NativeResult::err(cost, INVALID_VERIFYING_KEY)),
     }
 }
@@ -136,12 +127,7 @@ pub fn verify_groth16_proof_internal(
     // Load the cost parameters from the protocol config
     let (groth16_verify_groth16_proof_internal_cost_params, crypto_invalid_arguments_cost) = {
         let cost_table = &context.extensions().get::<NativesCostTable>();
-        (
-            cost_table
-                .groth16_verify_groth16_proof_internal_cost_params
-                .clone(),
-            cost_table.crypto_invalid_arguments_cost,
-        )
+        (cost_table.groth16_verify_groth16_proof_internal_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
     let bytes5 = pop_arg!(args, VectorRef);
     let proof_points = bytes5.as_bytes_ref();
@@ -165,16 +151,14 @@ pub fn verify_groth16_proof_internal(
 
     let (base_cost, cost_per_public_input, num_public_inputs) = match curve {
         BLS12381 => (
-            groth16_verify_groth16_proof_internal_cost_params
-                .groth16_verify_groth16_proof_internal_bls12381_cost_base,
+            groth16_verify_groth16_proof_internal_cost_params.groth16_verify_groth16_proof_internal_bls12381_cost_base,
             groth16_verify_groth16_proof_internal_cost_params
                 .groth16_verify_groth16_proof_internal_bls12381_cost_per_public_input,
             (public_proof_inputs.len() + fastcrypto::groups::bls12381::SCALAR_LENGTH - 1)
                 / fastcrypto::groups::bls12381::SCALAR_LENGTH,
         ),
         BN254 => (
-            groth16_verify_groth16_proof_internal_cost_params
-                .groth16_verify_groth16_proof_internal_bn254_cost_base,
+            groth16_verify_groth16_proof_internal_cost_params.groth16_verify_groth16_proof_internal_bn254_cost_base,
             groth16_verify_groth16_proof_internal_cost_params
                 .groth16_verify_groth16_proof_internal_bn254_cost_per_public_input,
             (public_proof_inputs.len() + fastcrypto_zkp::bn254::api::SCALAR_SIZE - 1)
@@ -183,12 +167,7 @@ pub fn verify_groth16_proof_internal(
         _ => {
             // Charge for failure but dont fail if we run out of gas otherwise the actual error is masked by OUT_OF_GAS error
             context.charge_gas(crypto_invalid_arguments_cost);
-            let cost = if context
-                .extensions()
-                .get::<ObjectRuntime>()
-                .protocol_config
-                .native_charging_v2()
-            {
+            let cost = if context.extensions().get::<ObjectRuntime>().protocol_config.native_charging_v2() {
                 context.gas_used()
             } else {
                 context.gas_budget()
@@ -211,9 +190,7 @@ pub fn verify_groth16_proof_internal(
 
     let result;
     if curve == BLS12381 {
-        if public_proof_inputs.len()
-            > fastcrypto::groups::bls12381::SCALAR_LENGTH * MAX_PUBLIC_INPUTS
-        {
+        if public_proof_inputs.len() > fastcrypto::groups::bls12381::SCALAR_LENGTH * MAX_PUBLIC_INPUTS {
             return Ok(NativeResult::err(cost, TOO_MANY_PUBLIC_INPUTS));
         }
         result = fastcrypto_zkp::bls12381::api::verify_groth16_in_bytes(
@@ -240,8 +217,5 @@ pub fn verify_groth16_proof_internal(
         return Ok(NativeResult::err(cost, INVALID_CURVE));
     }
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::bool(result.unwrap_or(false))],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(result.unwrap_or(false))]))
 }

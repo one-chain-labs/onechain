@@ -36,10 +36,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (sui, sender, recipient) = setup_for_write().await?;
 
     // we need to find the coin we will use as gas
-    let coins = sui
-        .coin_read_api()
-        .get_coins(sender, None, None, None)
-        .await?;
+    let coins = sui.coin_read_api().get_coins(sender, None, None, None).await?;
     let coin = coins.data.into_iter().next().unwrap();
 
     // programmable transactions allows the user to bundle a number of actions into one transaction
@@ -48,17 +45,11 @@ async fn main() -> Result<(), anyhow::Error> {
     // 2) split coin
     // the amount we want in the new coin, 1000 MIST
     let split_coint_amount = ptb.pure(1000u64)?; // note that we need to specify the u64 type
-    ptb.command(Command::SplitCoins(
-        Argument::GasCoin,
-        vec![split_coint_amount],
-    ));
+    ptb.command(Command::SplitCoins(Argument::GasCoin, vec![split_coint_amount]));
 
     // 3) transfer the new coin to a different address
     let argument_address = ptb.pure(recipient)?;
-    ptb.command(Command::TransferObjects(
-        vec![Argument::Result(0)],
-        argument_address,
-    ));
+    ptb.command(Command::TransferObjects(vec![Argument::Result(0)], argument_address));
 
     // finish building the transaction block by calling finish on the ptb
     let builder = ptb.finish();
@@ -66,13 +57,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let gas_budget = 5_000_000;
     let gas_price = sui.read_api().get_reference_gas_price().await?;
     // create the transaction data that will be sent to the network
-    let tx_data = TransactionData::new_programmable(
-        sender,
-        vec![coin.object_ref()],
-        builder,
-        gas_budget,
-        gas_price,
-    );
+    let tx_data = TransactionData::new_programmable(sender, vec![coin.object_ref()], builder, gas_budget, gas_price);
 
     // 4) sign transaction
     let keystore = FileBasedKeystore::new(&sui_config_dir()?.join(SUI_KEYSTORE_FILENAME))?;
@@ -91,14 +76,8 @@ async fn main() -> Result<(), anyhow::Error> {
     print!("done\n Transaction information: ");
     println!("{:?}", transaction_response);
 
-    let coins = sui
-        .coin_read_api()
-        .get_coins(recipient, None, None, None)
-        .await?;
+    let coins = sui.coin_read_api().get_coins(recipient, None, None, None).await?;
 
-    println!(
-        "After the transfer, the recipient address {recipient} has {} coins",
-        coins.data.len()
-    );
+    println!("After the transfer, the recipient address {recipient} has {} coins", coins.data.len());
     Ok(())
 }

@@ -1,23 +1,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_trait::async_trait;
-use std::path::Path;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
+use async_trait::async_trait;
 use move_core_types::account_address::AccountAddress;
 use sui_package_resolver::{
-    error::Error as PackageResolverError, Package, PackageStore, PackageStoreWithLruCache, Result,
+    error::Error as PackageResolverError,
+    Package,
+    PackageStore,
+    PackageStoreWithLruCache,
+    Result,
 };
 use sui_rpc_api::Client;
-use sui_types::base_types::ObjectID;
-use sui_types::object::Object;
+use sui_types::{base_types::ObjectID, object::Object};
 use thiserror::Error;
-use typed_store::rocks::{DBMap, MetricConf};
-use typed_store::traits::TableSummary;
-use typed_store::traits::TypedStoreDebug;
-use typed_store::DBMapUtils;
-use typed_store::{Map, TypedStoreError};
+use typed_store::{
+    rocks::{DBMap, MetricConf},
+    traits::{TableSummary, TypedStoreDebug},
+    DBMapUtils,
+    Map,
+    TypedStoreError,
+};
 
 const STORE: &str = "RocksDB";
 
@@ -30,10 +34,7 @@ pub enum Error {
 impl From<Error> for PackageResolverError {
     fn from(source: Error) -> Self {
         match source {
-            Error::TypedStore(store_error) => Self::Store {
-                store: STORE,
-                error: store_error.to_string(),
-            },
+            Error::TypedStore(store_error) => Self::Store { store: STORE, error: store_error.to_string() },
         }
     }
 }
@@ -45,18 +46,12 @@ pub struct PackageStoreTables {
 
 impl PackageStoreTables {
     pub fn new(path: &Path) -> Arc<Self> {
-        Arc::new(Self::open_tables_read_write(
-            path.to_path_buf(),
-            MetricConf::new("package"),
-            None,
-            None,
-        ))
+        Arc::new(Self::open_tables_read_write(path.to_path_buf(), MetricConf::new("package"), None, None))
     }
+
     pub(crate) fn update(&self, package: &Object) -> Result<()> {
         let mut batch = self.packages.batch();
-        batch
-            .insert_batch(&self.packages, std::iter::once((package.id(), package)))
-            .map_err(Error::TypedStore)?;
+        batch.insert_batch(&self.packages, std::iter::once((package.id(), package))).map_err(Error::TypedStore)?;
         batch.write().map_err(Error::TypedStore)?;
         Ok(())
     }
@@ -74,10 +69,7 @@ pub struct LocalDBPackageStore {
 
 impl LocalDBPackageStore {
     pub fn new(path: &Path, rest_url: &str) -> Self {
-        Self {
-            package_store_tables: PackageStoreTables::new(path),
-            fallback_client: Client::new(rest_url).unwrap(),
-        }
+        Self { package_store_tables: PackageStoreTables::new(path), fallback_client: Client::new(rest_url).unwrap() }
     }
 
     pub fn update(&self, object: &Object) -> Result<()> {
@@ -89,11 +81,8 @@ impl LocalDBPackageStore {
     }
 
     pub async fn get(&self, id: AccountAddress) -> Result<Object> {
-        let object = if let Some(object) = self
-            .package_store_tables
-            .packages
-            .get(&ObjectID::from(id))
-            .map_err(Error::TypedStore)?
+        let object = if let Some(object) =
+            self.package_store_tables.packages.get(&ObjectID::from(id)).map_err(Error::TypedStore)?
         {
             object
         } else {

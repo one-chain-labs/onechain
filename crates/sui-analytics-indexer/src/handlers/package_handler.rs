@@ -5,13 +5,10 @@ use anyhow::Result;
 use fastcrypto::encoding::{Base64, Encoding};
 use sui_data_ingestion_core::Worker;
 use sui_rpc_api::CheckpointData;
-use sui_types::full_checkpoint_content::CheckpointTransaction;
-use sui_types::object::Object;
+use sui_types::{full_checkpoint_content::CheckpointTransaction, object::Object};
 use tokio::sync::Mutex;
 
-use crate::handlers::AnalyticsHandler;
-use crate::tables::MovePackageEntry;
-use crate::FileType;
+use crate::{handlers::AnalyticsHandler, tables::MovePackageEntry, FileType};
 
 pub struct PackageHandler {
     state: Mutex<State>,
@@ -26,11 +23,7 @@ impl Worker for PackageHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions: checkpoint_transactions,
-            ..
-        } = checkpoint_data;
+        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
         let mut state = self.state.lock().await;
         for checkpoint_transaction in checkpoint_transactions {
             self.process_transaction(
@@ -68,6 +61,7 @@ impl PackageHandler {
         let state = Mutex::new(State { packages: vec![] });
         PackageHandler { state }
     }
+
     fn process_transaction(
         &self,
         epoch: u64,
@@ -81,6 +75,7 @@ impl PackageHandler {
         }
         Ok(())
     }
+
     fn process_package(
         &self,
         epoch: u64,

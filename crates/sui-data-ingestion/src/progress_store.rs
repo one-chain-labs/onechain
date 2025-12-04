@@ -1,15 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{str::FromStr, time::Duration};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use aws_config::timeout::TimeoutConfig;
-use aws_sdk_dynamodb::error::SdkError;
-use aws_sdk_dynamodb::types::AttributeValue;
-use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::{error::SdkError, types::AttributeValue, Client};
 use aws_sdk_s3::config::{Credentials, Region};
-use std::str::FromStr;
-use std::time::Duration;
 use sui_data_ingestion_core::ProgressStore;
 use sui_kvstore::BigTableProgressStore;
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
@@ -30,13 +28,7 @@ impl DynamoDBProgressStore {
         is_backfill: bool,
         bigtable_store: Option<BigTableProgressStore>,
     ) -> Self {
-        let credentials = Credentials::new(
-            aws_access_key_id,
-            aws_secret_access_key,
-            None,
-            None,
-            "dynamodb",
-        );
+        let credentials = Credentials::new(aws_access_key_id, aws_secret_access_key, None, None, "dynamodb");
         let timeout_config = TimeoutConfig::builder()
             .operation_timeout(Duration::from_secs(3))
             .operation_attempt_timeout(Duration::from_secs(10))
@@ -49,12 +41,7 @@ impl DynamoDBProgressStore {
             .load()
             .await;
         let client = Client::new(&aws_config);
-        Self {
-            client,
-            table_name,
-            is_backfill,
-            bigtable_store,
-        }
+        Self { client, table_name, is_backfill, bigtable_store }
     }
 }
 
@@ -75,19 +62,14 @@ impl ProgressStore for DynamoDBProgressStore {
         }
         Ok(0)
     }
-    async fn save(
-        &mut self,
-        task_name: String,
-        checkpoint_number: CheckpointSequenceNumber,
-    ) -> Result<()> {
+
+    async fn save(&mut self, task_name: String, checkpoint_number: CheckpointSequenceNumber) -> Result<()> {
         if self.is_backfill && checkpoint_number % 1000 != 0 {
             return Ok(());
         }
         if task_name == "bigtable" {
             if let Some(ref mut bigtable_store) = self.bigtable_store {
-                bigtable_store
-                    .save(task_name.clone(), checkpoint_number)
-                    .await?;
+                bigtable_store.save(task_name.clone(), checkpoint_number).await?;
             }
         }
         let backoff = backoff::ExponentialBackoff::default();
@@ -100,19 +82,12 @@ impl ProgressStore for DynamoDBProgressStore {
                 .update_expression("SET #nstate = :newState")
                 .condition_expression("#nstate < :newState")
                 .expression_attribute_names("#nstate", "nstate")
-                .expression_attribute_values(
-                    ":newState",
-                    AttributeValue::N(checkpoint_number.to_string()),
-                )
+                .expression_attribute_values(":newState", AttributeValue::N(checkpoint_number.to_string()))
                 .send()
                 .await;
             match result {
                 Ok(_) => Ok(()),
-                Err(SdkError::ServiceError(err))
-                    if err.err().is_conditional_check_failed_exception() =>
-                {
-                    Ok(())
-                }
+                Err(SdkError::ServiceError(err)) if err.err().is_conditional_check_failed_exception() => Ok(()),
                 Err(err) => Err(backoff::Error::transient(err)),
             }
         })

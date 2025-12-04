@@ -1,27 +1,40 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::drivers::Interval;
-use crate::system_state_observer::SystemStateObserver;
-use crate::workloads::payload::Payload;
-use crate::workloads::workload::{
-    ExpectedFailureType, WorkloadBuilder, ESTIMATED_COMPUTATION_COST, MAX_GAS_FOR_TESTING,
-    STORAGE_COST_PER_COIN,
-};
-use crate::workloads::{Gas, GasCoinConfig, Workload, WorkloadBuilderInfo, WorkloadParams};
-use crate::ExecutionEffects;
-use crate::ValidatorProxy;
+use std::{collections::HashMap, fmt, sync::Arc};
+
 use async_trait::async_trait;
 use rand::seq::IteratorRandom;
-use std::collections::HashMap;
-use std::fmt;
-use std::sync::Arc;
 use sui_core::test_utils::make_transfer_object_transaction;
-use sui_types::base_types::SuiAddress;
-use sui_types::crypto::{AccountKeyPair, Ed25519SuiSignature};
-use sui_types::signature::GenericSignature;
-use sui_types::{base_types::ObjectRef, crypto::get_key_pair, transaction::Transaction};
+use sui_types::{
+    base_types::{ObjectRef, SuiAddress},
+    crypto::{get_key_pair, AccountKeyPair, Ed25519SuiSignature},
+    signature::GenericSignature,
+    transaction::Transaction,
+};
 use tracing::debug;
+
+use crate::{
+    drivers::Interval,
+    system_state_observer::SystemStateObserver,
+    workloads::{
+        payload::Payload,
+        workload::{
+            ExpectedFailureType,
+            WorkloadBuilder,
+            ESTIMATED_COMPUTATION_COST,
+            MAX_GAS_FOR_TESTING,
+            STORAGE_COST_PER_COIN,
+        },
+        Gas,
+        GasCoinConfig,
+        Workload,
+        WorkloadBuilderInfo,
+        WorkloadParams,
+    },
+    ExecutionEffects,
+    ValidatorProxy,
+};
 
 #[derive(Debug, Clone)]
 pub struct ExpectedFailurePayload {
@@ -46,11 +59,9 @@ impl ExpectedFailurePayload {
             ExpectedFailureType::InvalidSignature => {
                 let signatures = tx.tx_signatures_mut_for_testing();
                 signatures.pop();
-                signatures.push(GenericSignature::Signature(
-                    sui_types::crypto::Signature::Ed25519SuiSignature(
-                        Ed25519SuiSignature::default(),
-                    ),
-                ));
+                signatures.push(GenericSignature::Signature(sui_types::crypto::Signature::Ed25519SuiSignature(
+                    Ed25519SuiSignature::default(),
+                )));
                 tx
             }
             ExpectedFailureType::Random => unreachable!(),
@@ -76,10 +87,7 @@ impl Payload for ExpectedFailurePayload {
             self.transfer_from,
             keypair,
             self.transfer_to,
-            self.system_state_observer
-                .state
-                .borrow()
-                .reference_gas_price,
+            self.system_state_observer.state.borrow().reference_gas_price,
         );
         self.create_failing_transaction(tx)
     }
@@ -119,24 +127,14 @@ impl ExpectedFailureWorkloadBuilder {
         if max_ops == 0 || num_workers == 0 {
             None
         } else {
-            let workload_params = WorkloadParams {
-                target_qps,
-                num_workers,
-                max_ops,
-                duration,
-                group,
-            };
-            let workload_builder = Box::<dyn WorkloadBuilder<dyn Payload>>::from(Box::new(
-                ExpectedFailureWorkloadBuilder {
+            let workload_params = WorkloadParams { target_qps, num_workers, max_ops, duration, group };
+            let workload_builder =
+                Box::<dyn WorkloadBuilder<dyn Payload>>::from(Box::new(ExpectedFailureWorkloadBuilder {
                     expected_failure_cfg,
                     num_payloads: max_ops,
                     num_transfer_accounts,
-                },
-            ));
-            let builder_info = WorkloadBuilderInfo {
-                workload_params,
-                workload_builder,
-            };
+                }));
+            let builder_info = WorkloadBuilderInfo { workload_params, workload_builder };
             Some(builder_info)
         }
     }
@@ -147,25 +145,21 @@ impl WorkloadBuilder<dyn Payload> for ExpectedFailureWorkloadBuilder {
     async fn generate_coin_config_for_init(&self) -> Vec<GasCoinConfig> {
         vec![]
     }
+
     async fn generate_coin_config_for_payloads(&self) -> Vec<GasCoinConfig> {
         let mut address_map = HashMap::new();
         // Have to include not just the coins that are going to be created and sent
         // but the coin being used as gas as well.
-        let amount = MAX_GAS_FOR_TESTING
-            + ESTIMATED_COMPUTATION_COST
-            + STORAGE_COST_PER_COIN * (self.num_transfer_accounts + 1);
+        let amount =
+            MAX_GAS_FOR_TESTING + ESTIMATED_COMPUTATION_COST + STORAGE_COST_PER_COIN * (self.num_transfer_accounts + 1);
         // gas for payloads
         let mut payload_configs = vec![];
-        for _i in 0..self.num_transfer_accounts {
+        for _i in 0 .. self.num_transfer_accounts {
             let (address, keypair) = get_key_pair();
             let cloned_keypair: Arc<AccountKeyPair> = Arc::new(keypair);
             address_map.insert(address, cloned_keypair.clone());
-            for _j in 0..self.num_payloads {
-                payload_configs.push(GasCoinConfig {
-                    amount,
-                    address,
-                    keypair: cloned_keypair.clone(),
-                });
+            for _j in 0 .. self.num_payloads {
+                payload_configs.push(GasCoinConfig { amount, address, keypair: cloned_keypair.clone() });
             }
         }
 
@@ -173,27 +167,17 @@ impl WorkloadBuilder<dyn Payload> for ExpectedFailureWorkloadBuilder {
 
         // transfer tokens
         let mut gas_configs = vec![];
-        for _i in 0..self.num_payloads {
+        for _i in 0 .. self.num_payloads {
             let (address, keypair) = (owner, address_map.get(&owner).unwrap().clone());
-            gas_configs.push(GasCoinConfig {
-                amount,
-                address,
-                keypair: keypair.clone(),
-            });
+            gas_configs.push(GasCoinConfig { amount, address, keypair: keypair.clone() });
         }
 
         gas_configs.extend(payload_configs);
         gas_configs
     }
-    async fn build(
-        &self,
-        _init_gas: Vec<Gas>,
-        payload_gas: Vec<Gas>,
-    ) -> Box<dyn Workload<dyn Payload>> {
-        debug!(
-            "Using `{:?}` expected failure workloads",
-            self.expected_failure_cfg.failure_type,
-        );
+
+    async fn build(&self, _init_gas: Vec<Gas>, payload_gas: Vec<Gas>) -> Box<dyn Workload<dyn Payload>> {
+        debug!("Using `{:?}` expected failure workloads", self.expected_failure_cfg.failure_type,);
 
         Box::<dyn Workload<dyn Payload>>::from(Box::new(ExpectedFailureWorkload {
             num_tokens: self.num_payloads,
@@ -227,26 +211,20 @@ impl Workload<dyn Payload> for ExpectedFailureWorkload {
         let (transfer_tokens, payload_gas) = self.payload_gas.split_at(self.num_tokens as usize);
         let mut gas_by_address: HashMap<SuiAddress, Vec<Gas>> = HashMap::new();
         for gas in payload_gas.iter() {
-            gas_by_address
-                .entry(gas.1)
-                .or_insert_with(|| Vec::with_capacity(1))
-                .push(gas.clone());
+            gas_by_address.entry(gas.1).or_insert_with(|| Vec::with_capacity(1)).push(gas.clone());
         }
 
         let addresses: Vec<SuiAddress> = gas_by_address.keys().cloned().collect();
         let mut transfer_gas: Vec<Vec<Gas>> = vec![];
-        for i in 0..self.num_tokens {
+        for i in 0 .. self.num_tokens {
             let mut account_transfer_gas = vec![];
             for address in addresses.iter() {
                 account_transfer_gas.push(gas_by_address[address][i as usize].clone());
             }
             transfer_gas.push(account_transfer_gas);
         }
-        let refs: Vec<(Vec<Gas>, Gas)> = transfer_gas
-            .into_iter()
-            .zip(transfer_tokens.iter())
-            .map(|(g, t)| (g, t.clone()))
-            .collect();
+        let refs: Vec<(Vec<Gas>, Gas)> =
+            transfer_gas.into_iter().zip(transfer_tokens.iter()).map(|(g, t)| (g, t.clone())).collect();
         refs.iter()
             .map(|(g, t)| {
                 let from = t.1;

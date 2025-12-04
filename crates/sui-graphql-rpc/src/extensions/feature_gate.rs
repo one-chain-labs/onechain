@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use async_graphql::{
     extensions::{Extension, ExtensionContext, ExtensionFactory, NextResolve, ResolveInfo},
-    ServerError, ServerResult, Value,
+    ServerError,
+    ServerResult,
+    Value,
 };
 use async_trait::async_trait;
 
@@ -31,21 +33,11 @@ impl Extension for FeatureGate {
         info: ResolveInfo<'_>,
         next: NextResolve<'_>,
     ) -> ServerResult<Option<Value>> {
-        let ResolveInfo {
-            parent_type,
-            name,
-            is_for_introspection,
-            ..
-        } = &info;
+        let ResolveInfo { parent_type, name, is_for_introspection, .. } = &info;
 
-        let ServiceConfig {
-            disabled_features, ..
-        } = ctx.data().map_err(|_| {
-            graphql_error(
-                code::INTERNAL_SERVER_ERROR,
-                "Unable to fetch service configuration",
-            )
-        })?;
+        let ServiceConfig { disabled_features, .. } = ctx
+            .data()
+            .map_err(|_| graphql_error(code::INTERNAL_SERVER_ERROR, "Unable to fetch service configuration"))?;
 
         // TODO: Is there a way to set `is_visible` on `MetaField` and `MetaType` in a generic way
         // after building the schema? (to a function which reads the `ServiceConfig` from the
@@ -83,9 +75,8 @@ mod tests {
     use async_graphql::{EmptySubscription, Schema};
     use expect_test::expect;
 
-    use crate::{functional_group::FunctionalGroup, mutation::Mutation, types::query::Query};
-
     use super::*;
+    use crate::{functional_group::FunctionalGroup, mutation::Mutation, types::query::Query};
 
     #[tokio::test]
     #[should_panic] // because it tries to access the data provider, which isn't there

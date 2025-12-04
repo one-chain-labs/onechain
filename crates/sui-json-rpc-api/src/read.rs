@@ -1,19 +1,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use jsonrpsee::core::RpcResult;
-use jsonrpsee::proc_macros::rpc;
-
-use sui_json_rpc_types::ProtocolConfigResponse;
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use sui_json_rpc_types::{
-    Checkpoint, CheckpointId, CheckpointPage, SuiEvent, SuiGetPastObjectRequest,
-    SuiObjectDataOptions, SuiObjectResponse, SuiPastObjectResponse, SuiTransactionBlockResponse,
+    Checkpoint,
+    CheckpointId,
+    CheckpointPage,
+    ProtocolConfigResponse,
+    SuiEvent,
+    SuiGetPastObjectRequest,
+    SuiObjectDataOptions,
+    SuiObjectResponse,
+    SuiPastObjectResponse,
+    SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
-    ZkLoginIntentScope, ZkLoginVerifyResult,
+    ZkLoginIntentScope,
+    ZkLoginVerifyResult,
 };
 use sui_open_rpc_macros::open_rpc;
-use sui_types::base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest};
-use sui_types::sui_serde::BigInt;
+use sui_types::{
+    base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest},
+    sui_serde::BigInt,
+};
 
 #[open_rpc(namespace = "sui", tag = "Read API")]
 #[rpc(server, client, namespace = "sui")]
@@ -174,5 +182,4 @@ pub trait ReadApi {
         /// The author of the signature.
         author: SuiAddress,
     ) -> RpcResult<ZkLoginVerifyResult>;
-
 }

@@ -1,7 +1,9 @@
-use super::types::proto_to_timestamp_ms;
-use super::types::timestamp_ms_to_proto;
-use super::TryFromProtoError;
 use tap::Pipe;
+
+use super::{
+    types::{proto_to_timestamp_ms, timestamp_ms_to_proto},
+    TryFromProtoError,
+};
 
 #[rustfmt::skip]
 #[path = "generated/sui.node.v2.rs"]
@@ -14,8 +16,9 @@ mod file_descriptor_set {
 
     #[cfg(test)]
     mod tests {
-        use super::FILE_DESCRIPTOR_SET;
         use prost::Message as _;
+
+        use super::FILE_DESCRIPTOR_SET;
 
         #[test]
         fn file_descriptor_set_is_valid() {
@@ -43,26 +46,13 @@ impl TryFrom<&BalanceChange> for sui_sdk_types::BalanceChange {
     type Error = TryFromProtoError;
 
     fn try_from(value: &BalanceChange) -> Result<Self, Self::Error> {
-        let address = value
-            .address
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("address"))?
-            .pipe(TryInto::try_into)?;
-        let coin_type = value
-            .coin_type
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("coin_type"))?
-            .pipe(TryInto::try_into)?;
-        let amount = value
-            .amount
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("amount"))?
-            .pipe(TryInto::try_into)?;
-        Ok(Self {
-            address,
-            coin_type,
-            amount,
-        })
+        let address =
+            value.address.as_ref().ok_or_else(|| TryFromProtoError::missing("address"))?.pipe(TryInto::try_into)?;
+        let coin_type =
+            value.coin_type.as_ref().ok_or_else(|| TryFromProtoError::missing("coin_type"))?.pipe(TryInto::try_into)?;
+        let amount =
+            value.amount.as_ref().ok_or_else(|| TryFromProtoError::missing("amount"))?.pipe(TryInto::try_into)?;
+        Ok(Self { address, coin_type, amount })
     }
 }
 
@@ -111,28 +101,17 @@ impl TryFrom<&GetNodeInfoResponse> for crate::types::NodeInfo {
             software_version,
         }: &GetNodeInfoResponse,
     ) -> Result<Self, Self::Error> {
-        let chain_id = chain_id
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("chain_id"))?
-            .pipe(TryInto::try_into)?;
-        let chain = chain
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("chain"))?
-            .to_owned()
-            .into();
-        let timestamp_ms = timestamp
-            .ok_or_else(|| TryFromProtoError::missing("timestamp"))?
-            .pipe(proto_to_timestamp_ms)?;
+        let chain_id =
+            chain_id.as_ref().ok_or_else(|| TryFromProtoError::missing("chain_id"))?.pipe(TryInto::try_into)?;
+        let chain = chain.as_ref().ok_or_else(|| TryFromProtoError::missing("chain"))?.to_owned().into();
+        let timestamp_ms =
+            timestamp.ok_or_else(|| TryFromProtoError::missing("timestamp"))?.pipe(proto_to_timestamp_ms)?;
 
         let epoch = epoch.ok_or_else(|| TryFromProtoError::missing("epoch"))?;
-        let checkpoint_height =
-            checkpoint_height.ok_or_else(|| TryFromProtoError::missing("checkpoint_height"))?;
+        let checkpoint_height = checkpoint_height.ok_or_else(|| TryFromProtoError::missing("checkpoint_height"))?;
 
-        let software_version = software_version
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("software_version"))?
-            .to_owned()
-            .into();
+        let software_version =
+            software_version.as_ref().ok_or_else(|| TryFromProtoError::missing("software_version"))?.to_owned().into();
 
         Self {
             chain_id,
@@ -154,17 +133,11 @@ impl TryFrom<&GetNodeInfoResponse> for crate::types::NodeInfo {
 
 impl GetObjectOptions {
     pub fn all() -> Self {
-        Self {
-            object: Some(true),
-            object_bcs: Some(true),
-        }
+        Self { object: Some(true), object_bcs: Some(true) }
     }
 
     pub fn none() -> Self {
-        Self {
-            object: Some(false),
-            object_bcs: Some(false),
-        }
+        Self { object: Some(false), object_bcs: Some(false) }
     }
 
     pub fn with_object(mut self) -> Self {
@@ -189,9 +162,7 @@ impl GetObjectOptions {
 }
 
 impl From<crate::types::GetObjectOptions> for GetObjectOptions {
-    fn from(
-        crate::types::GetObjectOptions { object, object_bcs }: crate::types::GetObjectOptions,
-    ) -> Self {
+    fn from(crate::types::GetObjectOptions { object, object_bcs }: crate::types::GetObjectOptions) -> Self {
         Self { object, object_bcs }
     }
 }
@@ -208,11 +179,7 @@ impl From<GetObjectOptions> for crate::types::GetObjectOptions {
 
 impl GetObjectRequest {
     pub fn new<T: Into<super::types::ObjectId>>(object_id: T) -> Self {
-        Self {
-            object_id: Some(object_id.into()),
-            version: None,
-            options: None,
-        }
+        Self { object_id: Some(object_id.into()), version: None, options: None }
     }
 
     pub fn with_version(mut self, version: u64) -> Self {
@@ -232,13 +199,7 @@ impl GetObjectRequest {
 
 impl From<crate::types::ObjectResponse> for GetObjectResponse {
     fn from(
-        crate::types::ObjectResponse {
-            object_id,
-            version,
-            digest,
-            object,
-            object_bcs,
-        }: crate::types::ObjectResponse,
+        crate::types::ObjectResponse { object_id, version, digest, object, object_bcs }: crate::types::ObjectResponse,
     ) -> Self {
         Self {
             object_id: Some(object_id.into()),
@@ -254,35 +215,17 @@ impl TryFrom<&GetObjectResponse> for crate::types::ObjectResponse {
     type Error = TryFromProtoError;
 
     fn try_from(
-        GetObjectResponse {
-            object_id,
-            version,
-            digest,
-            object,
-            object_bcs,
-        }: &GetObjectResponse,
+        GetObjectResponse { object_id, version, digest, object, object_bcs }: &GetObjectResponse,
     ) -> Result<Self, Self::Error> {
-        let object_id = object_id
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("object_id"))?
-            .pipe(TryInto::try_into)?;
+        let object_id =
+            object_id.as_ref().ok_or_else(|| TryFromProtoError::missing("object_id"))?.pipe(TryInto::try_into)?;
         let version = version.ok_or_else(|| TryFromProtoError::missing("version"))?;
-        let digest = digest
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("digest"))?
-            .pipe(TryInto::try_into)?;
+        let digest = digest.as_ref().ok_or_else(|| TryFromProtoError::missing("digest"))?.pipe(TryInto::try_into)?;
 
         let object = object.as_ref().map(TryInto::try_into).transpose()?;
         let object_bcs = object_bcs.as_ref().map(Into::into);
 
-        Self {
-            object_id,
-            version,
-            digest,
-            object,
-            object_bcs,
-        }
-        .pipe(Ok)
+        Self { object_id, version, digest, object, object_bcs }.pipe(Ok)
     }
 }
 
@@ -372,33 +315,15 @@ impl From<crate::types::GetCheckpointOptions> for GetCheckpointOptions {
             contents_bcs,
         }: crate::types::GetCheckpointOptions,
     ) -> Self {
-        Self {
-            summary,
-            summary_bcs,
-            signature,
-            contents,
-            contents_bcs,
-        }
+        Self { summary, summary_bcs, signature, contents, contents_bcs }
     }
 }
 
 impl From<GetCheckpointOptions> for crate::types::GetCheckpointOptions {
     fn from(
-        GetCheckpointOptions {
-            summary,
-            summary_bcs,
-            signature,
-            contents,
-            contents_bcs,
-        }: GetCheckpointOptions,
+        GetCheckpointOptions { summary, summary_bcs, signature, contents, contents_bcs }: GetCheckpointOptions,
     ) -> Self {
-        Self {
-            summary,
-            summary_bcs,
-            signature,
-            contents,
-            contents_bcs,
-        }
+        Self { summary, summary_bcs, signature, contents, contents_bcs }
     }
 }
 
@@ -408,27 +333,15 @@ impl From<GetCheckpointOptions> for crate::types::GetCheckpointOptions {
 
 impl GetCheckpointRequest {
     pub fn latest() -> Self {
-        Self {
-            sequence_number: None,
-            digest: None,
-            options: None,
-        }
+        Self { sequence_number: None, digest: None, options: None }
     }
 
     pub fn by_digest<T: Into<super::types::Digest>>(digest: T) -> Self {
-        Self {
-            sequence_number: None,
-            digest: Some(digest.into()),
-            options: None,
-        }
+        Self { sequence_number: None, digest: Some(digest.into()), options: None }
     }
 
     pub fn by_sequence_number(sequence_number: u64) -> Self {
-        Self {
-            sequence_number: Some(sequence_number),
-            digest: None,
-            options: None,
-        }
+        Self { sequence_number: Some(sequence_number), digest: None, options: None }
     }
 
     pub fn with_options(mut self, options: GetCheckpointOptions) -> Self {
@@ -562,16 +475,7 @@ impl From<crate::types::GetTransactionOptions> for GetTransactionOptions {
             events_bcs,
         }: crate::types::GetTransactionOptions,
     ) -> Self {
-        Self {
-            transaction,
-            transaction_bcs,
-            signatures,
-            signatures_bytes,
-            effects,
-            effects_bcs,
-            events,
-            events_bcs,
-        }
+        Self { transaction, transaction_bcs, signatures, signatures_bytes, effects, effects_bcs, events, events_bcs }
     }
 }
 
@@ -588,16 +492,7 @@ impl From<GetTransactionOptions> for crate::types::GetTransactionOptions {
             events_bcs,
         }: GetTransactionOptions,
     ) -> Self {
-        Self {
-            transaction,
-            transaction_bcs,
-            signatures,
-            signatures_bytes,
-            effects,
-            effects_bcs,
-            events,
-            events_bcs,
-        }
+        Self { transaction, transaction_bcs, signatures, signatures_bytes, effects, effects_bcs, events, events_bcs }
     }
 }
 
@@ -607,10 +502,7 @@ impl From<GetTransactionOptions> for crate::types::GetTransactionOptions {
 
 impl GetTransactionRequest {
     pub fn new<T: Into<super::types::Digest>>(digest: T) -> Self {
-        Self {
-            digest: Some(digest.into()),
-            options: None,
-        }
+        Self { digest: Some(digest.into()), options: None }
     }
 
     pub fn with_options(mut self, options: GetTransactionOptions) -> Self {
@@ -633,13 +525,7 @@ impl From<crate::types::ExecuteTransactionOptions> for ExecuteTransactionOptions
             balance_changes,
         }: crate::types::ExecuteTransactionOptions,
     ) -> Self {
-        Self {
-            effects,
-            effects_bcs,
-            events,
-            events_bcs,
-            balance_changes,
-        }
+        Self { effects, effects_bcs, events, events_bcs, balance_changes }
     }
 }
 
@@ -653,13 +539,7 @@ impl From<ExecuteTransactionOptions> for crate::types::ExecuteTransactionOptions
             balance_changes,
         }: ExecuteTransactionOptions,
     ) -> Self {
-        Self {
-            effects,
-            effects_bcs,
-            events,
-            events_bcs,
-            balance_changes,
-        }
+        Self { effects, effects_bcs, events, events_bcs, balance_changes }
     }
 }
 
@@ -945,27 +825,15 @@ impl From<GetFullCheckpointOptions> for crate::types::GetFullCheckpointOptions {
 
 impl GetFullCheckpointRequest {
     pub fn latest() -> Self {
-        Self {
-            sequence_number: None,
-            digest: None,
-            options: None,
-        }
+        Self { sequence_number: None, digest: None, options: None }
     }
 
     pub fn by_digest<T: Into<super::types::Digest>>(digest: T) -> Self {
-        Self {
-            sequence_number: None,
-            digest: Some(digest.into()),
-            options: None,
-        }
+        Self { sequence_number: None, digest: Some(digest.into()), options: None }
     }
 
     pub fn by_sequence_number(sequence_number: u64) -> Self {
-        Self {
-            sequence_number: Some(sequence_number),
-            digest: None,
-            options: None,
-        }
+        Self { sequence_number: Some(sequence_number), digest: None, options: None }
     }
 
     pub fn with_options(mut self, options: GetFullCheckpointOptions) -> Self {
@@ -994,13 +862,11 @@ impl From<crate::types::TransactionResponse> for GetTransactionResponse {
             timestamp_ms,
         }: crate::types::TransactionResponse,
     ) -> Self {
-        let signatures = signatures.map(|signatures| UserSignatures {
-            signatures: signatures.into_iter().map(Into::into).collect(),
-        });
+        let signatures =
+            signatures.map(|signatures| UserSignatures { signatures: signatures.into_iter().map(Into::into).collect() });
 
-        let signatures_bytes = signatures_bytes.map(|signatures| UserSignaturesBytes {
-            signatures: signatures.into_iter().map(Into::into).collect(),
-        });
+        let signatures_bytes = signatures_bytes
+            .map(|signatures| UserSignaturesBytes { signatures: signatures.into_iter().map(Into::into).collect() });
 
         Self {
             digest: Some(digest.into()),
@@ -1036,32 +902,19 @@ impl TryFrom<&GetTransactionResponse> for crate::types::TransactionResponse {
             timestamp,
         }: &GetTransactionResponse,
     ) -> Result<Self, Self::Error> {
-        let digest = digest
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("digest"))?
-            .pipe(TryInto::try_into)?;
+        let digest = digest.as_ref().ok_or_else(|| TryFromProtoError::missing("digest"))?.pipe(TryInto::try_into)?;
 
         let transaction = transaction.as_ref().map(TryInto::try_into).transpose()?;
         let transaction_bcs = transaction_bcs.as_ref().map(Into::into);
 
         let signatures = signatures
             .as_ref()
-            .map(|signatures| {
-                signatures
-                    .signatures
-                    .iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<Vec<_>, _>>()
-            })
+            .map(|signatures| signatures.signatures.iter().map(TryInto::try_into).collect::<Result<Vec<_>, _>>())
             .transpose()?;
 
-        let signatures_bytes = signatures_bytes.as_ref().map(|signatures| {
-            signatures
-                .signatures
-                .iter()
-                .map(|bytes| bytes.to_vec())
-                .collect()
-        });
+        let signatures_bytes = signatures_bytes
+            .as_ref()
+            .map(|signatures| signatures.signatures.iter().map(|bytes| bytes.to_vec()).collect());
 
         let effects = effects.as_ref().map(TryInto::try_into).transpose()?;
         let effects_bcs = effects_bcs.as_ref().map(Into::into);
@@ -1130,12 +983,8 @@ impl TryFrom<&GetCheckpointResponse> for crate::types::CheckpointResponse {
             contents_bcs,
         }: &GetCheckpointResponse,
     ) -> Result<Self, Self::Error> {
-        let sequence_number =
-            sequence_number.ok_or_else(|| TryFromProtoError::missing("sequence_number"))?;
-        let digest = digest
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("digest"))?
-            .pipe(TryInto::try_into)?;
+        let sequence_number = sequence_number.ok_or_else(|| TryFromProtoError::missing("sequence_number"))?;
+        let digest = digest.as_ref().ok_or_else(|| TryFromProtoError::missing("digest"))?.pipe(TryInto::try_into)?;
 
         let summary = summary.as_ref().map(TryInto::try_into).transpose()?;
         let summary_bcs = summary_bcs.as_ref().map(Into::into);
@@ -1145,16 +994,7 @@ impl TryFrom<&GetCheckpointResponse> for crate::types::CheckpointResponse {
         let contents = contents.as_ref().map(TryInto::try_into).transpose()?;
         let contents_bcs = contents_bcs.as_ref().map(Into::into);
 
-        Self {
-            sequence_number,
-            digest,
-            summary,
-            summary_bcs,
-            signature,
-            contents,
-            contents_bcs,
-        }
-        .pipe(Ok)
+        Self { sequence_number, digest, summary, summary_bcs, signature, contents, contents_bcs }.pipe(Ok)
     }
 }
 
@@ -1203,12 +1043,8 @@ impl TryFrom<&GetFullCheckpointResponse> for crate::types::FullCheckpointRespons
             transactions,
         }: &GetFullCheckpointResponse,
     ) -> Result<Self, Self::Error> {
-        let sequence_number =
-            sequence_number.ok_or_else(|| TryFromProtoError::missing("sequence_number"))?;
-        let digest = digest
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("digest"))?
-            .pipe(TryInto::try_into)?;
+        let sequence_number = sequence_number.ok_or_else(|| TryFromProtoError::missing("sequence_number"))?;
+        let digest = digest.as_ref().ok_or_else(|| TryFromProtoError::missing("digest"))?.pipe(TryInto::try_into)?;
 
         let summary = summary.as_ref().map(TryInto::try_into).transpose()?;
         let summary_bcs = summary_bcs.as_ref().map(Into::into);
@@ -1218,22 +1054,9 @@ impl TryFrom<&GetFullCheckpointResponse> for crate::types::FullCheckpointRespons
         let contents = contents.as_ref().map(TryInto::try_into).transpose()?;
         let contents_bcs = contents_bcs.as_ref().map(Into::into);
 
-        let transactions = transactions
-            .iter()
-            .map(TryInto::try_into)
-            .collect::<Result<_, _>>()?;
+        let transactions = transactions.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
 
-        Self {
-            sequence_number,
-            digest,
-            summary,
-            summary_bcs,
-            signature,
-            contents,
-            contents_bcs,
-            transactions,
-        }
-        .pipe(Ok)
+        Self { sequence_number, digest, summary, summary_bcs, signature, contents, contents_bcs, transactions }.pipe(Ok)
     }
 }
 
@@ -1265,35 +1088,17 @@ impl TryFrom<&FullCheckpointObject> for crate::types::FullCheckpointObject {
     type Error = TryFromProtoError;
 
     fn try_from(
-        FullCheckpointObject {
-            object_id,
-            version,
-            digest,
-            object,
-            object_bcs,
-        }: &FullCheckpointObject,
+        FullCheckpointObject { object_id, version, digest, object, object_bcs }: &FullCheckpointObject,
     ) -> Result<Self, Self::Error> {
-        let object_id = object_id
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("object_id"))?
-            .pipe(TryInto::try_into)?;
+        let object_id =
+            object_id.as_ref().ok_or_else(|| TryFromProtoError::missing("object_id"))?.pipe(TryInto::try_into)?;
         let version = version.ok_or_else(|| TryFromProtoError::missing("version"))?;
-        let digest = digest
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("digest"))?
-            .pipe(TryInto::try_into)?;
+        let digest = digest.as_ref().ok_or_else(|| TryFromProtoError::missing("digest"))?.pipe(TryInto::try_into)?;
 
         let object = object.as_ref().map(TryInto::try_into).transpose()?;
         let object_bcs = object_bcs.as_ref().map(Into::into);
 
-        Self {
-            object_id,
-            version,
-            digest,
-            object,
-            object_bcs,
-        }
-        .pipe(Ok)
+        Self { object_id, version, digest, object, object_bcs }.pipe(Ok)
     }
 }
 
@@ -1315,12 +1120,10 @@ impl From<crate::types::FullCheckpointTransaction> for FullCheckpointTransaction
             output_objects,
         }: crate::types::FullCheckpointTransaction,
     ) -> Self {
-        let input_objects = input_objects.map(|objects| FullCheckpointObjects {
-            objects: objects.into_iter().map(Into::into).collect(),
-        });
-        let output_objects = output_objects.map(|objects| FullCheckpointObjects {
-            objects: objects.into_iter().map(Into::into).collect(),
-        });
+        let input_objects = input_objects
+            .map(|objects| FullCheckpointObjects { objects: objects.into_iter().map(Into::into).collect() });
+        let output_objects = output_objects
+            .map(|objects| FullCheckpointObjects { objects: objects.into_iter().map(Into::into).collect() });
         Self {
             digest: Some(digest.into()),
             transaction: transaction.map(Into::into),
@@ -1351,10 +1154,7 @@ impl TryFrom<&FullCheckpointTransaction> for crate::types::FullCheckpointTransac
             output_objects,
         }: &FullCheckpointTransaction,
     ) -> Result<Self, Self::Error> {
-        let digest = digest
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("digest"))?
-            .pipe(TryInto::try_into)?;
+        let digest = digest.as_ref().ok_or_else(|| TryFromProtoError::missing("digest"))?.pipe(TryInto::try_into)?;
 
         let transaction = transaction.as_ref().map(TryInto::try_into).transpose()?;
         let transaction_bcs = transaction_bcs.as_ref().map(Into::into);
@@ -1367,24 +1167,12 @@ impl TryFrom<&FullCheckpointTransaction> for crate::types::FullCheckpointTransac
 
         let input_objects = input_objects
             .as_ref()
-            .map(|objects| {
-                objects
-                    .objects
-                    .iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<_, _>>()
-            })
+            .map(|objects| objects.objects.iter().map(TryInto::try_into).collect::<Result<_, _>>())
             .transpose()?;
 
         let output_objects = output_objects
             .as_ref()
-            .map(|objects| {
-                objects
-                    .objects
-                    .iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<_, _>>()
-            })
+            .map(|objects| objects.objects.iter().map(TryInto::try_into).collect::<Result<_, _>>())
             .transpose()?;
 
         Self {
@@ -1444,10 +1232,8 @@ impl TryFrom<&ExecuteTransactionResponse> for crate::types::ExecuteTransactionRe
             balance_changes,
         }: &ExecuteTransactionResponse,
     ) -> Result<Self, Self::Error> {
-        let finality = finality
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("finality"))?
-            .pipe(TryInto::try_into)?;
+        let finality =
+            finality.as_ref().ok_or_else(|| TryFromProtoError::missing("finality"))?.pipe(TryInto::try_into)?;
 
         let effects = effects.as_ref().map(TryInto::try_into).transpose()?;
         let effects_bcs = effects_bcs.as_ref().map(Into::into);
@@ -1458,23 +1244,11 @@ impl TryFrom<&ExecuteTransactionResponse> for crate::types::ExecuteTransactionRe
         let balance_changes = balance_changes
             .as_ref()
             .map(|balance_changes| {
-                balance_changes
-                    .balance_changes
-                    .iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<_, _>>()
+                balance_changes.balance_changes.iter().map(TryInto::try_into).collect::<Result<_, _>>()
             })
             .transpose()?;
 
-        Self {
-            finality,
-            effects,
-            effects_bcs,
-            events,
-            events_bcs,
-            balance_changes,
-        }
-        .pipe(Ok)
+        Self { finality, effects, effects_bcs, events, events_bcs, balance_changes }.pipe(Ok)
     }
 }
 
@@ -1484,8 +1258,7 @@ impl TryFrom<&ExecuteTransactionResponse> for crate::types::ExecuteTransactionRe
 
 impl From<crate::types::EffectsFinality> for crate::proto::node::EffectsFinality {
     fn from(value: crate::types::EffectsFinality) -> Self {
-        use crate::proto::node::effects_finality::Finality;
-        use crate::types::EffectsFinality::*;
+        use crate::{proto::node::effects_finality::Finality, types::EffectsFinality::*};
 
         let finality = match value {
             Certified { signature } => Finality::Certified(signature.into()),
@@ -1493,9 +1266,7 @@ impl From<crate::types::EffectsFinality> for crate::proto::node::EffectsFinality
             QuorumExecuted => Finality::QuorumExecuted(()),
         };
 
-        Self {
-            finality: Some(finality),
-        }
+        Self { finality: Some(finality) }
     }
 }
 
@@ -1505,17 +1276,9 @@ impl TryFrom<&crate::proto::node::EffectsFinality> for crate::types::EffectsFina
     fn try_from(value: &crate::proto::node::EffectsFinality) -> Result<Self, Self::Error> {
         use crate::proto::node::effects_finality::Finality;
 
-        match value
-            .finality
-            .as_ref()
-            .ok_or_else(|| crate::proto::TryFromProtoError::missing("finality"))?
-        {
-            Finality::Certified(signature) => Self::Certified {
-                signature: signature.try_into()?,
-            },
-            Finality::Checkpointed(checkpoint) => Self::Checkpointed {
-                checkpoint: *checkpoint,
-            },
+        match value.finality.as_ref().ok_or_else(|| crate::proto::TryFromProtoError::missing("finality"))? {
+            Finality::Certified(signature) => Self::Certified { signature: signature.try_into()? },
+            Finality::Checkpointed(checkpoint) => Self::Checkpointed { checkpoint: *checkpoint },
             Finality::QuorumExecuted(()) => Self::QuorumExecuted,
         }
         .pipe(Ok)
@@ -1527,15 +1290,10 @@ impl TryFrom<&crate::proto::node::EffectsFinality> for crate::types::EffectsFina
 // To be removed in 1.41
 /// Generated server implementations.
 pub mod node_server {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value
-    )]
-    use super::node_service_server::NodeService as Node;
+    #![allow(unused_variables, dead_code, missing_docs, clippy::wildcard_imports, clippy::let_unit_value)]
     use tonic::codegen::*;
+
+    use super::node_service_server::NodeService as Node;
     #[derive(Debug)]
     pub struct NodeServer<T> {
         inner: Arc<T>,
@@ -1548,6 +1306,7 @@ pub mod node_server {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
+
         pub fn from_arc(inner: Arc<T>) -> Self {
             Self {
                 inner,
@@ -1557,24 +1316,28 @@ pub mod node_server {
                 max_encoding_message_size: None,
             }
         }
+
         pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
         }
+
         /// Enable decompressing requests with the given encoding.
         #[must_use]
         pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.accept_compression_encodings.enable(encoding);
             self
         }
+
         /// Compress responses with the given encoding, if the client supports it.
         #[must_use]
         pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.send_compression_encodings.enable(encoding);
             self
         }
+
         /// Limits the maximum size of a decoded message.
         ///
         /// Default: `4MB`
@@ -1583,6 +1346,7 @@ pub mod node_server {
             self.max_decoding_message_size = Some(limit);
             self
         }
+
         /// Limits the maximum size of an encoded message.
         ///
         /// Default: `usize::MAX`
@@ -1598,31 +1362,27 @@ pub mod node_server {
         B: Body + std::marker::Send + 'static,
         B::Error: Into<StdError> + std::marker::Send + 'static,
     {
-        type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(
-            &mut self,
-            _cx: &mut Context<'_>,
-        ) -> Poll<std::result::Result<(), Self::Error>> {
+        type Response = http::Response<tonic::body::BoxBody>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
+
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
                 "/sui.node.v2.Node/GetNodeInfo" => {
                     #[allow(non_camel_case_types)]
                     struct GetNodeInfoSvc<T: Node>(pub Arc<T>);
                     impl<T: Node> tonic::server::UnaryService<()> for GetNodeInfoSvc<T> {
-                        type Response = super::GetNodeInfoResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Response = super::GetNodeInfoResponse;
+
                         fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Node>::get_node_info(
-                                    &inner,
-                                    request.map(|_| super::GetNodeInfoRequest {}),
-                                )
-                                .await
+                                <T as Node>::get_node_info(&inner, request.map(|_| super::GetNodeInfoRequest {})).await
                             };
                             Box::pin(fut)
                         }
@@ -1636,14 +1396,8 @@ pub mod node_server {
                         let method = GetNodeInfoSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
+                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1653,15 +1407,12 @@ pub mod node_server {
                     #[allow(non_camel_case_types)]
                     struct GetCommitteeSvc<T: Node>(pub Arc<T>);
                     impl<T: Node> tonic::server::UnaryService<super::GetCommitteeRequest> for GetCommitteeSvc<T> {
-                        type Response = super::GetCommitteeResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::GetCommitteeRequest>,
-                        ) -> Self::Future {
+                        type Response = super::GetCommitteeResponse;
+
+                        fn call(&mut self, request: tonic::Request<super::GetCommitteeRequest>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Node>::get_committee(&inner, request).await };
+                            let fut = async move { <T as Node>::get_committee(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1674,14 +1425,8 @@ pub mod node_server {
                         let method = GetCommitteeSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
+                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1691,12 +1436,10 @@ pub mod node_server {
                     #[allow(non_camel_case_types)]
                     struct GetObjectSvc<T: Node>(pub Arc<T>);
                     impl<T: Node> tonic::server::UnaryService<super::GetObjectRequest> for GetObjectSvc<T> {
-                        type Response = super::GetObjectResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::GetObjectRequest>,
-                        ) -> Self::Future {
+                        type Response = super::GetObjectResponse;
+
+                        fn call(&mut self, request: tonic::Request<super::GetObjectRequest>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move { <T as Node>::get_object(&inner, request).await };
                             Box::pin(fut)
@@ -1711,14 +1454,8 @@ pub mod node_server {
                         let method = GetObjectSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
+                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1728,15 +1465,12 @@ pub mod node_server {
                     #[allow(non_camel_case_types)]
                     struct GetTransactionSvc<T: Node>(pub Arc<T>);
                     impl<T: Node> tonic::server::UnaryService<super::GetTransactionRequest> for GetTransactionSvc<T> {
-                        type Response = super::GetTransactionResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::GetTransactionRequest>,
-                        ) -> Self::Future {
+                        type Response = super::GetTransactionResponse;
+
+                        fn call(&mut self, request: tonic::Request<super::GetTransactionRequest>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Node>::get_transaction(&inner, request).await };
+                            let fut = async move { <T as Node>::get_transaction(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1749,14 +1483,8 @@ pub mod node_server {
                         let method = GetTransactionSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
+                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1766,15 +1494,12 @@ pub mod node_server {
                     #[allow(non_camel_case_types)]
                     struct GetCheckpointSvc<T: Node>(pub Arc<T>);
                     impl<T: Node> tonic::server::UnaryService<super::GetCheckpointRequest> for GetCheckpointSvc<T> {
-                        type Response = super::GetCheckpointResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::GetCheckpointRequest>,
-                        ) -> Self::Future {
+                        type Response = super::GetCheckpointResponse;
+
+                        fn call(&mut self, request: tonic::Request<super::GetCheckpointRequest>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Node>::get_checkpoint(&inner, request).await };
+                            let fut = async move { <T as Node>::get_checkpoint(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1787,14 +1512,8 @@ pub mod node_server {
                         let method = GetCheckpointSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
+                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1803,19 +1522,13 @@ pub mod node_server {
                 "/sui.node.v2.Node/GetFullCheckpoint" => {
                     #[allow(non_camel_case_types)]
                     struct GetFullCheckpointSvc<T: Node>(pub Arc<T>);
-                    impl<T: Node> tonic::server::UnaryService<super::GetFullCheckpointRequest>
-                        for GetFullCheckpointSvc<T>
-                    {
-                        type Response = super::GetFullCheckpointResponse;
+                    impl<T: Node> tonic::server::UnaryService<super::GetFullCheckpointRequest> for GetFullCheckpointSvc<T> {
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::GetFullCheckpointRequest>,
-                        ) -> Self::Future {
+                        type Response = super::GetFullCheckpointResponse;
+
+                        fn call(&mut self, request: tonic::Request<super::GetFullCheckpointRequest>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Node>::get_full_checkpoint(&inner, request).await
-                            };
+                            let fut = async move { <T as Node>::get_full_checkpoint(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1828,14 +1541,8 @@ pub mod node_server {
                         let method = GetFullCheckpointSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
+                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1844,19 +1551,13 @@ pub mod node_server {
                 "/sui.node.v2.Node/ExecuteTransaction" => {
                     #[allow(non_camel_case_types)]
                     struct ExecuteTransactionSvc<T: Node>(pub Arc<T>);
-                    impl<T: Node> tonic::server::UnaryService<super::ExecuteTransactionRequest>
-                        for ExecuteTransactionSvc<T>
-                    {
-                        type Response = super::ExecuteTransactionResponse;
+                    impl<T: Node> tonic::server::UnaryService<super::ExecuteTransactionRequest> for ExecuteTransactionSvc<T> {
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ExecuteTransactionRequest>,
-                        ) -> Self::Future {
+                        type Response = super::ExecuteTransactionResponse;
+
+                        fn call(&mut self, request: tonic::Request<super::ExecuteTransactionRequest>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Node>::execute_transaction(&inner, request).await
-                            };
+                            let fut = async move { <T as Node>::execute_transaction(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1869,14 +1570,8 @@ pub mod node_server {
                         let method = ExecuteTransactionSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                            .apply_compression_config(accept_compression_encodings, send_compression_encodings)
+                            .apply_max_message_size_config(max_decoding_message_size, max_encoding_message_size);
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1885,14 +1580,8 @@ pub mod node_server {
                 _ => Box::pin(async move {
                     let mut response = http::Response::new(empty_body());
                     let headers = response.headers_mut();
-                    headers.insert(
-                        tonic::Status::GRPC_STATUS,
-                        (tonic::Code::Unimplemented as i32).into(),
-                    );
-                    headers.insert(
-                        http::header::CONTENT_TYPE,
-                        tonic::metadata::GRPC_CONTENT_TYPE,
-                    );
+                    headers.insert(tonic::Status::GRPC_STATUS, (tonic::Code::Unimplemented as i32).into());
+                    headers.insert(http::header::CONTENT_TYPE, tonic::metadata::GRPC_CONTENT_TYPE);
                     Ok(response)
                 }),
             }

@@ -1,18 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::backfill::backfill_instances::get_backfill_task;
-use crate::backfill::backfill_task::BackfillTask;
-use crate::backfill::BackfillTaskKind;
-use crate::config::BackFillConfig;
-use crate::database::ConnectionPool;
+use std::{collections::BTreeSet, ops::RangeInclusive, sync::Arc, time::Instant};
+
 use futures::StreamExt;
-use std::collections::BTreeSet;
-use std::ops::RangeInclusive;
-use std::sync::Arc;
-use std::time::Instant;
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
+
+use crate::{
+    backfill::{backfill_instances::get_backfill_task, backfill_task::BackfillTask, BackfillTaskKind},
+    config::BackFillConfig,
+    database::ConnectionPool,
+};
 
 pub struct BackfillRunner {}
 
@@ -89,6 +88,6 @@ fn create_chunk_iter(
     let end = *total_range.end();
     total_range.step_by(chunk_size).map(move |chunk_start| {
         let chunk_end = std::cmp::min(chunk_start + chunk_size - 1, end);
-        chunk_start..=chunk_end
+        chunk_start ..= chunk_end
     })
 }

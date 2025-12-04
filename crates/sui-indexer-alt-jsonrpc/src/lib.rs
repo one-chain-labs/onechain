@@ -9,8 +9,10 @@ use sui_pg_db::Db;
 use tokio::task::JoinHandle;
 use tracing::info;
 
-use crate::api::governance::{GovernanceImpl, GovernanceServer};
-use crate::args::Args;
+use crate::{
+    api::governance::{GovernanceImpl, GovernanceServer},
+    args::Args,
+};
 
 mod api;
 pub mod args;
@@ -39,10 +41,7 @@ impl RpcService {
     /// bind to its socket upon construction (and will fail if this is not possible), but will not
     /// accept connections until [Self::run] is called.
     pub async fn new(rpc_args: RpcArgs) -> anyhow::Result<Self> {
-        let RpcArgs {
-            listen_address,
-            max_rpc_connections,
-        } = rpc_args;
+        let RpcArgs { listen_address, max_rpc_connections } = rpc_args;
 
         let server = ServerBuilder::new()
             .http_only()
@@ -51,18 +50,13 @@ impl RpcService {
             .await
             .context("Failed to bind server")?;
 
-        Ok(Self {
-            server,
-            modules: RpcModule::new(()),
-        })
+        Ok(Self { server, modules: RpcModule::new(()) })
     }
 
     /// Add an [RpcModule] to the service. The module's methods are combined with the existing
     /// methods registered on the service, and the operation will fail if there is any overlap.
     pub fn add_module<M>(&mut self, module: RpcModule<M>) -> anyhow::Result<()> {
-        self.modules
-            .merge(module.remove_context())
-            .context("Failed to add module because of a name conflict")
+        self.modules.merge(module.remove_context()).context("Failed to add module because of a name conflict")
     }
 
     /// Start the service (it will accept connections) and return a handle that will resolve when
@@ -70,15 +64,11 @@ impl RpcService {
     pub async fn run(self) -> anyhow::Result<JoinHandle<()>> {
         let Self { server, modules } = self;
 
-        let listen_address = server
-            .local_addr()
-            .context("Can't start RPC service without listen address")?;
+        let listen_address = server.local_addr().context("Can't start RPC service without listen address")?;
 
         info!("Starting JSON-RPC service on {listen_address}",);
 
-        let handle = server
-            .start(modules)
-            .context("Failed to start JSON-RPC service")?;
+        let handle = server.start(modules).context("Failed to start JSON-RPC service")?;
 
         Ok(tokio::spawn(async move {
             handle.stopped().await;
@@ -88,23 +78,16 @@ impl RpcService {
 
 impl Default for RpcArgs {
     fn default() -> Self {
-        Self {
-            listen_address: "0.0.0.0:6000".parse().unwrap(),
-            max_rpc_connections: 100,
-        }
+        Self { listen_address: "0.0.0.0:6000".parse().unwrap(), max_rpc_connections: 100 }
     }
 }
 
 pub async fn start_rpc(args: Args) -> anyhow::Result<()> {
     let Args { db_args, rpc_args } = args;
 
-    let mut rpc = RpcService::new(rpc_args)
-        .await
-        .context("Failed to start RPC service")?;
+    let mut rpc = RpcService::new(rpc_args).await.context("Failed to start RPC service")?;
 
-    let db = Db::for_read(db_args)
-        .await
-        .context("Failed to connect to database")?;
+    let db = Db::for_read(db_args).await.context("Failed to connect to database")?;
 
     rpc.add_module(GovernanceImpl(db.clone()).into_rpc())?;
 
@@ -131,12 +114,9 @@ mod tests {
     }
 
     async fn test_service() -> RpcService {
-        RpcService::new(RpcArgs {
-            listen_address: test_listen_address(),
-            ..Default::default()
-        })
-        .await
-        .expect("Failed to create test JSON-RPC service")
+        RpcService::new(RpcArgs { listen_address: test_listen_address(), ..Default::default() })
+            .await
+            .expect("Failed to create test JSON-RPC service")
     }
 
     #[tokio::test]
@@ -159,10 +139,7 @@ mod tests {
 
         rpc.add_module(FooImpl.into_rpc()).unwrap();
 
-        assert_eq!(
-            BTreeSet::from_iter(rpc.modules.method_names()),
-            BTreeSet::from_iter(["test_bar"]),
-        )
+        assert_eq!(BTreeSet::from_iter(rpc.modules.method_names()), BTreeSet::from_iter(["test_bar"]),)
     }
 
     #[tokio::test]
@@ -192,10 +169,7 @@ mod tests {
 
         rpc.add_module(FooImpl.into_rpc()).unwrap();
 
-        assert_eq!(
-            BTreeSet::from_iter(rpc.modules.method_names()),
-            BTreeSet::from_iter(["test_bar", "test_baz"]),
-        )
+        assert_eq!(BTreeSet::from_iter(rpc.modules.method_names()), BTreeSet::from_iter(["test_bar", "test_baz"]),)
     }
 
     #[tokio::test]
@@ -232,10 +206,7 @@ mod tests {
         rpc.add_module(FooImpl.into_rpc()).unwrap();
         rpc.add_module(BarImpl.into_rpc()).unwrap();
 
-        assert_eq!(
-            BTreeSet::from_iter(rpc.modules.method_names()),
-            BTreeSet::from_iter(["test_bar", "test_baz"]),
-        )
+        assert_eq!(BTreeSet::from_iter(rpc.modules.method_names()), BTreeSet::from_iter(["test_bar", "test_baz"]),)
     }
 
     #[tokio::test]

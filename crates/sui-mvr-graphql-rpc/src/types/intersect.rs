@@ -5,11 +5,7 @@
 /// some combined value if there is some consistent combination, and `None` otherwise. The overall
 /// function returns `Some(None)`, if the filters combined to no filter, `Some(Some(f))` if the
 /// filters combined to `f`, and `None` if the filters couldn't be combined.
-pub(crate) fn field<T>(
-    this: Option<T>,
-    that: Option<T>,
-    merge: impl FnOnce(T, T) -> Option<T>,
-) -> Option<Option<T>> {
+pub(crate) fn field<T>(this: Option<T>, that: Option<T>, merge: impl FnOnce(T, T) -> Option<T>) -> Option<Option<T>> {
     match (this, that) {
         (None, None) => Some(None),
         (Some(this), None) => Some(Some(this)),

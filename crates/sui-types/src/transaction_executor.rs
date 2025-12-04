@@ -3,15 +3,14 @@
 
 use std::collections::BTreeMap;
 
-use crate::base_types::ObjectID;
-use crate::effects::TransactionEffects;
-use crate::effects::TransactionEvents;
-use crate::error::SuiError;
-use crate::object::Object;
-use crate::quorum_driver_types::ExecuteTransactionRequestV3;
-use crate::quorum_driver_types::ExecuteTransactionResponseV3;
-use crate::quorum_driver_types::QuorumDriverError;
-use crate::transaction::TransactionData;
+use crate::{
+    base_types::ObjectID,
+    effects::{TransactionEffects, TransactionEvents},
+    error::SuiError,
+    object::Object,
+    quorum_driver_types::{ExecuteTransactionRequestV3, ExecuteTransactionResponseV3, QuorumDriverError},
+    transaction::TransactionData,
+};
 
 /// Trait to define the interface for how the REST service interacts with a a QuorumDriver or a
 /// simulated transaction executor.
@@ -23,10 +22,7 @@ pub trait TransactionExecutor: Send + Sync {
         client_addr: Option<std::net::SocketAddr>,
     ) -> Result<ExecuteTransactionResponseV3, QuorumDriverError>;
 
-    fn simulate_transaction(
-        &self,
-        transaction: TransactionData,
-    ) -> Result<SimulateTransactionResult, SuiError>;
+    fn simulate_transaction(&self, transaction: TransactionData) -> Result<SimulateTransactionResult, SuiError>;
 }
 
 pub struct SimulateTransactionResult {

@@ -17,12 +17,11 @@ use sui_types::{
     object::MoveObject as NativeMoveObject,
 };
 
+use super::error::MoveRegistryError;
 use crate::{
     config::{MoveRegistryConfig, MOVE_REGISTRY_MODULE, MOVE_REGISTRY_TYPE},
     types::base64::Base64,
 };
-
-use super::error::MoveRegistryError;
 
 /// Regex to parse a dot move name. Version is optional (defaults to latest).
 /// For versioned format, the expected format is `@org/app/1` (1 == version).
@@ -30,8 +29,7 @@ use super::error::MoveRegistryError;
 ///
 /// The unbound regex can be used to search matches in a type tag.
 /// Use `VERSIONED_NAME_REGEX` for parsing a single name from a str.
-const VERSIONED_NAME_UNBOUND_REGEX: &str =
-    concat!(r"([a-z0-9.\-@]*)", r"\/", "([a-z0-9.-]*)", r"(?:\/(\d+))?",);
+const VERSIONED_NAME_UNBOUND_REGEX: &str = concat!(r"([a-z0-9.\-@]*)", r"\/", "([a-z0-9.-]*)", r"(?:\/(\d+))?",);
 
 /// Regex to parse a dot move name. Version is optional (defaults to latest).
 /// For versioned format, the expected format is `@org/app/1`.
@@ -39,22 +37,14 @@ const VERSIONED_NAME_UNBOUND_REGEX: &str =
 ///
 /// This regex is used to parse a single name (does not do type_tag matching).
 /// Use `VERSIONED_NAME_UNBOUND_REGEX` for type tag matching.
-const VERSIONED_NAME_REGEX: &str = concat!(
-    "^",
-    r"([a-z0-9.\-@]*)",
-    r"\/",
-    "([a-z0-9.-]*)",
-    r"(?:\/(\d+))?",
-    "$"
-);
+const VERSIONED_NAME_REGEX: &str = concat!("^", r"([a-z0-9.\-@]*)", r"\/", "([a-z0-9.-]*)", r"(?:\/(\d+))?", "$");
 
 /// A regular expression that detects all possible dot move names in a type tag.
 pub(crate) static VERSIONED_NAME_UNBOUND_REG: Lazy<Regex> =
     Lazy::new(|| Regex::new(VERSIONED_NAME_UNBOUND_REGEX).unwrap());
 
 /// A regular expression that detects a single name in the format `@org/app/1`.
-pub(crate) static VERSIONED_NAME_REG: Lazy<Regex> =
-    Lazy::new(|| Regex::new(VERSIONED_NAME_REGEX).unwrap());
+pub(crate) static VERSIONED_NAME_REG: Lazy<Regex> = Lazy::new(|| Regex::new(VERSIONED_NAME_REGEX).unwrap());
 
 /// An AppRecord entry in the DotMove service.
 /// Attention: The format of this struct should not change unless the on-chain format changes,
@@ -96,10 +86,7 @@ pub(crate) struct Name {
 
 impl Name {
     pub(crate) fn new(org: Domain, app: &str) -> Self {
-        Self {
-            org,
-            app: vec![app.to_string()],
-        }
+        Self { org, app: vec![app.to_string()] }
     }
 
     pub(crate) fn type_(package_address: SuiAddress) -> StructTag {
@@ -120,10 +107,7 @@ impl Name {
     }
 
     /// Generate the ObjectID for a given `Name`
-    pub(crate) fn to_dynamic_field_id(
-        &self,
-        config: &MoveRegistryConfig,
-    ) -> Result<ObjectID, bcs::Error> {
+    pub(crate) fn to_dynamic_field_id(&self, config: &MoveRegistryConfig) -> Result<ObjectID, bcs::Error> {
         let domain_type_tag = Self::type_(config.package_address);
 
         sui_types::dynamic_field::derive_dynamic_field_id(
@@ -147,8 +131,7 @@ impl FromStr for VersionedName {
         };
 
         // validate org_name by trying to cast our input to a Domain.
-        let domain = Domain::from_str(org_name)
-            .map_err(|_| MoveRegistryError::InvalidName(s.to_string()))?;
+        let domain = Domain::from_str(org_name).map_err(|_| MoveRegistryError::InvalidName(s.to_string()))?;
 
         let Some(app_name) = caps.get(2).map(|x| x.as_str()) else {
             return Err(MoveRegistryError::InvalidName(s.to_string()));
@@ -157,16 +140,10 @@ impl FromStr for VersionedName {
         // Validate our app's label.
         validate_label(app_name).map_err(|_| MoveRegistryError::InvalidName(s.to_string()))?;
 
-        let version: Option<u64> = caps
-            .get(3)
-            .map(|x| x.as_str().parse())
-            .transpose()
-            .map_err(|_| MoveRegistryError::InvalidVersion)?;
+        let version: Option<u64> =
+            caps.get(3).map(|x| x.as_str().parse()).transpose().map_err(|_| MoveRegistryError::InvalidVersion)?;
 
-        Ok(Self {
-            version,
-            name: Name::new(domain, app_name),
-        })
+        Ok(Self { version, name: Name::new(domain, app_name) })
     }
 }
 
@@ -183,45 +160,25 @@ impl TryFrom<NativeMoveObject> for AppRecord {
 
 #[cfg(test)]
 mod tests {
-    use super::VersionedName;
     use std::str::FromStr;
+
+    use super::VersionedName;
 
     #[test]
     fn parse_some_names() {
         let versioned = VersionedName::from_str("@org/app/1").unwrap();
         assert!(versioned.version.is_some_and(|x| x == 1));
 
-        assert!(VersionedName::from_str("@org/app/34")
-            .unwrap()
-            .version
-            .is_some_and(|x| x == 34));
-        assert!(VersionedName::from_str("@org/app")
-            .unwrap()
-            .version
-            .is_none());
+        assert!(VersionedName::from_str("@org/app/34").unwrap().version.is_some_and(|x| x == 34));
+        assert!(VersionedName::from_str("@org/app").unwrap().version.is_none());
 
-        let ok_names = vec![
-            "@org/1-app/1",
-            "@org/1-app/34",
-            "@org/1-app",
-            "nested@org/app",
-            "even.more.nested@org/app",
-        ];
+        let ok_names = vec!["@org/1-app/1", "@org/1-app/34", "@org/1-app", "nested@org/app", "even.more.nested@org/app"];
 
         let composite_ok_names = vec![
             format!("@org/{}/1", generate_fixed_string(63)),
             format!("@org/{}-app/34", generate_fixed_string(59)),
-            format!(
-                "@{}/{}",
-                generate_fixed_string(63),
-                generate_fixed_string(63)
-            ),
-            format!(
-                "@{}/{}-{}",
-                generate_fixed_string(63),
-                generate_fixed_string(30),
-                generate_fixed_string(30)
-            ),
+            format!("@{}/{}", generate_fixed_string(63), generate_fixed_string(63)),
+            format!("@{}/{}-{}", generate_fixed_string(63), generate_fixed_string(30), generate_fixed_string(30)),
         ];
 
         for name in ok_names {
@@ -253,24 +210,9 @@ mod tests {
             " ",
         ];
         let composite_err_names = vec![
-            format!(
-                "@{}{}--/{}",
-                generate_fixed_string(10),
-                generate_fixed_string(10),
-                generate_fixed_string(63)
-            ),
-            format!(
-                "@--{}-{}/{}",
-                generate_fixed_string(10),
-                generate_fixed_string(10),
-                generate_fixed_string(63)
-            ),
-            format!(
-                "@{}/--{}{}",
-                generate_fixed_string(63),
-                generate_fixed_string(30),
-                generate_fixed_string(30)
-            ),
+            format!("@{}{}--/{}", generate_fixed_string(10), generate_fixed_string(10), generate_fixed_string(63)),
+            format!("@--{}-{}/{}", generate_fixed_string(10), generate_fixed_string(10), generate_fixed_string(63)),
+            format!("@{}/--{}{}", generate_fixed_string(63), generate_fixed_string(30), generate_fixed_string(30)),
         ];
 
         for name in not_ok_names {
@@ -288,7 +230,7 @@ mod tests {
         let repeated_chars = chars.repeat(3);
 
         // Take the first 63 characters to form the string
-        let fixed_string = &repeated_chars[0..len];
+        let fixed_string = &repeated_chars[0 .. len];
 
         fixed_string.to_string()
     }

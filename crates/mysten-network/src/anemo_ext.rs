@@ -1,18 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anemo::codegen::BoxError;
-use anemo::codegen::BoxFuture;
-use anemo::codegen::Service;
-use anemo::types::PeerEvent;
-use anemo::Network;
-use anemo::PeerId;
-use anemo::Request;
-use anemo::Response;
-use bytes::Bytes;
-use futures::future::OptionFuture;
-use futures::FutureExt;
 use std::time::Instant;
+
+use anemo::{
+    codegen::{BoxError, BoxFuture, Service},
+    types::PeerEvent,
+    Network,
+    PeerId,
+    Request,
+    Response,
+};
+use bytes::Bytes;
+use futures::{future::OptionFuture, FutureExt};
 
 pub trait NetworkExt {
     fn waiting_peer(&self, peer_id: PeerId) -> WaitingPeer;
@@ -89,15 +89,12 @@ impl WaitingPeer {
 }
 
 impl Service<Request<Bytes>> for WaitingPeer {
-    type Response = Response<Bytes>;
     type Error = BoxError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Response = Response<Bytes>;
 
     #[inline]
-    fn poll_ready(
-        &mut self,
-        _: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
         std::task::Poll::Ready(Ok(()))
     }
 

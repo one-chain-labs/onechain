@@ -1,39 +1,49 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    check_completed_snapshot,
-    db_tool::{execute_db_tool_command, print_db_all_tables, DbToolCommand},
-    download_db_snapshot, download_formal_snapshot, dump_checkpoints_from_archive,
-    get_latest_available_epoch, get_object, get_transaction_block, make_clients,
-    restore_from_db_checkpoint, verify_archive, verify_archive_by_checksum, ConciseObjectOutput,
-    GroupedObjectOutput, SnapshotVerifyMode, VerboseObjectOutput,
-};
+use std::{collections::BTreeMap, env, path::PathBuf, sync::Arc};
+
 use anyhow::Result;
+use clap::*;
+use fastcrypto::encoding::Encoding;
 use futures::{future::join_all, StreamExt};
-use std::path::PathBuf;
-use std::{collections::BTreeMap, env, sync::Arc};
-use sui_config::genesis::Genesis;
-use sui_core::authority_client::AuthorityAPI;
+use sui_archival::{read_manifest_as_json, write_manifest_from_json};
+use sui_config::{
+    genesis::Genesis,
+    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
+    Config,
+};
+use sui_core::{authority_aggregator::AuthorityAggregatorBuilder, authority_client::AuthorityAPI};
 use sui_protocol_config::Chain;
 use sui_replay::{execute_replay_command, ReplayToolCommand};
 use sui_sdk::{rpc_types::SuiTransactionBlockResponseOptions, SuiClient, SuiClientBuilder};
+use sui_types::{
+    base_types::*,
+    crypto::AuthorityPublicKeyBytes,
+    messages_checkpoint::{CheckpointRequest, CheckpointResponse, CheckpointSequenceNumber},
+    messages_grpc::TransactionInfoRequest,
+    transaction::{SenderSignedData, Transaction},
+};
 use telemetry_subscribers::TracingHandle;
 
-use sui_types::{
-    base_types::*, crypto::AuthorityPublicKeyBytes, messages_grpc::TransactionInfoRequest,
+use crate::{
+    check_completed_snapshot,
+    db_tool::{execute_db_tool_command, print_db_all_tables, DbToolCommand},
+    download_db_snapshot,
+    download_formal_snapshot,
+    dump_checkpoints_from_archive,
+    get_latest_available_epoch,
+    get_object,
+    get_transaction_block,
+    make_clients,
+    restore_from_db_checkpoint,
+    verify_archive,
+    verify_archive_by_checksum,
+    ConciseObjectOutput,
+    GroupedObjectOutput,
+    SnapshotVerifyMode,
+    VerboseObjectOutput,
 };
-
-use clap::*;
-use fastcrypto::encoding::Encoding;
-use sui_archival::{read_manifest_as_json, write_manifest_from_json};
-use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
-use sui_config::Config;
-use sui_core::authority_aggregator::AuthorityAggregatorBuilder;
-use sui_types::messages_checkpoint::{
-    CheckpointRequest, CheckpointResponse, CheckpointSequenceNumber,
-};
-use sui_types::transaction::{SenderSignedData, Transaction};
 
 #[derive(Parser, Clone, ValueEnum)]
 pub enum Verbosity {
@@ -72,10 +82,7 @@ pub enum ToolCommand {
         #[arg(long, help = "Fetch object at a specific sequence")]
         version: Option<u64>,
 
-        #[arg(
-            long,
-            help = "Validator to fetch from - if not specified, all validators are queried"
-        )]
+        #[arg(long, help = "Validator to fetch from - if not specified, all validators are queried")]
         validator: Option<AuthorityName>,
 
         // RPC address to provide the up-to-date committee info
@@ -90,18 +97,10 @@ pub enum ToolCommand {
         ///      --genesis $HOME/.sui/sui_config/genesis.blob \
         ///      --verbosity concise --concise-no-header
         /// ```
-        #[arg(
-            value_enum,
-            long = "verbosity",
-            default_value = "grouped",
-            ignore_case = true
-        )]
+        #[arg(value_enum, long = "verbosity", default_value = "grouped", ignore_case = true)]
         verbosity: Verbosity,
 
-        #[arg(
-            long = "concise-no-header",
-            help = "don't show header in concise output"
-        )]
+        #[arg(long = "concise-no-header", help = "don't show header in concise output")]
         concise_no_header: bool,
     },
 
@@ -207,10 +206,7 @@ pub enum ToolCommand {
         #[arg(long = "genesis")]
         genesis: PathBuf,
 
-        #[arg(
-            long = "concise",
-            help = "show concise output - name, protocol key and network address"
-        )]
+        #[arg(long = "concise", help = "show concise output - name, protocol key and network address")]
         concise: bool,
     },
 
@@ -253,10 +249,7 @@ pub enum ToolCommand {
     DownloadDBSnapshot {
         #[clap(long = "epoch", conflicts_with = "latest")]
         epoch: Option<u64>,
-        #[clap(
-            long = "path",
-            help = "the path to write the downloaded snapshot files"
-        )]
+        #[clap(long = "path", help = "the path to write the downloaded snapshot files")]
         path: PathBuf,
         /// skip downloading indexes dir
         #[clap(long = "skip-indexes")]
@@ -283,10 +276,7 @@ pub enum ToolCommand {
         snapshot_bucket_type: Option<ObjectStoreType>,
         /// Path to snapshot directory on local filesystem.
         /// Only applicable if `--snapshot-bucket-type` is "file".
-        #[clap(
-            long = "snapshot-path",
-            help = "only used for testing, when --snapshot-bucket-type=FILE"
-        )]
+        #[clap(long = "snapshot-path", help = "only used for testing, when --snapshot-bucket-type=FILE")]
         snapshot_path: Option<PathBuf>,
         /// If true, no authentication is needed for snapshot restores
         #[clap(
@@ -410,10 +400,7 @@ pub enum ToolCommand {
         #[arg(long = "genesis")]
         genesis: PathBuf,
 
-        #[arg(
-            long,
-            help = "The Base64-encoding of the bcs bytes of SenderSignedData"
-        )]
+        #[arg(long, help = "The Base64-encoding of the bcs bytes of SenderSignedData")]
         sender_signed_data: String,
     },
 }
@@ -448,26 +435,15 @@ async fn check_locked_object(
         return Ok(());
     }
     println!("Object {} is rescueable, trying tx {}", id, tx_digest);
-    let validator = output
-        .grouped_results
-        .get(&Some(top_record))
-        .unwrap()
-        .first()
-        .unwrap();
+    let validator = output.grouped_results.get(&Some(top_record)).unwrap().first().unwrap();
     let client = &clients.get(validator).unwrap().1;
     let tx = client
-        .handle_transaction_info_request(TransactionInfoRequest {
-            transaction_digest: tx_digest,
-        })
+        .handle_transaction_info_request(TransactionInfoRequest { transaction_digest: tx_digest })
         .await?
         .transaction;
     let res = sui_client
         .quorum_driver_api()
-        .execute_transaction_block(
-            Transaction::new(tx),
-            SuiTransactionBlockResponseOptions::full_content(),
-            None,
-        )
+        .execute_transaction_block(Transaction::new(tx), SuiTransactionBlockResponseOptions::full_content(), None)
         .await;
     match res {
         Ok(_) => {
@@ -484,14 +460,8 @@ impl ToolCommand {
     #[allow(clippy::format_in_format_args)]
     pub async fn execute(self, tracing_handle: TracingHandle) -> Result<(), anyhow::Error> {
         match self {
-            ToolCommand::LockedObject {
-                id,
-                fullnode_rpc_url,
-                rescue,
-                address,
-            } => {
-                let sui_client =
-                    Arc::new(SuiClientBuilder::default().build(fullnode_rpc_url).await?);
+            ToolCommand::LockedObject { id, fullnode_rpc_url, rescue, address } => {
+                let sui_client = Arc::new(SuiClientBuilder::default().build(fullnode_rpc_url).await?);
                 let committee = Arc::new(
                     sui_client
                         .governance_api()
@@ -516,29 +486,13 @@ impl ToolCommand {
                 for ids in object_ids.chunks(30) {
                     let mut tasks = vec![];
                     for id in ids {
-                        tasks.push(check_locked_object(
-                            &sui_client,
-                            committee.clone(),
-                            *id,
-                            rescue,
-                        ))
+                        tasks.push(check_locked_object(&sui_client, committee.clone(), *id, rescue))
                     }
-                    join_all(tasks)
-                        .await
-                        .into_iter()
-                        .collect::<Result<Vec<_>, _>>()?;
+                    join_all(tasks).await.into_iter().collect::<Result<Vec<_>, _>>()?;
                 }
             }
-            ToolCommand::FetchObject {
-                id,
-                validator,
-                version,
-                fullnode_rpc_url,
-                verbosity,
-                concise_no_header,
-            } => {
-                let sui_client =
-                    Arc::new(SuiClientBuilder::default().build(fullnode_rpc_url).await?);
+            ToolCommand::FetchObject { id, validator, version, fullnode_rpc_url, verbosity, concise_no_header } => {
+                let sui_client = Arc::new(SuiClientBuilder::default().build(fullnode_rpc_url).await?);
                 let clients = Arc::new(make_clients(&sui_client).await?);
                 let output = get_object(id, version, validator, clients).await?;
 
@@ -566,15 +520,8 @@ impl ToolCommand {
                     }
                 }
             }
-            ToolCommand::FetchTransaction {
-                digest,
-                show_input_tx,
-                fullnode_rpc_url,
-            } => {
-                print!(
-                    "{}",
-                    get_transaction_block(digest, show_input_tx, fullnode_rpc_url).await?
-                );
+            ToolCommand::FetchTransaction { digest, show_input_tx, fullnode_rpc_url } => {
+                print!("{}", get_transaction_block(digest, show_input_tx, fullnode_rpc_url).await?);
             }
             ToolCommand::DbTool { db_path, cmd } => {
                 let path = PathBuf::from(db_path);
@@ -583,16 +530,9 @@ impl ToolCommand {
                     None => print_db_all_tables(path)?,
                 }
             }
-            ToolCommand::DumpPackages {
-                rpc_url,
-                output_dir,
-                before_checkpoint,
-                verbose,
-            } => {
+            ToolCommand::DumpPackages { rpc_url, output_dir, before_checkpoint, verbose } => {
                 if !verbose {
-                    tracing_handle
-                        .update_log("off")
-                        .expect("Failed to update log level");
+                    tracing_handle.update_log("off").expect("Failed to update log level");
                 }
 
                 sui_package_dump::dump(rpc_url, output_dir, before_checkpoint).await?;
@@ -619,26 +559,16 @@ impl ToolCommand {
                 let genesis = Genesis::load(genesis)?;
                 println!("{:#?}", genesis);
             }
-            ToolCommand::FetchCheckpoint {
-                sequence_number,
-                fullnode_rpc_url,
-            } => {
-                let sui_client =
-                    Arc::new(SuiClientBuilder::default().build(fullnode_rpc_url).await?);
+            ToolCommand::FetchCheckpoint { sequence_number, fullnode_rpc_url } => {
+                let sui_client = Arc::new(SuiClientBuilder::default().build(fullnode_rpc_url).await?);
                 let clients = make_clients(&sui_client).await?;
 
                 for (name, (_, client)) in clients {
                     let resp = client
-                        .handle_checkpoint(CheckpointRequest {
-                            sequence_number,
-                            request_content: true,
-                        })
+                        .handle_checkpoint(CheckpointRequest { sequence_number, request_content: true })
                         .await
                         .unwrap();
-                    let CheckpointResponse {
-                        checkpoint,
-                        contents,
-                    } = resp;
+                    let CheckpointResponse { checkpoint, contents } = resp;
                     println!("Validator: {:?}\n", name.concise());
                     println!("Checkpoint: {:?}\n", checkpoint);
                     println!("Content: {:?}\n", contents);
@@ -648,10 +578,7 @@ impl ToolCommand {
                 let config = crate::make_anemo_config();
                 anemo_cli::run(config, args).await
             }
-            ToolCommand::RestoreFromDBCheckpoint {
-                config_path,
-                db_checkpoint_path,
-            } => {
+            ToolCommand::RestoreFromDBCheckpoint { config_path, db_checkpoint_path } => {
                 let config = sui_config::NodeConfig::load(config_path)?;
                 restore_from_db_checkpoint(&config, &db_checkpoint_path).await?;
             }
@@ -671,31 +598,23 @@ impl ToolCommand {
                 all_checkpoints,
             } => {
                 if !verbose {
-                    tracing_handle
-                        .update_log("off")
-                        .expect("Failed to update log level");
+                    tracing_handle.update_log("off").expect("Failed to update log level");
                 }
-                let num_parallel_downloads = num_parallel_downloads.unwrap_or_else(|| {
-                    num_cpus::get()
-                        .checked_sub(1)
-                        .expect("Failed to get number of CPUs")
+                let num_parallel_downloads = num_parallel_downloads
+                    .unwrap_or_else(|| num_cpus::get().checked_sub(1).expect("Failed to get number of CPUs"));
+                let snapshot_bucket = snapshot_bucket.or_else(|| match (network, no_sign_request) {
+                    (Chain::Mainnet, false) => {
+                        Some(env::var("MAINNET_FORMAL_SIGNED_BUCKET").unwrap_or("mysten-mainnet-formal".to_string()))
+                    }
+                    (Chain::Mainnet, true) => env::var("MAINNET_FORMAL_UNSIGNED_BUCKET").ok(),
+                    (Chain::Testnet, true) => env::var("TESTNET_FORMAL_UNSIGNED_BUCKET").ok(),
+                    (Chain::Testnet, _) => {
+                        Some(env::var("TESTNET_FORMAL_SIGNED_BUCKET").unwrap_or("mysten-testnet-formal".to_string()))
+                    }
+                    (Chain::Unknown, _) => {
+                        panic!("Cannot generate default snapshot bucket for unknown network");
+                    }
                 });
-                let snapshot_bucket =
-                    snapshot_bucket.or_else(|| match (network, no_sign_request) {
-                        (Chain::Mainnet, false) => Some(
-                            env::var("MAINNET_FORMAL_SIGNED_BUCKET")
-                                .unwrap_or("mysten-mainnet-formal".to_string()),
-                        ),
-                        (Chain::Mainnet, true) => env::var("MAINNET_FORMAL_UNSIGNED_BUCKET").ok(),
-                        (Chain::Testnet, true) => env::var("TESTNET_FORMAL_UNSIGNED_BUCKET").ok(),
-                        (Chain::Testnet, _) => Some(
-                            env::var("TESTNET_FORMAL_SIGNED_BUCKET")
-                                .unwrap_or("mysten-testnet-formal".to_string()),
-                        ),
-                        (Chain::Unknown, _) => {
-                            panic!("Cannot generate default snapshot bucket for unknown network");
-                        }
-                    });
 
                 let aws_endpoint = env::var("AWS_SNAPSHOT_ENDPOINT").ok().or_else(|| {
                     if no_sign_request {
@@ -714,8 +633,7 @@ impl ToolCommand {
                 let snapshot_bucket_type = if no_sign_request {
                     ObjectStoreType::S3
                 } else {
-                    snapshot_bucket_type
-                        .expect("You must set either --snapshot-bucket-type or --no-sign-request")
+                    snapshot_bucket_type.expect("You must set either --snapshot-bucket-type or --no-sign-request")
                 };
                 let snapshot_store_config = match snapshot_bucket_type {
                     ObjectStoreType::S3 => ObjectStoreConfig {
@@ -725,12 +643,10 @@ impl ToolCommand {
                         aws_secret_access_key: env::var("AWS_SNAPSHOT_SECRET_ACCESS_KEY").ok(),
                         aws_region: env::var("AWS_SNAPSHOT_REGION").ok(),
                         aws_endpoint: aws_endpoint.filter(|s| !s.is_empty()),
-                        aws_virtual_hosted_style_request: env::var(
-                            "AWS_SNAPSHOT_VIRTUAL_HOSTED_REQUESTS",
-                        )
-                        .ok()
-                        .and_then(|b| b.parse().ok())
-                        .unwrap_or(no_sign_request),
+                        aws_virtual_hosted_style_request: env::var("AWS_SNAPSHOT_VIRTUAL_HOSTED_REQUESTS")
+                            .ok()
+                            .and_then(|b| b.parse().ok())
+                            .unwrap_or(no_sign_request),
                         object_store_connection_limit: 200,
                         no_sign_request,
                         ..Default::default()
@@ -738,8 +654,7 @@ impl ToolCommand {
                     ObjectStoreType::GCS => ObjectStoreConfig {
                         object_store: Some(ObjectStoreType::GCS),
                         bucket: snapshot_bucket,
-                        google_service_account: env::var("GCS_SNAPSHOT_SERVICE_ACCOUNT_FILE_PATH")
-                            .ok(),
+                        google_service_account: env::var("GCS_SNAPSHOT_SERVICE_ACCOUNT_FILE_PATH").ok(),
                         object_store_connection_limit: 200,
                         no_sign_request,
                         ..Default::default()
@@ -748,8 +663,7 @@ impl ToolCommand {
                         object_store: Some(ObjectStoreType::Azure),
                         bucket: snapshot_bucket,
                         azure_storage_account: env::var("AZURE_SNAPSHOT_STORAGE_ACCOUNT").ok(),
-                        azure_storage_access_key: env::var("AZURE_SNAPSHOT_STORAGE_ACCESS_KEY")
-                            .ok(),
+                        azure_storage_access_key: env::var("AZURE_SNAPSHOT_STORAGE_ACCESS_KEY").ok(),
                         object_store_connection_limit: 200,
                         no_sign_request,
                         ..Default::default()
@@ -762,22 +676,19 @@ impl ToolCommand {
                                 ..Default::default()
                             }
                         } else {
-                            panic!(
-                                "--snapshot-path must be specified for --snapshot-bucket-type=file"
-                            );
+                            panic!("--snapshot-path must be specified for --snapshot-bucket-type=file");
                         }
                     }
                 };
 
-                let archive_bucket = Some(
-                    env::var("FORMAL_SNAPSHOT_ARCHIVE_BUCKET").unwrap_or_else(|_| match network {
+                let archive_bucket =
+                    Some(env::var("FORMAL_SNAPSHOT_ARCHIVE_BUCKET").unwrap_or_else(|_| match network {
                         Chain::Mainnet => "mysten-mainnet-archives".to_string(),
                         Chain::Testnet => "mysten-testnet-archives".to_string(),
                         Chain::Unknown => {
                             panic!("Cannot generate default archive bucket for unknown network");
                         }
-                    }),
-                );
+                    }));
 
                 let mut custom_archive_enabled = false;
                 if let Ok(custom_archive_check) = env::var("CUSTOM_ARCHIVE_BUCKET") {
@@ -786,10 +697,7 @@ impl ToolCommand {
                     }
                 }
                 let archive_store_config = if custom_archive_enabled {
-                    let aws_region = Some(
-                        env::var("FORMAL_SNAPSHOT_ARCHIVE_REGION")
-                            .unwrap_or("us-west-2".to_string()),
-                    );
+                    let aws_region = Some(env::var("FORMAL_SNAPSHOT_ARCHIVE_REGION").unwrap_or("us-west-2".to_string()));
 
                     let archive_bucket_type = env::var("FORMAL_SNAPSHOT_ARCHIVE_BUCKET_TYPE").expect("If setting `CUSTOM_ARCHIVE_BUCKET=true` Must set FORMAL_SNAPSHOT_ARCHIVE_BUCKET_TYPE, and credentials");
                     match archive_bucket_type.to_ascii_lowercase().as_str()
@@ -841,30 +749,22 @@ impl ToolCommand {
                         bucket: archive_bucket.filter(|s| !s.is_empty()),
                         aws_region: Some("us-west-2".to_string()),
                         aws_endpoint: env::var("AWS_ARCHIVE_ENDPOINT").ok(),
-                        aws_virtual_hosted_style_request: env::var(
-                            "AWS_ARCHIVE_VIRTUAL_HOSTED_REQUESTS",
-                        )
-                        .ok()
-                        .and_then(|b| b.parse().ok())
-                        .unwrap_or(false),
+                        aws_virtual_hosted_style_request: env::var("AWS_ARCHIVE_VIRTUAL_HOSTED_REQUESTS")
+                            .ok()
+                            .and_then(|b| b.parse().ok())
+                            .unwrap_or(false),
                         object_store_connection_limit: 200,
                         no_sign_request: true,
                         ..Default::default()
                     }
                 };
-                let latest_available_epoch =
-                    latest.then_some(get_latest_available_epoch(&snapshot_store_config).await?);
-                let epoch_to_download = epoch.or(latest_available_epoch).expect(
-                    "Either pass epoch with --epoch <epoch_num> or use latest with --latest",
-                );
+                let latest_available_epoch = latest.then_some(get_latest_available_epoch(&snapshot_store_config).await?);
+                let epoch_to_download = epoch
+                    .or(latest_available_epoch)
+                    .expect("Either pass epoch with --epoch <epoch_num> or use latest with --latest");
 
-                if let Err(e) =
-                    check_completed_snapshot(&snapshot_store_config, epoch_to_download).await
-                {
-                    panic!(
-                        "Aborting snapshot restore: {}, snapshot may not be uploaded yet",
-                        e
-                    );
+                if let Err(e) = check_completed_snapshot(&snapshot_store_config, epoch_to_download).await {
+                    panic!("Aborting snapshot restore: {}, snapshot may not be uploaded yet", e);
                 }
 
                 let verify = verify.unwrap_or_default();
@@ -895,38 +795,29 @@ impl ToolCommand {
                 verbose,
             } => {
                 if !verbose {
-                    tracing_handle
-                        .update_log("off")
-                        .expect("Failed to update log level");
+                    tracing_handle.update_log("off").expect("Failed to update log level");
                 }
-                let num_parallel_downloads = num_parallel_downloads.unwrap_or_else(|| {
-                    num_cpus::get()
-                        .checked_sub(1)
-                        .expect("Failed to get number of CPUs")
+                let num_parallel_downloads = num_parallel_downloads
+                    .unwrap_or_else(|| num_cpus::get().checked_sub(1).expect("Failed to get number of CPUs"));
+                let snapshot_bucket = snapshot_bucket.or_else(|| match (network, no_sign_request) {
+                    (Chain::Mainnet, false) => {
+                        Some(env::var("MAINNET_DB_SIGNED_BUCKET").unwrap_or("mysten-mainnet-snapshots".to_string()))
+                    }
+                    (Chain::Mainnet, true) => env::var("MAINNET_DB_UNSIGNED_BUCKET").ok(),
+                    (Chain::Testnet, true) => env::var("TESTNET_DB_UNSIGNED_BUCKET").ok(),
+                    (Chain::Testnet, _) => {
+                        Some(env::var("TESTNET_DB_SIGNED_BUCKET").unwrap_or("mysten-testnet-snapshots".to_string()))
+                    }
+                    (Chain::Unknown, _) => {
+                        panic!("Cannot generate default snapshot bucket for unknown network");
+                    }
                 });
-                let snapshot_bucket =
-                    snapshot_bucket.or_else(|| match (network, no_sign_request) {
-                        (Chain::Mainnet, false) => Some(
-                            env::var("MAINNET_DB_SIGNED_BUCKET")
-                                .unwrap_or("mysten-mainnet-snapshots".to_string()),
-                        ),
-                        (Chain::Mainnet, true) => env::var("MAINNET_DB_UNSIGNED_BUCKET").ok(),
-                        (Chain::Testnet, true) => env::var("TESTNET_DB_UNSIGNED_BUCKET").ok(),
-                        (Chain::Testnet, _) => Some(
-                            env::var("TESTNET_DB_SIGNED_BUCKET")
-                                .unwrap_or("mysten-testnet-snapshots".to_string()),
-                        ),
-                        (Chain::Unknown, _) => {
-                            panic!("Cannot generate default snapshot bucket for unknown network");
-                        }
-                    });
 
                 let aws_endpoint = env::var("AWS_SNAPSHOT_ENDPOINT").ok();
                 let snapshot_bucket_type = if no_sign_request {
                     ObjectStoreType::S3
                 } else {
-                    snapshot_bucket_type
-                        .expect("You must set either --snapshot-bucket-type or --no-sign-request")
+                    snapshot_bucket_type.expect("You must set either --snapshot-bucket-type or --no-sign-request")
                 };
                 let snapshot_store_config = if no_sign_request {
                     let aws_endpoint = env::var("AWS_SNAPSHOT_ENDPOINT").ok().or_else(|| {
@@ -941,12 +832,10 @@ impl ToolCommand {
                     ObjectStoreConfig {
                         object_store: Some(ObjectStoreType::S3),
                         aws_endpoint: aws_endpoint.filter(|s| !s.is_empty()),
-                        aws_virtual_hosted_style_request: env::var(
-                            "AWS_SNAPSHOT_VIRTUAL_HOSTED_REQUESTS",
-                        )
-                        .ok()
-                        .and_then(|b| b.parse().ok())
-                        .unwrap_or(no_sign_request),
+                        aws_virtual_hosted_style_request: env::var("AWS_SNAPSHOT_VIRTUAL_HOSTED_REQUESTS")
+                            .ok()
+                            .and_then(|b| b.parse().ok())
+                            .unwrap_or(no_sign_request),
                         object_store_connection_limit: 200,
                         no_sign_request,
                         ..Default::default()
@@ -960,12 +849,10 @@ impl ToolCommand {
                             aws_secret_access_key: env::var("AWS_SNAPSHOT_SECRET_ACCESS_KEY").ok(),
                             aws_region: env::var("AWS_SNAPSHOT_REGION").ok(),
                             aws_endpoint: aws_endpoint.filter(|s| !s.is_empty()),
-                            aws_virtual_hosted_style_request: env::var(
-                                "AWS_SNAPSHOT_VIRTUAL_HOSTED_REQUESTS",
-                            )
-                            .ok()
-                            .and_then(|b| b.parse().ok())
-                            .unwrap_or(no_sign_request),
+                            aws_virtual_hosted_style_request: env::var("AWS_SNAPSHOT_VIRTUAL_HOSTED_REQUESTS")
+                                .ok()
+                                .and_then(|b| b.parse().ok())
+                                .unwrap_or(no_sign_request),
                             object_store_connection_limit: 200,
                             no_sign_request,
                             ..Default::default()
@@ -973,12 +860,8 @@ impl ToolCommand {
                         ObjectStoreType::GCS => ObjectStoreConfig {
                             object_store: Some(ObjectStoreType::GCS),
                             bucket: snapshot_bucket,
-                            google_service_account: env::var(
-                                "GCS_SNAPSHOT_SERVICE_ACCOUNT_FILE_PATH",
-                            )
-                            .ok(),
-                            google_project_id: env::var("GCS_SNAPSHOT_SERVICE_ACCOUNT_PROJECT_ID")
-                                .ok(),
+                            google_service_account: env::var("GCS_SNAPSHOT_SERVICE_ACCOUNT_FILE_PATH").ok(),
+                            google_project_id: env::var("GCS_SNAPSHOT_SERVICE_ACCOUNT_PROJECT_ID").ok(),
                             object_store_connection_limit: 200,
                             no_sign_request,
                             ..Default::default()
@@ -987,8 +870,7 @@ impl ToolCommand {
                             object_store: Some(ObjectStoreType::Azure),
                             bucket: snapshot_bucket,
                             azure_storage_account: env::var("AZURE_SNAPSHOT_STORAGE_ACCOUNT").ok(),
-                            azure_storage_access_key: env::var("AZURE_SNAPSHOT_STORAGE_ACCESS_KEY")
-                                .ok(),
+                            azure_storage_access_key: env::var("AZURE_SNAPSHOT_STORAGE_ACCESS_KEY").ok(),
                             object_store_connection_limit: 200,
                             no_sign_request,
                             ..Default::default()
@@ -1001,27 +883,19 @@ impl ToolCommand {
                                     ..Default::default()
                                 }
                             } else {
-                                panic!(
-                                "--snapshot-path must be specified for --snapshot-bucket-type=file"
-                            );
+                                panic!("--snapshot-path must be specified for --snapshot-bucket-type=file");
                             }
                         }
                     }
                 };
 
-                let latest_available_epoch =
-                    latest.then_some(get_latest_available_epoch(&snapshot_store_config).await?);
-                let epoch_to_download = epoch.or(latest_available_epoch).expect(
-                    "Either pass epoch with --epoch <epoch_num> or use latest with --latest",
-                );
+                let latest_available_epoch = latest.then_some(get_latest_available_epoch(&snapshot_store_config).await?);
+                let epoch_to_download = epoch
+                    .or(latest_available_epoch)
+                    .expect("Either pass epoch with --epoch <epoch_num> or use latest with --latest");
 
-                if let Err(e) =
-                    check_completed_snapshot(&snapshot_store_config, epoch_to_download).await
-                {
-                    panic!(
-                        "Aborting snapshot restore: {}, snapshot may not be uploaded yet",
-                        e
-                    );
+                if let Err(e) = check_completed_snapshot(&snapshot_store_config, epoch_to_download).await {
+                    panic!("Aborting snapshot restore: {}, snapshot may not be uploaded yet", e);
                 }
                 download_db_snapshot(
                     &path,
@@ -1032,62 +906,32 @@ impl ToolCommand {
                 )
                 .await?;
             }
-            ToolCommand::Replay {
-                rpc_url,
-                safety_checks,
-                cmd,
-                use_authority,
-                cfg_path,
-                chain,
-            } => {
-                execute_replay_command(rpc_url, safety_checks, use_authority, cfg_path, chain, cmd)
-                    .await?;
+            ToolCommand::Replay { rpc_url, safety_checks, cmd, use_authority, cfg_path, chain } => {
+                execute_replay_command(rpc_url, safety_checks, use_authority, cfg_path, chain, cmd).await?;
             }
-            ToolCommand::VerifyArchive {
-                genesis,
-                object_store_config,
-                download_concurrency,
-            } => {
+            ToolCommand::VerifyArchive { genesis, object_store_config, download_concurrency } => {
                 verify_archive(&genesis, object_store_config, download_concurrency, true).await?;
             }
-            ToolCommand::PrintArchiveManifest {
-                object_store_config,
-            } => {
+            ToolCommand::PrintArchiveManifest { object_store_config } => {
                 println!("{}", read_manifest_as_json(object_store_config).await?);
             }
-            ToolCommand::UpdateArchiveManifest {
-                object_store_config,
-                archive_json_path,
-            } => {
+            ToolCommand::UpdateArchiveManifest { object_store_config, archive_json_path } => {
                 write_manifest_from_json(object_store_config, archive_json_path).await?;
             }
-            ToolCommand::VerifyArchiveByChecksum {
-                object_store_config,
-                download_concurrency,
-            } => {
+            ToolCommand::VerifyArchiveByChecksum { object_store_config, download_concurrency } => {
                 verify_archive_by_checksum(object_store_config, download_concurrency).await?;
             }
-            ToolCommand::DumpArchiveByChecksum {
-                object_store_config,
-                start,
-                end,
-                max_content_length,
-            } => {
-                dump_checkpoints_from_archive(object_store_config, start, end, max_content_length)
-                    .await?;
+            ToolCommand::DumpArchiveByChecksum { object_store_config, start, end, max_content_length } => {
+                dump_checkpoints_from_archive(object_store_config, start, end, max_content_length).await?;
             }
-            ToolCommand::SignTransaction {
-                genesis,
-                sender_signed_data,
-            } => {
+            ToolCommand::SignTransaction { genesis, sender_signed_data } => {
                 let genesis = Genesis::load(genesis)?;
                 let sender_signed_data = bcs::from_bytes::<SenderSignedData>(
                     &fastcrypto::encoding::Base64::decode(sender_signed_data.as_str()).unwrap(),
                 )
                 .unwrap();
                 let transaction = Transaction::new(sender_signed_data);
-                let (agg, _) =
-                    AuthorityAggregatorBuilder::from_genesis(&genesis).build_network_clients();
+                let (agg, _) = AuthorityAggregatorBuilder::from_genesis(&genesis).build_network_clients();
                 let result = agg.process_transaction(transaction, None).await;
                 println!("{:?}", result);
             }

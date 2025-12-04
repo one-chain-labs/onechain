@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::manage_package::resolve_lock_file_path;
+use std::{fs, path::Path};
+
 use clap::Parser;
 use move_cli::base;
 use move_package::BuildConfig as MoveBuildConfig;
 use serde_json::json;
-use std::{fs, path::Path};
 use sui_move_build::{check_invalid_dependencies, check_unpublished_dependencies, BuildConfig};
+
+use crate::manage_package::resolve_lock_file_path;
 
 const LAYOUTS_DIR: &str = "layouts";
 const STRUCT_LAYOUTS_FILENAME: &str = "struct_layouts.yaml";
@@ -42,11 +44,7 @@ pub struct Build {
 }
 
 impl Build {
-    pub fn execute(
-        &self,
-        path: Option<&Path>,
-        build_config: MoveBuildConfig,
-    ) -> anyhow::Result<()> {
+    pub fn execute(&self, path: Option<&Path>, build_config: MoveBuildConfig) -> anyhow::Result<()> {
         let rerooted_path = base::reroot_path(path)?;
         let build_config = resolve_lock_file_path(build_config, Some(&rerooted_path))?;
         Self::execute_internal(
@@ -67,13 +65,8 @@ impl Build {
         generate_struct_layouts: bool,
         chain_id: Option<String>,
     ) -> anyhow::Result<()> {
-        let pkg = BuildConfig {
-            config,
-            run_bytecode_verifier: true,
-            print_diags_to_stderr: true,
-            chain_id,
-        }
-        .build(rerooted_path)?;
+        let pkg = BuildConfig { config, run_bytecode_verifier: true, print_diags_to_stderr: true, chain_id }
+            .build(rerooted_path)?;
         if dump_bytecode_as_base64 {
             check_invalid_dependencies(&pkg.dependency_ids.invalid)?;
             if !with_unpublished_deps {

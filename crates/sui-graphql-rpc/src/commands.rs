@@ -1,19 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use clap::*;
 use std::path::PathBuf;
+
+use clap::*;
 
 use crate::config::{ConnectionConfig, Ide, TxExecFullNodeConfig};
 
 #[derive(Parser)]
-#[clap(
-    name = "sui-graphql-rpc",
-    about = "Sui GraphQL RPC",
-    rename_all = "kebab-case",
-    author,
-    version
-)]
+#[clap(name = "sui-graphql-rpc", about = "Sui GraphQL RPC", rename_all = "kebab-case", author, version)]
 pub enum Command {
     /// Output a TOML config (suitable for passing into the --config parameter of the start-server
     /// command) with all values set to their defaults.

@@ -1,24 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sui_client_config::SuiClientConfig;
-use crate::SuiClient;
+use std::{collections::BTreeSet, path::Path, sync::Arc};
+
 use anyhow::anyhow;
 use shared_crypto::intent::Intent;
-use std::collections::BTreeSet;
-use std::path::Path;
-use std::sync::Arc;
 use sui_config::{Config, PersistedConfig};
 use sui_json_rpc_types::{
-    SuiObjectData, SuiObjectDataFilter, SuiObjectDataOptions, SuiObjectResponse,
-    SuiObjectResponseQuery, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
+    SuiObjectData,
+    SuiObjectDataFilter,
+    SuiObjectDataOptions,
+    SuiObjectResponse,
+    SuiObjectResponseQuery,
+    SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions,
 };
 use sui_keys::keystore::AccountKeystore;
-use sui_types::base_types::{ObjectID, ObjectRef, SuiAddress};
-use sui_types::crypto::SuiKeyPair;
-use sui_types::gas_coin::GasCoin;
-use sui_types::transaction::{Transaction, TransactionData, TransactionDataAPI};
+use sui_types::{
+    base_types::{ObjectID, ObjectRef, SuiAddress},
+    crypto::SuiKeyPair,
+    gas_coin::GasCoin,
+    transaction::{Transaction, TransactionData, TransactionDataAPI},
+};
 use tokio::sync::RwLock;
+
+use crate::{sui_client_config::SuiClientConfig, SuiClient};
 
 pub struct WalletContext {
     pub config: PersistedConfig<SuiClientConfig>,
@@ -33,20 +39,11 @@ impl WalletContext {
         request_timeout: Option<std::time::Duration>,
         max_concurrent_requests: Option<u64>,
     ) -> Result<Self, anyhow::Error> {
-        let config: SuiClientConfig = PersistedConfig::read(config_path).map_err(|err| {
-            anyhow!(
-                "Cannot open wallet config file at {:?}. Err: {err}",
-                config_path
-            )
-        })?;
+        let config: SuiClientConfig = PersistedConfig::read(config_path)
+            .map_err(|err| anyhow!("Cannot open wallet config file at {:?}. Err: {err}", config_path))?;
 
         let config = config.persisted(config_path);
-        let context = Self {
-            config,
-            request_timeout,
-            client: Default::default(),
-            max_concurrent_requests,
-        };
+        let context = Self { config, request_timeout, client: Default::default(), max_concurrent_requests };
         Ok(context)
     }
 
@@ -73,18 +70,13 @@ impl WalletContext {
     // TODO: Ger rid of mut
     pub fn active_address(&mut self) -> Result<SuiAddress, anyhow::Error> {
         if self.config.keystore.addresses().is_empty() {
-            return Err(anyhow!(
-                "No managed addresses. Create new address with `new-address` command."
-            ));
+            return Err(anyhow!("No managed addresses. Create new address with `new-address` command."));
         }
 
         // Ok to unwrap because we checked that config addresses not empty
         // Set it if not exists
-        self.config.active_address = Some(
-            self.config
-                .active_address
-                .unwrap_or(*self.config.keystore.addresses().first().unwrap()),
-        );
+        self.config.active_address =
+            Some(self.config.active_address.unwrap_or(*self.config.keystore.addresses().first().unwrap()));
 
         Ok(self.config.active_address.unwrap())
     }
@@ -101,10 +93,7 @@ impl WalletContext {
     }
 
     /// Get all the gas objects (and conveniently, gas amounts) for the address
-    pub async fn gas_objects(
-        &self,
-        address: SuiAddress,
-    ) -> Result<Vec<(u64, SuiObjectData)>, anyhow::Error> {
+    pub async fn gas_objects(&self, address: SuiAddress) -> Result<Vec<(u64, SuiObjectData)>, anyhow::Error> {
         let client = self.get_client().await?;
 
         let mut objects: Vec<SuiObjectResponse> = Vec::new();
@@ -153,16 +142,10 @@ impl WalletContext {
             .get_object_with_options(*id, SuiObjectDataOptions::new().with_owner())
             .await?
             .into_object()?;
-        Ok(object
-            .owner
-            .ok_or_else(|| anyhow!("Owner field is None"))?
-            .get_owner_address()?)
+        Ok(object.owner.ok_or_else(|| anyhow!("Owner field is None"))?.get_owner_address()?)
     }
 
-    pub async fn try_get_object_owner(
-        &self,
-        id: &Option<ObjectID>,
-    ) -> Result<Option<SuiAddress>, anyhow::Error> {
+    pub async fn try_get_object_owner(&self, id: &Option<ObjectID>) -> Result<Option<SuiAddress>, anyhow::Error> {
         if let Some(id) = id {
             Ok(Some(self.get_object_owner(id).await?))
         } else {
@@ -187,10 +170,7 @@ impl WalletContext {
         ))
     }
 
-    pub async fn get_all_gas_objects_owned_by_address(
-        &self,
-        address: SuiAddress,
-    ) -> anyhow::Result<Vec<ObjectRef>> {
+    pub async fn get_all_gas_objects_owned_by_address(&self, address: SuiAddress) -> anyhow::Result<Vec<ObjectRef>> {
         self.get_gas_objects_owned_by_address(address, None).await
     }
 
@@ -221,23 +201,14 @@ impl WalletContext {
 
     /// Given an address, return one gas object owned by this address.
     /// The actual implementation just returns the first one returned by the read api.
-    pub async fn get_one_gas_object_owned_by_address(
-        &self,
-        address: SuiAddress,
-    ) -> anyhow::Result<Option<ObjectRef>> {
-        Ok(self
-            .get_gas_objects_owned_by_address(address, Some(1))
-            .await?
-            .pop())
+    pub async fn get_one_gas_object_owned_by_address(&self, address: SuiAddress) -> anyhow::Result<Option<ObjectRef>> {
+        Ok(self.get_gas_objects_owned_by_address(address, Some(1)).await?.pop())
     }
 
     /// Returns one address and all gas objects owned by that address.
     pub async fn get_one_account(&self) -> anyhow::Result<(SuiAddress, Vec<ObjectRef>)> {
         let address = self.get_addresses().pop().unwrap();
-        Ok((
-            address,
-            self.get_all_gas_objects_owned_by_address(address).await?,
-        ))
+        Ok((address, self.get_all_gas_objects_owned_by_address(address).await?))
     }
 
     /// Return a gas object owned by an arbitrary address managed by the wallet.
@@ -251,17 +222,10 @@ impl WalletContext {
     }
 
     /// Returns all the account addresses managed by the wallet and their owned gas objects.
-    pub async fn get_all_accounts_and_gas_objects(
-        &self,
-    ) -> anyhow::Result<Vec<(SuiAddress, Vec<ObjectRef>)>> {
+    pub async fn get_all_accounts_and_gas_objects(&self) -> anyhow::Result<Vec<(SuiAddress, Vec<ObjectRef>)>> {
         let mut result = vec![];
         for address in self.get_addresses() {
-            let objects = self
-                .gas_objects(address)
-                .await?
-                .into_iter()
-                .map(|(_, o)| o.object_ref())
-                .collect();
+            let objects = self.gas_objects(address).await?.into_iter().map(|(_, o)| o.object_ref()).collect();
             result.push((address, objects));
         }
         Ok(result)
@@ -280,38 +244,24 @@ impl WalletContext {
 
     /// Sign a transaction with a key currently managed by the WalletContext
     pub fn sign_transaction(&self, data: &TransactionData) -> Transaction {
-        let sig = self
-            .config
-            .keystore
-            .sign_secure(&data.sender(), data, Intent::sui_transaction())
-            .unwrap();
+        let sig = self.config.keystore.sign_secure(&data.sender(), data, Intent::sui_transaction()).unwrap();
         // TODO: To support sponsored transaction, we should also look at the gas owner.
         Transaction::from_data(data.clone(), vec![sig])
     }
 
     /// Execute a transaction and wait for it to be locally executed on the fullnode.
     /// Also expects the effects status to be ExecutionStatus::Success.
-    pub async fn execute_transaction_must_succeed(
-        &self,
-        tx: Transaction,
-    ) -> SuiTransactionBlockResponse {
+    pub async fn execute_transaction_must_succeed(&self, tx: Transaction) -> SuiTransactionBlockResponse {
         tracing::debug!("Executing transaction: {:?}", tx);
         let response = self.execute_transaction_may_fail(tx).await.unwrap();
-        assert!(
-            response.status_ok().unwrap(),
-            "Transaction failed: {:?}",
-            response
-        );
+        assert!(response.status_ok().unwrap(), "Transaction failed: {:?}", response);
         response
     }
 
     /// Execute a transaction and wait for it to be locally executed on the fullnode.
     /// The transaction execution is not guaranteed to succeed and may fail. This is usually only
     /// needed in non-test environment or the caller is explicitly testing some failure behavior.
-    pub async fn execute_transaction_may_fail(
-        &self,
-        tx: Transaction,
-    ) -> anyhow::Result<SuiTransactionBlockResponse> {
+    pub async fn execute_transaction_may_fail(&self, tx: Transaction) -> anyhow::Result<SuiTransactionBlockResponse> {
         let client = self.get_client().await?;
         Ok(client
             .quorum_driver_api()

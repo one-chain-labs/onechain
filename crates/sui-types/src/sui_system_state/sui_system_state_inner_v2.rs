@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use serde::{Deserialize, Serialize};
+
 use super::{
     epoch_start_sui_system_state::EpochStartValidatorInfoV1,
     sui_system_state_inner_v1::ValidatorV1,
@@ -21,7 +23,6 @@ use crate::{
         sui_system_state_inner_v1::{StakeSubsidyV1, StorageFundV1, SuiSupperCommittee, ValidatorSetV1},
     },
 };
-use serde::{Deserialize, Serialize};
 
 /// Rust version of the Move sui::sui_system::SystemParametersV2 type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]

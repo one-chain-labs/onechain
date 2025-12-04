@@ -1,5 +1,6 @@
-use super::TryFromProtoError;
 use tap::Pipe;
+
+use super::TryFromProtoError;
 
 //
 // Identifier
@@ -7,9 +8,7 @@ use tap::Pipe;
 
 impl From<sui_sdk_types::Identifier> for super::Identifier {
     fn from(value: sui_sdk_types::Identifier) -> Self {
-        Self {
-            identifier: Some(value.into_inner().into()),
-        }
+        Self { identifier: Some(value.into_inner().into()) }
     }
 }
 
@@ -45,33 +44,14 @@ impl TryFrom<&super::StructTag> for sui_sdk_types::StructTag {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::StructTag) -> Result<Self, Self::Error> {
-        let address = value
-            .address
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("address"))?
-            .pipe(TryFrom::try_from)?;
-        let module = value
-            .module
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("module"))?
-            .pipe(TryFrom::try_from)?;
-        let name = value
-            .name
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("name"))?
-            .pipe(TryFrom::try_from)?;
-        let type_params = value
-            .type_parameters
-            .iter()
-            .map(TryInto::try_into)
-            .collect::<Result<_, _>>()?;
+        let address =
+            value.address.as_ref().ok_or_else(|| TryFromProtoError::missing("address"))?.pipe(TryFrom::try_from)?;
+        let module =
+            value.module.as_ref().ok_or_else(|| TryFromProtoError::missing("module"))?.pipe(TryFrom::try_from)?;
+        let name = value.name.as_ref().ok_or_else(|| TryFromProtoError::missing("name"))?.pipe(TryFrom::try_from)?;
+        let type_params = value.type_parameters.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
 
-        Ok(Self {
-            address,
-            module,
-            name,
-            type_params,
-        })
+        Ok(Self { address, module, name, type_params })
     }
 }
 
@@ -81,8 +61,9 @@ impl TryFrom<&super::StructTag> for sui_sdk_types::StructTag {
 
 impl From<sui_sdk_types::TypeTag> for super::TypeTag {
     fn from(value: sui_sdk_types::TypeTag) -> Self {
-        use super::type_tag::Tag;
         use sui_sdk_types::TypeTag;
+
+        use super::type_tag::Tag;
 
         let tag = match value {
             TypeTag::U8 => Tag::U8(()),
@@ -108,11 +89,7 @@ impl TryFrom<&super::TypeTag> for sui_sdk_types::TypeTag {
     fn try_from(value: &super::TypeTag) -> Result<Self, Self::Error> {
         use super::type_tag::Tag;
 
-        match value
-            .tag
-            .as_ref()
-            .ok_or_else(|| TryFromProtoError::missing("type_tag"))?
-        {
+        match value.tag.as_ref().ok_or_else(|| TryFromProtoError::missing("type_tag"))? {
             Tag::U8(()) => Self::U8,
             Tag::U16(()) => Self::U16,
             Tag::U32(()) => Self::U32,

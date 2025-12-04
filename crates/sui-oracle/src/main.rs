@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, time::Duration};
+
 use clap::Parser;
 use mysten_metrics::start_prometheus_server;
-use std::path::PathBuf;
-use std::time::Duration;
 use sui_config::Config;
 use sui_oracle::{config::OracleNodeConfig, OracleNode};
 use sui_sdk::wallet_context::WalletContext;
@@ -37,20 +37,12 @@ async fn main() -> anyhow::Result<()> {
     let prometheus_registry = registry_service.default_registry();
 
     // Init logging
-    let (_guard, _filter_handle) = telemetry_subscribers::TelemetryConfig::new()
-        .with_env()
-        .with_prom_registry(&prometheus_registry)
-        .init();
+    let (_guard, _filter_handle) =
+        telemetry_subscribers::TelemetryConfig::new().with_env().with_prom_registry(&prometheus_registry).init();
 
-    OracleNode::new(
-        config.upload_feeds,
-        config.gas_object_id,
-        config.download_feeds,
-        wallet_ctx,
-        prometheus_registry,
-    )
-    .run()
-    .await?;
+    OracleNode::new(config.upload_feeds, config.gas_object_id, config.download_feeds, wallet_ctx, prometheus_registry)
+        .run()
+        .await?;
 
     Ok(())
 }

@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
-use clap::Parser;
 use std::path::{Path, PathBuf};
 
+use anyhow::bail;
+use clap::Parser;
 use move_cli::base;
 use move_package::{
     lock_file::{self, LockFile},
@@ -43,15 +43,9 @@ pub struct ManagePackage {
 }
 
 impl ManagePackage {
-    pub fn execute(
-        self,
-        package_path: Option<&Path>,
-        build_config: BuildConfig,
-    ) -> anyhow::Result<()> {
+    pub fn execute(self, package_path: Option<&Path>, build_config: BuildConfig) -> anyhow::Result<()> {
         let build_config = resolve_lock_file_path(build_config, package_path)?;
-        let Some(lock_file) = build_config.lock_file else {
-            bail!(NO_LOCK_FILE)
-        };
+        let Some(lock_file) = build_config.lock_file else { bail!(NO_LOCK_FILE) };
         if !lock_file.exists() {
             bail!(NO_LOCK_FILE)
         };

@@ -3,15 +3,11 @@
 
 use anyhow::Result;
 use sui_data_ingestion_core::Worker;
+use sui_rpc_api::CheckpointData;
+use sui_types::{base_types::ObjectID, transaction::TransactionDataAPI};
 use tokio::sync::Mutex;
 
-use sui_rpc_api::CheckpointData;
-use sui_types::base_types::ObjectID;
-use sui_types::transaction::TransactionDataAPI;
-
-use crate::handlers::AnalyticsHandler;
-use crate::tables::MoveCallEntry;
-use crate::FileType;
+use crate::{handlers::AnalyticsHandler, tables::MoveCallEntry, FileType};
 
 pub struct MoveCallHandler {
     state: Mutex<State>,
@@ -26,17 +22,10 @@ impl Worker for MoveCallHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions: checkpoint_transactions,
-            ..
-        } = checkpoint_data;
+        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
         let mut state = self.state.lock().await;
         for checkpoint_transaction in checkpoint_transactions {
-            let move_calls = checkpoint_transaction
-                .transaction
-                .transaction_data()
-                .move_calls();
+            let move_calls = checkpoint_transaction.transaction.transaction_data().move_calls();
             self.process_move_calls(
                 checkpoint_summary.epoch,
                 checkpoint_summary.sequence_number,
@@ -71,10 +60,9 @@ impl AnalyticsHandler<MoveCallEntry> for MoveCallHandler {
 impl MoveCallHandler {
     pub fn new() -> Self {
         let state = State { move_calls: vec![] };
-        Self {
-            state: Mutex::new(state),
-        }
+        Self { state: Mutex::new(state) }
     }
+
     fn process_move_calls(
         &self,
         epoch: u64,

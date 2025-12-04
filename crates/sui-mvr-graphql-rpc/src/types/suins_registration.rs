@@ -3,6 +3,14 @@
 
 use std::str::FromStr;
 
+use async_graphql::{connection::Connection, *};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use serde::{Deserialize, Serialize};
+use sui_indexer::models::objects::StoredHistoryObject;
+use sui_json_rpc::name_service::{Domain as NativeDomain, NameRecord, NameServiceConfig, NameServiceError};
+use sui_types::{base_types::SuiAddress as NativeSuiAddress, dynamic_field::Field, id::UID};
+
 use super::{
     available_range::AvailableRange,
     balance::{self, Balance},
@@ -30,15 +38,6 @@ use crate::{
     data::{Db, DbConnection, QueryExecutor},
     error::Error,
 };
-use async_graphql::{connection::Connection, *};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
-use serde::{Deserialize, Serialize};
-use sui_indexer::models::objects::StoredHistoryObject;
-use sui_json_rpc::name_service::{
-    Domain as NativeDomain, NameRecord, NameServiceConfig, NameServiceError,
-};
-use sui_types::{base_types::SuiAddress as NativeSuiAddress, dynamic_field::Field, id::UID};
 
 const MOD_REGISTRATION: &IdentStr = ident_str!("suins_registration");
 const TYP_REGISTRATION: &IdentStr = ident_str!("SuinsRegistration");
@@ -110,21 +109,13 @@ impl SuinsRegistration {
         before: Option<object::Cursor>,
         filter: Option<ObjectFilter>,
     ) -> Result<Connection<String, MoveObject>> {
-        OwnerImpl::from(&self.super_.super_)
-            .objects(ctx, first, after, last, before, filter)
-            .await
+        OwnerImpl::from(&self.super_.super_).objects(ctx, first, after, last, before, filter).await
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
     /// it defaults to `0x2::oct::OCT`.
-    pub(crate) async fn balance(
-        &self,
-        ctx: &Context<'_>,
-        type_: Option<ExactTypeFilter>,
-    ) -> Result<Option<Balance>> {
-        OwnerImpl::from(&self.super_.super_)
-            .balance(ctx, type_)
-            .await
+    pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
+        OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
     }
 
     /// The balances of all coin types owned by this object.
@@ -136,9 +127,7 @@ impl SuinsRegistration {
         last: Option<u64>,
         before: Option<balance::Cursor>,
     ) -> Result<Connection<String, Balance>> {
-        OwnerImpl::from(&self.super_.super_)
-            .balances(ctx, first, after, last, before)
-            .await
+        OwnerImpl::from(&self.super_.super_).balances(ctx, first, after, last, before).await
     }
 
     /// The coin objects for this object.
@@ -153,9 +142,7 @@ impl SuinsRegistration {
         before: Option<object::Cursor>,
         type_: Option<ExactTypeFilter>,
     ) -> Result<Connection<String, Coin>> {
-        OwnerImpl::from(&self.super_.super_)
-            .coins(ctx, first, after, last, before, type_)
-            .await
+        OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
     }
 
     /// The `0x3::staking_pool::StakedOct` objects owned by this object.
@@ -167,9 +154,7 @@ impl SuinsRegistration {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_.super_)
-            .staked_octs(ctx, first, after, last, before)
-            .await
+        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -178,9 +163,7 @@ impl SuinsRegistration {
         ctx: &Context<'_>,
         format: Option<DomainFormat>,
     ) -> Result<Option<String>> {
-        OwnerImpl::from(&self.super_.super_)
-            .default_suins_name(ctx, format)
-            .await
+        OwnerImpl::from(&self.super_.super_).default_suins_name(ctx, format).await
     }
 
     /// The SuinsRegistration NFTs owned by this object. These grant the owner the capability to
@@ -193,9 +176,7 @@ impl SuinsRegistration {
         last: Option<u64>,
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, SuinsRegistration>> {
-        OwnerImpl::from(&self.super_.super_)
-            .suins_registrations(ctx, first, after, last, before)
-            .await
+        OwnerImpl::from(&self.super_.super_).suins_registrations(ctx, first, after, last, before).await
     }
 
     pub(crate) async fn version(&self) -> UInt53 {
@@ -224,13 +205,8 @@ impl SuinsRegistration {
     }
 
     /// The transaction block that created this version of the object.
-    pub(crate) async fn previous_transaction_block(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Option<TransactionBlock>> {
-        ObjectImpl(&self.super_.super_)
-            .previous_transaction_block(ctx)
-            .await
+    pub(crate) async fn previous_transaction_block(&self, ctx: &Context<'_>) -> Result<Option<TransactionBlock>> {
+        ObjectImpl(&self.super_.super_).previous_transaction_block(ctx).await
     }
 
     /// The amount of SUI we would rebate if this object gets deleted or mutated. This number is
@@ -306,14 +282,8 @@ impl SuinsRegistration {
     ///
     /// Dynamic fields on wrapped objects can be accessed by using the same API under the Owner
     /// type.
-    pub(crate) async fn dynamic_field(
-        &self,
-        ctx: &Context<'_>,
-        name: DynamicFieldName,
-    ) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_)
-            .dynamic_field(ctx, name, Some(self.super_.root_version()))
-            .await
+    pub(crate) async fn dynamic_field(&self, ctx: &Context<'_>, name: DynamicFieldName) -> Result<Option<DynamicField>> {
+        OwnerImpl::from(&self.super_.super_).dynamic_field(ctx, name, Some(self.super_.root_version())).await
     }
 
     /// Access a dynamic object field on an object using its name. Names are arbitrary Move values
@@ -328,9 +298,7 @@ impl SuinsRegistration {
         ctx: &Context<'_>,
         name: DynamicFieldName,
     ) -> Result<Option<DynamicField>> {
-        OwnerImpl::from(&self.super_.super_)
-            .dynamic_object_field(ctx, name, Some(self.super_.root_version()))
-            .await
+        OwnerImpl::from(&self.super_.super_).dynamic_object_field(ctx, name, Some(self.super_.root_version())).await
     }
 
     /// The dynamic fields and dynamic object fields on an object.
@@ -346,14 +314,7 @@ impl SuinsRegistration {
         before: Option<object::Cursor>,
     ) -> Result<Connection<String, DynamicField>> {
         OwnerImpl::from(&self.super_.super_)
-            .dynamic_fields(
-                ctx,
-                first,
-                after,
-                last,
-                before,
-                Some(self.super_.root_version()),
-            )
+            .dynamic_fields(ctx, first, after, last, before, Some(self.super_.root_version()))
             .await
     }
 
@@ -381,9 +342,7 @@ impl NameService {
     ) -> Result<Option<NameRecord>, Error> {
         // Query for the domain's NameRecord and parent NameRecord if applicable. The checkpoint's
         // timestamp is also fetched. These values are used to determine if the domain is expired.
-        let Some(domain_expiration) =
-            Self::query_domain_expiration(ctx, domain, checkpoint_viewed_at).await?
-        else {
+        let Some(domain_expiration) = Self::query_domain_expiration(ctx, domain, checkpoint_viewed_at).await? else {
             return Ok(None);
         };
 
@@ -433,20 +392,14 @@ impl NameService {
 
         let reverse_record_id = config.reverse_record_field_id(address.as_slice());
 
-        let Some(object) = MoveObject::query(
-            ctx,
-            reverse_record_id.into(),
-            Object::latest_at(checkpoint_viewed_at),
-        )
-        .await?
+        let Some(object) =
+            MoveObject::query(ctx, reverse_record_id.into(), Object::latest_at(checkpoint_viewed_at)).await?
         else {
             return Ok(None);
         };
 
-        let field: Field<NativeSuiAddress, NativeDomain> = object
-            .native
-            .to_rust()
-            .ok_or_else(|| Error::Internal("Malformed Suins Domain".to_string()))?;
+        let field: Field<NativeSuiAddress, NativeDomain> =
+            object.native.to_rust().ok_or_else(|| Error::Internal("Malformed Suins Domain".to_string()))?;
 
         let domain = Domain(field.value);
 
@@ -477,33 +430,21 @@ impl NameService {
         }
 
         // Create a page with a bound of `object_ids` length to fetch the relevant `NameRecord`s.
-        let page: Page<object::Cursor> = Page::from_params(
-            ctx.data_unchecked(),
-            Some(object_ids.len() as u64),
-            None,
-            None,
-            None,
-        )
-        .map_err(|_| {
-            Error::Internal("Page size of 2 is incompatible with configured limits".to_string())
-        })?;
+        let page: Page<object::Cursor> =
+            Page::from_params(ctx.data_unchecked(), Some(object_ids.len() as u64), None, None, None)
+                .map_err(|_| Error::Internal("Page size of 2 is incompatible with configured limits".to_string()))?;
 
         // prepare the filter for the query.
-        let filter = ObjectFilter {
-            object_ids: Some(object_ids.clone()),
-            ..Default::default()
-        };
+        let filter = ObjectFilter { object_ids: Some(object_ids.clone()), ..Default::default() };
 
         let Some((checkpoint_timestamp_ms, results)) = db
             .execute_repeatable(move |conn| {
                 async move {
-                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await?
-                    else {
+                    let Some(range) = AvailableRange::result(conn, checkpoint_viewed_at).await? else {
                         return Ok::<_, diesel::result::Error>(None);
                     };
 
-                    let timestamp_ms =
-                        Checkpoint::query_timestamp(conn, checkpoint_viewed_at).await?;
+                    let timestamp_ms = Checkpoint::query_timestamp(conn, checkpoint_viewed_at).await?;
 
                     let sql = build_objects_query(
                         View::Consistent,
@@ -513,8 +454,7 @@ impl NameService {
                         move |newer| newer,
                     );
 
-                    let objects: Vec<StoredHistoryObject> =
-                        conn.results(move || sql.clone().into_boxed()).await?;
+                    let objects: Vec<StoredHistoryObject> = conn.results(move || sql.clone().into_boxed()).await?;
 
                     Ok(Some((timestamp_ms, objects)))
                 }
@@ -522,28 +462,19 @@ impl NameService {
             })
             .await?
         else {
-            return Err(Error::Client(
-                "Requested data is outside the available range".to_string(),
-            ));
+            return Err(Error::Client("Requested data is outside the available range".to_string()));
         };
 
-        let mut domain_expiration = DomainExpiration {
-            parent_name_record: None,
-            name_record: None,
-            checkpoint_timestamp_ms,
-        };
+        let mut domain_expiration =
+            DomainExpiration { parent_name_record: None, name_record: None, checkpoint_timestamp_ms };
 
         // Max size of results is 2. We loop through them, convert to objects, and then parse
         // name_record. We then assign it to the correct field on `domain_expiration` based on the
         // address.
         for result in results {
-            let object =
-                Object::try_from_stored_history_object(result, checkpoint_viewed_at, None)?;
+            let object = Object::try_from_stored_history_object(result, checkpoint_viewed_at, None)?;
             let move_object = MoveObject::try_from(&object).map_err(|_| {
-                Error::Internal(format!(
-                    "Expected {0} to be a NameRecord, but it's not a Move Object.",
-                    object.address
-                ))
+                Error::Internal(format!("Expected {0} to be a NameRecord, but it's not a Move Object.", object.address))
             })?;
 
             let record = NameRecord::try_from(move_object.native)?;
@@ -576,25 +507,16 @@ impl SuinsRegistration {
     ) -> Result<Connection<String, SuinsRegistration>, Error> {
         let type_ = SuinsRegistration::type_(config.package_address.into());
 
-        let filter = ObjectFilter {
-            type_: Some(type_.clone().into()),
-            owner: Some(owner),
-            ..Default::default()
-        };
+        let filter = ObjectFilter { type_: Some(type_.clone().into()), owner: Some(owner), ..Default::default() };
 
         Object::paginate_subtype(db, page, filter, checkpoint_viewed_at, |object| {
             let address = object.address;
             let move_object = MoveObject::try_from(&object).map_err(|_| {
-                Error::Internal(format!(
-                    "Expected {address} to be a SuinsRegistration, but it's not a Move Object.",
-                ))
+                Error::Internal(format!("Expected {address} to be a SuinsRegistration, but it's not a Move Object.",))
             })?;
 
-            SuinsRegistration::try_from(&move_object, &type_).map_err(|_| {
-                Error::Internal(format!(
-                    "Expected {address} to be a SuinsRegistration, but it is not."
-                ))
-            })
+            SuinsRegistration::try_from(&move_object, &type_)
+                .map_err(|_| Error::Internal(format!("Expected {address} to be a SuinsRegistration, but it is not.")))
         })
         .await
     }
@@ -612,18 +534,14 @@ impl SuinsRegistration {
 
     // Because the type of the SuinsRegistration object is not constant,
     // we need to take it in as a param.
-    pub(crate) fn try_from(
-        move_object: &MoveObject,
-        tag: &StructTag,
-    ) -> Result<Self, SuinsRegistrationDowncastError> {
+    pub(crate) fn try_from(move_object: &MoveObject, tag: &StructTag) -> Result<Self, SuinsRegistrationDowncastError> {
         if !move_object.native.is_type(tag) {
             return Err(SuinsRegistrationDowncastError::NotASuinsRegistration);
         }
 
         Ok(Self {
             super_: move_object.clone(),
-            native: bcs::from_bytes(move_object.native.contents())
-                .map_err(SuinsRegistrationDowncastError::Bcs)?,
+            native: bcs::from_bytes(move_object.native.contents()).map_err(SuinsRegistrationDowncastError::Bcs)?,
         })
     }
 }

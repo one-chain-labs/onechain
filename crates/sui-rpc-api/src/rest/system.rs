@@ -1,16 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ApiEndpoint, RouteHandler};
-use crate::{reader::StateReader, rest::accept::AcceptFormat, Result, RpcService, RpcServiceError};
+use std::collections::BTreeMap;
+
 use axum::{
     extract::{Path, State},
     Json,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use sui_protocol_config::{ProtocolConfig, ProtocolConfigValue, ProtocolVersion};
 use sui_sdk_types::{Address, ObjectId};
+
+use super::{ApiEndpoint, RouteHandler};
+use crate::{reader::StateReader, rest::accept::AcceptFormat, Result, RpcService, RpcServiceError};
 
 pub struct GetSystemStateSummary;
 
@@ -34,12 +36,7 @@ async fn get_system_state_summary(
 ) -> Result<Json<SystemStateSummary>> {
     match accept {
         AcceptFormat::Json => {}
-        _ => {
-            return Err(RpcServiceError::new(
-                axum::http::StatusCode::BAD_REQUEST,
-                "invalid accept type",
-            ))
-        }
+        _ => return Err(RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "invalid accept type")),
     }
 
     let summary = state.get_system_state_summary()?;
@@ -259,12 +256,8 @@ pub struct ValidatorSummary {
     pub exchange_rates_size: u64,
 }
 
-impl From<sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSummary>
-    for ValidatorSummary
-{
-    fn from(
-        value: sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSummary,
-    ) -> Self {
+impl From<sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSummary> for ValidatorSummary {
+    fn from(value: sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSummary) -> Self {
         let sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSummary {
             sui_address,
             protocol_pubkey_bytes,
@@ -312,14 +305,9 @@ impl From<sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSum
 
         Self {
             address: sui_address.into(),
-            protocol_public_key: sui_sdk_types::Bls12381PublicKey::from_bytes(
-                protocol_pubkey_bytes,
-            )
-            .unwrap(),
-            network_public_key: sui_sdk_types::Ed25519PublicKey::from_bytes(network_pubkey_bytes)
-                .unwrap(),
-            worker_public_key: sui_sdk_types::Ed25519PublicKey::from_bytes(worker_pubkey_bytes)
-                .unwrap(),
+            protocol_public_key: sui_sdk_types::Bls12381PublicKey::from_bytes(protocol_pubkey_bytes).unwrap(),
+            network_public_key: sui_sdk_types::Ed25519PublicKey::from_bytes(network_pubkey_bytes).unwrap(),
+            worker_public_key: sui_sdk_types::Ed25519PublicKey::from_bytes(worker_pubkey_bytes).unwrap(),
             proof_of_possession_bytes,
             name,
             description,
@@ -364,12 +352,8 @@ impl From<sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSum
     }
 }
 
-impl From<sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary>
-    for SystemStateSummary
-{
-    fn from(
-        value: sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
-    ) -> Self {
+impl From<sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary> for SystemStateSummary {
+    fn from(value: sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary) -> Self {
         let sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary {
             epoch,
             protocol_version,
@@ -447,18 +431,10 @@ impl From<sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateS
             inactive_pools_size,
             validator_candidates_id: validator_candidates_id.into(),
             validator_candidates_size,
-            at_risk_validators: at_risk_validators
-                .into_iter()
-                .map(|(address, idx)| (address.into(), idx))
-                .collect(),
+            at_risk_validators: at_risk_validators.into_iter().map(|(address, idx)| (address.into(), idx)).collect(),
             validator_report_records: validator_report_records
                 .into_iter()
-                .map(|(address, reports)| {
-                    (
-                        address.into(),
-                        reports.into_iter().map(Into::into).collect(),
-                    )
-                })
+                .map(|(address, reports)| (address.into(), reports.into_iter().map(Into::into).collect()))
                 .collect(),
         }
     }
@@ -486,12 +462,7 @@ async fn get_current_protocol_config(
 ) -> Result<(SupportedProtocolHeaders, Json<ProtocolConfigResponse>)> {
     match accept {
         AcceptFormat::Json => {}
-        _ => {
-            return Err(RpcServiceError::new(
-                axum::http::StatusCode::BAD_REQUEST,
-                "invalid accept type",
-            ))
-        }
+        _ => return Err(RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "invalid accept type")),
     }
 
     let current_protocol_version = state.get_system_state_summary()?.protocol_version;
@@ -528,19 +499,12 @@ async fn get_protocol_config(
 ) -> Result<(SupportedProtocolHeaders, Json<ProtocolConfigResponse>)> {
     match accept {
         AcceptFormat::Json => {}
-        _ => {
-            return Err(RpcServiceError::new(
-                axum::http::StatusCode::BAD_REQUEST,
-                "invalid accept type",
-            ))
-        }
+        _ => return Err(RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "invalid accept type")),
     }
 
-    let config = ProtocolConfig::get_for_version_if_supported(
-        version.into(),
-        state.inner().get_chain_identifier()?.chain(),
-    )
-    .ok_or_else(|| ProtocolNotFoundError::new(version))?;
+    let config =
+        ProtocolConfig::get_for_version_if_supported(version.into(), state.inner().get_chain_identifier()?.chain())
+            .ok_or_else(|| ProtocolNotFoundError::new(version))?;
 
     Ok((supported_protocol_headers(), Json(config.into())))
 }
@@ -579,14 +543,8 @@ type SupportedProtocolHeaders = [(&'static str, String); 2];
 
 fn supported_protocol_headers() -> SupportedProtocolHeaders {
     [
-        (
-            X_SUI_MIN_SUPPORTED_PROTOCOL_VERSION,
-            ProtocolVersion::MIN.as_u64().to_string(),
-        ),
-        (
-            X_SUI_MAX_SUPPORTED_PROTOCOL_VERSION,
-            ProtocolVersion::MAX.as_u64().to_string(),
-        ),
+        (X_SUI_MIN_SUPPORTED_PROTOCOL_VERSION, ProtocolVersion::MIN.as_u64().to_string()),
+        (X_SUI_MAX_SUPPORTED_PROTOCOL_VERSION, ProtocolVersion::MAX.as_u64().to_string()),
     ]
 }
 
@@ -640,25 +598,15 @@ impl ApiEndpoint<RpcService> for GetGasInfo {
     }
 }
 
-async fn get_gas_info(
-    accept: AcceptFormat,
-    State(state): State<StateReader>,
-) -> Result<Json<GasInfo>> {
+async fn get_gas_info(accept: AcceptFormat, State(state): State<StateReader>) -> Result<Json<GasInfo>> {
     match accept {
         AcceptFormat::Json => {}
-        _ => {
-            return Err(RpcServiceError::new(
-                axum::http::StatusCode::BAD_REQUEST,
-                "invalid accept type",
-            ))
-        }
+        _ => return Err(RpcServiceError::new(axum::http::StatusCode::BAD_REQUEST, "invalid accept type")),
     }
 
     let reference_gas_price = state.get_system_state_summary()?.reference_gas_price;
 
-    Ok(Json(GasInfo {
-        reference_gas_price,
-    }))
+    Ok(Json(GasInfo { reference_gas_price }))
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

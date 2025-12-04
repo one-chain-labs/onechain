@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use fastcrypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     traits::{ToFromBytes, VerifyingKey},
@@ -15,7 +16,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 const ED25519_BLOCK_SIZE: usize = 128;
 
@@ -46,16 +48,9 @@ pub fn ed25519_verify(
     debug_assert!(args.len() == 3);
 
     // Load the cost parameters from the protocol config
-    let ed25519_verify_cost_params = &context
-        .extensions()
-        .get::<NativesCostTable>()
-        .ed25519_verify_cost_params
-        .clone();
+    let ed25519_verify_cost_params = &context.extensions().get::<NativesCostTable>().ed25519_verify_cost_params.clone();
     // Charge the base cost for this oper
-    native_charge_gas_early_exit!(
-        context,
-        ed25519_verify_cost_params.ed25519_ed25519_verify_cost_base
-    );
+    native_charge_gas_early_exit!(context, ed25519_verify_cost_params.ed25519_ed25519_verify_cost_base);
 
     let msg = pop_arg!(args, VectorRef);
     let msg_ref = msg.as_bytes_ref();
@@ -67,8 +62,7 @@ pub fn ed25519_verify(
     // Charge the arg size dependent costs
     native_charge_gas_early_exit!(
         context,
-        ed25519_verify_cost_params.ed25519_ed25519_verify_msg_cost_per_byte
-            * (msg_ref.len() as u64).into()
+        ed25519_verify_cost_params.ed25519_ed25519_verify_msg_cost_per_byte * (msg_ref.len() as u64).into()
             + ed25519_verify_cost_params.ed25519_ed25519_verify_msg_cost_per_block
                 * (((msg_ref.len() + ED25519_BLOCK_SIZE - 1) / ED25519_BLOCK_SIZE) as u64).into()
     );
@@ -78,13 +72,9 @@ pub fn ed25519_verify(
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
     };
 
-    let Ok(public_key) = <Ed25519PublicKey as ToFromBytes>::from_bytes(&public_key_bytes_ref)
-    else {
+    let Ok(public_key) = <Ed25519PublicKey as ToFromBytes>::from_bytes(&public_key_bytes_ref) else {
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
     };
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::bool(public_key.verify(&msg_ref, &signature).is_ok())],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(public_key.verify(&msg_ref, &signature).is_ok())]))
 }

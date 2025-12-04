@@ -23,8 +23,7 @@ pub const X_SUI_LOWEST_AVAILABLE_CHECKPOINT: &str = "x-sui-lowest-available-chec
 ///
 /// Specifically this is the lowest checkpoint for which input/output object data will be
 /// available.
-pub const X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS: &str =
-    "x-sui-lowest-available-checkpoint-objects";
+pub const X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS: &str = "x-sui-lowest-available-checkpoint-objects";
 
 /// Current epoch of the chain
 pub const X_SUI_EPOCH: &str = "x-sui-epoch";
@@ -223,15 +222,11 @@ pub struct TransactionResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub events_bcs: Option<Vec<u8>>,
 
-    #[serde_as(
-        as = "Option<sui_types::sui_serde::Readable<sui_types::sui_serde::BigInt<u64>, _>>"
-    )]
+    #[serde_as(as = "Option<sui_types::sui_serde::Readable<sui_types::sui_serde::BigInt<u64>, _>>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checkpoint: Option<u64>,
 
-    #[serde_as(
-        as = "Option<sui_types::sui_serde::Readable<sui_types::sui_serde::BigInt<u64>, _>>"
-    )]
+    #[serde_as(as = "Option<sui_types::sui_serde::Readable<sui_types::sui_serde::BigInt<u64>, _>>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_ms: Option<u64>,
 }

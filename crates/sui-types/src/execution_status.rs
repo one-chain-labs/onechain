@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::base_types::SuiAddress;
-use crate::ObjectID;
+use std::fmt::{self, Display, Formatter};
+
 use move_binary_format::file_format::{CodeOffset, TypeParameterIndex};
 use move_core_types::language_storage::ModuleId;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display, Formatter};
 use sui_macros::EnumVariantOrder;
 use thiserror::Error;
+
+use crate::{base_types::SuiAddress, ObjectID};
 
 #[cfg(test)]
 #[path = "unit_tests/execution_status_tests.rs"]
@@ -55,18 +56,12 @@ pub enum ExecutionFailureStatus {
         "Move object with size {object_size} is larger \
         than the maximum object size {max_object_size}"
     )]
-    MoveObjectTooBig {
-        object_size: u64,
-        max_object_size: u64,
-    },
+    MoveObjectTooBig { object_size: u64, max_object_size: u64 },
     #[error(
         "Move package with size {object_size} is larger than the \
         maximum object size {max_object_size}"
     )]
-    MovePackageTooBig {
-        object_size: u64,
-        max_object_size: u64,
-    },
+    MovePackageTooBig { object_size: u64, max_object_size: u64 },
     #[error("Circular Object Ownership, including object {object}.")]
     CircularObjectOwnership { object: ObjectID },
 
@@ -130,15 +125,9 @@ pub enum ExecutionFailureStatus {
     #[error("Non Entry Function Invoked. Move Call must start with an entry function")]
     NonEntryFunctionInvoked,
     #[error("Invalid command argument at {arg_idx}. {kind}")]
-    CommandArgumentError {
-        arg_idx: u16,
-        kind: CommandArgumentError,
-    },
+    CommandArgumentError { arg_idx: u16, kind: CommandArgumentError },
     #[error("Error for type argument at index {argument_idx}: {kind}")]
-    TypeArgumentError {
-        argument_idx: TypeParameterIndex,
-        kind: TypeArgumentError,
-    },
+    TypeArgumentError { argument_idx: TypeParameterIndex, kind: TypeArgumentError },
     #[error(
         "Unused result without the drop ability. \
         Command result {result_idx}, return value {secondary_idx}"
@@ -206,10 +195,7 @@ pub enum ExecutionFailureStatus {
     ExecutionCancelledDueToSharedObjectCongestion { congested_objects: CongestedObjects },
 
     #[error("Address {address:?} is denied for coin {coin_type}")]
-    AddressDeniedForCoin {
-        address: SuiAddress,
-        coin_type: String,
-    },
+    AddressDeniedForCoin { address: SuiAddress, coin_type: String },
 
     #[error("Coin type is globally paused for use: {coin_type}")]
     CoinTypeGlobalPause { coin_type: String },
@@ -292,10 +278,7 @@ pub enum PackageUpgradeError {
     #[error("Upgrade policy {policy} is not a valid upgrade policy")]
     UnknownUpgradePolicy { policy: u8 },
     #[error("Package ID {package_id} does not match package ID in upgrade ticket {ticket_id}")]
-    PackageIDDoesNotMatch {
-        package_id: ObjectID,
-        ticket_id: ObjectID,
-    },
+    PackageIDDoesNotMatch { package_id: ObjectID, ticket_id: ObjectID },
 }
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug, Serialize, Deserialize, Hash, Error)]
@@ -323,31 +306,17 @@ impl Display for MoveLocationOpt {
 
 impl Display for MoveLocation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Self {
-            module,
-            function,
-            instruction,
-            function_name,
-        } = self;
+        let Self { module, function, instruction, function_name } = self;
         if let Some(fname) = function_name {
-            write!(
-                f,
-                "{module}::{fname} (function index {function}) at offset {instruction}"
-            )
+            write!(f, "{module}::{fname} (function index {function}) at offset {instruction}")
         } else {
-            write!(
-                f,
-                "{module} in function definition {function} at offset {instruction}"
-            )
+            write!(f, "{module} in function definition {function} at offset {instruction}")
         }
     }
 }
 
 impl ExecutionStatus {
-    pub fn new_failure(
-        error: ExecutionFailureStatus,
-        command: Option<CommandIndex>,
-    ) -> ExecutionStatus {
+    pub fn new_failure(error: ExecutionFailureStatus, command: Option<CommandIndex>) -> ExecutionStatus {
         ExecutionStatus::Failure { error, command }
     }
 

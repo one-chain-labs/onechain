@@ -1,13 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::indexer_test_utils::{InMemoryPersistent, NoopDataMapper, TestDatasource};
 use prometheus::{
-    register_int_counter_vec_with_registry, register_int_gauge_vec_with_registry, IntCounterVec,
-    IntGaugeVec, Registry,
+    register_int_counter_vec_with_registry,
+    register_int_gauge_vec_with_registry,
+    IntCounterVec,
+    IntGaugeVec,
+    Registry,
 };
-use sui_indexer_builder::indexer_builder::{BackfillStrategy, IndexerBuilder};
-use sui_indexer_builder::{Task, LIVE_TASK_TARGET_CHECKPOINT};
+use sui_indexer_builder::{
+    indexer_builder::{BackfillStrategy, IndexerBuilder},
+    Task,
+    LIVE_TASK_TARGET_CHECKPOINT,
+};
+
+use crate::indexer_test_utils::{InMemoryPersistent, NoopDataMapper, TestDatasource};
 
 mod indexer_test_utils;
 
@@ -17,7 +24,7 @@ async fn indexer_simple_backfill_task_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=10u64).collect::<Vec<_>>();
+    let data = (0 ..= 10u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 5,
@@ -27,19 +34,9 @@ async fn indexer_simple_backfill_task_test() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .build();
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone()).build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     assert_ranges(&tasks, vec![(5, i64::MAX as u64), (0, 4)]);
     indexer.start().await.unwrap();
 
@@ -59,7 +56,7 @@ async fn indexer_partitioned_backfill_task_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -69,32 +66,17 @@ async fn indexer_partitioned_backfill_task_test() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
-    .build();
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
-    assert_ranges(
-        &tasks,
-        vec![(35, i64::MAX as u64), (30, 34), (20, 29), (10, 19), (0, 9)],
-    );
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
+    assert_ranges(&tasks, vec![(35, i64::MAX as u64), (30, 34), (20, 29), (10, 19), (0, 9)]);
     indexer.start().await.unwrap();
 
     // it should have 5 task created for the indexer - a live task and 4 backfill task
     let tasks = persistent.get_all_tasks("test_indexer").await.unwrap();
-    assert_ranges(
-        &tasks,
-        vec![(50, i64::MAX as u64), (34, 34), (29, 29), (19, 19), (9, 9)],
-    );
+    assert_ranges(&tasks, vec![(50, i64::MAX as u64), (34, 34), (29, 29), (19, 19), (9, 9)]);
     // the data recorded in storage should be the same as the datasource
     let mut recorded_data = persistent.data.lock().await.clone();
     recorded_data.sort();
@@ -107,7 +89,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test1() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 31,
@@ -117,31 +99,19 @@ async fn indexer_partitioned_task_with_data_already_in_db_test1() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.data.lock().await.append(&mut (0..=30).collect());
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 1".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 1".to_string(),
-            start_checkpoint: 30,
-            target_checkpoint: 30,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
-    .build();
+    persistent.data.lock().await.append(&mut (0 ..= 30).collect());
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 1".to_string(), Task {
+        task_name: "test_indexer - backfill - 1".to_string(),
+        start_checkpoint: 30,
+        target_checkpoint: 30,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     assert_ranges(&tasks, vec![(31, i64::MAX as u64), (30, 30)]);
     indexer.start().await.unwrap();
 
@@ -160,7 +130,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test2() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -170,31 +140,19 @@ async fn indexer_partitioned_task_with_data_already_in_db_test2() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.data.lock().await.append(&mut (0..=30).collect());
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 1".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 1".to_string(),
-            start_checkpoint: 30,
-            target_checkpoint: 30,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
-    .build();
+    persistent.data.lock().await.append(&mut (0 ..= 30).collect());
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 1".to_string(), Task {
+        task_name: "test_indexer - backfill - 1".to_string(),
+        start_checkpoint: 30,
+        target_checkpoint: 30,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     assert_ranges(&tasks, vec![(35, i64::MAX as u64), (31, 34), (30, 30)]);
     indexer.start().await.unwrap();
 
@@ -215,7 +173,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test3() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 28,
@@ -225,40 +183,25 @@ async fn indexer_partitioned_task_with_data_already_in_db_test3() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 20:30".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 20:30".to_string(),
-            start_checkpoint: 30,
-            target_checkpoint: 30,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 10:19".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 10:19".to_string(),
-            start_checkpoint: 10,
-            target_checkpoint: 19,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
-    .build();
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 20:30".to_string(), Task {
+        task_name: "test_indexer - backfill - 20:30".to_string(),
+        start_checkpoint: 30,
+        target_checkpoint: 30,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 10:19".to_string(), Task {
+        task_name: "test_indexer - backfill - 10:19".to_string(),
+        start_checkpoint: 10,
+        target_checkpoint: 19,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     assert_ranges(&tasks, vec![(30, 30), (28, i64::MAX as u64), (10, 19)]);
     indexer.start().await.unwrap();
 
@@ -274,7 +217,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test4() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -284,51 +227,30 @@ async fn indexer_partitioned_task_with_data_already_in_db_test4() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 20:30".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 20:30".to_string(),
-            start_checkpoint: 30,
-            target_checkpoint: 30,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 10:19".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 10:19".to_string(),
-            start_checkpoint: 10,
-            target_checkpoint: 19,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
-    .build();
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 20:30".to_string(), Task {
+        task_name: "test_indexer - backfill - 20:30".to_string(),
+        start_checkpoint: 30,
+        target_checkpoint: 30,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 10:19".to_string(), Task {
+        task_name: "test_indexer - backfill - 10:19".to_string(),
+        start_checkpoint: 10,
+        target_checkpoint: 19,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Partitioned { task_size: 10 })
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
-    assert_ranges(
-        &tasks,
-        vec![(35, i64::MAX as u64), (31, 34), (30, 30), (10, 19)],
-    );
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
+    assert_ranges(&tasks, vec![(35, i64::MAX as u64), (31, 34), (30, 30), (10, 19)]);
     indexer.start().await.unwrap();
 
     let tasks = persistent.get_all_tasks("test_indexer").await.unwrap();
-    assert_ranges(
-        &tasks,
-        vec![(50, i64::MAX as u64), (34, 34), (30, 30), (19, 19)],
-    );
+    assert_ranges(&tasks, vec![(50, i64::MAX as u64), (34, 34), (30, 30), (19, 19)]);
 }
 
 #[tokio::test]
@@ -337,7 +259,7 @@ async fn indexer_with_existing_live_task1() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -347,30 +269,18 @@ async fn indexer_with_existing_live_task1() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - Live".to_string(),
-        Task {
-            task_name: "test_indexer - Live".to_string(),
-            start_checkpoint: 30,
-            target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
-            timestamp: 0,
-            is_live_task: true,
-        },
-    );
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Simple)
-    .build();
+    persistent.progress_store.lock().await.insert("test_indexer - Live".to_string(), Task {
+        task_name: "test_indexer - Live".to_string(),
+        start_checkpoint: 30,
+        target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
+        timestamp: 0,
+        is_live_task: true,
+    });
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Simple)
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     assert_ranges(&tasks, vec![(35, i64::MAX as u64), (31, 34)]);
     indexer.start().await.unwrap();
 
@@ -384,7 +294,7 @@ async fn indexer_with_existing_live_task2() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 25,
@@ -394,30 +304,18 @@ async fn indexer_with_existing_live_task2() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - Live".to_string(),
-        Task {
-            task_name: "test_indexer - Live".to_string(),
-            start_checkpoint: 30,
-            target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
-            timestamp: 10,
-            is_live_task: true,
-        },
-    );
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Simple)
-    .build();
+    persistent.progress_store.lock().await.insert("test_indexer - Live".to_string(), Task {
+        task_name: "test_indexer - Live".to_string(),
+        start_checkpoint: 30,
+        target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
+        timestamp: 10,
+        is_live_task: true,
+    });
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Simple)
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     println!("{tasks:?}");
     assert_ranges(&tasks, vec![(25, i64::MAX as u64)]);
     indexer.start().await.unwrap();
@@ -442,7 +340,7 @@ async fn resume_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 31,
@@ -452,30 +350,18 @@ async fn resume_test() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 30".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 30".to_string(),
-            start_checkpoint: 10,
-            target_checkpoint: 30,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Simple)
-    .build();
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 30".to_string(), Task {
+        task_name: "test_indexer - backfill - 30".to_string(),
+        start_checkpoint: 10,
+        target_checkpoint: 30,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Simple)
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     assert_ranges(&tasks, vec![(31, i64::MAX as u64), (10, 30)]);
     indexer.start().await.unwrap();
 
@@ -485,7 +371,7 @@ async fn resume_test() {
     // the data recorded in storage should be the same as the datasource
     let mut recorded_data = persistent.data.lock().await.clone();
     recorded_data.sort();
-    assert_eq!((10..=50u64).collect::<Vec<_>>(), recorded_data);
+    assert_eq!((10 ..= 50u64).collect::<Vec<_>>(), recorded_data);
 }
 
 #[tokio::test]
@@ -494,7 +380,7 @@ async fn resume_with_live_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=70u64).collect::<Vec<_>>();
+    let data = (0 ..= 70u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 60,
@@ -504,46 +390,27 @@ async fn resume_with_live_test() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - backfill - 30".to_string(),
-        Task {
-            task_name: "test_indexer - backfill - 30".to_string(),
-            start_checkpoint: 10,
-            target_checkpoint: 30,
-            timestamp: 0,
-            is_live_task: false,
-        },
-    );
-    persistent.progress_store.lock().await.insert(
-        "test_indexer - Live".to_string(),
-        Task {
-            task_name: "test_indexer - Live".to_string(),
-            start_checkpoint: 50,
-            target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
-            timestamp: 10,
-            is_live_task: true,
-        },
-    );
+    persistent.progress_store.lock().await.insert("test_indexer - backfill - 30".to_string(), Task {
+        task_name: "test_indexer - backfill - 30".to_string(),
+        start_checkpoint: 10,
+        target_checkpoint: 30,
+        timestamp: 0,
+        is_live_task: false,
+    });
+    persistent.progress_store.lock().await.insert("test_indexer - Live".to_string(), Task {
+        task_name: "test_indexer - Live".to_string(),
+        start_checkpoint: 50,
+        target_checkpoint: LIVE_TASK_TARGET_CHECKPOINT as u64,
+        timestamp: 10,
+        is_live_task: true,
+    });
     // the live task have indexed cp 31 to 50 before shutdown
-    persistent
-        .data
-        .lock()
-        .await
-        .append(&mut (31..=50).collect());
-    let mut indexer = IndexerBuilder::new(
-        "test_indexer",
-        datasource,
-        NoopDataMapper,
-        persistent.clone(),
-    )
-    .with_backfill_strategy(BackfillStrategy::Simple)
-    .build();
+    persistent.data.lock().await.append(&mut (31 ..= 50).collect());
+    let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
+        .with_backfill_strategy(BackfillStrategy::Simple)
+        .build();
     indexer.test_only_update_tasks().await.unwrap();
-    let tasks = indexer
-        .test_only_storage()
-        .get_all_tasks("test_indexer")
-        .await
-        .unwrap();
+    let tasks = indexer.test_only_storage().get_all_tasks("test_indexer").await.unwrap();
     assert_ranges(&tasks, vec![(60, i64::MAX as u64), (51, 59), (10, 30)]);
     indexer.start().await.unwrap();
 
@@ -553,7 +420,7 @@ async fn resume_with_live_test() {
     // the data recorded in storage should be the same as the datasource
     let mut recorded_data = persistent.data.lock().await.clone();
     recorded_data.sort();
-    assert_eq!((10..=70u64).collect::<Vec<_>>(), recorded_data);
+    assert_eq!((10 ..= 70u64).collect::<Vec<_>>(), recorded_data);
 }
 
 fn new_gauge_vec(registry: &Registry, name: &str) -> IntGaugeVec {
@@ -561,11 +428,6 @@ fn new_gauge_vec(registry: &Registry, name: &str) -> IntGaugeVec {
 }
 
 fn new_counter_vec(registry: &Registry) -> IntCounterVec {
-    register_int_counter_vec_with_registry!(
-        "whatever_counter",
-        "whatever",
-        &["whatever1", "whatever2"],
-        registry,
-    )
-    .unwrap()
+    register_int_counter_vec_with_registry!("whatever_counter", "whatever", &["whatever1", "whatever2"], registry,)
+        .unwrap()
 }

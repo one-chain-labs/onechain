@@ -1,6 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+use move_core_types::language_storage::TypeTag;
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     base_types::{ObjectID, ObjectRef, SequenceNumber},
     digests::{ObjectDigest, TransactionDigest},
@@ -10,10 +16,6 @@ use crate::{
     storage::{BackingPackageStore, ObjectChange},
     transaction::Argument,
 };
-use move_core_types::language_storage::TypeTag;
-use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// A type containing all of the information needed to work with a deleted shared object in
 /// execution and when committing the execution effects of the transaction. This holds:
@@ -95,10 +97,8 @@ impl ExecutionResultsV2 {
     pub fn merge_results(&mut self, new_results: Self) {
         self.written_objects.extend(new_results.written_objects);
         self.modified_objects.extend(new_results.modified_objects);
-        self.created_object_ids
-            .extend(new_results.created_object_ids);
-        self.deleted_object_ids
-            .extend(new_results.deleted_object_ids);
+        self.created_object_ids.extend(new_results.created_object_ids);
+        self.deleted_object_ids.extend(new_results.deleted_object_ids);
         self.user_events.extend(new_results.user_events);
     }
 
@@ -134,10 +134,7 @@ impl ExecutionResultsV2 {
             // Record the version that the shared object was created at in its owner field.  Note,
             // this only works because shared objects must be created as shared (not created as
             // owned in one transaction and later converted to shared in another).
-            if let Owner::Shared {
-                initial_shared_version,
-            } = &mut obj.owner
-            {
+            if let Owner::Shared { initial_shared_version } = &mut obj.owner {
                 if self.created_object_ids.contains(id) {
                     assert_eq!(
                         *initial_shared_version,
@@ -149,9 +146,8 @@ impl ExecutionResultsV2 {
 
                 // Update initial_shared_version for reshared objects
                 if reshare_at_initial_version {
-                    if let Some(Owner::Shared {
-                        initial_shared_version: previous_initial_shared_version,
-                    }) = input_objects.get(id).map(|obj| &obj.owner)
+                    if let Some(Owner::Shared { initial_shared_version: previous_initial_shared_version }) =
+                        input_objects.get(id).map(|obj| &obj.owner)
                     {
                         debug_assert!(!self.created_object_ids.contains(id));
                         debug_assert!(!self.deleted_object_ids.contains(id));
@@ -199,6 +195,5 @@ pub fn is_certificate_denied(
     transaction_digest: &TransactionDigest,
     certificate_deny_set: &HashSet<TransactionDigest>,
 ) -> bool {
-    certificate_deny_set.contains(transaction_digest)
-        || get_denied_certificates().contains(transaction_digest)
+    certificate_deny_set.contains(transaction_digest) || get_denied_certificates().contains(transaction_digest)
 }

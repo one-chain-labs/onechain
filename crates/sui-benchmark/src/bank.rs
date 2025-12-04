@@ -1,19 +1,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::util::UpdatedAndNewlyMintedGasCoins;
-use crate::workloads::payload::Payload;
-use crate::workloads::workload::{Workload, WorkloadBuilder, MAX_BUDGET};
-use crate::workloads::{Gas, GasCoinConfig};
-use crate::ValidatorProxy;
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
+
 use anyhow::{Error, Result};
 use itertools::Itertools;
-use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
 use sui_core::test_utils::{make_pay_oct_transaction, make_transfer_oct_transaction};
-use sui_types::base_types::SuiAddress;
-use sui_types::crypto::AccountKeyPair;
+use sui_types::{base_types::SuiAddress, crypto::AccountKeyPair};
 use tracing::info;
+
+use crate::{
+    util::UpdatedAndNewlyMintedGasCoins,
+    workloads::{
+        payload::Payload,
+        workload::{Workload, WorkloadBuilder, MAX_BUDGET},
+        Gas,
+        GasCoinConfig,
+    },
+    ValidatorProxy,
+};
 
 /// Bank is used for generating gas for running the benchmark.
 #[derive(Clone)]
@@ -25,11 +33,9 @@ pub struct BenchmarkBank {
 
 impl BenchmarkBank {
     pub fn new(proxy: Arc<dyn ValidatorProxy + Send + Sync>, primary_coin: Gas) -> Self {
-        BenchmarkBank {
-            proxy,
-            primary_coin,
-        }
+        BenchmarkBank { proxy, primary_coin }
     }
+
     pub async fn generate(
         &mut self,
         builders: Vec<Box<dyn WorkloadBuilder<dyn Payload>>>,
@@ -44,9 +50,7 @@ impl BenchmarkBank {
             coin_configs.push_back(payload_gas_config);
         }
         let mut all_coin_configs = vec![];
-        coin_configs
-            .iter()
-            .for_each(|v| all_coin_configs.extend(v.clone()));
+        coin_configs.iter().for_each(|v| all_coin_configs.extend(v.clone()));
 
         let mut new_gas_coins: Vec<Gas> = vec![];
         let chunked_coin_configs = all_coin_configs.chunks(chunk_size as usize);
@@ -55,10 +59,7 @@ impl BenchmarkBank {
         // of main gas coin used by other instances of this tool.
         let total_gas_needed: u64 = all_coin_configs.iter().map(|c| c.amount).sum();
         let mut init_coin = self
-            .create_init_coin(
-                total_gas_needed + (MAX_BUDGET * chunked_coin_configs.len() as u64),
-                gas_price,
-            )
+            .create_init_coin(total_gas_needed + (MAX_BUDGET * chunked_coin_configs.len() as u64), gas_price)
             .await?;
 
         info!("Number of gas requests = {}", chunked_coin_configs.len());
@@ -73,20 +74,14 @@ impl BenchmarkBank {
             let init_gas: Vec<Gas> = init_gas_config
                 .iter()
                 .map(|c| {
-                    let (index, _) = new_gas_coins
-                        .iter()
-                        .find_position(|g| g.1 == c.address)
-                        .unwrap();
+                    let (index, _) = new_gas_coins.iter().find_position(|g| g.1 == c.address).unwrap();
                     new_gas_coins.remove(index)
                 })
                 .collect();
             let payload_gas: Vec<Gas> = payload_gas_config
                 .iter()
                 .map(|c| {
-                    let (index, _) = new_gas_coins
-                        .iter()
-                        .find_position(|g| g.1 == c.address)
-                        .unwrap();
+                    let (index, _) = new_gas_coins.iter().find_position(|g| g.1 == c.address).unwrap();
                     new_gas_coins.remove(index)
                 })
                 .collect();
@@ -104,11 +99,7 @@ impl BenchmarkBank {
         let recipient_addresses: Vec<SuiAddress> = coin_configs.iter().map(|g| g.address).collect();
         let amounts: Vec<u64> = coin_configs.iter().map(|c| c.amount).collect();
 
-        info!(
-            "Creating {} coin(s) of balance {}...",
-            amounts.len(),
-            amounts[0],
-        );
+        info!("Creating {} coin(s) of balance {}...", amounts.len(), amounts[0],);
 
         let tx = make_pay_oct_transaction(
             init_coin.0,
@@ -139,20 +130,16 @@ impl BenchmarkBank {
         init_coin.1 = updated_gas.1.get_owner_address()?;
         init_coin.2 = self.primary_coin.2.clone();
 
-        let address_map: HashMap<SuiAddress, Arc<AccountKeyPair>> = coin_configs
-            .iter()
-            .map(|c| (c.address, c.keypair.clone()))
-            .collect();
+        let address_map: HashMap<SuiAddress, Arc<AccountKeyPair>> =
+            coin_configs.iter().map(|c| (c.address, c.keypair.clone())).collect();
 
         let transferred_coins: Result<Vec<Gas>> = effects
             .created()
             .into_iter()
             .map(|c| {
                 let address = c.1.get_owner_address()?;
-                let keypair = address_map
-                    .get(&address)
-                    .ok_or("Owner address missing in the address map")
-                    .map_err(Error::msg)?;
+                let keypair =
+                    address_map.get(&address).ok_or("Owner address missing in the address map").map_err(Error::msg)?;
                 Ok((c.0, address, keypair.clone()))
             })
             .collect();
@@ -186,18 +173,10 @@ impl BenchmarkBank {
             .ok_or("Input gas missing in the effects")
             .map_err(Error::msg)?;
 
-        self.primary_coin = (
-            updated_gas.0,
-            updated_gas.1.get_owner_address()?,
-            self.primary_coin.2.clone(),
-        );
+        self.primary_coin = (updated_gas.0, updated_gas.1.get_owner_address()?, self.primary_coin.2.clone());
 
         match effects.created().first() {
-            Some(created_coin) => Ok((
-                created_coin.0,
-                created_coin.1.get_owner_address()?,
-                self.primary_coin.2.clone(),
-            )),
+            Some(created_coin) => Ok((created_coin.0, created_coin.1.get_owner_address()?, self.primary_coin.2.clone())),
             None => panic!("Failed to create initilization coin for workload."),
         }
     }

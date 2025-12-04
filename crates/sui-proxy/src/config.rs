@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use anyhow::{Context, Result};
 use core::time::Duration;
+use std::net::SocketAddr;
+
+use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use std::net::SocketAddr;
 use tracing::debug;
 
 #[serde_as]
@@ -102,9 +103,7 @@ fn remote_write_url() -> String {
 pub fn load<P: AsRef<std::path::Path>, T: DeserializeOwned + Serialize>(path: P) -> Result<T> {
     let path = path.as_ref();
     debug!("Reading config from {:?}", path);
-    Ok(serde_yaml::from_reader(
-        std::fs::File::open(path).context(format!("cannot open {:?}", path))?,
-    )?)
+    Ok(serde_yaml::from_reader(std::fs::File::open(path).context(format!("cannot open {:?}", path))?)?)
 }
 
 #[cfg(test)]

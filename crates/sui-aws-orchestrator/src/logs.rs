@@ -38,9 +38,7 @@ impl LogsAnalyzer {
         for counter in counters {
             if counter.node_panic || counter.client_panic {
                 return counter;
-            } else if counter.client_errors > highest.client_errors
-                || counter.node_errors > highest.node_errors
-            {
+            } else if counter.client_errors > highest.client_errors || counter.node_errors > highest.node_errors {
                 highest = counter;
             }
         }
@@ -55,10 +53,7 @@ impl LogsAnalyzer {
             display::error("Client(s) panicked!");
         } else if self.node_errors != 0 || self.client_errors != 0 {
             display::newline();
-            display::warn(format!(
-                "Logs contain errors (node: {}, client: {})",
-                self.node_errors, self.client_errors
-            ));
+            display::warn(format!("Logs contain errors (node: {}, client: {})", self.node_errors, self.client_errors));
         }
     }
 }

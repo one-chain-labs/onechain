@@ -1,24 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ingestion::local_client::LocalIngestionClient;
-use crate::ingestion::remote_client::RemoteIngestionClient;
-use crate::ingestion::Error as IngestionError;
-use crate::ingestion::Result as IngestionResult;
-use crate::metrics::CheckpointLagMetricReporter;
-use crate::metrics::IndexerMetrics;
-use backoff::backoff::Constant;
-use backoff::Error as BE;
-use backoff::ExponentialBackoff;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{path::PathBuf, sync::Arc, time::Duration};
+
+use backoff::{backoff::Constant, Error as BE, ExponentialBackoff};
 use sui_storage::blob::Blob;
 use sui_types::full_checkpoint_content::CheckpointData;
-use tokio_util::bytes::Bytes;
-use tokio_util::sync::CancellationToken;
+use tokio_util::{bytes::Bytes, sync::CancellationToken};
 use tracing::debug;
 use url::Url;
+
+use crate::{
+    ingestion::{
+        local_client::LocalIngestionClient,
+        remote_client::RemoteIngestionClient,
+        Error as IngestionError,
+        Result as IngestionResult,
+    },
+    metrics::{CheckpointLagMetricReporter, IndexerMetrics},
+};
 
 /// Wait at most this long between retries for transient errors.
 const MAX_TRANSIENT_RETRY_INTERVAL: Duration = Duration::from_secs(60);
@@ -69,11 +69,7 @@ impl IngestionClient {
             metrics.latest_ingested_checkpoint_timestamp_lag_ms.clone(),
             metrics.latest_ingested_checkpoint.clone(),
         );
-        IngestionClient {
-            client,
-            metrics,
-            checkpoint_lag_reporter,
-        }
+        IngestionClient { client, metrics, checkpoint_lag_reporter }
     }
 
     /// Fetch checkpoint data by sequence number.
@@ -135,14 +131,10 @@ impl IngestionClient {
 
                 let bytes = client.fetch(checkpoint).await.map_err(|err| match err {
                     FetchError::NotFound => BE::permanent(IngestionError::NotFound(checkpoint)),
-                    FetchError::Permanent(error) => {
-                        BE::permanent(IngestionError::FetchError(checkpoint, error))
+                    FetchError::Permanent(error) => BE::permanent(IngestionError::FetchError(checkpoint, error)),
+                    FetchError::Transient { reason, error } => {
+                        self.metrics.inc_retry(checkpoint, reason, IngestionError::FetchError(checkpoint, error))
                     }
-                    FetchError::Transient { reason, error } => self.metrics.inc_retry(
-                        checkpoint,
-                        reason,
-                        IngestionError::FetchError(checkpoint, error),
-                    ),
                 })?;
 
                 self.metrics.total_ingested_bytes.inc_by(bytes.len() as u64);
@@ -169,41 +161,25 @@ impl IngestionClient {
         let data = backoff::future::retry(backoff, request).await?;
         let elapsed = guard.stop_and_record();
 
-        debug!(
-            checkpoint,
-            elapsed_ms = elapsed * 1000.0,
-            "Fetched checkpoint"
-        );
+        debug!(checkpoint, elapsed_ms = elapsed * 1000.0, "Fetched checkpoint");
 
-        self.checkpoint_lag_reporter
-            .report_lag(checkpoint, data.checkpoint_summary.timestamp_ms);
+        self.checkpoint_lag_reporter.report_lag(checkpoint, data.checkpoint_summary.timestamp_ms);
 
         self.metrics.total_ingested_checkpoints.inc();
 
+        self.metrics.total_ingested_transactions.inc_by(data.transactions.len() as u64);
+
         self.metrics
-            .total_ingested_transactions
-            .inc_by(data.transactions.len() as u64);
+            .total_ingested_events
+            .inc_by(data.transactions.iter().map(|tx| tx.events.as_ref().map_or(0, |evs| evs.data.len()) as u64).sum());
 
-        self.metrics.total_ingested_events.inc_by(
-            data.transactions
-                .iter()
-                .map(|tx| tx.events.as_ref().map_or(0, |evs| evs.data.len()) as u64)
-                .sum(),
-        );
+        self.metrics
+            .total_ingested_inputs
+            .inc_by(data.transactions.iter().map(|tx| tx.input_objects.len() as u64).sum());
 
-        self.metrics.total_ingested_inputs.inc_by(
-            data.transactions
-                .iter()
-                .map(|tx| tx.input_objects.len() as u64)
-                .sum(),
-        );
-
-        self.metrics.total_ingested_outputs.inc_by(
-            data.transactions
-                .iter()
-                .map(|tx| tx.output_objects.len() as u64)
-                .sum(),
-        );
+        self.metrics
+            .total_ingested_outputs
+            .inc_by(data.transactions.iter().map(|tx| tx.output_objects.len() as u64).sum());
 
         Ok(Arc::new(data))
     }

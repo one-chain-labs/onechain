@@ -1,19 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
-use fastcrypto::error::FastCryptoError;
-use fastcrypto::hash::{Keccak256, Sha256};
-use fastcrypto::traits::RecoverableSignature;
+use std::collections::VecDeque;
+
 use fastcrypto::{
-    secp256r1::{
-        recoverable::Secp256r1RecoverableSignature, Secp256r1PublicKey, Secp256r1Signature,
-    },
-    traits::ToFromBytes,
+    error::FastCryptoError,
+    hash::{Keccak256, Sha256},
+    secp256r1::{recoverable::Secp256r1RecoverableSignature, Secp256r1PublicKey, Secp256r1Signature},
+    traits::{RecoverableSignature, ToFromBytes},
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_charge_gas_early_exit;
-use move_vm_runtime::native_functions::NativeContext;
+use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
@@ -21,7 +18,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 pub const FAIL_TO_RECOVER_PUBKEY: u64 = 0;
 pub const INVALID_SIGNATURE: u64 = 1;
@@ -72,10 +70,7 @@ pub fn ecrecover(
     // Load the cost parameters from the protocol config
     let (ecdsa_r1_ecrecover_cost_params, crypto_invalid_arguments_cost) = {
         let cost_table = &context.extensions().get::<NativesCostTable>();
-        (
-            cost_table.ecdsa_r1_ecrecover_cost_params.clone(),
-            cost_table.crypto_invalid_arguments_cost,
-        )
+        (cost_table.ecdsa_r1_ecrecover_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
 
     let (base_cost, cost_per_byte, cost_per_block, block_size) = match hash {
@@ -95,10 +90,7 @@ pub fn ecrecover(
             // Charge for failure but dont fail if we run out of gas otherwise the actual error is masked by OUT_OF_GAS error
             context.charge_gas(crypto_invalid_arguments_cost);
 
-            return Ok(NativeResult::err(
-                context.gas_used(),
-                FAIL_TO_RECOVER_PUBKEY,
-            ));
+            return Ok(NativeResult::err(context.gas_used(), FAIL_TO_RECOVER_PUBKEY));
         }
     };
 
@@ -131,10 +123,7 @@ pub fn ecrecover(
     };
 
     match pk {
-        Ok(pk) => Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::vector_u8(pk.as_bytes().to_vec())],
-        )),
+        Ok(pk) => Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(pk.as_bytes().to_vec())])),
         Err(_) => Ok(NativeResult::err(cost, FAIL_TO_RECOVER_PUBKEY)),
     }
 }
@@ -176,36 +165,26 @@ pub fn secp256r1_verify(
     // Load the cost parameters from the protocol config
     let (ecdsa_r1_secp256_r1_verify_cost_params, crypto_invalid_arguments_cost) = {
         let cost_table = &context.extensions().get::<NativesCostTable>();
-        (
-            cost_table.ecdsa_r1_secp256_r1_verify_cost_params.clone(),
-            cost_table.crypto_invalid_arguments_cost,
-        )
+        (cost_table.ecdsa_r1_secp256_r1_verify_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
     let hash = pop_arg!(args, u8);
     let (base_cost, cost_per_byte, cost_per_block, block_size) = match hash {
         KECCAK256 => (
             ecdsa_r1_secp256_r1_verify_cost_params.ecdsa_r1_secp256r1_verify_keccak256_cost_base,
-            ecdsa_r1_secp256_r1_verify_cost_params
-                .ecdsa_r1_secp256r1_verify_keccak256_msg_cost_per_byte,
-            ecdsa_r1_secp256_r1_verify_cost_params
-                .ecdsa_r1_secp256r1_verify_keccak256_msg_cost_per_block,
+            ecdsa_r1_secp256_r1_verify_cost_params.ecdsa_r1_secp256r1_verify_keccak256_msg_cost_per_byte,
+            ecdsa_r1_secp256_r1_verify_cost_params.ecdsa_r1_secp256r1_verify_keccak256_msg_cost_per_block,
             KECCAK256_BLOCK_SIZE,
         ),
         SHA256 => (
             ecdsa_r1_secp256_r1_verify_cost_params.ecdsa_r1_secp256r1_verify_sha256_cost_base,
-            ecdsa_r1_secp256_r1_verify_cost_params
-                .ecdsa_r1_secp256r1_verify_sha256_msg_cost_per_byte,
-            ecdsa_r1_secp256_r1_verify_cost_params
-                .ecdsa_r1_secp256r1_verify_sha256_msg_cost_per_block,
+            ecdsa_r1_secp256_r1_verify_cost_params.ecdsa_r1_secp256r1_verify_sha256_msg_cost_per_byte,
+            ecdsa_r1_secp256_r1_verify_cost_params.ecdsa_r1_secp256r1_verify_sha256_msg_cost_per_block,
             SHA256_BLOCK_SIZE,
         ),
         _ => {
             // Charge for failure but dont fail if we run out of gas otherwise the actual error is masked by OUT_OF_GAS error
             context.charge_gas(crypto_invalid_arguments_cost);
-            return Ok(NativeResult::ok(
-                context.gas_used(),
-                smallvec![Value::bool(false)],
-            ));
+            return Ok(NativeResult::ok(context.gas_used(), smallvec![Value::bool(false)]));
         }
     };
 

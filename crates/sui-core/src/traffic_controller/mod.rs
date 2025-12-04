@@ -6,27 +6,29 @@ pub mod nodefw_client;
 pub mod nodefw_test_server;
 pub mod policies;
 
+use std::{
+    fmt::Debug,
+    fs,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::Add,
+    sync::Arc,
+    time::{Duration, Instant, SystemTime},
+};
+
 use dashmap::DashMap;
 use fs::File;
+use mysten_metrics::spawn_monitored_task;
 use prometheus::IntGauge;
-use std::fs;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::ops::Add;
-use std::sync::Arc;
+use rand::Rng;
+use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig, Weight};
+use tokio::sync::{mpsc, mpsc::error::TrySendError};
+use tracing::{debug, error, info, trace, warn};
 
 use self::metrics::TrafficControllerMetrics;
-use crate::traffic_controller::nodefw_client::{BlockAddress, BlockAddresses, NodeFWClient};
-use crate::traffic_controller::policies::{
-    Policy, PolicyResponse, TrafficControlPolicy, TrafficTally,
+use crate::traffic_controller::{
+    nodefw_client::{BlockAddress, BlockAddresses, NodeFWClient},
+    policies::{Policy, PolicyResponse, TrafficControlPolicy, TrafficTally},
 };
-use mysten_metrics::spawn_monitored_task;
-use rand::Rng;
-use std::fmt::Debug;
-use std::time::{Duration, Instant, SystemTime};
-use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig, Weight};
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::TrySendError;
-use tracing::{debug, error, info, trace, warn};
 
 pub const METRICS_INTERVAL_SECS: u64 = 2;
 pub const DEFAULT_DRAIN_TIMEOUT_SECS: u64 = 300;
@@ -65,14 +67,8 @@ impl Debug for TrafficController {
         // to get length from the metrics rather than from the blocklists themselves
         // to avoid unneccesarily aquiring the read lock.
         f.debug_struct("TrafficController")
-            .field(
-                "connection_ip_blocklist_len",
-                &self.metrics.connection_ip_blocklist_len.get(),
-            )
-            .field(
-                "proxy_ip_blocklist_len",
-                &self.metrics.proxy_ip_blocklist_len.get(),
-            )
+            .field("connection_ip_blocklist_len", &self.metrics.connection_ip_blocklist_len.get())
+            .field("proxy_ip_blocklist_len", &self.metrics.proxy_ip_blocklist_len.get())
             .finish()
     }
 }
@@ -88,9 +84,7 @@ impl TrafficController {
                 let allowlist = allow_list
                     .into_iter()
                     .map(|ip_str| {
-                        parse_ip(&ip_str).unwrap_or_else(|| {
-                            panic!("Failed to parse allowlist IP address: {:?}", ip_str)
-                        })
+                        parse_ip(&ip_str).unwrap_or_else(|| panic!("Failed to parse allowlist IP address: {:?}", ip_str))
                     })
                     .collect();
                 Self {
@@ -115,17 +109,9 @@ impl TrafficController {
         // funtions to prevent them from continuing to populate blocklists
         // if drain is set, as otherwise it will grow without bounds
         // without the firewall running to periodically clear it.
-        let mem_drainfile_present = fw_config
-            .as_ref()
-            .map(|config| config.drain_path.exists())
-            .unwrap_or(false);
-        metrics
-            .deadmans_switch_enabled
-            .set(mem_drainfile_present as i64);
-        let blocklists = Blocklists {
-            clients: Arc::new(DashMap::new()),
-            proxied_clients: Arc::new(DashMap::new()),
-        };
+        let mem_drainfile_present = fw_config.as_ref().map(|config| config.drain_path.exists()).unwrap_or(false);
+        metrics.deadmans_switch_enabled.set(mem_drainfile_present as i64);
+        let blocklists = Blocklists { clients: Arc::new(DashMap::new()), proxied_clients: Arc::new(DashMap::new()) };
         let tally_loop_blocklists = blocklists.clone();
         let clear_loop_blocklists = blocklists.clone();
         let tally_loop_metrics = metrics.clone();
@@ -139,22 +125,11 @@ impl TrafficController {
             tally_loop_metrics,
             mem_drainfile_present,
         ));
-        spawn_monitored_task!(run_clear_blocklists_loop(
-            clear_loop_blocklists,
-            clear_loop_metrics,
-        ));
-        Self {
-            tally_channel: Some(tx),
-            acl: Acl::Blocklists(blocklists),
-            metrics: metrics.clone(),
-            dry_run_mode,
-        }
+        spawn_monitored_task!(run_clear_blocklists_loop(clear_loop_blocklists, clear_loop_metrics,));
+        Self { tally_channel: Some(tx), acl: Acl::Blocklists(blocklists), metrics: metrics.clone(), dry_run_mode }
     }
 
-    pub fn init_for_test(
-        policy_config: PolicyConfig,
-        fw_config: Option<RemoteFirewallConfig>,
-    ) -> Self {
+    pub fn init_for_test(policy_config: PolicyConfig, fw_config: Option<RemoteFirewallConfig>) -> Self {
         let metrics = TrafficControllerMetrics::new(&prometheus::Registry::new());
         Self::init(policy_config, metrics, fw_config)
     }
@@ -205,9 +180,7 @@ impl TrafficController {
                 check_with_dry_run_maybe(allowed)
             }
             Acl::Blocklists(blocklists) => {
-                let allowed = self
-                    .check_blocklists(blocklists, client, proxied_client)
-                    .await;
+                let allowed = self.check_blocklists(blocklists, client, proxied_client).await;
                 check_with_dry_run_maybe(allowed)
             }
         }
@@ -230,8 +203,7 @@ impl TrafficController {
             blocklists.proxied_clients.clone(),
             &self.metrics.proxy_ip_blocklist_len,
         );
-        let (client_check, proxied_client_check) =
-            futures::future::join(client_check, proxied_client_check).await;
+        let (client_check, proxied_client_check) = futures::future::join(client_check, proxied_client_check).await;
         client_check && proxied_client_check
     }
 
@@ -278,15 +250,9 @@ async fn run_clear_blocklists_loop(blocklists: Blocklists, metrics: Arc<TrafficC
         tokio::time::sleep(Duration::from_secs(3)).await;
         let now = SystemTime::now();
         blocklists.clients.retain(|_, expiration| now < *expiration);
-        blocklists
-            .proxied_clients
-            .retain(|_, expiration| now < *expiration);
-        metrics
-            .connection_ip_blocklist_len
-            .set(blocklists.clients.len() as i64);
-        metrics
-            .proxy_ip_blocklist_len
-            .set(blocklists.proxied_clients.len() as i64);
+        blocklists.proxied_clients.retain(|_, expiration| now < *expiration);
+        metrics.connection_ip_blocklist_len.set(blocklists.clients.len() as i64);
+        metrics.proxy_ip_blocklist_len.set(blocklists.proxied_clients.len() as i64);
     }
 }
 
@@ -302,14 +268,9 @@ async fn run_tally_loop(
     let mut error_policy = TrafficControlPolicy::from_error_config(policy_config.clone()).await;
     let spam_blocklists = Arc::new(blocklists.clone());
     let error_blocklists = Arc::new(blocklists);
-    let node_fw_client = fw_config
-        .as_ref()
-        .map(|fw_config| NodeFWClient::new(fw_config.remote_fw_url.clone()));
+    let node_fw_client = fw_config.as_ref().map(|fw_config| NodeFWClient::new(fw_config.remote_fw_url.clone()));
 
-    let timeout = fw_config
-        .as_ref()
-        .map(|fw_config| fw_config.drain_timeout_secs)
-        .unwrap_or(DEFAULT_DRAIN_TIMEOUT_SECS);
+    let timeout = fw_config.as_ref().map(|fw_config| fw_config.drain_timeout_secs).unwrap_or(DEFAULT_DRAIN_TIMEOUT_SECS);
     let mut metric_timer = Instant::now();
 
     loop {
@@ -375,39 +336,22 @@ async fn run_tally_loop(
         if metric_timer.elapsed() > Duration::from_secs(METRICS_INTERVAL_SECS) {
             if let TrafficControlPolicy::FreqThreshold(spam_policy) = &spam_policy {
                 if let Some(highest_direct_rate) = spam_policy.highest_direct_rate() {
-                    metrics
-                        .highest_direct_spam_rate
-                        .set(highest_direct_rate.0 as i64);
+                    metrics.highest_direct_spam_rate.set(highest_direct_rate.0 as i64);
                     debug!("Recent highest direct spam rate: {:?}", highest_direct_rate);
                 }
                 if let Some(highest_proxied_rate) = spam_policy.highest_proxied_rate() {
-                    metrics
-                        .highest_proxied_spam_rate
-                        .set(highest_proxied_rate.0 as i64);
-                    debug!(
-                        "Recent highest proxied spam rate: {:?}",
-                        highest_proxied_rate
-                    );
+                    metrics.highest_proxied_spam_rate.set(highest_proxied_rate.0 as i64);
+                    debug!("Recent highest proxied spam rate: {:?}", highest_proxied_rate);
                 }
             }
             if let TrafficControlPolicy::FreqThreshold(error_policy) = &error_policy {
                 if let Some(highest_direct_rate) = error_policy.highest_direct_rate() {
-                    metrics
-                        .highest_direct_error_rate
-                        .set(highest_direct_rate.0 as i64);
-                    debug!(
-                        "Recent highest direct error rate: {:?}",
-                        highest_direct_rate
-                    );
+                    metrics.highest_direct_error_rate.set(highest_direct_rate.0 as i64);
+                    debug!("Recent highest direct error rate: {:?}", highest_direct_rate);
                 }
                 if let Some(highest_proxied_rate) = error_policy.highest_proxied_rate() {
-                    metrics
-                        .highest_proxied_error_rate
-                        .set(highest_proxied_rate.0 as i64);
-                    debug!(
-                        "Recent highest proxied error rate: {:?}",
-                        highest_proxied_rate
-                    );
+                    metrics.highest_proxied_error_rate.set(highest_proxied_rate.0 as i64);
+                    debug!("Recent highest proxied error rate: {:?}", highest_proxied_rate);
                 }
             }
             metric_timer = Instant::now();
@@ -431,30 +375,15 @@ async fn handle_error_tally(
     if !error_weight.is_sampled() {
         return Ok(());
     }
-    trace!(
-        "Handling error_type {:?} from client {:?}",
-        error_type,
-        tally.direct,
-    );
-    metrics
-        .tally_error_types
-        .with_label_values(&[error_type.as_str()])
-        .inc();
+    trace!("Handling error_type {:?} from client {:?}", error_type, tally.direct,);
+    metrics.tally_error_types.with_label_values(&[error_type.as_str()]).inc();
     let resp = policy.handle_tally(tally);
     metrics.error_tally_handled.inc();
     if let Some(fw_config) = fw_config {
         if fw_config.delegate_error_blocking && !mem_drainfile_present {
-            let client = nodefw_client
-                .as_ref()
-                .expect("Expected NodeFWClient for blocklist delegation");
-            return delegate_policy_response(
-                resp,
-                policy_config,
-                client,
-                fw_config.destination_port,
-                metrics.clone(),
-            )
-            .await;
+            let client = nodefw_client.as_ref().expect("Expected NodeFWClient for blocklist delegation");
+            return delegate_policy_response(resp, policy_config, client, fw_config.destination_port, metrics.clone())
+                .await;
         }
     }
     handle_policy_response(resp, policy_config, blocklists, metrics).await;
@@ -478,17 +407,9 @@ async fn handle_spam_tally(
     metrics.tally_handled.inc();
     if let Some(fw_config) = fw_config {
         if fw_config.delegate_spam_blocking && !mem_drainfile_present {
-            let client = nodefw_client
-                .as_ref()
-                .expect("Expected NodeFWClient for blocklist delegation");
-            return delegate_policy_response(
-                resp,
-                policy_config,
-                client,
-                fw_config.destination_port,
-                metrics.clone(),
-            )
-            .await;
+            let client = nodefw_client.as_ref().expect("Expected NodeFWClient for blocklist delegation");
+            return delegate_policy_response(resp, policy_config, client, fw_config.destination_port, metrics.clone())
+                .await;
         }
     }
     handle_policy_response(resp, policy_config, blocklists, metrics).await;
@@ -501,22 +422,12 @@ async fn handle_policy_response(
     blocklists: Arc<Blocklists>,
     metrics: Arc<TrafficControllerMetrics>,
 ) {
-    let PolicyResponse {
-        block_client,
-        block_proxied_client,
-    } = response;
-    let PolicyConfig {
-        connection_blocklist_ttl_sec,
-        proxy_blocklist_ttl_sec,
-        ..
-    } = policy_config;
+    let PolicyResponse { block_client, block_proxied_client } = response;
+    let PolicyConfig { connection_blocklist_ttl_sec, proxy_blocklist_ttl_sec, .. } = policy_config;
     if let Some(client) = block_client {
         if blocklists
             .clients
-            .insert(
-                client,
-                SystemTime::now() + Duration::from_secs(*connection_blocklist_ttl_sec),
-            )
+            .insert(client, SystemTime::now() + Duration::from_secs(*connection_blocklist_ttl_sec))
             .is_none()
         {
             // Only increment the metric if the client was not already blocked
@@ -528,10 +439,7 @@ async fn handle_policy_response(
     if let Some(client) = block_proxied_client {
         if blocklists
             .proxied_clients
-            .insert(
-                client,
-                SystemTime::now() + Duration::from_secs(*proxy_blocklist_ttl_sec),
-            )
+            .insert(client, SystemTime::now() + Duration::from_secs(*proxy_blocklist_ttl_sec))
             .is_none()
         {
             // Only increment the metric if the client was not already blocked
@@ -549,15 +457,8 @@ async fn delegate_policy_response(
     destination_port: u16,
     metrics: Arc<TrafficControllerMetrics>,
 ) -> Result<(), reqwest::Error> {
-    let PolicyResponse {
-        block_client,
-        block_proxied_client,
-    } = response;
-    let PolicyConfig {
-        connection_blocklist_ttl_sec,
-        proxy_blocklist_ttl_sec,
-        ..
-    } = policy_config;
+    let PolicyResponse { block_client, block_proxied_client } = response;
+    let PolicyConfig { connection_blocklist_ttl_sec, proxy_blocklist_ttl_sec, .. } = policy_config;
     let mut addresses = vec![];
     if let Some(client_id) = block_client {
         debug!("Delegating client blocking to firewall");
@@ -569,22 +470,13 @@ async fn delegate_policy_response(
     }
     if let Some(ip) = block_proxied_client {
         debug!("Delegating proxied client blocking to firewall");
-        addresses.push(BlockAddress {
-            source_address: ip.to_string(),
-            destination_port,
-            ttl: *proxy_blocklist_ttl_sec,
-        });
+        addresses.push(BlockAddress { source_address: ip.to_string(), destination_port, ttl: *proxy_blocklist_ttl_sec });
     }
     if addresses.is_empty() {
         Ok(())
     } else {
-        metrics
-            .blocks_delegated_to_firewall
-            .inc_by(addresses.len() as u64);
-        match node_fw_client
-            .block_addresses(BlockAddresses { addresses })
-            .await
-        {
+        metrics.blocks_delegated_to_firewall.inc_by(addresses.len() as u64);
+        match node_fw_client.block_addresses(BlockAddresses { addresses }).await {
             Ok(()) => Ok(()),
             Err(err) => {
                 metrics.firewall_delegation_request_fail.inc();
@@ -630,10 +522,7 @@ impl Add for TrafficSimMetrics {
                 (None, Some(b)) => Some(b),
                 (None, None) => None,
             },
-            abs_time_to_first_block: match (
-                self.abs_time_to_first_block,
-                other.abs_time_to_first_block,
-            ) {
+            abs_time_to_first_block: match (self.abs_time_to_first_block, other.abs_time_to_first_block) {
                 (Some(a), Some(b)) => Some(a.min(b)),
                 (Some(a), None) => Some(a),
                 (None, Some(b)) => Some(b),
@@ -667,30 +556,19 @@ impl TrafficSim {
         assert!(duration.as_secs() > 0);
 
         let controller = TrafficController::init_for_test(policy.clone(), None);
-        let tasks = (0..num_clients).map(|task_num| {
-            tokio::spawn(Self::run_single_client(
-                controller.clone(),
-                duration,
-                task_num,
-                per_client_tps,
-            ))
+        let tasks = (0 .. num_clients).map(|task_num| {
+            tokio::spawn(Self::run_single_client(controller.clone(), duration, task_num, per_client_tps))
         });
 
         let status_task = if report {
             Some(tokio::spawn(async move {
-                println!(
-                    "Running naive traffic simulation for {} seconds",
-                    duration.as_secs()
-                );
+                println!("Running naive traffic simulation for {} seconds", duration.as_secs());
                 println!("Policy: {:#?}", policy);
                 println!("Num clients: {}", num_clients);
                 println!("TPS per client: {}", per_client_tps);
-                println!(
-                    "Target total TPS: {}",
-                    per_client_tps * num_clients as usize
-                );
+                println!("Target total TPS: {}", per_client_tps * num_clients as usize);
                 println!("\n");
-                for _ in 0..duration.as_secs() {
+                for _ in 0 .. duration.as_secs() {
                     print!(".");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
@@ -704,10 +582,7 @@ impl TrafficSim {
             TrafficSimMetrics::default(),
             |acc, run_client_ret| {
                 if run_client_ret.is_err() {
-                    error!(
-                        "Error running traffic sim client: {:?}",
-                        run_client_ret.err()
-                    );
+                    error!("Error running traffic sim client: {:?}", run_client_ret.err());
                     acc
                 } else {
                     let metrics = run_client_ret.unwrap();
@@ -732,7 +607,7 @@ impl TrafficSim {
         // Do an initial sleep for a random amount of time to smooth
         // out the traffic. This shouldn't be strictly necessary and
         // we can remove if we want more determinism
-        let sleep_time = Duration::from_micros(rand::thread_rng().gen_range(0..100));
+        let sleep_time = Duration::from_micros(rand::thread_rng().gen_range(0 .. 100));
         tokio::time::sleep(sleep_time).await;
 
         // collectors
@@ -786,19 +661,11 @@ impl TrafficSim {
         }
     }
 
-    fn report_metrics(
-        metrics: TrafficSimMetrics,
-        duration: Duration,
-        per_client_tps: usize,
-        num_clients: u8,
-    ) {
+    fn report_metrics(metrics: TrafficSimMetrics, duration: Duration, per_client_tps: usize, num_clients: u8) {
         println!("TrafficSim metrics:");
         println!("-------------------");
         // The below two should be near equal
-        println!(
-            "Num expected requests: {}",
-            per_client_tps * (num_clients as usize) * duration.as_secs() as usize
-        );
+        println!("Num expected requests: {}", per_client_tps * (num_clients as usize) * duration.as_secs() as usize);
         println!("Num actual requests: {}", metrics.num_requests);
         // This reflects the number of requests that were blocked, but note that once a client
         // is added to the blocklist, all subsequent requests from that client are blocked
@@ -806,43 +673,29 @@ impl TrafficSim {
         println!("Num blocked requests: {}", metrics.num_blocked);
         // This metric on the other hand reflects the number of times a client was added to the blocklist
         // and thus can be compared an the expectation based on the policy block threshold and ttl
-        println!(
-            "Num times added to blocklist: {}",
-            metrics.num_blocklist_adds
-        );
+        println!("Num times added to blocklist: {}", metrics.num_blocklist_adds);
         // This averages the duration for the first request to be blocked across all clients,
         // which is useful for understanding if the policy is rate limiting based on expectation
-        let avg_first_block_time = metrics
-            .time_to_first_block
-            .map(|ttf| ttf / num_clients as u32);
+        let avg_first_block_time = metrics.time_to_first_block.map(|ttf| ttf / num_clients as u32);
         println!("Average time to first block: {:?}", avg_first_block_time);
         // This is the time it took for the first request to be blocked across all clients,
         // and is instead more useful for understanding false positives in terms of rate and magnitude.
-        println!(
-            "Abolute time to first block (across all clients): {:?}",
-            metrics.abs_time_to_first_block
-        );
+        println!("Abolute time to first block (across all clients): {:?}", metrics.abs_time_to_first_block);
         // Useful for ensuring that TTL is respected
         let avg_time_blocked = if metrics.num_blocklist_adds > 0 {
             metrics.total_time_blocked.as_millis() as u64 / metrics.num_blocklist_adds
         } else {
             0
         };
-        println!(
-            "Average time blocked (ttl): {:?}",
-            Duration::from_millis(avg_time_blocked)
-        );
+        println!("Average time blocked (ttl): {:?}", Duration::from_millis(avg_time_blocked));
     }
 }
 
 pub fn parse_ip(ip: &str) -> Option<IpAddr> {
     ip.parse::<IpAddr>().ok().or_else(|| {
-        ip.parse::<SocketAddr>()
-            .ok()
-            .map(|socket_addr| socket_addr.ip())
-            .or_else(|| {
-                error!("Failed to parse value of {:?} to ip address or socket.", ip,);
-                None
-            })
+        ip.parse::<SocketAddr>().ok().map(|socket_addr| socket_addr.ip()).or_else(|| {
+            error!("Failed to parse value of {:?} to ip address or socket.", ip,);
+            None
+        })
     })
 }

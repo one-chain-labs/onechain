@@ -3,12 +3,17 @@
 
 use camino::Utf8PathBuf;
 use sui_config::local_ip_utils;
-use sui_genesis_builder::validator_info::ValidatorInfo;
-use sui_genesis_builder::Builder;
-use sui_types::base_types::SuiAddress;
-use sui_types::crypto::{
-    generate_proof_of_possession, get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair,
-    KeypairTraits, NetworkKeyPair,
+use sui_genesis_builder::{validator_info::ValidatorInfo, Builder};
+use sui_types::{
+    base_types::SuiAddress,
+    crypto::{
+        generate_proof_of_possession,
+        get_key_pair_from_rng,
+        AccountKeyPair,
+        AuthorityKeyPair,
+        KeypairTraits,
+        NetworkKeyPair,
+    },
 };
 
 #[tokio::main]
@@ -18,7 +23,7 @@ async fn main() {
 
     let mut builder = Builder::new();
     let mut keys = Vec::new();
-    for i in 0..2 {
+    for i in 0 .. 2 {
         let key: AuthorityKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
         let worker_key: NetworkKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
         let account_key: AccountKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;

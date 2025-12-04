@@ -8,12 +8,11 @@ use tokio::{task::JoinHandle, time::interval};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
+use super::{Handler, PrunerConfig};
 use crate::{
     metrics::IndexerMetrics,
     watermarks::{ReaderWatermark, StoredWatermark},
 };
-
-use super::{Handler, PrunerConfig};
 
 /// The reader watermark task is responsible for updating the `reader_lo` and `pruner_timestamp`
 /// values for a pipeline's row in the watermark table, based on the pruner configuration, and the

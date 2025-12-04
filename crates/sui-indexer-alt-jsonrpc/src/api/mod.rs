@@ -1,17 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use diesel::dsl::Limit;
-use diesel::pg::Pg;
-use diesel::query_builder::QueryFragment;
-use diesel::query_dsl::methods::LimitDsl;
-use diesel::result::Error as DieselError;
-use diesel_async::methods::LoadQuery;
-use diesel_async::RunQueryDsl;
-use jsonrpsee::core::Error as RpcError;
-use jsonrpsee::types::{
-    error::{CallError, INTERNAL_ERROR_CODE},
-    ErrorObject,
+use diesel::{
+    dsl::Limit,
+    pg::Pg,
+    query_builder::QueryFragment,
+    query_dsl::methods::LimitDsl,
+    result::Error as DieselError,
+};
+use diesel_async::{methods::LoadQuery, RunQueryDsl};
+use jsonrpsee::{
+    core::Error as RpcError,
+    types::{
+        error::{CallError, INTERNAL_ERROR_CODE},
+        ErrorObject,
+    },
 };
 use sui_pg_db as db;
 use tracing::debug;
@@ -52,17 +55,13 @@ impl<'p> Connection<'p> {
 impl From<DbError> for RpcError {
     fn from(err: DbError) -> RpcError {
         match err {
-            DbError::Connect(err) => RpcError::Call(CallError::Custom(ErrorObject::owned(
-                INTERNAL_ERROR_CODE,
-                err.to_string(),
-                None::<()>,
-            ))),
+            DbError::Connect(err) => {
+                RpcError::Call(CallError::Custom(ErrorObject::owned(INTERNAL_ERROR_CODE, err.to_string(), None::<()>)))
+            }
 
-            DbError::RunQuery(err) => RpcError::Call(CallError::Custom(ErrorObject::owned(
-                INTERNAL_ERROR_CODE,
-                err.to_string(),
-                None::<()>,
-            ))),
+            DbError::RunQuery(err) => {
+                RpcError::Call(CallError::Custom(ErrorObject::owned(INTERNAL_ERROR_CODE, err.to_string(), None::<()>)))
+            }
         }
     }
 }

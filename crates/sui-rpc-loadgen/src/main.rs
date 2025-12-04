@@ -4,29 +4,33 @@
 mod load_test;
 mod payload;
 
+use std::{
+    error::Error,
+    path::PathBuf,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
 use anyhow::Result;
 use clap::Parser;
 use payload::AddressQueryType;
-
-use std::error::Error;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
 use sui_types::crypto::{EncodeDecodeBase64, SuiKeyPair};
 use tracing::info;
 
-use crate::load_test::{LoadTest, LoadTestConfig};
-use crate::payload::{
-    load_addresses_from_file, load_digests_from_file, load_objects_from_file, Command,
-    RpcCommandProcessor, SignerInfo,
+use crate::{
+    load_test::{LoadTest, LoadTestConfig},
+    payload::{
+        load_addresses_from_file,
+        load_digests_from_file,
+        load_objects_from_file,
+        Command,
+        RpcCommandProcessor,
+        SignerInfo,
+    },
 };
 
 #[derive(Parser)]
-#[clap(
-    name = "Sui RPC Load Generator",
-    version = "0.1",
-    about = "A load test application for Sui RPC"
-)]
+#[clap(name = "Sui RPC Load Generator", version = "0.1", about = "A load test application for Sui RPC")]
 struct Opts {
     // TODO(chris): support running multiple commands at once
     #[clap(subcommand)]
@@ -199,42 +203,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
             skip_verify_objects,
             skip_record,
         } => (
-            Command::new_get_checkpoints(
-                start,
-                end,
-                !skip_verify_transactions,
-                !skip_verify_objects,
-                !skip_record,
-            ),
+            Command::new_get_checkpoints(start, end, !skip_verify_transactions, !skip_verify_objects, !skip_record),
             common,
             false,
         ),
-        ClapCommand::QueryTransactionBlocks {
-            common,
-            address_type,
-        } => {
+        ClapCommand::QueryTransactionBlocks { common, address_type } => {
             let addresses = load_addresses_from_file(expand_path(&opts.data_directory));
-            (
-                Command::new_query_transaction_blocks(address_type, addresses),
-                common,
-                false,
-            )
+            (Command::new_query_transaction_blocks(address_type, addresses), common, false)
         }
         ClapCommand::MultiGetTransactionBlocks { common } => {
             let digests = load_digests_from_file(expand_path(&opts.data_directory));
-            (
-                Command::new_multi_get_transaction_blocks(digests),
-                common,
-                false,
-            )
+            (Command::new_multi_get_transaction_blocks(digests), common, false)
         }
         ClapCommand::GetAllBalances { common, chunk_size } => {
             let addresses = load_addresses_from_file(expand_path(&opts.data_directory));
-            (
-                Command::new_get_all_balances(addresses, chunk_size),
-                common,
-                false,
-            )
+            (Command::new_get_all_balances(addresses, chunk_size), common, false)
         }
         ClapCommand::MultiGetObjects { common } => {
             let objects = load_objects_from_file(expand_path(&opts.data_directory));
@@ -242,11 +225,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         ClapCommand::GetReferenceGasPrice { common } => {
             let num_repeats = common.num_chunks_per_thread;
-            (
-                Command::new_get_reference_gas_price(num_repeats),
-                common,
-                false,
-            )
+            (Command::new_get_reference_gas_price(num_repeats), common, false)
         }
         ClapCommand::GetObject { common, chunk_size } => {
             let objects = load_objects_from_file(expand_path(&opts.data_directory));
@@ -256,9 +235,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let signer_info = need_keystore.then_some(get_keypair()?);
 
-    let command = command
-        .with_repeat_interval(Duration::from_millis(common.interval_in_ms))
-        .with_repeat_n_times(common.repeat);
+    let command =
+        command.with_repeat_interval(Duration::from_millis(common.interval_in_ms)).with_repeat_n_times(common.repeat);
 
     let processor = RpcCommandProcessor::new(&opts.urls, expand_path(&opts.data_directory)).await;
 

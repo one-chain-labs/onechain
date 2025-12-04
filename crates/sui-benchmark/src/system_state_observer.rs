@@ -1,16 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ValidatorProxy;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
+
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
-use tokio::sync::oneshot::Sender;
-use tokio::sync::watch;
-use tokio::sync::watch::Receiver;
-use tokio::time;
-use tokio::time::Instant;
+use tokio::{
+    sync::{oneshot::Sender, watch, watch::Receiver},
+    time,
+    time::Instant,
+};
 use tracing::{error, info};
+
+use crate::ValidatorProxy;
 
 #[derive(Debug, Clone)]
 pub struct SystemState {
@@ -29,10 +30,7 @@ impl SystemStateObserver {
         let (sender, mut recv) = tokio::sync::oneshot::channel();
         let mut interval = tokio::time::interval_at(Instant::now(), Duration::from_secs(60));
         interval.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
-        let (tx, rx) = watch::channel(SystemState {
-            reference_gas_price: 1u64,
-            protocol_config: None,
-        });
+        let (tx, rx) = watch::channel(SystemState { reference_gas_price: 1u64, protocol_config: None });
         tokio::task::spawn(async move {
             loop {
                 tokio::select! {
@@ -53,9 +51,6 @@ impl SystemStateObserver {
                 }
             }
         });
-        Self {
-            state: rx,
-            _sender: sender,
-        }
+        Self { state: rx, _sender: sender }
     }
 }

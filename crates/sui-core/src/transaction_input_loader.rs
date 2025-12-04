@@ -1,24 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::authority_per_epoch_store::CertLockGuard, execution_cache::ObjectCacheRead,
-};
+use std::{collections::HashMap, sync::Arc};
+
 use itertools::izip;
 use mysten_common::fatal;
 use once_cell::unsync::OnceCell;
-use std::collections::HashMap;
-use std::sync::Arc;
 use sui_types::{
     base_types::{EpochId, ObjectRef, TransactionDigest},
     error::{SuiError, SuiResult, UserInputError},
     storage::{GetSharedLocks, ObjectKey},
     transaction::{
-        InputObjectKind, InputObjects, ObjectReadResult, ObjectReadResultKind,
-        ReceivingObjectReadResult, ReceivingObjectReadResultKind, ReceivingObjects, TransactionKey,
+        InputObjectKind,
+        InputObjects,
+        ObjectReadResult,
+        ObjectReadResultKind,
+        ReceivingObjectReadResult,
+        ReceivingObjectReadResultKind,
+        ReceivingObjects,
+        TransactionKey,
     },
 };
 use tracing::instrument;
+
+use crate::{authority::authority_per_epoch_store::CertLockGuard, execution_cache::ObjectCacheRead};
 
 pub(crate) struct TransactionInputLoader {
     cache: Arc<dyn ObjectCacheRead>,
@@ -62,14 +67,9 @@ impl TransactionInputLoader {
                     });
                 }
                 InputObjectKind::SharedMoveObject { id, .. } => match self.cache.get_object(id) {
-                    Some(object) => {
-                        input_results[i] = Some(ObjectReadResult::new(*kind, object.into()))
-                    }
+                    Some(object) => input_results[i] = Some(ObjectReadResult::new(*kind, object.into())),
                     None => {
-                        if let Some((version, digest)) = self
-                            .cache
-                            .get_last_shared_object_deletion_info(id, epoch_id)
-                        {
+                        if let Some((version, digest)) = self.cache.get_last_shared_object_deletion_info(id, epoch_id) {
                             input_results[i] = Some(ObjectReadResult {
                                 input_object_kind: *kind,
                                 object: ObjectReadResultKind::DeletedSharedObject(version, digest),
@@ -86,9 +86,7 @@ impl TransactionInputLoader {
             }
         }
 
-        let objects = self
-            .cache
-            .multi_get_objects_with_more_accurate_error_return(&object_refs)?;
+        let objects = self.cache.multi_get_objects_with_more_accurate_error_return(&object_refs)?;
         assert_eq!(objects.len(), object_refs.len());
         for (index, object) in fetch_indices.into_iter().zip(objects.into_iter()) {
             input_results[index] = Some(ObjectReadResult {
@@ -97,17 +95,9 @@ impl TransactionInputLoader {
             });
         }
 
-        let receiving_results =
-            self.read_receiving_objects_for_signing(receiving_objects, epoch_id)?;
+        let receiving_results = self.read_receiving_objects_for_signing(receiving_objects, epoch_id)?;
 
-        Ok((
-            input_results
-                .into_iter()
-                .map(Option::unwrap)
-                .collect::<Vec<_>>()
-                .into(),
-            receiving_results,
-        ))
+        Ok((input_results.into_iter().map(Option::unwrap).collect::<Vec<_>>().into(), receiving_results))
     }
 
     /// Read the inputs for a transaction that is ready to be executed.
@@ -180,9 +170,7 @@ impl TransactionInputLoader {
                         // Do not need to fetch shared object for cancelled transaction.
                         results[i] = Some(ObjectReadResult {
                             input_object_kind: *input,
-                            object: ObjectReadResultKind::CancelledTransactionSharedObject(
-                                *version,
-                            ),
+                            object: ObjectReadResultKind::CancelledTransactionSharedObject(*version),
                         })
                     } else {
                         object_keys.push(ObjectKey(*id, *version));
@@ -196,21 +184,18 @@ impl TransactionInputLoader {
 
         assert!(objects.len() == object_keys.len() && objects.len() == fetches.len());
 
-        for (object, key, (index, input)) in izip!(
-            objects.into_iter(),
-            object_keys.into_iter(),
-            fetches.into_iter()
-        ) {
+        for (object, key, (index, input)) in izip!(objects.into_iter(), object_keys.into_iter(), fetches.into_iter()) {
             results[index] = Some(match (object, input) {
-                (Some(obj), input_object_kind) => ObjectReadResult {
-                    input_object_kind: *input_object_kind,
-                    object: obj.into(),
-                },
+                (Some(obj), input_object_kind) => {
+                    ObjectReadResult { input_object_kind: *input_object_kind, object: obj.into() }
+                }
                 (None, InputObjectKind::SharedMoveObject { id, .. }) => {
                     assert!(key.1.is_valid());
                     // Check if the object was deleted by a concurrently certified tx
                     let version = key.1;
-                    if let Some(dependency) = self.cache.get_deleted_shared_object_previous_tx_digest(id, version, epoch_id) {
+                    if let Some(dependency) =
+                        self.cache.get_deleted_shared_object_previous_tx_digest(id, version, epoch_id)
+                    {
                         ObjectReadResult {
                             input_object_kind: *input,
                             object: ObjectReadResultKind::DeletedSharedObject(version, dependency),
@@ -218,16 +203,14 @@ impl TransactionInputLoader {
                     } else {
                         panic!("All dependencies of tx {tx_key:?} should have been executed now, but Shared Object id: {}, version: {version} is absent in epoch {epoch_id}", *id);
                     }
-                },
-                _ => panic!("All dependencies of tx {tx_key:?} should have been executed now, but obj {key:?} is absent"),
+                }
+                _ => {
+                    panic!("All dependencies of tx {tx_key:?} should have been executed now, but obj {key:?} is absent")
+                }
             });
         }
 
-        Ok(results
-            .into_iter()
-            .map(Option::unwrap)
-            .collect::<Vec<_>>()
-            .into())
+        Ok(results.into_iter().map(Option::unwrap).collect::<Vec<_>>().into())
     }
 }
 
@@ -243,10 +226,7 @@ impl TransactionInputLoader {
             // Note: the digest is checked later in check_transaction_input
             let (object_id, version, _) = objref;
 
-            if self
-                .cache
-                .have_received_object_at_version(object_id, *version, epoch_id)
-            {
+            if self.cache.have_received_object_at_version(object_id, *version, epoch_id) {
                 receiving_results.push(ReceivingObjectReadResult::new(
                     *objref,
                     ReceivingObjectReadResultKind::PreviouslyReceivedObject,
@@ -255,11 +235,7 @@ impl TransactionInputLoader {
             }
 
             let Some(object) = self.cache.get_object(object_id) else {
-                return Err(UserInputError::ObjectNotFound {
-                    object_id: *object_id,
-                    version: Some(*version),
-                }
-                .into());
+                return Err(UserInputError::ObjectNotFound { object_id: *object_id, version: Some(*version) }.into());
             };
 
             receiving_results.push(ReceivingObjectReadResult::new(*objref, object.into()));

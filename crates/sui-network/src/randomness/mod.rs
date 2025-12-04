@@ -1,7 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use self::{auth::AllowedPeersUpdatable, metrics::Metrics};
+use std::{
+    collections::{btree_map::BTreeMap, HashMap, HashSet},
+    ops::Bound,
+    sync::Arc,
+    time::{self, Duration},
+};
+
 use anemo::PeerId;
 use anyhow::Result;
 use fastcrypto::groups::bls12381;
@@ -14,12 +20,6 @@ use fastcrypto_tbls::{
 use mysten_metrics::spawn_monitored_task;
 use mysten_network::anemo_ext::NetworkExt;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{btree_map::BTreeMap, HashMap, HashSet},
-    ops::Bound,
-    sync::Arc,
-    time::{self, Duration},
-};
 use sui_config::p2p::RandomnessConfig;
 use sui_macros::fail_point_if;
 use sui_types::{
@@ -27,10 +27,10 @@ use sui_types::{
     committee::EpochId,
     crypto::{RandomnessPartialSignature, RandomnessRound, RandomnessSignature},
 };
-use tokio::sync::{
-    OnceCell, {mpsc, oneshot},
-};
+use tokio::sync::{mpsc, oneshot, OnceCell};
 use tracing::{debug, error, info, instrument, warn};
+
+use self::{auth::AllowedPeersUpdatable, metrics::Metrics};
 
 mod auth;
 mod builder;
@@ -108,11 +108,7 @@ impl Handle {
 
     /// Admin interface handler: generates partial signatures for the given round at the
     /// current epoch.
-    pub fn admin_get_partial_signatures(
-        &self,
-        round: RandomnessRound,
-        tx: oneshot::Sender<Vec<u8>>,
-    ) {
+    pub fn admin_get_partial_signatures(&self, round: RandomnessRound, tx: oneshot::Sender<Vec<u8>>) {
         self.sender
             .try_send(RandomnessMessage::AdminGetPartialSignatures(round, tx))
             .expect("RandomnessEventLoop mailbox should not overflow or be closed")
@@ -128,12 +124,7 @@ impl Handle {
         result_channel: oneshot::Sender<Result<()>>,
     ) {
         self.sender
-            .try_send(RandomnessMessage::AdminInjectPartialSignatures(
-                authority_name,
-                round,
-                sigs,
-                result_channel,
-            ))
+            .try_send(RandomnessMessage::AdminInjectPartialSignatures(authority_name, round, sigs, result_channel))
             .expect("RandomnessEventLoop mailbox should not overflow or be closed")
     }
 
@@ -146,11 +137,7 @@ impl Handle {
         result_channel: oneshot::Sender<Result<()>>,
     ) {
         self.sender
-            .try_send(RandomnessMessage::AdminInjectFullSignature(
-                round,
-                sig,
-                result_channel,
-            ))
+            .try_send(RandomnessMessage::AdminInjectFullSignature(round, sig, result_channel))
             .expect("RandomnessEventLoop mailbox should not overflow or be closed")
     }
 
@@ -184,13 +171,7 @@ enum RandomnessMessage {
     ),
     SendPartialSignatures(EpochId, RandomnessRound),
     CompleteRound(EpochId, RandomnessRound),
-    ReceiveSignatures(
-        PeerId,
-        EpochId,
-        RandomnessRound,
-        Vec<Vec<u8>>,
-        Option<RandomnessSignature>,
-    ),
+    ReceiveSignatures(PeerId, EpochId, RandomnessRound, Vec<Vec<u8>>, Option<RandomnessSignature>),
     MaybeIgnoreByzantinePeer(EpochId, PeerId),
     AdminGetPartialSignatures(RandomnessRound, oneshot::Sender<Vec<u8>>),
     AdminInjectPartialSignatures(
@@ -199,11 +180,7 @@ enum RandomnessMessage {
         Vec<RandomnessPartialSignature>,
         oneshot::Sender<Result<()>>,
     ),
-    AdminInjectFullSignature(
-        RandomnessRound,
-        RandomnessSignature,
-        oneshot::Sender<Result<()>>,
-    ),
+    AdminInjectFullSignature(RandomnessRound, RandomnessSignature, oneshot::Sender<Result<()>>),
 }
 
 struct RandomnessEventLoop {
@@ -224,13 +201,7 @@ struct RandomnessEventLoop {
     dkg_output: Option<dkg_v1::Output<bls12381::G2Element, bls12381::G2Element>>,
     aggregation_threshold: u16,
     highest_requested_round: BTreeMap<EpochId, RandomnessRound>,
-    send_tasks: BTreeMap<
-        RandomnessRound,
-        (
-            tokio::task::JoinHandle<()>,
-            Arc<OnceCell<RandomnessSignature>>,
-        ),
-    >,
+    send_tasks: BTreeMap<RandomnessRound, (tokio::task::JoinHandle<()>, Arc<OnceCell<RandomnessSignature>>)>,
     round_request_time: BTreeMap<(EpochId, RandomnessRound), time::Instant>,
     future_epoch_partial_sigs: BTreeMap<(EpochId, RandomnessRound, PeerId), Vec<Vec<u8>>>,
     received_partial_sigs: BTreeMap<(RandomnessRound, PeerId), Vec<RandomnessPartialSignature>>,
@@ -278,9 +249,7 @@ impl RandomnessEventLoop {
                     error!("BUG: failed to update epoch in RandomnessEventLoop: {e:?}");
                 }
             }
-            RandomnessMessage::SendPartialSignatures(epoch, round) => {
-                self.send_partial_signatures(epoch, round)
-            }
+            RandomnessMessage::SendPartialSignatures(epoch, round) => self.send_partial_signatures(epoch, round),
             RandomnessMessage::CompleteRound(epoch, round) => self.complete_round(epoch, round),
             RandomnessMessage::ReceiveSignatures(peer_id, epoch, round, partial_sigs, sig) => {
                 if let Some(sig) = sig {
@@ -292,20 +261,9 @@ impl RandomnessEventLoop {
             RandomnessMessage::MaybeIgnoreByzantinePeer(epoch, peer_id) => {
                 self.maybe_ignore_byzantine_peer(epoch, peer_id)
             }
-            RandomnessMessage::AdminGetPartialSignatures(round, tx) => {
-                self.admin_get_partial_signatures(round, tx)
-            }
-            RandomnessMessage::AdminInjectPartialSignatures(
-                authority_name,
-                round,
-                sigs,
-                result_channel,
-            ) => {
-                let _ = result_channel.send(self.admin_inject_partial_signatures(
-                    authority_name,
-                    round,
-                    sigs,
-                ));
+            RandomnessMessage::AdminGetPartialSignatures(round, tx) => self.admin_get_partial_signatures(round, tx),
+            RandomnessMessage::AdminInjectPartialSignatures(authority_name, round, sigs, result_channel) => {
+                let _ = result_channel.send(self.admin_inject_partial_signatures(authority_name, round, sigs));
             }
             RandomnessMessage::AdminInjectFullSignature(round, sig, result_channel) => {
                 let _ = result_channel.send(self.admin_inject_full_signature(round, sig));
@@ -329,29 +287,19 @@ impl RandomnessEventLoop {
         self.peer_share_ids = Some(authority_info.iter().try_fold(
             HashMap::new(),
             |mut acc, (_name, (peer_id, party_id))| -> Result<_> {
-                let ids = dkg_output
-                    .nodes
-                    .share_ids_of(*party_id)
-                    .expect("party_id should be valid");
+                let ids = dkg_output.nodes.share_ids_of(*party_id).expect("party_id should be valid");
                 acc.insert(*peer_id, ids);
                 Ok(acc)
             },
         )?);
-        self.allowed_peers_set = authority_info
-            .values()
-            .map(|(peer_id, _)| *peer_id)
-            .collect();
-        self.allowed_peers
-            .update(Arc::new(self.allowed_peers_set.clone()));
+        self.allowed_peers_set = authority_info.values().map(|(peer_id, _)| *peer_id).collect();
+        self.allowed_peers.update(Arc::new(self.allowed_peers_set.clone()));
         self.epoch = new_epoch;
         self.authority_info = Arc::new(authority_info);
         self.dkg_output = Some(dkg_output);
         self.aggregation_threshold = aggregation_threshold;
         if let Some(round) = recovered_highest_completed_round {
-            self.highest_completed_round
-                .entry(new_epoch)
-                .and_modify(|r| *r = std::cmp::max(*r, round))
-                .or_insert(round);
+            self.highest_completed_round.entry(new_epoch).and_modify(|r| *r = std::cmp::max(*r, round)).or_insert(round);
         }
         for (_, (task, _)) in std::mem::take(&mut self.send_tasks) {
             task.abort();
@@ -360,9 +308,7 @@ impl RandomnessEventLoop {
 
         // Throw away info from old epochs.
         self.highest_requested_round = self.highest_requested_round.split_off(&new_epoch);
-        self.round_request_time = self
-            .round_request_time
-            .split_off(&(new_epoch, RandomnessRound(0)));
+        self.round_request_time = self.round_request_time.split_off(&(new_epoch, RandomnessRound(0)));
         self.received_partial_sigs.clear();
         self.completed_sigs.clear();
         self.highest_completed_round = self.highest_completed_round.split_off(&new_epoch);
@@ -373,14 +319,11 @@ impl RandomnessEventLoop {
         // Aggregate any sigs received early from the new epoch.
         // (We can't call `maybe_aggregate_partial_signatures` directly while iterating,
         // because it takes `&mut self`, so we store in a Vec first.)
-        for ((epoch, round, peer_id), sig_bytes) in
-            std::mem::take(&mut self.future_epoch_partial_sigs)
-        {
+        for ((epoch, round, peer_id), sig_bytes) in std::mem::take(&mut self.future_epoch_partial_sigs) {
             // We can fully validate these now that we have current epoch DKG output.
             self.receive_partial_signatures(peer_id, epoch, round, sig_bytes);
         }
-        let rounds_to_aggregate: Vec<_> =
-            self.received_partial_sigs.keys().map(|(r, _)| *r).collect();
+        let rounds_to_aggregate: Vec<_> = self.received_partial_sigs.keys().map(|(r, _)| *r).collect();
         for round in rounds_to_aggregate {
             self.maybe_aggregate_partial_signatures(new_epoch, round);
         }
@@ -391,14 +334,8 @@ impl RandomnessEventLoop {
     #[instrument(level = "debug", skip_all, fields(?epoch, ?round))]
     fn send_partial_signatures(&mut self, epoch: EpochId, round: RandomnessRound) {
         if epoch < self.epoch {
-            error!(
-                "BUG: skipping sending partial sigs, we are already up to epoch {}",
-                self.epoch
-            );
-            debug_assert!(
-                false,
-                "skipping sending partial sigs, we are already up to higher epoch"
-            );
+            error!("BUG: skipping sending partial sigs, we are already up to epoch {}", self.epoch);
+            debug_assert!(false, "skipping sending partial sigs, we are already up to higher epoch");
             return;
         }
         if epoch == self.epoch {
@@ -410,23 +347,16 @@ impl RandomnessEventLoop {
             }
         }
 
-        self.highest_requested_round
-            .entry(epoch)
-            .and_modify(|r| *r = std::cmp::max(*r, round))
-            .or_insert(round);
-        self.round_request_time
-            .insert((epoch, round), time::Instant::now());
+        self.highest_requested_round.entry(epoch).and_modify(|r| *r = std::cmp::max(*r, round)).or_insert(round);
+        self.round_request_time.insert((epoch, round), time::Instant::now());
         self.maybe_start_pending_tasks();
     }
 
     #[instrument(level = "debug", skip_all, fields(?epoch, ?round))]
     fn complete_round(&mut self, epoch: EpochId, round: RandomnessRound) {
         debug!("completing randomness round");
-        let new_highest_round = *self
-            .highest_completed_round
-            .entry(epoch)
-            .and_modify(|r| *r = std::cmp::max(*r, round))
-            .or_insert(round);
+        let new_highest_round =
+            *self.highest_completed_round.entry(epoch).and_modify(|r| *r = std::cmp::max(*r, round)).or_insert(round);
         if round != new_highest_round {
             // This round completion came out of order, and we're already ahead. Nothing more
             // to do in that case.
@@ -461,17 +391,11 @@ impl RandomnessEventLoop {
     ) {
         // Basic validity checks.
         if epoch < self.epoch {
-            debug!(
-                "skipping received partial sigs, we are already up to epoch {}",
-                self.epoch
-            );
+            debug!("skipping received partial sigs, we are already up to epoch {}", self.epoch);
             return;
         }
         if epoch > self.epoch + 1 {
-            debug!(
-                "skipping received partial sigs, we are still on epoch {}",
-                self.epoch
-            );
+            debug!("skipping received partial sigs, we are still on epoch {}", self.epoch);
             return;
         }
         if epoch == self.epoch && self.completed_sigs.contains_key(&round) {
@@ -495,8 +419,7 @@ impl RandomnessEventLoop {
             }
 
             debug!("saving partial sigs from future epoch for later use");
-            self.future_epoch_partial_sigs
-                .insert((epoch, round, peer_id), sig_bytes);
+            self.future_epoch_partial_sigs.insert((epoch, round, peer_id), sig_bytes);
             return;
         }
 
@@ -520,41 +443,29 @@ impl RandomnessEventLoop {
         // Accept partial signatures up to `max_partial_sigs_rounds_ahead` past the round of the
         // last completed signature, or the highest completed round, whichever is greater.
         let last_completed_signature = self.completed_sigs.last_key_value().map(|(r, _)| *r);
-        let last_completed_round = std::cmp::max(last_completed_signature, highest_completed_round)
-            .unwrap_or(RandomnessRound(0));
-        if round.0
-            >= last_completed_round
-                .0
-                .saturating_add(self.config.max_partial_sigs_rounds_ahead())
-        {
-            debug!(
-                "skipping received partial sigs, most recent round we completed was only {last_completed_round}",
-            );
+        let last_completed_round =
+            std::cmp::max(last_completed_signature, highest_completed_round).unwrap_or(RandomnessRound(0));
+        if round.0 >= last_completed_round.0.saturating_add(self.config.max_partial_sigs_rounds_ahead()) {
+            debug!("skipping received partial sigs, most recent round we completed was only {last_completed_round}",);
             return;
         }
 
         // Deserialize the partial sigs.
-        let partial_sigs =
-            match sig_bytes
-                .iter()
-                .try_fold(Vec::new(), |mut acc, bytes| -> Result<_> {
-                    let sig: RandomnessPartialSignature = bcs::from_bytes(bytes)?;
-                    acc.push(sig);
-                    Ok(acc)
-                }) {
-                Ok(partial_sigs) => partial_sigs,
-                Err(e) => {
-                    warn!("failed to deserialize partial sigs: {e:?}");
-                    return;
-                }
-            };
+        let partial_sigs = match sig_bytes.iter().try_fold(Vec::new(), |mut acc, bytes| -> Result<_> {
+            let sig: RandomnessPartialSignature = bcs::from_bytes(bytes)?;
+            acc.push(sig);
+            Ok(acc)
+        }) {
+            Ok(partial_sigs) => partial_sigs,
+            Err(e) => {
+                warn!("failed to deserialize partial sigs: {e:?}");
+                return;
+            }
+        };
         // Verify we received the expected share IDs (to protect against a validator that sends
         // valid signatures of other peers which will be successfully verified below).
         let received_share_ids = partial_sigs.iter().map(|s| s.index);
-        if received_share_ids
-            .zip(expected_share_ids.iter())
-            .any(|(a, b)| a != *b)
-        {
+        if received_share_ids.zip(expected_share_ids.iter()).any(|(a, b)| a != *b) {
             let received_share_ids = partial_sigs.iter().map(|s| s.index).collect::<Vec<_>>();
             warn!("received partial sigs with wrong share ids: expected {expected_share_ids:?}, received {received_share_ids:?}");
             return;
@@ -562,8 +473,7 @@ impl RandomnessEventLoop {
 
         // We passed all the checks, save the partial sigs.
         debug!("recording received partial signatures");
-        self.received_partial_sigs
-            .insert((round, peer_id), partial_sigs);
+        self.received_partial_sigs.insert((round, peer_id), partial_sigs);
 
         self.maybe_aggregate_partial_signatures(epoch, round);
     }
@@ -588,9 +498,7 @@ impl RandomnessEventLoop {
         }
 
         if epoch != self.epoch {
-            debug!(
-                "waiting to aggregate randomness partial signatures until DKG completes for epoch"
-            );
+            debug!("waiting to aggregate randomness partial signatures until DKG completes for epoch");
             return;
         }
 
@@ -607,62 +515,47 @@ impl RandomnessEventLoop {
             &dkg_output.vss_pk
         };
 
-        let sig_bounds = (
-            Bound::Included((round, PeerId([0; 32]))),
-            Bound::Excluded((round + 1, PeerId([0; 32]))),
-        );
+        let sig_bounds = (Bound::Included((round, PeerId([0; 32]))), Bound::Excluded((round + 1, PeerId([0; 32]))));
 
         // If we have enough partial signatures, aggregate them.
-        let sig_range = self
-            .received_partial_sigs
-            .range(sig_bounds)
-            .flat_map(|(_, sigs)| sigs);
-        let mut sig =
-            match ThresholdBls12381MinSig::aggregate(self.aggregation_threshold, sig_range) {
-                Ok(sig) => sig,
-                Err(fastcrypto::error::FastCryptoError::NotEnoughInputs) => return, // wait for more input
-                Err(e) => {
-                    error!("error while aggregating randomness partial signatures: {e:?}");
-                    return;
-                }
-            };
+        let sig_range = self.received_partial_sigs.range(sig_bounds).flat_map(|(_, sigs)| sigs);
+        let mut sig = match ThresholdBls12381MinSig::aggregate(self.aggregation_threshold, sig_range) {
+            Ok(sig) => sig,
+            Err(fastcrypto::error::FastCryptoError::NotEnoughInputs) => return, // wait for more input
+            Err(e) => {
+                error!("error while aggregating randomness partial signatures: {e:?}");
+                return;
+            }
+        };
 
         // Try to verify the aggregated signature all at once. (Should work in the happy path.)
         if ThresholdBls12381MinSig::verify(vss_pk.c0(), &round.signature_message(), &sig).is_err() {
             // If verifiation fails, some of the inputs must be invalid. We have to go through
             // one-by-one to find which.
             // TODO: add test for individual sig verification.
-            self.received_partial_sigs
-                .retain(|&(r, peer_id), partial_sigs| {
-                    if round != r {
-                        return true;
-                    }
-                    if ThresholdBls12381MinSig::partial_verify_batch(
-                        vss_pk,
-                        &round.signature_message(),
-                        partial_sigs.iter(),
-                        &mut rand::thread_rng(),
-                    )
-                    .is_err()
-                    {
-                        warn!(
-                            "received invalid partial signatures from possibly-Byzantine peer {peer_id}"
-                        );
-                        if let Some(sender) = self.mailbox_sender.upgrade() {
-                            sender.try_send(RandomnessMessage::MaybeIgnoreByzantinePeer(
-                                epoch,
-                                peer_id,
-                            ))
+            self.received_partial_sigs.retain(|&(r, peer_id), partial_sigs| {
+                if round != r {
+                    return true;
+                }
+                if ThresholdBls12381MinSig::partial_verify_batch(
+                    vss_pk,
+                    &round.signature_message(),
+                    partial_sigs.iter(),
+                    &mut rand::thread_rng(),
+                )
+                .is_err()
+                {
+                    warn!("received invalid partial signatures from possibly-Byzantine peer {peer_id}");
+                    if let Some(sender) = self.mailbox_sender.upgrade() {
+                        sender
+                            .try_send(RandomnessMessage::MaybeIgnoreByzantinePeer(epoch, peer_id))
                             .expect("RandomnessEventLoop mailbox should not overflow or be closed");
-                        }
-                        return false;
                     }
-                    true
-                });
-            let sig_range = self
-                .received_partial_sigs
-                .range(sig_bounds)
-                .flat_map(|(_, sigs)| sigs);
+                    return false;
+                }
+                true
+            });
+            let sig_range = self.received_partial_sigs.range(sig_bounds).flat_map(|(_, sigs)| sigs);
             sig = match ThresholdBls12381MinSig::aggregate(self.aggregation_threshold, sig_range) {
                 Ok(sig) => sig,
                 Err(fastcrypto::error::FastCryptoError::NotEnoughInputs) => return, // wait for more input
@@ -671,11 +564,12 @@ impl RandomnessEventLoop {
                     return;
                 }
             };
-            if let Err(e) =
-                ThresholdBls12381MinSig::verify(vss_pk.c0(), &round.signature_message(), &sig)
-            {
+            if let Err(e) = ThresholdBls12381MinSig::verify(vss_pk.c0(), &round.signature_message(), &sig) {
                 error!("error while verifying randomness partial signatures after removing invalid partials: {e:?}");
-                debug_assert!(false, "error while verifying randomness partial signatures after removing invalid partials");
+                debug_assert!(
+                    false,
+                    "error while verifying randomness partial signatures after removing invalid partials"
+                );
                 return;
             }
         }
@@ -720,15 +614,11 @@ impl RandomnessEventLoop {
         let highest_requested_round = self.highest_requested_round.get(&epoch);
         if highest_requested_round.is_none() || round > *highest_requested_round.unwrap() {
             // Wait for local consensus to catch up if necessary.
-            debug!(
-                "skipping received full signature, local consensus is not caught up to its round"
-            );
+            debug!("skipping received full signature, local consensus is not caught up to its round");
             return;
         }
 
-        if let Err(e) =
-            ThresholdBls12381MinSig::verify(vss_pk.c0(), &round.signature_message(), &sig)
-        {
+        if let Err(e) = ThresholdBls12381MinSig::verify(vss_pk.c0(), &round.signature_message(), &sig) {
             info!("received invalid full signature from peer {peer_id}: {e:?}");
             if let Some(sender) = self.mailbox_sender.upgrade() {
                 sender
@@ -742,18 +632,11 @@ impl RandomnessEventLoop {
         self.process_valid_full_signature(epoch, round, sig);
     }
 
-    fn process_valid_full_signature(
-        &mut self,
-        epoch: EpochId,
-        round: RandomnessRound,
-        sig: RandomnessSignature,
-    ) {
+    fn process_valid_full_signature(&mut self, epoch: EpochId, round: RandomnessRound, sig: RandomnessSignature) {
         assert_eq!(epoch, self.epoch);
 
         if let Some((_, full_sig_cell)) = self.send_tasks.get(&round) {
-            full_sig_cell
-                .set(sig)
-                .expect("full signature should never be processed twice");
+            full_sig_cell.set(sig).expect("full signature should never be processed twice");
         }
         self.completed_sigs.insert(round, sig);
         self.remove_partial_sigs_in_range((
@@ -790,21 +673,17 @@ impl RandomnessEventLoop {
             warn!("can't ignore unknown byzantine peer {peer_id:?}");
             return;
         };
-        let max_ignored_shares = (self.config.max_ignored_peer_weight_factor()
-            * (dkg_output.nodes.total_weight() as f64)) as usize;
+        let max_ignored_shares =
+            (self.config.max_ignored_peer_weight_factor() * (dkg_output.nodes.total_weight() as f64)) as usize;
         if self.blocked_share_id_count + peer_shares.len() > max_ignored_shares {
             warn!("ignoring byzantine peer {peer_id:?} with {} shares would exceed max ignored peer weight {max_ignored_shares}", peer_shares.len());
             return;
         }
 
-        warn!(
-            "ignoring byzantine peer {peer_id:?} with {} shares",
-            peer_shares.len()
-        );
+        warn!("ignoring byzantine peer {peer_id:?} with {} shares", peer_shares.len());
         self.blocked_share_id_count += peer_shares.len();
         self.allowed_peers_set.remove(&peer_id);
-        self.allowed_peers
-            .update(Arc::new(self.allowed_peers_set.clone()));
+        self.allowed_peers.update(Arc::new(self.allowed_peers_set.clone()));
         self.metrics.inc_num_ignored_byzantine_peers();
     }
 
@@ -833,14 +712,11 @@ impl RandomnessEventLoop {
             } else {
                 RandomnessRound(0)
             },
-            self.send_tasks
-                .last_key_value()
-                .map(|(r, _)| r.checked_add(1).unwrap())
-                .unwrap_or(RandomnessRound(0)),
+            self.send_tasks.last_key_value().map(|(r, _)| r.checked_add(1).unwrap()).unwrap_or(RandomnessRound(0)),
         );
 
         let mut rounds_to_aggregate = Vec::new();
-        for round in start_round.0..=highest_requested_round.0 {
+        for round in start_round.0 ..= highest_requested_round.0 {
             let round = RandomnessRound(round);
 
             if self.send_tasks.len() >= self.config.max_partial_sigs_concurrent_sends() {
@@ -855,16 +731,13 @@ impl RandomnessEventLoop {
                 let metrics = self.metrics.clone();
                 let authority_info = self.authority_info.clone();
                 let epoch = self.epoch;
-                let partial_sigs = ThresholdBls12381MinSig::partial_sign_batch(
-                    shares.iter(),
-                    &round.signature_message(),
-                );
+                let partial_sigs =
+                    ThresholdBls12381MinSig::partial_sign_batch(shares.iter(), &round.signature_message());
                 let full_sig_cell_clone = full_sig_cell.clone();
 
                 // Record own partial sigs.
                 if !self.completed_sigs.contains_key(&round) {
-                    self.received_partial_sigs
-                        .insert((round, self.network.peer_id()), partial_sigs.clone());
+                    self.received_partial_sigs.insert((round, self.network.peer_id()), partial_sigs.clone());
                     rounds_to_aggregate.push((epoch, round));
                 }
 
@@ -898,16 +771,9 @@ impl RandomnessEventLoop {
     #[allow(clippy::type_complexity)]
     fn remove_partial_sigs_in_range(
         &mut self,
-        range: (
-            Bound<(RandomnessRound, PeerId)>,
-            Bound<(RandomnessRound, PeerId)>,
-        ),
+        range: (Bound<(RandomnessRound, PeerId)>, Bound<(RandomnessRound, PeerId)>),
     ) {
-        let keys_to_remove: Vec<_> = self
-            .received_partial_sigs
-            .range(range)
-            .map(|(key, _)| *key)
-            .collect();
+        let keys_to_remove: Vec<_> = self.received_partial_sigs.range(range).map(|(key, _)| *key).collect();
         for key in keys_to_remove {
             // Have to remove keys one-by-one because BTreeMap does not support range-removal.
             self.received_partial_sigs.remove(&key);
@@ -936,18 +802,12 @@ impl RandomnessEventLoop {
             return;
         }
 
-        let _metrics_guard = metrics
-            .round_observation_latency_metric()
-            .map(|metric| metric.start_timer());
+        let _metrics_guard = metrics.round_observation_latency_metric().map(|metric| metric.start_timer());
 
-        let peers: HashMap<_, _> = authority_info
-            .iter()
-            .map(|(name, (peer_id, _party_id))| (name, network.waiting_peer(*peer_id)))
-            .collect();
-        let partial_sigs: Vec<_> = partial_sigs
-            .iter()
-            .map(|sig| bcs::to_bytes(sig).expect("message serialization should not fail"))
-            .collect();
+        let peers: HashMap<_, _> =
+            authority_info.iter().map(|(name, (peer_id, _party_id))| (name, network.waiting_peer(*peer_id))).collect();
+        let partial_sigs: Vec<_> =
+            partial_sigs.iter().map(|sig| bcs::to_bytes(sig).expect("message serialization should not fail")).collect();
 
         loop {
             let mut requests = Vec::new();
@@ -961,11 +821,7 @@ impl RandomnessEventLoop {
                 let request = anemo::Request::new(SendSignaturesRequest {
                     epoch,
                     round,
-                    partial_sigs: if full_sig.is_none() {
-                        partial_sigs.clone()
-                    } else {
-                        Vec::new()
-                    },
+                    partial_sigs: if full_sig.is_none() { partial_sigs.clone() } else { Vec::new() },
                     sig: full_sig,
                 })
                 .with_timeout(SEND_PARTIAL_SIGNATURES_TIMEOUT);
@@ -987,41 +843,30 @@ impl RandomnessEventLoop {
     }
 
     fn update_rounds_pending_metric(&self) {
-        let highest_requested_round = self
-            .highest_requested_round
-            .get(&self.epoch)
-            .map(|r| r.0)
-            .unwrap_or(0);
-        let highest_completed_round = self
-            .highest_completed_round
-            .get(&self.epoch)
-            .map(|r| r.0)
-            .unwrap_or(0);
-        let num_rounds_pending =
-            highest_requested_round.saturating_sub(highest_completed_round) as i64;
+        let highest_requested_round = self.highest_requested_round.get(&self.epoch).map(|r| r.0).unwrap_or(0);
+        let highest_completed_round = self.highest_completed_round.get(&self.epoch).map(|r| r.0).unwrap_or(0);
+        let num_rounds_pending = highest_requested_round.saturating_sub(highest_completed_round) as i64;
         let prev_value = self.metrics.num_rounds_pending().unwrap_or_default();
         if num_rounds_pending / 100 > prev_value / 100 {
             warn!(
                 // Recording multiples of 100 so tests can match on the log message.
                 "RandomnessEventLoop randomness generation backlog: over {} rounds are pending (oldest is {:?})",
                 (num_rounds_pending / 100) * 100,
-                highest_completed_round+1,
+                highest_completed_round + 1,
             );
         }
         self.metrics.set_num_rounds_pending(num_rounds_pending);
     }
 
     fn admin_get_partial_signatures(&self, round: RandomnessRound, tx: oneshot::Sender<Vec<u8>>) {
-        let shares = if let Some(shares) = self.dkg_output.as_ref().and_then(|d| d.shares.as_ref())
-        {
+        let shares = if let Some(shares) = self.dkg_output.as_ref().and_then(|d| d.shares.as_ref()) {
             shares
         } else {
             let _ = tx.send(Vec::new()); // no error handling needed if receiver is already dropped
             return;
         };
 
-        let partial_sigs =
-            ThresholdBls12381MinSig::partial_sign_batch(shares.iter(), &round.signature_message());
+        let partial_sigs = ThresholdBls12381MinSig::partial_sign_batch(shares.iter(), &round.signature_message());
         // no error handling needed if receiver is already dropped
         let _ = tx.send(bcs::to_bytes(&partial_sigs).expect("serialization should not fail"));
     }
@@ -1042,16 +887,10 @@ impl RandomnessEventLoop {
         Ok(())
     }
 
-    fn admin_inject_full_signature(
-        &mut self,
-        round: RandomnessRound,
-        sig: RandomnessSignature,
-    ) -> Result<()> {
+    fn admin_inject_full_signature(&mut self, round: RandomnessRound, sig: RandomnessSignature) -> Result<()> {
         let vss_pk = {
             let Some(dkg_output) = &self.dkg_output else {
-                return Err(anyhow::anyhow!(
-                    "called admin_inject_full_signature before DKG completed"
-                ));
+                return Err(anyhow::anyhow!("called admin_inject_full_signature before DKG completed"));
             };
             &dkg_output.vss_pk
         };

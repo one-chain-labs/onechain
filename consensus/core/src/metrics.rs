@@ -4,19 +4,29 @@
 use std::sync::Arc;
 
 use prometheus::{
-    exponential_buckets, register_histogram_vec_with_registry, register_histogram_with_registry,
-    register_int_counter_vec_with_registry, register_int_counter_with_registry,
-    register_int_gauge_vec_with_registry, register_int_gauge_with_registry, Histogram,
-    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Registry,
+    exponential_buckets,
+    register_histogram_vec_with_registry,
+    register_histogram_with_registry,
+    register_int_counter_vec_with_registry,
+    register_int_counter_with_registry,
+    register_int_gauge_vec_with_registry,
+    register_int_gauge_with_registry,
+    Histogram,
+    HistogramVec,
+    IntCounter,
+    IntCounterVec,
+    IntGauge,
+    IntGaugeVec,
+    Registry,
 };
 
 use crate::network::metrics::NetworkMetrics;
 
 // starts from 1μs, 50μs, 100μs...
 const FINE_GRAINED_LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.000_001, 0.000_050, 0.000_100, 0.000_500, 0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25,
-    0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5,
-    4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10., 20., 30., 60., 120.,
+    0.000_001, 0.000_050, 0.000_100, 0.000_500, 0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
+    0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0,
+    8.5, 9.0, 9.5, 10., 20., 30., 60., 120.,
 ];
 
 const NUM_BUCKETS: &[f64] = &[
@@ -49,9 +59,9 @@ const NUM_BUCKETS: &[f64] = &[
 ];
 
 const LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9,
-    1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5,
-    9.0, 9.5, 10., 12.5, 15., 17.5, 20., 25., 30., 60., 90., 120., 180., 300.,
+    0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6,
+    1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10., 12.5, 15., 17.5, 20., 25.,
+    30., 60., 90., 120., 180., 300.,
 ];
 
 const SIZE_BUCKETS: &[f64] = &[
@@ -85,10 +95,7 @@ pub(crate) fn initialise_metrics(registry: Registry) -> Arc<Metrics> {
     let node_metrics = NodeMetrics::new(&registry);
     let network_metrics = NetworkMetrics::new(&registry);
 
-    Arc::new(Metrics {
-        node_metrics,
-        network_metrics,
-    })
+    Arc::new(Metrics { node_metrics, network_metrics })
 }
 
 #[cfg(test)]

@@ -1,31 +1,40 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consistency::ConsistentIndexCursor;
-use crate::data::apys::calculate_apy;
-use crate::data::{DataLoader, Db};
-use crate::types::cursor::{JsonCursor, Page};
-use async_graphql::connection::{Connection, CursorType, Edge};
-use async_graphql::dataloader::Loader;
 use std::collections::{BTreeMap, HashMap};
-use sui_indexer::apis::GovernanceReadApi;
-use sui_types::committee::EpochId;
-use sui_types::sui_system_state::PoolTokenExchangeRate;
 
-use sui_types::base_types::SuiAddress as NativeSuiAddress;
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    dataloader::Loader,
+    *,
+};
+use sui_indexer::apis::{governance_api::exchange_rates, GovernanceReadApi};
+use sui_types::{
+    base_types::SuiAddress as NativeSuiAddress,
+    committee::EpochId,
+    sui_system_state::{
+        sui_system_state_summary::SuiValidatorSummary as NativeSuiValidatorSummary,
+        PoolTokenExchangeRate,
+    },
+};
 
-use super::big_int::BigInt;
-use super::move_object::MoveObject;
-use super::object::Object;
-use super::owner::Owner;
-use super::sui_address::SuiAddress;
-use super::uint53::UInt53;
-use super::validator_credentials::ValidatorCredentials;
-use super::{address::Address, base64::Base64};
-use crate::error::Error;
-use async_graphql::*;
-use sui_indexer::apis::governance_api::exchange_rates;
-use sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSummary as NativeSuiValidatorSummary;
+use super::{
+    address::Address,
+    base64::Base64,
+    big_int::BigInt,
+    move_object::MoveObject,
+    object::Object,
+    owner::Owner,
+    sui_address::SuiAddress,
+    uint53::UInt53,
+    validator_credentials::ValidatorCredentials,
+};
+use crate::{
+    consistency::ConsistentIndexCursor,
+    data::{apys::calculate_apy, DataLoader, Db},
+    error::Error,
+    types::cursor::{JsonCursor, Page},
+};
 #[derive(Clone, Debug)]
 pub(crate) struct Validator {
     pub validator_summary: NativeSuiValidatorSummary,
@@ -46,23 +55,14 @@ type EpochStakeSubsidyStarted = u64;
 /// less than or equal to the requested epoch.
 #[async_trait::async_trait]
 impl Loader<u64> for Db {
-    type Value = (
-        EpochStakeSubsidyStarted,
-        BTreeMap<NativeSuiAddress, Vec<(EpochId, PoolTokenExchangeRate)>>,
-    );
     type Error = Error;
+    type Value = (EpochStakeSubsidyStarted, BTreeMap<NativeSuiAddress, Vec<(EpochId, PoolTokenExchangeRate)>>);
 
     async fn load(
         &self,
         keys: &[u64],
     ) -> Result<
-        HashMap<
-            u64,
-            (
-                EpochStakeSubsidyStarted,
-                BTreeMap<NativeSuiAddress, Vec<(EpochId, PoolTokenExchangeRate)>>,
-            ),
-        >,
+        HashMap<u64, (EpochStakeSubsidyStarted, BTreeMap<NativeSuiAddress, Vec<(EpochId, PoolTokenExchangeRate)>>)>,
         Error,
     > {
         let latest_sui_system_state = self
@@ -98,13 +98,8 @@ impl Loader<u64> for Db {
         // TODO we might even filter here by the epoch at which the stake subsidy started
         // to avoid passing that to the `calculate_apy` function and doing another filter there
         for er in exchange_rates {
-            results.insert(
-                er.address,
-                er.rates
-                    .into_iter()
-                    .filter(|(epoch, _)| epoch <= &epoch_to_filter_out)
-                    .collect(),
-            );
+            results
+                .insert(er.address, er.rates.into_iter().filter(|(epoch, _)| epoch <= &epoch_to_filter_out).collect());
         }
 
         let requested_epoch = match keys.first() {
@@ -113,10 +108,7 @@ impl Loader<u64> for Db {
         };
 
         let mut r = HashMap::new();
-        r.insert(
-            requested_epoch,
-            (latest_sui_system_state.stake_subsidy_start_epoch, results),
-        );
+        r.insert(requested_epoch, (latest_sui_system_state.stake_subsidy_start_epoch, results));
 
         Ok(r)
     }
@@ -154,10 +146,7 @@ impl Validator {
     async fn next_epoch_credentials(&self) -> Option<ValidatorCredentials> {
         let v = &self.validator_summary;
         let credentials = ValidatorCredentials {
-            protocol_pub_key: v
-                .next_epoch_protocol_pubkey_bytes
-                .as_ref()
-                .map(Base64::from),
+            protocol_pub_key: v.next_epoch_protocol_pubkey_bytes.as_ref().map(Base64::from),
             network_pub_key: v.next_epoch_network_pubkey_bytes.as_ref().map(Base64::from),
             worker_pub_key: v.next_epoch_worker_pubkey_bytes.as_ref().map(Base64::from),
             proof_of_possession: v.next_epoch_proof_of_possession.as_ref().map(Base64::from),
@@ -193,21 +182,13 @@ impl Validator {
     /// the operation ability to another address. The address holding this `Cap` object
     /// can then update the reference gas price and tallying rule on behalf of the validator.
     async fn operation_cap(&self, ctx: &Context<'_>) -> Result<Option<MoveObject>> {
-        MoveObject::query(
-            ctx,
-            self.operation_cap_id(),
-            Object::latest_at(self.checkpoint_viewed_at),
-        )
-        .await
-        .extend()
+        MoveObject::query(ctx, self.operation_cap_id(), Object::latest_at(self.checkpoint_viewed_at)).await.extend()
     }
 
     /// The validator's current staking pool object, used to track the amount of stake
     /// and to compound staking rewards.
-    #[graphql(
-        deprecation = "The staking pool is a wrapped object. Access its fields directly on the \
-        `Validator` type."
-    )]
+    #[graphql(deprecation = "The staking pool is a wrapped object. Access its fields directly on the \
+        `Validator` type.")]
     async fn staking_pool(&self) -> Result<Option<MoveObject>> {
         Ok(None)
     }
@@ -219,10 +200,8 @@ impl Validator {
 
     /// The validator's current exchange object. The exchange rate is used to determine
     /// the amount of SUI tokens that each past SUI staker can withdraw in the future.
-    #[graphql(
-        deprecation = "The exchange object is a wrapped object. Access its dynamic fields through \
-        the `exchangeRatesTable` query."
-    )]
+    #[graphql(deprecation = "The exchange object is a wrapped object. Access its dynamic fields through \
+        the `exchangeRatesTable` query.")]
     async fn exchange_rates(&self) -> Result<Option<MoveObject>> {
         Ok(None)
     }
@@ -245,16 +224,12 @@ impl Validator {
 
     /// The epoch at which this pool became active.
     async fn staking_pool_activation_epoch(&self) -> Option<UInt53> {
-        self.validator_summary
-            .staking_pool_activation_epoch
-            .map(UInt53::from)
+        self.validator_summary.staking_pool_activation_epoch.map(UInt53::from)
     }
 
     /// The total number of SUI tokens in this pool.
     async fn staking_pool_oct_balance(&self) -> Option<BigInt> {
-        Some(BigInt::from(
-            self.validator_summary.staking_pool_oct_balance,
-        ))
+        Some(BigInt::from(self.validator_summary.staking_pool_oct_balance))
     }
 
     /// The epoch stake rewards will be added here at the end of each epoch.
@@ -274,16 +249,12 @@ impl Validator {
 
     /// Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
     async fn pending_total_oct_withdraw(&self) -> Option<BigInt> {
-        Some(BigInt::from(
-            self.validator_summary.pending_total_oct_withdraw,
-        ))
+        Some(BigInt::from(self.validator_summary.pending_total_oct_withdraw))
     }
 
     /// Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
     async fn pending_pool_token_withdraw(&self) -> Option<BigInt> {
-        Some(BigInt::from(
-            self.validator_summary.pending_pool_token_withdraw,
-        ))
+        Some(BigInt::from(self.validator_summary.pending_pool_token_withdraw))
     }
 
     /// The voting power of this validator in basis points (e.g., 100 = 1% voting power).
@@ -341,8 +312,7 @@ impl Validator {
             return Ok(connection);
         };
 
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(addresses.len(), self.checkpoint_viewed_at)?
+        let Some((prev, next, _, cs)) = page.paginate_consistent_indices(addresses.len(), self.checkpoint_viewed_at)?
         else {
             return Ok(connection);
         };
@@ -351,13 +321,10 @@ impl Validator {
         connection.has_next_page = next;
 
         for c in cs {
-            connection.edges.push(Edge::new(
-                c.encode_cursor(),
-                Address {
-                    address: addresses[c.ix].address,
-                    checkpoint_viewed_at: c.c,
-                },
-            ));
+            connection.edges.push(Edge::new(c.encode_cursor(), Address {
+                address: addresses[c.ix].address,
+                checkpoint_viewed_at: c.c,
+            }));
         }
 
         Ok(connection)
@@ -371,14 +338,12 @@ impl Validator {
             .load_one(self.requested_for_epoch)
             .await?
             .ok_or_else(|| Error::Internal("DataLoading exchange rates failed".to_string()))?;
-        let rates = exchange_rates
-            .get(&self.validator_summary.sui_address)
-            .ok_or_else(|| {
-                Error::Internal(format!(
-                    "Failed to get the exchange rate for this validator address {} for requested epoch {}",
-                    self.validator_summary.sui_address, self.requested_for_epoch
-                ))
-            })?;
+        let rates = exchange_rates.get(&self.validator_summary.sui_address).ok_or_else(|| {
+            Error::Internal(format!(
+                "Failed to get the exchange rate for this validator address {} for requested epoch {}",
+                self.validator_summary.sui_address, self.requested_for_epoch
+            ))
+        })?;
 
         let avg_apy = Some(calculate_apy(stake_subsidy_start_epoch, rates));
 

@@ -1,20 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::object_runtime::{ObjectRuntime, TransferResult};
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    account_address::AccountAddress, gas_algebra::InternalGas, language_storage::TypeTag,
+    account_address::AccountAddress,
+    gas_algebra::InternalGas,
+    language_storage::TypeTag,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-};
+use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value};
 use smallvec::smallvec;
-use std::collections::VecDeque;
 use sui_types::{base_types::SequenceNumber, object::Owner};
+
+use super::object_runtime::{ObjectRuntime, TransferResult};
+use crate::NativesCostTable;
 
 const E_SHARED_NON_NEW_OBJECT: u64 = 0;
 
@@ -35,16 +37,10 @@ pub fn transfer_internal(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 2);
 
-    let transfer_transfer_internal_cost_params = context
-        .extensions_mut()
-        .get::<NativesCostTable>()
-        .transfer_transfer_internal_cost_params
-        .clone();
+    let transfer_transfer_internal_cost_params =
+        context.extensions_mut().get::<NativesCostTable>().transfer_transfer_internal_cost_params.clone();
 
-    native_charge_gas_early_exit!(
-        context,
-        transfer_transfer_internal_cost_params.transfer_transfer_internal_cost_base
-    );
+    native_charge_gas_early_exit!(context, transfer_transfer_internal_cost_params.transfer_transfer_internal_cost_base);
 
     let ty = ty_args.pop().unwrap();
     let recipient = pop_arg!(args, AccountAddress);
@@ -72,16 +68,10 @@ pub fn freeze_object(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    let transfer_freeze_object_cost_params = context
-        .extensions_mut()
-        .get::<NativesCostTable>()
-        .transfer_freeze_object_cost_params
-        .clone();
+    let transfer_freeze_object_cost_params =
+        context.extensions_mut().get::<NativesCostTable>().transfer_freeze_object_cost_params.clone();
 
-    native_charge_gas_early_exit!(
-        context,
-        transfer_freeze_object_cost_params.transfer_freeze_object_cost_base
-    );
+    native_charge_gas_early_exit!(context, transfer_freeze_object_cost_params.transfer_freeze_object_cost_base);
 
     let ty = ty_args.pop().unwrap();
     let obj = args.pop_back().unwrap();
@@ -107,16 +97,10 @@ pub fn share_object(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    let transfer_share_object_cost_params = context
-        .extensions_mut()
-        .get::<NativesCostTable>()
-        .transfer_share_object_cost_params
-        .clone();
+    let transfer_share_object_cost_params =
+        context.extensions_mut().get::<NativesCostTable>().transfer_share_object_cost_params.clone();
 
-    native_charge_gas_early_exit!(
-        context,
-        transfer_share_object_cost_params.transfer_share_object_cost_base
-    );
+    native_charge_gas_early_exit!(context, transfer_share_object_cost_params.transfer_share_object_cost_base);
 
     let ty = ty_args.pop().unwrap();
     let obj = args.pop_back().unwrap();
@@ -124,9 +108,7 @@ pub fn share_object(
         context,
         // Dummy version, to be filled with the correct initial version when the effects of the
         // transaction are written to storage.
-        Owner::Shared {
-            initial_shared_version: SequenceNumber::new(),
-        },
+        Owner::Shared { initial_shared_version: SequenceNumber::new() },
         ty,
         obj,
     )?;
@@ -148,10 +130,8 @@ fn object_runtime_transfer(
     obj: Value,
 ) -> PartialVMResult<TransferResult> {
     if !matches!(context.type_to_type_tag(&ty)?, TypeTag::Struct(_)) {
-        return Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Sui verifier guarantees this is a struct".to_string()),
-        );
+        return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            .with_message("Sui verifier guarantees this is a struct".to_string()));
     }
 
     let obj_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();

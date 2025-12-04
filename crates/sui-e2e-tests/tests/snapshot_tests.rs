@@ -11,10 +11,7 @@ use test_cluster::TestClusterBuilder;
 // special constants for substitution in commands
 const ME: &str = "{ME}";
 
-async fn run_one(
-    test: Vec<&str>,
-    context: &mut WalletContext,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+async fn run_one(test: Vec<&str>, context: &mut WalletContext) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     let mut test_output = Vec::new();
     let active_addr = context.active_address()?.to_string();
     for cli_cmd in test {
@@ -59,15 +56,15 @@ async fn basic_read_cmd_snapshot_tests() -> Result<(), anyhow::Error> {
     let cmds = vec![
         "sui client objects {ME}", // valid addr
         "sui client objects 0x0000000000000000000000000000000000000000000000000000000000000000", // empty addr
-        "sui client object 0x5",       // valid object
+        "sui client object 0x5",   // valid object
         "sui client object 0x5 --bcs", // valid object BCS
         // Simtest object IDs are not stable so these object IDs may or may not exist currently --
         // commenting them out for now.
         // "sui client object 0x3b5121a0603ef7ab4cb57827fceca17db3338ef2cd76126cc1523b681df27cee", // valid object
         // "sui client object 0x3b5121a0603ef7ab4cb57827fceca17db3338ef2cd76126cc1523b681df27cee --bcs", // valid object BCS
         "sui client object 0x0000000000000000000000000000000000000000000000000000000000000000", // non-existent object
-        "sui client tx-block Duwr9uSk9ZvAndEa8oDHunx345i6oyrp3e78MYHVAbYdv", // valid tx digest
-        "sui client tx-block EgMTHQygMi6SRsBqrPHAEKZCNrpShXurCp9rcb9qbSg8", // non-existent tx digest
+        "sui client tx-block Duwr9uSk9ZvAndEa8oDHunx345i6oyrp3e78MYHVAbYdv",                    // valid tx digest
+        "sui client tx-block EgMTHQygMi6SRsBqrPHAEKZCNrpShXurCp9rcb9qbSg8",                     // non-existent tx digest
     ];
     assert_json_snapshot!(run_one(cmds, context).await?);
     Ok(())

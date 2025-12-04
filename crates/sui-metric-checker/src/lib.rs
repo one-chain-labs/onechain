@@ -93,9 +93,7 @@ impl NowProvider for UtcNowProvider {
 //  - "now"
 //  - "now-1h"
 //  - "now-30m 10s"
-pub fn timestamp_string_to_unix_seconds<N: NowProvider>(
-    timestamp: &str,
-) -> Result<i64, anyhow::Error> {
+pub fn timestamp_string_to_unix_seconds<N: NowProvider>(timestamp: &str) -> Result<i64, anyhow::Error> {
     if timestamp.starts_with("now") {
         if let Some(relative_timestamp) = timestamp.strip_prefix("now-") {
             let duration = parse_duration(relative_timestamp)?;
@@ -120,11 +118,7 @@ pub fn timestamp_string_to_unix_seconds<N: NowProvider>(
     }
 }
 
-pub fn fails_threshold_condition(
-    queried_value: f64,
-    threshold: f64,
-    failure_condition: &Condition,
-) -> bool {
+pub fn fails_threshold_condition(queried_value: f64, threshold: f64, failure_condition: &Condition) -> bool {
     match failure_condition {
         Condition::Greater => queried_value > threshold,
         Condition::Equal => queried_value == threshold,
@@ -133,15 +127,14 @@ pub fn fails_threshold_condition(
 }
 
 fn unix_seconds_to_timestamp_string(unix_seconds: i64) -> String {
-    DateTime::from_timestamp(unix_seconds, 0)
-        .unwrap()
-        .to_string()
+    DateTime::from_timestamp(unix_seconds, 0).unwrap().to_string()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     struct MockNowProvider;
 
@@ -205,10 +198,7 @@ mod tests {
                 step: 60.0,
                 percentile: 50,
             },
-            validate_result: Some(QueryResultValidation {
-                threshold: 3.0,
-                failure_condition: Condition::Greater,
-            }),
+            validate_result: Some(QueryResultValidation { threshold: 3.0, failure_condition: Condition::Greater }),
         };
 
         let expected_instant_query = Query {

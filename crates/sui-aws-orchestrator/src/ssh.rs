@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_trait::async_trait;
 use std::{
     io::Write,
     net::SocketAddr,
@@ -10,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use async_trait::async_trait;
 use futures::future::try_join_all;
 use russh::{
     client::{self, Msg},
@@ -131,7 +131,7 @@ impl SshConnectionManager {
     /// Create a new ssh connection with the provided host.
     pub async fn connect(&self, address: SocketAddr) -> SshResult<SshConnection> {
         let mut error = None;
-        for _ in 0..self.retries + 1 {
+        for _ in 0 .. self.retries + 1 {
             match SshConnection::new(
                 address,
                 &self.username,
@@ -306,7 +306,7 @@ impl SshConnection {
     /// Execute a ssh command on the remote machine.
     pub async fn execute(&self, command: String) -> SshResult<(String, String)> {
         let mut error = None;
-        for _ in 0..self.retries + 1 {
+        for _ in 0 .. self.retries + 1 {
             let channel = match self.session.channel_open_session().await {
                 Ok(x) => x,
                 Err(e) => {
@@ -354,7 +354,7 @@ impl SshConnection {
     /// TODO: if the files get too big then we should leverage a simple S3 bucket instead.
     pub async fn download<P: AsRef<Path>>(&self, path: P) -> SshResult<String> {
         let mut error = None;
-        for _ in 0..self.retries + 1 {
+        for _ in 0 .. self.retries + 1 {
             match self.execute(format!("cat {}", path.as_ref().to_str().unwrap())).await {
                 Ok((file_data, _)) => return Ok(file_data),
                 Err(err) => error = Some(err),

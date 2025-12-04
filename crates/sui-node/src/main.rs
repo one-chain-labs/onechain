@@ -1,22 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, sync::Arc, time::Duration};
+
 use clap::{ArgGroup, Parser};
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
+use mysten_common::sync::async_once_cell::AsyncOnceCell;
+use one_node::metrics;
+use sui_config::{node::RunWithRange, Config, NodeConfig};
+use sui_core::runtime::SuiRuntimes;
+use sui_types::{
+    committee::EpochId,
+    messages_checkpoint::CheckpointSequenceNumber,
+    multiaddr::Multiaddr,
+    supported_protocol_versions::SupportedProtocolVersions,
+};
 use tokio::sync::broadcast;
 use tracing::{error, info};
-
-use mysten_common::sync::async_once_cell::AsyncOnceCell;
-use sui_config::node::RunWithRange;
-use sui_config::{Config, NodeConfig};
-use sui_core::runtime::SuiRuntimes;
-use one_node::metrics;
-use sui_types::committee::EpochId;
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
-use sui_types::multiaddr::Multiaddr;
-use sui_types::supported_protocol_versions::SupportedProtocolVersions;
 
 // Define the `GIT_REVISION` and `VERSION` consts
 bin_version::bin_version!();
@@ -62,9 +61,7 @@ fn main() {
     // for run_with_range. i.e if this is set in the config, it is ignored. only the cli args
     // enable/disable run_with_range
     match (args.run_with_range_epoch, args.run_with_range_checkpoint) {
-        (None, Some(checkpoint)) => {
-            config.run_with_range = Some(RunWithRange::Checkpoint(checkpoint))
-        }
+        (None, Some(checkpoint)) => config.run_with_range = Some(RunWithRange::Checkpoint(checkpoint)),
         (Some(epoch), None) => config.run_with_range = Some(RunWithRange::Epoch(epoch)),
         _ => config.run_with_range = None,
     };
@@ -75,23 +72,15 @@ fn main() {
     let prometheus_registry = registry_service.default_registry();
 
     // Initialize logging
-    let (_guard, filter_handle) = telemetry_subscribers::TelemetryConfig::new()
-        .with_env()
-        .with_prom_registry(&prometheus_registry)
-        .init();
+    let (_guard, filter_handle) =
+        telemetry_subscribers::TelemetryConfig::new().with_env().with_prom_registry(&prometheus_registry).init();
 
     drop(metrics_rt);
 
     info!("One Node version: {VERSION}");
-    info!(
-        "Supported protocol versions: {:?}",
-        config.supported_protocol_versions
-    );
+    info!("Supported protocol versions: {:?}", config.supported_protocol_versions);
 
-    info!(
-        "Started Prometheus HTTP endpoint at {}",
-        config.metrics_address
-    );
+    info!("Started Prometheus HTTP endpoint at {}", config.metrics_address);
 
     {
         let _enter = runtimes.metrics.enter();
@@ -117,9 +106,7 @@ fn main() {
 
     runtimes.sui_node.spawn(async move {
         match one_node::SuiNode::start_async(config, registry_service, Some(rpc_runtime), VERSION).await {
-            Ok(one_node) => node_once_cell_clone
-                .set(one_node)
-                .expect("Failed to set node in AsyncOnceCell"),
+            Ok(one_node) => node_once_cell_clone.set(one_node).expect("Failed to set node in AsyncOnceCell"),
 
             Err(e) => {
                 error!("Failed to start node: {e:?}");
@@ -154,11 +141,7 @@ fn main() {
         info!("Sui chain identifier: {chain_identifier}");
         prometheus_registry
             .register(mysten_metrics::uptime_metric(
-                if is_validator {
-                    "validator"
-                } else {
-                    "fullnode"
-                },
+                if is_validator { "validator" } else { "fullnode" },
                 VERSION,
                 chain_identifier.as_str(),
             ))

@@ -3,19 +3,21 @@
 
 use std::fmt;
 
-use move_core_types::parsing::{
-    address::{NumericalAddress, ParsedAddress},
-    types::{ParsedFqName, ParsedModuleId, ParsedStructType, ParsedType},
+use move_core_types::{
+    parsing::{
+        address::{NumericalAddress, ParsedAddress},
+        types::{ParsedFqName, ParsedModuleId, ParsedStructType, ParsedType},
+    },
+    runtime_value::MoveValue,
 };
-use move_core_types::runtime_value::MoveValue;
 use sui_types::{
     base_types::{ObjectID, RESOLVED_ASCII_STR, RESOLVED_STD_OPTION, RESOLVED_UTF8_STR},
-    Identifier, TypeTag,
+    Identifier,
+    TypeTag,
 };
 
-use crate::{err, error, sp};
-
 use super::error::{PTBResult, Span, Spanned};
+use crate::{err, error, sp};
 
 pub type ParsedProgram = (Program, ProgramMetadata);
 
@@ -55,9 +57,7 @@ pub const SOME: &str = "some";
 pub const NONE: &str = "none";
 pub const GAS: &str = "gas";
 
-pub const KEYWORDS: &[&str] = &[
-    ADDRESS, BOOL, VECTOR, SOME, NONE, GAS, U8, U16, U32, U64, U128, U256,
-];
+pub const KEYWORDS: &[&str] = &[ADDRESS, BOOL, VECTOR, SOME, NONE, GAS, U8, U16, U32, U64, U128, U256];
 
 pub const COMMANDS: &[&str] = &[
     TRANSFER_OBJECTS,
@@ -85,11 +85,7 @@ pub fn is_keyword(s: &str) -> bool {
 }
 
 pub fn all_keywords() -> String {
-    KEYWORDS[..KEYWORDS.len() - 1]
-        .iter()
-        .map(|x| format!("'{}'", x))
-        .collect::<Vec<_>>()
-        .join(", ")
+    KEYWORDS[.. KEYWORDS.len() - 1].iter().map(|x| format!("'{}'", x)).collect::<Vec<_>>().join(", ")
         + &format!(", or '{}'", KEYWORDS[KEYWORDS.len() - 1])
 }
 
@@ -132,11 +128,7 @@ pub enum ParsedPTBCommand {
     SplitCoins(Spanned<Argument>, Spanned<Vec<Spanned<Argument>>>),
     MergeCoins(Spanned<Argument>, Spanned<Vec<Spanned<Argument>>>),
     MakeMoveVec(Spanned<ParsedType>, Spanned<Vec<Spanned<Argument>>>),
-    MoveCall(
-        Spanned<ModuleAccess>,
-        Option<Spanned<Vec<ParsedType>>>,
-        Vec<Spanned<Argument>>,
-    ),
+    MoveCall(Spanned<ModuleAccess>, Option<Spanned<Vec<ParsedType>>>, Vec<Spanned<Argument>>),
     Assign(Spanned<String>, Option<Spanned<Argument>>),
     Publish(Spanned<String>),
     Upgrade(Spanned<String>, Spanned<Argument>),
@@ -183,42 +175,28 @@ impl Argument {
                 vs.iter()
                     .map(|sp!(loc, v)| v.checked_to_pure_move_value(*loc, ty))
                     .collect::<PTBResult<Vec<_>>>()
-                    .map_err(|e| {
-                        e.with_help("Literal vectors cannot contain object values.".to_string())
-                    })?,
+                    .map_err(|e| e.with_help("Literal vectors cannot contain object values.".to_string()))?,
             ),
             (Argument::String(s), TypeTag::Vector(ty)) if **ty == TypeTag::U8 => {
                 MoveValue::Vector(s.bytes().map(MoveValue::U8).collect::<Vec<_>>())
             }
             (Argument::String(s), TypeTag::Struct(stag))
                 if {
-                    let resolved = (
-                        &stag.address,
-                        stag.module.as_ident_str(),
-                        stag.name.as_ident_str(),
-                    );
+                    let resolved = (&stag.address, stag.module.as_ident_str(), stag.name.as_ident_str());
                     resolved == RESOLVED_ASCII_STR || resolved == RESOLVED_UTF8_STR
                 } =>
             {
                 MoveValue::Vector(s.bytes().map(MoveValue::U8).collect::<Vec<_>>())
             }
             (Argument::Option(sp!(loc, o)), TypeTag::Struct(stag))
-                if (
-                    &stag.address,
-                    stag.module.as_ident_str(),
-                    stag.name.as_ident_str(),
-                ) == RESOLVED_STD_OPTION
+                if (&stag.address, stag.module.as_ident_str(), stag.name.as_ident_str()) == RESOLVED_STD_OPTION
                     && stag.type_params.len() == 1 =>
             {
                 if let Some(v) = o {
                     let v = v
                         .as_ref()
                         .checked_to_pure_move_value(*loc, &stag.type_params[0])
-                        .map_err(|e| {
-                            e.with_help(
-                                "Literal option values cannot contain object values.".to_string(),
-                            )
-                        })?;
+                        .map_err(|e| e.with_help("Literal option values cannot contain object values.".to_string()))?;
                     MoveValue::Vector(vec![v])
                 } else {
                     MoveValue::Vector(vec![])
@@ -249,20 +227,15 @@ impl Argument {
                 vs.iter()
                     .map(|sp!(loc, v)| v.to_pure_move_value(*loc))
                     .collect::<PTBResult<Vec<_>>>()
-                    .map_err(|e| {
-                        e.with_help("Literal vectors cannot contain object values.".to_string())
-                    })?,
+                    .map_err(|e| e.with_help("Literal vectors cannot contain object values.".to_string()))?,
             ),
-            Argument::String(s) => {
-                MoveValue::Vector(s.bytes().map(MoveValue::U8).collect::<Vec<_>>())
-            }
+            Argument::String(s) => MoveValue::Vector(s.bytes().map(MoveValue::U8).collect::<Vec<_>>()),
             Argument::Option(sp!(loc, o)) => {
                 if let Some(v) = o {
-                    let v = v.as_ref().to_pure_move_value(*loc).map_err(|e| {
-                        e.with_help(
-                            "Literal option values cannot contain object values.".to_string(),
-                        )
-                    })?;
+                    let v = v
+                        .as_ref()
+                        .to_pure_move_value(*loc)
+                        .map_err(|e| e.with_help("Literal option values cannot contain object values.".to_string()))?;
                     MoveValue::Vector(vec![v])
                 } else {
                     MoveValue::Vector(vec![])
@@ -274,15 +247,11 @@ impl Argument {
         })
     }
 
-    fn cast_inferrred_num(
-        val: move_core_types::u256::U256,
-        tag: &TypeTag,
-        loc: Span,
-    ) -> PTBResult<MoveValue> {
+    fn cast_inferrred_num(val: move_core_types::u256::U256, tag: &TypeTag, loc: Span) -> PTBResult<MoveValue> {
         match tag {
-            TypeTag::U8 => u8::try_from(val)
-                .map(MoveValue::U8)
-                .map_err(|_| err!(loc, "Value {val} is too large to be a u8 value")),
+            TypeTag::U8 => {
+                u8::try_from(val).map(MoveValue::U8).map_err(|_| err!(loc, "Value {val} is too large to be a u8 value"))
+            }
             TypeTag::U16 => u16::try_from(val)
                 .map(MoveValue::U16)
                 .map_err(|_| err!(loc, "Value {val} is too large to be a u16 value")),
@@ -377,11 +346,7 @@ impl fmt::Display for ParsedPTBCommand {
                 f,
                 "{ASSIGN} {}{}",
                 arg.value,
-                if let Some(arg) = arg_opt {
-                    format!(" {}", arg.value)
-                } else {
-                    "".to_string()
-                }
+                if let Some(arg) = arg_opt { format!(" {}", arg.value) } else { "".to_string() }
             ),
             ParsedPTBCommand::Publish(s) => write!(f, "{PUBLISH} {}", s.value),
             ParsedPTBCommand::Upgrade(s, a) => write!(f, "{UPGRADE} {} {}", s.value, a.value),
@@ -394,18 +359,7 @@ impl fmt::Display for ParsedPTBCommand {
                 delimited_list(f, ", ", args.value.iter().map(|x| &x.value))?;
                 write!(f, "]")
             }
-            ParsedPTBCommand::MoveCall(
-                sp!(
-                    _,
-                    ModuleAccess {
-                        address,
-                        module_name,
-                        function_name
-                    }
-                ),
-                tys,
-                args,
-            ) => {
+            ParsedPTBCommand::MoveCall(sp!(_, ModuleAccess { address, module_name, function_name }), tys, args) => {
                 let type_args = |f: &mut std::fmt::Formatter| match tys {
                     Some(tys) => {
                         write!(f, "<")?;
@@ -414,11 +368,7 @@ impl fmt::Display for ParsedPTBCommand {
                     }
                     None => Ok(()),
                 };
-                write!(
-                    f,
-                    "{MOVE_CALL} {}::{}::{}",
-                    address.value, module_name.value, function_name.value
-                )?;
+                write!(f, "{MOVE_CALL} {}::{}::{}", address.value, module_name.value, function_name.value)?;
                 type_args(f)?;
 
                 if !args.is_empty() {
@@ -448,11 +398,7 @@ impl<'a> fmt::Display for TyDisplay<'a> {
             Signer => write!(f, "signer"),
             Vector(ty) => write!(f, "vector<{}>", TyDisplay(ty)),
             Struct(ParsedStructType {
-                fq_name:
-                    ParsedFqName {
-                        module: ParsedModuleId { address, name },
-                        name: struct_name,
-                    },
+                fq_name: ParsedFqName { module: ParsedModuleId { address, name }, name: struct_name },
                 type_args,
             }) => {
                 write!(f, "{address}::{name}::{struct_name}")?;

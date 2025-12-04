@@ -34,10 +34,7 @@ async fn direct_commit() {
     let leader_round_wave_0_pipeline_1 = committer.committers[1].leader_round(0);
     if let DecidedLeader::Commit(ref block) = sequence[0] {
         assert_eq!(block.round(), leader_round_wave_0_pipeline_1);
-        assert_eq!(
-            block.author(),
-            committer.get_leaders(leader_round_wave_0_pipeline_1)[0]
-        );
+        assert_eq!(block.author(), committer.get_leaders(leader_round_wave_0_pipeline_1)[0]);
     } else {
         panic!("Expected a committed leader")
     };
@@ -52,12 +49,7 @@ async fn idempotence() {
     // note: pipelines, waves & rounds are zero-indexed.
     let leader_round_pipeline_1_wave_0 = committer.committers[1].leader_round(0);
     let decision_round_pipeline_1_wave_0 = committer.committers[1].decision_round(0);
-    build_dag(
-        context.clone(),
-        dag_state.clone(),
-        None,
-        decision_round_pipeline_1_wave_0,
-    );
+    build_dag(context.clone(), dag_state.clone(), None, decision_round_pipeline_1_wave_0);
 
     // Commit one leader.
     let last_decided = Slot::new_for_test(0, 0);
@@ -67,10 +59,7 @@ async fn idempotence() {
 
     if let DecidedLeader::Commit(ref block) = first_sequence[0] {
         assert_eq!(block.round(), leader_round_pipeline_1_wave_0);
-        assert_eq!(
-            block.author(),
-            committer.get_leaders(leader_round_pipeline_1_wave_0)[0]
-        )
+        assert_eq!(block.author(), committer.get_leaders(leader_round_pipeline_1_wave_0)[0])
     } else {
         panic!("Expected a committed leader")
     };
@@ -82,10 +71,7 @@ async fn idempotence() {
     assert_eq!(first_sequence.len(), 1);
     if let DecidedLeader::Commit(ref block) = first_sequence[0] {
         assert_eq!(block.round(), leader_round_pipeline_1_wave_0);
-        assert_eq!(
-            block.author(),
-            committer.get_leaders(leader_round_pipeline_1_wave_0)[0]
-        )
+        assert_eq!(block.author(), committer.get_leaders(leader_round_pipeline_1_wave_0)[0])
     } else {
         panic!("Expected a committed leader")
     };
@@ -104,7 +90,7 @@ async fn multiple_direct_commit() {
 
     let mut last_decided = Slot::new_for_test(0, 0);
     let mut ancestors = None;
-    for n in 1..=10 {
+    for n in 1 ..= 10 {
         // Build the dag up to the decision round for each pipeline's wave starting
         // with wave 1.
         // note: pipelines, waves & rounds are zero-indexed.
@@ -113,12 +99,7 @@ async fn multiple_direct_commit() {
         let decision_round = committer.committers[pipeline].decision_round(wave_number);
         let leader_round = committer.committers[pipeline].leader_round(wave_number);
 
-        ancestors = Some(build_dag(
-            context.clone(),
-            dag_state.clone(),
-            ancestors,
-            decision_round,
-        ));
+        ancestors = Some(build_dag(context.clone(), dag_state.clone(), ancestors, decision_round));
 
         // Because of pipelining we are committing a leader every round.
         let sequence = committer.try_decide(last_decided);
@@ -127,10 +108,7 @@ async fn multiple_direct_commit() {
         assert_eq!(sequence.len(), 1);
         if let DecidedLeader::Commit(ref block) = sequence[0] {
             assert_eq!(block.round(), leader_round);
-            assert_eq!(
-                block.author(),
-                *committer.get_leaders(leader_round).first().unwrap()
-            );
+            assert_eq!(block.author(), *committer.get_leaders(leader_round).first().unwrap());
         } else {
             panic!("Expected a committed leader")
         }
@@ -184,7 +162,7 @@ async fn no_genesis_commit() {
     let decision_round_pipeline_0_wave_0 = committer.committers[0].decision_round(0);
 
     let mut ancestors = None;
-    for r in 0..decision_round_pipeline_0_wave_0 {
+    for r in 0 .. decision_round_pipeline_0_wave_0 {
         ancestors = Some(build_dag(context.clone(), dag_state.clone(), ancestors, r));
 
         let last_decided = Slot::new_for_test(0, 0);
@@ -222,12 +200,7 @@ async fn direct_skip_no_leader() {
     let references = build_dag_layer(connections, dag_state.clone());
 
     let decision_round_pipeline_1_wave_0 = committer.committers[1].decision_round(0);
-    build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references),
-        decision_round_pipeline_1_wave_0,
-    );
+    build_dag(context.clone(), dag_state.clone(), Some(references), decision_round_pipeline_1_wave_0);
 
     // Ensure no blocks are committed because there are 2f+1 blame (non-votes) for
     // the missing leader.
@@ -253,19 +226,11 @@ async fn direct_skip_enough_blame() {
     // note: pipelines, waves & rounds are zero-indexed.
     let leader_round_pipeline_1_wave_0 = committer.committers[1].leader_round(0);
     let leader_pipeline_1_wave_0 = committer.get_leaders(leader_round_pipeline_1_wave_0)[0];
-    let references_round_1 = build_dag(
-        context.clone(),
-        dag_state.clone(),
-        None,
-        leader_round_pipeline_1_wave_0,
-    );
+    let references_round_1 = build_dag(context.clone(), dag_state.clone(), None, leader_round_pipeline_1_wave_0);
 
     // Filter out that leader.
-    let references_without_leader_1: Vec<_> = references_round_1
-        .iter()
-        .cloned()
-        .filter(|x| x.author != leader_pipeline_1_wave_0)
-        .collect();
+    let references_without_leader_1: Vec<_> =
+        references_round_1.iter().cloned().filter(|x| x.author != leader_pipeline_1_wave_0).collect();
 
     // 2f+1 validators non votes for that leader.
     let connections_without_leader_1 = context
@@ -274,8 +239,7 @@ async fn direct_skip_enough_blame() {
         .take(context.committee.quorum_threshold() as usize)
         .map(|authority| (authority.0, references_without_leader_1.clone()))
         .collect();
-    let references_without_votes_for_leader_1 =
-        build_dag_layer(connections_without_leader_1, dag_state.clone());
+    let references_without_votes_for_leader_1 = build_dag_layer(connections_without_leader_1, dag_state.clone());
 
     // one vote for that leader
     let connections_with_leader_1 = context
@@ -284,8 +248,7 @@ async fn direct_skip_enough_blame() {
         .skip(context.committee.quorum_threshold() as usize)
         .map(|authority| (authority.0, references_round_1.clone()))
         .collect();
-    let references_with_votes_for_leader_1 =
-        build_dag_layer(connections_with_leader_1, dag_state.clone());
+    let references_with_votes_for_leader_1 = build_dag_layer(connections_with_leader_1, dag_state.clone());
 
     let references: Vec<_> = references_without_votes_for_leader_1
         .into_iter()
@@ -295,12 +258,7 @@ async fn direct_skip_enough_blame() {
 
     // Add enough blocks to reach the decision round of the wave 0 leader for pipeline 1.
     let decision_round_pipeline_1_wave_0 = committer.committers[1].decision_round(0);
-    build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references),
-        decision_round_pipeline_1_wave_0,
-    );
+    build_dag(context.clone(), dag_state.clone(), Some(references), decision_round_pipeline_1_wave_0);
 
     // Ensure the leader is skipped because there are 2f+1 blame (non-votes) for
     // the wave 0 leader of pipeline 1.
@@ -326,24 +284,13 @@ async fn indirect_commit() {
     // Add enough blocks to reach the wave 0 leader of pipeline 1.
     // note: pipelines, waves & rounds are zero-indexed.
     let leader_round_pipeline_1_wave_0 = committer.committers[1].leader_round(0);
-    let references_round_1 = build_dag(
-        context.clone(),
-        dag_state.clone(),
-        None,
-        leader_round_pipeline_1_wave_0,
-    );
+    let references_round_1 = build_dag(context.clone(), dag_state.clone(), None, leader_round_pipeline_1_wave_0);
 
     // Filter out that leader.
     let references_without_leader_1: Vec<_> = references_round_1
         .iter()
         .cloned()
-        .filter(|x| {
-            x.author
-                != *committer
-                    .get_leaders(leader_round_pipeline_1_wave_0)
-                    .first()
-                    .unwrap()
-        })
+        .filter(|x| x.author != *committer.get_leaders(leader_round_pipeline_1_wave_0).first().unwrap())
         .collect();
 
     // Only 2f+1 validators vote for that leader.
@@ -353,8 +300,7 @@ async fn indirect_commit() {
         .take(context.committee.quorum_threshold() as usize)
         .map(|authority| (authority.0, references_round_1.clone()))
         .collect();
-    let references_with_votes_for_leader_1 =
-        build_dag_layer(connections_with_leader_1, dag_state.clone());
+    let references_with_votes_for_leader_1 = build_dag_layer(connections_with_leader_1, dag_state.clone());
 
     let connections_without_leader_1 = context
         .committee
@@ -362,8 +308,7 @@ async fn indirect_commit() {
         .skip(context.committee.quorum_threshold() as usize)
         .map(|authority| (authority.0, references_without_leader_1.clone()))
         .collect();
-    let references_without_votes_for_leader_1 =
-        build_dag_layer(connections_without_leader_1, dag_state.clone());
+    let references_without_votes_for_leader_1 = build_dag_layer(connections_without_leader_1, dag_state.clone());
 
     // Only f+1 validators certify that leader.
     let mut references_round_3 = Vec::new();
@@ -374,10 +319,7 @@ async fn indirect_commit() {
         .take(context.committee.validity_threshold() as usize)
         .map(|authority| (authority.0, references_with_votes_for_leader_1.clone()))
         .collect::<Vec<_>>();
-    references_round_3.extend(build_dag_layer(
-        connections_with_votes_for_leader_1,
-        dag_state.clone(),
-    ));
+    references_round_3.extend(build_dag_layer(connections_with_votes_for_leader_1, dag_state.clone()));
 
     let references: Vec<_> = references_without_votes_for_leader_1
         .into_iter()
@@ -390,10 +332,7 @@ async fn indirect_commit() {
         .skip(context.committee.validity_threshold() as usize)
         .map(|authority| (authority.0, references.clone()))
         .collect::<Vec<_>>();
-    references_round_3.extend(build_dag_layer(
-        connections_without_votes_for_leader_1,
-        dag_state.clone(),
-    ));
+    references_round_3.extend(build_dag_layer(connections_without_votes_for_leader_1, dag_state.clone()));
 
     // Add enough blocks to decide the leader of round 5. The leader of round 2 will be skipped
     // (it was the vote for the first leader that we removed) so we add enough blocks
@@ -402,12 +341,7 @@ async fn indirect_commit() {
     let pipeline_leader_5 = leader_round_5 % wave_length as usize;
     let wave_leader_5 = committer.committers[pipeline_leader_5].wave_number(leader_round_5 as u32);
     let decision_round_5 = committer.committers[pipeline_leader_5].decision_round(wave_leader_5);
-    build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references_round_3),
-        decision_round_5,
-    );
+    build_dag(context.clone(), dag_state.clone(), Some(references_round_3), decision_round_5);
 
     // Ensure we commit the first leaders.
     let last_decided = Slot::new_for_test(0, 0);
@@ -461,10 +395,7 @@ async fn indirect_skip() {
         .take(context.committee.validity_threshold() as usize)
         .map(|authority| (authority.0, references_round_4.clone()))
         .collect::<Vec<_>>();
-    references_round_5.extend(build_dag_layer(
-        connections_with_leader_4,
-        dag_state.clone(),
-    ));
+    references_round_5.extend(build_dag_layer(connections_with_leader_4, dag_state.clone()));
 
     let connections_without_leader_4 = context
         .committee
@@ -472,22 +403,14 @@ async fn indirect_skip() {
         .skip(context.committee.validity_threshold() as usize)
         .map(|authority| (authority.0, references_without_leader_4.clone()))
         .collect();
-    references_round_5.extend(build_dag_layer(
-        connections_without_leader_4,
-        dag_state.clone(),
-    ));
+    references_round_5.extend(build_dag_layer(connections_without_leader_4, dag_state.clone()));
 
     // Add enough blocks to reach the decision round of the 7th leader.
     let leader_round_7 = 7;
     let pipeline_leader_7 = leader_round_7 % wave_length as usize;
     let wave_leader_7 = committer.committers[pipeline_leader_7].wave_number(leader_round_7 as u32);
     let decision_round_7 = committer.committers[pipeline_leader_7].decision_round(wave_leader_7);
-    build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references_round_5),
-        decision_round_7,
-    );
+    build_dag(context.clone(), dag_state.clone(), Some(references_round_5), decision_round_7);
 
     // Ensure we commit the first 3 leaders, skip the 4th, and commit the last 2 leaders.
     let last_decided = Slot::new_for_test(0, 0);
@@ -496,7 +419,7 @@ async fn indirect_skip() {
     assert_eq!(sequence.len(), 7);
 
     // Ensure we commit the first 3 leaders.
-    for i in 0..=2 {
+    for i in 0 ..= 2 {
         // First sequenced leader should be in round 1.
         let leader_round = i + 1;
         let leader = committer.get_leaders(leader_round)[0];
@@ -516,7 +439,7 @@ async fn indirect_skip() {
     }
 
     // Ensure we commit the last 3 leaders.
-    for i in 4..=6 {
+    for i in 4 ..= 6 {
         let leader_round = i + 1;
         let leader = committer.get_leaders(leader_round)[0];
         if let DecidedLeader::Commit(ref block) = sequence[i as usize] {
@@ -552,20 +475,12 @@ async fn undecided() {
         .map(|authority| (authority.0, references_1_without_leader.clone()))
         .collect();
 
-    let connections = leader_connection
-        .into_iter()
-        .chain(non_leader_connections)
-        .collect::<Vec<_>>();
+    let connections = leader_connection.into_iter().chain(non_leader_connections).collect::<Vec<_>>();
     let references_voting_round_1 = build_dag_layer(connections, dag_state.clone());
 
     // Add enough blocks to reach the first decision round
     let decision_round_1 = committer.committers[1].decision_round(0);
-    build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references_voting_round_1),
-        decision_round_1,
-    );
+    build_dag(context.clone(), dag_state.clone(), Some(references_voting_round_1), decision_round_1);
 
     // Ensure no blocks are committed.
     let last_decided = Slot::new_for_test(0, 0);
@@ -586,18 +501,13 @@ async fn test_byzantine_validator() {
     // Add enough blocks to reach leader A12
     // note: pipelines, waves & rounds are zero-indexed.
     let leader_round_12 = 12;
-    let references_leader_round_12 =
-        build_dag(context.clone(), dag_state.clone(), None, leader_round_12);
+    let references_leader_round_12 = build_dag(context.clone(), dag_state.clone(), None, leader_round_12);
 
     // Add blocks to reach voting round for leader A12
     let voting_round_12 = leader_round_12 + 1;
     // This includes a "good vote" from validator B which is acting as a byzantine validator
-    let good_references_voting_round_wave_4 = build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references_leader_round_12.clone()),
-        voting_round_12,
-    );
+    let good_references_voting_round_wave_4 =
+        build_dag(context.clone(), dag_state.clone(), Some(references_leader_round_12.clone()), voting_round_12);
 
     // DagState Update:
     // - A12 got a good vote from 'B' above
@@ -609,10 +519,8 @@ async fn test_byzantine_validator() {
 
     // Filter out leader A12
     let leader_12 = committer.get_leaders(leader_round_12)[0];
-    let references_without_leader_round_wave_4: Vec<_> = references_leader_round_12
-        .into_iter()
-        .filter(|x| x.author != leader_12)
-        .collect();
+    let references_without_leader_round_wave_4: Vec<_> =
+        references_leader_round_12.into_iter().filter(|x| x.author != leader_12).collect();
 
     // Accept these references/blocks as ancestors from decision round blocks in dag state
     let byzantine_block_b13_1 = VerifiedBlock::new_for_test(
@@ -621,9 +529,7 @@ async fn test_byzantine_validator() {
             .set_transactions(vec![Transaction::new(vec![1])])
             .build(),
     );
-    dag_state
-        .write()
-        .accept_block(byzantine_block_b13_1.clone());
+    dag_state.write().accept_block(byzantine_block_b13_1.clone());
 
     let byzantine_block_b13_2 = VerifiedBlock::new_for_test(
         TestBlock::new(13, 1)
@@ -631,9 +537,7 @@ async fn test_byzantine_validator() {
             .set_transactions(vec![Transaction::new(vec![2])])
             .build(),
     );
-    dag_state
-        .write()
-        .accept_block(byzantine_block_b13_2.clone());
+    dag_state.write().accept_block(byzantine_block_b13_2.clone());
 
     let byzantine_block_b13_3 = VerifiedBlock::new_for_test(
         TestBlock::new(13, 1)
@@ -641,18 +545,14 @@ async fn test_byzantine_validator() {
             .set_transactions(vec![Transaction::new(vec![3])])
             .build(),
     );
-    dag_state
-        .write()
-        .accept_block(byzantine_block_b13_3.clone());
+    dag_state.write().accept_block(byzantine_block_b13_3.clone());
 
     // Ancestors of decision blocks in round 14 should include multiple byzantine non-votes B13
     // but there are enough good votes to prevent a skip. Additionally only one of the non-votes
     // per authority should be counted so we should not skip leader A12.
     let mut references_round_14 = vec![];
     let decison_block_a14 = VerifiedBlock::new_for_test(
-        TestBlock::new(14, 0)
-            .set_ancestors(good_references_voting_round_wave_4.clone())
-            .build(),
+        TestBlock::new(14, 0).set_ancestors(good_references_voting_round_wave_4.clone()).build(),
     );
     references_round_14.push(decison_block_a14.reference());
     dag_state.write().accept_block(decison_block_a14.clone());
@@ -727,12 +627,7 @@ async fn test_byzantine_validator() {
 
     // Now build an additional dag layer on top of the existing dag so a commit
     // decision can be made about leader B13 which is the byzantine validator.
-    let references_round_15 = build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references_round_14),
-        15,
-    );
+    let references_round_15 = build_dag(context.clone(), dag_state.clone(), Some(references_round_14), 15);
 
     // Ensure B13 is marked as undecided as there is <2f+1 blame and <2f+1 certs
     let last_sequenced = sequence.last().unwrap();
@@ -743,12 +638,7 @@ async fn test_byzantine_validator() {
     // Now build an additional 3 dag layers on top of the existing dag so a commit
     // decision can be made about leader A16 and then an indirect decision can be
     // made about B13
-    build_dag(
-        context.clone(),
-        dag_state.clone(),
-        Some(references_round_15),
-        18,
-    );
+    build_dag(context.clone(), dag_state.clone(), Some(references_round_15), 18);
     let sequence = committer.try_decide(last_decided);
     tracing::info!("Commit sequence: {sequence:#?}");
     assert_eq!(sequence.len(), 4);
@@ -765,28 +655,16 @@ async fn test_byzantine_validator() {
     };
 }
 
-fn basic_test_setup() -> (
-    Arc<Context>,
-    Arc<RwLock<DagState>>,
-    super::UniversalCommitter,
-) {
+fn basic_test_setup() -> (Arc<Context>, Arc<RwLock<DagState>>, super::UniversalCommitter) {
     telemetry_subscribers::init_for_testing();
     // Commitee of 4 with even stake
     let context = Arc::new(Context::new_for_test(4).0);
-    let dag_state = Arc::new(RwLock::new(DagState::new(
-        context.clone(),
-        Arc::new(MemStore::new()),
-    )));
-    let leader_schedule = Arc::new(LeaderSchedule::new(
-        context.clone(),
-        LeaderSwapTable::default(),
-    ));
+    let dag_state = Arc::new(RwLock::new(DagState::new(context.clone(), Arc::new(MemStore::new()))));
+    let leader_schedule = Arc::new(LeaderSchedule::new(context.clone(), LeaderSwapTable::default()));
 
     // Create committer with pipelining and only 1 leader per leader round
     let committer =
-        UniversalCommitterBuilder::new(context.clone(), leader_schedule, dag_state.clone())
-            .with_pipeline(true)
-            .build();
+        UniversalCommitterBuilder::new(context.clone(), leader_schedule, dag_state.clone()).with_pipeline(true).build();
 
     // note: with pipelining and without multi-leader enabled there should be
     // three committers.

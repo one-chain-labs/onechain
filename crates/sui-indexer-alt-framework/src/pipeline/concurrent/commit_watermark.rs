@@ -16,13 +16,12 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
+use super::Handler;
 use crate::{
     metrics::{CheckpointLagMetricReporter, IndexerMetrics},
     pipeline::{logging::WatermarkLogger, CommitterConfig, WatermarkPart, WARN_PENDING_WATERMARKS},
     watermarks::CommitterWatermark,
 };
-
-use super::Handler;
 
 /// The watermark task is responsible for keeping track of a pipeline's out-of-order commits and
 /// updating its row in the `watermarks` table when a continuous run of checkpoints have landed
@@ -254,10 +253,6 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
             }
         }
 
-        info!(
-            pipeline = H::NAME,
-            ?watermark,
-            "Stopping committer watermark task"
-        );
+        info!(pipeline = H::NAME, ?watermark, "Stopping committer watermark task");
     })
 }

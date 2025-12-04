@@ -13,15 +13,12 @@ use sui_types::full_checkpoint_content::CheckpointData;
 pub(crate) struct ObjVersions;
 
 impl Processor for ObjVersions {
-    const NAME: &'static str = "obj_versions";
     type Value = StoredObjVersion;
 
+    const NAME: &'static str = "obj_versions";
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData {
-            transactions,
-            checkpoint_summary,
-            ..
-        } = checkpoint.as_ref();
+        let CheckpointData { transactions, checkpoint_summary, .. } = checkpoint.as_ref();
 
         let cp_sequence_number = checkpoint_summary.sequence_number as i64;
         Ok(transactions
@@ -44,14 +41,10 @@ impl Processor for ObjVersions {
 
 #[async_trait::async_trait]
 impl Handler for ObjVersions {
-    const MIN_EAGER_ROWS: usize = 100;
     const MAX_PENDING_ROWS: usize = 10000;
+    const MIN_EAGER_ROWS: usize = 100;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(obj_versions::table)
-            .values(values)
-            .on_conflict_do_nothing()
-            .execute(conn)
-            .await?)
+        Ok(diesel::insert_into(obj_versions::table).values(values).on_conflict_do_nothing().execute(conn).await?)
     }
 }

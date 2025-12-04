@@ -1,62 +1,78 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::key_identity::{get_identity_address_from_keystore, KeyIdentity};
-use crate::zklogin_commands_util::{perform_zk_login_test_tx, read_cli_line};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
 use anyhow::anyhow;
 use bip32::DerivationPath;
 use clap::*;
-use fastcrypto::ed25519::Ed25519KeyPair;
-use fastcrypto::encoding::{Base64, Encoding, Hex};
-use fastcrypto::hash::HashFunction;
-use fastcrypto::jwt_utils::parse_and_validate_jwt;
-use fastcrypto::secp256k1::recoverable::Secp256k1Sig;
-use fastcrypto::traits::{KeyPair, ToFromBytes};
-use fastcrypto_zkp::bn254::utils::{
-    gen_address_seed, get_nonce, get_oidc_url, get_proof, get_test_issuer_jwt_token,
-    get_token_exchange_url,
+use fastcrypto::{
+    ed25519::Ed25519KeyPair,
+    encoding::{Base64, Encoding, Hex},
+    hash::HashFunction,
+    jwt_utils::parse_and_validate_jwt,
+    secp256k1::recoverable::Secp256k1Sig,
+    traits::{KeyPair, ToFromBytes},
 };
-use fastcrypto_zkp::bn254::zk_login::{fetch_jwks, OIDCProvider, ZkLoginInputs};
-use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
-use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
+use fastcrypto_zkp::bn254::{
+    utils::{gen_address_seed, get_nonce, get_oidc_url, get_proof, get_test_issuer_jwt_token, get_token_exchange_url},
+    zk_login::{fetch_jwks, JwkId, OIDCProvider, ZkLoginInputs, JWK},
+    zk_login_api::ZkLoginEnv,
+};
 use im::hashmap::HashMap as ImHashMap;
 use json_to_table::{json_to_table, Orientation};
 use num_bigint::BigUint;
-use rand::rngs::StdRng;
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rusoto_core::Region;
 use rusoto_kms::{Kms, KmsClient, SignRequest};
 use serde::Serialize;
 use serde_json::json;
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope, PersonalMessage};
-use std::fmt::{Debug, Display, Formatter};
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use sui_keys::key_derive::generate_new_key;
-use sui_keys::keypair_file::{
-    read_authority_keypair_from_file, read_keypair_from_file, write_authority_keypair_to_file,
-    write_keypair_to_file,
+use sui_keys::{
+    key_derive::generate_new_key,
+    keypair_file::{
+        read_authority_keypair_from_file,
+        read_keypair_from_file,
+        write_authority_keypair_to_file,
+        write_keypair_to_file,
+    },
+    keystore::{AccountKeystore, Keystore},
 };
-use sui_keys::keystore::{AccountKeystore, Keystore};
-use sui_types::base_types::SuiAddress;
-use sui_types::committee::EpochId;
-use sui_types::crypto::{
-    get_authority_key_pair, EncodeDecodeBase64, Signature, SignatureScheme, SuiKeyPair,
-    ZkLoginPublicIdentifier,
+use sui_types::{
+    base_types::SuiAddress,
+    committee::EpochId,
+    crypto::{
+        get_authority_key_pair,
+        DefaultHash,
+        EncodeDecodeBase64,
+        PublicKey,
+        Signature,
+        SignatureScheme,
+        SuiKeyPair,
+        ZkLoginPublicIdentifier,
+    },
+    error::SuiResult,
+    multisig::{MultiSig, MultiSigPublicKey, ThresholdUnit, WeightUnit},
+    multisig_legacy::{MultiSigLegacy, MultiSigPublicKeyLegacy},
+    signature::{GenericSignature, VerifyParams},
+    signature_verification::VerifiedDigestCache,
+    transaction::{TransactionData, TransactionDataAPI},
+    zk_login_authenticator::ZkLoginAuthenticator,
 };
-use sui_types::crypto::{DefaultHash, PublicKey};
-use sui_types::error::SuiResult;
-use sui_types::multisig::{MultiSig, MultiSigPublicKey, ThresholdUnit, WeightUnit};
-use sui_types::multisig_legacy::{MultiSigLegacy, MultiSigPublicKeyLegacy};
-use sui_types::signature::{GenericSignature, VerifyParams};
-use sui_types::signature_verification::VerifiedDigestCache;
-use sui_types::transaction::{TransactionData, TransactionDataAPI};
-use sui_types::zk_login_authenticator::ZkLoginAuthenticator;
-use tabled::builder::Builder;
-use tabled::settings::Rotate;
-use tabled::settings::{object::Rows, Modify, Width};
+use tabled::{
+    builder::Builder,
+    settings::{object::Rows, Modify, Rotate, Width},
+};
 use tracing::info;
+
+use crate::{
+    key_identity::{get_identity_address_from_keystore, KeyIdentity},
+    zklogin_commands_util::{perform_zk_login_test_tx, read_cli_line},
+};
 #[cfg(test)]
 #[path = "unit_tests/keytool_tests.rs"]
 mod keytool_tests;
@@ -109,11 +125,7 @@ pub enum KeyToolCommand {
     /// a Base64 encoded string of 33-byte `flag || privkey`.
     ///
     /// Use `sui client new-address` if you want to generate and save the key into sui.keystore.
-    Generate {
-        key_scheme: SignatureScheme,
-        derivation_path: Option<DerivationPath>,
-        word_length: Option<String>,
-    },
+    Generate { key_scheme: SignatureScheme, derivation_path: Option<DerivationPath>, word_length: Option<String> },
 
     /// Add a new key to Sui CLI Keystore using either the input mnemonic phrase or a Bech32 encoded 33-byte
     /// `flag || privkey` starting with "suiprivkey", the key scheme flag {ed25519 | secp256k1 | secp256r1}
@@ -479,26 +491,16 @@ pub enum CommandOutput {
 impl KeyToolCommand {
     pub async fn execute(self, keystore: &mut Keystore) -> Result<CommandOutput, anyhow::Error> {
         let cmd_result = Ok(match self {
-            KeyToolCommand::Alias {
-                old_alias,
-                new_alias,
-            } => {
+            KeyToolCommand::Alias { old_alias, new_alias } => {
                 let new_alias = keystore.update_alias(&old_alias, new_alias.as_deref())?;
-                CommandOutput::Alias(AliasUpdate {
-                    old_alias,
-                    new_alias,
-                })
+                CommandOutput::Alias(AliasUpdate { old_alias, new_alias })
             }
             KeyToolCommand::Convert { value } => {
                 let result = convert_private_key_to_bech32(value)?;
                 CommandOutput::Convert(result)
             }
 
-            KeyToolCommand::DecodeMultiSig {
-                multisig,
-                tx_bytes,
-                cur_epoch,
-            } => {
+            KeyToolCommand::DecodeMultiSig { multisig, tx_bytes, cur_epoch } => {
                 let pks = multisig.get_pk().pubkeys();
                 let sigs = multisig.get_sigs();
                 let bitmap = multisig.get_indices()?;
@@ -524,9 +526,7 @@ impl KeyToolCommand {
                 };
 
                 for (sig, i) in sigs.iter().zip(bitmap) {
-                    let (pk, w) = pks
-                        .get(i as usize)
-                        .ok_or(anyhow!("Invalid public keys index".to_string()))?;
+                    let (pk, w) = pks.get(i as usize).ok_or(anyhow!("Invalid public keys index".to_string()))?;
                     output.participating_keys_signatures.push(DecodedMultiSig {
                         public_base64_key: pk.encode_base64().clone(),
                         sig_base64: Base64::encode(sig.as_ref()),
@@ -535,8 +535,8 @@ impl KeyToolCommand {
                 }
 
                 if tx_bytes.is_some() {
-                    let tx_bytes = Base64::decode(&tx_bytes.unwrap())
-                        .map_err(|e| anyhow!("Invalid base64 tx bytes: {:?}", e))?;
+                    let tx_bytes =
+                        Base64::decode(&tx_bytes.unwrap()).map_err(|e| anyhow!("Invalid base64 tx bytes: {:?}", e))?;
                     let tx_data: TransactionData = bcs::from_bytes(&tx_bytes)?;
                     let s = GenericSignature::MultiSig(multisig);
                     let res = s.verify_authenticator(
@@ -556,19 +556,11 @@ impl KeyToolCommand {
                 CommandOutput::DecodeMultiSig(output)
             }
 
-            KeyToolCommand::DecodeOrVerifyTx {
-                tx_bytes,
-                sig,
-                cur_epoch,
-            } => {
-                let tx_bytes = Base64::decode(&tx_bytes)
-                    .map_err(|e| anyhow!("Invalid base64 key: {:?}", e))?;
+            KeyToolCommand::DecodeOrVerifyTx { tx_bytes, sig, cur_epoch } => {
+                let tx_bytes = Base64::decode(&tx_bytes).map_err(|e| anyhow!("Invalid base64 key: {:?}", e))?;
                 let tx_data: TransactionData = bcs::from_bytes(&tx_bytes)?;
                 match sig {
-                    None => CommandOutput::DecodeOrVerifyTx(DecodeOrVerifyTxOutput {
-                        tx: tx_data,
-                        result: None,
-                    }),
+                    None => CommandOutput::DecodeOrVerifyTx(DecodeOrVerifyTxOutput { tx: tx_data, result: None }),
                     Some(s) => {
                         let res = s.verify_authenticator(
                             &IntentMessage::new(Intent::sui_transaction(), tx_data.clone()),
@@ -577,18 +569,11 @@ impl KeyToolCommand {
                             &VerifyParams::default(),
                             Arc::new(VerifiedDigestCache::new_empty()),
                         );
-                        CommandOutput::DecodeOrVerifyTx(DecodeOrVerifyTxOutput {
-                            tx: tx_data,
-                            result: Some(res),
-                        })
+                        CommandOutput::DecodeOrVerifyTx(DecodeOrVerifyTxOutput { tx: tx_data, result: Some(res) })
                     }
                 }
             }
-            KeyToolCommand::Generate {
-                key_scheme,
-                derivation_path,
-                word_length,
-            } => match key_scheme {
+            KeyToolCommand::Generate { key_scheme, derivation_path, word_length } => match key_scheme {
                 SignatureScheme::BLS12381 => {
                     let (sui_address, kp) = get_authority_key_pair();
                     let file_name = format!("bls-{sui_address}.key");
@@ -614,12 +599,7 @@ impl KeyToolCommand {
                 }
             },
 
-            KeyToolCommand::Import {
-                alias,
-                input_string,
-                key_scheme,
-                derivation_path,
-            } => {
+            KeyToolCommand::Import { alias, input_string, key_scheme, derivation_path } => {
                 if Hex::decode(&input_string).is_ok() {
                     return Err(anyhow!(
                         "Sui Keystore and Sui Wallet no longer support importing 
@@ -645,12 +625,8 @@ impl KeyToolCommand {
                     }
                     Err(_) => {
                         info!("Importing mneomonics to keystore");
-                        let sui_address = keystore.import_from_mnemonic(
-                            &input_string,
-                            key_scheme,
-                            derivation_path,
-                            alias.clone(),
-                        )?;
+                        let sui_address =
+                            keystore.import_from_mnemonic(&input_string, key_scheme, derivation_path, alias.clone())?;
                         let skp = keystore.get_key(&sui_address)?;
                         let mut key = Key::from(skp);
 
@@ -668,9 +644,7 @@ impl KeyToolCommand {
                 let address = get_identity_address_from_keystore(key_identity, keystore)?;
                 let skp = keystore.get_key(&address)?;
                 let key = ExportedKey {
-                    exported_private_key: skp
-                        .encode()
-                        .map_err(|_| anyhow!("Cannot decode keypair"))?,
+                    exported_private_key: skp.encode().map_err(|_| anyhow!("Cannot decode keypair"))?,
                     key: Key::from(skp),
                 };
                 CommandOutput::Export(key)
@@ -718,10 +692,7 @@ impl KeyToolCommand {
                                 key_scheme: SignatureScheme::BLS12381.to_string(),
                             },
                             Err(e) => {
-                                return Err(anyhow!(format!(
-                                    "Failed to read keypair at path {:?} err: {:?}",
-                                    file, e
-                                )));
+                                return Err(anyhow!(format!("Failed to read keypair at path {:?} err: {:?}", file, e)));
                             }
                         }
                     }
@@ -729,17 +700,10 @@ impl KeyToolCommand {
                 CommandOutput::LoadKeypair(output)
             }
 
-            KeyToolCommand::MultiSigAddress {
-                threshold,
-                pks,
-                weights,
-            } => {
+            KeyToolCommand::MultiSigAddress { threshold, pks, weights } => {
                 let multisig_pk = MultiSigPublicKey::new(pks.clone(), weights.clone(), threshold)?;
                 let address: SuiAddress = (&multisig_pk).into();
-                let mut output = MultiSigAddress {
-                    multisig_address: address.to_string(),
-                    multisig: vec![],
-                };
+                let mut output = MultiSigAddress { multisig_address: address.to_string(), multisig: vec![] };
 
                 for (pk, w) in pks.into_iter().zip(weights.into_iter()) {
                     output.multisig.push(MultiSigOutput {
@@ -751,12 +715,7 @@ impl KeyToolCommand {
                 CommandOutput::MultiSigAddress(output)
             }
 
-            KeyToolCommand::MultiSigCombinePartialSig {
-                sigs,
-                pks,
-                weights,
-                threshold,
-            } => {
+            KeyToolCommand::MultiSigCombinePartialSig { sigs, pks, weights, threshold } => {
                 let multisig_pk = MultiSigPublicKey::new(pks, weights, threshold)?;
                 let address: SuiAddress = (&multisig_pk).into();
                 let multisig = MultiSig::combine(sigs, multisig_pk)?;
@@ -769,27 +728,19 @@ impl KeyToolCommand {
                 })
             }
 
-            KeyToolCommand::MultiSigCombinePartialSigLegacy {
-                sigs,
-                pks,
-                weights,
-                threshold,
-            } => {
-                let multisig_pk_legacy =
-                    MultiSigPublicKeyLegacy::new(pks.clone(), weights.clone(), threshold)?;
+            KeyToolCommand::MultiSigCombinePartialSigLegacy { sigs, pks, weights, threshold } => {
+                let multisig_pk_legacy = MultiSigPublicKeyLegacy::new(pks.clone(), weights.clone(), threshold)?;
                 let multisig_pk = MultiSigPublicKey::new(pks, weights, threshold)?;
                 let address: SuiAddress = (&multisig_pk).into();
                 let multisig = MultiSigLegacy::combine(sigs, multisig_pk_legacy)?;
                 let generic_sig: GenericSignature = multisig.into();
                 let multisig_legacy_serialized = generic_sig.encode_base64();
 
-                CommandOutput::MultiSigCombinePartialSigLegacy(
-                    MultiSigCombinePartialSigLegacyOutput {
-                        multisig_address: address,
-                        multisig_legacy_parsed: generic_sig,
-                        multisig_legacy_serialized,
-                    },
-                )
+                CommandOutput::MultiSigCombinePartialSigLegacy(MultiSigCombinePartialSigLegacyOutput {
+                    multisig_address: address,
+                    multisig_legacy_parsed: generic_sig,
+                    multisig_legacy_serialized,
+                })
             }
 
             KeyToolCommand::Show { file } => {
@@ -812,33 +763,24 @@ impl KeyToolCommand {
                                 mnemonic: None,
                             })
                         }
-                        Err(e) => CommandOutput::Error(format!(
-                            "Failed to read keypair at path {:?}, err: {e}",
-                            file
-                        )),
+                        Err(e) => CommandOutput::Error(format!("Failed to read keypair at path {:?}, err: {e}", file)),
                     },
                 }
             }
 
-            KeyToolCommand::Sign {
-                address,
-                data,
-                intent,
-            } => {
+            KeyToolCommand::Sign { address, data, intent } => {
                 let address = get_identity_address_from_keystore(address, keystore)?;
                 let intent = intent.unwrap_or_else(Intent::sui_transaction);
                 let intent_clone = intent.clone();
-                let msg: TransactionData =
-                    bcs::from_bytes(&Base64::decode(&data).map_err(|e| {
-                        anyhow!("Cannot deserialize data as TransactionData {:?}", e)
-                    })?)?;
+                let msg: TransactionData = bcs::from_bytes(
+                    &Base64::decode(&data).map_err(|e| anyhow!("Cannot deserialize data as TransactionData {:?}", e))?,
+                )?;
                 let intent_msg = IntentMessage::new(intent, msg);
                 let raw_intent_msg: String = Base64::encode(bcs::to_bytes(&intent_msg)?);
                 let mut hasher = DefaultHash::default();
                 hasher.update(bcs::to_bytes(&intent_msg)?);
                 let digest = hasher.finalize().digest;
-                let sui_signature =
-                    keystore.sign_secure(&address, &intent_msg.value, intent_msg.intent)?;
+                let sui_signature = keystore.sign_secure(&address, &intent_msg.value, intent_msg.intent)?;
                 CommandOutput::Sign(SignData {
                     sui_address: address,
                     raw_tx_data: data,
@@ -849,29 +791,20 @@ impl KeyToolCommand {
                 })
             }
 
-            KeyToolCommand::SignKMS {
-                data,
-                keyid,
-                intent,
-                base64pk,
-            } => {
+            KeyToolCommand::SignKMS { data, keyid, intent, base64pk } => {
                 // Currently only supports secp256k1 keys
-                let pk_owner = PublicKey::decode_base64(&base64pk)
-                    .map_err(|e| anyhow!("Invalid base64 key: {:?}", e))?;
+                let pk_owner =
+                    PublicKey::decode_base64(&base64pk).map_err(|e| anyhow!("Invalid base64 key: {:?}", e))?;
                 let address_owner = SuiAddress::from(&pk_owner);
                 info!("Address For Corresponding KMS Key: {}", address_owner);
                 info!("Raw tx_bytes to execute: {}", data);
                 let intent = intent.unwrap_or_else(Intent::sui_transaction);
                 info!("Intent: {:?}", intent);
-                let msg: TransactionData =
-                    bcs::from_bytes(&Base64::decode(&data).map_err(|e| {
-                        anyhow!("Cannot deserialize data as TransactionData {:?}", e)
-                    })?)?;
+                let msg: TransactionData = bcs::from_bytes(
+                    &Base64::decode(&data).map_err(|e| anyhow!("Cannot deserialize data as TransactionData {:?}", e))?,
+                )?;
                 let intent_msg = IntentMessage::new(intent, msg);
-                info!(
-                    "Raw intent message: {:?}",
-                    Base64::encode(bcs::to_bytes(&intent_msg)?)
-                );
+                info!("Raw intent message: {:?}", Base64::encode(bcs::to_bytes(&intent_msg)?));
                 let mut hasher = DefaultHash::default();
                 hasher.update(bcs::to_bytes(&intent_msg)?);
                 let digest = hasher.finalize().digest;
@@ -893,10 +826,8 @@ impl KeyToolCommand {
                 // Sign the message, normalize the signature and then compacts it
                 // serialize_compact is loaded as bytes for Secp256k1Sinaturere
                 let response = kms.sign(request).await?;
-                let sig_bytes_der = response
-                    .signature
-                    .map(|b| b.to_vec())
-                    .expect("Requires Asymmetric Key Generated in KMS");
+                let sig_bytes_der =
+                    response.signature.map(|b| b.to_vec()).expect("Requires Asymmetric Key Generated in KMS");
 
                 let mut external_sig = Secp256k1Sig::from_der(&sig_bytes_der)?;
                 external_sig.normalize_s();
@@ -906,39 +837,30 @@ impl KeyToolCommand {
                 serialized_sig.extend_from_slice(&sig_compact);
                 serialized_sig.extend_from_slice(pk_owner.as_ref());
                 let serialized_sig = Base64::encode(&serialized_sig);
-                CommandOutput::SignKMS(SerializedSig {
-                    serialized_sig_base64: serialized_sig,
-                })
+                CommandOutput::SignKMS(SerializedSig { serialized_sig_base64: serialized_sig })
             }
 
             KeyToolCommand::Unpack { keypair } => {
-                let keypair = SuiKeyPair::decode_base64(&keypair)
-                    .map_err(|_| anyhow!("Invalid Base64 encode keypair"))?;
+                let keypair =
+                    SuiKeyPair::decode_base64(&keypair).map_err(|_| anyhow!("Invalid Base64 encode keypair"))?;
 
                 let key = Key::from(&keypair);
                 let path_str = format!("{}.key", key.sui_address).to_lowercase();
                 let path = Path::new(&path_str);
-                let out_str = format!(
-                    "address: {}\nkeypair: {}\nflag: {}",
-                    key.sui_address,
-                    keypair.encode_base64(),
-                    key.flag
-                );
+                let out_str =
+                    format!("address: {}\nkeypair: {}\nflag: {}", key.sui_address, keypair.encode_base64(), key.flag);
                 fs::write(path, out_str).unwrap();
                 CommandOutput::Show(key)
             }
 
             KeyToolCommand::ZkLoginInsecureSignPersonalMessage { data, max_epoch } => {
-                let msg = PersonalMessage {
-                    message: data.as_bytes().to_vec(),
-                };
+                let msg = PersonalMessage { message: data.as_bytes().to_vec() };
                 let sub = "1";
                 let user_salt = "1";
                 let intent_msg = IntentMessage::new(Intent::personal_message(), msg.clone());
 
                 // set up keypair, nonce with max_epoch
-                let skp =
-                    SuiKeyPair::Ed25519(Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32])));
+                let skp = SuiKeyPair::Ed25519(Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32])));
                 let jwt_randomness = BigUint::from_bytes_be(&[0; 32]).to_string();
                 let mut eph_pk_bytes = vec![0x00];
                 eph_pk_bytes.extend(skp.public().as_ref());
@@ -947,15 +869,11 @@ impl KeyToolCommand {
 
                 // call test issuer to get jwt token.
                 let client = reqwest::Client::new();
-                let parsed_token = get_test_issuer_jwt_token(
-                    &client,
-                    &nonce,
-                    &OIDCProvider::TestIssuer.get_config().iss,
-                    sub,
-                )
-                .await
-                .unwrap()
-                .jwt;
+                let parsed_token =
+                    get_test_issuer_jwt_token(&client, &nonce, &OIDCProvider::TestIssuer.get_config().iss, sub)
+                        .await
+                        .unwrap()
+                        .jwt;
 
                 // call prover-dev for zklogin inputs
                 let reader = get_proof(
@@ -970,38 +888,22 @@ impl KeyToolCommand {
                 .unwrap();
                 let (_, aud, _) = parse_and_validate_jwt(&parsed_token).unwrap();
                 let address_seed = gen_address_seed(user_salt, "sub", sub, &aud).unwrap();
-                let zk_login_inputs =
-                    ZkLoginInputs::from_reader(reader, &address_seed.to_string()).unwrap();
+                let zk_login_inputs = ZkLoginInputs::from_reader(reader, &address_seed.to_string()).unwrap();
                 let pk = PublicKey::ZkLogin(
-                    ZkLoginPublicIdentifier::new(
-                        zk_login_inputs.get_iss(),
-                        zk_login_inputs.get_address_seed(),
-                    )
-                    .unwrap(),
+                    ZkLoginPublicIdentifier::new(zk_login_inputs.get_iss(), zk_login_inputs.get_address_seed()).unwrap(),
                 );
                 let address = SuiAddress::from(&pk);
                 // sign with ephemeral key and combine with zklogin inputs to generic signature
                 let s = Signature::new_secure(&intent_msg, &skp);
-                let sig = GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(
-                    zk_login_inputs,
-                    max_epoch,
-                    s,
-                ));
-                CommandOutput::ZkLoginInsecureSignPersonalMessage(
-                    ZkLoginInsecureSignPersonalMessage {
-                        sig: Base64::encode(sig.as_bytes()),
-                        bytes: Base64::encode(data.as_bytes()),
-                        address: address.to_string(),
-                    },
-                )
+                let sig =
+                    GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(zk_login_inputs, max_epoch, s));
+                CommandOutput::ZkLoginInsecureSignPersonalMessage(ZkLoginInsecureSignPersonalMessage {
+                    sig: Base64::encode(sig.as_bytes()),
+                    bytes: Base64::encode(data.as_bytes()),
+                    address: address.to_string(),
+                })
             }
-            KeyToolCommand::ZkLoginSignAndExecuteTx {
-                max_epoch,
-                network,
-                fixed,
-                test_multisig,
-                sign_with_sk,
-            } => {
+            KeyToolCommand::ZkLoginSignAndExecuteTx { max_epoch, network, fixed, test_multisig, sign_with_sk } => {
                 let skp = if fixed {
                     SuiKeyPair::Ed25519(Ed25519KeyPair::generate(&mut StdRng::from_seed([0; 32])))
                 } else {
@@ -1089,10 +991,7 @@ impl KeyToolCommand {
                     "39b955a118f2f21110939bf3dff1de90",
                 )?;
                 let url_9 = get_oidc_url(
-                    OIDCProvider::AwsTenant((
-                        "us-east-1".to_string(),
-                        "zklogin-example".to_string(),
-                    )),
+                    OIDCProvider::AwsTenant(("us-east-1".to_string(), "zklogin-example".to_string())),
                     &eph_pk_bytes,
                     max_epoch,
                     "6c56t7re6ekgmv23o7to8r0sic",
@@ -1207,13 +1106,7 @@ impl KeyToolCommand {
                 CommandOutput::ZkLoginSignAndExecuteTx(ZkLoginSignAndExecuteTx { tx_digest })
             }
 
-            KeyToolCommand::ZkLoginSigVerify {
-                sig,
-                bytes,
-                intent_scope,
-                cur_epoch,
-                network,
-            } => {
+            KeyToolCommand::ZkLoginSigVerify { sig, bytes, intent_scope, cur_epoch, network } => {
                 match GenericSignature::from_bytes(
                     &Base64::decode(&sig).map_err(|e| anyhow!("Invalid base64 sig: {:?}", e))?,
                 )? {
@@ -1231,8 +1124,7 @@ impl KeyToolCommand {
                         }
 
                         let client = reqwest::Client::new();
-                        let provider = OIDCProvider::from_iss(zk.get_iss())
-                            .map_err(|_| anyhow!("Invalid iss"))?;
+                        let provider = OIDCProvider::from_iss(zk.get_iss()).map_err(|_| anyhow!("Invalid iss"))?;
                         let jwks = fetch_jwks(&provider, &client).await?;
                         let parsed: ImHashMap<JwkId, JWK> = jwks.clone().into_iter().collect();
                         let env = match network.as_str() {
@@ -1240,47 +1132,44 @@ impl KeyToolCommand {
                             "mainnet" | "testnet" => ZkLoginEnv::Prod,
                             _ => return Err(anyhow!("Invalid network")),
                         };
-                        let verify_params =
-                            VerifyParams::new(parsed, vec![], env, true, true, Some(2));
+                        let verify_params = VerifyParams::new(parsed, vec![], env, true, true, Some(2));
 
-                        let (serialized, res) = match IntentScope::try_from(intent_scope)
-                            .map_err(|_| anyhow!("Invalid scope"))?
-                        {
-                            IntentScope::TransactionData => {
-                                let tx_data: TransactionData = bcs::from_bytes(
-                                    &Base64::decode(&bytes.unwrap())
-                                        .map_err(|e| anyhow!("Invalid base64 tx data: {:?}", e))?,
-                                )?;
+                        let (serialized, res) =
+                            match IntentScope::try_from(intent_scope).map_err(|_| anyhow!("Invalid scope"))? {
+                                IntentScope::TransactionData => {
+                                    let tx_data: TransactionData = bcs::from_bytes(
+                                        &Base64::decode(&bytes.unwrap())
+                                            .map_err(|e| anyhow!("Invalid base64 tx data: {:?}", e))?,
+                                    )?;
 
-                                let sig = GenericSignature::ZkLoginAuthenticator(zk.clone());
-                                let res = sig.verify_authenticator(
-                                    &IntentMessage::new(Intent::sui_transaction(), tx_data.clone()),
-                                    tx_data.execution_parts().1,
-                                    cur_epoch.unwrap(),
-                                    &verify_params,
-                                    Arc::new(VerifiedDigestCache::new_empty()),
-                                );
-                                (serde_json::to_string(&tx_data)?, res)
-                            }
-                            IntentScope::PersonalMessage => {
-                                let data = PersonalMessage {
-                                    message: Base64::decode(&bytes.unwrap()).map_err(|e| {
-                                        anyhow!("Invalid base64 personal message data: {:?}", e)
-                                    })?,
-                                };
+                                    let sig = GenericSignature::ZkLoginAuthenticator(zk.clone());
+                                    let res = sig.verify_authenticator(
+                                        &IntentMessage::new(Intent::sui_transaction(), tx_data.clone()),
+                                        tx_data.execution_parts().1,
+                                        cur_epoch.unwrap(),
+                                        &verify_params,
+                                        Arc::new(VerifiedDigestCache::new_empty()),
+                                    );
+                                    (serde_json::to_string(&tx_data)?, res)
+                                }
+                                IntentScope::PersonalMessage => {
+                                    let data = PersonalMessage {
+                                        message: Base64::decode(&bytes.unwrap())
+                                            .map_err(|e| anyhow!("Invalid base64 personal message data: {:?}", e))?,
+                                    };
 
-                                let sig = GenericSignature::ZkLoginAuthenticator(zk.clone());
-                                let res = sig.verify_authenticator(
-                                    &IntentMessage::new(Intent::personal_message(), data.clone()),
-                                    (&zk).try_into()?,
-                                    cur_epoch.unwrap(),
-                                    &verify_params,
-                                    Arc::new(VerifiedDigestCache::new_empty()),
-                                );
-                                (serde_json::to_string(&data)?, res)
-                            }
-                            _ => return Err(anyhow!("Invalid intent scope")),
-                        };
+                                    let sig = GenericSignature::ZkLoginAuthenticator(zk.clone());
+                                    let res = sig.verify_authenticator(
+                                        &IntentMessage::new(Intent::personal_message(), data.clone()),
+                                        (&zk).try_into()?,
+                                        cur_epoch.unwrap(),
+                                        &verify_params,
+                                        Arc::new(VerifiedDigestCache::new_empty()),
+                                    );
+                                    (serde_json::to_string(&data)?, res)
+                                }
+                                _ => return Err(anyhow!("Invalid intent scope")),
+                            };
                         CommandOutput::ZkLoginSigVerify(ZkLoginSigVerifyResponse {
                             data: Some(serialized),
                             parsed: serde_json::to_string(&zk)?,
@@ -1324,11 +1213,7 @@ impl Display for CommandOutput {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             CommandOutput::Alias(update) => {
-                write!(
-                    formatter,
-                    "Old alias {} was updated to {}",
-                    update.old_alias, update.new_alias
-                )
+                write!(formatter, "Old alias {} was updated to {}", update.old_alias, update.new_alias)
             }
             // Sign needs to be manually built because we need to wrap the very long
             // rawTxData string and rawIntentMsg strings into multiple rows due to
@@ -1340,14 +1225,7 @@ impl Display for CommandOutput {
 
                 let mut builder = Builder::default();
                 builder
-                    .set_header([
-                        "suiSignature",
-                        "digest",
-                        "rawIntentMsg",
-                        "intent",
-                        "rawTxData",
-                        "suiAddress",
-                    ])
+                    .set_header(["suiSignature", "digest", "rawIntentMsg", "intent", "rawTxData", "suiAddress"])
                     .push_record([
                         &data.sui_signature,
                         &data.digest,
@@ -1359,7 +1237,7 @@ impl Display for CommandOutput {
                 let mut table = builder.build();
                 table.with(Rotate::Left);
                 table.with(tabled::settings::Style::rounded().horizontals([]));
-                table.with(Modify::new(Rows::new(0..)).with(Width::wrap(160).keep_words()));
+                table.with(Modify::new(Rows::new(0 ..)).with(Width::wrap(160).keep_words()));
                 write!(formatter, "{}", table)
             }
             _ => {
@@ -1376,11 +1254,7 @@ impl Display for CommandOutput {
 
 impl CommandOutput {
     pub fn print(&self, pretty: bool) {
-        let line = if pretty {
-            format!("{self}")
-        } else {
-            format!("{:?}", self)
-        };
+        let line = if pretty { format!("{self}") } else { format!("{:?}", self) };
         // Log line by line
         for line in line.lines() {
             // Logs write to a file on the side.  Print to stdout and also log to file, for tests to pass.
@@ -1412,10 +1286,7 @@ fn convert_private_key_to_bech32(value: String) -> Result<ConvertOutput, anyhow:
         Err(_) => match Hex::decode(&value) {
             Ok(decoded) => {
                 if decoded.len() != 32 {
-                    return Err(anyhow!(format!(
-                        "Invalid private key length, expected 32 but got {}",
-                        decoded.len()
-                    )));
+                    return Err(anyhow!(format!("Invalid private key length, expected 32 but got {}", decoded.len())));
                 }
                 SuiKeyPair::Ed25519(Ed25519KeyPair::from_bytes(&decoded)?)
             }
@@ -1432,7 +1303,7 @@ fn convert_private_key_to_bech32(value: String) -> Result<ConvertOutput, anyhow:
     Ok(ConvertOutput {
         bech32_with_flag: skp.encode().map_err(|_| anyhow!("Cannot encode keypair"))?,
         base64_with_flag: skp.encode_base64(),
-        hex_without_flag: Hex::encode(&skp.to_bytes()[1..]),
+        hex_without_flag: Hex::encode(&skp.to_bytes()[1 ..]),
         scheme: skp.public().scheme().to_string(),
     })
 }

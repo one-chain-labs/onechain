@@ -1,18 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{hash_map::Entry, BTreeMap, HashMap},
+    hash::Hash,
+    sync::Arc,
+};
+
 use serde::Serialize;
 use shared_crypto::intent::Intent;
-use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap};
-use std::hash::Hash;
-use std::sync::Arc;
-use sui_types::base_types::AuthorityName;
-use sui_types::base_types::ConciseableName;
-use sui_types::committee::{Committee, CommitteeTrait, StakeUnit};
-use sui_types::crypto::{AuthorityQuorumSignInfo, AuthoritySignInfo, AuthoritySignInfoTrait};
-use sui_types::error::SuiError;
-use sui_types::message_envelope::{Envelope, Message};
+use sui_types::{
+    base_types::{AuthorityName, ConciseableName},
+    committee::{Committee, CommitteeTrait, StakeUnit},
+    crypto::{AuthorityQuorumSignInfo, AuthoritySignInfo, AuthoritySignInfoTrait},
+    error::SuiError,
+    message_envelope::{Envelope, Message},
+};
 use tracing::warn;
 
 /// StakeAggregator allows us to keep track of the total stake of a set of validators.
@@ -31,17 +34,10 @@ pub struct StakeAggregator<S, const STRENGTH: bool> {
 /// implementation for `AuthoritySignInfo` is followed below.
 impl<S: Clone + Eq, const STRENGTH: bool> StakeAggregator<S, STRENGTH> {
     pub fn new(committee: Arc<Committee>) -> Self {
-        Self {
-            data: Default::default(),
-            total_votes: Default::default(),
-            committee,
-        }
+        Self { data: Default::default(), total_votes: Default::default(), committee }
     }
 
-    pub fn from_iter<I: Iterator<Item = (AuthorityName, S)>>(
-        committee: Arc<Committee>,
-        data: I,
-    ) -> Self {
+    pub fn from_iter<I: Iterator<Item = (AuthorityName, S)>>(committee: Arc<Committee>, data: I) -> Self {
         let mut this = Self::new(committee);
         for (authority, s) in data {
             this.insert_generic(authority, s);
@@ -54,11 +50,7 @@ impl<S: Clone + Eq, const STRENGTH: bool> StakeAggregator<S, STRENGTH> {
     /// checks and aggregations in the end.
     /// Returns Map authority -> S, without aggregating it.
     /// If you want to get an aggregated signature instead, use `StakeAggregator::insert`
-    pub fn insert_generic(
-        &mut self,
-        authority: AuthorityName,
-        s: S,
-    ) -> InsertResult<&HashMap<AuthorityName, S>> {
+    pub fn insert_generic(&mut self, authority: AuthorityName, s: S) -> InsertResult<&HashMap<AuthorityName, S>> {
         match self.data.entry(authority) {
             Entry::Occupied(oc) => {
                 return InsertResult::Failed {
@@ -78,15 +70,10 @@ impl<S: Clone + Eq, const STRENGTH: bool> StakeAggregator<S, STRENGTH> {
             if self.total_votes >= self.committee.threshold::<STRENGTH>() {
                 InsertResult::QuorumReached(&self.data)
             } else {
-                InsertResult::NotEnoughVotes {
-                    bad_votes: 0,
-                    bad_authorities: vec![],
-                }
+                InsertResult::NotEnoughVotes { bad_votes: 0, bad_authorities: vec![] }
             }
         } else {
-            InsertResult::Failed {
-                error: SuiError::InvalidAuthenticator,
-            }
+            InsertResult::Failed { error: SuiError::InvalidAuthenticator }
         }
     }
 
@@ -126,10 +113,7 @@ impl<const STRENGTH: bool> StakeAggregator<AuthoritySignInfo, STRENGTH> {
         let (data, sig) = envelope.into_data_and_sig();
         if self.committee.epoch != sig.epoch {
             return InsertResult::Failed {
-                error: SuiError::WrongEpoch {
-                    expected_epoch: self.committee.epoch,
-                    actual_epoch: sig.epoch,
-                },
+                error: SuiError::WrongEpoch { expected_epoch: self.committee.epoch, actual_epoch: sig.epoch },
             };
         }
         match self.insert_generic(sig.authority, sig) {
@@ -139,11 +123,7 @@ impl<const STRENGTH: bool> StakeAggregator<AuthoritySignInfo, STRENGTH> {
                     self.committee(),
                 ) {
                     Ok(aggregated) => {
-                        match aggregated.verify_secure(
-                            &data,
-                            Intent::sui_app(T::SCOPE),
-                            self.committee(),
-                        ) {
+                        match aggregated.verify_secure(&data, Intent::sui_app(T::SCOPE), self.committee()) {
                             // In the happy path, the aggregated signature verifies ok and no need to verify
                             // individual.
                             Ok(_) => InsertResult::QuorumReached(aggregated),
@@ -159,11 +139,9 @@ impl<const STRENGTH: bool> StakeAggregator<AuthoritySignInfo, STRENGTH> {
                                 let mut bad_votes = 0;
                                 let mut bad_authorities = vec![];
                                 for (name, sig) in &self.data.clone() {
-                                    if let Err(err) = sig.verify_secure(
-                                        &data,
-                                        Intent::sui_app(T::SCOPE),
-                                        self.committee(),
-                                    ) {
+                                    if let Err(err) =
+                                        sig.verify_secure(&data, Intent::sui_app(T::SCOPE), self.committee())
+                                    {
                                         // TODO(joyqvq): Currently, the aggregator cannot do much with an authority that
                                         // always returns an invalid signature other than saving to errors in state. It
                                         // is possible to add the authority to a denylist or  punish the byzantine authority.
@@ -175,10 +153,7 @@ impl<const STRENGTH: bool> StakeAggregator<AuthoritySignInfo, STRENGTH> {
                                         bad_authorities.push(*name);
                                     }
                                 }
-                                InsertResult::NotEnoughVotes {
-                                    bad_votes,
-                                    bad_authorities,
-                                }
+                                InsertResult::NotEnoughVotes { bad_votes, bad_authorities }
                             }
                         }
                     }
@@ -187,26 +162,17 @@ impl<const STRENGTH: bool> StakeAggregator<AuthoritySignInfo, STRENGTH> {
             }
             // The following is necessary to change the template type of InsertResult.
             InsertResult::Failed { error } => InsertResult::Failed { error },
-            InsertResult::NotEnoughVotes {
-                bad_votes,
-                bad_authorities,
-            } => InsertResult::NotEnoughVotes {
-                bad_votes,
-                bad_authorities,
-            },
+            InsertResult::NotEnoughVotes { bad_votes, bad_authorities } => {
+                InsertResult::NotEnoughVotes { bad_votes, bad_authorities }
+            }
         }
     }
 }
 
 pub enum InsertResult<CertT> {
     QuorumReached(CertT),
-    Failed {
-        error: SuiError,
-    },
-    NotEnoughVotes {
-        bad_votes: u64,
-        bad_authorities: Vec<AuthorityName>,
-    },
+    Failed { error: SuiError },
+    NotEnoughVotes { bad_votes: u64, bad_authorities: Vec<AuthorityName> },
 }
 
 impl<CertT> InsertResult<CertT> {
@@ -227,10 +193,7 @@ pub struct MultiStakeAggregator<K, V, const STRENGTH: bool> {
 
 impl<K, V, const STRENGTH: bool> MultiStakeAggregator<K, V, STRENGTH> {
     pub fn new(committee: Arc<Committee>) -> Self {
-        Self {
-            committee,
-            stake_maps: Default::default(),
-        }
+        Self { committee, stake_maps: Default::default() }
     }
 
     pub fn unique_key_count(&self) -> usize {
@@ -238,10 +201,7 @@ impl<K, V, const STRENGTH: bool> MultiStakeAggregator<K, V, STRENGTH> {
     }
 
     pub fn total_votes(&self) -> StakeUnit {
-        self.stake_maps
-            .values()
-            .map(|(_, stake_aggregator)| stake_aggregator.total_votes())
-            .sum()
+        self.stake_maps.values().map(|(_, stake_aggregator)| stake_aggregator.total_votes()).sum()
     }
 }
 
@@ -299,11 +259,7 @@ where
 
     /// Total stake of the largest faction
     pub fn plurality_stake(&self) -> StakeUnit {
-        self.stake_maps
-            .values()
-            .map(|(_, agg)| agg.total_votes())
-            .max()
-            .unwrap_or_default()
+        self.stake_maps.values().map(|(_, agg)| agg.total_votes()).max().unwrap_or_default()
     }
 
     /// If true, there isn't enough uncommitted stake to reach quorum for any value
@@ -325,22 +281,11 @@ where
     K: Hash + Eq,
 {
     pub fn new(committee: Arc<Committee>) -> Self {
-        Self {
-            committee,
-            stake_maps: Default::default(),
-            votes_per_authority: Default::default(),
-        }
+        Self { committee, stake_maps: Default::default(), votes_per_authority: Default::default() }
     }
 
-    pub fn insert(
-        &mut self,
-        authority: AuthorityName,
-        k: K,
-    ) -> InsertResult<&HashMap<AuthorityName, ()>> {
-        let agg = self
-            .stake_maps
-            .entry(k)
-            .or_insert_with(|| StakeAggregator::new(self.committee.clone()));
+    pub fn insert(&mut self, authority: AuthorityName, k: K) -> InsertResult<&HashMap<AuthorityName, ()>> {
+        let agg = self.stake_maps.entry(k).or_insert_with(|| StakeAggregator::new(self.committee.clone()));
 
         if !agg.contains_key(&authority) {
             *self.votes_per_authority.entry(authority).or_default() += 1;
@@ -358,10 +303,7 @@ where
     }
 
     pub fn votes_for_authority(&self, authority: AuthorityName) -> u64 {
-        self.votes_per_authority
-            .get(&authority)
-            .copied()
-            .unwrap_or_default()
+        self.votes_per_authority.get(&authority).copied().unwrap_or_default()
     }
 }
 
@@ -370,8 +312,7 @@ fn test_votes_per_authority() {
     let (committee, _) = Committee::new_simple_test_committee();
     let authorities: Vec<_> = committee.names().copied().collect();
 
-    let mut agg: GenericMultiStakeAggregator<&str, true> =
-        GenericMultiStakeAggregator::new(Arc::new(committee));
+    let mut agg: GenericMultiStakeAggregator<&str, true> = GenericMultiStakeAggregator::new(Arc::new(committee));
 
     // 1. Inserting an `authority` and a `key`, and then checking the number of votes for that `authority`.
     let key1: &str = "key1";

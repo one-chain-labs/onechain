@@ -1,23 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::base_types::{SequenceNumber, VersionDigest};
-use crate::effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents};
-use crate::error::SuiResult;
-use crate::execution::DynamicallyLoadedObjectMetadata;
-use crate::storage::PackageObject;
-use crate::storage::{BackingPackageStore, InputKey};
-use crate::{
-    base_types::ObjectID,
-    object::{Object, Owner},
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
 };
-use move_binary_format::binary_config::BinaryConfig;
-use move_binary_format::CompiledModule;
+
+use move_binary_format::{binary_config::BinaryConfig, CompiledModule};
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::language_storage::ModuleId;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::sync::Arc;
+
+use crate::{
+    base_types::{ObjectID, SequenceNumber, VersionDigest},
+    effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
+    error::SuiResult,
+    execution::DynamicallyLoadedObjectMetadata,
+    object::{Object, Owner},
+    storage::{BackingPackageStore, InputKey, PackageObject},
+};
 
 pub type WrittenObjects = BTreeMap<ObjectID, Object>;
 pub type ObjectMap = BTreeMap<ObjectID, Object>;
@@ -45,32 +45,18 @@ impl InnerTemporaryStore {
                 if obj.is_package() {
                     InputKey::Package { id: *id }
                 } else {
-                    InputKey::VersionedObject {
-                        id: *id,
-                        version: obj.version(),
-                    }
+                    InputKey::VersionedObject { id: *id, version: obj.version() }
                 }
             })
             .collect();
 
-        let deleted: HashMap<_, _> = effects
-            .deleted()
-            .iter()
-            .map(|oref| (oref.0, oref.1))
-            .collect();
+        let deleted: HashMap<_, _> = effects.deleted().iter().map(|oref| (oref.0, oref.1)).collect();
 
         // add deleted shared objects to the outputkeys that then get sent to notify_commit
         let deleted_output_keys = deleted
             .iter()
-            .filter(|(id, _)| {
-                self.input_objects
-                    .get(id)
-                    .is_some_and(|obj| obj.is_shared())
-            })
-            .map(|(id, seq)| InputKey::VersionedObject {
-                id: *id,
-                version: *seq,
-            });
+            .filter(|(id, _)| self.input_objects.get(id).is_some_and(|obj| obj.is_shared()))
+            .map(|(id, seq)| InputKey::VersionedObject { id: *id, version: *seq });
         output_keys.extend(deleted_output_keys);
 
         // For any previously deleted shared objects that appeared mutably in the transaction,
@@ -78,10 +64,7 @@ impl InnerTemporaryStore {
         let smeared_version = self.lamport_version;
         let deleted_accessed_objects = effects.deleted_mutably_accessed_shared_objects();
         for object_id in deleted_accessed_objects.into_iter() {
-            let key = InputKey::VersionedObject {
-                id: object_id,
-                version: smeared_version,
-            };
+            let key = InputKey::VersionedObject { id: object_id, version: smeared_version };
             output_keys.push(key);
         }
 
@@ -96,10 +79,7 @@ pub struct TemporaryModuleResolver<'a, R> {
 
 impl<'a, R> TemporaryModuleResolver<'a, R> {
     pub fn new(temp_store: &'a InnerTemporaryStore, fallback: R) -> Self {
-        Self {
-            temp_store,
-            fallback,
-        }
+        Self { temp_store, fallback }
     }
 }
 
@@ -114,10 +94,7 @@ where
         let obj = self.temp_store.written.get(&ObjectID::from(*id.address()));
         if let Some(o) = obj {
             if let Some(p) = o.data.try_as_package() {
-                return Ok(Some(Arc::new(p.deserialize_module(
-                    &id.name().into(),
-                    &self.temp_store.binary_config,
-                )?)));
+                return Ok(Some(Arc::new(p.deserialize_module(&id.name().into(), &self.temp_store.binary_config)?)));
             }
         }
         self.fallback.get_module_by_id(id)
@@ -126,11 +103,7 @@ where
 
 impl BackingPackageStore for InnerTemporaryStore {
     fn get_package_object(&self, package_id: &ObjectID) -> SuiResult<Option<PackageObject>> {
-        Ok(self
-            .written
-            .get(package_id)
-            .cloned()
-            .map(PackageObject::new))
+        Ok(self.written.get(package_id).cloned().map(PackageObject::new))
     }
 }
 

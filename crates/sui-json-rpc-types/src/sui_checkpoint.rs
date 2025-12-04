@@ -1,22 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Page;
 use fastcrypto::encoding::Base64;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sui_types::base_types::TransactionDigest;
-use sui_types::committee::EpochId;
-use sui_types::crypto::AggregateAuthoritySignature;
-use sui_types::digests::CheckpointDigest;
-use sui_types::gas::GasCostSummary;
-use sui_types::message_envelope::Message;
-use sui_types::messages_checkpoint::{
-    CheckpointCommitment, CheckpointContents, CheckpointSequenceNumber, CheckpointSummary,
-    CheckpointTimestamp, EndOfEpochData,
+use sui_types::{
+    base_types::TransactionDigest,
+    committee::EpochId,
+    crypto::AggregateAuthoritySignature,
+    digests::CheckpointDigest,
+    gas::GasCostSummary,
+    message_envelope::Message,
+    messages_checkpoint::{
+        CheckpointCommitment,
+        CheckpointContents,
+        CheckpointSequenceNumber,
+        CheckpointSummary,
+        CheckpointTimestamp,
+        EndOfEpochData,
+    },
+    sui_serde::BigInt,
 };
-use sui_types::sui_serde::BigInt;
+
+use crate::Page;
 pub type CheckpointPage = Page<Checkpoint, BigInt<u64>>;
 
 #[serde_as]
@@ -64,19 +71,9 @@ pub struct Checkpoint {
     pub validator_signature: AggregateAuthoritySignature,
 }
 
-impl
-    From<(
-        CheckpointSummary,
-        CheckpointContents,
-        AggregateAuthoritySignature,
-    )> for Checkpoint
-{
+impl From<(CheckpointSummary, CheckpointContents, AggregateAuthoritySignature)> for Checkpoint {
     fn from(
-        (summary, contents, signature): (
-            CheckpointSummary,
-            CheckpointContents,
-            AggregateAuthoritySignature,
-        ),
+        (summary, contents, signature): (CheckpointSummary, CheckpointContents, AggregateAuthoritySignature),
     ) -> Self {
         let digest = summary.digest();
         let CheckpointSummary {

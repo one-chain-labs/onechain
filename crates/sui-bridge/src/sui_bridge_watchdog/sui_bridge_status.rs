@@ -3,14 +3,14 @@
 
 //! The SuiBridgeStatus observable monitors whether the Sui Bridge is paused.
 
-use crate::sui_bridge_watchdog::Observable;
-use crate::sui_client::SuiBridgeClient;
-use async_trait::async_trait;
-use prometheus::IntGauge;
 use std::sync::Arc;
 
+use async_trait::async_trait;
+use prometheus::IntGauge;
 use tokio::time::Duration;
 use tracing::{error, info};
+
+use crate::{sui_bridge_watchdog::Observable, sui_client::SuiBridgeClient};
 
 pub struct SuiBridgeStatus {
     sui_client: Arc<SuiBridgeClient>,

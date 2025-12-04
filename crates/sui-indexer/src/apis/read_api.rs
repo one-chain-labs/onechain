@@ -2,28 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use async_trait::async_trait;
-use jsonrpsee::core::RpcResult;
-use jsonrpsee::RpcModule;
-use sui_json_rpc::error::SuiRpcInputError;
-use sui_types::error::SuiObjectResponseError;
-use sui_types::object::ObjectRead;
-
-use crate::errors::IndexerError;
-use crate::indexer_reader::IndexerReader;
-use sui_json_rpc::SuiRpcModule;
+use jsonrpsee::{core::RpcResult, RpcModule};
+use sui_json_rpc::{error::SuiRpcInputError, SuiRpcModule};
 use sui_json_rpc_api::{ReadApiServer, QUERY_MAX_RESULT_LIMIT};
 use sui_json_rpc_types::{
-    Checkpoint, CheckpointId, CheckpointPage, ProtocolConfigResponse, SuiEvent,
-    SuiGetPastObjectRequest, SuiObjectDataOptions, SuiObjectResponse, SuiPastObjectResponse,
-    SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
-    ZkLoginIntentScope, ZkLoginVerifyResult,
+    Checkpoint,
+    CheckpointId,
+    CheckpointPage,
+    ProtocolConfigResponse,
+    SuiEvent,
+    SuiGetPastObjectRequest,
+    SuiObjectDataOptions,
+    SuiObjectResponse,
+    SuiPastObjectResponse,
+    SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions,
+    ZkLoginIntentScope,
+    ZkLoginVerifyResult,
 };
 use sui_open_rpc::Module;
 use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
-use sui_types::base_types::{ObjectID, SequenceNumber};
-use sui_types::base_types::SuiAddress;
-use sui_types::digests::{ChainIdentifier, TransactionDigest};
-use sui_types::sui_serde::BigInt;
+use sui_types::{
+    base_types::{ObjectID, SequenceNumber, SuiAddress},
+    digests::{ChainIdentifier, TransactionDigest},
+    error::SuiObjectResponseError,
+    object::ObjectRead,
+    sui_serde::BigInt,
+};
+
+use crate::{errors::IndexerError, indexer_reader::IndexerReader};
 
 #[derive(Clone)]
 pub struct ReadApi {
@@ -38,9 +45,7 @@ impl ReadApi {
     async fn get_checkpoint(&self, id: CheckpointId) -> Result<Checkpoint, IndexerError> {
         match self.inner.get_checkpoint(id).await {
             Ok(Some(epoch_info)) => Ok(epoch_info),
-            Ok(None) => Err(IndexerError::InvalidArgumentError(format!(
-                "Checkpoint {id:?} not found"
-            ))),
+            Ok(None) => Err(IndexerError::InvalidArgumentError(format!("Checkpoint {id:?} not found"))),
             Err(e) => Err(e),
         }
     }
@@ -75,17 +80,13 @@ impl ReadApiServer for ReadApi {
         options: Option<SuiObjectDataOptions>,
     ) -> RpcResult<Vec<SuiObjectResponse>> {
         if object_ids.len() > *QUERY_MAX_RESULT_LIMIT {
-            return Err(
-                SuiRpcInputError::SizeLimitExceeded(QUERY_MAX_RESULT_LIMIT.to_string()).into(),
-            );
+            return Err(SuiRpcInputError::SizeLimitExceeded(QUERY_MAX_RESULT_LIMIT.to_string()).into());
         }
         let stored_objects = self.inner.multi_get_objects(object_ids).await?;
         let options = options.unwrap_or_default();
 
         let futures = stored_objects.into_iter().map(|stored_object| async {
-            let object_read = stored_object
-                .try_into_object_read(self.inner.package_resolver())
-                .await?;
+            let object_read = stored_object.try_into_object_read(self.inner.package_resolver()).await?;
             object_read_to_object_response(&self.inner, object_read, options.clone()).await
         });
 
@@ -106,13 +107,10 @@ impl ReadApiServer for ReadApi {
         digest: TransactionDigest,
         options: Option<SuiTransactionBlockResponseOptions>,
     ) -> RpcResult<SuiTransactionBlockResponse> {
-        let mut txn = self
-            .multi_get_transaction_blocks(vec![digest], options)
-            .await?;
+        let mut txn = self.multi_get_transaction_blocks(vec![digest], options).await?;
 
-        let txn = txn.pop().ok_or_else(|| {
-            IndexerError::InvalidArgumentError(format!("Transaction {digest} not found"))
-        })?;
+        let txn =
+            txn.pop().ok_or_else(|| IndexerError::InvalidArgumentError(format!("Transaction {digest} not found")))?;
 
         Ok(txn)
     }
@@ -124,16 +122,11 @@ impl ReadApiServer for ReadApi {
     ) -> RpcResult<Vec<SuiTransactionBlockResponse>> {
         let num_digests = digests.len();
         if num_digests > *QUERY_MAX_RESULT_LIMIT {
-            Err(SuiRpcInputError::SizeLimitExceeded(
-                QUERY_MAX_RESULT_LIMIT.to_string(),
-            ))?
+            Err(SuiRpcInputError::SizeLimitExceeded(QUERY_MAX_RESULT_LIMIT.to_string()))?
         }
 
         let options = options.unwrap_or_default();
-        let txns = self
-            .inner
-            .multi_get_transaction_block_response_in_blocking_task(digests, options)
-            .await?;
+        let txns = self.inner.multi_get_transaction_block_response_in_blocking_task(digests, options).await?;
 
         Ok(txns)
     }
@@ -144,21 +137,11 @@ impl ReadApiServer for ReadApi {
         _version: SequenceNumber,
         _options: Option<SuiObjectDataOptions>,
     ) -> RpcResult<SuiPastObjectResponse> {
-        Err(jsonrpsee::types::error::CallError::Custom(
-            jsonrpsee::types::error::ErrorCode::MethodNotFound.into(),
-        )
-        .into())
+        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
     }
 
-    async fn try_get_object_before_version(
-        &self,
-        _: ObjectID,
-        _: SequenceNumber,
-    ) -> RpcResult<SuiPastObjectResponse> {
-        Err(jsonrpsee::types::error::CallError::Custom(
-            jsonrpsee::types::error::ErrorCode::MethodNotFound.into(),
-        )
-        .into())
+    async fn try_get_object_before_version(&self, _: ObjectID, _: SequenceNumber) -> RpcResult<SuiPastObjectResponse> {
+        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
     }
 
     async fn try_multi_get_past_objects(
@@ -166,10 +149,7 @@ impl ReadApiServer for ReadApi {
         _past_objects: Vec<SuiGetPastObjectRequest>,
         _options: Option<SuiObjectDataOptions>,
     ) -> RpcResult<Vec<SuiPastObjectResponse>> {
-        Err(jsonrpsee::types::error::CallError::Custom(
-            jsonrpsee::types::error::ErrorCode::MethodNotFound.into(),
-        )
-        .into())
+        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
     }
 
     async fn get_latest_checkpoint_sequence_number(&self) -> RpcResult<BigInt<u64>> {
@@ -188,27 +168,17 @@ impl ReadApiServer for ReadApi {
         descending_order: bool,
     ) -> RpcResult<CheckpointPage> {
         let cursor = cursor.map(BigInt::into_inner);
-        let limit = sui_json_rpc_api::validate_limit(
-            limit,
-            sui_json_rpc_api::QUERY_MAX_RESULT_LIMIT_CHECKPOINTS,
-        )
-        .map_err(SuiRpcInputError::from)?;
+        let limit = sui_json_rpc_api::validate_limit(limit, sui_json_rpc_api::QUERY_MAX_RESULT_LIMIT_CHECKPOINTS)
+            .map_err(SuiRpcInputError::from)?;
 
-        let mut checkpoints = self
-            .inner
-            .get_checkpoints(cursor, limit + 1, descending_order)
-            .await?;
+        let mut checkpoints = self.inner.get_checkpoints(cursor, limit + 1, descending_order).await?;
 
         let has_next_page = checkpoints.len() > limit;
         checkpoints.truncate(limit);
 
         let next_cursor = checkpoints.last().map(|d| d.sequence_number.into());
 
-        Ok(CheckpointPage {
-            data: checkpoints,
-            next_cursor,
-            has_next_page,
-        })
+        Ok(CheckpointPage { data: checkpoints, next_cursor, has_next_page })
     }
 
     async fn get_checkpoints_deprecated_limit(
@@ -217,25 +187,14 @@ impl ReadApiServer for ReadApi {
         limit: Option<BigInt<u64>>,
         descending_order: bool,
     ) -> RpcResult<CheckpointPage> {
-        self.get_checkpoints(
-            cursor,
-            limit.map(|l| l.into_inner() as usize),
-            descending_order,
-        )
-        .await
+        self.get_checkpoints(cursor, limit.map(|l| l.into_inner() as usize), descending_order).await
     }
 
     async fn get_events(&self, transaction_digest: TransactionDigest) -> RpcResult<Vec<SuiEvent>> {
-        self.inner
-            .get_transaction_events(transaction_digest)
-            .await
-            .map_err(Into::into)
+        self.inner.get_transaction_events(transaction_digest).await.map_err(Into::into)
     }
 
-    async fn get_protocol_config(
-        &self,
-        version: Option<BigInt<u64>>,
-    ) -> RpcResult<ProtocolConfigResponse> {
+    async fn get_protocol_config(&self, version: Option<BigInt<u64>>) -> RpcResult<ProtocolConfigResponse> {
         let chain = self.get_chain_identifier().await?.chain();
         let version = if let Some(version) = version {
             (*version).into()
@@ -284,9 +243,9 @@ async fn object_read_to_object_response(
     options: SuiObjectDataOptions,
 ) -> RpcResult<SuiObjectResponse> {
     match object_read {
-        ObjectRead::NotExists(id) => Ok(SuiObjectResponse::new_with_error(
-            SuiObjectResponseError::NotExists { object_id: id },
-        )),
+        ObjectRead::NotExists(id) => {
+            Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::NotExists { object_id: id }))
+        }
         ObjectRead::Exists(object_ref, o, layout) => {
             let mut display_fields = None;
             if options.show_display {
@@ -295,23 +254,15 @@ async fn object_read_to_object_response(
                     Err(e) => {
                         return Ok(SuiObjectResponse::new(
                             Some((object_ref, o, layout, options, None).try_into()?),
-                            Some(SuiObjectResponseError::DisplayError {
-                                error: e.to_string(),
-                            }),
+                            Some(SuiObjectResponseError::DisplayError { error: e.to_string() }),
                         ));
                     }
                 }
             }
-            Ok(SuiObjectResponse::new_with_data(
-                (object_ref, o, layout, options, display_fields).try_into()?,
-            ))
+            Ok(SuiObjectResponse::new_with_data((object_ref, o, layout, options, display_fields).try_into()?))
         }
-        ObjectRead::Deleted((object_id, version, digest)) => Ok(SuiObjectResponse::new_with_error(
-            SuiObjectResponseError::Deleted {
-                object_id,
-                version,
-                digest,
-            },
-        )),
+        ObjectRead::Deleted((object_id, version, digest)) => {
+            Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::Deleted { object_id, version, digest }))
+        }
     }
 }

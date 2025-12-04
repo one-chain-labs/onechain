@@ -18,16 +18,12 @@ const MAX_INSERT_CHUNK_ROWS: usize = i16::MAX as usize / StoredPackage::FIELD_CO
 pub(crate) struct SumPackages;
 
 impl Processor for SumPackages {
-    const NAME: &'static str = "sum_packages";
-
     type Value = StoredPackage;
 
+    const NAME: &'static str = "sum_packages";
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions,
-            ..
-        } = checkpoint.as_ref();
+        let CheckpointData { checkpoint_summary, transactions, .. } = checkpoint.as_ref();
 
         let cp_sequence_number = checkpoint_summary.sequence_number as i64;
         let mut values = vec![];

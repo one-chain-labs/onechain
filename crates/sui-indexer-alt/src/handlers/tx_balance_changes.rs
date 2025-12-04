@@ -21,31 +21,25 @@ use sui_types::{
 pub(crate) struct TxBalanceChanges;
 
 impl Processor for TxBalanceChanges {
-    const NAME: &'static str = "tx_balance_changes";
-
     type Value = StoredTxBalanceChange;
 
+    const NAME: &'static str = "tx_balance_changes";
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData {
-            transactions,
-            checkpoint_summary,
-            ..
-        } = checkpoint.as_ref();
+        let CheckpointData { transactions, checkpoint_summary, .. } = checkpoint.as_ref();
 
         let mut values = Vec::new();
         let first_tx = checkpoint_summary.network_total_transactions as usize - transactions.len();
 
         for (i, tx) in transactions.iter().enumerate() {
             let tx_sequence_number = (first_tx + i) as i64;
-            let balance_changes = balance_changes(tx).with_context(|| {
-                format!("Calculating balance changes for transaction {tx_sequence_number}")
-            })?;
+            let balance_changes = balance_changes(tx)
+                .with_context(|| format!("Calculating balance changes for transaction {tx_sequence_number}"))?;
 
             values.push(StoredTxBalanceChange {
                 tx_sequence_number,
-                balance_changes: bcs::to_bytes(&balance_changes).with_context(|| {
-                    format!("Serializing balance changes for transaction {tx_sequence_number}")
-                })?,
+                balance_changes: bcs::to_bytes(&balance_changes)
+                    .with_context(|| format!("Serializing balance changes for transaction {tx_sequence_number}"))?,
             });
         }
 
@@ -55,15 +49,11 @@ impl Processor for TxBalanceChanges {
 
 #[async_trait::async_trait]
 impl Handler for TxBalanceChanges {
-    const MIN_EAGER_ROWS: usize = 100;
     const MAX_PENDING_ROWS: usize = 10000;
+    const MIN_EAGER_ROWS: usize = 100;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(tx_balance_changes::table)
-            .values(values)
-            .on_conflict_do_nothing()
-            .execute(conn)
-            .await?)
+        Ok(diesel::insert_into(tx_balance_changes::table).values(values).on_conflict_do_nothing().execute(conn).await?)
     }
 }
 

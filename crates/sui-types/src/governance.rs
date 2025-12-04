@@ -1,20 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::ident_str;
-use move_core_types::identifier::IdentStr;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use serde::{Deserialize, Serialize};
 
-use crate::balance::Balance;
-use crate::base_types::ObjectID;
-use crate::committee::EpochId;
-use crate::error::SuiError;
-use crate::gas_coin::MIST_PER_OCT;
-use crate::id::{ID, UID};
-use crate::object::{Data, Object};
-use crate::SUI_SYSTEM_ADDRESS;
-use serde::Deserialize;
-use serde::Serialize;
+use crate::{
+    balance::Balance,
+    base_types::ObjectID,
+    committee::EpochId,
+    error::SuiError,
+    gas_coin::MIST_PER_OCT,
+    id::{ID, UID},
+    object::{Data, Object},
+    SUI_SYSTEM_ADDRESS,
+};
 
 /// Maximum number of active validators at any moment.
 /// We do not allow the number of validators in any epoch to go above this.
@@ -98,6 +97,7 @@ impl StakedOct {
 
 impl TryFrom<&Object> for StakedOct {
     type Error = SuiError;
+
     fn try_from(object: &Object) -> Result<Self, Self::Error> {
         match &object.data {
             Data::Move(o) => {
@@ -110,8 +110,6 @@ impl TryFrom<&Object> for StakedOct {
             Data::Package(_) => {}
         }
 
-        Err(SuiError::TypeError {
-            error: format!("Object type is not a StakedOct: {:?}", object),
-        })
+        Err(SuiError::TypeError { error: format!("Object type is not a StakedOct: {:?}", object) })
     }
 }

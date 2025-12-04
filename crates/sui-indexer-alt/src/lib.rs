@@ -4,26 +4,41 @@
 use anyhow::Context;
 use bootstrap::bootstrap;
 use config::{ConsistencyConfig, IndexerConfig, PipelineLayer};
-use handlers::coin_balance_buckets::CoinBalanceBuckets;
-use handlers::coin_balance_buckets_pruner::CoinBalanceBucketsPruner;
-use handlers::obj_info_pruner::ObjInfoPruner;
 use handlers::{
-    ev_emit_mod::EvEmitMod, ev_struct_inst::EvStructInst, kv_checkpoints::KvCheckpoints,
-    kv_epoch_ends::KvEpochEnds, kv_epoch_starts::KvEpochStarts, kv_feature_flags::KvFeatureFlags,
-    kv_objects::KvObjects, kv_protocol_configs::KvProtocolConfigs, kv_transactions::KvTransactions,
-    obj_info::ObjInfo, obj_versions::ObjVersions, sum_displays::SumDisplays,
-    sum_packages::SumPackages, tx_affected_addresses::TxAffectedAddresses,
-    tx_affected_objects::TxAffectedObjects, tx_balance_changes::TxBalanceChanges,
-    tx_calls::TxCalls, tx_digests::TxDigests, tx_kinds::TxKinds,
+    coin_balance_buckets::CoinBalanceBuckets,
+    coin_balance_buckets_pruner::CoinBalanceBucketsPruner,
+    ev_emit_mod::EvEmitMod,
+    ev_struct_inst::EvStructInst,
+    kv_checkpoints::KvCheckpoints,
+    kv_epoch_ends::KvEpochEnds,
+    kv_epoch_starts::KvEpochStarts,
+    kv_feature_flags::KvFeatureFlags,
+    kv_objects::KvObjects,
+    kv_protocol_configs::KvProtocolConfigs,
+    kv_transactions::KvTransactions,
+    obj_info::ObjInfo,
+    obj_info_pruner::ObjInfoPruner,
+    obj_versions::ObjVersions,
+    sum_displays::SumDisplays,
+    sum_packages::SumPackages,
+    tx_affected_addresses::TxAffectedAddresses,
+    tx_affected_objects::TxAffectedObjects,
+    tx_balance_changes::TxBalanceChanges,
+    tx_calls::TxCalls,
+    tx_digests::TxDigests,
+    tx_kinds::TxKinds,
 };
-use sui_indexer_alt_framework::handlers::cp_sequence_numbers::CpSequenceNumbers;
-use sui_indexer_alt_framework::ingestion::{ClientArgs, IngestionConfig};
-use sui_indexer_alt_framework::pipeline::{
-    concurrent::{ConcurrentConfig, PrunerConfig},
-    sequential::SequentialConfig,
-    CommitterConfig,
+use sui_indexer_alt_framework::{
+    handlers::cp_sequence_numbers::CpSequenceNumbers,
+    ingestion::{ClientArgs, IngestionConfig},
+    pipeline::{
+        concurrent::{ConcurrentConfig, PrunerConfig},
+        sequential::SequentialConfig,
+        CommitterConfig,
+    },
+    Indexer,
+    IndexerArgs,
 };
-use sui_indexer_alt_framework::{Indexer, IndexerArgs};
 use sui_indexer_alt_schema::MIGRATIONS;
 use sui_pg_db::DbArgs;
 use tokio_util::sync::CancellationToken;
@@ -47,14 +62,7 @@ pub async fn start_indexer(
     // For instance, we could also pass in dummy genesis data in the benchmark mode.
     with_genesis: bool,
 ) -> anyhow::Result<()> {
-    let IndexerConfig {
-        ingestion,
-        consistency,
-        committer,
-        pruner,
-        pipeline,
-        extra: _,
-    } = indexer_config.finish();
+    let IndexerConfig { ingestion, consistency, committer, pruner, pipeline, extra: _ } = indexer_config.finish();
 
     let PipelineLayer {
         sum_displays,
@@ -91,15 +99,7 @@ pub async fn start_indexer(
     let cancel = CancellationToken::new();
     let retry_interval = ingestion.retry_interval();
 
-    let mut indexer = Indexer::new(
-        db_args,
-        indexer_args,
-        client_args,
-        ingestion,
-        &MIGRATIONS,
-        cancel.clone(),
-    )
-    .await?;
+    let mut indexer = Indexer::new(db_args, indexer_args, client_args, ingestion, &MIGRATIONS, cancel.clone()).await?;
 
     // These macros are responsible for registering pipelines with the indexer. It is responsible
     // for:
@@ -139,10 +139,7 @@ pub async fn start_indexer(
                 indexer
                     .sequential_pipeline(
                         $handler,
-                        layer.finish(SequentialConfig {
-                            committer: committer.clone(),
-                            ..Default::default()
-                        }),
+                        layer.finish(SequentialConfig { committer: committer.clone(), ..Default::default() }),
                     )
                     .await?
             }
@@ -156,14 +153,11 @@ pub async fn start_indexer(
         ($main_handler:expr, $main_config:expr; $lagged_handler:expr, $lagged_config:expr) => {
             if let Some(main_layer) = $main_config {
                 indexer
-                    .concurrent_pipeline(
-                        $main_handler,
-                        ConcurrentConfig {
-                            committer: main_layer.finish(committer.clone()),
-                            pruner: None,
-                            checkpoint_lag: None,
-                        },
-                    )
+                    .concurrent_pipeline($main_handler, ConcurrentConfig {
+                        committer: main_layer.finish(committer.clone()),
+                        pruner: None,
+                        checkpoint_lag: None,
+                    })
                     .await?;
 
                 indexer

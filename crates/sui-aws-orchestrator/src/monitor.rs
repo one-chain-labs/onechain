@@ -25,12 +25,7 @@ impl Monitor {
         nodes: Vec<Instance>,
         ssh_manager: SshConnectionManager,
     ) -> Self {
-        Self {
-            instance,
-            clients,
-            nodes,
-            ssh_manager,
-        }
+        Self { instance, clients, nodes, ssh_manager }
     }
 
     /// Dependencies to install.
@@ -42,16 +37,10 @@ impl Monitor {
     }
 
     /// Start a prometheus instance on each remote machine.
-    pub async fn start_prometheus<P: ProtocolMetrics>(
-        &self,
-        protocol_commands: &P,
-    ) -> MonitorResult<()> {
+    pub async fn start_prometheus<P: ProtocolMetrics>(&self, protocol_commands: &P) -> MonitorResult<()> {
         let instance = std::iter::once(self.instance.clone());
-        let commands =
-            Prometheus::setup_commands(self.clients.clone(), self.nodes.clone(), protocol_commands);
-        self.ssh_manager
-            .execute(instance, commands, CommandContext::default())
-            .await?;
+        let commands = Prometheus::setup_commands(self.clients.clone(), self.nodes.clone(), protocol_commands);
+        self.ssh_manager.execute(instance, commands, CommandContext::default()).await?;
         Ok(())
     }
 
@@ -60,9 +49,7 @@ impl Monitor {
         // Configure and reload grafana.
         let instance = std::iter::once(self.instance.clone());
         let commands = Grafana::setup_commands();
-        self.ssh_manager
-            .execute(instance, commands, CommandContext::default())
-            .await?;
+        self.ssh_manager.execute(instance, commands, CommandContext::default()).await?;
 
         Ok(())
     }
@@ -78,17 +65,14 @@ impl Monitor {
 pub struct Prometheus;
 
 impl Prometheus {
-    /// The default prometheus configuration path.
-    const DEFAULT_PROMETHEUS_CONFIG_PATH: &'static str = "/etc/prometheus/prometheus.yml";
     /// The default prometheus port.
     pub const DEFAULT_PORT: u16 = 9090;
+    /// The default prometheus configuration path.
+    const DEFAULT_PROMETHEUS_CONFIG_PATH: &'static str = "/etc/prometheus/prometheus.yml";
 
     /// The commands to install prometheus.
     pub fn install_commands() -> Vec<&'static str> {
-        vec![
-            "sudo apt-get -y install prometheus",
-            "sudo chmod 777 -R /var/lib/prometheus/ /etc/prometheus/",
-        ]
+        vec!["sudo apt-get -y install prometheus", "sudo chmod 777 -R /var/lib/prometheus/ /etc/prometheus/"]
     }
 
     /// Generate the commands to update the prometheus configuration and restart prometheus.
@@ -118,11 +102,7 @@ impl Prometheus {
 
         // Make the command to configure and restart prometheus.
         [
-            &format!(
-                "sudo echo \"{}\" > {}",
-                config.join("\n"),
-                Self::DEFAULT_PROMETHEUS_CONFIG_PATH
-            ),
+            &format!("sudo echo \"{}\" > {}", config.join("\n"), Self::DEFAULT_PROMETHEUS_CONFIG_PATH),
             "sudo service prometheus restart",
         ]
         .join(" && ")
@@ -131,13 +111,7 @@ impl Prometheus {
     /// Generate the global prometheus configuration.
     /// NOTE: The configuration file is a yaml file so spaces are important.
     fn global_configuration() -> String {
-        [
-            "global:",
-            "  scrape_interval: 5s",
-            "  evaluation_interval: 5s",
-            "scrape_configs:",
-        ]
-        .join("\n")
+        ["global:", "  scrape_interval: 5s", "  evaluation_interval: 5s", "scrape_configs:"].join("\n")
     }
 
     /// Generate the prometheus configuration from the given metrics path.
@@ -186,11 +160,7 @@ impl Grafana {
         [
             &format!("(rm -r {} || true)", Self::DATASOURCES_PATH),
             &format!("mkdir -p {}", Self::DATASOURCES_PATH),
-            &format!(
-                "sudo echo \"{}\" > {}/testbed.yml",
-                Self::datasource(),
-                Self::DATASOURCES_PATH
-            ),
+            &format!("sudo echo \"{}\" > {}/testbed.yml", Self::datasource(), Self::DATASOURCES_PATH),
             "sudo service grafana-server restart",
         ]
         .join(" && ")
@@ -226,10 +196,10 @@ pub struct LocalGrafana;
 
 #[allow(dead_code)]
 impl LocalGrafana {
-    /// The default grafana home directory (macOS, homebrew install).
-    const DEFAULT_GRAFANA_HOME: &'static str = "/opt/homebrew/opt/grafana/share/grafana/";
     /// The path to the datasources directory.
     const DATASOURCES_PATH: &'static str = "conf/provisioning/datasources/";
+    /// The default grafana home directory (macOS, homebrew install).
+    const DEFAULT_GRAFANA_HOME: &'static str = "/opt/homebrew/opt/grafana/share/grafana/";
     /// The default grafana port.
     pub const DEFAULT_PORT: u16 = 3000;
 
@@ -238,9 +208,7 @@ impl LocalGrafana {
     where
         I: IntoIterator<Item = Instance>,
     {
-        let path: PathBuf = [Self::DEFAULT_GRAFANA_HOME, Self::DATASOURCES_PATH]
-            .iter()
-            .collect();
+        let path: PathBuf = [Self::DEFAULT_GRAFANA_HOME, Self::DATASOURCES_PATH].iter().collect();
 
         // Remove the old datasources.
         fs::remove_dir_all(&path).unwrap();
@@ -250,9 +218,8 @@ impl LocalGrafana {
         for (i, instance) in instances.into_iter().enumerate() {
             let mut file = path.clone();
             file.push(format!("instance-{}.yml", i));
-            fs::write(&file, Self::datasource(&instance, i)).map_err(|e| {
-                MonitorError::GrafanaError(format!("Failed to write grafana datasource ({e})"))
-            })?;
+            fs::write(&file, Self::datasource(&instance, i))
+                .map_err(|e| MonitorError::GrafanaError(format!("Failed to write grafana datasource ({e})")))?;
         }
 
         // Restart grafana.
@@ -281,11 +248,7 @@ impl LocalGrafana {
             "    type: prometheus",
             "    access: proxy",
             "    orgId: 1",
-            &format!(
-                "    url: http://{}:{}",
-                instance.main_ip,
-                Prometheus::DEFAULT_PORT
-            ),
+            &format!("    url: http://{}:{}", instance.main_ip, Prometheus::DEFAULT_PORT),
             "    editable: true",
             &format!("    uid: UID-{index}"),
         ]

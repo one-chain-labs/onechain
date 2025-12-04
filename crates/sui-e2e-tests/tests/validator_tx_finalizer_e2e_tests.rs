@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::time::Duration;
+
 use sui_macros::sim_test;
 use sui_test_transaction_builder::publish_basics_package_and_make_counter;
 use sui_types::base_types::dbg_addr;
@@ -15,29 +16,18 @@ async fn test_validator_tx_finalizer_fastpath_tx() {
         .with_epoch_duration_ms(1000 * 1000)
         .build()
         .await;
-    let tx_data = cluster
-        .test_transaction_builder()
-        .await
-        .transfer_oct(None, dbg_addr(1))
-        .build();
+    let tx_data = cluster.test_transaction_builder().await.transfer_oct(None, dbg_addr(1)).build();
     let tx = cluster.sign_transaction(&tx_data);
     let tx_digest = *tx.digest();
     // Only broadcast to get a certificate, but do not execute it.
-    cluster
-        .authority_aggregator()
-        .process_transaction(tx, None)
-        .await
-        .unwrap();
+    cluster.authority_aggregator().process_transaction(tx, None).await.unwrap();
     // Since 2f+1 signed the tx, i.e. 5 validators have signed the tx, in the worst case where the other 2 wake up first,
     // it would take 10 + 3 * 1 = 13s for a validator to finalize this.
     let tx_digests = [tx_digest];
     tokio::time::timeout(Duration::from_secs(60), async move {
         for node in cluster.all_node_handles() {
             node.with_async(|n| async {
-                n.state()
-                    .get_transaction_cache_reader()
-                    .notify_read_executed_effects_digests(&tx_digests)
-                    .await;
+                n.state().get_transaction_cache_reader().notify_read_executed_effects_digests(&tx_digests).await;
             })
             .await;
         }
@@ -55,27 +45,17 @@ async fn test_validator_tx_finalizer_consensus_tx() {
         .build()
         .await;
     let (package, counter) = publish_basics_package_and_make_counter(&cluster.wallet).await;
-    let tx_data = cluster
-        .test_transaction_builder()
-        .await
-        .call_counter_increment(package.0, counter.0, counter.1)
-        .build();
+    let tx_data =
+        cluster.test_transaction_builder().await.call_counter_increment(package.0, counter.0, counter.1).build();
     let tx = cluster.sign_transaction(&tx_data);
     let tx_digest = *tx.digest();
     // Only broadcast to get a certificate, but do not execute it.
-    cluster
-        .authority_aggregator()
-        .process_transaction(tx, None)
-        .await
-        .unwrap();
+    cluster.authority_aggregator().process_transaction(tx, None).await.unwrap();
     let tx_digests = [tx_digest];
     tokio::time::timeout(Duration::from_secs(60), async move {
         for node in cluster.all_node_handles() {
             node.with_async(|n| async {
-                n.state()
-                    .get_transaction_cache_reader()
-                    .notify_read_executed_effects_digests(&tx_digests)
-                    .await;
+                n.state().get_transaction_cache_reader().notify_read_executed_effects_digests(&tx_digests).await;
             })
             .await;
         }
@@ -93,17 +73,9 @@ async fn test_validator_tx_finalizer_equivocation() {
         .with_epoch_duration_ms(1000 * 1000)
         .build()
         .await;
-    let tx_data1 = cluster
-        .test_transaction_builder()
-        .await
-        .transfer_oct(None, dbg_addr(1))
-        .build();
+    let tx_data1 = cluster.test_transaction_builder().await.transfer_oct(None, dbg_addr(1)).build();
     let tx1 = cluster.sign_transaction(&tx_data1);
-    let tx_data2 = cluster
-        .test_transaction_builder()
-        .await
-        .transfer_oct(None, dbg_addr(2))
-        .build();
+    let tx_data2 = cluster.test_transaction_builder().await.transfer_oct(None, dbg_addr(2)).build();
     let tx2 = cluster.sign_transaction(&tx_data2);
     let tx_digest1 = *tx1.digest();
     let tx_digest2 = *tx2.digest();
@@ -124,14 +96,7 @@ async fn test_validator_tx_finalizer_equivocation() {
             let state = n.state();
             assert!(!state.is_tx_already_executed(&tx_digest1));
             assert!(!state.is_tx_already_executed(&tx_digest2));
-            assert_eq!(
-                state
-                    .validator_tx_finalizer
-                    .as_ref()
-                    .unwrap()
-                    .num_finalization_attempts_for_testing(),
-                1
-            );
+            assert_eq!(state.validator_tx_finalizer.as_ref().unwrap().num_finalization_attempts_for_testing(), 1);
         });
     }
 }

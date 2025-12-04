@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::{Display, Formatter},
+};
+
 use move_core_types::{
     annotated_value::MoveStructLayout,
     ident_str,
@@ -8,8 +13,6 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
-use std::fmt::{Display, Formatter};
 
 use crate::{
     balance::Balance,
@@ -91,9 +94,7 @@ mod checked {
 
         /// Return `true` if `s` is the type of a gas balance (i.e., 0x2::balance::Balance<0x2::oct::OCT>)
         pub fn is_gas_balance(s: &StructTag) -> bool {
-            Balance::is_balance(s)
-                && s.type_params.len() == 1
-                && GAS::is_gas_type(&s.type_params[0])
+            Balance::is_balance(s) && s.type_params.len() == 1 && GAS::is_gas_type(&s.type_params[0])
         }
 
         pub fn id(&self) -> &ObjectID {

@@ -11,13 +11,12 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
+use super::{Handler, PrunerConfig};
 use crate::{
     metrics::IndexerMetrics,
     pipeline::logging::{LoggerWatermark, WatermarkLogger},
     watermarks::PrunerWatermark,
 };
-
-use super::{Handler, PrunerConfig};
 
 /// The pruner task is responsible for deleting old data from the database. It will periodically
 /// check the `watermarks` table to see if there is any data that should be pruned between the
@@ -117,21 +116,12 @@ pub(super) fn pruner<H: Handler + 'static>(
                     break 'outer;
                 }
 
-                metrics
-                    .total_pruner_chunks_attempted
-                    .with_label_values(&[H::NAME])
-                    .inc();
+                metrics.total_pruner_chunks_attempted.with_label_values(&[H::NAME]).inc();
 
-                let guard = metrics
-                    .pruner_delete_latency
-                    .with_label_values(&[H::NAME])
-                    .start_timer();
+                let guard = metrics.pruner_delete_latency.with_label_values(&[H::NAME]).start_timer();
 
                 let Ok(mut conn) = db.connect().await else {
-                    warn!(
-                        pipeline = H::NAME,
-                        "Pruner failed to connect, while pruning"
-                    );
+                    warn!(pipeline = H::NAME, "Pruner failed to connect, while pruning");
                     break;
                 };
 
@@ -149,54 +139,32 @@ pub(super) fn pruner<H: Handler + 'static>(
                     }
                 };
 
-                metrics
-                    .total_pruner_chunks_deleted
-                    .with_label_values(&[H::NAME])
-                    .inc();
+                metrics.total_pruner_chunks_deleted.with_label_values(&[H::NAME]).inc();
 
-                metrics
-                    .total_pruner_rows_deleted
-                    .with_label_values(&[H::NAME])
-                    .inc_by(affected as u64);
+                metrics.total_pruner_rows_deleted.with_label_values(&[H::NAME]).inc_by(affected as u64);
 
-                metrics
-                    .watermark_pruner_hi
-                    .with_label_values(&[H::NAME])
-                    .set(watermark.pruner_hi);
+                metrics.watermark_pruner_hi.with_label_values(&[H::NAME]).set(watermark.pruner_hi);
             }
 
             // (4) Update the pruner watermark
-            let guard = metrics
-                .watermark_pruner_write_latency
-                .with_label_values(&[H::NAME])
-                .start_timer();
+            let guard = metrics.watermark_pruner_write_latency.with_label_values(&[H::NAME]).start_timer();
 
             let Ok(mut conn) = db.connect().await else {
-                warn!(
-                    pipeline = H::NAME,
-                    "Pruner failed to connect, while updating watermark"
-                );
+                warn!(pipeline = H::NAME, "Pruner failed to connect, while updating watermark");
                 continue;
             };
 
             match watermark.update(&mut conn).await {
                 Err(e) => {
                     let elapsed = guard.stop_and_record();
-                    error!(
-                        pipeline = H::NAME,
-                        elapsed_ms = elapsed * 1000.0,
-                        "Failed to update pruner watermark: {e}"
-                    )
+                    error!(pipeline = H::NAME, elapsed_ms = elapsed * 1000.0, "Failed to update pruner watermark: {e}")
                 }
 
                 Ok(true) => {
                     let elapsed = guard.stop_and_record();
                     logger.log::<H>(&watermark, elapsed);
 
-                    metrics
-                        .watermark_pruner_hi_in_db
-                        .with_label_values(&[H::NAME])
-                        .set(watermark.pruner_hi);
+                    metrics.watermark_pruner_hi_in_db.with_label_values(&[H::NAME]).set(watermark.pruner_hi);
                 }
                 Ok(false) => {}
             }

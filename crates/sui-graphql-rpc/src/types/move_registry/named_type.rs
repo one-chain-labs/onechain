@@ -1,21 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use async_graphql::Context;
 use futures::future;
 use regex::{Captures, Regex};
 use sui_types::{base_types::ObjectID, TypeTag};
 
-use crate::{data::package_resolver::PackageResolver, error::Error};
-
 use super::{
     error::MoveRegistryError,
     named_move_package::NamedMovePackage,
     on_chain::{VersionedName, VERSIONED_NAME_UNBOUND_REG},
 };
+use crate::{data::package_resolver::PackageResolver, error::Error};
 
 pub(crate) struct NamedType;
 
@@ -23,20 +21,14 @@ impl NamedType {
     /// Queries a type by the given name.
     /// Name should be a valid type tag, with move names in it in the format `app@org::type::Type`.
     /// For nested type params, we just follow the same pattern e.g. `app@org::type::Type<app@org::type::AnotherType, u64>`.
-    pub(crate) async fn query(
-        ctx: &Context<'_>,
-        name: &str,
-        checkpoint_viewed_at: u64,
-    ) -> Result<TypeTag, Error> {
+    pub(crate) async fn query(ctx: &Context<'_>, name: &str, checkpoint_viewed_at: u64) -> Result<TypeTag, Error> {
         let resolver: &PackageResolver = ctx.data_unchecked();
         // we do not de-duplicate the names here, as the dataloader will do this for us.
         let names = Self::parse_names(name)?;
 
         // Gather all the requests to resolve the names.
-        let names_to_resolve = names
-            .iter()
-            .map(|x| NamedMovePackage::query(ctx, x, checkpoint_viewed_at))
-            .collect::<Vec<_>>();
+        let names_to_resolve =
+            names.iter().map(|x| NamedMovePackage::query(ctx, x, checkpoint_viewed_at)).collect::<Vec<_>>();
 
         // now we resolve all the names in parallel (data-loader will do the proper de-duplication / batching for us)
         // also the `NamedMovePackage` query will re-validate the names (including max length, which is not checked on the regex).
@@ -47,22 +39,16 @@ impl NamedType {
 
         for (name, result) in names.into_iter().zip(results.into_iter()) {
             let Some(package) = result else {
-                return Err(Error::MoveNameRegistry(MoveRegistryError::NameNotFound(
-                    name,
-                )));
+                return Err(Error::MoveNameRegistry(MoveRegistryError::NameNotFound(name)));
             };
             name_package_id_mapping.insert(name, package.native.id());
         }
 
         let correct_type_tag: String = Self::replace_names(name, &name_package_id_mapping)?;
 
-        let tag = TypeTag::from_str(&correct_type_tag)
-            .map_err(|e| Error::Client(format!("bad type: {e}")))?;
+        let tag = TypeTag::from_str(&correct_type_tag).map_err(|e| Error::Client(format!("bad type: {e}")))?;
 
-        resolver
-            .canonical_type(tag)
-            .await
-            .map_err(|e| Error::Internal(format!("Failed to retrieve type: {e}")))
+        resolver.canonical_type(tag).await.map_err(|e| Error::Internal(format!("Failed to retrieve type: {e}")))
     }
 
     /// Is this already caught by the global limits?
@@ -96,24 +82,18 @@ impl NamedType {
     /// The names are guaranteed to be the same and exist (as long as this is called in sequence),
     /// since we use the same parser to extract the names.
     fn replace_names(type_name: &str, names: &HashMap<String, ObjectID>) -> Result<String, Error> {
-        let struct_tag_str = replace_all_result(
-            &VERSIONED_NAME_UNBOUND_REG,
-            type_name,
-            |m: &regex::Captures| {
-                // SAFETY: we know that the regex will have a match on position 0.
-                let name = m.get(0).unwrap().as_str();
+        let struct_tag_str = replace_all_result(&VERSIONED_NAME_UNBOUND_REG, type_name, |m: &regex::Captures| {
+            // SAFETY: we know that the regex will have a match on position 0.
+            let name = m.get(0).unwrap().as_str();
 
-                // if we are misusing the function, and we cannot find the name in the hashmap,
-                // we return an empty string, which will make the type tag invalid.
-                if let Some(addr) = names.get(name) {
-                    Ok(addr.to_string())
-                } else {
-                    Err(Error::MoveNameRegistry(MoveRegistryError::NameNotFound(
-                        name.to_string(),
-                    )))
-                }
-            },
-        )?;
+            // if we are misusing the function, and we cannot find the name in the hashmap,
+            // we return an empty string, which will make the type tag invalid.
+            if let Some(addr) = names.get(name) {
+                Ok(addr.to_string())
+            } else {
+                Err(Error::MoveNameRegistry(MoveRegistryError::NameNotFound(name.to_string())))
+            }
+        })?;
 
         Ok(struct_tag_str.to_string())
     }
@@ -132,11 +112,11 @@ fn replace_all_result(
     for caps in re.captures_iter(haystack) {
         // SAFETY: we know that the regex will have a match on position 0.
         let m = caps.get(0).unwrap();
-        new.push_str(&haystack[last_match..m.start()]);
+        new.push_str(&haystack[last_match .. m.start()]);
         new.push_str(&replacement(&caps)?);
         last_match = m.end();
     }
-    new.push_str(&haystack[last_match..]);
+    new.push_str(&haystack[last_match ..]);
     Ok(new)
 }
 
@@ -183,8 +163,7 @@ mod tests {
         });
 
         demo_data.push(DemoData {
-            input_type: "@org/app::type::Type<@org/another-app::type::AnotherType, u64>"
-                .to_string(),
+            input_type: "@org/app::type::Type<@org/another-app::type::AnotherType, u64>".to_string(),
             expected_output: format!(
                 "{}<{}, u64>",
                 format_type("0x0", "::type::Type"),
@@ -210,10 +189,7 @@ mod tests {
             let mut mapping = HashMap::new();
 
             for (index, name) in data.expected_names.iter().enumerate() {
-                mapping.insert(
-                    name.clone(),
-                    ObjectID::from_hex_literal(&format!("0x{}", index)).unwrap(),
-                );
+                mapping.insert(name.clone(), ObjectID::from_hex_literal(&format!("0x{}", index)).unwrap());
             }
 
             let replaced = NamedType::replace_names(&data.input_type, &mapping);
@@ -241,12 +217,6 @@ mod tests {
     }
 
     fn format_type(address: &str, rest: &str) -> String {
-        format!(
-            "{}{}",
-            ObjectID::from_hex_literal(address)
-                .unwrap()
-                .to_canonical_string(true),
-            rest
-        )
+        format!("{}{}", ObjectID::from_hex_literal(address).unwrap().to_canonical_string(true), rest)
     }
 }

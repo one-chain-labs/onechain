@@ -1,13 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use object_store::path::Path;
-use object_store::{DynObjectStore, ObjectMeta};
-use std::sync::Arc;
+use object_store::{path::Path, DynObjectStore, ObjectMeta};
 
 pub mod http;
 pub mod util;
@@ -40,33 +40,21 @@ impl ObjectStoreGetExt for Arc<DynObjectStore> {
             .map_err(|e| anyhow!("Failed to get file {} with error: {:?}", src, e))?
             .bytes()
             .await
-            .map_err(|e| {
-                anyhow!(
-                    "Failed to collect GET result for file {} into bytes with error: {:?}",
-                    src,
-                    e
-                )
-            })
+            .map_err(|e| anyhow!("Failed to collect GET result for file {} into bytes with error: {:?}", src, e))
     }
 }
 
 #[async_trait]
 pub trait ObjectStoreListExt: Send + Sync + 'static {
     /// List the objects at the given path in object store
-    async fn list_objects(
-        &self,
-        src: Option<&Path>,
-    ) -> BoxStream<'_, object_store::Result<ObjectMeta>>;
+    async fn list_objects(&self, src: Option<&Path>) -> BoxStream<'_, object_store::Result<ObjectMeta>>;
 }
 
 macro_rules! as_ref_list_ext_impl {
     ($type:ty) => {
         #[async_trait]
         impl ObjectStoreListExt for $type {
-            async fn list_objects(
-                &self,
-                src: Option<&Path>,
-            ) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
+            async fn list_objects(&self, src: Option<&Path>) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
                 self.as_ref().list_objects(src).await
             }
         }
@@ -78,10 +66,7 @@ as_ref_list_ext_impl!(Box<dyn ObjectStoreListExt>);
 
 #[async_trait]
 impl ObjectStoreListExt for Arc<DynObjectStore> {
-    async fn list_objects(
-        &self,
-        src: Option<&Path>,
-    ) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
+    async fn list_objects(&self, src: Option<&Path>) -> BoxStream<'_, object_store::Result<ObjectMeta>> {
         self.list(src)
     }
 }

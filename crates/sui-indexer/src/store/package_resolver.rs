@@ -3,16 +3,15 @@
 
 use std::sync::Arc;
 
-use crate::database::ConnectionPool;
-use crate::schema::objects;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use diesel::ExpressionMethods;
-use diesel::QueryDsl;
+use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::RunQueryDsl;
 use move_core_types::account_address::AccountAddress;
 use sui_package_resolver::{error::Error as PackageResolverError, Package, PackageStore};
 use sui_types::object::Object;
+
+use crate::{database::ConnectionPool, schema::objects};
 
 /// A package resolver that reads packages from the database.
 #[derive(Clone)]
@@ -32,10 +31,7 @@ impl PackageStore for IndexerStorePackageResolver {
         let pkg = self
             .get_package_from_db(id)
             .await
-            .map_err(|e| PackageResolverError::Store {
-                store: "PostgresDB",
-                error: e.to_string(),
-            })?;
+            .map_err(|e| PackageResolverError::Store { store: "PostgresDB", error: e.to_string() })?;
         Ok(Arc::new(pkg))
     }
 }
@@ -52,7 +48,6 @@ impl IndexerStorePackageResolver {
             .map_err(|e| anyhow!("Package not found in DB: {e}"))?;
 
         let object = bcs::from_bytes::<Object>(&bcs)?;
-        Package::read_from_object(&object)
-            .map_err(|e| anyhow!("Failed parsing object to package: {e}"))
+        Package::read_from_object(&object).map_err(|e| anyhow!("Failed parsing object to package: {e}"))
     }
 }

@@ -17,16 +17,12 @@ use sui_types::{
 pub(crate) struct KvEpochStarts;
 
 impl Processor for KvEpochStarts {
-    const NAME: &'static str = "kv_epoch_starts";
-
     type Value = StoredEpochStart;
 
+    const NAME: &'static str = "kv_epoch_starts";
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions,
-            ..
-        } = checkpoint.as_ref();
+        let CheckpointData { checkpoint_summary, transactions, .. } = checkpoint.as_ref();
 
         // If this is the last checkpoint in the current epoch, it will contain enough information
         // about the start of the next epoch.
@@ -55,8 +51,7 @@ impl Processor for KvEpochStarts {
             cp_lo: checkpoint_summary.sequence_number as i64 + 1,
             start_timestamp_ms: system_state.epoch_start_timestamp_ms() as i64,
             reference_gas_price: system_state.reference_gas_price() as i64,
-            system_state: bcs::to_bytes(&system_state)
-                .context("Failed to serialize SystemState")?,
+            system_state: bcs::to_bytes(&system_state).context("Failed to serialize SystemState")?,
         }])
     }
 }
@@ -66,10 +61,6 @@ impl Handler for KvEpochStarts {
     const MIN_EAGER_ROWS: usize = 1;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(kv_epoch_starts::table)
-            .values(values)
-            .on_conflict_do_nothing()
-            .execute(conn)
-            .await?)
+        Ok(diesel::insert_into(kv_epoch_starts::table).values(values).on_conflict_do_nothing().execute(conn).await?)
     }
 }

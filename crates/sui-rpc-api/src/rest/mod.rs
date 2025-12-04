@@ -3,10 +3,11 @@
 
 use std::sync::Arc;
 
-use axum::{handler::Handler, http::Method, routing::MethodRouter};
 use axum::{
+    handler::Handler,
+    http::Method,
     response::{Redirect, ResponseParts},
-    routing::get,
+    routing::{get, MethodRouter},
     Router,
 };
 
@@ -80,10 +81,7 @@ pub struct PageCursor<C>(pub Option<C>);
 impl<C: std::fmt::Display> axum::response::IntoResponseParts for PageCursor<C> {
     type Error = (axum::http::StatusCode, String);
 
-    fn into_response_parts(
-        self,
-        res: ResponseParts,
-    ) -> std::result::Result<ResponseParts, Self::Error> {
+    fn into_response_parts(self, res: ResponseParts) -> std::result::Result<ResponseParts, Self::Error> {
         self.0
             .map(|cursor| [(crate::types::X_SUI_CURSOR, cursor.to_string())])
             .into_response_parts(res)
@@ -108,9 +106,7 @@ impl axum::extract::FromRef<RpcService> for StateReader {
 }
 
 // Enable TransactionExecutor to be used as axum::extract::State
-impl axum::extract::FromRef<RpcService>
-    for Option<Arc<dyn sui_types::transaction_executor::TransactionExecutor>>
-{
+impl axum::extract::FromRef<RpcService> for Option<Arc<dyn sui_types::transaction_executor::TransactionExecutor>> {
     fn from_ref(input: &RpcService) -> Self {
         input.executor.clone()
     }

@@ -1,16 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::base_types::{ObjectID, SequenceNumber};
-use crate::digests::{ObjectDigest, TransactionEventsDigest};
-use crate::effects::{EffectsObjectChange, IDOperation, ObjectIn, ObjectOut, TransactionEffects};
-use crate::execution::SharedInput;
-use crate::execution_status::ExecutionStatus;
-use crate::gas::GasCostSummary;
-use crate::message_envelope::Message;
-use crate::object::Owner;
-use crate::transaction::{InputObjectKind, SenderSignedData, TransactionDataAPI};
 use std::collections::{BTreeMap, BTreeSet};
+
+use crate::{
+    base_types::{ObjectID, SequenceNumber},
+    digests::{ObjectDigest, TransactionEventsDigest},
+    effects::{EffectsObjectChange, IDOperation, ObjectIn, ObjectOut, TransactionEffects},
+    execution::SharedInput,
+    execution_status::ExecutionStatus,
+    gas::GasCostSummary,
+    message_envelope::Message,
+    object::Owner,
+    transaction::{InputObjectKind, SenderSignedData, TransactionDataAPI},
+};
 
 pub struct TestEffectsBuilder {
     transaction: SenderSignedData,
@@ -36,10 +39,7 @@ impl TestEffectsBuilder {
         self
     }
 
-    pub fn with_shared_input_versions(
-        mut self,
-        versions: BTreeMap<ObjectID, SequenceNumber>,
-    ) -> Self {
+    pub fn with_shared_input_versions(mut self, versions: BTreeMap<ObjectID, SequenceNumber>) -> Self {
         assert!(self.shared_input_versions.is_empty());
         self.shared_input_versions = versions;
         self
@@ -66,13 +66,7 @@ impl TestEffectsBuilder {
                 .unwrap()
                 .iter()
                 .filter_map(|kind| kind.version())
-                .chain(
-                    self.transaction
-                        .transaction_data()
-                        .receiving_objects()
-                        .iter()
-                        .map(|oref| oref.1),
-                )
+                .chain(self.transaction.transaction_data().receiving_objects().iter().map(|oref| oref.1))
                 .chain(self.shared_input_versions.values().copied()),
         );
         let sender = self.transaction.transaction_data().sender();
@@ -84,51 +78,30 @@ impl TestEffectsBuilder {
             .unwrap()
             .iter()
             .filter_map(|kind| match kind {
-                InputObjectKind::ImmOrOwnedMoveObject(oref) => Some((
-                    oref.0,
-                    EffectsObjectChange {
-                        input_state: ObjectIn::Exist((
-                            (oref.1, oref.2),
-                            Owner::AddressOwner(sender),
-                        )),
-                        output_state: ObjectOut::ObjectWrite((
-                            // Digest must change with a mutation.
-                            ObjectDigest::MAX,
-                            Owner::AddressOwner(sender),
-                        )),
-                        id_operation: IDOperation::None,
-                    },
-                )),
+                InputObjectKind::ImmOrOwnedMoveObject(oref) => Some((oref.0, EffectsObjectChange {
+                    input_state: ObjectIn::Exist(((oref.1, oref.2), Owner::AddressOwner(sender))),
+                    output_state: ObjectOut::ObjectWrite((
+                        // Digest must change with a mutation.
+                        ObjectDigest::MAX,
+                        Owner::AddressOwner(sender),
+                    )),
+                    id_operation: IDOperation::None,
+                })),
                 InputObjectKind::MovePackage(_) => None,
-                InputObjectKind::SharedMoveObject {
-                    id,
-                    initial_shared_version,
-                    mutable,
-                } => mutable.then_some((
-                    *id,
-                    EffectsObjectChange {
+                InputObjectKind::SharedMoveObject { id, initial_shared_version, mutable } => {
+                    mutable.then_some((*id, EffectsObjectChange {
                         input_state: ObjectIn::Exist((
-                            (
-                                *self
-                                    .shared_input_versions
-                                    .get(id)
-                                    .unwrap_or(initial_shared_version),
-                                ObjectDigest::MIN,
-                            ),
-                            Owner::Shared {
-                                initial_shared_version: *initial_shared_version,
-                            },
+                            (*self.shared_input_versions.get(id).unwrap_or(initial_shared_version), ObjectDigest::MIN),
+                            Owner::Shared { initial_shared_version: *initial_shared_version },
                         )),
                         output_state: ObjectOut::ObjectWrite((
                             // Digest must change with a mutation.
                             ObjectDigest::MAX,
-                            Owner::Shared {
-                                initial_shared_version: *initial_shared_version,
-                            },
+                            Owner::Shared { initial_shared_version: *initial_shared_version },
                         )),
                         id_operation: IDOperation::None,
-                    },
-                )),
+                    }))
+                }
             })
             .collect();
         let gas_object_id = self.transaction.transaction_data().gas()[0].0;

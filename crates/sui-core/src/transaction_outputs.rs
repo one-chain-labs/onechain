@@ -1,13 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use sui_types::base_types::ObjectRef;
-use sui_types::effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents};
-use sui_types::inner_temporary_store::{InnerTemporaryStore, WrittenObjects};
-use sui_types::storage::{MarkerValue, ObjectKey};
-use sui_types::transaction::{TransactionDataAPI, VerifiedTransaction};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+
+use sui_types::{
+    base_types::ObjectRef,
+    effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
+    inner_temporary_store::{InnerTemporaryStore, WrittenObjects},
+    storage::{MarkerValue, ObjectKey},
+    transaction::{TransactionDataAPI, VerifiedTransaction},
+};
 
 /// TransactionOutputs
 pub struct TransactionOutputs {
@@ -49,25 +54,18 @@ impl TransactionOutputs {
         // object will show up in the modified-at set.
         let modified_at: HashSet<_> = effects.modified_at_versions().into_iter().collect();
         let possible_to_receive = transaction.transaction_data().receiving_objects();
-        let received_objects = possible_to_receive
-            .iter()
-            .cloned()
-            .filter(|obj_ref| modified_at.contains(&(obj_ref.0, obj_ref.1)));
+        let received_objects =
+            possible_to_receive.iter().cloned().filter(|obj_ref| modified_at.contains(&(obj_ref.0, obj_ref.1)));
 
         // We record any received or deleted objects since they could be pruned, and smear shared
         // object deletions in the marker table. For deleted entries in the marker table we need to
         // make sure we don't accidentally overwrite entries.
         let markers: Vec<_> = {
-            let received = received_objects
-                .clone()
-                .map(|objref| (ObjectKey::from(objref), MarkerValue::Received));
+            let received = received_objects.clone().map(|objref| (ObjectKey::from(objref), MarkerValue::Received));
 
             let deleted = deleted.into_iter().map(|(object_id, version)| {
                 let object_key = ObjectKey(object_id, version);
-                if input_objects
-                    .get(&object_id)
-                    .is_some_and(|object| object.is_shared())
-                {
+                if input_objects.get(&object_id).is_some_and(|object| object.is_shared()) {
                     (object_key, MarkerValue::SharedDeleted(tx_digest))
                 } else {
                     (object_key, MarkerValue::OwnedDeleted)
@@ -79,41 +77,33 @@ impl TransactionOutputs {
             // NB: that we do _not_ smear shared objects that were taken immutably in the
             // transaction.
             let smeared_objects = effects.deleted_mutably_accessed_shared_objects();
-            let shared_smears = smeared_objects.into_iter().map(move |object_id| {
-                (
-                    ObjectKey(object_id, lamport_version),
-                    MarkerValue::SharedDeleted(tx_digest),
-                )
-            });
+            let shared_smears = smeared_objects
+                .into_iter()
+                .map(move |object_id| (ObjectKey(object_id, lamport_version), MarkerValue::SharedDeleted(tx_digest)));
 
             received.chain(deleted).chain(shared_smears).collect()
         };
 
         let locks_to_delete: Vec<_> = mutable_inputs
             .into_iter()
-            .filter_map(|(id, ((version, digest), owner))| {
-                owner.is_address_owned().then_some((id, version, digest))
-            })
+            .filter_map(|(id, ((version, digest), owner))| owner.is_address_owned().then_some((id, version, digest)))
             .chain(received_objects)
             .collect();
 
-        let new_locks_to_init: Vec<_> = written
-            .values()
-            .filter_map(|new_object| {
-                if new_object.is_address_owned() {
-                    Some(new_object.compute_object_reference())
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let new_locks_to_init: Vec<_> =
+            written
+                .values()
+                .filter_map(|new_object| {
+                    if new_object.is_address_owned() {
+                        Some(new_object.compute_object_reference())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
-        let deleted = effects
-            .deleted()
-            .into_iter()
-            .chain(effects.unwrapped_then_deleted())
-            .map(ObjectKey::from)
-            .collect();
+        let deleted =
+            effects.deleted().into_iter().chain(effects.unwrapped_then_deleted()).map(ObjectKey::from).collect();
 
         let wrapped = effects.wrapped().into_iter().map(ObjectKey::from).collect();
 

@@ -1,13 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::authority_store_tables::LiveObject;
-use crate::authority::AuthorityStore;
 use std::time::Instant;
-use sui_types::base_types::ObjectID;
-use sui_types::object::Object;
-use sui_types::storage::error::Error as StorageError;
+
+use sui_types::{base_types::ObjectID, object::Object, storage::error::Error as StorageError};
 use tracing::info;
+
+use crate::authority::{authority_store_tables::LiveObject, AuthorityStore};
 
 /// Make `LiveObjectIndexer`s for parallel indexing of the live object set
 pub trait ParMakeLiveObjectIndexer: Sync {
@@ -42,7 +41,7 @@ pub fn par_index_live_object_set<T: ParMakeLiveObjectIndexer>(
     std::thread::scope(|s| -> Result<(), StorageError> {
         let mut threads = Vec::new();
         const BITS: u8 = 5;
-        for index in 0u8..(1 << BITS) {
+        for index in 0u8 .. (1 << BITS) {
             threads.push(s.spawn(move || {
                 let object_indexer = make_indexer.make_live_object_indexer();
                 live_object_set_index_task(index, BITS, authority_store, object_indexer)
@@ -57,10 +56,7 @@ pub fn par_index_live_object_set<T: ParMakeLiveObjectIndexer>(
         Ok(())
     })?;
 
-    info!(
-        "Indexing Live Object Set took {} seconds",
-        start_time.elapsed().as_secs()
-    );
+    info!("Indexing Live Object Set took {} seconds", start_time.elapsed().as_secs());
 
     Ok(())
 }
@@ -89,10 +85,7 @@ fn live_object_set_index_task<T: LiveObjectIndexer>(
     {
         object_scanned += 1;
         if object_scanned % 2_000_000 == 0 {
-            info!(
-                "[Index] Task {}: object scanned: {}",
-                task_id, object_scanned
-            );
+            info!("[Index] Task {}: object scanned: {}", task_id, object_scanned);
         }
 
         object_indexer.index_object(object)?

@@ -1,28 +1,40 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::BTreeMap,
+    fmt,
+    fmt::{Display, Formatter, Write},
+};
+
 use colored::Colorize;
 use itertools::Itertools;
-use move_binary_format::file_format::{Ability, AbilitySet, DatatypeTyParameter, Visibility};
-use move_binary_format::normalized::{
-    Enum as NormalizedEnum, Field as NormalizedField, Function as SuiNormalizedFunction,
-    Module as NormalizedModule, Struct as NormalizedStruct, Type as NormalizedType,
+use move_binary_format::{
+    file_format::{Ability, AbilitySet, DatatypeTyParameter, Visibility},
+    normalized::{
+        Enum as NormalizedEnum,
+        Field as NormalizedField,
+        Function as SuiNormalizedFunction,
+        Module as NormalizedModule,
+        Struct as NormalizedStruct,
+        Type as NormalizedType,
+    },
 };
-use move_core_types::annotated_value::{MoveStruct, MoveValue, MoveVariant};
-use move_core_types::identifier::Identifier;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    annotated_value::{MoveStruct, MoveValue, MoveVariant},
+    identifier::Identifier,
+    language_storage::StructTag,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use serde_with::serde_as;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::fmt::{Display, Formatter, Write};
 use sui_macros::EnumVariantOrder;
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    sui_serde::SuiStructTag,
+};
 use tracing::warn;
-
-use sui_types::base_types::{ObjectID, SuiAddress};
-use sui_types::sui_serde::SuiStructTag;
 
 pub type SuiMoveTypeParameterIndex = u16;
 
@@ -135,9 +147,7 @@ pub struct SuiMoveNormalizedModule {
 
 impl PartialEq for SuiMoveNormalizedModule {
     fn eq(&self, other: &Self) -> bool {
-        self.file_format_version == other.file_format_version
-            && self.address == other.address
-            && self.name == other.name
+        self.file_format_version == other.file_format_version && self.address == other.address && self.name == other.name
     }
 }
 
@@ -187,11 +197,7 @@ impl From<SuiNormalizedFunction> for SuiMoveNormalizedFunction {
                 Visibility::Friend => SuiMoveVisibility::Friend,
             },
             is_entry: function.is_entry,
-            type_parameters: function
-                .type_parameters
-                .into_iter()
-                .map(|a| a.into())
-                .collect::<Vec<SuiMoveAbilitySet>>(),
+            type_parameters: function.type_parameters.into_iter().map(|a| a.into()).collect::<Vec<SuiMoveAbilitySet>>(),
             parameters: function
                 .parameters
                 .into_iter()
@@ -253,19 +259,13 @@ impl From<NormalizedEnum> for SuiMoveNormalizedEnum {
 
 impl From<DatatypeTyParameter> for SuiMoveStructTypeParameter {
     fn from(type_parameter: DatatypeTyParameter) -> Self {
-        Self {
-            constraints: type_parameter.constraints.into(),
-            is_phantom: type_parameter.is_phantom,
-        }
+        Self { constraints: type_parameter.constraints.into(), is_phantom: type_parameter.is_phantom }
     }
 }
 
 impl From<NormalizedField> for SuiMoveNormalizedField {
     fn from(normalized_field: NormalizedField) -> Self {
-        Self {
-            name: normalized_field.name.to_string(),
-            type_: SuiMoveNormalizedType::from(normalized_field.type_),
-        }
+        Self { name: normalized_field.name.to_string(), type_: SuiMoveNormalizedType::from(normalized_field.type_) }
     }
 }
 
@@ -281,12 +281,7 @@ impl From<NormalizedType> for SuiMoveNormalizedType {
             NormalizedType::U256 => SuiMoveNormalizedType::U256,
             NormalizedType::Address => SuiMoveNormalizedType::Address,
             NormalizedType::Signer => SuiMoveNormalizedType::Signer,
-            NormalizedType::Struct {
-                address,
-                module,
-                name,
-                type_arguments,
-            } => SuiMoveNormalizedType::Struct {
+            NormalizedType::Struct { address, module, name, type_arguments } => SuiMoveNormalizedType::Struct {
                 address: address.to_hex_literal(),
                 module: module.to_string(),
                 name: name.to_string(),
@@ -295,13 +290,9 @@ impl From<NormalizedType> for SuiMoveNormalizedType {
                     .map(SuiMoveNormalizedType::from)
                     .collect::<Vec<SuiMoveNormalizedType>>(),
             },
-            NormalizedType::Vector(v) => {
-                SuiMoveNormalizedType::Vector(Box::new(SuiMoveNormalizedType::from(*v)))
-            }
+            NormalizedType::Vector(v) => SuiMoveNormalizedType::Vector(Box::new(SuiMoveNormalizedType::from(*v))),
             NormalizedType::TypeParameter(t) => SuiMoveNormalizedType::TypeParameter(t),
-            NormalizedType::Reference(r) => {
-                SuiMoveNormalizedType::Reference(Box::new(SuiMoveNormalizedType::from(*r)))
-            }
+            NormalizedType::Reference(r) => SuiMoveNormalizedType::Reference(Box::new(SuiMoveNormalizedType::from(*r))),
             NormalizedType::MutableReference(mr) => {
                 SuiMoveNormalizedType::MutableReference(Box::new(SuiMoveNormalizedType::from(*mr)))
             }
@@ -383,11 +374,7 @@ impl Display for SuiMoveValue {
             SuiMoveValue::Struct(value) => write!(writer, "{}", value)?,
             SuiMoveValue::Option(value) => write!(writer, "{:?}", value)?,
             SuiMoveValue::Vector(vec) => {
-                write!(
-                    writer,
-                    "{}",
-                    vec.iter().map(|value| format!("{value}")).join(",\n")
-                )?;
+                write!(writer, "{}", vec.iter().map(|value| format!("{value}")).join(",\n"))?;
             }
             SuiMoveValue::Variant(value) => write!(writer, "{}", value)?,
         }
@@ -405,9 +392,7 @@ impl From<MoveValue> for SuiMoveValue {
             MoveValue::U128(value) => SuiMoveValue::String(format!("{value}")),
             MoveValue::U256(value) => SuiMoveValue::String(format!("{value}")),
             MoveValue::Bool(value) => SuiMoveValue::Bool(value),
-            MoveValue::Vector(values) => {
-                SuiMoveValue::Vector(values.into_iter().map(|value| value.into()).collect())
-            }
+            MoveValue::Vector(values) => SuiMoveValue::Vector(values.into_iter().map(|value| value.into()).collect()),
             MoveValue::Struct(value) => {
                 // Best effort Sui core type conversion
                 let MoveStruct { type_, fields } = &value;
@@ -419,19 +404,16 @@ impl From<MoveValue> for SuiMoveValue {
             MoveValue::Signer(value) | MoveValue::Address(value) => {
                 SuiMoveValue::Address(SuiAddress::from(ObjectID::from(value)))
             }
-            MoveValue::Variant(MoveVariant {
-                type_,
-                variant_name,
-                tag: _,
-                fields,
-            }) => SuiMoveValue::Variant(SuiMoveVariant {
-                type_: type_.clone(),
-                variant: variant_name.to_string(),
-                fields: fields
-                    .into_iter()
-                    .map(|(id, value)| (id.into_string(), value.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            }),
+            MoveValue::Variant(MoveVariant { type_, variant_name, tag: _, fields }) => {
+                SuiMoveValue::Variant(SuiMoveVariant {
+                    type_: type_.clone(),
+                    variant: variant_name.to_string(),
+                    fields: fields
+                        .into_iter()
+                        .map(|(id, value)| (id.into_string(), value.into()))
+                        .collect::<BTreeMap<_, _>>(),
+                })
+            }
         }
     }
 }
@@ -440,13 +422,7 @@ fn to_bytearray(value: &[MoveValue]) -> Option<Vec<u8>> {
     if value.iter().all(|value| matches!(value, MoveValue::U8(_))) {
         let bytearray = value
             .iter()
-            .flat_map(|value| {
-                if let MoveValue::U8(u8) = value {
-                    Some(*u8)
-                } else {
-                    None
-                }
-            })
+            .flat_map(|value| if let MoveValue::U8(u8) = value { Some(*u8) } else { None })
             .collect::<Vec<_>>();
         Some(bytearray)
     } else {
@@ -469,11 +445,8 @@ pub struct SuiMoveVariant {
 impl SuiMoveVariant {
     pub fn to_json_value(self) -> Value {
         // We only care about values here, assuming type information is known at the client side.
-        let fields = self
-            .fields
-            .into_iter()
-            .map(|(key, value)| (key, value.to_json_value()))
-            .collect::<BTreeMap<_, _>>();
+        let fields =
+            self.fields.into_iter().map(|(key, value)| (key, value.to_json_value())).collect::<BTreeMap<_, _>>();
         json!({
             "variant": self.variant,
             "fields": fields,
@@ -484,21 +457,13 @@ impl SuiMoveVariant {
 impl Display for SuiMoveVariant {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut writer = String::new();
-        let SuiMoveVariant {
-            type_,
-            variant,
-            fields,
-        } = self;
+        let SuiMoveVariant { type_, variant, fields } = self;
         writeln!(writer)?;
         writeln!(writer, "  {}: {type_}", "type".bold().bright_black())?;
         writeln!(writer, "  {}: {variant}", "variant".bold().bright_black())?;
         for (name, value) in fields {
             let value = format!("{}", value);
-            let value = if value.starts_with('\n') {
-                indent(&value, 2)
-            } else {
-                value
-            };
+            let value = if value.starts_with('\n') { indent(&value, 2) } else { value };
             writeln!(writer, "  {}: {value}", name.bold().bright_black())?;
         }
 
@@ -527,18 +492,13 @@ impl SuiMoveStruct {
         // Unwrap MoveStructs
         match self {
             SuiMoveStruct::Runtime(values) => {
-                let values = values
-                    .into_iter()
-                    .map(|value| value.to_json_value())
-                    .collect::<Vec<_>>();
+                let values = values.into_iter().map(|value| value.to_json_value()).collect::<Vec<_>>();
                 json!(values)
             }
             // We only care about values here, assuming struct type information is known at the client side.
             SuiMoveStruct::WithTypes { type_: _, fields } | SuiMoveStruct::WithFields(fields) => {
-                let fields = fields
-                    .into_iter()
-                    .map(|(key, value)| (key, value.to_json_value()))
-                    .collect::<BTreeMap<_, _>>();
+                let fields =
+                    fields.into_iter().map(|(key, value)| (key, value.to_json_value())).collect::<BTreeMap<_, _>>();
                 json!(fields)
             }
         }
@@ -568,11 +528,7 @@ impl Display for SuiMoveStruct {
                 writeln!(writer, "  {}: {type_}", "type".bold().bright_black())?;
                 for (name, value) in fields {
                     let value = format!("{}", value);
-                    let value = if value.starts_with('\n') {
-                        indent(&value, 2)
-                    } else {
-                        value
-                    };
+                    let value = if value.starts_with('\n') { indent(&value, 2) } else { value };
                     writeln!(writer, "  {}: {value}", name.bold().bright_black())?;
                 }
             }
@@ -582,29 +538,16 @@ impl Display for SuiMoveStruct {
 }
 
 fn indent<T: Display>(d: &T, indent: usize) -> String {
-    d.to_string()
-        .lines()
-        .map(|line| format!("{:indent$}{}", "", line))
-        .join("\n")
+    d.to_string().lines().map(|line| format!("{:indent$}{}", "", line)).join("\n")
 }
 
 fn try_convert_type(type_: &StructTag, fields: &[(Identifier, MoveValue)]) -> Option<SuiMoveValue> {
-    let struct_name = format!(
-        "0x{}::{}::{}",
-        type_.address.short_str_lossless(),
-        type_.module,
-        type_.name
-    );
-    let mut values = fields
-        .iter()
-        .map(|(id, value)| (id.to_string(), value))
-        .collect::<BTreeMap<_, _>>();
+    let struct_name = format!("0x{}::{}::{}", type_.address.short_str_lossless(), type_.module, type_.name);
+    let mut values = fields.iter().map(|(id, value)| (id.to_string(), value)).collect::<BTreeMap<_, _>>();
     match struct_name.as_str() {
         "0x1::string::String" | "0x1::ascii::String" => {
             if let Some(MoveValue::Vector(bytes)) = values.remove("bytes") {
-                return to_bytearray(bytes)
-                    .and_then(|bytes| String::from_utf8(bytes).ok())
-                    .map(SuiMoveValue::String);
+                return to_bytearray(bytes).and_then(|bytes| String::from_utf8(bytes).ok()).map(SuiMoveValue::String);
             }
         }
         "0x2::url::Url" => {
@@ -616,9 +559,7 @@ fn try_convert_type(type_: &StructTag, fields: &[(Identifier, MoveValue)]) -> Op
         "0x2::object::UID" => {
             let id = values.remove("id").cloned().map(SuiMoveValue::from);
             if let Some(SuiMoveValue::Address(address)) = id {
-                return Some(SuiMoveValue::UID {
-                    id: ObjectID::from(address),
-                });
+                return Some(SuiMoveValue::UID { id: ObjectID::from(address) });
             }
         }
         "0x2::balance::Balance" => {
@@ -645,11 +586,7 @@ impl From<MoveStruct> for SuiMoveStruct {
     fn from(move_struct: MoveStruct) -> Self {
         SuiMoveStruct::WithTypes {
             type_: move_struct.type_,
-            fields: move_struct
-                .fields
-                .into_iter()
-                .map(|(id, value)| (id.into_string(), value.into()))
-                .collect(),
+            fields: move_struct.fields.into_iter().map(|(id, value)| (id.into_string(), value.into())).collect(),
         }
     }
 }

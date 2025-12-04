@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ApiEndpoint, RouteHandler};
-use crate::{Result, RpcService};
 use axum::{
     extract::{Path, State},
     Json,
 };
 use sui_sdk_types::{EpochId, ValidatorCommittee};
+
+use super::{ApiEndpoint, RouteHandler};
+use crate::{Result, RpcService};
 
 pub struct GetLatestCommittee;
 
@@ -45,9 +46,6 @@ impl ApiEndpoint<RpcService> for GetCommittee {
     }
 }
 
-async fn get_committee(
-    Path(epoch): Path<EpochId>,
-    State(state): State<RpcService>,
-) -> Result<Json<ValidatorCommittee>> {
+async fn get_committee(Path(epoch): Path<EpochId>, State(state): State<RpcService>) -> Result<Json<ValidatorCommittee>> {
     state.get_committee(Some(epoch)).map(Json)
 }

@@ -34,11 +34,7 @@ pub(crate) struct StakeAggregator<T> {
 
 impl<T: CommitteeThreshold> StakeAggregator<T> {
     pub(crate) fn new() -> Self {
-        Self {
-            votes: Default::default(),
-            stake: 0,
-            _phantom: Default::default(),
-        }
+        Self { votes: Default::default(), stake: 0, _phantom: Default::default() }
     }
 
     /// Adds a vote for the specified authority index to the aggregator. It is guaranteed to count

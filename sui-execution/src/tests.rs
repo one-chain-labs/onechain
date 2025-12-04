@@ -48,8 +48,7 @@ fn test_encapsulation() {
 
         for exec_crate in &exec_crates {
             let paths = all_simple_paths::<Vec<&str>, &PackageGraph>(
-                &graph, root, exec_crate, /* min_intermediate_nodes */ 0,
-                /* max_intermediate_nodes */ None,
+                &graph, root, exec_crate, /* min_intermediate_nodes */ 0, /* max_intermediate_nodes */ None,
             );
 
             examples.extend(paths.map(|p| p.join(" -> ")));
@@ -88,12 +87,7 @@ impl Packages {
     /// Create a mapping from package names to package `metadata` (from the output of `cargo
     /// metadata`).
     fn new(metadata: &Metadata) -> Self {
-        Self(HashMap::from_iter(
-            metadata
-                .packages
-                .iter()
-                .map(|pkg| (pkg.name.clone(), pkg.clone())),
-        ))
+        Self(HashMap::from_iter(metadata.packages.iter().map(|pkg| (pkg.name.clone(), pkg.clone()))))
     }
 
     /// Extract the transitive dependency sub-graph of the package named `root`.  The graph is a
@@ -118,18 +112,13 @@ impl Packages {
     /// as pairs of Node IDs).  A normal dependency is a non-target specific, non-build, non-dev
     /// dependency.
     fn normal_edges<'p, 'q>(&'q self, pkg: &'p str) -> impl Iterator<Item = (&'p str, &'q str)> {
-        self.0
-            .get(pkg)
-            .map(|p| &p.dependencies)
-            .into_iter()
-            .flatten()
-            .filter_map(move |dep| {
-                if let (DependencyKind::Normal, None) = (dep.kind, &dep.target) {
-                    Some((pkg, dep.name.as_str()))
-                } else {
-                    None
-                }
-            })
+        self.0.get(pkg).map(|p| &p.dependencies).into_iter().flatten().filter_map(move |dep| {
+            if let (DependencyKind::Normal, None) = (dep.kind, &dep.target) {
+                Some((pkg, dep.name.as_str()))
+            } else {
+                None
+            }
+        })
     }
 
     /// Returns an iterator over all of `pkg`'s "normal" dependencies. (See [normal_edges] for a

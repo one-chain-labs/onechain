@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diesel::{ExpressionMethods, QueryDsl};
-
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use sui_indexer_alt_schema::schema::kv_epoch_starts;
 use sui_pg_db::Db;
@@ -25,13 +24,7 @@ impl GovernanceServer for GovernanceImpl {
         use kv_epoch_starts::dsl as e;
 
         let mut conn = Connection::get(&self.0).await?;
-        let rgp: i64 = conn
-            .first(
-                e::kv_epoch_starts
-                    .select(e::reference_gas_price)
-                    .order(e::epoch.desc()),
-            )
-            .await?;
+        let rgp: i64 = conn.first(e::kv_epoch_starts.select(e::reference_gas_price).order(e::epoch.desc())).await?;
 
         Ok((rgp as u64).into())
     }

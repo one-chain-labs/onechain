@@ -1,22 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::WatchdogMetrics;
-use crate::pagerduty::{Body, CreateIncident, Incident, Pagerduty, Service};
-use crate::query_runner::{QueryRunner, SnowflakeQueryRunner};
-use crate::SecurityWatchdogConfig;
+use std::{any::Any, collections::BTreeMap, fs::File, io::Read, sync::Arc};
+
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use prometheus::{IntGauge, Registry};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::Read;
-use std::sync::Arc;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, info};
 use uuid::Uuid;
+
+use crate::{
+    metrics::WatchdogMetrics,
+    pagerduty::{Body, CreateIncident, Incident, Pagerduty, Service},
+    query_runner::{QueryRunner, SnowflakeQueryRunner},
+    SecurityWatchdogConfig,
+};
 
 const MIST_PER_OCT: i128 = 1_000_000_000;
 
@@ -138,16 +138,9 @@ impl SchedulerService {
             let metrics = metrics.clone();
             Box::pin(async move {
                 info!("Running wallet monitoring job: {}", entry.name);
-                if let Err(err) =
-                    Self::run_wallet_monitoring_job(&pd, &pd_service_id, &query_runner, &entry)
-                        .await
-                {
+                if let Err(err) = Self::run_wallet_monitoring_job(&pd, &pd_service_id, &query_runner, &entry).await {
                     error!("Failed to run wallet monitoring job with err: {}", err);
-                    metrics
-                        .get("wallet_monitoring_error")
-                        .await
-                        .iter()
-                        .for_each(|metric| metric.inc());
+                    metrics.get("wallet_monitoring_error").await.iter().for_each(|metric| metric.inc());
                 }
             })
         })?;
@@ -171,24 +164,13 @@ impl SchedulerService {
                 .downcast_ref::<String>()
                 .ok_or(anyhow!("Failed to downcast wallet_id"))?
                 .clone();
-            let current_balance = Self::extract_i128(
-                row.get("CURRENT_BALANCE")
-                    .ok_or_else(|| anyhow!("Missing current_balance"))?,
-            )
-            .ok_or(anyhow!("Failed to downcast current_balance"))?;
-            let lower_bound = Self::extract_i128(
-                row.get("LOWER_BOUND")
-                    .ok_or_else(|| anyhow!("Missing lower_bound"))?,
-            )
-            .ok_or(anyhow!("Failed to downcast lower_bound"))?;
-            Self::create_wallet_monitoring_incident(
-                pagerduty,
-                &wallet_id,
-                current_balance,
-                lower_bound,
-                service_id,
-            )
-            .await?;
+            let current_balance =
+                Self::extract_i128(row.get("CURRENT_BALANCE").ok_or_else(|| anyhow!("Missing current_balance"))?)
+                    .ok_or(anyhow!("Failed to downcast current_balance"))?;
+            let lower_bound = Self::extract_i128(row.get("LOWER_BOUND").ok_or_else(|| anyhow!("Missing lower_bound"))?)
+                .ok_or(anyhow!("Failed to downcast lower_bound"))?;
+            Self::create_wallet_monitoring_incident(pagerduty, &wallet_id, current_balance, lower_bound, service_id)
+                .await?;
         }
         Ok(())
     }
@@ -200,10 +182,7 @@ impl SchedulerService {
         lower_bound: i128,
         service_id: &str,
     ) -> anyhow::Result<()> {
-        let service = Service {
-            id: service_id.to_string(),
-            ..Default::default()
-        };
+        let service = Service { id: service_id.to_string(), ..Default::default() };
         let incident_body = Body {
             details: format!(
                 "Current balance: {} SUI, Lower bound: {} SUI",
@@ -220,9 +199,7 @@ impl SchedulerService {
             ..Default::default()
         };
         let create_incident = CreateIncident { incident };
-        pagerduty
-            .create_incident("sadhan@mystenlabs.com", create_incident)
-            .await?;
+        pagerduty.create_incident("sadhan@mystenlabs.com", create_incident).await?;
         Ok(())
     }
 
@@ -240,15 +217,9 @@ impl SchedulerService {
             let metrics = metrics.clone();
             Box::pin(async move {
                 info!("Running metric publish job: {}", &entry.name);
-                if let Err(err) =
-                    Self::run_metric_publish_job(&query_runner, &metrics, &entry).await
-                {
+                if let Err(err) = Self::run_metric_publish_job(&query_runner, &metrics, &entry).await {
                     error!("Failed to run metric publish job with err: {}", err);
-                    metrics
-                        .get("metric_publishing_error")
-                        .await
-                        .iter()
-                        .for_each(|metric| metric.inc());
+                    metrics.get("metric_publishing_error").await.iter().for_each(|metric| metric.inc());
                 }
             })
         })?;
@@ -286,7 +257,7 @@ impl SchedulerService {
     }
 
     fn get_current_limit(limits: &BTreeMap<DateTime<Utc>, f64>) -> Option<f64> {
-        limits.range(..Utc::now()).next_back().map(|(_, val)| *val)
+        limits.range(.. Utc::now()).next_back().map(|(_, val)| *val)
     }
 
     fn extract_i128(value: &Box<dyn Any + Send>) -> Option<i128> {

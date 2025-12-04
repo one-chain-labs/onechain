@@ -36,6 +36,7 @@ fn test_macro_shows_feature_enabled() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_profiler() {
     use std::fs;
+
     use sui_replay::ReplayToolCommand;
     use tempfile::tempdir;
 
@@ -53,20 +54,14 @@ async fn test_profiler() {
         config_objects: None,
     };
 
-    let command_result =
-        sui_replay::execute_replay_command(Some(testnet_url), false, false, None, None, cmd).await;
+    let command_result = sui_replay::execute_replay_command(Some(testnet_url), false, false, None, None, cmd).await;
 
     assert!(command_result.is_ok());
 
     // check that the profile was written
     let mut found = false;
     for entry in fs::read_dir(output_dir.into_path()).unwrap().flatten() {
-        if entry
-            .file_name()
-            .into_string()
-            .unwrap()
-            .starts_with("profile")
-        {
+        if entry.file_name().into_string().unwrap().starts_with("profile") {
             found = true;
         }
     }

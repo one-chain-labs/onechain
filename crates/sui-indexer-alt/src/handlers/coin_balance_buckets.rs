@@ -28,28 +28,21 @@ pub(crate) struct ProcessedCoinBalanceBucket {
 }
 
 pub(crate) enum CoinBalanceBucketChangeKind {
-    Insert {
-        owner_kind: StoredCoinOwnerKind,
-        owner_id: SuiAddress,
-        coin_type: TypeTag,
-        balance_bucket: i16,
-    },
+    Insert { owner_kind: StoredCoinOwnerKind, owner_id: SuiAddress, coin_type: TypeTag, balance_bucket: i16 },
     Delete,
 }
 
 impl Processor for CoinBalanceBuckets {
-    const NAME: &'static str = "coin_balance_buckets";
     type Value = ProcessedCoinBalanceBucket;
+
+    const NAME: &'static str = "coin_balance_buckets";
 
     // TODO: We need to add tests for this function.
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
         let cp_sequence_number = checkpoint.checkpoint_summary.sequence_number;
         let checkpoint_input_objects = checkpoint.checkpoint_input_objects();
-        let latest_live_output_objects: BTreeMap<_, _> = checkpoint
-            .latest_live_output_objects()
-            .into_iter()
-            .map(|o| (o.id(), o))
-            .collect();
+        let latest_live_output_objects: BTreeMap<_, _> =
+            checkpoint.latest_live_output_objects().into_iter().map(|o| (o.id(), o)).collect();
         let mut values: BTreeMap<ObjectID, Self::Value> = BTreeMap::new();
         for (object_id, input_object) in checkpoint_input_objects.iter() {
             // This loop processes all coins that were owned by a single address prior to the checkpoint,
@@ -63,14 +56,11 @@ impl Processor for CoinBalanceBuckets {
             if latest_live_output_objects.contains_key(object_id) {
                 continue;
             }
-            values.insert(
-                *object_id,
-                ProcessedCoinBalanceBucket {
-                    object_id: *object_id,
-                    cp_sequence_number,
-                    change: CoinBalanceBucketChangeKind::Delete,
-                },
-            );
+            values.insert(*object_id, ProcessedCoinBalanceBucket {
+                object_id: *object_id,
+                cp_sequence_number,
+                change: CoinBalanceBucketChangeKind::Delete,
+            });
         }
         for (object_id, output_object) in latest_live_output_objects.iter() {
             let Some(coin_type) = output_object.coin_type_maybe() else {
@@ -94,35 +84,26 @@ impl Processor for CoinBalanceBuckets {
                     // In this case, the coin was owned by a single address prior to the checkpoint,
                     // but is now either shared or immutable after the checkpoint. We treat this the same
                     // as if the coin was deleted, from the perspective of the balance bucket.
-                    values.insert(
-                        *object_id,
-                        ProcessedCoinBalanceBucket {
-                            object_id: *object_id,
-                            cp_sequence_number,
-                            change: CoinBalanceBucketChangeKind::Delete,
-                        },
-                    );
+                    values.insert(*object_id, ProcessedCoinBalanceBucket {
+                        object_id: *object_id,
+                        cp_sequence_number,
+                        change: CoinBalanceBucketChangeKind::Delete,
+                    });
                 }
-                (_, Some(new_owner))
-                    if input_owner != output_owner
-                        || input_bucket != Some(output_balance_bucket) =>
-                {
+                (_, Some(new_owner)) if input_owner != output_owner || input_bucket != Some(output_balance_bucket) => {
                     // In this case, the coin is still owned by a single address after the checkpoint,
                     // but either the owner or the balance bucket has changed. This also includes the case
                     // where the coin did not exist prior to the checkpoint, and is now created/unwrapped.
-                    values.insert(
-                        *object_id,
-                        ProcessedCoinBalanceBucket {
-                            object_id: *object_id,
-                            cp_sequence_number,
-                            change: CoinBalanceBucketChangeKind::Insert {
-                                owner_kind: new_owner.0,
-                                owner_id: new_owner.1,
-                                coin_type,
-                                balance_bucket: output_balance_bucket,
-                            },
+                    values.insert(*object_id, ProcessedCoinBalanceBucket {
+                        object_id: *object_id,
+                        cp_sequence_number,
+                        change: CoinBalanceBucketChangeKind::Insert {
+                            owner_kind: new_owner.0,
+                            owner_id: new_owner.1,
+                            coin_type,
+                            balance_bucket: output_balance_bucket,
                         },
-                    );
+                    });
                 }
                 _ => {}
             }
@@ -135,10 +116,7 @@ impl Processor for CoinBalanceBuckets {
 #[async_trait::async_trait]
 impl Handler for CoinBalanceBuckets {
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        let values = values
-            .iter()
-            .map(|v| v.try_into())
-            .collect::<Result<Vec<StoredCoinBalanceBucket>>>()?;
+        let values = values.iter().map(|v| v.try_into()).collect::<Result<Vec<StoredCoinBalanceBucket>>>()?;
         Ok(diesel::insert_into(coin_balance_buckets::table)
             .values(values)
             .on_conflict_do_nothing()
@@ -156,14 +134,9 @@ impl TryInto<StoredCoinBalanceBucket> for &ProcessedCoinBalanceBucket {
 
     fn try_into(self) -> Result<StoredCoinBalanceBucket> {
         match &self.change {
-            CoinBalanceBucketChangeKind::Insert {
-                owner_kind,
-                owner_id,
-                coin_type,
-                balance_bucket,
-            } => {
-                let serialized_coin_type = bcs::to_bytes(&coin_type)
-                    .map_err(|_| anyhow!("Failed to serialize type for {}", self.object_id))?;
+            CoinBalanceBucketChangeKind::Insert { owner_kind, owner_id, coin_type, balance_bucket } => {
+                let serialized_coin_type =
+                    bcs::to_bytes(&coin_type).map_err(|_| anyhow!("Failed to serialize type for {}", self.object_id))?;
                 Ok(StoredCoinBalanceBucket {
                     object_id: self.object_id.to_vec(),
                     cp_sequence_number: self.cp_sequence_number as i64,
@@ -190,10 +163,9 @@ impl TryInto<StoredCoinBalanceBucket> for &ProcessedCoinBalanceBucket {
 pub(crate) fn get_coin_owner(object: &Object) -> Option<(StoredCoinOwnerKind, SuiAddress)> {
     match object.owner() {
         Owner::AddressOwner(owner_id) => Some((StoredCoinOwnerKind::Fastpath, *owner_id)),
-        Owner::ConsensusV2 { authenticator, .. } => Some((
-            StoredCoinOwnerKind::Consensus,
-            *authenticator.as_single_owner(),
-        )),
+        Owner::ConsensusV2 { authenticator, .. } => {
+            Some((StoredCoinOwnerKind::Consensus, *authenticator.as_single_owner()))
+        }
         Owner::Immutable | Owner::ObjectOwner(_) | Owner::Shared { .. } => None,
     }
 }

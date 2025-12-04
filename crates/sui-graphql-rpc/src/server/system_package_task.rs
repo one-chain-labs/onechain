@@ -17,16 +17,8 @@ pub(crate) struct SystemPackageTask {
 }
 
 impl SystemPackageTask {
-    pub(crate) fn new(
-        resolver: PackageResolver,
-        epoch_rx: watch::Receiver<u64>,
-        cancel: CancellationToken,
-    ) -> Self {
-        Self {
-            resolver,
-            epoch_rx,
-            cancel,
-        }
+    pub(crate) fn new(resolver: PackageResolver, epoch_rx: watch::Receiver<u64>, cancel: CancellationToken) -> Self {
+        Self { resolver, epoch_rx, cancel }
     }
 
     pub(crate) async fn run(&mut self) {

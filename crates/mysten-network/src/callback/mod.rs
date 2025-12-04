@@ -8,9 +8,7 @@ mod future;
 mod layer;
 mod service;
 
-pub use self::{
-    body::ResponseBody, future::ResponseFuture, layer::CallbackLayer, service::Callback,
-};
+pub use self::{body::ResponseBody, future::ResponseFuture, layer::CallbackLayer, service::Callback};
 
 pub trait MakeCallbackHandler {
     type Handler: ResponseHandler;

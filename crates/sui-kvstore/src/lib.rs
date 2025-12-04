@@ -3,36 +3,25 @@
 mod bigtable;
 use anyhow::Result;
 use async_trait::async_trait;
-pub use bigtable::client::BigTableClient;
-pub use bigtable::progress_store::BigTableProgressStore;
-pub use bigtable::worker::KvWorker;
-use sui_types::base_types::ObjectID;
-use sui_types::crypto::AuthorityStrongQuorumSignInfo;
-use sui_types::digests::{CheckpointDigest, TransactionDigest};
-use sui_types::effects::{TransactionEffects, TransactionEvents};
-use sui_types::full_checkpoint_content::CheckpointData;
-use sui_types::messages_checkpoint::{
-    CheckpointContents, CheckpointSequenceNumber, CheckpointSummary,
+pub use bigtable::{client::BigTableClient, progress_store::BigTableProgressStore, worker::KvWorker};
+use sui_types::{
+    base_types::ObjectID,
+    crypto::AuthorityStrongQuorumSignInfo,
+    digests::{CheckpointDigest, TransactionDigest},
+    effects::{TransactionEffects, TransactionEvents},
+    full_checkpoint_content::CheckpointData,
+    messages_checkpoint::{CheckpointContents, CheckpointSequenceNumber, CheckpointSummary},
+    object::Object,
+    storage::ObjectKey,
+    transaction::Transaction,
 };
-use sui_types::object::Object;
-use sui_types::storage::ObjectKey;
-use sui_types::transaction::Transaction;
 
 #[async_trait]
 pub trait KeyValueStoreReader {
     async fn get_objects(&mut self, objects: &[ObjectKey]) -> Result<Vec<Object>>;
-    async fn get_transactions(
-        &mut self,
-        transactions: &[TransactionDigest],
-    ) -> Result<Vec<TransactionData>>;
-    async fn get_checkpoints(
-        &mut self,
-        sequence_numbers: &[CheckpointSequenceNumber],
-    ) -> Result<Vec<Checkpoint>>;
-    async fn get_checkpoint_by_digest(
-        &mut self,
-        digest: CheckpointDigest,
-    ) -> Result<Option<Checkpoint>>;
+    async fn get_transactions(&mut self, transactions: &[TransactionDigest]) -> Result<Vec<TransactionData>>;
+    async fn get_checkpoints(&mut self, sequence_numbers: &[CheckpointSequenceNumber]) -> Result<Vec<Checkpoint>>;
+    async fn get_checkpoint_by_digest(&mut self, digest: CheckpointDigest) -> Result<Option<Checkpoint>>;
     async fn get_latest_checkpoint(&mut self) -> Result<CheckpointSequenceNumber>;
     async fn get_latest_object(&mut self, object_id: &ObjectID) -> Result<Option<Object>>;
 }

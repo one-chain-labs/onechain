@@ -25,8 +25,12 @@ impl Error {
 
     pub fn is_client_error(&self) -> bool {
         use jsonrpsee::types::error::{
-            BATCHES_NOT_SUPPORTED_CODE, INVALID_PARAMS_CODE, INVALID_REQUEST_CODE,
-            METHOD_NOT_FOUND_CODE, OVERSIZED_REQUEST_CODE, PARSE_ERROR_CODE,
+            BATCHES_NOT_SUPPORTED_CODE,
+            INVALID_PARAMS_CODE,
+            INVALID_REQUEST_CODE,
+            METHOD_NOT_FOUND_CODE,
+            OVERSIZED_REQUEST_CODE,
+            PARSE_ERROR_CODE,
         };
         matches!(
             self.code,
@@ -54,10 +58,6 @@ impl From<jsonrpsee::core::Error> for Error {
         // The following code relies on jsonrpsee's From<Error> for ErrorObjectOwned implementation
         // It converts any variant that is not Error::Call into an ErrorObject with UNKNOWN_ERROR_CODE
         let error_object_owned: ErrorObjectOwned = err.into();
-        Error {
-            code: error_object_owned.code(),
-            message: error_object_owned.message().to_string(),
-            data: None,
-        }
+        Error { code: error_object_owned.code(), message: error_object_owned.message().to_string(), data: None }
     }
 }

@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_macros::sim_test;
-use sui_rpc_api::client::sdk::Client;
-use sui_rpc_api::client::Client as CoreClient;
-use sui_rpc_api::proto::node::node_service_client::NodeServiceClient;
-use sui_rpc_api::proto::node::GetObjectOptions;
-use sui_rpc_api::proto::node::GetObjectRequest;
-use sui_rpc_api::proto::node::GetObjectResponse;
+use sui_rpc_api::{
+    client::{sdk::Client, Client as CoreClient},
+    proto::node::{node_service_client::NodeServiceClient, GetObjectOptions, GetObjectRequest, GetObjectResponse},
+};
 use sui_sdk_types::ObjectId;
 use test_cluster::TestClusterBuilder;
 
@@ -19,30 +17,16 @@ async fn get_object() {
 
     let client = Client::new(test_cluster.rpc_url()).unwrap();
     let core_client = CoreClient::new(test_cluster.rpc_url()).unwrap();
-    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned())
-        .await
-        .unwrap();
+    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned()).await.unwrap();
 
     let _object = client.get_object(id).await.unwrap();
     let _object = core_client.get_object(id.into()).await.unwrap();
 
     let _object = client.get_object_with_version(id, 1).await.unwrap();
-    let _object = core_client
-        .get_object_with_version(id.into(), 1.into())
-        .await
-        .unwrap();
+    let _object = core_client.get_object_with_version(id.into(), 1.into()).await.unwrap();
 
-    let GetObjectResponse {
-        object_id,
-        version,
-        digest,
-        object,
-        object_bcs,
-    } = grpc_client
-        .get_object(GetObjectRequest::new(id))
-        .await
-        .unwrap()
-        .into_inner();
+    let GetObjectResponse { object_id, version, digest, object, object_bcs } =
+        grpc_client.get_object(GetObjectRequest::new(id)).await.unwrap().into_inner();
 
     assert_eq!(object_id, Some(id.into()));
     assert!(version.is_some());
@@ -50,18 +34,8 @@ async fn get_object() {
     assert!(object.is_none());
     assert!(object_bcs.is_none()); // By default object_bcs isn't returned
 
-    let GetObjectResponse {
-        object_id,
-        version,
-        digest,
-        object,
-        object_bcs,
-    } = grpc_client
-        .get_object(
-            GetObjectRequest::new(id)
-                .with_version(1)
-                .with_options(GetObjectOptions::none()),
-        )
+    let GetObjectResponse { object_id, version, digest, object, object_bcs } = grpc_client
+        .get_object(GetObjectRequest::new(id).with_version(1).with_options(GetObjectOptions::none()))
         .await
         .unwrap()
         .into_inner();
@@ -80,13 +54,7 @@ async fn get_object() {
         .unwrap()
         .into_inner();
 
-    let GetObjectResponse {
-        object_id,
-        version,
-        digest,
-        object,
-        object_bcs,
-    } = &response;
+    let GetObjectResponse { object_id, version, digest, object, object_bcs } = &response;
 
     assert!(object_id.is_some());
     assert!(version.is_some());

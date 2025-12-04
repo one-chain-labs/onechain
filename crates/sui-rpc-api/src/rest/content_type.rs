@@ -16,10 +16,7 @@ impl ContentType {
 }
 
 fn parse_content_type(headers: &HeaderMap) -> Result<Option<Mime>, mime::FromStrError> {
-    let Some(header) = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|hval| hval.to_str().ok())
-    else {
+    let Some(header) = headers.get(header::CONTENT_TYPE).and_then(|hval| hval.to_str().ok()) else {
         return Ok(None);
     };
 
@@ -34,10 +31,7 @@ where
 {
     type Rejection = (StatusCode, &'static str);
 
-    async fn from_request_parts(
-        parts: &mut http::request::Parts,
-        _: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut http::request::Parts, _: &S) -> Result<Self, Self::Rejection> {
         parse_content_type(&parts.headers)
             .map_err(|_| (StatusCode::BAD_REQUEST, "invalid Content-Type mime"))?
             .ok_or((StatusCode::BAD_REQUEST, "Content-Type header missing"))?

@@ -4,18 +4,17 @@
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
-use jsonrpsee::core::RpcResult;
-use jsonrpsee::RpcModule;
+use jsonrpsee::{core::RpcResult, RpcModule};
 use move_binary_format::normalized::Module as NormalizedModule;
-
-use sui_json_rpc::error::SuiRpcInputError;
-use sui_json_rpc::SuiRpcModule;
+use sui_json_rpc::{error::SuiRpcInputError, SuiRpcModule};
 use sui_json_rpc_api::MoveUtilsServer;
-use sui_json_rpc_types::ObjectValueKind;
-use sui_json_rpc_types::SuiMoveNormalizedType;
 use sui_json_rpc_types::{
-    MoveFunctionArgType, SuiMoveNormalizedFunction, SuiMoveNormalizedModule,
+    MoveFunctionArgType,
+    ObjectValueKind,
+    SuiMoveNormalizedFunction,
+    SuiMoveNormalizedModule,
     SuiMoveNormalizedStruct,
+    SuiMoveNormalizedType,
 };
 use sui_open_rpc::Module;
 use sui_types::base_types::ObjectID;
@@ -52,11 +51,9 @@ impl MoveUtilsServer for MoveUtilsApi {
         module_name: String,
     ) -> RpcResult<SuiMoveNormalizedModule> {
         let mut modules = self.get_normalized_move_modules_by_package(package).await?;
-        let module = modules.remove(&module_name).ok_or_else(|| {
-            SuiRpcInputError::GenericNotFound(format!(
-                "No module was found with name {module_name}",
-            ))
-        })?;
+        let module = modules
+            .remove(&module_name)
+            .ok_or_else(|| SuiRpcInputError::GenericNotFound(format!("No module was found with name {module_name}",)))?;
         Ok(module)
     }
 
@@ -66,16 +63,12 @@ impl MoveUtilsServer for MoveUtilsApi {
         module_name: String,
         struct_name: String,
     ) -> RpcResult<SuiMoveNormalizedStruct> {
-        let mut module = self
-            .get_normalized_move_module(package, module_name)
-            .await?;
+        let mut module = self.get_normalized_move_module(package, module_name).await?;
         module
             .structs
             .remove(&struct_name)
             .ok_or_else(|| {
-                SuiRpcInputError::GenericNotFound(format!(
-                    "No struct was found with struct name {struct_name}"
-                ))
+                SuiRpcInputError::GenericNotFound(format!("No struct was found with struct name {struct_name}"))
             })
             .map_err(Into::into)
     }
@@ -86,16 +79,12 @@ impl MoveUtilsServer for MoveUtilsApi {
         module_name: String,
         function_name: String,
     ) -> RpcResult<SuiMoveNormalizedFunction> {
-        let mut module = self
-            .get_normalized_move_module(package, module_name)
-            .await?;
+        let mut module = self.get_normalized_move_module(package, module_name).await?;
         module
             .exposed_functions
             .remove(&function_name)
             .ok_or_else(|| {
-                SuiRpcInputError::GenericNotFound(format!(
-                    "No function was found with function name {function_name}",
-                ))
+                SuiRpcInputError::GenericNotFound(format!("No function was found with function name {function_name}",))
             })
             .map_err(Into::into)
     }
@@ -106,19 +95,13 @@ impl MoveUtilsServer for MoveUtilsApi {
         module: String,
         function: String,
     ) -> RpcResult<Vec<MoveFunctionArgType>> {
-        let function = self
-            .get_normalized_move_function(package, module, function)
-            .await?;
+        let function = self.get_normalized_move_function(package, module, function).await?;
         let args = function
             .parameters
             .iter()
             .map(|p| match p {
-                SuiMoveNormalizedType::Struct { .. } => {
-                    MoveFunctionArgType::Object(ObjectValueKind::ByValue)
-                }
-                SuiMoveNormalizedType::Vector(_) => {
-                    MoveFunctionArgType::Object(ObjectValueKind::ByValue)
-                }
+                SuiMoveNormalizedType::Struct { .. } => MoveFunctionArgType::Object(ObjectValueKind::ByValue),
+                SuiMoveNormalizedType::Vector(_) => MoveFunctionArgType::Object(ObjectValueKind::ByValue),
                 SuiMoveNormalizedType::Reference(_) => {
                     MoveFunctionArgType::Object(ObjectValueKind::ByImmutableReference)
                 }

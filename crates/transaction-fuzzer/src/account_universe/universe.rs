@@ -4,20 +4,21 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_universe::{
-        account::{AccountCurrent, AccountData},
-        default_num_accounts, default_num_transactions,
-        helpers::{pick_slice_idxs, Index},
-    },
-    executor::Executor,
-};
-
 use proptest::{
     collection::{vec, SizeRange},
     prelude::*,
 };
 use proptest_derive::Arbitrary;
+
+use crate::{
+    account_universe::{
+        account::{AccountCurrent, AccountData},
+        default_num_accounts,
+        default_num_transactions,
+        helpers::{pick_slice_idxs, Index},
+    },
+    executor::Executor,
+};
 
 const PICK_SIZE: usize = 3;
 
@@ -73,10 +74,8 @@ impl AccountUniverseGen {
         // XXX should we also test edge cases around large sequence numbers?
         // Note that using a function as a strategy directly means that shrinking will not occur,
         // but that should be fine because there's nothing to really shrink within accounts anyway.
-        vec(AccountData::strategy(balance_strategy), num_accounts).prop_map(|accounts| Self {
-            accounts,
-            pick_style: AccountPickStyle::Unlimited,
-        })
+        vec(AccountData::strategy(balance_strategy), num_accounts)
+            .prop_map(|accounts| Self { accounts, pick_style: AccountPickStyle::Unlimited })
     }
 
     /// Returns a [`Strategy`] that generates a universe of accounts that's guaranteed to succeed,
@@ -86,10 +85,7 @@ impl AccountUniverseGen {
         // issues.
         let min_balance = (100_000 * (default_num_transactions()) * 5) as u64;
         let max_balance = min_balance * 10;
-        Self::strategy(
-            min_accounts..default_num_accounts(),
-            min_balance..max_balance,
-        )
+        Self::strategy(min_accounts .. default_num_accounts(), min_balance .. max_balance)
     }
 
     /// Sets the pick style used by this account universe.
@@ -114,19 +110,11 @@ impl AccountUniverseGen {
 }
 
 impl AccountUniverse {
-    fn new(
-        accounts: Vec<AccountData>,
-        pick_style: AccountPickStyle,
-        ignore_new_accounts: bool,
-    ) -> Self {
+    fn new(accounts: Vec<AccountData>, pick_style: AccountPickStyle, ignore_new_accounts: bool) -> Self {
         let accounts: Vec<_> = accounts.into_iter().map(AccountCurrent::new).collect();
         let picker = AccountPicker::new(pick_style, accounts.len());
 
-        Self {
-            accounts,
-            picker,
-            ignore_new_accounts,
-        }
+        Self { accounts, picker, ignore_new_accounts }
     }
 
     /// Returns the number of accounts currently in this universe.
@@ -166,7 +154,7 @@ impl AccountPicker {
         match pick_style {
             AccountPickStyle::Unlimited => AccountPicker::Unlimited(num_accounts),
             AccountPickStyle::Limited(limit) => {
-                let remaining = (0..num_accounts).map(|idx| (idx, limit)).collect();
+                let remaining = (0 .. num_accounts).map(|idx| (idx, limit)).collect();
                 AccountPicker::Limited(remaining)
             }
         }
@@ -184,26 +172,19 @@ impl AccountPicker {
 
     fn pick_account_indices(&mut self, indexes: &[Index; PICK_SIZE]) -> [usize; PICK_SIZE] {
         match self {
-            AccountPicker::Unlimited(num_accounts) => {
-                Self::pick_account_indices_impl(*num_accounts, indexes)
-            }
-            AccountPicker::Limited(remaining) => {
-                Self::pick_account_indices_impl(remaining.len(), indexes).map(|idx| {
-                    let (account_idx, _) = remaining[idx];
-                    account_idx
-                })
-            }
+            AccountPicker::Unlimited(num_accounts) => Self::pick_account_indices_impl(*num_accounts, indexes),
+            AccountPicker::Limited(remaining) => Self::pick_account_indices_impl(remaining.len(), indexes).map(|idx| {
+                let (account_idx, _) = remaining[idx];
+                account_idx
+            }),
         }
     }
 
     fn pick_account_indices_impl(max: usize, indexes: &[Index; PICK_SIZE]) -> [usize; PICK_SIZE] {
         let idxs = pick_slice_idxs(max, indexes);
         assert_eq!(idxs.len(), PICK_SIZE);
-        let idxs: [usize; PICK_SIZE] = idxs[0..PICK_SIZE].try_into().unwrap();
-        assert!(
-            idxs[0] < idxs[1],
-            "pick_slice_idxs should return sorted order"
-        );
+        let idxs: [usize; PICK_SIZE] = idxs[0 .. PICK_SIZE].try_into().unwrap();
+        assert!(idxs[0] < idxs[1], "pick_slice_idxs should return sorted order");
         idxs
     }
 
@@ -232,11 +213,8 @@ impl AccountPairGen {
         // from a single slice at any given time.
         let (head, tail) = universe.accounts.split_at_mut(low_idx + 1);
         let (mid, tail) = tail.split_at_mut(mid_idx - low_idx);
-        let (low_account, mid_account, high_account) = (
-            head.last_mut().unwrap(),
-            mid.last_mut().unwrap(),
-            tail.last_mut().unwrap(),
-        );
+        let (low_account, mid_account, high_account) =
+            (head.last_mut().unwrap(), mid.last_mut().unwrap(), tail.last_mut().unwrap());
 
         if self.reverse {
             AccountTriple {

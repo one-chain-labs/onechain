@@ -1,56 +1,47 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::authority_store_types::{ObjectContentDigest, StoreData, StoreObject};
-use crate::checkpoints::{CheckpointStore, CheckpointWatermark};
-use crate::rpc_index::RpcIndexStore;
+use std::{
+    cmp::{max, min},
+    collections::{BTreeSet, HashMap},
+    sync::{Arc, Mutex},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
 use anyhow::anyhow;
 use mysten_metrics::{monitored_scope, spawn_monitored_task};
 use once_cell::sync::Lazy;
-use prometheus::{
-    register_int_counter_with_registry, register_int_gauge_with_registry, IntCounter, IntGauge,
-    Registry,
-};
-use std::cmp::{max, min};
-use std::collections::{BTreeSet, HashMap};
-use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{sync::Arc, time::Duration};
+use prometheus::{register_int_counter_with_registry, register_int_gauge_with_registry, IntCounter, IntGauge, Registry};
 use sui_archival::reader::ArchiveReaderBalancer;
 use sui_config::node::AuthorityStorePruningConfig;
 use sui_storage::mutex_table::RwLockTable;
-use sui_types::base_types::SequenceNumber;
-use sui_types::committee::EpochId;
-use sui_types::effects::TransactionEffects;
-use sui_types::effects::TransactionEffectsAPI;
-use sui_types::message_envelope::Message;
-use sui_types::messages_checkpoint::{
-    CheckpointContents, CheckpointDigest, CheckpointSequenceNumber,
-};
 use sui_types::{
-    base_types::{ObjectID, VersionNumber},
+    base_types::{ObjectID, SequenceNumber, VersionNumber},
+    committee::EpochId,
+    effects::{TransactionEffects, TransactionEffectsAPI},
+    message_envelope::Message,
+    messages_checkpoint::{CheckpointContents, CheckpointDigest, CheckpointSequenceNumber},
     storage::ObjectKey,
 };
-use tokio::sync::oneshot::{self, Sender};
-use tokio::time::Instant;
+use tokio::{
+    sync::oneshot::{self, Sender},
+    time::Instant,
+};
 use tracing::{debug, error, info, warn};
-use typed_store::rocksdb::LiveFile;
-use typed_store::{Map, TypedStoreError};
+use typed_store::{rocksdb::LiveFile, Map, TypedStoreError};
 
 use super::authority_store_tables::AuthorityPerpetualTables;
+use crate::{
+    authority::authority_store_types::{ObjectContentDigest, StoreData, StoreObject},
+    checkpoints::{CheckpointStore, CheckpointWatermark},
+    rpc_index::RpcIndexStore,
+};
 
 static PERIODIC_PRUNING_TABLES: Lazy<BTreeSet<String>> = Lazy::new(|| {
-    [
-        "objects",
-        "effects",
-        "transactions",
-        "events",
-        "executed_effects",
-        "executed_transactions_to_checkpoint",
-    ]
-    .into_iter()
-    .map(|cf| cf.to_string())
-    .collect()
+    ["objects", "effects", "transactions", "events", "executed_effects", "executed_transactions_to_checkpoint"]
+        .into_iter()
+        .map(|cf| cf.to_string())
+        .collect()
 });
 pub const EPOCH_DURATION_MS_FOR_TESTING: u64 = 24 * 60 * 60 * 1000;
 pub struct AuthorityStorePruner {
@@ -146,27 +137,17 @@ impl AuthorityStorePruner {
 
             if enable_pruning_tombstones {
                 for deleted_object_key in effects.all_tombstones() {
-                    object_tombstones_to_prune
-                        .push(ObjectKey(deleted_object_key.0, deleted_object_key.1));
+                    object_tombstones_to_prune.push(ObjectKey(deleted_object_key.0, deleted_object_key.1));
                 }
             }
         }
 
-        metrics
-            .num_pruned_objects
-            .inc_by(live_object_keys_to_prune.len() as u64);
-        metrics
-            .num_pruned_tombstones
-            .inc_by(object_tombstones_to_prune.len() as u64);
+        metrics.num_pruned_objects.inc_by(live_object_keys_to_prune.len() as u64);
+        metrics.num_pruned_tombstones.inc_by(object_tombstones_to_prune.len() as u64);
 
         let mut indirect_objects: HashMap<_, i64> = HashMap::new();
         if indirect_objects_threshold > 0 && indirect_objects_threshold < usize::MAX {
-            for object in perpetual_db
-                .objects
-                .multi_get(live_object_keys_to_prune.iter())?
-                .into_iter()
-                .flatten()
-            {
+            for object in perpetual_db.objects.multi_get(live_object_keys_to_prune.iter())?.into_iter().flatten() {
                 if let StoreObject::Value(obj) = object.into_inner() {
                     if let StoreData::IndirectObject(indirect_object) = obj.data {
                         *indirect_objects.entry(indirect_object.digest).or_default() -= 1;
@@ -184,10 +165,7 @@ impl AuthorityStorePruner {
         }
 
         for (object_id, (min_version, max_version)) in updates {
-            debug!(
-                "Pruning object {:?} versions {:?} - {:?}",
-                object_id, min_version, max_version
-            );
+            debug!("Pruning object {:?} versions {:?} - {:?}", object_id, min_version, max_version);
             let start_range = ObjectKey(object_id, min_version);
             let end_range = ObjectKey(object_id, (max_version.value() + 1).into());
             wb.schedule_delete_range(&perpetual_db.objects, &start_range, &end_range)?;
@@ -215,17 +193,13 @@ impl AuthorityStorePruner {
         }
 
         if !indirect_objects.is_empty() {
-            let ref_count_update = indirect_objects
-                .iter()
-                .map(|(digest, delta)| (digest, delta.to_le_bytes()));
+            let ref_count_update = indirect_objects.iter().map(|(digest, delta)| (digest, delta.to_le_bytes()));
             wb.partial_merge_batch(&perpetual_db.indirect_move_objects, ref_count_update)?;
         }
         perpetual_db.set_highest_pruned_checkpoint(&mut wb, checkpoint_number)?;
         metrics.last_pruned_checkpoint.set(checkpoint_number as i64);
 
-        let _locks = objects_lock_table
-            .acquire_locks(indirect_objects.into_keys())
-            .await;
+        let _locks = objects_lock_table.acquire_locks(indirect_objects.into_keys()).await;
         wb.write()?;
         Ok(())
     }
@@ -243,17 +217,12 @@ impl AuthorityStorePruner {
         let _scope = monitored_scope("EffectsLivePruner");
 
         let mut perpetual_batch = perpetual_db.objects.batch();
-        let transactions: Vec<_> = checkpoint_content_to_prune
-            .iter()
-            .flat_map(|content| content.iter().map(|tx| tx.transaction))
-            .collect();
+        let transactions: Vec<_> =
+            checkpoint_content_to_prune.iter().flat_map(|content| content.iter().map(|tx| tx.transaction)).collect();
 
         perpetual_batch.delete_batch(&perpetual_db.transactions, transactions.iter())?;
         perpetual_batch.delete_batch(&perpetual_db.executed_effects, transactions.iter())?;
-        perpetual_batch.delete_batch(
-            &perpetual_db.executed_transactions_to_checkpoint,
-            transactions,
-        )?;
+        perpetual_batch.delete_batch(&perpetual_db.executed_transactions_to_checkpoint, transactions)?;
 
         let mut effect_digests = vec![];
         for effects in effects_to_prune {
@@ -275,36 +244,24 @@ impl AuthorityStorePruner {
 
         let mut checkpoints_batch = checkpoint_db.certified_checkpoints.batch();
 
-        let checkpoint_content_digests =
-            checkpoint_content_to_prune.iter().map(|ckpt| ckpt.digest());
-        checkpoints_batch.delete_batch(
-            &checkpoint_db.checkpoint_content,
-            checkpoint_content_digests.clone(),
-        )?;
-        checkpoints_batch.delete_batch(
-            &checkpoint_db.checkpoint_sequence_by_contents_digest,
-            checkpoint_content_digests,
-        )?;
-
+        let checkpoint_content_digests = checkpoint_content_to_prune.iter().map(|ckpt| ckpt.digest());
+        checkpoints_batch.delete_batch(&checkpoint_db.checkpoint_content, checkpoint_content_digests.clone())?;
         checkpoints_batch
-            .delete_batch(&checkpoint_db.checkpoint_by_digest, checkpoints_to_prune)?;
+            .delete_batch(&checkpoint_db.checkpoint_sequence_by_contents_digest, checkpoint_content_digests)?;
 
-        checkpoints_batch.insert_batch(
-            &checkpoint_db.watermarks,
-            [(
-                &CheckpointWatermark::HighestPruned,
-                &(checkpoint_number, CheckpointDigest::random()),
-            )],
-        )?;
+        checkpoints_batch.delete_batch(&checkpoint_db.checkpoint_by_digest, checkpoints_to_prune)?;
+
+        checkpoints_batch.insert_batch(&checkpoint_db.watermarks, [(
+            &CheckpointWatermark::HighestPruned,
+            &(checkpoint_number, CheckpointDigest::random()),
+        )])?;
 
         if let Some(rpc_index) = rpc_index {
             rpc_index.prune(&checkpoint_content_to_prune)?;
         }
         perpetual_batch.write()?;
         checkpoints_batch.write()?;
-        metrics
-            .last_pruned_effects_checkpoint
-            .set(checkpoint_number as i64);
+        metrics.last_pruned_effects_checkpoint.set(checkpoint_number as i64);
         Ok(())
     }
 
@@ -363,22 +320,15 @@ impl AuthorityStorePruner {
         epoch_duration_ms: u64,
     ) -> anyhow::Result<()> {
         let _scope = monitored_scope("PruneCheckpointsForEligibleEpochs");
-        let pruned_checkpoint_number =
-            checkpoint_store.get_highest_pruned_checkpoint_seq_number()?;
+        let pruned_checkpoint_number = checkpoint_store.get_highest_pruned_checkpoint_seq_number()?;
         let (last_executed_checkpoint, epoch_id) = checkpoint_store
             .get_highest_executed_checkpoint()?
             .map(|c| (*c.sequence_number(), c.epoch))
             .unwrap_or_default();
-        let latest_archived_checkpoint = archive_readers
-            .get_archive_watermark()
-            .await?
-            .unwrap_or(u64::MAX);
+        let latest_archived_checkpoint = archive_readers.get_archive_watermark().await?.unwrap_or(u64::MAX);
         let mut max_eligible_checkpoint = min(latest_archived_checkpoint, last_executed_checkpoint);
         if config.num_epochs_to_retain != u64::MAX {
-            max_eligible_checkpoint = min(
-                max_eligible_checkpoint,
-                perpetual_db.get_highest_pruned_checkpoint()?,
-            );
+            max_eligible_checkpoint = min(max_eligible_checkpoint, perpetual_db.get_highest_pruned_checkpoint()?);
         }
         if config.smooth {
             if let Some(num_epochs_to_retain) = config.num_epochs_to_retain_for_checkpoints {
@@ -398,9 +348,7 @@ impl AuthorityStorePruner {
             checkpoint_store,
             rpc_index,
             PruningMode::Checkpoints,
-            config
-                .num_epochs_to_retain_for_checkpoints()
-                .ok_or_else(|| anyhow!("config value not set"))?,
+            config.num_epochs_to_retain_for_checkpoints().ok_or_else(|| anyhow!("config value not set"))?,
             pruned_checkpoint_number,
             max_eligible_checkpoint,
             objects_lock_table,
@@ -428,20 +376,14 @@ impl AuthorityStorePruner {
         let _scope = monitored_scope("PruneForEligibleEpochs");
 
         let mut checkpoint_number = starting_checkpoint_number;
-        let current_epoch = checkpoint_store
-            .get_highest_executed_checkpoint()?
-            .map(|c| c.epoch())
-            .unwrap_or_default();
+        let current_epoch = checkpoint_store.get_highest_executed_checkpoint()?.map(|c| c.epoch()).unwrap_or_default();
 
         let mut checkpoints_to_prune = vec![];
         let mut checkpoint_content_to_prune = vec![];
         let mut effects_to_prune = vec![];
 
         loop {
-            let Some(ckpt) = checkpoint_store
-                .certified_checkpoints
-                .get(&(checkpoint_number + 1))?
-            else {
+            let Some(ckpt) = checkpoint_store.certified_checkpoints.get(&(checkpoint_number + 1))? else {
                 break;
             };
             let checkpoint = ckpt.into_inner();
@@ -458,15 +400,8 @@ impl AuthorityStorePruner {
 
             let content = checkpoint_store
                 .get_checkpoint_contents(&checkpoint.content_digest)?
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "checkpoint content data is missing: {}",
-                        checkpoint.sequence_number
-                    )
-                })?;
-            let effects = perpetual_db
-                .effects
-                .multi_get(content.iter().map(|tx| tx.effects))?;
+                .ok_or_else(|| anyhow::anyhow!("checkpoint content data is missing: {}", checkpoint.sequence_number))?;
+            let effects = perpetual_db.effects.multi_get(content.iter().map(|tx| tx.effects))?;
 
             info!("scheduling pruning for checkpoint {:?}", checkpoint_number);
             checkpoints_to_prune.push(*checkpoint.digest());
@@ -543,12 +478,9 @@ impl AuthorityStorePruner {
         last_processed: Arc<Mutex<HashMap<String, SystemTime>>>,
     ) -> anyhow::Result<Option<LiveFile>> {
         let db_path = perpetual_db.objects.rocksdb.path();
-        let mut state = last_processed
-            .lock()
-            .expect("failed to obtain a lock for last processed SST files");
+        let mut state = last_processed.lock().expect("failed to obtain a lock for last processed SST files");
         let mut sst_file_for_compaction: Option<LiveFile> = None;
-        let time_threshold =
-            SystemTime::now() - Duration::from_secs(delay_days as u64 * 24 * 60 * 60);
+        let time_threshold = SystemTime::now() - Duration::from_secs(delay_days as u64 * 24 * 60 * 60);
         for sst_file in perpetual_db.objects.rocksdb.live_files()? {
             let file_path = db_path.join(sst_file.name.clone().trim_matches('/'));
             let last_modified = std::fs::metadata(file_path)?.modified()?;
@@ -607,9 +539,8 @@ impl AuthorityStorePruner {
         if max_eligible_checkpoint == 0 {
             return Ok(max_eligible_checkpoint);
         }
-        let num_intervals = epoch_duration_ms
-            .checked_div(Self::pruning_tick_duration_ms(epoch_duration_ms))
-            .unwrap_or(1);
+        let num_intervals =
+            epoch_duration_ms.checked_div(Self::pruning_tick_duration_ms(epoch_duration_ms)).unwrap_or(1);
         let delta = max_eligible_checkpoint
             .checked_sub(pruned_checkpoint)
             .unwrap_or_default()
@@ -630,20 +561,15 @@ impl AuthorityStorePruner {
         archive_readers: ArchiveReaderBalancer,
     ) -> Sender<()> {
         let (sender, mut recv) = tokio::sync::oneshot::channel();
-        debug!(
-            "Starting object pruning service with num_epochs_to_retain={}",
-            config.num_epochs_to_retain
-        );
+        debug!("Starting object pruning service with num_epochs_to_retain={}", config.num_epochs_to_retain);
 
-        let tick_duration =
-            Duration::from_millis(Self::pruning_tick_duration_ms(epoch_duration_ms));
+        let tick_duration = Duration::from_millis(Self::pruning_tick_duration_ms(epoch_duration_ms));
         let pruning_initial_delay = if cfg!(msim) {
             Duration::from_millis(1)
         } else {
             Duration::from_secs(config.pruning_run_delay_seconds.unwrap_or(60 * 60))
         };
-        let mut objects_prune_interval =
-            tokio::time::interval_at(Instant::now() + pruning_initial_delay, tick_duration);
+        let mut objects_prune_interval = tokio::time::interval_at(Instant::now() + pruning_initial_delay, tick_duration);
         let mut checkpoints_prune_interval =
             tokio::time::interval_at(Instant::now() + pruning_initial_delay, tick_duration);
 
@@ -654,10 +580,8 @@ impl AuthorityStorePruner {
                 loop {
                     let db = perpetual_db_for_compaction.clone();
                     let state = Arc::clone(&last_processed);
-                    let result = tokio::task::spawn_blocking(move || {
-                        Self::compact_next_sst_file(db, delay_days, state)
-                    })
-                    .await;
+                    let result =
+                        tokio::task::spawn_blocking(move || Self::compact_next_sst_file(db, delay_days, state)).await;
                     let mut sleep_interval_secs = 1;
                     match result {
                         Err(err) => error!("Failed to compact sst file: {:?}", err),
@@ -672,14 +596,10 @@ impl AuthorityStorePruner {
             });
         }
 
+        metrics.num_epochs_to_retain_for_objects.set(config.num_epochs_to_retain as i64);
         metrics
-            .num_epochs_to_retain_for_objects
-            .set(config.num_epochs_to_retain as i64);
-        metrics.num_epochs_to_retain_for_checkpoints.set(
-            config
-                .num_epochs_to_retain_for_checkpoints
-                .unwrap_or_default() as i64,
-        );
+            .num_epochs_to_retain_for_checkpoints
+            .set(config.num_epochs_to_retain_for_checkpoints.unwrap_or_default() as i64);
 
         tokio::task::spawn(async move {
             loop {
@@ -713,9 +633,11 @@ impl AuthorityStorePruner {
         indirect_objects_threshold: usize,
         archive_readers: ArchiveReaderBalancer,
     ) -> Self {
-        if pruning_config.num_epochs_to_retain > 0 && pruning_config.num_epochs_to_retain < u64::MAX
-        {
-            warn!("Using objects pruner with num_epochs_to_retain = {} can lead to performance issues", pruning_config.num_epochs_to_retain);
+        if pruning_config.num_epochs_to_retain > 0 && pruning_config.num_epochs_to_retain < u64::MAX {
+            warn!(
+                "Using objects pruner with num_epochs_to_retain = {} can lead to performance issues",
+                pruning_config.num_epochs_to_retain
+            );
             if is_validator {
                 warn!("Resetting to aggressive pruner.");
                 pruning_config.num_epochs_to_retain = 0;
@@ -748,33 +670,36 @@ impl AuthorityStorePruner {
 
 #[cfg(test)]
 mod tests {
-    use more_asserts as ma;
-    use std::path::Path;
-    use std::time::Duration;
-    use std::{collections::HashSet, sync::Arc};
-    use tracing::log::info;
+    use std::{collections::HashSet, path::Path, sync::Arc, time::Duration};
 
-    use crate::authority::authority_store_pruner::AuthorityStorePruningMetrics;
-    use crate::authority::authority_store_tables::AuthorityPerpetualTables;
-    use crate::authority::authority_store_types::{
-        get_store_object_pair, ObjectContentDigest, StoreData, StoreObject, StoreObjectPair,
-        StoreObjectWrapper,
-    };
+    use more_asserts as ma;
     use prometheus::Registry;
     use sui_storage::mutex_table::RwLockTable;
-    use sui_types::base_types::ObjectDigest;
-    use sui_types::effects::TransactionEffects;
-    use sui_types::effects::TransactionEffectsAPI;
     use sui_types::{
-        base_types::{ObjectID, SequenceNumber},
+        base_types::{ObjectDigest, ObjectID, SequenceNumber},
+        effects::{TransactionEffects, TransactionEffectsAPI},
         object::Object,
         storage::ObjectKey,
     };
-    use typed_store::rocks::util::reference_count_merge_operator;
-    use typed_store::rocks::{DBMap, MetricConf, ReadWriteOptions};
-    use typed_store::Map;
+    use tracing::log::info;
+    use typed_store::{
+        rocks::{util::reference_count_merge_operator, DBMap, MetricConf, ReadWriteOptions},
+        Map,
+    };
 
     use super::AuthorityStorePruner;
+    use crate::authority::{
+        authority_store_pruner::AuthorityStorePruningMetrics,
+        authority_store_tables::AuthorityPerpetualTables,
+        authority_store_types::{
+            get_store_object_pair,
+            ObjectContentDigest,
+            StoreData,
+            StoreObject,
+            StoreObjectPair,
+            StoreObjectWrapper,
+        },
+    };
 
     fn get_keys_after_pruning(path: &Path) -> anyhow::Result<HashSet<ObjectKey>> {
         let perpetual_db_path = path.join(Path::new("perpetual"));
@@ -786,12 +711,8 @@ mod tests {
             reference_count_merge_operator,
             reference_count_merge_operator,
         );
-        let perpetual_db = typed_store::rocks::open_cf(
-            perpetual_db_path,
-            Some(db_options),
-            MetricConf::new("perpetual_pruning"),
-            &cfs,
-        );
+        let perpetual_db =
+            typed_store::rocks::open_cf(perpetual_db_path, Some(db_options), MetricConf::new("perpetual_pruning"), &cfs);
 
         let mut after_pruning = HashSet::new();
         let objects = DBMap::<ObjectKey, StoreObjectWrapper>::reopen(
@@ -825,7 +746,7 @@ mod tests {
 
         let ids = ObjectID::in_range(ObjectID::ZERO, total_unique_object_ids.into())?;
         for id in ids {
-            for (counter, seq) in (0..num_versions_per_object).rev().enumerate() {
+            for (counter, seq) in (0 .. num_versions_per_object).rev().enumerate() {
                 let object_key = ObjectKey(id, SequenceNumber::from_u64(seq));
                 if counter < num_object_versions_to_retain.try_into().unwrap() {
                     // latest `num_object_versions_to_retain` should not have been pruned
@@ -833,20 +754,12 @@ mod tests {
                 } else {
                     to_delete.push(object_key);
                 }
-                let StoreObjectPair(obj, indirect_obj) = get_store_object_pair(
-                    Object::immutable_with_id_for_testing(id),
-                    indirect_object_threshold,
-                );
-                batch.insert_batch(
-                    &db.objects,
-                    [(ObjectKey(id, SequenceNumber::from(seq)), obj.clone())],
-                )?;
+                let StoreObjectPair(obj, indirect_obj) =
+                    get_store_object_pair(Object::immutable_with_id_for_testing(id), indirect_object_threshold);
+                batch.insert_batch(&db.objects, [(ObjectKey(id, SequenceNumber::from(seq)), obj.clone())])?;
                 if let StoreObject::Value(o) = obj.into_inner() {
                     if let StoreData::IndirectObject(metadata) = o.data {
-                        batch.merge_batch(
-                            &db.indirect_move_objects,
-                            [(metadata.digest, indirect_obj.unwrap())],
-                        )?;
+                        batch.merge_batch(&db.indirect_move_objects, [(metadata.digest, indirect_obj.unwrap())])?;
                     }
                 }
             }
@@ -855,26 +768,18 @@ mod tests {
             if num_object_versions_to_retain == 0 {
                 let tombstone_key = ObjectKey(id, SequenceNumber::from(num_versions_per_object));
                 println!("Adding tombstone object {:?}", tombstone_key);
-                batch.insert_batch(
-                    &db.objects,
-                    [(tombstone_key, StoreObjectWrapper::V1(StoreObject::Deleted))],
-                )?;
+                batch.insert_batch(&db.objects, [(tombstone_key, StoreObjectWrapper::V1(StoreObject::Deleted))])?;
                 tombstones.push(tombstone_key);
             }
         }
         batch.write().unwrap();
         assert_eq!(
             to_keep.len() as u64,
-            std::cmp::min(num_object_versions_to_retain, num_versions_per_object)
-                * total_unique_object_ids as u64
+            std::cmp::min(num_object_versions_to_retain, num_versions_per_object) * total_unique_object_ids as u64
         );
         assert_eq!(
             tombstones.len() as u64,
-            if num_object_versions_to_retain == 0 {
-                total_unique_object_ids as u64
-            } else {
-                0
-            }
+            if num_object_versions_to_retain == 0 { total_unique_object_ids as u64 } else { 0 }
         );
         Ok((to_keep, to_delete, tombstones))
     }
@@ -904,18 +809,10 @@ mod tests {
             .unwrap();
             let mut effects = TransactionEffects::default();
             for object in to_delete {
-                effects.unsafe_add_deleted_live_object_for_testing((
-                    object.0,
-                    object.1,
-                    ObjectDigest::MIN,
-                ));
+                effects.unsafe_add_deleted_live_object_for_testing((object.0, object.1, ObjectDigest::MIN));
             }
             for object in tombstones {
-                effects.unsafe_add_object_tombstone_for_testing((
-                    object.0,
-                    object.1,
-                    ObjectDigest::MIN,
-                ));
+                effects.unsafe_add_object_tombstone_for_testing((object.0, object.1, ObjectDigest::MIN));
             }
             AuthorityStorePruner::prune_objects(
                 vec![effects],
@@ -939,10 +836,7 @@ mod tests {
     async fn test_pruning_objects() {
         let path = tempfile::tempdir().unwrap().into_path();
         let to_keep = run_pruner(&path, 3, 2, 1000, 0).await;
-        assert_eq!(
-            HashSet::from_iter(to_keep),
-            get_keys_after_pruning(&path).unwrap()
-        );
+        assert_eq!(HashSet::from_iter(to_keep), get_keys_after_pruning(&path).unwrap());
         run_pruner(&tempfile::tempdir().unwrap().into_path(), 3, 2, 1000, 0).await;
     }
 
@@ -976,14 +870,8 @@ mod tests {
         {
             let perpetual_db = AuthorityPerpetualTables::open(&path, None);
             perpetual_db.indirect_move_objects.flush().unwrap();
-            perpetual_db
-                .indirect_move_objects
-                .compact_range(&ObjectDigest::MIN, &ObjectDigest::MAX)
-                .unwrap();
-            perpetual_db
-                .indirect_move_objects
-                .compact_range(&ObjectDigest::MIN, &ObjectDigest::MAX)
-                .unwrap();
+            perpetual_db.indirect_move_objects.compact_range(&ObjectDigest::MIN, &ObjectDigest::MAX).unwrap();
+            perpetual_db.indirect_move_objects.compact_range(&ObjectDigest::MIN, &ObjectDigest::MAX).unwrap();
             let count = perpetual_db.indirect_move_objects.keys().count();
             assert_eq!(count, 0);
         }
@@ -999,14 +887,12 @@ mod tests {
         let ids = ObjectID::in_range(ObjectID::ZERO, total_unique_object_ids)?;
         let mut to_delete = vec![];
         for id in ids {
-            for i in (0..num_versions_per_object).rev() {
+            for i in (0 .. num_versions_per_object).rev() {
                 if i < num_versions_per_object - 2 {
                     to_delete.push((id, SequenceNumber::from(i)));
                 }
                 let obj = get_store_object_pair(Object::immutable_with_id_for_testing(id), 0).0;
-                perpetual_db
-                    .objects
-                    .insert(&ObjectKey(id, SequenceNumber::from(i)), &obj)?;
+                perpetual_db.objects.insert(&ObjectKey(id, SequenceNumber::from(i)), &obj)?;
             }
         }
 
@@ -1035,24 +921,12 @@ mod tests {
 
         let mut effects = TransactionEffects::default();
         for object in to_delete {
-            effects.unsafe_add_deleted_live_object_for_testing((
-                object.0,
-                object.1,
-                ObjectDigest::MIN,
-            ));
+            effects.unsafe_add_deleted_live_object_for_testing((object.0, object.1, ObjectDigest::MIN));
         }
         let registry = Registry::default();
         let metrics = AuthorityStorePruningMetrics::new(&registry);
-        let total_pruned = AuthorityStorePruner::prune_objects(
-            vec![effects],
-            &perpetual_db,
-            &lock_table(),
-            0,
-            metrics,
-            0,
-            true,
-        )
-        .await;
+        let total_pruned =
+            AuthorityStorePruner::prune_objects(vec![effects], &perpetual_db, &lock_table(), 0, metrics, 0, true).await;
         info!("Total pruned keys = {:?}", total_pruned);
 
         perpetual_db.objects.rocksdb.flush()?;
@@ -1072,41 +946,34 @@ mod tests {
 #[cfg(not(target_os = "macos"))]
 #[cfg(not(target_env = "msvc"))]
 mod pprof_tests {
-    use crate::authority::authority_store_pruner::tests;
-
     use std::sync::Arc;
-    use tracing::log::{error, info};
 
-    use crate::authority::authority_store_pruner::tests::lock_table;
-    use crate::authority::authority_store_pruner::AuthorityStorePruningMetrics;
-    use crate::authority::authority_store_tables::AuthorityPerpetualTables;
-    use crate::authority::authority_store_types::{get_store_object_pair, StoreObjectWrapper};
     use pprof::Symbol;
     use prometheus::Registry;
-    use sui_types::base_types::ObjectDigest;
-    use sui_types::base_types::VersionNumber;
-    use sui_types::effects::TransactionEffects;
-    use sui_types::effects::TransactionEffectsAPI;
     use sui_types::{
-        base_types::{ObjectID, SequenceNumber},
+        base_types::{ObjectDigest, ObjectID, SequenceNumber, VersionNumber},
+        effects::{TransactionEffects, TransactionEffectsAPI},
         object::Object,
         storage::ObjectKey,
     };
-    use typed_store::rocks::DBMap;
-    use typed_store::Map;
+    use tracing::log::{error, info};
+    use typed_store::{rocks::DBMap, Map};
 
     use super::AuthorityStorePruner;
+    use crate::authority::{
+        authority_store_pruner::{tests, tests::lock_table, AuthorityStorePruningMetrics},
+        authority_store_tables::AuthorityPerpetualTables,
+        authority_store_types::{get_store_object_pair, StoreObjectWrapper},
+    };
 
-    fn insert_keys(
-        objects: &DBMap<ObjectKey, StoreObjectWrapper>,
-    ) -> Result<TransactionEffects, anyhow::Error> {
+    fn insert_keys(objects: &DBMap<ObjectKey, StoreObjectWrapper>) -> Result<TransactionEffects, anyhow::Error> {
         let mut to_delete = vec![];
         let num_versions_to_keep = 2;
         let total_unique_object_ids = 100_000;
         let num_versions_per_object = 10;
         let ids = ObjectID::in_range(ObjectID::ZERO, total_unique_object_ids)?;
         for id in ids {
-            for i in (0..num_versions_per_object).rev() {
+            for i in (0 .. num_versions_per_object).rev() {
                 let obj = get_store_object_pair(Object::immutable_with_id_for_testing(id), 0).0;
                 objects.insert(&ObjectKey(id, SequenceNumber::from(i)), &obj)?;
                 if i < num_versions_per_object - num_versions_to_keep {
@@ -1118,19 +985,12 @@ mod pprof_tests {
 
         let mut effects = TransactionEffects::default();
         for object in to_delete {
-            effects.unsafe_add_deleted_live_object_for_testing((
-                object.0,
-                object.1,
-                ObjectDigest::MIN,
-            ));
+            effects.unsafe_add_deleted_live_object_for_testing((object.0, object.1, ObjectDigest::MIN));
         }
         Ok(effects)
     }
 
-    fn read_keys(
-        objects: &DBMap<ObjectKey, StoreObjectWrapper>,
-        num_reads: u32,
-    ) -> Result<(), anyhow::Error> {
+    fn read_keys(objects: &DBMap<ObjectKey, StoreObjectWrapper>, num_reads: u32) -> Result<(), anyhow::Error> {
         let mut i = 0;
         while i < num_reads {
             let _res = objects.get(&ObjectKey(ObjectID::random(), VersionNumber::MAX))?;
@@ -1141,10 +1001,7 @@ mod pprof_tests {
 
     fn is_rocksdb_range_tombstone_frame(vs: &[Symbol]) -> bool {
         for symbol in vs.iter() {
-            if symbol
-                .name()
-                .contains("rocksdb::FragmentedRangeTombstoneList")
-            {
+            if symbol.name().contains("rocksdb::FragmentedRangeTombstoneList") {
                 return true;
             }
         }
@@ -1154,8 +1011,7 @@ mod pprof_tests {
     #[tokio::test]
     // un-ignore once https://github.com/tikv/pprof-rs/issues/250 is fixed
     #[ignore]
-    async fn ensure_no_tombstone_fragmentation_in_stack_frame_with_ignore_tombstones(
-    ) -> Result<(), anyhow::Error> {
+    async fn ensure_no_tombstone_fragmentation_in_stack_frame_with_ignore_tombstones() -> Result<(), anyhow::Error> {
         // This test writes a bunch of objects to objects table, invokes pruning on it and
         // then does a bunch of get(). We open the db with `ignore_range_delete` set to true (default mode).
         // We then record a cpu profile of the `get()` calls and do not find any range fragmentation stack frame
@@ -1165,26 +1021,12 @@ mod pprof_tests {
         let primary_path = tempfile::tempdir()?.into_path();
         let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&primary_path, None));
         let effects = insert_keys(&perpetual_db.objects)?;
-        AuthorityStorePruner::prune_objects(
-            vec![effects],
-            &perpetual_db,
-            &tests::lock_table(),
-            0,
-            metrics,
-            1,
-            true,
-        )
-        .await?;
-        let guard = pprof::ProfilerGuardBuilder::default()
-            .frequency(1000)
-            .build()
-            .unwrap();
+        AuthorityStorePruner::prune_objects(vec![effects], &perpetual_db, &tests::lock_table(), 0, metrics, 1, true)
+            .await?;
+        let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).build().unwrap();
         read_keys(&perpetual_db.objects, 1000)?;
         if let Ok(report) = guard.report().build() {
-            assert!(!report.data.keys().any(|f| f
-                .frames
-                .iter()
-                .any(|vs| is_rocksdb_range_tombstone_frame(vs))));
+            assert!(!report.data.keys().any(|f| f.frames.iter().any(|vs| is_rocksdb_range_tombstone_frame(vs))));
         }
         Ok(())
     }
@@ -1192,8 +1034,7 @@ mod pprof_tests {
     #[tokio::test]
     // un-ignore once https://github.com/tikv/pprof-rs/issues/250 is fixed
     #[ignore]
-    async fn ensure_no_tombstone_fragmentation_in_stack_frame_after_flush(
-    ) -> Result<(), anyhow::Error> {
+    async fn ensure_no_tombstone_fragmentation_in_stack_frame_after_flush() -> Result<(), anyhow::Error> {
         // This test writes a bunch of objects to objects table, invokes pruning on it and
         // then does a bunch of get(). We open the db with `ignore_range_delete` set to true (default mode).
         // We then record a cpu profile of the `get()` calls and do not find any range fragmentation stack frame
@@ -1203,31 +1044,16 @@ mod pprof_tests {
         let effects = insert_keys(&perpetual_db.objects)?;
         let registry = Registry::default();
         let metrics = AuthorityStorePruningMetrics::new(&registry);
-        AuthorityStorePruner::prune_objects(
-            vec![effects],
-            &perpetual_db,
-            &lock_table(),
-            0,
-            metrics,
-            1,
-            true,
-        )
-        .await?;
+        AuthorityStorePruner::prune_objects(vec![effects], &perpetual_db, &lock_table(), 0, metrics, 1, true).await?;
         if let Ok(()) = perpetual_db.objects.flush() {
             info!("Completed flushing objects table");
         } else {
             error!("Failed to flush objects table");
         }
-        let guard = pprof::ProfilerGuardBuilder::default()
-            .frequency(1000)
-            .build()
-            .unwrap();
+        let guard = pprof::ProfilerGuardBuilder::default().frequency(1000).build().unwrap();
         read_keys(&perpetual_db.objects, 1000)?;
         if let Ok(report) = guard.report().build() {
-            assert!(!report.data.keys().any(|f| f
-                .frames
-                .iter()
-                .any(|vs| is_rocksdb_range_tombstone_frame(vs))));
+            assert!(!report.data.keys().any(|f| f.frames.iter().any(|vs| is_rocksdb_range_tombstone_frame(vs))));
         }
         Ok(())
     }

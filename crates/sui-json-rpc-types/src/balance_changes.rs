@@ -1,13 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::fmt::{Display, Formatter, Result};
+
 use move_core_types::language_storage::TypeTag;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::DisplayFromStr;
-use std::fmt::{Display, Formatter, Result};
-use sui_types::object::Owner;
-use sui_types::sui_serde::SuiTypeTag;
+use serde_with::{serde_as, DisplayFromStr};
+use sui_types::{object::Owner, sui_serde::SuiTypeTag};
 
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
@@ -27,10 +26,6 @@ pub struct BalanceChange {
 
 impl Display for BalanceChange {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(
-            f,
-            " ┌──\n │ Owner: {} \n │ CoinType: {} \n │ Amount: {}\n └──",
-            self.owner, self.coin_type, self.amount
-        )
+        write!(f, " ┌──\n │ Owner: {} \n │ CoinType: {} \n │ Amount: {}\n └──", self.owner, self.coin_type, self.amount)
     }
 }

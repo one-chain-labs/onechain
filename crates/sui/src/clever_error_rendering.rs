@@ -12,9 +12,7 @@
 //! rendering logic for Clever Errors should be used instead.
 
 use fastcrypto::encoding::{Base64, Encoding};
-use move_binary_format::{
-    binary_config::BinaryConfig, file_format::SignatureToken, CompiledModule,
-};
+use move_binary_format::{binary_config::BinaryConfig, file_format::SignatureToken, CompiledModule};
 use move_command_line_common::{
     display::{try_render_constant, RenderResult},
     error_bitset::ErrorBitset,
@@ -32,10 +30,7 @@ use sui_types::{base_types::ObjectID, Identifier};
 /// This function is used to render Clever Errors for on-chain errors only within the Sui CLI. This
 /// function is _not_ used at all for off-chain errors or Move unit tests. You should only use this
 /// function within this crate.
-pub(crate) async fn render_clever_error_opt(
-    error_string: &str,
-    read_api: &ReadApi,
-) -> Option<String> {
+pub(crate) async fn render_clever_error_opt(error_string: &str, read_api: &ReadApi) -> Option<String> {
     let (address, module_name, function_name, instruction, abort_code, command_index) =
         parse_abort_status_string(error_string).ok()?;
 
@@ -64,10 +59,7 @@ pub(crate) async fn render_clever_error_opt(
         }
 
         let SuiRawData::Package(package) = read_api
-            .get_object_with_options(
-                ObjectID::from_address(address),
-                SuiObjectDataOptions::bcs_lossless(),
-            )
+            .get_object_with_options(ObjectID::from_address(address), SuiObjectDataOptions::bcs_lossless())
             .await
             .ok()?
             .into_object()
@@ -78,24 +70,17 @@ pub(crate) async fn render_clever_error_opt(
         };
 
         let module = package.module_map.get(module_name.as_str())?;
-        let module =
-            CompiledModule::deserialize_with_config(module, &BinaryConfig::standard()).ok()?;
+        let module = CompiledModule::deserialize_with_config(module, &BinaryConfig::standard()).ok()?;
 
-        let error_identifier_constant = module
-            .constant_pool()
-            .get(error_bitset.identifier_index()? as usize)?;
-        let error_value_constant = module
-            .constant_pool()
-            .get(error_bitset.constant_index()? as usize)?;
+        let error_identifier_constant = module.constant_pool().get(error_bitset.identifier_index()? as usize)?;
+        let error_value_constant = module.constant_pool().get(error_bitset.constant_index()? as usize)?;
 
-        if !matches!(&error_identifier_constant.type_, SignatureToken::Vector(x) if x.as_ref() == &SignatureToken::U8)
-        {
+        if !matches!(&error_identifier_constant.type_, SignatureToken::Vector(x) if x.as_ref() == &SignatureToken::U8) {
             return None;
         };
 
-        let error_identifier = bcs::from_bytes::<Vec<u8>>(&error_identifier_constant.data)
-            .ok()
-            .and_then(|x| String::from_utf8(x).ok())?;
+        let error_identifier =
+            bcs::from_bytes::<Vec<u8>>(&error_identifier_constant.data).ok().and_then(|x| String::from_utf8(x).ok())?;
 
         let const_str = match try_render_constant(error_value_constant) {
             RenderResult::NotRendered => {
@@ -138,16 +123,11 @@ pub(crate) async fn render_clever_error_opt(
 /// return `Err`.
 ///
 /// You should delete this function with glee once the CLI is updated to use the GraphQL API.
-fn parse_abort_status_string(
-    s: &str,
-) -> Result<(AccountAddress, Identifier, Identifier, u16, u64, u16), anyhow::Error> {
+fn parse_abort_status_string(s: &str) -> Result<(AccountAddress, Identifier, Identifier, u16, u64, u16), anyhow::Error> {
     use regex::Regex;
     let re = Regex::new(r#"MoveAbort.*address:\s*(.*?),.* name:.*Identifier\((.*?)\).*instruction:\s+(\d+),.*function_name:.*Some\((.*?)\).*},\s*(\d+).*in command\s*(\d+)"#).unwrap();
     let Some(captures) = re.captures(s) else {
-        anyhow::bail!(
-            "Cannot parse abort status string: {} as a move abort string",
-            s
-        );
+        anyhow::bail!("Cannot parse abort status string: {} as a move abort string", s);
     };
 
     // Remove any escape characters from the string if present.
@@ -159,14 +139,7 @@ fn parse_abort_status_string(
     let function_name = Identifier::new(clean_string(&captures[4]))?;
     let abort_code = captures[5].parse::<u64>()?;
     let command_index = captures[6].parse::<u16>()?;
-    Ok((
-        address,
-        module_name,
-        function_name,
-        instruction,
-        abort_code,
-        command_index,
-    ))
+    Ok((address, module_name, function_name, instruction, abort_code, command_index))
 }
 
 #[cfg(test)]

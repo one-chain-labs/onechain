@@ -19,17 +19,15 @@ pub(crate) struct ObjInfoToBePruned {
 }
 
 impl Processor for ObjInfoPruner {
-    const NAME: &'static str = "obj_info_pruner";
     type Value = ObjInfoToBePruned;
+
+    const NAME: &'static str = "obj_info_pruner";
 
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
         let cp_sequence_number = checkpoint.checkpoint_summary.sequence_number;
         let checkpoint_input_objects = checkpoint.checkpoint_input_objects();
-        let latest_live_output_objects = checkpoint
-            .latest_live_output_objects()
-            .into_iter()
-            .map(|o| (o.id(), o))
-            .collect::<BTreeMap<_, _>>();
+        let latest_live_output_objects =
+            checkpoint.latest_live_output_objects().into_iter().map(|o| (o.id(), o)).collect::<BTreeMap<_, _>>();
         let mut values = Vec::with_capacity(checkpoint_input_objects.len());
         // We only need to prune if an object is removed, or its owner changed.
         // We do not need to prune when an object is created or unwrapped, since there would have not
@@ -38,16 +36,10 @@ impl Processor for ObjInfoPruner {
         for (object_id, input_object) in checkpoint_input_objects {
             if let Some(output_object) = latest_live_output_objects.get(&object_id) {
                 if output_object.owner() != input_object.owner() {
-                    values.push(ObjInfoToBePruned {
-                        object_id,
-                        cp_sequence_number_exclusive: cp_sequence_number,
-                    });
+                    values.push(ObjInfoToBePruned { object_id, cp_sequence_number_exclusive: cp_sequence_number });
                 }
             } else {
-                values.push(ObjInfoToBePruned {
-                    object_id,
-                    cp_sequence_number_exclusive: cp_sequence_number + 1,
-                });
+                values.push(ObjInfoToBePruned { object_id, cp_sequence_number_exclusive: cp_sequence_number + 1 });
             }
         }
         Ok(values)

@@ -2,13 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_macros::sim_test;
-use sui_rpc_api::client::sdk::Client;
-use sui_rpc_api::client::Client as CoreClient;
-use sui_rpc_api::proto::node::node_service_client::NodeServiceClient;
-use sui_rpc_api::proto::node::{
-    FullCheckpointObject, FullCheckpointTransaction, GetCheckpointOptions, GetCheckpointRequest,
-    GetCheckpointResponse, GetFullCheckpointOptions, GetFullCheckpointRequest,
-    GetFullCheckpointResponse,
+use sui_rpc_api::{
+    client::{sdk::Client, Client as CoreClient},
+    proto::node::{
+        node_service_client::NodeServiceClient,
+        FullCheckpointObject,
+        FullCheckpointTransaction,
+        GetCheckpointOptions,
+        GetCheckpointRequest,
+        GetCheckpointResponse,
+        GetFullCheckpointOptions,
+        GetFullCheckpointRequest,
+        GetFullCheckpointResponse,
+    },
 };
 use test_cluster::TestClusterBuilder;
 
@@ -23,11 +29,7 @@ async fn list_checkpoint() {
     let client = Client::new(test_cluster.rpc_url()).unwrap();
     let core_client = CoreClient::new(test_cluster.rpc_url()).unwrap();
 
-    let checkpoints = client
-        .list_checkpoints(&Default::default())
-        .await
-        .unwrap()
-        .into_inner();
+    let checkpoints = client.list_checkpoints(&Default::default()).await.unwrap().into_inner();
 
     assert!(!checkpoints.is_empty());
 
@@ -45,29 +47,13 @@ async fn get_checkpoint() {
     let client = Client::new(test_cluster.rpc_url()).unwrap();
 
     let latest = client.get_latest_checkpoint().await.unwrap().into_inner();
-    let _ = client
-        .get_checkpoint(latest.checkpoint.sequence_number)
-        .await
-        .unwrap();
+    let _ = client.get_checkpoint(latest.checkpoint.sequence_number).await.unwrap();
 
-    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned())
-        .await
-        .unwrap();
+    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned()).await.unwrap();
 
     // Request default fields
-    let GetCheckpointResponse {
-        sequence_number,
-        digest,
-        summary,
-        summary_bcs,
-        signature,
-        contents,
-        contents_bcs,
-    } = grpc_client
-        .get_checkpoint(GetCheckpointRequest::latest())
-        .await
-        .unwrap()
-        .into_inner();
+    let GetCheckpointResponse { sequence_number, digest, summary, summary_bcs, signature, contents, contents_bcs } =
+        grpc_client.get_checkpoint(GetCheckpointRequest::latest()).await.unwrap().into_inner();
 
     assert!(sequence_number.is_some());
     assert!(digest.is_some());
@@ -78,19 +64,12 @@ async fn get_checkpoint() {
     assert!(contents_bcs.is_none());
 
     // Request no fields
-    let GetCheckpointResponse {
-        sequence_number,
-        digest,
-        summary,
-        summary_bcs,
-        signature,
-        contents,
-        contents_bcs,
-    } = grpc_client
-        .get_checkpoint(GetCheckpointRequest::latest().with_options(GetCheckpointOptions::none()))
-        .await
-        .unwrap()
-        .into_inner();
+    let GetCheckpointResponse { sequence_number, digest, summary, summary_bcs, signature, contents, contents_bcs } =
+        grpc_client
+            .get_checkpoint(GetCheckpointRequest::latest().with_options(GetCheckpointOptions::none()))
+            .await
+            .unwrap()
+            .into_inner();
 
     assert!(sequence_number.is_some());
     assert!(digest.is_some());
@@ -107,15 +86,8 @@ async fn get_checkpoint() {
         .unwrap()
         .into_inner();
 
-    let GetCheckpointResponse {
-        sequence_number,
-        digest,
-        summary,
-        summary_bcs,
-        signature,
-        contents,
-        contents_bcs,
-    } = &response;
+    let GetCheckpointResponse { sequence_number, digest, summary, summary_bcs, signature, contents, contents_bcs } =
+        &response;
 
     assert!(sequence_number.is_some());
     assert!(digest.is_some());
@@ -131,8 +103,7 @@ async fn get_checkpoint() {
     // Request by digest
     let response = grpc_client
         .get_checkpoint(
-            GetCheckpointRequest::by_digest(digest.clone().unwrap())
-                .with_options(GetCheckpointOptions::none()),
+            GetCheckpointRequest::by_digest(digest.clone().unwrap()).with_options(GetCheckpointOptions::none()),
         )
         .await
         .unwrap()
@@ -172,20 +143,13 @@ async fn get_full_checkpoint() {
     let core_client = CoreClient::new(test_cluster.rpc_url()).unwrap();
 
     let latest = client.get_latest_checkpoint().await.unwrap().into_inner();
-    let _ = core_client
-        .get_full_checkpoint(latest.checkpoint.sequence_number)
-        .await
-        .unwrap();
+    let _ = core_client.get_full_checkpoint(latest.checkpoint.sequence_number).await.unwrap();
 
-    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned())
-        .await
-        .unwrap();
+    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned()).await.unwrap();
 
     // A Checkpoint that we know has a transaction that emitted an event
     let checkpoint = grpc_client
-        .get_transaction(sui_rpc_api::proto::node::GetTransactionRequest::new(
-            transaction_digest,
-        ))
+        .get_transaction(sui_rpc_api::proto::node::GetTransactionRequest::new(transaction_digest))
         .await
         .unwrap()
         .into_inner()
@@ -257,8 +221,7 @@ async fn get_full_checkpoint() {
         transactions,
     } = grpc_client
         .get_full_checkpoint(
-            GetFullCheckpointRequest::by_sequence_number(checkpoint)
-                .with_options(GetFullCheckpointOptions::none()),
+            GetFullCheckpointRequest::by_sequence_number(checkpoint).with_options(GetFullCheckpointOptions::none()),
         )
         .await
         .unwrap()
@@ -304,8 +267,7 @@ async fn get_full_checkpoint() {
     // Request all fields
     let response = grpc_client
         .get_full_checkpoint(
-            GetFullCheckpointRequest::by_sequence_number(checkpoint)
-                .with_options(GetFullCheckpointOptions::all()),
+            GetFullCheckpointRequest::by_sequence_number(checkpoint).with_options(GetFullCheckpointOptions::all()),
         )
         .await
         .unwrap()
@@ -356,20 +318,10 @@ async fn get_full_checkpoint() {
         assert!(input_objects.is_some());
         assert!(output_objects.is_some());
 
-        for FullCheckpointObject {
-            object_id,
-            version,
-            digest,
-            object,
-            object_bcs,
-        } in input_objects
+        for FullCheckpointObject { object_id, version, digest, object, object_bcs } in input_objects
             .iter()
             .flat_map(|objects| objects.objects.iter())
-            .chain(
-                output_objects
-                    .iter()
-                    .flat_map(|objects| objects.objects.iter()),
-            )
+            .chain(output_objects.iter().flat_map(|objects| objects.objects.iter()))
         {
             assert!(object_id.is_some());
             assert!(version.is_some());
@@ -387,8 +339,7 @@ async fn get_full_checkpoint() {
     // Request by digest
     let response = grpc_client
         .get_full_checkpoint(
-            GetFullCheckpointRequest::by_digest(digest.clone().unwrap())
-                .with_options(GetFullCheckpointOptions::none()),
+            GetFullCheckpointRequest::by_digest(digest.clone().unwrap()).with_options(GetFullCheckpointOptions::none()),
         )
         .await
         .unwrap()

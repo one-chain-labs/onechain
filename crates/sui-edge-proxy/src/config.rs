@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{net::SocketAddr, time::Duration};
+
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::DurationSeconds;
-use std::{net::SocketAddr, time::Duration};
+use serde_with::{serde_as, DurationSeconds};
 use tracing::error;
 use url::Url;
 
@@ -48,9 +48,8 @@ pub struct PeerConfig {
 /// Load and validate configuration
 pub async fn load<P: AsRef<std::path::Path>>(path: P) -> Result<(ProxyConfig, Client)> {
     let path = path.as_ref();
-    let config: ProxyConfig = serde_yaml::from_reader(
-        std::fs::File::open(path).context(format!("cannot open {:?}", path))?,
-    )?;
+    let config: ProxyConfig =
+        serde_yaml::from_reader(std::fs::File::open(path).context(format!("cannot open {:?}", path))?)?;
 
     // Build a reqwest client that supports HTTP/2
     let client = reqwest::ClientBuilder::new()
@@ -69,45 +68,26 @@ pub async fn load<P: AsRef<std::path::Path>>(path: P) -> Result<(ProxyConfig, Cl
 
 /// Validate that the given PeerConfig URL has a valid host
 async fn validate_peer_url(client: &Client, peer: &PeerConfig) -> Result<()> {
-    let health_url = peer
-        .address
-        .join("/health")
-        .context("Failed to construct health check URL")?;
+    let health_url = peer.address.join("/health").context("Failed to construct health check URL")?;
 
     const RETRY_DELAY: Duration = Duration::from_secs(1);
     const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
     let mut attempt = 1;
     loop {
-        match client
-            .get(health_url.clone())
-            .timeout(REQUEST_TIMEOUT)
-            .send()
-            .await
-        {
+        match client.get(health_url.clone()).timeout(REQUEST_TIMEOUT).send().await {
             Ok(response) => {
                 if response.version() != reqwest::Version::HTTP_2 {
-                    tracing::warn!(
-                        "Peer {} does not support HTTP/2 (using {:?})",
-                        peer.address,
-                        response.version()
-                    );
+                    tracing::warn!("Peer {} does not support HTTP/2 (using {:?})", peer.address, response.version());
                 }
 
                 if !response.status().is_success() {
-                    tracing::warn!(
-                        "Health check failed for peer {} with status {}",
-                        peer.address,
-                        response.status()
-                    );
+                    tracing::warn!("Health check failed for peer {} with status {}", peer.address, response.status());
                 }
                 return Ok(());
             }
             Err(e) => {
-                error!(
-                    "Failed to connect to peer {} (attempt {}): {}",
-                    peer.address, attempt, e
-                );
+                error!("Failed to connect to peer {} (attempt {}): {}", peer.address, attempt, e);
                 tokio::time::sleep(RETRY_DELAY).await;
                 attempt += 1;
                 continue;

@@ -1,34 +1,43 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    read_manifest, FileMetadata, FileType, Manifest, CHECKPOINT_FILE_MAGIC, SUMMARY_FILE_MAGIC,
+use std::{
+    borrow::Borrow,
+    future,
+    ops::Range,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
+
 use anyhow::{anyhow, Context, Result};
-use bytes::buf::Reader;
-use bytes::{Buf, Bytes};
+use bytes::{buf::Reader, Buf, Bytes};
 use futures::{StreamExt, TryStreamExt};
 use prometheus::{register_int_counter_vec_with_registry, IntCounterVec, Registry};
 use rand::seq::SliceRandom;
-use std::borrow::Borrow;
-use std::future;
-use std::ops::Range;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
 use sui_config::node::ArchiveReaderConfig;
-use sui_storage::object_store::http::HttpDownloaderBuilder;
-use sui_storage::object_store::util::get;
-use sui_storage::object_store::ObjectStoreGetExt;
-use sui_storage::{compute_sha3_checksum_for_bytes, make_iterator, verify_checkpoint};
-use sui_types::messages_checkpoint::{
-    CertifiedCheckpointSummary, CheckpointSequenceNumber,
-    FullCheckpointContents as CheckpointContents, VerifiedCheckpoint, VerifiedCheckpointContents,
+use sui_storage::{
+    compute_sha3_checksum_for_bytes,
+    make_iterator,
+    object_store::{http::HttpDownloaderBuilder, util::get, ObjectStoreGetExt},
+    verify_checkpoint,
 };
-use sui_types::storage::WriteStore;
-use tokio::sync::oneshot::Sender;
-use tokio::sync::{oneshot, Mutex};
+use sui_types::{
+    messages_checkpoint::{
+        CertifiedCheckpointSummary,
+        CheckpointSequenceNumber,
+        FullCheckpointContents as CheckpointContents,
+        VerifiedCheckpoint,
+        VerifiedCheckpointContents,
+    },
+    storage::WriteStore,
+};
+use tokio::sync::{oneshot, oneshot::Sender, Mutex};
 use tracing::info;
+
+use crate::{read_manifest, FileMetadata, FileType, Manifest, CHECKPOINT_FILE_MAGIC, SUMMARY_FILE_MAGIC};
 
 #[derive(Debug)]
 pub struct ArchiveReaderMetrics {
@@ -73,13 +82,10 @@ impl ArchiveReaderBalancer {
         }
         Ok(ArchiveReaderBalancer { readers })
     }
+
     pub async fn get_archive_watermark(&self) -> Result<Option<u64>> {
         let mut checkpoints: Vec<Result<CheckpointSequenceNumber>> = vec![];
-        for reader in self
-            .readers
-            .iter()
-            .filter(|r| r.use_for_pruning_watermark())
-        {
+        for reader in self.readers.iter().filter(|r| r.use_for_pruning_watermark()) {
             let latest_checkpoint = reader.latest_available_checkpoint().await;
             info!(
                 "Latest archived checkpoint in remote store: {:?} is: {:?}",
@@ -91,6 +97,7 @@ impl ArchiveReaderBalancer {
         let checkpoints: Result<Vec<CheckpointSequenceNumber>> = checkpoints.into_iter().collect();
         checkpoints.map(|vec| vec.into_iter().min())
     }
+
     pub async fn pick_one_random(
         &self,
         checkpoint_range: Range<CheckpointSequenceNumber>,
@@ -103,12 +110,7 @@ impl ArchiveReaderBalancer {
             }
         }
         if !archives_with_complete_range.is_empty() {
-            return Some(
-                archives_with_complete_range
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .clone(),
-            );
+            return Some(archives_with_complete_range.choose(&mut rand::thread_rng()).unwrap().clone());
         }
         let mut archives_with_partial_range = vec![];
         for reader in self.readers.iter() {
@@ -118,12 +120,7 @@ impl ArchiveReaderBalancer {
             }
         }
         if !archives_with_partial_range.is_empty() {
-            return Some(
-                archives_with_partial_range
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .clone(),
-            );
+            return Some(archives_with_partial_range.choose(&mut rand::thread_rng()).unwrap().clone());
         }
         None
     }
@@ -142,11 +139,7 @@ pub struct ArchiveReader {
 
 impl ArchiveReader {
     pub fn new(config: ArchiveReaderConfig, metrics: &Arc<ArchiveReaderMetrics>) -> Result<Self> {
-        let bucket = config
-            .remote_store_config
-            .bucket
-            .clone()
-            .unwrap_or("unknown".to_string());
+        let bucket = config.remote_store_config.bucket.clone().unwrap_or("unknown".to_string());
         let remote_object_store = if config.remote_store_config.no_sign_request {
             config.remote_store_config.make_http()?
         } else {
@@ -169,35 +162,23 @@ impl ArchiveReader {
 
     /// This function verifies that the files in archive cover the entire range of checkpoints from
     /// sequence number 0 until the latest available checkpoint with no missing checkpoint
-    pub async fn verify_manifest(
-        &self,
-        manifest: Manifest,
-    ) -> Result<Vec<(FileMetadata, FileMetadata)>> {
+    pub async fn verify_manifest(&self, manifest: Manifest) -> Result<Vec<(FileMetadata, FileMetadata)>> {
         let files = manifest.files();
         if files.is_empty() {
             return Err(anyhow!("Unexpected empty archive store"));
         }
 
-        let mut summary_files: Vec<_> = files
-            .clone()
-            .into_iter()
-            .filter(|f| f.file_type == FileType::CheckpointSummary)
-            .collect();
-        let mut contents_files: Vec<_> = files
-            .into_iter()
-            .filter(|f| f.file_type == FileType::CheckpointContent)
-            .collect();
+        let mut summary_files: Vec<_> =
+            files.clone().into_iter().filter(|f| f.file_type == FileType::CheckpointSummary).collect();
+        let mut contents_files: Vec<_> =
+            files.into_iter().filter(|f| f.file_type == FileType::CheckpointContent).collect();
         assert_eq!(summary_files.len(), contents_files.len());
 
         summary_files.sort_by_key(|f| f.checkpoint_seq_range.start);
         contents_files.sort_by_key(|f| f.checkpoint_seq_range.start);
 
-        assert!(summary_files
-            .windows(2)
-            .all(|w| w[1].checkpoint_seq_range.start == w[0].checkpoint_seq_range.end));
-        assert!(contents_files
-            .windows(2)
-            .all(|w| w[1].checkpoint_seq_range.start == w[0].checkpoint_seq_range.end));
+        assert!(summary_files.windows(2).all(|w| w[1].checkpoint_seq_range.start == w[0].checkpoint_seq_range.end));
+        assert!(contents_files.windows(2).all(|w| w[1].checkpoint_seq_range.start == w[0].checkpoint_seq_range.end));
 
         let files: Vec<(FileMetadata, FileMetadata)> = summary_files
             .into_iter()
@@ -215,20 +196,15 @@ impl ArchiveReader {
 
     /// This function downloads summary and content files and ensures their computed checksum matches
     /// the one in manifest
-    pub async fn verify_file_consistency(
-        &self,
-        files: Vec<(FileMetadata, FileMetadata)>,
-    ) -> Result<()> {
+    pub async fn verify_file_consistency(&self, files: Vec<(FileMetadata, FileMetadata)>) -> Result<()> {
         let remote_object_store = self.remote_object_store.clone();
         futures::stream::iter(files.iter())
             .enumerate()
             .map(|(_, (summary_metadata, content_metadata))| {
                 let remote_object_store = remote_object_store.clone();
                 async move {
-                    let summary_data =
-                        get(&remote_object_store, &summary_metadata.file_path()).await?;
-                    let content_data =
-                        get(&remote_object_store, &content_metadata.file_path()).await?;
+                    let summary_data = get(&remote_object_store, &summary_metadata.file_path()).await?;
+                    let content_data = get(&remote_object_store, &content_metadata.file_path()).await?;
                     Ok::<((Bytes, &FileMetadata), (Bytes, &FileMetadata)), anyhow::Error>((
                         (summary_data, summary_metadata),
                         (content_data, content_metadata),
@@ -237,29 +213,20 @@ impl ArchiveReader {
             })
             .boxed()
             .buffer_unordered(self.concurrency)
-            .try_for_each(
-                |((summary_data, summary_metadata), (content_data, content_metadata))| {
-                    let checksums = compute_sha3_checksum_for_bytes(summary_data).and_then(|s| {
-                        compute_sha3_checksum_for_bytes(content_data).map(|c| (s, c))
-                    });
-                    let result = checksums.and_then(|(summary_checksum, content_checksum)| {
-                        (summary_checksum == summary_metadata.sha3_digest)
-                            .then_some(())
-                            .ok_or(anyhow!(
-                                "Summary checksum doesn't match for file: {:?}",
-                                summary_metadata.file_path()
-                            ))?;
-                        (content_checksum == content_metadata.sha3_digest)
-                            .then_some(())
-                            .ok_or(anyhow!(
-                                "Content checksum doesn't match for file: {:?}",
-                                content_metadata.file_path()
-                            ))?;
-                        Ok::<(), anyhow::Error>(())
-                    });
-                    futures::future::ready(result)
-                },
-            )
+            .try_for_each(|((summary_data, summary_metadata), (content_data, content_metadata))| {
+                let checksums = compute_sha3_checksum_for_bytes(summary_data)
+                    .and_then(|s| compute_sha3_checksum_for_bytes(content_data).map(|c| (s, c)));
+                let result = checksums.and_then(|(summary_checksum, content_checksum)| {
+                    (summary_checksum == summary_metadata.sha3_digest)
+                        .then_some(())
+                        .ok_or(anyhow!("Summary checksum doesn't match for file: {:?}", summary_metadata.file_path()))?;
+                    (content_checksum == content_metadata.sha3_digest)
+                        .then_some(())
+                        .ok_or(anyhow!("Content checksum doesn't match for file: {:?}", content_metadata.file_path()))?;
+                    Ok::<(), anyhow::Error>(())
+                });
+                futures::future::ready(result)
+            })
             .await
     }
 
@@ -274,9 +241,7 @@ impl ArchiveReader {
     where
         S: WriteStore + Clone,
     {
-        let (summary_files, start_index, end_index) = self
-            .get_summary_files_for_range(checkpoint_range.clone())
-            .await?;
+        let (summary_files, start_index, end_index) = self.get_summary_files_for_range(checkpoint_range.clone()).await?;
         let remote_object_store = self.remote_object_store.clone();
         let stream = futures::stream::iter(summary_files.iter())
             .enumerate()
@@ -284,8 +249,7 @@ impl ArchiveReader {
             .map(|(_, summary_metadata)| {
                 let remote_object_store = remote_object_store.clone();
                 async move {
-                    let summary_data =
-                        get(&remote_object_store, &summary_metadata.file_path()).await?;
+                    let summary_data = get(&remote_object_store, &summary_metadata.file_path()).await?;
                     Ok::<Bytes, anyhow::Error>(summary_data)
                 }
             })
@@ -293,23 +257,21 @@ impl ArchiveReader {
         stream
             .buffer_unordered(self.concurrency)
             .try_for_each(|summary_data| {
-                let result: Result<(), anyhow::Error> =
-                    make_iterator::<CertifiedCheckpointSummary, Reader<Bytes>>(
-                        SUMMARY_FILE_MAGIC,
-                        summary_data.reader(),
-                    )
-                    .and_then(|summary_iter| {
-                        summary_iter
-                            .filter(|s| {
-                                s.sequence_number >= checkpoint_range.start
-                                    && s.sequence_number < checkpoint_range.end
-                            })
-                            .try_for_each(|summary| {
-                                Self::insert_certified_checkpoint(&store, summary)?;
-                                checkpoint_counter.fetch_add(1, Ordering::Relaxed);
-                                Ok::<(), anyhow::Error>(())
-                            })
-                    });
+                let result: Result<(), anyhow::Error> = make_iterator::<CertifiedCheckpointSummary, Reader<Bytes>>(
+                    SUMMARY_FILE_MAGIC,
+                    summary_data.reader(),
+                )
+                .and_then(|summary_iter| {
+                    summary_iter
+                        .filter(|s| {
+                            s.sequence_number >= checkpoint_range.start && s.sequence_number < checkpoint_range.end
+                        })
+                        .try_for_each(|summary| {
+                            Self::insert_certified_checkpoint(&store, summary)?;
+                            checkpoint_counter.fetch_add(1, Ordering::Relaxed);
+                            Ok::<(), anyhow::Error>(())
+                        })
+                });
                 futures::future::ready(result)
             })
             .await
@@ -332,8 +294,7 @@ impl ArchiveReader {
             .map(|summary_metadata| {
                 let remote_object_store = remote_object_store.clone();
                 async move {
-                    let summary_data =
-                        get(&remote_object_store, &summary_metadata.file_path()).await?;
+                    let summary_data = get(&remote_object_store, &summary_metadata.file_path()).await?;
                     Ok::<Bytes, anyhow::Error>(summary_data)
                 }
             })
@@ -342,20 +303,17 @@ impl ArchiveReader {
         stream
             .buffer_unordered(self.concurrency)
             .try_for_each(|summary_data| {
-                let result: Result<(), anyhow::Error> =
-                    make_iterator::<CertifiedCheckpointSummary, Reader<Bytes>>(
-                        SUMMARY_FILE_MAGIC,
-                        summary_data.reader(),
-                    )
-                    .and_then(|summary_iter| {
-                        summary_iter
-                            .filter(|s| skiplist.contains(&s.sequence_number))
-                            .try_for_each(|summary| {
-                                Self::insert_certified_checkpoint(&store, summary)?;
-                                checkpoint_counter.fetch_add(1, Ordering::Relaxed);
-                                Ok::<(), anyhow::Error>(())
-                            })
-                    });
+                let result: Result<(), anyhow::Error> = make_iterator::<CertifiedCheckpointSummary, Reader<Bytes>>(
+                    SUMMARY_FILE_MAGIC,
+                    summary_data.reader(),
+                )
+                .and_then(|summary_iter| {
+                    summary_iter.filter(|s| skiplist.contains(&s.sequence_number)).try_for_each(|summary| {
+                        Self::insert_certified_checkpoint(&store, summary)?;
+                        checkpoint_counter.fetch_add(1, Ordering::Relaxed);
+                        Ok::<(), anyhow::Error>(())
+                    })
+                });
                 futures::future::ready(result)
             })
             .await
@@ -371,8 +329,7 @@ impl ArchiveReader {
             .map(|summary_metadata| {
                 let remote_object_store = remote_object_store.clone();
                 async move {
-                    let summary_data =
-                        get(&remote_object_store, &summary_metadata.file_path()).await?;
+                    let summary_data = get(&remote_object_store, &summary_metadata.file_path()).await?;
                     Ok::<Bytes, anyhow::Error>(summary_data)
                 }
             })
@@ -416,30 +373,22 @@ impl ArchiveReader {
     {
         let manifest = self.manifest.lock().await.clone();
 
-        let latest_available_checkpoint = manifest
-            .next_checkpoint_seq_num()
-            .checked_sub(1)
-            .context("Checkpoint seq num underflow")?;
+        let latest_available_checkpoint =
+            manifest.next_checkpoint_seq_num().checked_sub(1).context("Checkpoint seq num underflow")?;
 
         if checkpoint_range.start > latest_available_checkpoint {
-            return Err(anyhow!(
-                "Latest available checkpoint is: {}",
-                latest_available_checkpoint
-            ));
+            return Err(anyhow!("Latest available checkpoint is: {}", latest_available_checkpoint));
         }
 
         let files: Vec<(FileMetadata, FileMetadata)> = self.verify_manifest(manifest).await?;
 
-        let start_index = match files.binary_search_by_key(&checkpoint_range.start, |(s, _c)| {
-            s.checkpoint_seq_range.start
-        }) {
-            Ok(index) => index,
-            Err(index) => index - 1,
-        };
+        let start_index =
+            match files.binary_search_by_key(&checkpoint_range.start, |(s, _c)| s.checkpoint_seq_range.start) {
+                Ok(index) => index,
+                Err(index) => index - 1,
+            };
 
-        let end_index = match files.binary_search_by_key(&checkpoint_range.end, |(s, _c)| {
-            s.checkpoint_seq_range.start
-        }) {
+        let end_index = match files.binary_search_by_key(&checkpoint_range.end, |(s, _c)| s.checkpoint_seq_range.start) {
             Ok(index) => index,
             Err(index) => index,
         };
@@ -451,44 +400,34 @@ impl ArchiveReader {
             .map(|(_, (summary_metadata, content_metadata))| {
                 let remote_object_store = remote_object_store.clone();
                 async move {
-                    let summary_data =
-                        get(&remote_object_store, &summary_metadata.file_path()).await?;
-                    let content_data =
-                        get(&remote_object_store, &content_metadata.file_path()).await?;
+                    let summary_data = get(&remote_object_store, &summary_metadata.file_path()).await?;
+                    let content_data = get(&remote_object_store, &content_metadata.file_path()).await?;
                     Ok::<(Bytes, Bytes), anyhow::Error>((summary_data, content_data))
                 }
             })
             .boxed()
             .buffered(self.concurrency)
             .try_for_each(|(summary_data, content_data)| {
-                let result: Result<(), anyhow::Error> = make_iterator::<
-                    CertifiedCheckpointSummary,
-                    Reader<Bytes>,
-                >(
-                    SUMMARY_FILE_MAGIC, summary_data.reader()
+                let result: Result<(), anyhow::Error> = make_iterator::<CertifiedCheckpointSummary, Reader<Bytes>>(
+                    SUMMARY_FILE_MAGIC,
+                    summary_data.reader(),
                 )
                 .and_then(|s| {
-                    make_iterator::<CheckpointContents, Reader<Bytes>>(
-                        CHECKPOINT_FILE_MAGIC,
-                        content_data.reader(),
-                    )
-                    .map(|c| (s, c))
+                    make_iterator::<CheckpointContents, Reader<Bytes>>(CHECKPOINT_FILE_MAGIC, content_data.reader())
+                        .map(|c| (s, c))
                 })
                 .and_then(|(summary_iter, content_iter)| {
                     summary_iter
                         .zip(content_iter)
                         .filter(|(s, _c)| {
-                            s.sequence_number >= checkpoint_range.start
-                                && s.sequence_number < checkpoint_range.end
+                            s.sequence_number >= checkpoint_range.start && s.sequence_number < checkpoint_range.end
                         })
                         .try_for_each(|(summary, contents)| {
-                            let verified_checkpoint =
-                                Self::get_or_insert_verified_checkpoint(&store, summary, verify)?;
+                            let verified_checkpoint = Self::get_or_insert_verified_checkpoint(&store, summary, verify)?;
                             // Verify content
                             let digest = verified_checkpoint.content_digest;
                             contents.verify_digests(digest)?;
-                            let verified_contents =
-                                VerifiedCheckpointContents::new_unchecked(contents.clone());
+                            let verified_contents = VerifiedCheckpointContents::new_unchecked(contents.clone());
                             // Insert content
                             store
                                 .insert_checkpoint_contents(&verified_checkpoint, verified_contents)
@@ -518,10 +457,7 @@ impl ArchiveReader {
     /// Return latest available checkpoint in archive
     pub async fn latest_available_checkpoint(&self) -> Result<CheckpointSequenceNumber> {
         let manifest = self.manifest.lock().await.clone();
-        manifest
-            .next_checkpoint_seq_num()
-            .checked_sub(1)
-            .context("No checkpoint data in archive")
+        manifest.next_checkpoint_seq_num().checked_sub(1).context("No checkpoint data in archive")
     }
 
     pub fn use_for_pruning_watermark(&self) -> bool {
@@ -541,10 +477,7 @@ impl ArchiveReader {
         Ok(self.manifest.lock().await.clone())
     }
 
-    async fn sync_manifest(
-        remote_store: Arc<dyn ObjectStoreGetExt>,
-        manifest: Arc<Mutex<Manifest>>,
-    ) -> Result<()> {
+    async fn sync_manifest(remote_store: Arc<dyn ObjectStoreGetExt>, manifest: Arc<Mutex<Manifest>>) -> Result<()> {
         let new_manifest = read_manifest(remote_store.clone()).await?;
         let mut locked = manifest.lock().await;
         *locked = new_manifest;
@@ -552,10 +485,7 @@ impl ArchiveReader {
     }
 
     /// Insert checkpoint summary without verifying it
-    fn insert_certified_checkpoint<S>(
-        store: &S,
-        certified_checkpoint: CertifiedCheckpointSummary,
-    ) -> Result<()>
+    fn insert_certified_checkpoint<S>(store: &S, certified_checkpoint: CertifiedCheckpointSummary) -> Result<()>
     where
         S: WriteStore + Clone,
     {
@@ -579,16 +509,11 @@ impl ArchiveReader {
             .unwrap_or_else(|| {
                 let verified_checkpoint = if verify {
                     // Verify checkpoint summary
-                    let prev_checkpoint_seq_num = certified_checkpoint
-                        .sequence_number
-                        .checked_sub(1)
-                        .context("Checkpoint seq num underflow")?;
+                    let prev_checkpoint_seq_num =
+                        certified_checkpoint.sequence_number.checked_sub(1).context("Checkpoint seq num underflow")?;
                     let prev_checkpoint = store
                         .get_checkpoint_by_sequence_number(prev_checkpoint_seq_num)
-                        .context(format!(
-                            "Missing previous checkpoint {} in store",
-                            prev_checkpoint_seq_num
-                        ))?;
+                        .context(format!("Missing previous checkpoint {} in store", prev_checkpoint_seq_num))?;
 
                     verify_checkpoint(&prev_checkpoint, store, certified_checkpoint)
                         .map_err(|_| anyhow!("Checkpoint verification failed"))?
@@ -600,9 +525,7 @@ impl ArchiveReader {
                     .insert_checkpoint(&verified_checkpoint)
                     .map_err(|e| anyhow!("Failed to insert checkpoint: {e}"))?;
                 // Update highest verified checkpoint watermark
-                store
-                    .update_highest_verified_checkpoint(&verified_checkpoint)
-                    .expect("store operation should not fail");
+                store.update_highest_verified_checkpoint(&verified_checkpoint).expect("store operation should not fail");
                 Ok::<VerifiedCheckpoint, anyhow::Error>(verified_checkpoint)
             })
             .map_err(|e| anyhow!("Failed to get verified checkpoint: {:?}", e))
@@ -614,34 +537,23 @@ impl ArchiveReader {
     ) -> Result<(Vec<FileMetadata>, usize, usize)> {
         let manifest = self.manifest.lock().await.clone();
 
-        let latest_available_checkpoint = manifest
-            .next_checkpoint_seq_num()
-            .checked_sub(1)
-            .context("Checkpoint seq num underflow")?;
+        let latest_available_checkpoint =
+            manifest.next_checkpoint_seq_num().checked_sub(1).context("Checkpoint seq num underflow")?;
 
         if checkpoint_range.start > latest_available_checkpoint {
-            return Err(anyhow!(
-                "Latest available checkpoint is: {}",
-                latest_available_checkpoint
-            ));
+            return Err(anyhow!("Latest available checkpoint is: {}", latest_available_checkpoint));
         }
 
-        let summary_files: Vec<FileMetadata> = self
-            .verify_manifest(manifest)
-            .await?
-            .iter()
-            .map(|(s, _)| s.clone())
-            .collect();
+        let summary_files: Vec<FileMetadata> =
+            self.verify_manifest(manifest).await?.iter().map(|(s, _)| s.clone()).collect();
 
-        let start_index = match summary_files
-            .binary_search_by_key(&checkpoint_range.start, |s| s.checkpoint_seq_range.start)
-        {
-            Ok(index) => index,
-            Err(index) => index - 1,
-        };
+        let start_index =
+            match summary_files.binary_search_by_key(&checkpoint_range.start, |s| s.checkpoint_seq_range.start) {
+                Ok(index) => index,
+                Err(index) => index - 1,
+            };
 
-        let end_index = match summary_files
-            .binary_search_by_key(&checkpoint_range.end, |s| s.checkpoint_seq_range.start)
+        let end_index = match summary_files.binary_search_by_key(&checkpoint_range.end, |s| s.checkpoint_seq_range.start)
         {
             Ok(index) => index,
             Err(index) => index,
@@ -650,32 +562,20 @@ impl ArchiveReader {
         Ok((summary_files, start_index, end_index))
     }
 
-    async fn get_summary_files_for_list(
-        &self,
-        checkpoints: Vec<CheckpointSequenceNumber>,
-    ) -> Result<Vec<FileMetadata>> {
+    async fn get_summary_files_for_list(&self, checkpoints: Vec<CheckpointSequenceNumber>) -> Result<Vec<FileMetadata>> {
         assert!(!checkpoints.is_empty());
         let manifest = self.manifest.lock().await.clone();
-        let latest_available_checkpoint = manifest
-            .next_checkpoint_seq_num()
-            .checked_sub(1)
-            .context("Checkpoint seq num underflow")?;
+        let latest_available_checkpoint =
+            manifest.next_checkpoint_seq_num().checked_sub(1).context("Checkpoint seq num underflow")?;
 
         let mut ordered_checkpoints = checkpoints;
         ordered_checkpoints.sort();
         if *ordered_checkpoints.first().unwrap() > latest_available_checkpoint {
-            return Err(anyhow!(
-                "Latest available checkpoint is: {}",
-                latest_available_checkpoint
-            ));
+            return Err(anyhow!("Latest available checkpoint is: {}", latest_available_checkpoint));
         }
 
-        let summary_files: Vec<FileMetadata> = self
-            .verify_manifest(manifest)
-            .await?
-            .iter()
-            .map(|(s, _)| s.clone())
-            .collect();
+        let summary_files: Vec<FileMetadata> =
+            self.verify_manifest(manifest).await?.iter().map(|(s, _)| s.clone()).collect();
 
         let mut summaries_filtered = vec![];
         for checkpoint in ordered_checkpoints.iter() {

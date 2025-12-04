@@ -1,12 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Context};
-use std::collections::HashMap;
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::{
+    collections::HashMap,
+    fs::File,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
+use anyhow::{bail, Context};
 use move_core_types::account_address::AccountAddress;
 use move_package::{
     lock_file::{self, schema::ManagedPackage, LockFile},
@@ -37,10 +39,7 @@ pub enum PublishedAtError {
         "Conflicting 'published-at' addresses between Move.toml -- {id_manifest} -- and \
          Move.lock -- {id_lock}"
     )]
-    Conflict {
-        id_lock: ObjectID,
-        id_manifest: ObjectID,
-    },
+    Conflict { id_lock: ObjectID, id_manifest: ObjectID },
 }
 
 /// Update the `Move.lock` file with automated address management info.
@@ -120,9 +119,8 @@ pub fn set_package_id(
     let Ok(mut lock_file) = File::open(lock_file_path.clone()) else {
         return Ok(None);
     };
-    let managed_package = ManagedPackage::read(&mut lock_file)
-        .ok()
-        .and_then(|m| m.into_iter().find(|(_, v)| v.chain_id == *chain_id));
+    let managed_package =
+        ManagedPackage::read(&mut lock_file).ok().and_then(|m| m.into_iter().find(|(_, v)| v.chain_id == *chain_id));
     let Some((env, v)) = managed_package else {
         return Ok(None);
     };
@@ -143,10 +141,7 @@ pub fn set_package_id(
 /// Else, we resolve from the `Move.lock`, where addresses are automatically
 /// managed. If conflicting IDs are found in the `Move.lock` vs. `Move.toml`, a
 /// "Conflict" error message returns.
-pub fn resolve_published_id(
-    package: &Package,
-    chain_id: Option<String>,
-) -> Result<ObjectID, PublishedAtError> {
+pub fn resolve_published_id(package: &Package, chain_id: Option<String>) -> Result<ObjectID, PublishedAtError> {
     // Look up a valid `published-at` in the `Move.toml` first, which we'll
     // return if the Move.lock does not manage addresses.
     let published_id_in_manifest = manifest_published_at(package);
@@ -164,15 +159,11 @@ pub fn resolve_published_id(
     };
 
     // Find the environment and ManagedPackage data for this chain_id.
-    let id_in_lock_for_chain_id =
-        lock_published_at(ManagedPackage::read(&mut lock_file).ok(), chain_id.as_ref());
+    let id_in_lock_for_chain_id = lock_published_at(ManagedPackage::read(&mut lock_file).ok(), chain_id.as_ref());
 
     match (id_in_lock_for_chain_id, published_id_in_manifest) {
         (Ok(id_lock), Ok(id_manifest)) if id_lock != id_manifest => {
-            Err(PublishedAtError::Conflict {
-                id_lock,
-                id_manifest,
-            })
+            Err(PublishedAtError::Conflict { id_lock, id_manifest })
         }
 
         (Ok(id), _) | (_, Ok(id)) => Ok(id),
@@ -185,17 +176,12 @@ pub fn resolve_published_id(
 }
 
 fn manifest_published_at(package: &Package) -> Result<ObjectID, PublishedAtError> {
-    let Some(value) = package
-        .source_package
-        .package
-        .custom_properties
-        .get(&Symbol::from(PUBLISHED_AT_MANIFEST_FIELD))
+    let Some(value) = package.source_package.package.custom_properties.get(&Symbol::from(PUBLISHED_AT_MANIFEST_FIELD))
     else {
         return Err(PublishedAtError::NotPresent);
     };
 
-    let id =
-        ObjectID::from_str(value.as_str()).map_err(|_| PublishedAtError::Invalid(value.clone()))?;
+    let id = ObjectID::from_str(value.as_str()).map_err(|_| PublishedAtError::Invalid(value.clone()))?;
 
     if id == ObjectID::ZERO {
         Err(PublishedAtError::NotPresent)
@@ -212,10 +198,7 @@ fn lock_published_at(
         return Err(PublishedAtError::NotPresent);
     };
 
-    let managed_package = lock
-        .into_values()
-        .find(|v| v.chain_id == *chain_id)
-        .ok_or(PublishedAtError::NotPresent)?;
+    let managed_package = lock.into_values().find(|v| v.chain_id == *chain_id).ok_or(PublishedAtError::NotPresent)?;
 
     let id = ObjectID::from_str(managed_package.latest_published_id.as_str())
         .map_err(|_| PublishedAtError::Invalid(managed_package.latest_published_id.clone()))?;

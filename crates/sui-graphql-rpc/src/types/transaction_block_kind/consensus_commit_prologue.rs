@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{date_time::DateTime, epoch::Epoch, uint53::UInt53};
 use async_graphql::*;
 use fastcrypto::encoding::{Base58, Encoding};
 use sui_types::{
@@ -14,6 +13,8 @@ use sui_types::{
         ConsensusDeterminedVersionAssignments,
     },
 };
+
+use crate::types::{date_time::DateTime, epoch::Epoch, uint53::UInt53};
 
 /// Other transaction kinds are usually represented by directly wrapping their native
 /// representation. This kind has two native versions in the protocol, so the same cannot be done.
@@ -43,9 +44,7 @@ pub(crate) struct ConsensusCommitPrologueTransaction {
 impl ConsensusCommitPrologueTransaction {
     /// Epoch of the commit prologue transaction.
     async fn epoch(&self, ctx: &Context<'_>) -> Result<Option<Epoch>> {
-        Epoch::query(ctx, Some(self.epoch), self.checkpoint_viewed_at)
-            .await
-            .extend()
+        Epoch::query(ctx, Some(self.epoch), self.checkpoint_viewed_at).await.extend()
     }
 
     /// Consensus round of the commit.
@@ -61,16 +60,12 @@ impl ConsensusCommitPrologueTransaction {
     /// Digest of consensus output, encoded as a Base58 string (only available from V2 of the
     /// transaction).
     async fn consensus_commit_digest(&self) -> Option<String> {
-        self.consensus_commit_digest
-            .map(|digest| Base58::encode(digest.inner()))
+        self.consensus_commit_digest.map(|digest| Base58::encode(digest.inner()))
     }
 }
 
 impl ConsensusCommitPrologueTransaction {
-    pub(crate) fn from_v1(
-        ccp: NativeConsensusCommitPrologueTransactionV1,
-        checkpoint_viewed_at: u64,
-    ) -> Self {
+    pub(crate) fn from_v1(ccp: NativeConsensusCommitPrologueTransactionV1, checkpoint_viewed_at: u64) -> Self {
         Self {
             epoch: ccp.epoch,
             round: ccp.round,
@@ -82,10 +77,7 @@ impl ConsensusCommitPrologueTransaction {
         }
     }
 
-    pub(crate) fn from_v2(
-        ccp: NativeConsensusCommitPrologueTransactionV2,
-        checkpoint_viewed_at: u64,
-    ) -> Self {
+    pub(crate) fn from_v2(ccp: NativeConsensusCommitPrologueTransactionV2, checkpoint_viewed_at: u64) -> Self {
         Self {
             epoch: ccp.epoch,
             round: ccp.round,
@@ -97,10 +89,7 @@ impl ConsensusCommitPrologueTransaction {
         }
     }
 
-    pub(crate) fn from_v3(
-        ccp: NativeConsensusCommitPrologueTransactionV3,
-        checkpoint_viewed_at: u64,
-    ) -> Self {
+    pub(crate) fn from_v3(ccp: NativeConsensusCommitPrologueTransactionV3, checkpoint_viewed_at: u64) -> Self {
         Self {
             epoch: ccp.epoch,
             round: ccp.round,
@@ -108,9 +97,7 @@ impl ConsensusCommitPrologueTransaction {
             commit_timestamp_ms: ccp.commit_timestamp_ms,
             consensus_commit_digest: Some(ccp.consensus_commit_digest),
             checkpoint_viewed_at,
-            consensus_determined_version_assignments: Some(
-                ccp.consensus_determined_version_assignments,
-            ),
+            consensus_determined_version_assignments: Some(ccp.consensus_determined_version_assignments),
         }
     }
 }

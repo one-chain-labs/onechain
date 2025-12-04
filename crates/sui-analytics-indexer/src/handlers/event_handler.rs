@@ -1,25 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::Path;
+
 use anyhow::Result;
 use fastcrypto::encoding::{Base64, Encoding};
 use move_core_types::annotated_value::MoveValue;
-use sui_types::SYSTEM_PACKAGE_ADDRESSES;
-
-use std::path::Path;
 use sui_data_ingestion_core::Worker;
-use tokio::sync::Mutex;
-
-use crate::handlers::AnalyticsHandler;
-use crate::package_store::{LocalDBPackageStore, PackageCache};
-use crate::tables::EventEntry;
-use crate::FileType;
 use sui_json_rpc_types::type_and_fields_from_move_event_data;
 use sui_package_resolver::Resolver;
 use sui_rpc_api::CheckpointData;
-use sui_types::digests::TransactionDigest;
-use sui_types::effects::TransactionEvents;
-use sui_types::event::Event;
+use sui_types::{digests::TransactionDigest, effects::TransactionEvents, event::Event, SYSTEM_PACKAGE_ADDRESSES};
+use tokio::sync::Mutex;
+
+use crate::{
+    handlers::AnalyticsHandler,
+    package_store::{LocalDBPackageStore, PackageCache},
+    tables::EventEntry,
+    FileType,
+};
 
 pub struct EventHandler {
     state: Mutex<State>,
@@ -36,11 +35,7 @@ impl Worker for EventHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions: checkpoint_transactions,
-            ..
-        } = checkpoint_data;
+        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
         let mut state = self.state.lock().await;
         for checkpoint_transaction in checkpoint_transactions {
             for object in checkpoint_transaction.output_objects.iter() {
@@ -58,10 +53,7 @@ impl Worker for EventHandler {
                 .await?;
             }
             if checkpoint_summary.end_of_epoch_data.is_some() {
-                state
-                    .resolver
-                    .package_store()
-                    .evict(SYSTEM_PACKAGE_ADDRESSES.iter().copied());
+                state.resolver.package_store().evict(SYSTEM_PACKAGE_ADDRESSES.iter().copied());
             }
         }
         Ok(())
@@ -94,10 +86,9 @@ impl EventHandler {
             package_store: package_store.clone(),
             resolver: Resolver::new(PackageCache::new(package_store)),
         };
-        Self {
-            state: Mutex::new(state),
-        }
+        Self { state: Mutex::new(state) }
     }
+
     async fn process_events(
         &self,
         epoch: u64,
@@ -108,18 +99,10 @@ impl EventHandler {
         state: &mut State,
     ) -> Result<()> {
         for (idx, event) in events.data.iter().enumerate() {
-            let Event {
-                package_id,
-                transaction_module,
-                sender,
-                type_,
-                contents,
-            } = event;
+            let Event { package_id, transaction_module, sender, type_, contents } = event;
             let layout = state
                 .resolver
-                .type_layout(move_core_types::language_storage::TypeTag::Struct(
-                    Box::new(type_.clone()),
-                ))
+                .type_layout(move_core_types::language_storage::TypeTag::Struct(Box::new(type_.clone())))
                 .await?;
             let move_value = MoveValue::simple_deserialize(contents, &layout)?;
             let (_, event_json) = type_and_fields_from_move_event_data(move_value)?;

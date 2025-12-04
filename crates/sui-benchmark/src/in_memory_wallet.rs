@@ -8,13 +8,17 @@ use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     crypto::AccountKeyPair,
     object::Owner,
-    transaction::{CallArg, Transaction, TransactionData, TransactionDataAPI},
+    transaction::{CallArg, Command, Transaction, TransactionData, TransactionDataAPI},
     utils::to_sender_signed_transaction,
 };
 
-use crate::ProgrammableTransactionBuilder;
-use crate::{convert_move_call_args, workloads::Gas, BenchMoveCallArg, ExecutionEffects};
-use sui_types::transaction::Command;
+use crate::{
+    convert_move_call_args,
+    workloads::Gas,
+    BenchMoveCallArg,
+    ExecutionEffects,
+    ProgrammableTransactionBuilder,
+};
 
 /// A Sui account and all of the objects it owns
 #[derive(Debug)]
@@ -65,20 +69,12 @@ pub struct InMemoryWallet {
 
 impl InMemoryWallet {
     pub fn new(gas: &Gas) -> Self {
-        let mut wallet = InMemoryWallet {
-            accounts: BTreeMap::new(),
-        };
+        let mut wallet = InMemoryWallet { accounts: BTreeMap::new() };
         wallet.add_account(gas.1, gas.2.clone(), gas.0, Vec::new());
         wallet
     }
 
-    pub fn add_account(
-        &mut self,
-        addr: SuiAddress,
-        key: Arc<AccountKeyPair>,
-        gas: ObjectRef,
-        objs: Vec<ObjectRef>,
-    ) {
+    pub fn add_account(&mut self, addr: SuiAddress, key: Arc<AccountKeyPair>, gas: ObjectRef, objs: Vec<ObjectRef>) {
         self.accounts.insert(addr, SuiAccount::new(key, gas, objs));
     }
 
@@ -225,12 +221,6 @@ pub fn move_call_pt_impl(
         type_arguments,
         args,
     ));
-    let data = TransactionData::new_programmable(
-        sender,
-        vec![*gas_ref],
-        builder.finish(),
-        gas_budget,
-        gas_price,
-    );
+    let data = TransactionData::new_programmable(sender, vec![*gas_ref], builder.finish(), gas_budget, gas_price);
     to_sender_signed_transaction(data, keypair)
 }

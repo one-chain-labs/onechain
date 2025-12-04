@@ -17,16 +17,12 @@ use sui_types::{
 pub(crate) struct KvEpochEnds;
 
 impl Processor for KvEpochEnds {
-    const NAME: &'static str = "kv_epoch_ends";
-
     type Value = StoredEpochEnd;
 
+    const NAME: &'static str = "kv_epoch_ends";
+
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions,
-            ..
-        } = checkpoint.as_ref();
+        let CheckpointData { checkpoint_summary, transactions, .. } = checkpoint.as_ref();
 
         let Some(end_of_epoch) = checkpoint_summary.end_of_epoch_data.as_ref() else {
             return Ok(vec![]);
@@ -59,11 +55,7 @@ impl Processor for KvEpochEnds {
             .events
             .iter()
             .flat_map(|events| &events.data)
-            .find_map(|event| {
-                event
-                    .is_system_epoch_info_event()
-                    .then(|| bcs::from_bytes(&event.contents))
-            })
+            .find_map(|event| event.is_system_epoch_info_event().then(|| bcs::from_bytes(&event.contents)))
             .transpose()
             .context("Failed to deserialize SystemEpochInfoEvent")?
         {
@@ -119,10 +111,6 @@ impl Handler for KvEpochEnds {
     const MIN_EAGER_ROWS: usize = 1;
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
-        Ok(diesel::insert_into(kv_epoch_ends::table)
-            .values(values)
-            .on_conflict_do_nothing()
-            .execute(conn)
-            .await?)
+        Ok(diesel::insert_into(kv_epoch_ends::table).values(values).on_conflict_do_nothing().execute(conn).await?)
     }
 }

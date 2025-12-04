@@ -20,6 +20,7 @@ pub enum KeyIdentity {
 
 impl FromStr for KeyIdentity {
     type Err = anyhow::Error;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with("0x") {
             Ok(KeyIdentity::Address(SuiAddress::from_str(s)?))
@@ -41,10 +42,7 @@ impl Display for KeyIdentity {
 
 /// Get the SuiAddress corresponding to this key identity.
 /// If no string is provided, then the current active address is returned.
-pub fn get_identity_address(
-    input: Option<KeyIdentity>,
-    ctx: &mut WalletContext,
-) -> Result<SuiAddress, Error> {
+pub fn get_identity_address(input: Option<KeyIdentity>, ctx: &mut WalletContext) -> Result<SuiAddress, Error> {
     if let Some(addr) = input {
         get_identity_address_from_keystore(addr, &ctx.config.keystore)
     } else {
@@ -52,10 +50,7 @@ pub fn get_identity_address(
     }
 }
 
-pub fn get_identity_address_from_keystore(
-    input: KeyIdentity,
-    keystore: &Keystore,
-) -> Result<SuiAddress, Error> {
+pub fn get_identity_address_from_keystore(input: KeyIdentity, keystore: &Keystore) -> Result<SuiAddress, Error> {
     match input {
         KeyIdentity::Address(x) => Ok(x),
         KeyIdentity::Alias(x) => Ok(*keystore.get_address_by_alias(x)?),

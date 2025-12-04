@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use fastcrypto::{hmac, traits::ToFromBytes};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
@@ -12,7 +13,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 const HMAC_SHA3_256_BLOCK_SIZE: usize = 136;
 
@@ -43,17 +45,11 @@ pub fn hmac_sha3_256(
     debug_assert!(args.len() == 2);
 
     // Load the cost parameters from the protocol config
-    let hmac_hmac_sha3_256_cost_params = &context
-        .extensions()
-        .get::<NativesCostTable>()
-        .hmac_hmac_sha3_256_cost_params
-        .clone();
+    let hmac_hmac_sha3_256_cost_params =
+        &context.extensions().get::<NativesCostTable>().hmac_hmac_sha3_256_cost_params.clone();
 
     // Charge the base cost for this operation
-    native_charge_gas_early_exit!(
-        context,
-        hmac_hmac_sha3_256_cost_params.hmac_hmac_sha3_256_cost_base
-    );
+    native_charge_gas_early_exit!(context, hmac_hmac_sha3_256_cost_params.hmac_hmac_sha3_256_cost_base);
 
     let message = pop_arg!(args, VectorRef);
     let key = pop_arg!(args, VectorRef);
@@ -67,8 +63,7 @@ pub fn hmac_sha3_256(
             // same cost for msg and key
             * ((msg_len + key_len) as u64).into()
             + hmac_hmac_sha3_256_cost_params.hmac_hmac_sha3_256_input_cost_per_block
-                * ((((msg_len + key_len) + (2 * HMAC_SHA3_256_BLOCK_SIZE - 2))
-                    / HMAC_SHA3_256_BLOCK_SIZE) as u64)
+                * ((((msg_len + key_len) + (2 * HMAC_SHA3_256_BLOCK_SIZE - 2)) / HMAC_SHA3_256_BLOCK_SIZE) as u64)
                     .into()
     );
 
@@ -76,10 +71,7 @@ pub fn hmac_sha3_256(
         .expect("HMAC key can be of any length and from_bytes should always succeed");
     let cost = context.gas_used();
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::vector_u8(
-            hmac::hmac_sha3_256(&hmac_key, &message.as_bytes_ref()).to_vec()
-        )],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
+        hmac::hmac_sha3_256(&hmac_key, &message.as_bytes_ref()).to_vec()
+    )]))
 }

@@ -1,16 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::time::Duration;
+
 use mysten_common::metrics::{push_metrics, MetricsPushClient};
+use mysten_metrics::RegistryService;
 use mysten_network::metrics::MetricsCallbackProvider;
 use prometheus::{
-    register_histogram_vec_with_registry, register_int_counter_vec_with_registry,
-    register_int_gauge_vec_with_registry, HistogramVec, IntCounterVec, IntGaugeVec, Registry,
+    register_histogram_vec_with_registry,
+    register_int_counter_vec_with_registry,
+    register_int_gauge_vec_with_registry,
+    HistogramVec,
+    IntCounterVec,
+    IntGaugeVec,
+    Registry,
 };
-
-use std::time::Duration;
 use sui_network::tonic::Code;
-
-use mysten_metrics::RegistryService;
 
 /// Starts a task to periodically push metrics to a configured endpoint if a metrics push endpoint
 /// is configured.
@@ -21,13 +25,8 @@ pub fn start_metrics_push_task(config: &sui_config::NodeConfig, registry: Regist
     const DEFAULT_METRICS_PUSH_INTERVAL: Duration = Duration::from_secs(60);
 
     let (interval, url) = match &config.metrics {
-        Some(MetricsConfig {
-            push_interval_seconds,
-            push_url: Some(url),
-        }) => {
-            let interval = push_interval_seconds
-                .map(Duration::from_secs)
-                .unwrap_or(DEFAULT_METRICS_PUSH_INTERVAL);
+        Some(MetricsConfig { push_interval_seconds, push_url: Some(url) }) => {
+            let interval = push_interval_seconds.map(Duration::from_secs).unwrap_or(DEFAULT_METRICS_PUSH_INTERVAL);
             let url = reqwest::Url::parse(url).expect("unable to parse metrics push url");
             (interval, url)
         }
@@ -123,9 +122,7 @@ pub struct GrpcMetrics {
     grpc_request_latency: HistogramVec,
 }
 
-const LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1., 2.5, 5., 10., 20., 30., 60., 90.,
-];
+const LATENCY_SEC_BUCKETS: &[f64] = &[0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1., 2.5, 5., 10., 20., 30., 60., 90.];
 
 impl GrpcMetrics {
     pub fn new(registry: &Registry) -> Self {
@@ -160,12 +157,8 @@ impl MetricsCallbackProvider for GrpcMetrics {
     fn on_request(&self, _path: String) {}
 
     fn on_response(&self, path: String, latency: Duration, _status: u16, grpc_status_code: Code) {
-        self.grpc_requests
-            .with_label_values(&[path.as_str(), format!("{grpc_status_code:?}").as_str()])
-            .inc();
-        self.grpc_request_latency
-            .with_label_values(&[path.as_str()])
-            .observe(latency.as_secs_f64());
+        self.grpc_requests.with_label_values(&[path.as_str(), format!("{grpc_status_code:?}").as_str()]).inc();
+        self.grpc_request_latency.with_label_values(&[path.as_str()]).observe(latency.as_secs_f64());
     }
 
     fn on_start(&self, path: &str) {
@@ -179,9 +172,10 @@ impl MetricsCallbackProvider for GrpcMetrics {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
     use mysten_metrics::start_prometheus_server;
     use prometheus::{IntCounter, Registry};
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[tokio::test]
     pub async fn test_metrics_endpoint_with_multiple_registries_add_remove() {
@@ -246,11 +240,7 @@ sui_counter_2 1"
 
     async fn get_metrics(port: u16) -> String {
         let client = reqwest::Client::new();
-        let response = client
-            .get(format!("http://127.0.0.1:{}/metrics", port))
-            .send()
-            .await
-            .unwrap();
+        let response = client.get(format!("http://127.0.0.1:{}/metrics", port)).send().await.unwrap();
         response.text().await.unwrap()
     }
 }

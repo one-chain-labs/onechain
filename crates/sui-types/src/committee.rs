@@ -2,23 +2,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::base_types::*;
-use crate::crypto::{
-    random_committee_key_pairs_of_size, AuthorityKeyPair, AuthorityPublicKey, NetworkPublicKey,
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    fmt::{Display, Formatter, Write},
+    hash::{Hash, Hasher},
 };
-use crate::error::{SuiError, SuiResult};
-use crate::multiaddr::Multiaddr;
+
 use fastcrypto::traits::KeyPair;
 use once_cell::sync::OnceCell;
-use rand::rngs::{StdRng, ThreadRng};
-use rand::seq::SliceRandom;
-use rand::{Rng, SeedableRng};
+use rand::{
+    rngs::{StdRng, ThreadRng},
+    seq::SliceRandom,
+    Rng,
+    SeedableRng,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt::Write;
-use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
 pub use sui_protocol_config::ProtocolVersion;
+
+use super::base_types::*;
+use crate::{
+    crypto::{random_committee_key_pairs_of_size, AuthorityKeyPair, AuthorityPublicKey, NetworkPublicKey},
+    error::{SuiError, SuiResult},
+    multiaddr::Multiaddr,
+};
 
 pub type EpochId = u64;
 
@@ -55,8 +61,7 @@ pub struct Committee {
 
 impl Committee {
     pub fn new(epoch: EpochId, voting_rights: BTreeMap<AuthorityName, StakeUnit>) -> Self {
-        let mut voting_rights: Vec<(AuthorityName, StakeUnit)> =
-            voting_rights.iter().map(|(a, s)| (*a, *s)).collect();
+        let mut voting_rights: Vec<(AuthorityName, StakeUnit)> = voting_rights.iter().map(|(a, s)| (*a, *s)).collect();
 
         assert!(!voting_rights.is_empty());
         assert!(voting_rights.iter().any(|(_, s)| *s != 0));
@@ -67,12 +72,7 @@ impl Committee {
 
         let (expanded_keys, index_map) = Self::load_inner(&voting_rights);
 
-        Committee {
-            epoch,
-            voting_rights,
-            expanded_keys,
-            index_map,
-        }
+        Committee { epoch, voting_rights, expanded_keys, index_map }
     }
 
     /// Normalize the given weights to TOTAL_VOTING_POWER and create the committee.
@@ -103,27 +103,14 @@ impl Committee {
     // We call this if these have not yet been computed
     pub fn load_inner(
         voting_rights: &[(AuthorityName, StakeUnit)],
-    ) -> (
-        HashMap<AuthorityName, AuthorityPublicKey>,
-        HashMap<AuthorityName, usize>,
-    ) {
+    ) -> (HashMap<AuthorityName, AuthorityPublicKey>, HashMap<AuthorityName, usize>) {
         let expanded_keys: HashMap<AuthorityName, AuthorityPublicKey> = voting_rights
             .iter()
-            .map(|(addr, _)| {
-                (
-                    *addr,
-                    (*addr)
-                        .try_into()
-                        .expect("Validator pubkey is always verified on-chain"),
-                )
-            })
+            .map(|(addr, _)| (*addr, (*addr).try_into().expect("Validator pubkey is always verified on-chain")))
             .collect();
 
-        let index_map: HashMap<AuthorityName, usize> = voting_rights
-            .iter()
-            .enumerate()
-            .map(|(index, (addr, _))| (*addr, index))
-            .collect();
+        let index_map: HashMap<AuthorityName, usize> =
+            voting_rights.iter().enumerate().map(|(index, (addr, _))| (*addr, index)).collect();
         (expanded_keys, index_map)
     }
 
@@ -154,9 +141,7 @@ impl Committee {
     /// Samples authorities by weight
     pub fn sample(&self) -> &AuthorityName {
         // unwrap safe unless committee is empty
-        Self::choose_multiple_weighted(&self.voting_rights[..], 1, &mut ThreadRng::default())
-            .next()
-            .unwrap()
+        Self::choose_multiple_weighted(&self.voting_rights[..], 1, &mut ThreadRng::default()).next().unwrap()
     }
 
     fn choose_multiple_weighted<'a>(
@@ -167,20 +152,12 @@ impl Committee {
         // unwrap is safe because we validate the committee composition in `new` above.
         // See https://docs.rs/rand/latest/rand/distributions/weighted/enum.WeightedError.html
         // for possible errors.
-        slice
-            .choose_multiple_weighted(rng, count, |(_, weight)| *weight as f64)
-            .unwrap()
-            .map(|(a, _)| a)
+        slice.choose_multiple_weighted(rng, count, |(_, weight)| *weight as f64).unwrap().map(|(a, _)| a)
     }
 
-    pub fn choose_multiple_weighted_iter(
-        &self,
-        count: usize,
-    ) -> impl Iterator<Item = &AuthorityName> {
+    pub fn choose_multiple_weighted_iter(&self, count: usize) -> impl Iterator<Item = &AuthorityName> {
         self.voting_rights
-            .choose_multiple_weighted(&mut ThreadRng::default(), count, |(_, weight)| {
-                *weight as f64
-            })
+            .choose_multiple_weighted(&mut ThreadRng::default(), count, |(_, weight)| *weight as f64)
             .unwrap()
             .map(|(a, _)| a)
     }
@@ -222,16 +199,11 @@ impl Committee {
     }
 
     pub fn authority_exists(&self, name: &AuthorityName) -> bool {
-        self.voting_rights
-            .binary_search_by_key(name, |(a, _)| *a)
-            .is_ok()
+        self.voting_rights.binary_search_by_key(name, |(a, _)| *a).is_ok()
     }
 
     /// Derive a seed deterministically from the transaction digest and shuffle the validators.
-    pub fn shuffle_by_stake_from_tx_digest(
-        &self,
-        tx_digest: &TransactionDigest,
-    ) -> Vec<AuthorityName> {
+    pub fn shuffle_by_stake_from_tx_digest(&self, tx_digest: &TransactionDigest) -> Vec<AuthorityName> {
         // the 32 is as requirement of the default StdRng::from_seed choice
         let digest_bytes = tx_digest.into_inner();
 
@@ -243,9 +215,7 @@ impl Committee {
     // ===== Testing-only methods =====
     //
     pub fn new_simple_test_committee_of_size(size: usize) -> (Self, Vec<AuthorityKeyPair>) {
-        let key_pairs: Vec<_> = random_committee_key_pairs_of_size(size)
-            .into_iter()
-            .collect();
+        let key_pairs: Vec<_> = random_committee_key_pairs_of_size(size).into_iter().collect();
         let committee = Self::new_for_testing_with_normalized_voting_power(
             0,
             key_pairs
@@ -276,13 +246,7 @@ impl CommitteeTrait<AuthorityName> for Committee {
         let restricted = self
             .voting_rights
             .iter()
-            .filter(|(name, _)| {
-                if let Some(restrict_to) = restrict_to {
-                    restrict_to.contains(name)
-                } else {
-                    true
-                }
-            })
+            .filter(|(name, _)| if let Some(restrict_to) = restrict_to { restrict_to.contains(name) } else { true })
             .cloned();
 
         let (preferred, rest): (Vec<_>, Vec<_>) = if let Some(preferences) = preferences {
@@ -324,11 +288,7 @@ impl Display for Committee {
         for (name, vote) in &self.voting_rights {
             write!(voting_rights, "{}: {}, ", name.concise(), vote)?;
         }
-        write!(
-            f,
-            "Committee (epoch={:?}, voting_rights=[{}])",
-            self.epoch, voting_rights
-        )
+        write!(f, "Committee (epoch={:?}, voting_rights=[{}])", self.epoch, voting_rights)
     }
 }
 
@@ -370,16 +330,10 @@ pub struct CommitteeWithNetworkMetadata {
 }
 
 impl CommitteeWithNetworkMetadata {
-    pub fn new(
-        epoch_id: EpochId,
-        validators: BTreeMap<AuthorityName, (StakeUnit, NetworkMetadata)>,
-    ) -> Self {
-        Self {
-            epoch_id,
-            validators,
-            committee: OnceCell::new(),
-        }
+    pub fn new(epoch_id: EpochId, validators: BTreeMap<AuthorityName, (StakeUnit, NetworkMetadata)>) -> Self {
+        Self { epoch_id, validators, committee: OnceCell::new() }
     }
+
     pub fn epoch(&self) -> EpochId {
         self.epoch_id
     }
@@ -390,32 +344,23 @@ impl CommitteeWithNetworkMetadata {
 
     pub fn committee(&self) -> &Committee {
         self.committee.get_or_init(|| {
-            Committee::new(
-                self.epoch_id,
-                self.validators
-                    .iter()
-                    .map(|(name, (stake, _))| (*name, *stake))
-                    .collect(),
-            )
+            Committee::new(self.epoch_id, self.validators.iter().map(|(name, (stake, _))| (*name, *stake)).collect())
         })
     }
 }
 
 impl Display for CommitteeWithNetworkMetadata {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "CommitteeWithNetworkMetadata (epoch={}, validators={:?})",
-            self.epoch_id, self.validators
-        )
+        write!(f, "CommitteeWithNetworkMetadata (epoch={}, validators={:?})", self.epoch_id, self.validators)
     }
 }
 
 #[cfg(test)]
 mod test {
+    use fastcrypto::traits::KeyPair;
+
     use super::*;
     use crate::crypto::{get_key_pair, AuthorityKeyPair};
-    use fastcrypto::traits::KeyPair;
 
     #[test]
     fn test_shuffle_by_weight() {
@@ -439,20 +384,14 @@ mod test {
         pref.insert(a2);
 
         // preference always comes first
-        for _ in 0..100 {
-            assert_eq!(
-                a2,
-                *committee
-                    .shuffle_by_stake(Some(&pref), None)
-                    .first()
-                    .unwrap()
-            );
+        for _ in 0 .. 100 {
+            assert_eq!(a2, *committee.shuffle_by_stake(Some(&pref), None).first().unwrap());
         }
 
         let mut restrict = BTreeSet::new();
         restrict.insert(a2);
 
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             let res = committee.shuffle_by_stake(None, Some(&restrict));
             assert_eq!(1, res.len());
             assert_eq!(a2, res[0]);

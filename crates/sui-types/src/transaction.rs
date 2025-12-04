@@ -2,57 +2,70 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{base_types::*, error::*, SUI_BRIDGE_OBJECT_ID};
-use crate::authenticator_state::ActiveJwk;
-use crate::committee::{Committee, EpochId, ProtocolVersion};
-use crate::crypto::{
-    default_hash, AuthoritySignInfo, AuthoritySignInfoTrait, AuthoritySignature,
-    AuthorityStrongQuorumSignInfo, DefaultHash, Ed25519SuiSignature, EmptySignInfo,
-    RandomnessRound, Signature, Signer, SuiSignatureInner, ToFromBytes,
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    fmt::{Debug, Display, Formatter, Write},
+    hash::Hash,
+    iter,
+    iter::once,
+    sync::Arc,
 };
-use crate::digests::{CertificateDigest, SenderSignedDataDigest};
-use crate::digests::{ChainIdentifier, ConsensusCommitDigest, ZKLoginInputsDigest};
-use crate::execution::SharedInput;
-use crate::message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope};
-use crate::messages_checkpoint::CheckpointTimestamp;
-use crate::messages_consensus::{
-    ConsensusCommitPrologue, ConsensusCommitPrologueV2, ConsensusCommitPrologueV3,
-    ConsensusDeterminedVersionAssignments,
-};
-use crate::object::{MoveObject, Object, Owner};
-use crate::programmable_transaction_builder::ProgrammableTransactionBuilder;
-use crate::signature::{GenericSignature, VerifyParams};
-use crate::signature_verification::{
-    verify_sender_signed_data_message_signatures, VerifiedDigestCache,
-};
-use crate::type_input::TypeInput;
-use crate::{
-    SUI_AUTHENTICATOR_STATE_OBJECT_ID, SUI_AUTHENTICATOR_STATE_OBJECT_SHARED_VERSION,
-    SUI_CLOCK_OBJECT_ID, SUI_CLOCK_OBJECT_SHARED_VERSION, SUI_FRAMEWORK_PACKAGE_ID,
-    SUI_RANDOMNESS_STATE_OBJECT_ID, SUI_SYSTEM_STATE_OBJECT_ID,
-    SUI_SYSTEM_STATE_OBJECT_SHARED_VERSION,
-};
+
 use enum_dispatch::enum_dispatch;
 use fastcrypto::{encoding::Base64, hash::HashFunction};
 use itertools::Either;
-use move_core_types::{ident_str, identifier};
-use move_core_types::{identifier::Identifier, language_storage::TypeTag};
+use move_core_types::{ident_str, identifier, identifier::Identifier, language_storage::TypeTag};
 use nonempty::{nonempty, NonEmpty};
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
-use std::fmt::Write;
-use std::fmt::{Debug, Display, Formatter};
-use std::iter::once;
-use std::sync::Arc;
-use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
-    hash::Hash,
-    iter,
-};
 use strum::IntoStaticStr;
 use sui_protocol_config::ProtocolConfig;
 use tap::Pipe;
 use tracing::trace;
+
+use super::{base_types::*, error::*, SUI_BRIDGE_OBJECT_ID};
+use crate::{
+    authenticator_state::ActiveJwk,
+    committee::{Committee, EpochId, ProtocolVersion},
+    crypto::{
+        default_hash,
+        AuthoritySignInfo,
+        AuthoritySignInfoTrait,
+        AuthoritySignature,
+        AuthorityStrongQuorumSignInfo,
+        DefaultHash,
+        Ed25519SuiSignature,
+        EmptySignInfo,
+        RandomnessRound,
+        Signature,
+        Signer,
+        SuiSignatureInner,
+        ToFromBytes,
+    },
+    digests::{CertificateDigest, ChainIdentifier, ConsensusCommitDigest, SenderSignedDataDigest, ZKLoginInputsDigest},
+    execution::SharedInput,
+    message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope},
+    messages_checkpoint::CheckpointTimestamp,
+    messages_consensus::{
+        ConsensusCommitPrologue,
+        ConsensusCommitPrologueV2,
+        ConsensusCommitPrologueV3,
+        ConsensusDeterminedVersionAssignments,
+    },
+    object::{MoveObject, Object, Owner},
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
+    signature::{GenericSignature, VerifyParams},
+    signature_verification::{verify_sender_signed_data_message_signatures, VerifiedDigestCache},
+    type_input::TypeInput,
+    SUI_AUTHENTICATOR_STATE_OBJECT_ID,
+    SUI_AUTHENTICATOR_STATE_OBJECT_SHARED_VERSION,
+    SUI_CLOCK_OBJECT_ID,
+    SUI_CLOCK_OBJECT_SHARED_VERSION,
+    SUI_FRAMEWORK_PACKAGE_ID,
+    SUI_RANDOMNESS_STATE_OBJECT_ID,
+    SUI_SYSTEM_STATE_OBJECT_ID,
+    SUI_SYSTEM_STATE_OBJECT_SHARED_VERSION,
+};
 
 pub const TEST_ONLY_GAS_UNIT_FOR_TRANSFER: u64 = 10_000;
 pub const TEST_ONLY_GAS_UNIT_FOR_OBJECT_BASICS: u64 = 50_000;
@@ -85,7 +98,11 @@ pub enum CallArg {
 }
 
 impl CallArg {
-    pub const SUI_SYSTEM_MUT: Self = Self::Object(ObjectArg::SUI_SYSTEM_MUT);
+    pub const AUTHENTICATOR_MUT: Self = Self::Object(ObjectArg::SharedObject {
+        id: SUI_AUTHENTICATOR_STATE_OBJECT_ID,
+        initial_shared_version: SUI_AUTHENTICATOR_STATE_OBJECT_SHARED_VERSION,
+        mutable: true,
+    });
     pub const CLOCK_IMM: Self = Self::Object(ObjectArg::SharedObject {
         id: SUI_CLOCK_OBJECT_ID,
         initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
@@ -96,11 +113,7 @@ impl CallArg {
         initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
         mutable: true,
     });
-    pub const AUTHENTICATOR_MUT: Self = Self::Object(ObjectArg::SharedObject {
-        id: SUI_AUTHENTICATOR_STATE_OBJECT_ID,
-        initial_shared_version: SUI_AUTHENTICATOR_STATE_OBJECT_SHARED_VERSION,
-        mutable: true,
-    });
+    pub const SUI_SYSTEM_MUT: Self = Self::Object(ObjectArg::SUI_SYSTEM_MUT);
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
@@ -109,11 +122,7 @@ pub enum ObjectArg {
     ImmOrOwnedObject(ObjectRef),
     // A Move object from consensus (historically consensus objects were always shared).
     // SharedObject::mutable controls whether caller asks for a mutable reference to shared object.
-    SharedObject {
-        id: ObjectID,
-        initial_shared_version: SequenceNumber,
-        mutable: bool,
-    },
+    SharedObject { id: ObjectID, initial_shared_version: SequenceNumber, mutable: bool },
     // A Move object that can be received in this transaction.
     Receiving(ObjectRef),
 }
@@ -126,20 +135,14 @@ fn type_input_validity_check(
     let mut stack = vec![(tag, 1)];
     while let Some((tag, depth)) = stack.pop() {
         *starting_count += 1;
-        fp_ensure!(
-            *starting_count < config.max_type_arguments() as usize,
-            UserInputError::SizeLimitExceeded {
-                limit: "maximum type arguments in a call transaction".to_string(),
-                value: config.max_type_arguments().to_string()
-            }
-        );
-        fp_ensure!(
-            depth < config.max_type_argument_depth(),
-            UserInputError::SizeLimitExceeded {
-                limit: "maximum type argument depth in a call transaction".to_string(),
-                value: config.max_type_argument_depth().to_string()
-            }
-        );
+        fp_ensure!(*starting_count < config.max_type_arguments() as usize, UserInputError::SizeLimitExceeded {
+            limit: "maximum type arguments in a call transaction".to_string(),
+            value: config.max_type_arguments().to_string()
+        });
+        fp_ensure!(depth < config.max_type_argument_depth(), UserInputError::SizeLimitExceeded {
+            limit: "maximum type argument depth in a call transaction".to_string(),
+            value: config.max_type_argument_depth().to_string()
+        });
         match tag {
             TypeInput::Bool
             | TypeInput::U8
@@ -156,18 +159,12 @@ fn type_input_validity_check(
             TypeInput::Struct(s) => {
                 let next_depth = depth + 1;
                 if config.validate_identifier_inputs() {
-                    fp_ensure!(
-                        identifier::is_valid(&s.module),
-                        UserInputError::InvalidIdentifier {
-                            error: s.module.clone()
-                        }
-                    );
-                    fp_ensure!(
-                        identifier::is_valid(&s.name),
-                        UserInputError::InvalidIdentifier {
-                            error: s.name.clone()
-                        }
-                    );
+                    fp_ensure!(identifier::is_valid(&s.module), UserInputError::InvalidIdentifier {
+                        error: s.module.clone()
+                    });
+                    fp_ensure!(identifier::is_valid(&s.name), UserInputError::InvalidIdentifier {
+                        error: s.name.clone()
+                    });
                 }
                 stack.extend(s.type_params.iter().map(|t| (t, next_depth)));
             }
@@ -207,10 +204,7 @@ pub struct GenesisTransaction {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum GenesisObject {
-    RawObject {
-        data: crate::object::Data,
-        owner: crate::object::Owner,
-    },
+    RawObject { data: crate::object::Data, owner: crate::object::Owner },
 }
 
 impl GenesisObject {
@@ -346,10 +340,7 @@ impl EndOfEpochTransactionKind {
         min_epoch: u64,
         authenticator_obj_initial_shared_version: SequenceNumber,
     ) -> Self {
-        Self::AuthenticatorStateExpire(AuthenticatorStateExpire {
-            min_epoch,
-            authenticator_obj_initial_shared_version,
-        })
+        Self::AuthenticatorStateExpire(AuthenticatorStateExpire { min_epoch, authenticator_obj_initial_shared_version })
     }
 
     pub fn new_authenticator_state_create() -> Self {
@@ -409,9 +400,7 @@ impl EndOfEpochTransactionKind {
 
     fn shared_input_objects(&self) -> impl Iterator<Item = SharedInputObject> + '_ {
         match self {
-            Self::ChangeEpoch(_) => {
-                Either::Left(vec![SharedInputObject::SUI_SYSTEM_OBJ].into_iter())
-            }
+            Self::ChangeEpoch(_) => Either::Left(vec![SharedInputObject::SUI_SYSTEM_OBJ].into_iter()),
             Self::AuthenticatorStateExpire(expire) => Either::Left(
                 vec![SharedInputObject {
                     id: SUI_AUTHENTICATOR_STATE_OBJECT_ID,
@@ -443,42 +432,30 @@ impl EndOfEpochTransactionKind {
             Self::ChangeEpoch(_) => (),
             Self::AuthenticatorStateCreate | Self::AuthenticatorStateExpire(_) => {
                 if !config.enable_jwk_consensus_updates() {
-                    return Err(UserInputError::Unsupported(
-                        "authenticator state updates not enabled".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("authenticator state updates not enabled".to_string()));
                 }
             }
             Self::RandomnessStateCreate => {
                 if !config.random_beacon() {
-                    return Err(UserInputError::Unsupported(
-                        "random beacon not enabled".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("random beacon not enabled".to_string()));
                 }
             }
             Self::DenyListStateCreate => {
                 if !config.enable_coin_deny_list_v1() {
-                    return Err(UserInputError::Unsupported(
-                        "coin deny list not enabled".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("coin deny list not enabled".to_string()));
                 }
             }
             Self::BridgeStateCreate(_) => {
                 if !config.enable_bridge() {
-                    return Err(UserInputError::Unsupported(
-                        "bridge not enabled".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("bridge not enabled".to_string()));
                 }
             }
             Self::BridgeCommitteeInit(_) => {
                 if !config.enable_bridge() {
-                    return Err(UserInputError::Unsupported(
-                        "bridge not enabled".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("bridge not enabled".to_string()));
                 }
                 if !config.should_try_to_finalize_bridge_committee() {
-                    return Err(UserInputError::Unsupported(
-                        "should not try to finalize committee yet".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("should not try to finalize committee yet".to_string()));
                 }
             }
         }
@@ -493,19 +470,11 @@ impl CallArg {
             CallArg::Object(ObjectArg::ImmOrOwnedObject(object_ref)) => {
                 vec![InputObjectKind::ImmOrOwnedMoveObject(*object_ref)]
             }
-            CallArg::Object(ObjectArg::SharedObject {
-                id,
-                initial_shared_version,
-                mutable,
-            }) => {
+            CallArg::Object(ObjectArg::SharedObject { id, initial_shared_version, mutable }) => {
                 let id = *id;
                 let initial_shared_version = *initial_shared_version;
                 let mutable = *mutable;
-                vec![InputObjectKind::SharedMoveObject {
-                    id,
-                    initial_shared_version,
-                    mutable,
-                }]
+                vec![InputObjectKind::SharedMoveObject { id, initial_shared_version, mutable }]
             }
             // Receiving objects are not part of the input objects.
             CallArg::Object(ObjectArg::Receiving(_)) => vec![],
@@ -526,13 +495,10 @@ impl CallArg {
     pub fn validity_check(&self, config: &ProtocolConfig) -> UserInputResult {
         match self {
             CallArg::Pure(p) => {
-                fp_ensure!(
-                    p.len() < config.max_pure_argument_size() as usize,
-                    UserInputError::SizeLimitExceeded {
-                        limit: "maximum pure argument size".to_string(),
-                        value: config.max_pure_argument_size().to_string()
-                    }
-                );
+                fp_ensure!(p.len() < config.max_pure_argument_size() as usize, UserInputError::SizeLimitExceeded {
+                    limit: "maximum pure argument size".to_string(),
+                    value: config.max_pure_argument_size().to_string()
+                });
             }
             CallArg::Object(o) => match o {
                 ObjectArg::ImmOrOwnedObject(_) | ObjectArg::SharedObject { .. } => (),
@@ -722,60 +688,38 @@ pub struct ProgrammableMoveCall {
 
 impl ProgrammableMoveCall {
     fn input_objects(&self) -> Vec<InputObjectKind> {
-        let ProgrammableMoveCall {
-            package,
-            type_arguments,
-            ..
-        } = self;
+        let ProgrammableMoveCall { package, type_arguments, .. } = self;
         let mut packages = BTreeSet::from([*package]);
         for type_argument in type_arguments {
             add_type_input_packages(&mut packages, type_argument)
         }
-        packages
-            .into_iter()
-            .map(InputObjectKind::MovePackage)
-            .collect()
+        packages.into_iter().map(InputObjectKind::MovePackage).collect()
     }
 
     pub fn validity_check(&self, config: &ProtocolConfig) -> UserInputResult {
-        let is_blocked = BLOCKED_MOVE_FUNCTIONS.contains(&(
-            self.package,
-            self.module.as_str(),
-            self.function.as_str(),
-        ));
+        let is_blocked = BLOCKED_MOVE_FUNCTIONS.contains(&(self.package, self.module.as_str(), self.function.as_str()));
         fp_ensure!(!is_blocked, UserInputError::BlockedMoveFunction);
         let mut type_arguments_count = 0;
         for tag in &self.type_arguments {
             type_input_validity_check(tag, config, &mut type_arguments_count)?;
         }
-        fp_ensure!(
-            self.arguments.len() < config.max_arguments() as usize,
-            UserInputError::SizeLimitExceeded {
-                limit: "maximum arguments in a move call".to_string(),
-                value: config.max_arguments().to_string()
-            }
-        );
+        fp_ensure!(self.arguments.len() < config.max_arguments() as usize, UserInputError::SizeLimitExceeded {
+            limit: "maximum arguments in a move call".to_string(),
+            value: config.max_arguments().to_string()
+        });
         if config.validate_identifier_inputs() {
-            fp_ensure!(
-                identifier::is_valid(&self.module),
-                UserInputError::InvalidIdentifier {
-                    error: self.module.clone()
-                }
-            );
-            fp_ensure!(
-                identifier::is_valid(&self.function),
-                UserInputError::InvalidIdentifier {
-                    error: self.module.clone()
-                }
-            );
+            fp_ensure!(identifier::is_valid(&self.module), UserInputError::InvalidIdentifier {
+                error: self.module.clone()
+            });
+            fp_ensure!(identifier::is_valid(&self.function), UserInputError::InvalidIdentifier {
+                error: self.module.clone()
+            });
         }
         Ok(())
     }
 
     fn is_input_arg_used(&self, arg: u16) -> bool {
-        self.arguments
-            .iter()
-            .any(|a| matches!(a, Argument::Input(inp) if *inp == arg))
+        self.arguments.iter().any(|a| matches!(a, Argument::Input(inp) if *inp == arg))
     }
 }
 
@@ -790,13 +734,7 @@ impl Command {
         let module = module.to_string();
         let function = function.to_string();
         let type_arguments = type_arguments.into_iter().map(TypeInput::from).collect();
-        Command::MoveCall(Box::new(ProgrammableMoveCall {
-            package,
-            module,
-            function,
-            type_arguments,
-            arguments,
-        }))
+        Command::MoveCall(Box::new(ProgrammableMoveCall { package, module, function, type_arguments, arguments }))
     }
 
     pub fn make_move_vec(ty: Option<TypeTag>, args: Vec<Argument>) -> Self {
@@ -810,18 +748,12 @@ impl Command {
                 .map(|id| InputObjectKind::MovePackage(*id))
                 .chain(Some(InputObjectKind::MovePackage(*package_id)))
                 .collect(),
-            Command::Publish(_, deps) => deps
-                .iter()
-                .map(|id| InputObjectKind::MovePackage(*id))
-                .collect(),
+            Command::Publish(_, deps) => deps.iter().map(|id| InputObjectKind::MovePackage(*id)).collect(),
             Command::MoveCall(c) => c.input_objects(),
             Command::MakeMoveVec(Some(t), _) => {
                 let mut packages = BTreeSet::new();
                 add_type_input_packages(&mut packages, t);
-                packages
-                    .into_iter()
-                    .map(InputObjectKind::MovePackage)
-                    .collect()
+                packages.into_iter().map(InputObjectKind::MovePackage).collect()
             }
             Command::MakeMoveVec(None, _)
             | Command::TransferObjects(_, _)
@@ -845,57 +777,39 @@ impl Command {
     fn validity_check(&self, config: &ProtocolConfig) -> UserInputResult {
         match self {
             Command::MoveCall(call) => call.validity_check(config)?,
-            Command::TransferObjects(args, _)
-            | Command::MergeCoins(_, args)
-            | Command::SplitCoins(_, args) => {
+            Command::TransferObjects(args, _) | Command::MergeCoins(_, args) | Command::SplitCoins(_, args) => {
                 fp_ensure!(!args.is_empty(), UserInputError::EmptyCommandInput);
-                fp_ensure!(
-                    args.len() < config.max_arguments() as usize,
-                    UserInputError::SizeLimitExceeded {
-                        limit: "maximum arguments in a programmable transaction command"
-                            .to_string(),
-                        value: config.max_arguments().to_string()
-                    }
-                );
+                fp_ensure!(args.len() < config.max_arguments() as usize, UserInputError::SizeLimitExceeded {
+                    limit: "maximum arguments in a programmable transaction command".to_string(),
+                    value: config.max_arguments().to_string()
+                });
             }
             Command::MakeMoveVec(ty_opt, args) => {
                 // ty_opt.is_none() ==> !args.is_empty()
-                fp_ensure!(
-                    ty_opt.is_some() || !args.is_empty(),
-                    UserInputError::EmptyCommandInput
-                );
+                fp_ensure!(ty_opt.is_some() || !args.is_empty(), UserInputError::EmptyCommandInput);
                 if let Some(ty) = ty_opt {
                     let mut type_arguments_count = 0;
                     type_input_validity_check(ty, config, &mut type_arguments_count)?;
                 }
-                fp_ensure!(
-                    args.len() < config.max_arguments() as usize,
-                    UserInputError::SizeLimitExceeded {
-                        limit: "maximum arguments in a programmable transaction command"
-                            .to_string(),
-                        value: config.max_arguments().to_string()
-                    }
-                );
+                fp_ensure!(args.len() < config.max_arguments() as usize, UserInputError::SizeLimitExceeded {
+                    limit: "maximum arguments in a programmable transaction command".to_string(),
+                    value: config.max_arguments().to_string()
+                });
             }
             Command::Publish(modules, deps) | Command::Upgrade(modules, deps, _, _) => {
                 fp_ensure!(!modules.is_empty(), UserInputError::EmptyCommandInput);
                 fp_ensure!(
                     modules.len() < config.max_modules_in_publish() as usize,
                     UserInputError::SizeLimitExceeded {
-                        limit: "maximum modules in a programmable transaction upgrade command"
-                            .to_string(),
+                        limit: "maximum modules in a programmable transaction upgrade command".to_string(),
                         value: config.max_modules_in_publish().to_string()
                     }
                 );
-                if let Some(max_package_dependencies) = config.max_package_dependencies_as_option()
-                {
-                    fp_ensure!(
-                        deps.len() < max_package_dependencies as usize,
-                        UserInputError::SizeLimitExceeded {
-                            limit: "maximum package dependencies".to_string(),
-                            value: max_package_dependencies.to_string()
-                        }
-                    );
+                if let Some(max_package_dependencies) = config.max_package_dependencies_as_option() {
+                    fp_ensure!(deps.len() < max_package_dependencies as usize, UserInputError::SizeLimitExceeded {
+                        limit: "maximum package dependencies".to_string(),
+                        value: max_package_dependencies.to_string()
+                    });
                 };
             }
         };
@@ -905,15 +819,10 @@ impl Command {
     fn is_input_arg_used(&self, input_arg: u16) -> bool {
         match self {
             Command::MoveCall(c) => c.is_input_arg_used(input_arg),
-            Command::TransferObjects(args, arg)
-            | Command::MergeCoins(arg, args)
-            | Command::SplitCoins(arg, args) => args
-                .iter()
-                .chain(once(arg))
-                .any(|a| matches!(a, Argument::Input(inp) if *inp == input_arg)),
-            Command::MakeMoveVec(_, args) => args
-                .iter()
-                .any(|a| matches!(a, Argument::Input(inp) if *inp == input_arg)),
+            Command::TransferObjects(args, arg) | Command::MergeCoins(arg, args) | Command::SplitCoins(arg, args) => {
+                args.iter().chain(once(arg)).any(|a| matches!(a, Argument::Input(inp) if *inp == input_arg))
+            }
+            Command::MakeMoveVec(_, args) => args.iter().any(|a| matches!(a, Argument::Input(inp) if *inp == input_arg)),
             Command::Upgrade(_, _, _, arg) => {
                 matches!(arg, Argument::Input(inp) if *inp == input_arg)
             }
@@ -922,11 +831,7 @@ impl Command {
     }
 }
 
-pub fn write_sep<T: Display>(
-    f: &mut Formatter<'_>,
-    items: impl IntoIterator<Item = T>,
-    sep: &str,
-) -> std::fmt::Result {
+pub fn write_sep<T: Display>(f: &mut Formatter<'_>, items: impl IntoIterator<Item = T>, sep: &str) -> std::fmt::Result {
     let mut xs = items.into_iter();
     let Some(x) = xs.next() else {
         return Ok(());
@@ -941,66 +846,45 @@ pub fn write_sep<T: Display>(
 impl ProgrammableTransaction {
     pub fn input_objects(&self) -> UserInputResult<Vec<InputObjectKind>> {
         let ProgrammableTransaction { inputs, commands } = self;
-        let input_arg_objects = inputs
-            .iter()
-            .flat_map(|arg| arg.input_objects())
-            .collect::<Vec<_>>();
+        let input_arg_objects = inputs.iter().flat_map(|arg| arg.input_objects()).collect::<Vec<_>>();
         // all objects, not just mutable, must be unique
         let mut used = HashSet::new();
         if !input_arg_objects.iter().all(|o| used.insert(o.object_id())) {
             return Err(UserInputError::DuplicateObjectRefInput);
         }
         // do not duplicate packages referred to in commands
-        let command_input_objects: BTreeSet<InputObjectKind> = commands
-            .iter()
-            .flat_map(|command| command.input_objects())
-            .collect();
-        Ok(input_arg_objects
-            .into_iter()
-            .chain(command_input_objects)
-            .collect())
+        let command_input_objects: BTreeSet<InputObjectKind> =
+            commands.iter().flat_map(|command| command.input_objects()).collect();
+        Ok(input_arg_objects.into_iter().chain(command_input_objects).collect())
     }
 
     fn receiving_objects(&self) -> Vec<ObjectRef> {
         let ProgrammableTransaction { inputs, .. } = self;
-        inputs
-            .iter()
-            .flat_map(|arg| arg.receiving_objects())
-            .collect()
+        inputs.iter().flat_map(|arg| arg.receiving_objects()).collect()
     }
 
     fn validity_check(&self, config: &ProtocolConfig) -> UserInputResult {
         let ProgrammableTransaction { inputs, commands } = self;
-        fp_ensure!(
-            commands.len() < config.max_programmable_tx_commands() as usize,
-            UserInputError::SizeLimitExceeded {
-                limit: "maximum commands in a programmable transaction".to_string(),
-                value: config.max_programmable_tx_commands().to_string()
-            }
-        );
+        fp_ensure!(commands.len() < config.max_programmable_tx_commands() as usize, UserInputError::SizeLimitExceeded {
+            limit: "maximum commands in a programmable transaction".to_string(),
+            value: config.max_programmable_tx_commands().to_string()
+        });
         let total_inputs = self.input_objects()?.len() + self.receiving_objects().len();
-        fp_ensure!(
-            total_inputs <= config.max_input_objects() as usize,
-            UserInputError::SizeLimitExceeded {
-                limit: "maximum input + receiving objects in a transaction".to_string(),
-                value: config.max_input_objects().to_string()
-            }
-        );
+        fp_ensure!(total_inputs <= config.max_input_objects() as usize, UserInputError::SizeLimitExceeded {
+            limit: "maximum input + receiving objects in a transaction".to_string(),
+            value: config.max_input_objects().to_string()
+        });
         for input in inputs {
             input.validity_check(config)?
         }
         if let Some(max_publish_commands) = config.max_publish_or_upgrade_per_ptb_as_option() {
-            let publish_count = commands
-                .iter()
-                .filter(|c| matches!(c, Command::Publish(_, _) | Command::Upgrade(_, _, _, _)))
-                .count() as u64;
-            fp_ensure!(
-                publish_count <= max_publish_commands,
-                UserInputError::MaxPublishCountExceeded {
-                    max_publish_commands,
-                    publish_count,
-                }
-            );
+            let publish_count =
+                commands.iter().filter(|c| matches!(c, Command::Publish(_, _) | Command::Upgrade(_, _, _, _))).count()
+                    as u64;
+            fp_ensure!(publish_count <= max_publish_commands, UserInputError::MaxPublishCountExceeded {
+                max_publish_commands,
+                publish_count,
+            });
         }
         for command in commands {
             command.validity_check(config)?;
@@ -1044,15 +928,13 @@ impl ProgrammableTransaction {
                 CallArg::Pure(_)
                 | CallArg::Object(ObjectArg::Receiving(_))
                 | CallArg::Object(ObjectArg::ImmOrOwnedObject(_)) => None,
-                CallArg::Object(ObjectArg::SharedObject {
-                    id,
-                    initial_shared_version,
-                    mutable,
-                }) => Some(vec![SharedInputObject {
-                    id: *id,
-                    initial_shared_version: *initial_shared_version,
-                    mutable: *mutable,
-                }]),
+                CallArg::Object(ObjectArg::SharedObject { id, initial_shared_version, mutable }) => {
+                    Some(vec![SharedInputObject {
+                        id: *id,
+                        initial_shared_version: *initial_shared_version,
+                        mutable: *mutable,
+                    }])
+                }
             })
             .flatten()
     }
@@ -1068,9 +950,7 @@ impl ProgrammableTransaction {
     }
 
     pub fn non_system_packages_to_be_published(&self) -> impl Iterator<Item = &Vec<Vec<u8>>> + '_ {
-        self.commands
-            .iter()
-            .filter_map(|q| q.non_system_packages_to_be_published())
+        self.commands.iter().filter_map(|q| q.non_system_packages_to_be_published())
     }
 }
 
@@ -1087,13 +967,7 @@ impl Display for Argument {
 
 impl Display for ProgrammableMoveCall {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let ProgrammableMoveCall {
-            package,
-            module,
-            function,
-            type_arguments,
-            arguments,
-        } = self;
+        let ProgrammableMoveCall { package, module, function, type_arguments, arguments } = self;
         write!(f, "{package}::{module}::{function}")?;
         if !type_arguments.is_empty() {
             write!(f, "<")?;
@@ -1212,10 +1086,7 @@ impl TransactionKind {
     }
 
     pub fn is_end_of_epoch_tx(&self) -> bool {
-        matches!(
-            self,
-            TransactionKind::EndOfEpochTransaction(_) | TransactionKind::ChangeEpoch(_)
-        )
+        matches!(self, TransactionKind::EndOfEpochTransaction(_) | TransactionKind::ChangeEpoch(_))
     }
 
     /// If this is advance epoch transaction, returns (total gas charged, total gas rebated).
@@ -1247,39 +1118,29 @@ impl TransactionKind {
     /// It covers both Call and ChangeEpoch transaction kind, because both makes Move calls.
     pub fn shared_input_objects(&self) -> impl Iterator<Item = SharedInputObject> + '_ {
         match &self {
-            Self::ChangeEpoch(_) => {
-                Either::Left(Either::Left(iter::once(SharedInputObject::SUI_SYSTEM_OBJ)))
-            }
+            Self::ChangeEpoch(_) => Either::Left(Either::Left(iter::once(SharedInputObject::SUI_SYSTEM_OBJ))),
 
             Self::ConsensusCommitPrologue(_)
             | Self::ConsensusCommitPrologueV2(_)
-            | Self::ConsensusCommitPrologueV3(_) => {
-                Either::Left(Either::Left(iter::once(SharedInputObject {
-                    id: SUI_CLOCK_OBJECT_ID,
-                    initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
-                    mutable: true,
-                })))
+            | Self::ConsensusCommitPrologueV3(_) => Either::Left(Either::Left(iter::once(SharedInputObject {
+                id: SUI_CLOCK_OBJECT_ID,
+                initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
+                mutable: true,
+            }))),
+            Self::AuthenticatorStateUpdate(update) => Either::Left(Either::Left(iter::once(SharedInputObject {
+                id: SUI_AUTHENTICATOR_STATE_OBJECT_ID,
+                initial_shared_version: update.authenticator_obj_initial_shared_version,
+                mutable: true,
+            }))),
+            Self::RandomnessStateUpdate(update) => Either::Left(Either::Left(iter::once(SharedInputObject {
+                id: SUI_RANDOMNESS_STATE_OBJECT_ID,
+                initial_shared_version: update.randomness_obj_initial_shared_version,
+                mutable: true,
+            }))),
+            Self::EndOfEpochTransaction(txns) => {
+                Either::Left(Either::Right(txns.iter().flat_map(|txn| txn.shared_input_objects())))
             }
-            Self::AuthenticatorStateUpdate(update) => {
-                Either::Left(Either::Left(iter::once(SharedInputObject {
-                    id: SUI_AUTHENTICATOR_STATE_OBJECT_ID,
-                    initial_shared_version: update.authenticator_obj_initial_shared_version,
-                    mutable: true,
-                })))
-            }
-            Self::RandomnessStateUpdate(update) => {
-                Either::Left(Either::Left(iter::once(SharedInputObject {
-                    id: SUI_RANDOMNESS_STATE_OBJECT_ID,
-                    initial_shared_version: update.randomness_obj_initial_shared_version,
-                    mutable: true,
-                })))
-            }
-            Self::EndOfEpochTransaction(txns) => Either::Left(Either::Right(
-                txns.iter().flat_map(|txn| txn.shared_input_objects()),
-            )),
-            Self::ProgrammableTransaction(pt) => {
-                Either::Right(Either::Left(pt.shared_input_objects()))
-            }
+            Self::ProgrammableTransaction(pt) => Either::Right(Either::Left(pt.shared_input_objects())),
             _ => Either::Right(Either::Right(iter::empty())),
         }
     }
@@ -1347,8 +1208,7 @@ impl TransactionKind {
             Self::EndOfEpochTransaction(txns) => {
                 // Dedup since transactions may have a overlap in input objects.
                 // Note: it's critical to ensure the order of inputs are deterministic.
-                let before_dedup: Vec<_> =
-                    txns.iter().flat_map(|txn| txn.input_objects()).collect();
+                let before_dedup: Vec<_> = txns.iter().flat_map(|txn| txn.input_objects()).collect();
                 let mut has_seen = HashSet::new();
                 let mut after_dedup = vec![];
                 for obj in before_dedup {
@@ -1384,23 +1244,17 @@ impl TransactionKind {
             | TransactionKind::ConsensusCommitPrologue(_) => (),
             TransactionKind::ConsensusCommitPrologueV2(_) => {
                 if !config.include_consensus_digest_in_prologue() {
-                    return Err(UserInputError::Unsupported(
-                        "ConsensusCommitPrologueV2 is not supported".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("ConsensusCommitPrologueV2 is not supported".to_string()));
                 }
             }
             TransactionKind::ConsensusCommitPrologueV3(_) => {
                 if !config.record_consensus_determined_version_assignments_in_prologue() {
-                    return Err(UserInputError::Unsupported(
-                        "ConsensusCommitPrologueV3 is not supported".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("ConsensusCommitPrologueV3 is not supported".to_string()));
                 }
             }
             TransactionKind::EndOfEpochTransaction(txns) => {
                 if !config.end_of_epoch_transaction_supported() {
-                    return Err(UserInputError::Unsupported(
-                        "EndOfEpochTransaction is not supported".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("EndOfEpochTransaction is not supported".to_string()));
                 }
 
                 for tx in txns {
@@ -1410,16 +1264,12 @@ impl TransactionKind {
 
             TransactionKind::AuthenticatorStateUpdate(_) => {
                 if !config.enable_jwk_consensus_updates() {
-                    return Err(UserInputError::Unsupported(
-                        "authenticator state updates not enabled".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("authenticator state updates not enabled".to_string()));
                 }
             }
             TransactionKind::RandomnessStateUpdate(_) => {
                 if !config.random_beacon() {
-                    return Err(UserInputError::Unsupported(
-                        "randomness state updates not enabled".to_string(),
-                    ));
+                    return Err(UserInputError::Unsupported("randomness state updates not enabled".to_string()));
                 }
             }
         };
@@ -1577,12 +1427,7 @@ impl TransactionData {
         TransactionData::V1(TransactionDataV1 {
             kind,
             sender,
-            gas_data: GasData {
-                price: gas_price,
-                owner: sender,
-                payment: vec![gas_payment],
-                budget: gas_budget,
-            },
+            gas_data: GasData { price: gas_price, owner: sender, payment: vec![gas_payment], budget: gas_budget },
             expiration: TransactionExpiration::None,
         })
     }
@@ -1594,14 +1439,7 @@ impl TransactionData {
         gas_budget: u64,
         gas_price: u64,
     ) -> Self {
-        Self::new_with_gas_coins_allow_sponsor(
-            kind,
-            sender,
-            gas_payment,
-            gas_budget,
-            gas_price,
-            sender,
-        )
+        Self::new_with_gas_coins_allow_sponsor(kind, sender, gas_payment, gas_budget, gas_price, sender)
     }
 
     pub fn new_with_gas_coins_allow_sponsor(
@@ -1615,23 +1453,13 @@ impl TransactionData {
         TransactionData::V1(TransactionDataV1 {
             kind,
             sender,
-            gas_data: GasData {
-                price: gas_price,
-                owner: gas_sponsor,
-                payment: gas_payment,
-                budget: gas_budget,
-            },
+            gas_data: GasData { price: gas_price, owner: gas_sponsor, payment: gas_payment, budget: gas_budget },
             expiration: TransactionExpiration::None,
         })
     }
 
     pub fn new_with_gas_data(kind: TransactionKind, sender: SuiAddress, gas_data: GasData) -> Self {
-        TransactionData::V1(TransactionDataV1 {
-            kind,
-            sender,
-            gas_data,
-            expiration: TransactionExpiration::None,
-        })
+        TransactionData::V1(TransactionDataV1 { kind, sender, gas_data, expiration: TransactionExpiration::None })
     }
 
     pub fn new_move_call(
@@ -1674,13 +1502,7 @@ impl TransactionData {
             builder.move_call(package, module, function, type_arguments, arguments)?;
             builder.finish()
         };
-        Ok(Self::new_programmable(
-            sender,
-            gas_payment,
-            pt,
-            gas_budget,
-            gas_price,
-        ))
+        Ok(Self::new_programmable(sender, gas_payment, pt, gas_budget, gas_price))
     }
 
     pub fn new_transfer(
@@ -1707,15 +1529,7 @@ impl TransactionData {
         gas_budget: u64,
         gas_price: u64,
     ) -> Self {
-        Self::new_transfer_oct_allow_sponsor(
-            recipient,
-            sender,
-            amount,
-            gas_payment,
-            gas_budget,
-            gas_price,
-            sender,
-        )
+        Self::new_transfer_oct_allow_sponsor(recipient, sender, amount, gas_payment, gas_budget, gas_price, sender)
     }
 
     pub fn new_transfer_oct_allow_sponsor(
@@ -1732,14 +1546,7 @@ impl TransactionData {
             builder.transfer_oct(recipient, amount);
             builder.finish()
         };
-        Self::new_programmable_allow_sponsor(
-            sender,
-            vec![gas_payment],
-            pt,
-            gas_budget,
-            gas_price,
-            gas_sponsor,
-        )
+        Self::new_programmable_allow_sponsor(sender, vec![gas_payment], pt, gas_budget, gas_price, gas_sponsor)
     }
 
     pub fn new_pay(
@@ -1756,13 +1563,7 @@ impl TransactionData {
             builder.pay(coins, recipients, amounts)?;
             builder.finish()
         };
-        Ok(Self::new_programmable(
-            sender,
-            vec![gas_payment],
-            pt,
-            gas_budget,
-            gas_price,
-        ))
+        Ok(Self::new_programmable(sender, vec![gas_payment], pt, gas_budget, gas_price))
     }
 
     pub fn new_pay_oct(
@@ -1780,9 +1581,7 @@ impl TransactionData {
             builder.pay_oct(recipients, amounts)?;
             builder.finish()
         };
-        Ok(Self::new_programmable(
-            sender, coins, pt, gas_budget, gas_price,
-        ))
+        Ok(Self::new_programmable(sender, coins, pt, gas_budget, gas_price))
     }
 
     pub fn new_pay_all_oct(
@@ -1835,17 +1634,10 @@ impl TransactionData {
             let mut builder = ProgrammableTransactionBuilder::new();
             let capability_arg = match capability_owner {
                 Owner::AddressOwner(_) => ObjectArg::ImmOrOwnedObject(upgrade_capability),
-                Owner::Shared {
-                    initial_shared_version,
+                Owner::Shared { initial_shared_version }
+                | Owner::ConsensusV2 { start_version: initial_shared_version, authenticator: _ } => {
+                    ObjectArg::SharedObject { id: upgrade_capability.0, initial_shared_version, mutable: true }
                 }
-                | Owner::ConsensusV2 {
-                    start_version: initial_shared_version,
-                    authenticator: _,
-                } => ObjectArg::SharedObject {
-                    id: upgrade_capability.0,
-                    initial_shared_version,
-                    mutable: true,
-                },
                 Owner::Immutable => {
                     return Err(anyhow::anyhow!(
                         "Upgrade capability is stored immutably and cannot be used for upgrades"
@@ -1853,9 +1645,7 @@ impl TransactionData {
                 }
                 // If the capability is owned by an object, then the module defining the owning
                 // object gets to decide how the upgrade capability should be used.
-                Owner::ObjectOwner(_) => {
-                    return Err(anyhow::anyhow!("Upgrade capability controlled by object"))
-                }
+                Owner::ObjectOwner(_) => return Err(anyhow::anyhow!("Upgrade capability controlled by object")),
             };
             builder.obj(capability_arg).unwrap();
             let upgrade_arg = builder.pure(upgrade_policy).unwrap();
@@ -1879,13 +1669,7 @@ impl TransactionData {
 
             builder.finish()
         };
-        Ok(Self::new_programmable(
-            sender,
-            vec![gas_payment],
-            pt,
-            gas_budget,
-            gas_price,
-        ))
+        Ok(Self::new_programmable(sender, vec![gas_payment], pt, gas_budget, gas_price))
     }
 
     pub fn new_programmable(
@@ -1907,14 +1691,7 @@ impl TransactionData {
         sponsor: SuiAddress,
     ) -> Self {
         let kind = TransactionKind::ProgrammableTransaction(pt);
-        Self::new_with_gas_coins_allow_sponsor(
-            kind,
-            sender,
-            gas_payment,
-            gas_budget,
-            gas_price,
-            sponsor,
-        )
+        Self::new_with_gas_coins_allow_sponsor(kind, sender, gas_payment, gas_budget, gas_price, sponsor)
     }
 
     pub fn message_version(&self) -> u64 {
@@ -1924,17 +1701,11 @@ impl TransactionData {
     }
 
     pub fn execution_parts(&self) -> (TransactionKind, SuiAddress, Vec<ObjectRef>) {
-        (
-            self.kind().clone(),
-            self.sender(),
-            self.gas_data().payment.clone(),
-        )
+        (self.kind().clone(), self.sender(), self.gas_data().payment.clone())
     }
 
     pub fn uses_randomness(&self) -> bool {
-        self.shared_input_objects()
-            .iter()
-            .any(|obj| obj.id() == SUI_RANDOMNESS_STATE_OBJECT_ID)
+        self.shared_input_objects().iter().any(|obj| obj.id() == SUI_RANDOMNESS_STATE_OBJECT_ID)
     }
 
     pub fn digest(&self) -> TransactionDigest {
@@ -2072,11 +1843,7 @@ impl TransactionDataAPI for TransactionDataV1 {
         let mut inputs = self.kind.input_objects()?;
 
         if !self.kind.is_system_tx() {
-            inputs.extend(
-                self.gas()
-                    .iter()
-                    .map(|obj_ref| InputObjectKind::ImmOrOwnedMoveObject(*obj_ref)),
-            );
+            inputs.extend(self.gas().iter().map(|obj_ref| InputObjectKind::ImmOrOwnedMoveObject(*obj_ref)));
         }
         Ok(inputs)
     }
@@ -2087,13 +1854,10 @@ impl TransactionDataAPI for TransactionDataV1 {
 
     fn validity_check(&self, config: &ProtocolConfig) -> UserInputResult {
         fp_ensure!(!self.gas().is_empty(), UserInputError::MissingGasPayment);
-        fp_ensure!(
-            self.gas().len() < config.max_gas_payment_objects() as usize,
-            UserInputError::SizeLimitExceeded {
-                limit: "maximum number of gas payment objects".to_string(),
-                value: config.max_gas_payment_objects().to_string()
-            }
-        );
+        fp_ensure!(self.gas().len() < config.max_gas_payment_objects() as usize, UserInputError::SizeLimitExceeded {
+            limit: "maximum number of gas payment objects".to_string(),
+            value: config.max_gas_payment_objects().to_string()
+        });
         self.validity_check_no_gas_check(config)
     }
 
@@ -2122,10 +1886,7 @@ impl TransactionDataAPI for TransactionDataV1 {
     }
 
     fn is_end_of_epoch_tx(&self) -> bool {
-        matches!(
-            self.kind,
-            TransactionKind::ChangeEpoch(_) | TransactionKind::EndOfEpochTransaction(_)
-        )
+        matches!(self.kind, TransactionKind::ChangeEpoch(_) | TransactionKind::EndOfEpochTransaction(_))
     }
 
     fn is_system_tx(&self) -> bool {
@@ -2179,10 +1940,7 @@ impl Serialize for SenderSignedTransaction {
             return Err(serde::ser::Error::custom("invalid Intent for Transaction"));
         }
 
-        let txn = SignedTxn {
-            intent_message: self.intent_message(),
-            tx_signatures: &self.tx_signatures,
-        };
+        let txn = SignedTxn { intent_message: self.intent_message(), tx_signatures: &self.tx_signatures };
         txn.serialize(serializer)
     }
 }
@@ -2199,19 +1957,13 @@ impl<'de> Deserialize<'de> for SenderSignedTransaction {
             tx_signatures: Vec<GenericSignature>,
         }
 
-        let SignedTxn {
-            intent_message,
-            tx_signatures,
-        } = Deserialize::deserialize(deserializer)?;
+        let SignedTxn { intent_message, tx_signatures } = Deserialize::deserialize(deserializer)?;
 
         if intent_message.intent != Intent::sui_transaction() {
             return Err(serde::de::Error::custom("invalid Intent for Transaction"));
         }
 
-        Ok(Self {
-            intent_message,
-            tx_signatures,
-        })
+        Ok(Self { intent_message, tx_signatures })
     }
 }
 
@@ -2276,8 +2028,7 @@ impl SenderSignedData {
         &self,
         verify_legacy_zklogin_address: bool,
     ) -> SuiResult<BTreeMap<SuiAddress, &GenericSignature>> {
-        self.inner()
-            .get_signer_sig_mapping(verify_legacy_zklogin_address)
+        self.inner().get_signer_sig_mapping(verify_legacy_zklogin_address)
     }
 
     pub fn transaction_data(&self) -> &TransactionData {
@@ -2297,9 +2048,7 @@ impl SenderSignedData {
     }
 
     pub fn has_upgraded_multisig(&self) -> bool {
-        self.tx_signatures()
-            .iter()
-            .any(|sig| sig.is_upgraded_multisig())
+        self.tx_signatures().iter().any(|sig| sig.is_upgraded_multisig())
     }
 
     #[cfg(test)]
@@ -2320,9 +2069,7 @@ impl SenderSignedData {
     }
 
     pub fn serialized_size(&self) -> SuiResult<usize> {
-        bcs::serialized_size(self).map_err(|e| SuiError::TransactionSerializationError {
-            error: e.to_string(),
-        })
+        bcs::serialized_size(self).map_err(|e| SuiError::TransactionSerializationError { error: e.to_string() })
     }
 
     fn check_user_signature_protocol_compatibility(&self, config: &ProtocolConfig) -> SuiResult {
@@ -2340,18 +2087,14 @@ impl SenderSignedData {
                 GenericSignature::ZkLoginAuthenticator(_) => {
                     if !config.zklogin_auth() {
                         return Err(SuiError::UserInputError {
-                            error: UserInputError::Unsupported(
-                                "zklogin is not enabled on this network".to_string(),
-                            ),
+                            error: UserInputError::Unsupported("zklogin is not enabled on this network".to_string()),
                         });
                     }
                 }
                 GenericSignature::PasskeyAuthenticator(_) => {
                     if !config.passkey_auth() {
                         return Err(SuiError::UserInputError {
-                            error: UserInputError::Unsupported(
-                                "passkey is not enabled on this network".to_string(),
-                            ),
+                            error: UserInputError::Unsupported("passkey is not enabled on this network".to_string()),
                         });
                     }
                 }
@@ -2364,25 +2107,16 @@ impl SenderSignedData {
 
     /// Validate untrusted user transaction, including its size, input count, command count, etc.
     /// Returns the certificate serialised bytes size.
-    pub fn validity_check(
-        &self,
-        config: &ProtocolConfig,
-        epoch: EpochId,
-    ) -> Result<usize, SuiError> {
+    pub fn validity_check(&self, config: &ProtocolConfig, epoch: EpochId) -> Result<usize, SuiError> {
         // Check that the features used by the user signatures are enabled on the network.
         self.check_user_signature_protocol_compatibility(config)?;
 
         // CRITICAL!!
         // Users cannot send system transactions.
         let tx_data = &self.transaction_data();
-        fp_ensure!(
-            !tx_data.is_system_tx(),
-            SuiError::UserInputError {
-                error: UserInputError::Unsupported(
-                    "SenderSignedData must not contain system transaction".to_string()
-                )
-            }
-        );
+        fp_ensure!(!tx_data.is_system_tx(), SuiError::UserInputError {
+            error: UserInputError::Unsupported("SenderSignedData must not contain system transaction".to_string())
+        });
 
         // Checks to see if the transaction has expired
         if match &tx_data.expiration() {
@@ -2395,21 +2129,14 @@ impl SenderSignedData {
         // Enforce overall transaction size limit.
         let tx_size = self.serialized_size()?;
         let max_tx_size_bytes = config.max_tx_size_bytes();
-        fp_ensure!(
-            tx_size as u64 <= max_tx_size_bytes,
-            SuiError::UserInputError {
-                error: UserInputError::SizeLimitExceeded {
-                    limit: format!(
-                        "serialized transaction size exceeded maximum of {max_tx_size_bytes}"
-                    ),
-                    value: tx_size.to_string(),
-                }
+        fp_ensure!(tx_size as u64 <= max_tx_size_bytes, SuiError::UserInputError {
+            error: UserInputError::SizeLimitExceeded {
+                limit: format!("serialized transaction size exceeded maximum of {max_tx_size_bytes}"),
+                value: tx_size.to_string(),
             }
-        );
+        });
 
-        tx_data
-            .validity_check(config)
-            .map_err(Into::<SuiError>::into)?;
+        tx_data.validity_check(config).map_err(Into::<SuiError>::into)?;
 
         Ok(tx_size)
     }
@@ -2417,6 +2144,7 @@ impl SenderSignedData {
 
 impl Message for SenderSignedData {
     type DigestType = TransactionDigest;
+
     const SCOPE: IntentScope = IntentScope::SenderSignedTransaction;
 
     /// Computes the tx digest that encodes the Rust type prefix from Signable trait.
@@ -2443,12 +2171,7 @@ impl<S> Envelope<SenderSignedData, S> {
     }
 
     pub fn shared_input_objects(&self) -> impl Iterator<Item = SharedInputObject> + '_ {
-        self.data()
-            .inner()
-            .intent_message
-            .value
-            .shared_input_objects()
-            .into_iter()
+        self.data().inner().intent_message.value.shared_input_objects().into_iter()
     }
 
     // Returns the primary key for this transaction.
@@ -2467,10 +2190,9 @@ impl<S> Envelope<SenderSignedData, S> {
     // the return type could change to Vec<TransactionKey>.
     pub fn non_digest_key(&self) -> Option<TransactionKey> {
         match &self.data().intent_message().value.kind() {
-            TransactionKind::RandomnessStateUpdate(rsu) => Some(TransactionKey::RandomnessRound(
-                rsu.epoch,
-                rsu.randomness_round,
-            )),
+            TransactionKind::RandomnessStateUpdate(rsu) => {
+                Some(TransactionKey::RandomnessRound(rsu.epoch, rsu.randomness_round))
+            }
             _ => None,
         }
     }
@@ -2485,16 +2207,10 @@ impl<S> Envelope<SenderSignedData, S> {
 }
 
 impl Transaction {
-    pub fn from_data_and_signer(
-        data: TransactionData,
-        signers: Vec<&dyn Signer<Signature>>,
-    ) -> Self {
+    pub fn from_data_and_signer(data: TransactionData, signers: Vec<&dyn Signer<Signature>>) -> Self {
         let signatures = {
             let intent_msg = IntentMessage::new(Intent::sui_transaction(), &data);
-            signers
-                .into_iter()
-                .map(|s| Signature::new_secure(&intent_msg, s))
-                .collect()
+            signers.into_iter().map(|s| Signature::new_secure(&intent_msg, s)).collect()
         };
         Self::from_data(data, signatures)
     }
@@ -2504,11 +2220,7 @@ impl Transaction {
         Self::from_generic_sig_data(data, signatures.into_iter().map(|s| s.into()).collect())
     }
 
-    pub fn signature_from_signer(
-        data: TransactionData,
-        intent: Intent,
-        signer: &dyn Signer<Signature>,
-    ) -> Signature {
+    pub fn signature_from_signer(data: TransactionData, intent: Intent, signer: &dyn Signer<Signature>) -> Signature {
         let intent_msg = IntentMessage::new(intent, data);
         Signature::new_secure(&intent_msg, signer)
     }
@@ -2522,12 +2234,7 @@ impl Transaction {
     pub fn to_tx_bytes_and_signatures(&self) -> (Base64, Vec<Base64>) {
         (
             Base64::from_bytes(&bcs::to_bytes(&self.data().intent_message().value).unwrap()),
-            self.data()
-                .inner()
-                .tx_signatures
-                .iter()
-                .map(|s| Base64::from_bytes(s.as_ref()))
-                .collect(),
+            self.data().inner().tx_signatures.iter().map(|s| Base64::from_bytes(s.as_ref())).collect(),
         )
     }
 }
@@ -2558,23 +2265,13 @@ impl VerifiedTransaction {
     }
 
     pub fn new_genesis_transaction(objects: Vec<GenesisObject>) -> Self {
-        GenesisTransaction { objects }
-            .pipe(TransactionKind::Genesis)
-            .pipe(Self::new_system_transaction)
+        GenesisTransaction { objects }.pipe(TransactionKind::Genesis).pipe(Self::new_system_transaction)
     }
 
-    pub fn new_consensus_commit_prologue(
-        epoch: u64,
-        round: u64,
-        commit_timestamp_ms: CheckpointTimestamp,
-    ) -> Self {
-        ConsensusCommitPrologue {
-            epoch,
-            round,
-            commit_timestamp_ms,
-        }
-        .pipe(TransactionKind::ConsensusCommitPrologue)
-        .pipe(Self::new_system_transaction)
+    pub fn new_consensus_commit_prologue(epoch: u64, round: u64, commit_timestamp_ms: CheckpointTimestamp) -> Self {
+        ConsensusCommitPrologue { epoch, round, commit_timestamp_ms }
+            .pipe(TransactionKind::ConsensusCommitPrologue)
+            .pipe(Self::new_system_transaction)
     }
 
     pub fn new_consensus_commit_prologue_v2(
@@ -2583,14 +2280,9 @@ impl VerifiedTransaction {
         commit_timestamp_ms: CheckpointTimestamp,
         consensus_commit_digest: ConsensusCommitDigest,
     ) -> Self {
-        ConsensusCommitPrologueV2 {
-            epoch,
-            round,
-            commit_timestamp_ms,
-            consensus_commit_digest,
-        }
-        .pipe(TransactionKind::ConsensusCommitPrologueV2)
-        .pipe(Self::new_system_transaction)
+        ConsensusCommitPrologueV2 { epoch, round, commit_timestamp_ms, consensus_commit_digest }
+            .pipe(TransactionKind::ConsensusCommitPrologueV2)
+            .pipe(Self::new_system_transaction)
     }
 
     pub fn new_consensus_commit_prologue_v3(
@@ -2607,10 +2299,9 @@ impl VerifiedTransaction {
             sub_dag_index: None,
             commit_timestamp_ms,
             consensus_commit_digest,
-            consensus_determined_version_assignments:
-                ConsensusDeterminedVersionAssignments::CancelledTransactions(
-                    cancelled_txn_version_assignment,
-                ),
+            consensus_determined_version_assignments: ConsensusDeterminedVersionAssignments::CancelledTransactions(
+                cancelled_txn_version_assignment,
+            ),
         }
         .pipe(TransactionKind::ConsensusCommitPrologueV3)
         .pipe(Self::new_system_transaction)
@@ -2622,14 +2313,9 @@ impl VerifiedTransaction {
         new_active_jwks: Vec<ActiveJwk>,
         authenticator_obj_initial_shared_version: SequenceNumber,
     ) -> Self {
-        AuthenticatorStateUpdate {
-            epoch,
-            round,
-            new_active_jwks,
-            authenticator_obj_initial_shared_version,
-        }
-        .pipe(TransactionKind::AuthenticatorStateUpdate)
-        .pipe(Self::new_system_transaction)
+        AuthenticatorStateUpdate { epoch, round, new_active_jwks, authenticator_obj_initial_shared_version }
+            .pipe(TransactionKind::AuthenticatorStateUpdate)
+            .pipe(Self::new_system_transaction)
     }
 
     pub fn new_randomness_state_update(
@@ -2638,14 +2324,9 @@ impl VerifiedTransaction {
         random_bytes: Vec<u8>,
         randomness_obj_initial_shared_version: SequenceNumber,
     ) -> Self {
-        RandomnessStateUpdate {
-            epoch,
-            randomness_round,
-            random_bytes,
-            randomness_obj_initial_shared_version,
-        }
-        .pipe(TransactionKind::RandomnessStateUpdate)
-        .pipe(Self::new_system_transaction)
+        RandomnessStateUpdate { epoch, randomness_round, random_bytes, randomness_obj_initial_shared_version }
+            .pipe(TransactionKind::RandomnessStateUpdate)
+            .pipe(Self::new_system_transaction)
     }
 
     pub fn new_end_of_epoch_transaction(txns: Vec<EndOfEpochTransactionKind>) -> Self {
@@ -2658,9 +2339,7 @@ impl VerifiedTransaction {
             .pipe(|data| {
                 SenderSignedData::new_from_sender_signature(
                     data,
-                    Ed25519SuiSignature::from_bytes(&[0; Ed25519SuiSignature::LENGTH])
-                        .unwrap()
-                        .into(),
+                    Ed25519SuiSignature::from_bytes(&[0; Ed25519SuiSignature::LENGTH]).unwrap().into(),
                 )
             })
             .pipe(Transaction::new)
@@ -2676,12 +2355,7 @@ impl VerifiedSignedTransaction {
         authority: AuthorityName,
         secret: &dyn Signer<AuthoritySignature>,
     ) -> Self {
-        Self::new_from_verified(SignedTransaction::new(
-            epoch,
-            transaction.into_inner().into_data(),
-            secret,
-            authority,
-        ))
+        Self::new_from_verified(SignedTransaction::new(epoch, transaction.into_inner().into_data(), secret, authority))
     }
 }
 
@@ -2695,11 +2369,7 @@ pub type SignedTransaction = Envelope<SenderSignedData, AuthoritySignInfo>;
 pub type VerifiedSignedTransaction = VerifiedEnvelope<SenderSignedData, AuthoritySignInfo>;
 
 impl Transaction {
-    pub fn verify_signature_for_testing(
-        &self,
-        current_epoch: EpochId,
-        verify_params: &VerifyParams,
-    ) -> SuiResult {
+    pub fn verify_signature_for_testing(&self, current_epoch: EpochId, verify_params: &VerifyParams) -> SuiResult {
         verify_sender_signed_data_message_signatures(
             self.data(),
             current_epoch,
@@ -2731,11 +2401,7 @@ impl SignedTransaction {
             Arc::new(VerifiedDigestCache::new_empty()),
         )?;
 
-        self.auth_sig().verify_secure(
-            self.data(),
-            Intent::sui_app(IntentScope::SenderSignedTransaction),
-            committee,
-        )
+        self.auth_sig().verify_secure(self.data(), Intent::sui_app(IntentScope::SenderSignedTransaction), committee)
     }
 
     pub fn try_into_verified_for_testing(
@@ -2776,11 +2442,7 @@ impl CertifiedTransaction {
             verify_params,
             zklogin_inputs_cache,
         )?;
-        self.auth_sig().verify_secure(
-            self.data(),
-            Intent::sui_app(IntentScope::SenderSignedTransaction),
-            committee,
-        )
+        self.auth_sig().verify_secure(self.data(), Intent::sui_app(IntentScope::SenderSignedTransaction), committee)
     }
 
     pub fn try_into_verified_for_testing(
@@ -2788,20 +2450,12 @@ impl CertifiedTransaction {
         committee: &Committee,
         verify_params: &VerifyParams,
     ) -> SuiResult<VerifiedCertificate> {
-        self.verify_signatures_authenticated(
-            committee,
-            verify_params,
-            Arc::new(VerifiedDigestCache::new_empty()),
-        )?;
+        self.verify_signatures_authenticated(committee, verify_params, Arc::new(VerifiedDigestCache::new_empty()))?;
         Ok(VerifiedCertificate::new_from_verified(self))
     }
 
     pub fn verify_committee_sigs_only(&self, committee: &Committee) -> SuiResult {
-        self.auth_sig().verify_secure(
-            self.data(),
-            Intent::sui_app(IntentScope::SenderSignedTransaction),
-            committee,
-        )
+        self.auth_sig().verify_secure(self.data(), Intent::sui_app(IntentScope::SenderSignedTransaction), committee)
     }
 }
 
@@ -2815,11 +2469,7 @@ pub enum InputObjectKind {
     // A Move object, either immutable, or owned mutable.
     ImmOrOwnedMoveObject(ObjectRef),
     // A Move object that's shared and mutable.
-    SharedMoveObject {
-        id: ObjectID,
-        initial_shared_version: SequenceNumber,
-        mutable: bool,
-    },
+    SharedMoveObject { id: ObjectID, initial_shared_version: SequenceNumber, mutable: bool },
 }
 
 impl InputObjectKind {
@@ -2841,17 +2491,11 @@ impl InputObjectKind {
 
     pub fn object_not_found_error(&self) -> UserInputError {
         match *self {
-            Self::MovePackage(package_id) => {
-                UserInputError::DependentPackageNotFound { package_id }
+            Self::MovePackage(package_id) => UserInputError::DependentPackageNotFound { package_id },
+            Self::ImmOrOwnedMoveObject((object_id, version, _)) => {
+                UserInputError::ObjectNotFound { object_id, version: Some(version) }
             }
-            Self::ImmOrOwnedMoveObject((object_id, version, _)) => UserInputError::ObjectNotFound {
-                object_id,
-                version: Some(version),
-            },
-            Self::SharedMoveObject { id, .. } => UserInputError::ObjectNotFound {
-                object_id: id,
-                version: None,
-            },
+            Self::SharedMoveObject { id, .. } => UserInputError::ObjectNotFound { object_id: id, version: None },
         }
     }
 
@@ -2910,26 +2554,19 @@ impl From<Object> for ObjectReadResultKind {
 
 impl ObjectReadResult {
     pub fn new(input_object_kind: InputObjectKind, object: ObjectReadResultKind) -> Self {
-        if let (
-            InputObjectKind::ImmOrOwnedMoveObject(_),
-            ObjectReadResultKind::DeletedSharedObject(_, _),
-        ) = (&input_object_kind, &object)
+        if let (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::DeletedSharedObject(_, _)) =
+            (&input_object_kind, &object)
         {
             panic!("only shared objects can be DeletedSharedObject");
         }
 
-        if let (
-            InputObjectKind::ImmOrOwnedMoveObject(_),
-            ObjectReadResultKind::CancelledTransactionSharedObject(_),
-        ) = (&input_object_kind, &object)
+        if let (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::CancelledTransactionSharedObject(_)) =
+            (&input_object_kind, &object)
         {
             panic!("only shared objects can be CancelledTransactionSharedObject");
         }
 
-        Self {
-            input_object_kind,
-            object,
-        }
+        Self { input_object_kind, object }
     }
 
     pub fn id(&self) -> ObjectID {
@@ -2955,17 +2592,13 @@ impl ObjectReadResult {
     pub fn is_mutable(&self) -> bool {
         match (&self.input_object_kind, &self.object) {
             (InputObjectKind::MovePackage(_), _) => false,
-            (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::Object(object)) => {
-                !object.is_immutable()
+            (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::Object(object)) => !object.is_immutable(),
+            (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::DeletedSharedObject(_, _)) => {
+                unreachable!()
             }
-            (
-                InputObjectKind::ImmOrOwnedMoveObject(_),
-                ObjectReadResultKind::DeletedSharedObject(_, _),
-            ) => unreachable!(),
-            (
-                InputObjectKind::ImmOrOwnedMoveObject(_),
-                ObjectReadResultKind::CancelledTransactionSharedObject(_),
-            ) => unreachable!(),
+            (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::CancelledTransactionSharedObject(_)) => {
+                unreachable!()
+            }
             (InputObjectKind::SharedMoveObject { mutable, .. }, _) => *mutable,
         }
     }
@@ -2989,24 +2622,19 @@ impl ObjectReadResult {
     pub fn get_owned_objref(&self) -> Option<ObjectRef> {
         match (&self.input_object_kind, &self.object) {
             (InputObjectKind::MovePackage(_), _) => None,
-            (
-                InputObjectKind::ImmOrOwnedMoveObject(objref),
-                ObjectReadResultKind::Object(object),
-            ) => {
+            (InputObjectKind::ImmOrOwnedMoveObject(objref), ObjectReadResultKind::Object(object)) => {
                 if object.is_immutable() {
                     None
                 } else {
                     Some(*objref)
                 }
             }
-            (
-                InputObjectKind::ImmOrOwnedMoveObject(_),
-                ObjectReadResultKind::DeletedSharedObject(_, _),
-            ) => unreachable!(),
-            (
-                InputObjectKind::ImmOrOwnedMoveObject(_),
-                ObjectReadResultKind::CancelledTransactionSharedObject(_),
-            ) => unreachable!(),
+            (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::DeletedSharedObject(_, _)) => {
+                unreachable!()
+            }
+            (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::CancelledTransactionSharedObject(_)) => {
+                unreachable!()
+            }
             (InputObjectKind::SharedMoveObject { .. }, _) => None,
         }
     }
@@ -3020,15 +2648,11 @@ impl ObjectReadResult {
             InputObjectKind::MovePackage(_) => None,
             InputObjectKind::ImmOrOwnedMoveObject(_) => None,
             InputObjectKind::SharedMoveObject { id, mutable, .. } => Some(match &self.object {
-                ObjectReadResultKind::Object(obj) => {
-                    SharedInput::Existing(obj.compute_object_reference())
-                }
+                ObjectReadResultKind::Object(obj) => SharedInput::Existing(obj.compute_object_reference()),
                 ObjectReadResultKind::DeletedSharedObject(seq, digest) => {
                     SharedInput::Deleted((id, *seq, mutable, *digest))
                 }
-                ObjectReadResultKind::CancelledTransactionSharedObject(seq) => {
-                    SharedInput::Cancelled((id, *seq))
-                }
+                ObjectReadResultKind::CancelledTransactionSharedObject(seq) => SharedInput::Cancelled((id, *seq)),
             }),
         }
     }
@@ -3107,9 +2731,7 @@ impl InputObjects {
     }
 
     pub fn contains_deleted_objects(&self) -> bool {
-        self.objects
-            .iter()
-            .any(|obj| obj.is_deleted_shared_object())
+        self.objects.iter().any(|obj| obj.is_deleted_shared_object())
     }
 
     // Returns IDs of objects responsible for a tranaction being cancelled, and the corresponding
@@ -3121,9 +2743,7 @@ impl InputObjects {
         for obj in &self.objects {
             if let ObjectReadResultKind::CancelledTransactionSharedObject(version) = obj.object {
                 contains_cancelled = true;
-                if version == SequenceNumber::CONGESTED
-                    || version == SequenceNumber::RANDOMNESS_UNAVAILABLE
-                {
+                if version == SequenceNumber::CONGESTED || version == SequenceNumber::RANDOMNESS_UNAVAILABLE {
                     // Verify we don't have multiple cancellation reasons.
                     assert!(cancel_reason.is_none() || cancel_reason == Some(version));
                     cancel_reason = Some(version);
@@ -3135,8 +2755,7 @@ impl InputObjects {
         if !cancelled_objects.is_empty() {
             Some((
                 cancelled_objects,
-                cancel_reason
-                    .expect("there should be a cancel reason if there are cancelled objects"),
+                cancel_reason.expect("there should be a cancel reason if there are cancelled objects"),
             ))
         } else {
             assert!(!contains_cancelled);
@@ -3145,16 +2764,9 @@ impl InputObjects {
     }
 
     pub fn filter_owned_objects(&self) -> Vec<ObjectRef> {
-        let owned_objects: Vec<_> = self
-            .objects
-            .iter()
-            .filter_map(|obj| obj.get_owned_objref())
-            .collect();
+        let owned_objects: Vec<_> = self.objects.iter().filter_map(|obj| obj.get_owned_objref()).collect();
 
-        trace!(
-            num_mutable_objects = owned_objects.len(),
-            "Checked locks and found mutable objects"
-        );
+        trace!(num_mutable_objects = owned_objects.len(), "Checked locks and found mutable objects");
 
         owned_objects
     }
@@ -3163,75 +2775,49 @@ impl InputObjects {
         self.objects
             .iter()
             .filter(|obj| obj.is_shared_object())
-            .map(|obj| {
-                obj.to_shared_input()
-                    .expect("already filtered for shared objects")
-            })
+            .map(|obj| obj.to_shared_input().expect("already filtered for shared objects"))
             .collect()
     }
 
     pub fn transaction_dependencies(&self) -> BTreeSet<TransactionDigest> {
-        self.objects
-            .iter()
-            .filter_map(|obj| obj.get_previous_transaction())
-            .collect()
+        self.objects.iter().filter_map(|obj| obj.get_previous_transaction()).collect()
     }
 
     pub fn mutable_inputs(&self) -> BTreeMap<ObjectID, (VersionDigest, Owner)> {
         self.objects
             .iter()
-            .filter_map(
-                |ObjectReadResult {
-                     input_object_kind,
-                     object,
-                 }| match (input_object_kind, object) {
-                    (InputObjectKind::MovePackage(_), _) => None,
-                    (
-                        InputObjectKind::ImmOrOwnedMoveObject(object_ref),
-                        ObjectReadResultKind::Object(object),
-                    ) => {
-                        if object.is_immutable() {
-                            None
-                        } else {
-                            Some((
-                                object_ref.0,
-                                ((object_ref.1, object_ref.2), object.owner.clone()),
-                            ))
-                        }
+            .filter_map(|ObjectReadResult { input_object_kind, object }| match (input_object_kind, object) {
+                (InputObjectKind::MovePackage(_), _) => None,
+                (InputObjectKind::ImmOrOwnedMoveObject(object_ref), ObjectReadResultKind::Object(object)) => {
+                    if object.is_immutable() {
+                        None
+                    } else {
+                        Some((object_ref.0, ((object_ref.1, object_ref.2), object.owner.clone())))
                     }
-                    (
-                        InputObjectKind::ImmOrOwnedMoveObject(_),
-                        ObjectReadResultKind::DeletedSharedObject(_, _),
-                    ) => {
-                        unreachable!()
+                }
+                (InputObjectKind::ImmOrOwnedMoveObject(_), ObjectReadResultKind::DeletedSharedObject(_, _)) => {
+                    unreachable!()
+                }
+                (InputObjectKind::SharedMoveObject { .. }, ObjectReadResultKind::DeletedSharedObject(_, _)) => None,
+                (InputObjectKind::SharedMoveObject { mutable, .. }, ObjectReadResultKind::Object(object)) => {
+                    if *mutable {
+                        let oref = object.compute_object_reference();
+                        Some((oref.0, ((oref.1, oref.2), object.owner.clone())))
+                    } else {
+                        None
                     }
-                    (
-                        InputObjectKind::SharedMoveObject { .. },
-                        ObjectReadResultKind::DeletedSharedObject(_, _),
-                    ) => None,
-                    (
-                        InputObjectKind::SharedMoveObject { mutable, .. },
-                        ObjectReadResultKind::Object(object),
-                    ) => {
-                        if *mutable {
-                            let oref = object.compute_object_reference();
-                            Some((oref.0, ((oref.1, oref.2), object.owner.clone())))
-                        } else {
-                            None
-                        }
-                    }
-                    (
-                        InputObjectKind::ImmOrOwnedMoveObject(_),
-                        ObjectReadResultKind::CancelledTransactionSharedObject(_),
-                    ) => {
-                        unreachable!()
-                    }
-                    (
-                        InputObjectKind::SharedMoveObject { .. },
-                        ObjectReadResultKind::CancelledTransactionSharedObject(_),
-                    ) => None,
-                },
-            )
+                }
+                (
+                    InputObjectKind::ImmOrOwnedMoveObject(_),
+                    ObjectReadResultKind::CancelledTransactionSharedObject(_),
+                ) => {
+                    unreachable!()
+                }
+                (
+                    InputObjectKind::SharedMoveObject { .. },
+                    ObjectReadResultKind::CancelledTransactionSharedObject(_),
+                ) => None,
+            })
             .collect()
     }
 
@@ -3243,9 +2829,7 @@ impl InputObjects {
             .objects
             .iter()
             .filter_map(|object| match &object.object {
-                ObjectReadResultKind::Object(object) => {
-                    object.data.try_as_move().map(MoveObject::version)
-                }
+                ObjectReadResultKind::Object(object) => object.data.try_as_move().map(MoveObject::version),
                 ObjectReadResultKind::DeletedSharedObject(v, _) => Some(*v),
                 ObjectReadResultKind::CancelledTransactionSharedObject(_) => None,
             })
@@ -3255,18 +2839,11 @@ impl InputObjects {
     }
 
     pub fn object_kinds(&self) -> impl Iterator<Item = &InputObjectKind> {
-        self.objects.iter().map(
-            |ObjectReadResult {
-                 input_object_kind, ..
-             }| input_object_kind,
-        )
+        self.objects.iter().map(|ObjectReadResult { input_object_kind, .. }| input_object_kind)
     }
 
     pub fn into_object_map(self) -> BTreeMap<ObjectID, Object> {
-        self.objects
-            .into_iter()
-            .filter_map(|o| o.as_object().map(|object| (o.id(), object.clone())))
-            .collect()
+        self.objects.into_iter().filter_map(|o| o.as_object().map(|object| (o.id(), object.clone()))).collect()
     }
 
     pub fn push(&mut self, object: ObjectReadResult) {
@@ -3312,10 +2889,7 @@ impl ReceivingObjectReadResult {
     }
 
     pub fn is_previously_received(&self) -> bool {
-        matches!(
-            self.object,
-            ReceivingObjectReadResultKind::PreviouslyReceivedObject
-        )
+        matches!(self.object, ReceivingObjectReadResultKind::PreviouslyReceivedObject)
     }
 }
 
@@ -3349,11 +2923,7 @@ impl Display for CertifiedTransaction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut writer = String::new();
         writeln!(writer, "Transaction Hash: {:?}", self.digest())?;
-        writeln!(
-            writer,
-            "Signed Authorities Bitmap : {:?}",
-            self.auth_sig().signers_map
-        )?;
+        writeln!(writer, "Signed Authorities Bitmap : {:?}", self.auth_sig().signers_map)?;
         write!(writer, "{}", &self.data().intent_message().value.kind())?;
         write!(f, "{}", writer)
     }

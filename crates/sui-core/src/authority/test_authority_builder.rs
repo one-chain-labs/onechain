@@ -1,34 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::{
-        authority_per_epoch_store::AuthorityPerEpochStore,
-        authority_store_tables::AuthorityPerpetualTables,
-        epoch_start_configuration::EpochStartConfiguration, AuthorityState, AuthorityStore,
-    },
-    checkpoints::CheckpointStore,
-    epoch::{
-        committee_store::CommitteeStore, epoch_metrics::EpochMetrics, randomness::RandomnessManager,
-    },
-    execution_cache::build_execution_cache,
-    jsonrpc_index::IndexStore,
-    mock_consensus::{ConsensusMode, MockConsensusClient},
-    module_cache_metrics::ResolverMetrics,
-    rpc_index::RpcIndexStore,
-    signature_verifier::SignatureVerifierMetrics,
-};
+use std::{path::PathBuf, sync::Arc};
+
 use fastcrypto::traits::KeyPair;
 use prometheus::Registry;
-use std::{path::PathBuf, sync::Arc};
 use sui_archival::reader::ArchiveReaderBalancer;
 use sui_config::{
     certificate_deny_config::CertificateDenyConfig,
     genesis::Genesis,
-    node::{
-        AuthorityOverloadConfig, AuthorityStorePruningConfig, DBCheckpointConfig,
-        ExpensiveSafetyCheckConfig,
-    },
+    node::{AuthorityOverloadConfig, AuthorityStorePruningConfig, DBCheckpointConfig, ExpensiveSafetyCheckConfig},
     transaction_deny_config::TransactionDenyConfig,
     ExecutionCacheConfig,
 };
@@ -47,8 +28,24 @@ use sui_types::{
     transaction::VerifiedTransaction,
 };
 
-use super::backpressure::BackpressureManager;
-use super::epoch_start_configuration::EpochFlag;
+use super::{backpressure::BackpressureManager, epoch_start_configuration::EpochFlag};
+use crate::{
+    authority::{
+        authority_per_epoch_store::AuthorityPerEpochStore,
+        authority_store_tables::AuthorityPerpetualTables,
+        epoch_start_configuration::EpochStartConfiguration,
+        AuthorityState,
+        AuthorityStore,
+    },
+    checkpoints::CheckpointStore,
+    epoch::{committee_store::CommitteeStore, epoch_metrics::EpochMetrics, randomness::RandomnessManager},
+    execution_cache::build_execution_cache,
+    jsonrpc_index::IndexStore,
+    mock_consensus::{ConsensusMode, MockConsensusClient},
+    module_cache_metrics::ResolverMetrics,
+    rpc_index::RpcIndexStore,
+    signature_verifier::SignatureVerifierMetrics,
+};
 
 #[derive(Default, Clone)]
 pub struct TestAuthorityBuilder<'a> {
@@ -108,18 +105,11 @@ impl<'a> TestAuthorityBuilder<'a> {
     pub fn with_reference_gas_price(mut self, reference_gas_price: u64) -> Self {
         // If genesis is already set then setting rgp is meaningless since it will be overwritten.
         assert!(self.genesis.is_none());
-        assert!(self
-            .reference_gas_price
-            .replace(reference_gas_price)
-            .is_none());
+        assert!(self.reference_gas_price.replace(reference_gas_price).is_none());
         self
     }
 
-    pub fn with_genesis_and_keypair(
-        mut self,
-        genesis: &'a Genesis,
-        keypair: &'a AuthorityKeyPair,
-    ) -> Self {
+    pub fn with_genesis_and_keypair(mut self, genesis: &'a Genesis, keypair: &'a AuthorityKeyPair) -> Self {
         assert!(self.genesis.replace(genesis).is_none());
         assert!(self.node_keypair.replace(keypair).is_none());
         self
@@ -133,10 +123,7 @@ impl<'a> TestAuthorityBuilder<'a> {
     /// When providing a network config, we will use the \node_idx validator's
     /// key as the keypair for the new node.
     pub fn with_network_config(self, config: &'a NetworkConfig, node_idx: usize) -> Self {
-        self.with_genesis_and_keypair(
-            &config.genesis,
-            config.validator_configs()[node_idx].protocol_key_pair(),
-        )
+        self.with_genesis_and_keypair(&config.genesis, config.validator_configs()[node_idx].protocol_key_pair())
     }
 
     pub fn disable_indexer(mut self) -> Self {
@@ -175,33 +162,25 @@ impl<'a> TestAuthorityBuilder<'a> {
                 .with_accounts(self.accounts)
                 .with_reference_gas_price(self.reference_gas_price.unwrap_or(500));
         if let Some(protocol_config) = &self.protocol_config {
-            local_network_config_builder =
-                local_network_config_builder.with_protocol_version(protocol_config.version);
+            local_network_config_builder = local_network_config_builder.with_protocol_version(protocol_config.version);
         }
         let local_network_config = local_network_config_builder.build();
         let genesis = &self.genesis.unwrap_or(&local_network_config.genesis);
         let genesis_committee = genesis.committee().unwrap();
         let path = self.store_base_path.unwrap_or_else(|| {
             let dir = std::env::temp_dir();
-            let store_base_path =
-                dir.join(format!("DB_{:?}", nondeterministic!(ObjectID::random())));
+            let store_base_path = dir.join(format!("DB_{:?}", nondeterministic!(ObjectID::random())));
             std::fs::create_dir(&store_base_path).unwrap();
             store_base_path
         });
         let authority_store = match self.store {
             Some(store) => store,
             None => {
-                let perpetual_tables =
-                    Arc::new(AuthorityPerpetualTables::open(&path.join("store"), None));
+                let perpetual_tables = Arc::new(AuthorityPerpetualTables::open(&path.join("store"), None));
                 // unwrap ok - for testing only.
-                AuthorityStore::open_with_committee_for_testing(
-                    perpetual_tables,
-                    &genesis_committee,
-                    genesis,
-                    0,
-                )
-                .await
-                .unwrap()
+                AuthorityStore::open_with_committee_for_testing(perpetual_tables, &genesis_committee, genesis, 0)
+                    .await
+                    .unwrap()
             }
         };
         let mut config = local_network_config.validator_configs()[0].clone();
@@ -209,11 +188,7 @@ impl<'a> TestAuthorityBuilder<'a> {
             config.execution_cache = cache_config;
         }
 
-        let keypair = if let Some(keypair) = self.node_keypair {
-            keypair
-        } else {
-            config.protocol_key_pair()
-        };
+        let keypair = if let Some(keypair) = self.node_keypair { keypair } else { config.protocol_key_pair() };
 
         let secret = Arc::pin(keypair.copy());
         let name: AuthorityName = secret.public().into();
@@ -222,9 +197,8 @@ impl<'a> TestAuthorityBuilder<'a> {
         let signature_verifier_metrics = SignatureVerifierMetrics::new(&registry);
         // `_guard` must be declared here so it is not dropped before
         // `AuthorityPerEpochStore::new` is called
-        let _guard = self
-            .protocol_config
-            .map(|config| ProtocolConfig::apply_overrides_for_testing(move |_, _| config.clone()));
+        let _guard =
+            self.protocol_config.map(|config| ProtocolConfig::apply_overrides_for_testing(move |_, _| config.clone()));
         let epoch_flags = EpochFlag::default_flags_for_new_epoch(&config);
         let epoch_start_configuration = EpochStartConfiguration::new(
             genesis.sui_system_object().into_epoch_start_state(),
@@ -236,8 +210,7 @@ impl<'a> TestAuthorityBuilder<'a> {
         let expensive_safety_checks = self.expensive_safety_checks.unwrap_or_default();
 
         let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
-        let backpressure_manager =
-            BackpressureManager::new_from_checkpoint_store(&checkpoint_store);
+        let backpressure_manager = BackpressureManager::new_from_checkpoint_store(&checkpoint_store);
 
         let cache_traits = build_execution_cache(
             &Default::default(),
@@ -261,11 +234,7 @@ impl<'a> TestAuthorityBuilder<'a> {
             &expensive_safety_checks,
             ChainIdentifier::from(*genesis.checkpoint().digest()),
         );
-        let committee_store = Arc::new(CommitteeStore::new(
-            path.join("epochs"),
-            &genesis_committee,
-            None,
-        ));
+        let committee_store = Arc::new(CommitteeStore::new(path.join("epochs"), &genesis_committee, None));
 
         let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
         if self.insert_genesis_checkpoint {
@@ -281,9 +250,7 @@ impl<'a> TestAuthorityBuilder<'a> {
             Some(Arc::new(IndexStore::new(
                 path.join("indexes"),
                 &registry,
-                epoch_store
-                    .protocol_config()
-                    .max_move_identifier_len_as_option(),
+                epoch_store.protocol_config().max_move_identifier_len_as_option(),
                 false,
                 &authority_store,
             )))
@@ -304,10 +271,7 @@ impl<'a> TestAuthorityBuilder<'a> {
         let certificate_deny_config = self.certificate_deny_config.unwrap_or_default();
         let authority_overload_config = self.authority_overload_config.unwrap_or_default();
         let mut pruning_config = AuthorityStorePruningConfig::default();
-        if !epoch_store
-            .protocol_config()
-            .simplified_unwrap_then_delete()
-        {
+        if !epoch_store.protocol_config().simplified_unwrap_then_delete() {
             // We cannot prune tombstones if simplified_unwrap_then_delete is not enabled.
             pruning_config.set_killswitch_tombstone_pruning(true);
         }
@@ -343,10 +307,7 @@ impl<'a> TestAuthorityBuilder<'a> {
 
         // Set up randomness with no-op consensus (DKG will not complete).
         if epoch_store.randomness_state_enabled() {
-            let consensus_client = Box::new(MockConsensusClient::new(
-                Arc::downgrade(&state),
-                ConsensusMode::Noop,
-            ));
+            let consensus_client = Box::new(MockConsensusClient::new(Arc::downgrade(&state), ConsensusMode::Noop));
             let randomness_manager = RandomnessManager::try_new(
                 Arc::downgrade(&epoch_store),
                 consensus_client,
@@ -357,10 +318,7 @@ impl<'a> TestAuthorityBuilder<'a> {
             if let Some(randomness_manager) = randomness_manager {
                 // Randomness might fail if test configuration does not permit DKG init.
                 // In that case, skip setting it up.
-                epoch_store
-                    .set_randomness_manager(randomness_manager)
-                    .await
-                    .unwrap();
+                epoch_store.set_randomness_manager(randomness_manager).await.unwrap();
             }
         }
 
@@ -392,10 +350,7 @@ impl<'a> TestAuthorityBuilder<'a> {
         // these objects directly.
         // TODO: we should probably have a better way to do this.
         if let Some(starting_objects) = self.starting_objects {
-            state
-                .insert_objects_unsafe_for_testing_only(starting_objects)
-                .await
-                .unwrap();
+            state.insert_objects_unsafe_for_testing_only(starting_objects).await.unwrap();
         };
         state
     }

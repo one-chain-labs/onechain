@@ -1,16 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ApiEndpoint, RouteHandler};
-use crate::response::Bcs;
-use crate::types::ExecuteTransactionOptions;
-use crate::types::ExecuteTransactionResponse;
-use crate::{Result, RpcService};
-use axum::extract::{Query, State};
-use axum::Json;
 use std::net::SocketAddr;
-use sui_sdk_types::{
-    BalanceChange, Object, SignedTransaction, Transaction, TransactionEffects, TransactionEvents,
+
+use axum::{
+    extract::{Query, State},
+    Json,
+};
+use sui_sdk_types::{BalanceChange, Object, SignedTransaction, Transaction, TransactionEffects, TransactionEvents};
+
+use super::{ApiEndpoint, RouteHandler};
+use crate::{
+    response::Bcs,
+    types::{ExecuteTransactionOptions, ExecuteTransactionResponse},
+    Result,
+    RpcService,
 };
 
 pub struct ExecuteTransaction;
@@ -40,10 +44,7 @@ async fn execute_transaction(
     client_address: Option<axum::extract::ConnectInfo<SocketAddr>>,
     Bcs(transaction): Bcs<SignedTransaction>,
 ) -> Result<Json<ExecuteTransactionResponse>> {
-    state
-        .execute_transaction(transaction, client_address.map(|a| a.0), &options)
-        .await
-        .map(Json)
+    state.execute_transaction(transaction, client_address.map(|a| a.0), &options).await.map(Json)
 }
 
 pub struct SimulateTransaction;
@@ -68,9 +69,7 @@ async fn simulate_transaction(
     //TODO allow accepting JSON as well as BCS
     Bcs(transaction): Bcs<Transaction>,
 ) -> Result<Json<TransactionSimulationResponse>> {
-    state
-        .simulate_transaction(&parameters, transaction)
-        .map(Json)
+    state.simulate_transaction(&parameters, transaction).map(Json)
 }
 
 /// Response type for the transaction simulation endpoint

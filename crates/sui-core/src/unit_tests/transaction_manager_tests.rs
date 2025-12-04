@@ -4,20 +4,18 @@
 use std::{time::Duration, vec};
 
 use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::executable_transaction::VerifiedExecutableTransaction;
-use sui_types::transaction::VerifiedTransaction;
 use sui_types::{
     base_types::{ObjectID, SequenceNumber},
     crypto::deterministic_random_account_key,
+    executable_transaction::VerifiedExecutableTransaction,
     object::Object,
     storage::InputKey,
-    transaction::{CallArg, ObjectArg},
+    transaction::{CallArg, ObjectArg, VerifiedTransaction},
     SUI_FRAMEWORK_PACKAGE_ID,
 };
-use tokio::time::Instant;
 use tokio::{
     sync::mpsc::{error::TryRecvError, unbounded_channel, UnboundedReceiver},
-    time::sleep,
+    time::{sleep, Instant},
 };
 
 use crate::{
@@ -26,9 +24,7 @@ use crate::{
 };
 
 #[allow(clippy::disallowed_methods)] // allow unbounded_channel()
-fn make_transaction_manager(
-    state: &AuthorityState,
-) -> (TransactionManager, UnboundedReceiver<PendingCertificate>) {
+fn make_transaction_manager(state: &AuthorityState) -> (TransactionManager, UnboundedReceiver<PendingCertificate>) {
     // Create a new transaction manager instead of reusing the authority's, to examine
     // transaction_manager output from rx_ready_certificates.
     let (tx_ready_certificates, rx_ready_certificates) = unbounded_channel();
@@ -48,28 +44,21 @@ fn make_transaction(gas_object: Object, input: Vec<CallArg>) -> VerifiedExecutab
     // transaction manager.
     let rgp = 100;
     let (sender, keypair) = deterministic_random_account_key();
-    let transaction =
-        TestTransactionBuilder::new(sender, gas_object.compute_object_reference(), rgp)
-            .move_call(SUI_FRAMEWORK_PACKAGE_ID, "counter", "assert_value", input)
-            .build_and_sign(&keypair);
+    let transaction = TestTransactionBuilder::new(sender, gas_object.compute_object_reference(), rgp)
+        .move_call(SUI_FRAMEWORK_PACKAGE_ID, "counter", "assert_value", input)
+        .build_and_sign(&keypair);
     VerifiedExecutableTransaction::new_system(VerifiedTransaction::new_unchecked(transaction), 0)
 }
 
 fn get_input_keys(objects: &[Object]) -> Vec<InputKey> {
-    objects
-        .iter()
-        .map(|object| InputKey::VersionedObject {
-            id: object.id(),
-            version: object.version(),
-        })
-        .collect()
+    objects.iter().map(|object| InputKey::VersionedObject { id: object.id(), version: object.version() }).collect()
 }
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn transaction_manager_basics() {
     // Initialize an authority state.
     let (owner, _keypair) = deterministic_random_account_key();
-    let gas_objects: Vec<Object> = (0..10)
+    let gas_objects: Vec<Object> = (0 .. 10)
         .map(|_| {
             let gas_object_id = ObjectID::random();
             Object::with_id_owner_for_testing(gas_object_id, owner)
@@ -81,18 +70,14 @@ async fn transaction_manager_basics() {
     // transaction_manager output from rx_ready_certificates.
     let (transaction_manager, mut rx_ready_certificates) = make_transaction_manager(&state);
     // TM should output no transaction.
-    assert!(rx_ready_certificates
-        .try_recv()
-        .is_err_and(|err| err == TryRecvError::Empty));
+    assert!(rx_ready_certificates.try_recv().is_err_and(|err| err == TryRecvError::Empty));
     // TM should be empty at the beginning.
     transaction_manager.check_empty_for_testing();
 
     // Enqueue empty vec should not crash.
     transaction_manager.enqueue(vec![], &state.epoch_store_for_testing());
     // TM should output no transaction.
-    assert!(rx_ready_certificates
-        .try_recv()
-        .is_err_and(|err| err == TryRecvError::Empty));
+    assert!(rx_ready_certificates.try_recv().is_err_and(|err| err == TryRecvError::Empty));
 
     // Enqueue a transaction with existing gas object, empty input.
     let transaction = make_transaction(gas_objects[0].clone(), vec![]);
@@ -103,50 +88,36 @@ async fn transaction_manager_basics() {
 
     // Tests that pending certificate stats are recorded properly.
     assert!(pending_certificate.stats.enqueue_time >= tx_start_time);
-    assert!(
-        pending_certificate.stats.ready_time.unwrap() >= pending_certificate.stats.enqueue_time
-    );
+    assert!(pending_certificate.stats.ready_time.unwrap() >= pending_certificate.stats.enqueue_time);
 
     assert_eq!(transaction_manager.inflight_queue_len(), 1);
 
     // Notify TM about transaction commit
-    transaction_manager.notify_commit(
-        transaction.digest(),
-        vec![],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.notify_commit(transaction.digest(), vec![], &state.epoch_store_for_testing());
 
     // TM should be empty.
     transaction_manager.check_empty_for_testing();
 
     // Enqueue a transaction with a new gas object, empty input.
-    let gas_object_new =
-        Object::with_id_owner_version_for_testing(ObjectID::random(), 0.into(), owner);
+    let gas_object_new = Object::with_id_owner_version_for_testing(ObjectID::random(), 0.into(), owner);
     let transaction = make_transaction(gas_object_new.clone(), vec![]);
     let tx_start_time = Instant::now();
     transaction_manager.enqueue(vec![transaction.clone()], &state.epoch_store_for_testing());
     // TM should output no transaction yet.
     sleep(Duration::from_secs(1)).await;
-    assert!(rx_ready_certificates
-        .try_recv()
-        .is_err_and(|err| err == TryRecvError::Empty));
+    assert!(rx_ready_certificates.try_recv().is_err_and(|err| err == TryRecvError::Empty));
 
     assert_eq!(transaction_manager.inflight_queue_len(), 1);
 
     // Duplicated enqueue is allowed.
     transaction_manager.enqueue(vec![transaction.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
-    assert!(rx_ready_certificates
-        .try_recv()
-        .is_err_and(|err| err == TryRecvError::Empty));
+    assert!(rx_ready_certificates.try_recv().is_err_and(|err| err == TryRecvError::Empty));
 
     assert_eq!(transaction_manager.inflight_queue_len(), 1);
 
     // Notify TM about availability of the gas object.
-    transaction_manager.objects_available(
-        get_input_keys(&[gas_object_new]),
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.objects_available(get_input_keys(&[gas_object_new]), &state.epoch_store_for_testing());
     // TM should output the transaction eventually.
     let pending_certificate = rx_ready_certificates.recv().await.unwrap();
 
@@ -154,23 +125,16 @@ async fn transaction_manager_basics() {
     // 2 seconds apart from the enqueue time.
     assert!(pending_certificate.stats.enqueue_time >= tx_start_time);
     assert!(
-        pending_certificate.stats.ready_time.unwrap() - pending_certificate.stats.enqueue_time
-            >= Duration::from_secs(2)
+        pending_certificate.stats.ready_time.unwrap() - pending_certificate.stats.enqueue_time >= Duration::from_secs(2)
     );
 
     // Re-enqueue the same transaction should not result in another output.
     transaction_manager.enqueue(vec![transaction.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
-    assert!(rx_ready_certificates
-        .try_recv()
-        .is_err_and(|err| err == TryRecvError::Empty));
+    assert!(rx_ready_certificates.try_recv().is_err_and(|err| err == TryRecvError::Empty));
 
     // Notify TM about transaction commit
-    transaction_manager.notify_commit(
-        transaction.digest(),
-        vec![],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.notify_commit(transaction.digest(), vec![], &state.epoch_store_for_testing());
 
     // TM should be empty at the end.
     transaction_manager.check_empty_for_testing();
@@ -188,7 +152,7 @@ async fn transaction_manager_basics() {
 async fn transaction_manager_object_dependency() {
     // Initialize an authority state, with gas objects and a shared object.
     let (owner, _keypair) = deterministic_random_account_key();
-    let gas_objects: Vec<Object> = (0..10)
+    let gas_objects: Vec<Object> = (0 .. 10)
         .map(|_| {
             let gas_object_id = ObjectID::random();
             Object::with_id_owner_for_testing(gas_object_id, owner)
@@ -197,14 +161,9 @@ async fn transaction_manager_object_dependency() {
     let shared_object = Object::shared_for_testing();
     let shared_object_2 = Object::shared_for_testing();
 
-    let state = init_state_with_objects(
-        [
-            gas_objects.clone(),
-            vec![shared_object.clone(), shared_object_2.clone()],
-        ]
-        .concat(),
-    )
-    .await;
+    let state =
+        init_state_with_objects([gas_objects.clone(), vec![shared_object.clone(), shared_object_2.clone()]].concat())
+            .await;
 
     // Create a new transaction manager instead of reusing the authority's, to examine
     // transaction_manager output from rx_ready_certificates.
@@ -214,75 +173,45 @@ async fn transaction_manager_object_dependency() {
 
     // Enqueue two transactions with the same shared object input in read-only mode.
     let shared_version = 1000.into();
-    let shared_object_arg_read = ObjectArg::SharedObject {
-        id: shared_object.id(),
-        initial_shared_version: 0.into(),
-        mutable: false,
-    };
-    let transaction_read_0 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(shared_object_arg_read)],
-    );
-    let transaction_read_1 = make_transaction(
-        gas_objects[1].clone(),
-        vec![CallArg::Object(shared_object_arg_read)],
-    );
+    let shared_object_arg_read =
+        ObjectArg::SharedObject { id: shared_object.id(), initial_shared_version: 0.into(), mutable: false };
+    let transaction_read_0 = make_transaction(gas_objects[0].clone(), vec![CallArg::Object(shared_object_arg_read)]);
+    let transaction_read_1 = make_transaction(gas_objects[1].clone(), vec![CallArg::Object(shared_object_arg_read)]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(
-            transaction_read_0.digest(),
-            &vec![(shared_object.id(), shared_version)],
-        )
+        .set_shared_object_versions_for_testing(transaction_read_0.digest(), &vec![(shared_object.id(), shared_version)])
         .unwrap();
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(
-            transaction_read_1.digest(),
-            &vec![(shared_object.id(), shared_version)],
-        )
+        .set_shared_object_versions_for_testing(transaction_read_1.digest(), &vec![(shared_object.id(), shared_version)])
         .unwrap();
 
     // Enqueue one transaction with the same shared object in mutable mode.
-    let shared_object_arg_default = ObjectArg::SharedObject {
-        id: shared_object.id(),
-        initial_shared_version: 0.into(),
-        mutable: true,
-    };
-    let transaction_default = make_transaction(
-        gas_objects[2].clone(),
-        vec![CallArg::Object(shared_object_arg_default)],
-    );
+    let shared_object_arg_default =
+        ObjectArg::SharedObject { id: shared_object.id(), initial_shared_version: 0.into(), mutable: true };
+    let transaction_default = make_transaction(gas_objects[2].clone(), vec![CallArg::Object(shared_object_arg_default)]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(
-            transaction_default.digest(),
-            &vec![(shared_object.id(), shared_version)],
-        )
+        .set_shared_object_versions_for_testing(transaction_default.digest(), &vec![(
+            shared_object.id(),
+            shared_version,
+        )])
         .unwrap();
 
     // Enqueue one transaction with two readonly shared object inputs, `shared_object` and `shared_object_2`.
     let shared_version_2 = 1000.into();
-    let shared_object_arg_read_2 = ObjectArg::SharedObject {
-        id: shared_object_2.id(),
-        initial_shared_version: 0.into(),
-        mutable: false,
-    };
-    let transaction_read_2 = make_transaction(
-        gas_objects[3].clone(),
-        vec![
-            CallArg::Object(shared_object_arg_default),
-            CallArg::Object(shared_object_arg_read_2),
-        ],
-    );
+    let shared_object_arg_read_2 =
+        ObjectArg::SharedObject { id: shared_object_2.id(), initial_shared_version: 0.into(), mutable: false };
+    let transaction_read_2 = make_transaction(gas_objects[3].clone(), vec![
+        CallArg::Object(shared_object_arg_default),
+        CallArg::Object(shared_object_arg_read_2),
+    ]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(
-            transaction_read_2.digest(),
-            &vec![
-                (shared_object.id(), shared_version),
-                (shared_object_2.id(), shared_version_2),
-            ],
-        )
+        .set_shared_object_versions_for_testing(transaction_read_2.digest(), &vec![
+            (shared_object.id(), shared_version),
+            (shared_object_2.id(), shared_version_2),
+        ])
         .unwrap();
 
     transaction_manager.enqueue(
@@ -303,10 +232,7 @@ async fn transaction_manager_object_dependency() {
 
     // Notify TM about availability of the first shared object.
     transaction_manager.objects_available(
-        vec![InputKey::VersionedObject {
-            id: shared_object.id(),
-            version: shared_version,
-        }],
+        vec![InputKey::VersionedObject { id: shared_object.id(), version: shared_version }],
         &state.epoch_store_for_testing(),
     );
 
@@ -315,11 +241,8 @@ async fn transaction_manager_object_dependency() {
     let tx_1 = rx_ready_certificates.recv().await.unwrap().certificate;
     let tx_2 = rx_ready_certificates.recv().await.unwrap().certificate;
     {
-        let mut want_digests = vec![
-            transaction_read_0.digest(),
-            transaction_read_1.digest(),
-            transaction_default.digest(),
-        ];
+        let mut want_digests =
+            vec![transaction_read_0.digest(), transaction_read_1.digest(), transaction_default.digest()];
         want_digests.sort();
         let mut got_digests = vec![tx_0.digest(), tx_1.digest(), tx_2.digest()];
         got_digests.sort();
@@ -340,10 +263,7 @@ async fn transaction_manager_object_dependency() {
 
     // Make shared_object_2 available.
     transaction_manager.objects_available(
-        vec![InputKey::VersionedObject {
-            id: shared_object_2.id(),
-            version: shared_version_2,
-        }],
+        vec![InputKey::VersionedObject { id: shared_object_2.id(), version: shared_version_2 }],
         &state.epoch_store_for_testing(),
     );
 
@@ -367,7 +287,7 @@ async fn transaction_manager_receiving_notify_commit() {
     telemetry_subscribers::init_for_testing();
     // Initialize an authority state.
     let (owner, _keypair) = deterministic_random_account_key();
-    let gas_objects: Vec<Object> = (0..10)
+    let gas_objects: Vec<Object> = (0 .. 10)
         .map(|_| {
             let gas_object_id = ObjectID::random();
             Object::with_id_owner_for_testing(gas_object_id, owner)
@@ -384,7 +304,7 @@ async fn transaction_manager_receiving_notify_commit() {
     transaction_manager.check_empty_for_testing();
 
     let obj_id = ObjectID::random();
-    let object_arguments: Vec<_> = (0..10)
+    let object_arguments: Vec<_> = (0 .. 10)
         .map(|i| {
             let object = Object::with_id_owner_version_for_testing(obj_id, i.into(), owner);
             // Every other transaction receives the object, and we create a run of multiple receives in
@@ -413,10 +333,8 @@ async fn transaction_manager_receiving_notify_commit() {
     }
 
     // Start things off by notifying TM that the receiving object 0 is available.
-    transaction_manager.objects_available(
-        get_input_keys(&[object_arguments[0].0.clone()]),
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager
+        .objects_available(get_input_keys(&[object_arguments[0].0.clone()]), &state.epoch_store_for_testing());
 
     // Now start to unravel the rest of the transactions by notifying that each subsequent
     // transaction has been processed.
@@ -434,19 +352,13 @@ async fn transaction_manager_receiving_notify_commit() {
         // object at the next version.
         transaction_manager.notify_commit(
             txn.digest(),
-            vec![InputKey::VersionedObject {
-                id: object.id(),
-                version: object.version().next(),
-            }],
+            vec![InputKey::VersionedObject { id: object.id(), version: object.version().next() }],
             &state.epoch_store_for_testing(),
         );
 
         // TM should now output another transaction to run since it the next version of that object
         // has become available.
-        assert_eq!(
-            transaction_manager.inflight_queue_len(),
-            object_arguments.len() - i - 1
-        );
+        assert_eq!(transaction_manager.inflight_queue_len(), object_arguments.len() - i - 1);
     }
 
     // After everything TM should be empty.
@@ -458,7 +370,7 @@ async fn transaction_manager_receiving_object_ready_notifications() {
     telemetry_subscribers::init_for_testing();
     // Initialize an authority state.
     let (owner, _keypair) = deterministic_random_account_key();
-    let gas_objects: Vec<Object> = (0..10)
+    let gas_objects: Vec<Object> = (0 .. 10)
         .map(|_| {
             let gas_object_id = ObjectID::random();
             Object::with_id_owner_for_testing(gas_object_id, owner)
@@ -477,62 +389,43 @@ async fn transaction_manager_receiving_object_ready_notifications() {
     let obj_id = ObjectID::random();
     let receiving_object_new0 = Object::with_id_owner_version_for_testing(obj_id, 0.into(), owner);
     let receiving_object_new1 = Object::with_id_owner_version_for_testing(obj_id, 1.into(), owner);
-    let receiving_object_arg0 =
-        ObjectArg::Receiving(receiving_object_new0.compute_object_reference());
-    let receive_object_transaction0 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(receiving_object_arg0)],
-    );
+    let receiving_object_arg0 = ObjectArg::Receiving(receiving_object_new0.compute_object_reference());
+    let receive_object_transaction0 =
+        make_transaction(gas_objects[0].clone(), vec![CallArg::Object(receiving_object_arg0)]);
 
-    let receiving_object_arg1 =
-        ObjectArg::Receiving(receiving_object_new1.compute_object_reference());
-    let receive_object_transaction1 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(receiving_object_arg1)],
-    );
+    let receiving_object_arg1 = ObjectArg::Receiving(receiving_object_new1.compute_object_reference());
+    let receive_object_transaction1 =
+        make_transaction(gas_objects[0].clone(), vec![CallArg::Object(receiving_object_arg1)]);
 
     // TM should output no transaction yet since waiting on receiving object.
-    transaction_manager.enqueue(
-        vec![receive_object_transaction0.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![receive_object_transaction0.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
     assert!(rx_ready_certificates.try_recv().is_err());
     assert_eq!(transaction_manager.inflight_queue_len(), 1);
 
     // TM should output no transaction yet since waiting on receiving object.
-    transaction_manager.enqueue(
-        vec![receive_object_transaction1.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![receive_object_transaction1.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
     assert!(rx_ready_certificates.try_recv().is_err());
     assert_eq!(transaction_manager.inflight_queue_len(), 2);
 
     // Duplicate enqueue of receiving object is allowed.
-    transaction_manager.enqueue(
-        vec![receive_object_transaction0.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![receive_object_transaction0.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
     assert!(rx_ready_certificates.try_recv().is_err());
     assert_eq!(transaction_manager.inflight_queue_len(), 2);
 
     // Notify TM that the receiving object 0 is available.
-    transaction_manager.objects_available(
-        get_input_keys(&[receiving_object_new0.clone()]),
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager
+        .objects_available(get_input_keys(&[receiving_object_new0.clone()]), &state.epoch_store_for_testing());
 
     // TM should output the transaction eventually now that the receiving object has become
     // available.
     rx_ready_certificates.recv().await.unwrap();
 
     // Notify TM that the receiving object 0 is available.
-    transaction_manager.objects_available(
-        get_input_keys(&[receiving_object_new1.clone()]),
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager
+        .objects_available(get_input_keys(&[receiving_object_new1.clone()]), &state.epoch_store_for_testing());
 
     // TM should output the transaction eventually now that the receiving object has become
     // available.
@@ -544,7 +437,7 @@ async fn transaction_manager_receiving_object_ready_notifications_multiple_of_sa
     telemetry_subscribers::init_for_testing();
     // Initialize an authority state.
     let (owner, _keypair) = deterministic_random_account_key();
-    let gas_objects: Vec<Object> = (0..10)
+    let gas_objects: Vec<Object> = (0 .. 10)
         .map(|_| {
             let gas_object_id = ObjectID::random();
             Object::with_id_owner_for_testing(gas_object_id, owner)
@@ -563,66 +456,44 @@ async fn transaction_manager_receiving_object_ready_notifications_multiple_of_sa
     let obj_id = ObjectID::random();
     let receiving_object_new0 = Object::with_id_owner_version_for_testing(obj_id, 0.into(), owner);
     let receiving_object_new1 = Object::with_id_owner_version_for_testing(obj_id, 1.into(), owner);
-    let receiving_object_arg0 =
-        ObjectArg::Receiving(receiving_object_new0.compute_object_reference());
-    let receive_object_transaction0 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(receiving_object_arg0)],
-    );
+    let receiving_object_arg0 = ObjectArg::Receiving(receiving_object_new0.compute_object_reference());
+    let receive_object_transaction0 =
+        make_transaction(gas_objects[0].clone(), vec![CallArg::Object(receiving_object_arg0)]);
 
-    let receive_object_transaction01 = make_transaction(
-        gas_objects[1].clone(),
-        vec![CallArg::Object(receiving_object_arg0)],
-    );
+    let receive_object_transaction01 =
+        make_transaction(gas_objects[1].clone(), vec![CallArg::Object(receiving_object_arg0)]);
 
-    let receiving_object_arg1 =
-        ObjectArg::Receiving(receiving_object_new1.compute_object_reference());
-    let receive_object_transaction1 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(receiving_object_arg1)],
-    );
+    let receiving_object_arg1 = ObjectArg::Receiving(receiving_object_new1.compute_object_reference());
+    let receive_object_transaction1 =
+        make_transaction(gas_objects[0].clone(), vec![CallArg::Object(receiving_object_arg1)]);
 
     // Enqueuing a transaction with a receiving object that is available at the time it is enqueued
     // should become immediately available.
     let gas_receiving_arg = ObjectArg::Receiving(gas_objects[3].compute_object_reference());
-    let tx1 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(gas_receiving_arg)],
-    );
+    let tx1 = make_transaction(gas_objects[0].clone(), vec![CallArg::Object(gas_receiving_arg)]);
 
     // TM should output no transaction yet since waiting on receiving object.
-    transaction_manager.enqueue(
-        vec![receive_object_transaction0.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![receive_object_transaction0.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
     assert!(rx_ready_certificates.try_recv().is_err());
     assert_eq!(transaction_manager.inflight_queue_len(), 1);
 
     // TM should output no transaction yet since waiting on receiving object.
-    transaction_manager.enqueue(
-        vec![receive_object_transaction1.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![receive_object_transaction1.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
     assert!(rx_ready_certificates.try_recv().is_err());
     assert_eq!(transaction_manager.inflight_queue_len(), 2);
 
     // Different transaction with a duplicate receiving object reference is allowed.
     // Both transaction's will be outputted once the receiving object is available.
-    transaction_manager.enqueue(
-        vec![receive_object_transaction01.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![receive_object_transaction01.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
     assert!(rx_ready_certificates.try_recv().is_err());
     assert_eq!(transaction_manager.inflight_queue_len(), 3);
 
     // Notify TM that the receiving object 0 is available.
-    transaction_manager.objects_available(
-        get_input_keys(&[receiving_object_new0.clone()]),
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager
+        .objects_available(get_input_keys(&[receiving_object_new0.clone()]), &state.epoch_store_for_testing());
 
     // TM should output both transactions depending on the receiving object now that the
     // transaction's receiving object has become available.
@@ -640,10 +511,8 @@ async fn transaction_manager_receiving_object_ready_notifications_multiple_of_sa
     rx_ready_certificates.recv().await.unwrap();
 
     // Notify TM that the receiving object 0 is available.
-    transaction_manager.objects_available(
-        get_input_keys(&[receiving_object_new1.clone()]),
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager
+        .objects_available(get_input_keys(&[receiving_object_new1.clone()]), &state.epoch_store_for_testing());
 
     // TM should output the transaction eventually now that the receiving object has become
     // available.
@@ -655,14 +524,13 @@ async fn transaction_manager_receiving_object_ready_if_current_version_greater()
     telemetry_subscribers::init_for_testing();
     // Initialize an authority state.
     let (owner, _keypair) = deterministic_random_account_key();
-    let mut gas_objects: Vec<Object> = (0..10)
+    let mut gas_objects: Vec<Object> = (0 .. 10)
         .map(|_| {
             let gas_object_id = ObjectID::random();
             Object::with_id_owner_for_testing(gas_object_id, owner)
         })
         .collect();
-    let receiving_object =
-        Object::with_id_owner_version_for_testing(ObjectID::random(), 10.into(), owner);
+    let receiving_object = Object::with_id_owner_version_for_testing(ObjectID::random(), 10.into(), owner);
     gas_objects.push(receiving_object.clone());
     let state = init_state_with_objects(gas_objects.clone()).await;
 
@@ -674,42 +542,23 @@ async fn transaction_manager_receiving_object_ready_if_current_version_greater()
     // TM should be empty at the beginning.
     transaction_manager.check_empty_for_testing();
 
-    let receiving_object_new0 =
-        Object::with_id_owner_version_for_testing(receiving_object.id(), 0.into(), owner);
-    let receiving_object_new1 =
-        Object::with_id_owner_version_for_testing(receiving_object.id(), 1.into(), owner);
-    let receiving_object_arg0 =
-        ObjectArg::Receiving(receiving_object_new0.compute_object_reference());
-    let receive_object_transaction0 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(receiving_object_arg0)],
-    );
+    let receiving_object_new0 = Object::with_id_owner_version_for_testing(receiving_object.id(), 0.into(), owner);
+    let receiving_object_new1 = Object::with_id_owner_version_for_testing(receiving_object.id(), 1.into(), owner);
+    let receiving_object_arg0 = ObjectArg::Receiving(receiving_object_new0.compute_object_reference());
+    let receive_object_transaction0 =
+        make_transaction(gas_objects[0].clone(), vec![CallArg::Object(receiving_object_arg0)]);
 
-    let receive_object_transaction01 = make_transaction(
-        gas_objects[1].clone(),
-        vec![CallArg::Object(receiving_object_arg0)],
-    );
+    let receive_object_transaction01 =
+        make_transaction(gas_objects[1].clone(), vec![CallArg::Object(receiving_object_arg0)]);
 
-    let receiving_object_arg1 =
-        ObjectArg::Receiving(receiving_object_new1.compute_object_reference());
-    let receive_object_transaction1 = make_transaction(
-        gas_objects[0].clone(),
-        vec![CallArg::Object(receiving_object_arg1)],
-    );
+    let receiving_object_arg1 = ObjectArg::Receiving(receiving_object_new1.compute_object_reference());
+    let receive_object_transaction1 =
+        make_transaction(gas_objects[0].clone(), vec![CallArg::Object(receiving_object_arg1)]);
 
     // TM should output no transaction yet since waiting on receiving object.
-    transaction_manager.enqueue(
-        vec![receive_object_transaction0.clone()],
-        &state.epoch_store_for_testing(),
-    );
-    transaction_manager.enqueue(
-        vec![receive_object_transaction01.clone()],
-        &state.epoch_store_for_testing(),
-    );
-    transaction_manager.enqueue(
-        vec![receive_object_transaction1.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![receive_object_transaction0.clone()], &state.epoch_store_for_testing());
+    transaction_manager.enqueue(vec![receive_object_transaction01.clone()], &state.epoch_store_for_testing());
+    transaction_manager.enqueue(vec![receive_object_transaction1.clone()], &state.epoch_store_for_testing());
     sleep(Duration::from_secs(1)).await;
     rx_ready_certificates.recv().await.unwrap();
     rx_ready_certificates.recv().await.unwrap();
@@ -743,16 +592,10 @@ async fn transaction_manager_with_cancelled_transactions() {
     assert!(rx_ready_certificates.try_recv().is_err());
 
     // Enqueue one transaction with 2 shared object inputs and 1 owned input.
-    let shared_object_arg_1 = ObjectArg::SharedObject {
-        id: shared_object_1.id(),
-        initial_shared_version: 0.into(),
-        mutable: true,
-    };
-    let shared_object_arg_2 = ObjectArg::SharedObject {
-        id: shared_object_2.id(),
-        initial_shared_version: 0.into(),
-        mutable: true,
-    };
+    let shared_object_arg_1 =
+        ObjectArg::SharedObject { id: shared_object_1.id(), initial_shared_version: 0.into(), mutable: true };
+    let shared_object_arg_2 =
+        ObjectArg::SharedObject { id: shared_object_2.id(), initial_shared_version: 0.into(), mutable: true };
 
     // Changes the desired owned object version to a higher version. We will make it available later.
     let owned_version = 2000.into();
@@ -760,29 +603,20 @@ async fn transaction_manager_with_cancelled_transactions() {
     owned_ref.1 = owned_version;
     let owned_object_arg = ObjectArg::ImmOrOwnedObject(owned_ref);
 
-    let cancelled_transaction = make_transaction(
-        gas_object.clone(),
-        vec![
-            CallArg::Object(shared_object_arg_1),
-            CallArg::Object(shared_object_arg_2),
-            CallArg::Object(owned_object_arg),
-        ],
-    );
+    let cancelled_transaction = make_transaction(gas_object.clone(), vec![
+        CallArg::Object(shared_object_arg_1),
+        CallArg::Object(shared_object_arg_2),
+        CallArg::Object(owned_object_arg),
+    ]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(
-            cancelled_transaction.digest(),
-            &vec![
-                (shared_object_1.id(), SequenceNumber::CANCELLED_READ),
-                (shared_object_2.id(), SequenceNumber::CONGESTED),
-            ],
-        )
+        .set_shared_object_versions_for_testing(cancelled_transaction.digest(), &vec![
+            (shared_object_1.id(), SequenceNumber::CANCELLED_READ),
+            (shared_object_2.id(), SequenceNumber::CONGESTED),
+        ])
         .unwrap();
 
-    transaction_manager.enqueue(
-        vec![cancelled_transaction.clone()],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.enqueue(vec![cancelled_transaction.clone()], &state.epoch_store_for_testing());
 
     // TM should output no transaction yet.
     sleep(Duration::from_secs(1)).await;
@@ -792,10 +626,7 @@ async fn transaction_manager_with_cancelled_transactions() {
 
     // Notify TM about availability of the owned object.
     transaction_manager.objects_available(
-        vec![InputKey::VersionedObject {
-            id: owned_object.id(),
-            version: owned_version,
-        }],
+        vec![InputKey::VersionedObject { id: owned_object.id(), version: owned_version }],
         &state.epoch_store_for_testing(),
     );
 
@@ -809,11 +640,7 @@ async fn transaction_manager_with_cancelled_transactions() {
     assert_eq!(transaction_manager.inflight_queue_len(), 1);
 
     // Notify TM about read-only transaction commit
-    transaction_manager.notify_commit(
-        available_txn.digest(),
-        vec![],
-        &state.epoch_store_for_testing(),
-    );
+    transaction_manager.notify_commit(available_txn.digest(), vec![], &state.epoch_store_for_testing());
 
     assert_eq!(transaction_manager.inflight_queue_len(), 0);
 

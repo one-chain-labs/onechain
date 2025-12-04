@@ -2,37 +2,61 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
-use crate::{
-    create_file_metadata, read_manifest, write_manifest, CheckpointUpdates, FileMetadata, FileType,
-    Manifest, CHECKPOINT_FILE_MAGIC, CHECKPOINT_FILE_SUFFIX, EPOCH_DIR_PREFIX, MAGIC_BYTES,
-    SUMMARY_FILE_MAGIC, SUMMARY_FILE_SUFFIX,
+use std::{
+    fs,
+    fs::{File, OpenOptions},
+    io::{BufWriter, Seek, SeekFrom, Write},
+    ops::Range,
+    path::{Path, PathBuf},
+    sync::Arc,
+    thread::sleep,
+    time::Duration,
 };
-use anyhow::Context;
-use anyhow::Result;
+
+use anyhow::{Context, Result};
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use object_store::DynObjectStore;
 use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
-use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Seek, SeekFrom, Write};
-use std::ops::Range;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::thread::sleep;
-use std::time::Duration;
 use sui_config::object_storage_config::ObjectStoreConfig;
-use sui_storage::blob::{Blob, BlobEncoding};
-use sui_storage::object_store::util::{copy_file, path_to_filesystem};
-use sui_storage::{compress, FileCompression, StorageFormat};
-use sui_types::messages_checkpoint::{
-    CertifiedCheckpointSummary as Checkpoint, CheckpointSequenceNumber,
-    FullCheckpointContents as CheckpointContents,
+use sui_storage::{
+    blob::{Blob, BlobEncoding},
+    compress,
+    object_store::util::{copy_file, path_to_filesystem},
+    FileCompression,
+    StorageFormat,
 };
-use sui_types::storage::WriteStore;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::time::Instant;
+use sui_types::{
+    messages_checkpoint::{
+        CertifiedCheckpointSummary as Checkpoint,
+        CheckpointSequenceNumber,
+        FullCheckpointContents as CheckpointContents,
+    },
+    storage::WriteStore,
+};
+use tokio::{
+    sync::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+    },
+    time::Instant,
+};
 use tracing::{debug, info};
+
+use crate::{
+    create_file_metadata,
+    read_manifest,
+    write_manifest,
+    CheckpointUpdates,
+    FileMetadata,
+    FileType,
+    Manifest,
+    CHECKPOINT_FILE_MAGIC,
+    CHECKPOINT_FILE_SUFFIX,
+    EPOCH_DIR_PREFIX,
+    MAGIC_BYTES,
+    SUMMARY_FILE_MAGIC,
+    SUMMARY_FILE_SUFFIX,
+};
 
 pub struct ArchiveMetrics {
     pub latest_checkpoint_archived: IntGauge,
@@ -105,7 +129,7 @@ impl CheckpointWriter {
         Ok(CheckpointWriter {
             root_dir_path,
             epoch_num,
-            checkpoint_range: checkpoint_sequence_num..checkpoint_sequence_num,
+            checkpoint_range: checkpoint_sequence_num .. checkpoint_sequence_num,
             wbuf: BufWriter::new(checkpoint_file),
             summary_wbuf: BufWriter::new(summary_file),
             checkpoint_buf_offset: 0,
@@ -119,11 +143,7 @@ impl CheckpointWriter {
         })
     }
 
-    pub fn write(
-        &mut self,
-        checkpoint_contents: CheckpointContents,
-        checkpoint_summary: Checkpoint,
-    ) -> Result<()> {
+    pub fn write(&mut self, checkpoint_contents: CheckpointContents, checkpoint_summary: Checkpoint) -> Result<()> {
         match self.storage_format {
             StorageFormat::Blob => self.write_as_blob(checkpoint_contents, checkpoint_summary),
         }
@@ -134,17 +154,9 @@ impl CheckpointWriter {
         checkpoint_contents: CheckpointContents,
         checkpoint_summary: Checkpoint,
     ) -> Result<()> {
-        assert_eq!(
-            checkpoint_summary.sequence_number,
-            self.checkpoint_range.end
-        );
+        assert_eq!(checkpoint_summary.sequence_number, self.checkpoint_range.end);
 
-        if checkpoint_summary.epoch()
-            == self
-                .epoch_num
-                .checked_add(1)
-                .context("Epoch num overflow")?
-        {
+        if checkpoint_summary.epoch() == self.epoch_num.checked_add(1).context("Epoch num overflow")? {
             self.cut()?;
             self.update_to_next_epoch();
             if self.epoch_dir().exists() {
@@ -156,15 +168,11 @@ impl CheckpointWriter {
 
         assert_eq!(checkpoint_summary.epoch, self.epoch_num);
 
-        assert_eq!(
-            checkpoint_summary.content_digest,
-            *checkpoint_contents.checkpoint_contents().digest()
-        );
+        assert_eq!(checkpoint_summary.content_digest, *checkpoint_contents.checkpoint_contents().digest());
 
         let contents_blob = Blob::encode(&checkpoint_contents, BlobEncoding::Bcs)?;
         let blob_size = contents_blob.size();
-        let cut_new_checkpoint_file = (self.checkpoint_buf_offset + blob_size)
-            > self.commit_file_size
+        let cut_new_checkpoint_file = (self.checkpoint_buf_offset + blob_size) > self.commit_file_size
             || (self.last_commit_instant.elapsed() > self.commit_duration);
         if cut_new_checkpoint_file {
             self.cut()?;
@@ -176,22 +184,17 @@ impl CheckpointWriter {
         let summary_blob = Blob::encode(&checkpoint_summary, BlobEncoding::Bcs)?;
         summary_blob.write(&mut self.summary_wbuf)?;
 
-        self.checkpoint_range.end = self
-            .checkpoint_range
-            .end
-            .checked_add(1)
-            .context("Checkpoint sequence num overflow")?;
+        self.checkpoint_range.end =
+            self.checkpoint_range.end.checked_add(1).context("Checkpoint sequence num overflow")?;
         Ok(())
     }
+
     fn finalize(&mut self) -> Result<FileMetadata> {
         self.wbuf.flush()?;
         self.wbuf.get_ref().sync_data()?;
         let off = self.wbuf.get_ref().stream_position()?;
         self.wbuf.get_ref().set_len(off)?;
-        let file_path = self.epoch_dir().join(format!(
-            "{}.{CHECKPOINT_FILE_SUFFIX}",
-            self.checkpoint_range.start
-        ));
+        let file_path = self.epoch_dir().join(format!("{}.{CHECKPOINT_FILE_SUFFIX}", self.checkpoint_range.start));
         self.compress(&file_path)?;
         let file_metadata = create_file_metadata(
             &file_path,
@@ -201,15 +204,13 @@ impl CheckpointWriter {
         )?;
         Ok(file_metadata)
     }
+
     fn finalize_summary(&mut self) -> Result<FileMetadata> {
         self.summary_wbuf.flush()?;
         self.summary_wbuf.get_ref().sync_data()?;
         let off = self.summary_wbuf.get_ref().stream_position()?;
         self.summary_wbuf.get_ref().set_len(off)?;
-        let file_path = self.epoch_dir().join(format!(
-            "{}.{SUMMARY_FILE_SUFFIX}",
-            self.checkpoint_range.start
-        ));
+        let file_path = self.epoch_dir().join(format!("{}.{SUMMARY_FILE_SUFFIX}", self.checkpoint_range.start));
         self.compress(&file_path)?;
         let file_metadata = create_file_metadata(
             &file_path,
@@ -219,6 +220,7 @@ impl CheckpointWriter {
         )?;
         Ok(file_metadata)
     }
+
     fn cut(&mut self) -> Result<()> {
         if !self.checkpoint_range.is_empty() {
             let checkpoint_file_metadata = self.finalize()?;
@@ -235,6 +237,7 @@ impl CheckpointWriter {
         }
         Ok(())
     }
+
     fn compress(&self, source: &Path) -> Result<()> {
         if self.file_compression == FileCompression::None {
             return Ok(());
@@ -246,6 +249,7 @@ impl CheckpointWriter {
         fs::rename(tmp_file_name, source)?;
         Ok(())
     }
+
     fn next_file(
         dir_path: &Path,
         checkpoint_sequence_num: u64,
@@ -266,6 +270,7 @@ impl CheckpointWriter {
         f.write_u8(file_compression.into())?;
         Ok(f)
     }
+
     fn create_new_files(&mut self) -> Result<()> {
         let f = Self::next_file(
             &self.epoch_dir(),
@@ -288,22 +293,26 @@ impl CheckpointWriter {
         self.summary_wbuf = BufWriter::new(f);
         Ok(())
     }
+
     fn reset(&mut self) -> Result<()> {
         self.reset_checkpoint_range();
         self.create_new_files()?;
         self.reset_last_commit_ts();
         Ok(())
     }
+
     fn reset_last_commit_ts(&mut self) {
         self.last_commit_instant = Instant::now();
     }
+
     fn reset_checkpoint_range(&mut self) {
-        self.checkpoint_range = self.checkpoint_range.end..self.checkpoint_range.end
+        self.checkpoint_range = self.checkpoint_range.end .. self.checkpoint_range.end
     }
+
     fn epoch_dir(&self) -> PathBuf {
-        self.root_dir_path
-            .join(format!("{}{}", EPOCH_DIR_PREFIX, self.epoch_num))
+        self.root_dir_path.join(format!("{}{}", EPOCH_DIR_PREFIX, self.epoch_num))
     }
+
     fn update_to_next_epoch(&mut self) {
         self.epoch_num = self.epoch_num.checked_add(1).unwrap();
     }
@@ -359,9 +368,7 @@ impl ArchiveWriter {
             // Start from genesis
             Manifest::new(0, 0)
         } else {
-            read_manifest(self.remote_object_store.clone())
-                .await
-                .expect("Failed to read manifest")
+            read_manifest(self.remote_object_store.clone()).await.expect("Failed to read manifest")
         };
         let start_checkpoint_sequence_number = manifest.next_checkpoint_seq_num();
         let (sender, receiver) = mpsc::channel::<CheckpointUpdates>(100);
@@ -385,12 +392,7 @@ impl ArchiveWriter {
             self.archive_metrics.clone(),
         ));
         tokio::task::spawn_blocking(move || {
-            Self::start_tailing_checkpoints(
-                start_checkpoint_sequence_number,
-                checkpoint_writer,
-                store,
-                kill_receiver,
-            )
+            Self::start_tailing_checkpoints(start_checkpoint_sequence_number, checkpoint_writer, store, kill_receiver)
         });
         Ok(kill_sender)
     }
@@ -408,17 +410,12 @@ impl ArchiveWriter {
         info!("Starting checkpoint tailing from sequence number: {checkpoint_sequence_number}");
 
         while kill.try_recv().is_err() {
-            if let Some(checkpoint_summary) =
-                store.get_checkpoint_by_sequence_number(checkpoint_sequence_number)
-            {
-                if let Some(checkpoint_contents) =
-                    store.get_full_checkpoint_contents(&checkpoint_summary.content_digest)
+            if let Some(checkpoint_summary) = store.get_checkpoint_by_sequence_number(checkpoint_sequence_number) {
+                if let Some(checkpoint_contents) = store.get_full_checkpoint_contents(&checkpoint_summary.content_digest)
                 {
-                    checkpoint_writer
-                        .write(checkpoint_contents, checkpoint_summary.into_inner())?;
-                    checkpoint_sequence_number = checkpoint_sequence_number
-                        .checked_add(1)
-                        .context("checkpoint seq number overflow")?;
+                    checkpoint_writer.write(checkpoint_contents, checkpoint_summary.into_inner())?;
+                    checkpoint_sequence_number =
+                        checkpoint_sequence_number.checked_add(1).context("checkpoint seq number overflow")?;
                     // There is more checkpoints to tail, so continue without sleeping
                     continue;
                 }

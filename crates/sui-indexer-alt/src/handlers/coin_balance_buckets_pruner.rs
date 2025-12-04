@@ -21,17 +21,15 @@ pub(crate) struct CoinBalanceBucketToBePruned {
 }
 
 impl Processor for CoinBalanceBucketsPruner {
-    const NAME: &'static str = "coin_balance_buckets_pruner";
     type Value = CoinBalanceBucketToBePruned;
+
+    const NAME: &'static str = "coin_balance_buckets_pruner";
 
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
         let cp_sequence_number = checkpoint.checkpoint_summary.sequence_number;
         let checkpoint_input_objects = checkpoint.checkpoint_input_objects();
-        let latest_live_output_objects: BTreeMap<_, _> = checkpoint
-            .latest_live_output_objects()
-            .into_iter()
-            .map(|o| (o.id(), o))
-            .collect();
+        let latest_live_output_objects: BTreeMap<_, _> =
+            checkpoint.latest_live_output_objects().into_iter().map(|o| (o.id(), o)).collect();
         let mut values = Vec::new();
         for (object_id, input_object) in checkpoint_input_objects {
             // This loop processes all coins that were owned by a single address prior to the checkpoint,
@@ -46,8 +44,7 @@ impl Processor for CoinBalanceBucketsPruner {
             if let Some(output_object) = latest_live_output_objects.get(&object_id) {
                 let output_coin_owner = get_coin_owner(output_object);
                 let output_coin_balance_bucket = get_coin_balance_bucket(output_object)?;
-                if (output_coin_owner, output_coin_balance_bucket)
-                    != (Some(input_coin_owner), input_coin_balance_bucket)
+                if (output_coin_owner, output_coin_balance_bucket) != (Some(input_coin_owner), input_coin_balance_bucket)
                 {
                     values.push(CoinBalanceBucketToBePruned {
                         object_id,

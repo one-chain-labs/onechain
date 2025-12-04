@@ -1,9 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+
+use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ReconfigCertStatus {
@@ -28,9 +30,7 @@ pub struct ReconfigState {
 
 impl Default for ReconfigState {
     fn default() -> Self {
-        Self {
-            status: ReconfigCertStatus::AcceptAllCerts,
-        }
+        Self { status: ReconfigCertStatus::AcceptAllCerts }
     }
 }
 
@@ -54,10 +54,7 @@ impl ReconfigState {
     }
 
     pub fn should_accept_consensus_certs(&self) -> bool {
-        matches!(
-            self.status,
-            ReconfigCertStatus::AcceptAllCerts | ReconfigCertStatus::RejectUserCerts
-        )
+        matches!(self.status, ReconfigCertStatus::AcceptAllCerts | ReconfigCertStatus::RejectUserCerts)
     }
 
     pub fn is_reject_all_certs(&self) -> bool {

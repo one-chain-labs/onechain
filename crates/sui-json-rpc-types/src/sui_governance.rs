@@ -4,9 +4,11 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sui_types::base_types::{AuthorityName, EpochId, ObjectID, SuiAddress};
-use sui_types::committee::{Committee, StakeUnit};
-use sui_types::sui_serde::BigInt;
+use sui_types::{
+    base_types::{AuthorityName, EpochId, ObjectID, SuiAddress},
+    committee::{Committee, StakeUnit},
+    sui_serde::BigInt,
+};
 
 /// RPC representation of the [Committee] type.
 #[serde_as]
@@ -23,10 +25,7 @@ pub struct SuiCommittee {
 
 impl From<Committee> for SuiCommittee {
     fn from(committee: Committee) -> Self {
-        Self {
-            epoch: committee.epoch,
-            validators: committee.voting_rights,
-        }
+        Self { epoch: committee.epoch, validators: committee.voting_rights }
     }
 }
 

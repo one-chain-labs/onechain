@@ -108,13 +108,8 @@ impl Broadcaster {
             let start = Instant::now();
             let req_timeout = rtt_estimate.mul_f64(TIMEOUT_THRESHOLD_MULTIPLIER);
             // Use a minimum timeout of 5s so the receiver does not terminate the request too early.
-            let network_timeout =
-                std::cmp::max(req_timeout, Broadcaster::MIN_SEND_BLOCK_NETWORK_TIMEOUT);
-            let resp = timeout(
-                req_timeout,
-                network_client.send_block(peer, &block, network_timeout),
-            )
-            .await;
+            let network_timeout = std::cmp::max(req_timeout, Broadcaster::MIN_SEND_BLOCK_NETWORK_TIMEOUT);
+            let resp = timeout(req_timeout, network_client.send_block(peer, &block, network_timeout)).await;
             if matches!(resp, Ok(Err(_))) {
                 // Add a delay before retrying.
                 sleep_until(start + req_timeout).await;
@@ -209,9 +204,7 @@ mod test {
 
     impl FakeNetworkClient {
         fn new() -> Self {
-            Self {
-                blocks_sent: Mutex::new(BTreeMap::new()),
-            }
+            Self { blocks_sent: Mutex::new(BTreeMap::new()) }
         }
 
         fn blocks_sent(&self) -> BTreeMap<AuthorityIndex, Vec<Bytes>> {
@@ -290,14 +283,10 @@ mod test {
         let context = Arc::new(context);
         let network_client = Arc::new(FakeNetworkClient::new());
         let (core_signals, signals_receiver) = CoreSignals::new(context.clone());
-        let _broadcaster =
-            Broadcaster::new(context.clone(), network_client.clone(), &signals_receiver);
+        let _broadcaster = Broadcaster::new(context.clone(), network_client.clone(), &signals_receiver);
 
         let block = VerifiedBlock::new_for_test(TestBlock::new(9, 1).build());
-        assert!(
-            core_signals.new_block(block.clone()).is_ok(),
-            "No subscriber active to receive the block"
-        );
+        assert!(core_signals.new_block(block.clone()).is_ok(), "No subscriber active to receive the block");
 
         // block should be broadcasted immediately to all peers.
         sleep(Duration::from_millis(1)).await;

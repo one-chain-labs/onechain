@@ -424,6 +424,7 @@ impl LaunchStage {
             LaunchStage::Deprecated => "DEPRECATED",
         }
     }
+
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -568,8 +569,7 @@ pub struct JavaSettings {
     ///         - google.pubsub.v1.Publisher: TopicAdmin
     ///         - google.pubsub.v1.Subscriber: SubscriptionAdmin
     #[prost(map = "string, string", tag = "2")]
-    pub service_class_names:
-        ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
+    pub service_class_names: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
     /// Some settings.
     #[prost(message, optional, tag = "3")]
     pub common: ::core::option::Option<CommonLanguageSettings>,
@@ -614,16 +614,14 @@ pub struct DotnetSettings {
     /// fully-qualified.)
     /// Example: Subscriber to SubscriberServiceApi.
     #[prost(map = "string, string", tag = "2")]
-    pub renamed_services:
-        ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
+    pub renamed_services: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
     /// Map from full resource types to the effective short name
     /// for the resource. This is used when otherwise resource
     /// named from different services would cause naming collisions.
     /// Example entry:
     /// "datalabeling.googleapis.com/Dataset": "DataLabelingDataset"
     #[prost(map = "string, string", tag = "3")]
-    pub renamed_resources:
-        ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
+    pub renamed_resources: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
     /// List of full resource types to ignore during generation.
     /// This is typically used for API-specific Location resources,
     /// which should be handled by the generator as if they were actually
@@ -762,6 +760,7 @@ impl ClientLibraryOrganization {
             ClientLibraryOrganization::GenerativeAi => "GENERATIVE_AI",
         }
     }
+
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -802,6 +801,7 @@ impl ClientLibraryDestination {
             ClientLibraryDestination::PackageManager => "PACKAGE_MANAGER",
         }
     }
+
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -886,6 +886,7 @@ impl FieldBehavior {
             FieldBehavior::Identifier => "IDENTIFIER",
         }
     }
+
     /// Creates an enum from field names used in the ProtoBuf definition.
     pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
         match value {
@@ -1061,6 +1062,7 @@ pub mod resource_descriptor {
                 History::FutureMultiPattern => "FUTURE_MULTI_PATTERN",
             }
         }
+
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
@@ -1098,6 +1100,7 @@ pub mod resource_descriptor {
                 Style::DeclarativeFriendly => "DECLARATIVE_FRIENDLY",
             }
         }
+
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {

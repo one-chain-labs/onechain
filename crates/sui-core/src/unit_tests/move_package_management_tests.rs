@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use expect_test::expect;
 use std::{fs::File, io::Read, path::PathBuf};
 
+use expect_test::expect;
 use sui_move::manage_package::ManagePackage;
 use sui_move_build::BuildConfig;
 use sui_types::base_types::ObjectID;
@@ -18,15 +18,9 @@ async fn test_manage_package_update() {
 
     let mut build_config = BuildConfig::new_for_testing();
     build_config.config.lock_file = Some(lock_file_path.clone());
-    build_config
-        .clone()
-        .build(&path)
-        .expect("Move package did not build");
+    build_config.clone().build(&path).expect("Move package did not build");
     // Update the lock file with placeholder compiler version so this isn't bumped every release.
-    build_config
-        .config
-        .update_lock_file_toolchain_version(&path, "0.0.1".into())
-        .expect("Could not update lock file");
+    build_config.config.update_lock_file_toolchain_version(&path, "0.0.1".into()).expect("Could not update lock file");
 
     let original_id = ObjectID::from_hex_literal("0xa").unwrap();
     let latest_id = ObjectID::from_hex_literal("0xb").unwrap();

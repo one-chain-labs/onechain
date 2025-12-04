@@ -1,28 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::HashMap,
+    fs,
+    io,
+    path::{Path, PathBuf},
+    str,
+};
+
 use expect_test::expect;
 use move_core_types::account_address::AccountAddress;
-use std::collections::HashMap;
-use std::{fs, io, path::Path};
-use std::{path::PathBuf, str};
-use sui_json_rpc_types::{
-    get_new_package_obj_from_response, get_new_package_upgrade_cap_from_response,
-};
+use sui_json_rpc_types::{get_new_package_obj_from_response, get_new_package_upgrade_cap_from_response};
 use sui_move_build::{BuildConfig, CompiledPackage, SuiPackageHooks};
 use sui_sdk::wallet_context::WalletContext;
 use sui_test_transaction_builder::{make_publish_transaction, make_publish_transaction_with_deps};
-use sui_types::base_types::ObjectID;
-use sui_types::move_package::UpgradePolicy;
-use sui_types::transaction::TEST_ONLY_GAS_UNIT_FOR_PUBLISH;
 use sui_types::{
-    base_types::{ObjectRef, SuiAddress, TransactionDigest},
+    base_types::{ObjectID, ObjectRef, SuiAddress, TransactionDigest},
+    move_package::UpgradePolicy,
+    transaction::TEST_ONLY_GAS_UNIT_FOR_PUBLISH,
     SUI_SYSTEM_STATE_OBJECT_ID,
 };
 use test_cluster::TestClusterBuilder;
 
-use crate::toolchain::CURRENT_COMPILER_VERSION;
-use crate::{BytecodeSourceVerifier, ValidationMode};
+use crate::{toolchain::CURRENT_COMPILER_VERSION, BytecodeSourceVerifier, ValidationMode};
 
 #[tokio::test]
 async fn successful_verification() -> anyhow::Result<()> {
@@ -45,38 +46,23 @@ async fn successful_verification() -> anyhow::Result<()> {
     let (a_pkg, a_ref) = {
         copy_published_package(&a_fixtures, "b", b_ref.0.into()).await?;
         let a_src = copy_published_package(&a_fixtures, "a", SuiAddress::ZERO).await?;
-        (
-            compile_package(a_src.clone()),
-            publish_package(context, a_src).await.0,
-        )
+        (compile_package(a_src.clone()), publish_package(context, a_src).await.0)
     };
 
     let client = context.get_client().await?;
     let verifier = BytecodeSourceVerifier::new(client.read_api());
 
     // Verify root without updating the address
-    verifier
-        .verify(&b_pkg, ValidationMode::root())
-        .await
-        .unwrap();
+    verifier.verify(&b_pkg, ValidationMode::root()).await.unwrap();
 
     // Verify deps but skip root
-    verifier
-        .verify(&a_pkg, ValidationMode::deps())
-        .await
-        .unwrap();
+    verifier.verify(&a_pkg, ValidationMode::deps()).await.unwrap();
 
     // Skip deps but verify root
-    verifier
-        .verify(&a_pkg, ValidationMode::root_at(a_ref.0.into()))
-        .await
-        .unwrap();
+    verifier.verify(&a_pkg, ValidationMode::root_at(a_ref.0.into())).await.unwrap();
 
     // Verify both deps and root
-    verifier
-        .verify(&a_pkg, ValidationMode::root_and_deps_at(a_ref.0.into()))
-        .await
-        .unwrap();
+    verifier.verify(&a_pkg, ValidationMode::root_and_deps_at(a_ref.0.into())).await.unwrap();
 
     Ok(())
 }
@@ -99,10 +85,7 @@ async fn successful_verification_unpublished_deps() -> anyhow::Result<()> {
     let verifier = BytecodeSourceVerifier::new(client.read_api());
 
     // Verify the root package which now includes dependency modules
-    verifier
-        .verify(&a_pkg, ValidationMode::root_at(a_ref.0.into()))
-        .await
-        .unwrap();
+    verifier.verify(&a_pkg, ValidationMode::root_at(a_ref.0.into())).await.unwrap();
 
     Ok(())
 }
@@ -133,10 +116,7 @@ async fn successful_verification_module_ordering() -> anyhow::Result<()> {
     };
 
     let client = context.get_client().await?;
-    BytecodeSourceVerifier::new(client.read_api())
-        .verify(&z_pkg, ValidationMode::root())
-        .await
-        .unwrap();
+    BytecodeSourceVerifier::new(client.read_api()).verify(&z_pkg, ValidationMode::root()).await.unwrap();
 
     Ok(())
 }
@@ -160,8 +140,7 @@ async fn successful_verification_upgrades() -> anyhow::Result<()> {
 
     let b_fixtures = tempfile::tempdir()?;
     let (b_pkg, e_pkg) = {
-        let b_src =
-            copy_upgraded_package(&b_fixtures, "b-v2", b_v2.0.into(), b_v1.0.into()).await?;
+        let b_src = copy_upgraded_package(&b_fixtures, "b-v2", b_v2.0.into(), b_v1.0.into()).await?;
         let e_src = copy_published_package(&b_fixtures, "e", SuiAddress::ZERO).await?;
         (compile_package(b_src), compile_package(e_src))
     };
@@ -170,16 +149,10 @@ async fn successful_verification_upgrades() -> anyhow::Result<()> {
     let verifier = BytecodeSourceVerifier::new(client.read_api());
 
     // Verify the upgraded package b-v2 as the root.
-    verifier
-        .verify(&b_pkg, ValidationMode::root())
-        .await
-        .unwrap();
+    verifier.verify(&b_pkg, ValidationMode::root()).await.unwrap();
 
     // Verify the upgraded package b-v2 as a dep of e.
-    verifier
-        .verify(&e_pkg, ValidationMode::deps())
-        .await
-        .unwrap();
+    verifier.verify(&e_pkg, ValidationMode::deps()).await.unwrap();
 
     Ok(())
 }
@@ -207,10 +180,7 @@ async fn fail_verification_bad_address() -> anyhow::Result<()> {
     let expected = expect!["On-chain address cannot be zero"];
     expected.assert_eq(
         &BytecodeSourceVerifier::new(client.read_api())
-            .verify(
-                &a_pkg,
-                ValidationMode::root_and_deps_at(AccountAddress::ZERO),
-            )
+            .verify(&a_pkg, ValidationMode::root_and_deps_at(AccountAddress::ZERO))
             .await
             .unwrap_err()
             .to_string(),
@@ -320,36 +290,27 @@ async fn package_not_found() -> anyhow::Result<()> {
         panic!("Expected verification to fail");
     };
 
-    let expected =
-        expect!["Dependency object does not exist or was deleted: NotExists { object_id: 0x<id> }"];
+    let expected = expect!["Dependency object does not exist or was deleted: NotExists { object_id: 0x<id> }"];
     expected.assert_eq(&sanitize_id(err.to_string(), &stable_addrs));
 
     let package_root = AccountAddress::random();
     stable_addrs.insert(SuiAddress::from(package_root), "<id>");
-    let Err(err) = verifier
-        .verify(&a_pkg, ValidationMode::root_and_deps_at(package_root))
-        .await
-    else {
+    let Err(err) = verifier.verify(&a_pkg, ValidationMode::root_and_deps_at(package_root)).await else {
         panic!("Expected verification to fail");
     };
 
     // <id> below may refer to either the package_root or dependent package `b`
     // (the check reports the first missing object nondeterministically)
-    let expected =
-        expect!["Dependency object does not exist or was deleted: NotExists { object_id: 0x<id> }"];
+    let expected = expect!["Dependency object does not exist or was deleted: NotExists { object_id: 0x<id> }"];
     expected.assert_eq(&sanitize_id(err.to_string(), &stable_addrs));
 
     let package_root = AccountAddress::random();
     stable_addrs.insert(SuiAddress::from(package_root), "<id>");
-    let Err(err) = verifier
-        .verify(&a_pkg, ValidationMode::root_at(package_root))
-        .await
-    else {
+    let Err(err) = verifier.verify(&a_pkg, ValidationMode::root_at(package_root)).await else {
         panic!("Expected verification to fail");
     };
 
-    let expected =
-        expect!["Dependency object does not exist or was deleted: NotExists { object_id: 0x<id> }"];
+    let expected = expect!["Dependency object does not exist or was deleted: NotExists { object_id: 0x<id> }"];
     expected.assert_eq(&sanitize_id(err.to_string(), &stable_addrs));
 
     Ok(())
@@ -401,10 +362,7 @@ async fn module_not_found_on_chain() -> anyhow::Result<()> {
     };
 
     let client = context.get_client().await?;
-    let Err(err) = BytecodeSourceVerifier::new(client.read_api())
-        .verify(&a_pkg, ValidationMode::deps())
-        .await
-    else {
+    let Err(err) = BytecodeSourceVerifier::new(client.read_api()).verify(&a_pkg, ValidationMode::deps()).await else {
         panic!("Expected verification to fail");
     };
 
@@ -437,10 +395,7 @@ async fn module_not_found_locally() -> anyhow::Result<()> {
     };
 
     let client = context.get_client().await?;
-    let Err(err) = BytecodeSourceVerifier::new(client.read_api())
-        .verify(&a_pkg, ValidationMode::deps())
-        .await
-    else {
+    let Err(err) = BytecodeSourceVerifier::new(client.read_api()).verify(&a_pkg, ValidationMode::deps()).await else {
         panic!("Expected verification to fail");
     };
 
@@ -462,9 +417,7 @@ async fn module_bytecode_mismatch() -> anyhow::Result<()> {
 
         // Modify a module before publishing
         let c_path = b_src.join("sources").join("c.move");
-        let c_file = tokio::fs::read_to_string(&c_path)
-            .await?
-            .replace("43", "44");
+        let c_file = tokio::fs::read_to_string(&c_path).await?.replace("43", "44");
         tokio::fs::write(&c_path, c_file).await?;
 
         publish_package(context, b_src).await.0
@@ -480,9 +433,7 @@ async fn module_bytecode_mismatch() -> anyhow::Result<()> {
         let compiled = compile_package(a_src.clone());
         // Modify a module before publishing
         let c_path = a_src.join("sources").join("a.move");
-        let c_file = tokio::fs::read_to_string(&c_path)
-            .await?
-            .replace("123", "1234");
+        let c_file = tokio::fs::read_to_string(&c_path).await?.replace("123", "1234");
         tokio::fs::write(&c_path, c_file).await?;
 
         (compiled, publish_package(context, a_src).await.0)
@@ -500,10 +451,7 @@ async fn module_bytecode_mismatch() -> anyhow::Result<()> {
     let expected = expect!["Local dependency did not match its on-chain version at <b_id>::b::c"];
     expected.assert_eq(&sanitize_id(err.to_string(), &stable_addrs));
 
-    let Err(err) = verifier
-        .verify(&a_pkg, ValidationMode::root_at(a_addr.into()))
-        .await
-    else {
+    let Err(err) = verifier.verify(&a_pkg, ValidationMode::root_at(a_addr.into())).await else {
         panic!("Expected verification to fail");
     };
 
@@ -526,8 +474,7 @@ async fn linkage_differs() -> anyhow::Result<()> {
 
     let b_v2_fixtures = tempfile::tempdir()?;
     let b_v2 = {
-        let b_src =
-            copy_upgraded_package(&b_v2_fixtures, "b-v2", b_v1.0.into(), SuiAddress::ZERO).await?;
+        let b_src = copy_upgraded_package(&b_v2_fixtures, "b-v2", b_v1.0.into(), SuiAddress::ZERO).await?;
         upgrade_package(context, b_v1.0, b_cap.0, b_src).await
     };
 
@@ -535,8 +482,7 @@ async fn linkage_differs() -> anyhow::Result<()> {
     // byte-for-byte identical with the second version;
     let b_v3_fixtures = tempfile::tempdir()?;
     let b_v3 = {
-        let b_src =
-            copy_upgraded_package(&b_v3_fixtures, "b-v2", b_v2.0.into(), SuiAddress::ZERO).await?;
+        let b_src = copy_upgraded_package(&b_v3_fixtures, "b-v2", b_v2.0.into(), SuiAddress::ZERO).await?;
         upgrade_package(context, b_v2.0, b_cap.0, b_src).await
     };
 
@@ -558,11 +504,7 @@ async fn linkage_differs() -> anyhow::Result<()> {
     };
 
     let client = context.get_client().await?;
-    let stable_ids = HashMap::from_iter([
-        (b_v1.0.into(), "<b1>"),
-        (b_v2.0.into(), "<b2>"),
-        (b_v3.0.into(), "<b3>"),
-    ]);
+    let stable_ids = HashMap::from_iter([(b_v1.0.into(), "<b1>"), (b_v2.0.into(), "<b2>"), (b_v3.0.into(), "<b3>")]);
 
     let error = BytecodeSourceVerifier::new(client.read_api())
         .verify(&e_pkg, ValidationMode::root())
@@ -618,10 +560,7 @@ async fn multiple_failures() -> anyhow::Result<()> {
     };
 
     let client = context.get_client().await?;
-    let Err(err) = BytecodeSourceVerifier::new(client.read_api())
-        .verify(&d_pkg, ValidationMode::deps())
-        .await
-    else {
+    let Err(err) = BytecodeSourceVerifier::new(client.read_api()).verify(&d_pkg, ValidationMode::deps()).await else {
         panic!("Expected verification to fail");
     };
 
@@ -642,27 +581,21 @@ async fn successful_versioned_dependency_verification() -> anyhow::Result<()> {
 
     let b_ref_fixtures = tempfile::tempdir()?;
     let b_ref = {
-        let b_src =
-            copy_published_package(&b_ref_fixtures, "versioned-b", SuiAddress::ZERO).await?;
+        let b_src = copy_published_package(&b_ref_fixtures, "versioned-b", SuiAddress::ZERO).await?;
         publish_package(context, b_src).await.0
     };
 
     let a_fixtures = tempfile::tempdir()?;
     let a_pkg = {
         copy_published_package(&a_fixtures, "versioned-b", b_ref.0.into()).await?;
-        let a_src =
-            copy_published_package(&a_fixtures, "versioned-a-depends-on-b", SuiAddress::ZERO)
-                .await?;
+        let a_src = copy_published_package(&a_fixtures, "versioned-a-depends-on-b", SuiAddress::ZERO).await?;
         compile_package(a_src.clone())
     };
 
     let client = context.get_client().await?;
 
     // Verify versioned dependency
-    BytecodeSourceVerifier::new(client.read_api())
-        .verify(&a_pkg, ValidationMode::deps())
-        .await
-        .unwrap();
+    BytecodeSourceVerifier::new(client.read_api()).verify(&a_pkg, ValidationMode::deps()).await.unwrap();
 
     Ok(())
 }
@@ -677,8 +610,7 @@ async fn successful_verification_with_bytecode_dep() -> anyhow::Result<()> {
     {
         // publish b
         fs::create_dir_all(tempdir.path().join("publish"))?;
-        let b_src =
-            copy_published_package(&tempdir.path().join("publish"), "b", SuiAddress::ZERO).await?;
+        let b_src = copy_published_package(&tempdir.path().join("publish"), "b", SuiAddress::ZERO).await?;
         let b_ref = publish_package(context, b_src).await.0;
 
         // setup b as a bytecode package
@@ -692,37 +624,22 @@ async fn successful_verification_with_bytecode_dep() -> anyhow::Result<()> {
 
     let (a_pkg, a_ref) = {
         let a_src = copy_published_package(&tempdir, "a", SuiAddress::ZERO).await?;
-        (
-            compile_package(a_src.clone()),
-            publish_package(context, a_src).await.0,
-        )
+        (compile_package(a_src.clone()), publish_package(context, a_src).await.0)
     };
 
-    assert!(
-        !a_pkg.bytecode_deps.is_empty(),
-        "Invalid test setup: expected bytecode deps to be present."
-    );
+    assert!(!a_pkg.bytecode_deps.is_empty(), "Invalid test setup: expected bytecode deps to be present.");
 
     let client = context.get_client().await?;
     let verifier = BytecodeSourceVerifier::new(client.read_api());
 
     // Verify deps but skip root
-    verifier
-        .verify(&a_pkg, ValidationMode::deps())
-        .await
-        .unwrap();
+    verifier.verify(&a_pkg, ValidationMode::deps()).await.unwrap();
 
     // Skip deps but verify root
-    verifier
-        .verify(&a_pkg, ValidationMode::root_at(a_ref.0.into()))
-        .await
-        .unwrap();
+    verifier.verify(&a_pkg, ValidationMode::root_at(a_ref.0.into())).await.unwrap();
 
     // Verify both deps and root
-    verifier
-        .verify(&a_pkg, ValidationMode::root_and_deps_at(a_ref.0.into()))
-        .await
-        .unwrap();
+    verifier.verify(&a_pkg, ValidationMode::root_and_deps_at(a_ref.0.into())).await.unwrap();
 
     Ok(())
 }
@@ -730,9 +647,7 @@ async fn successful_verification_with_bytecode_dep() -> anyhow::Result<()> {
 /// Compile the package at absolute path `package`.
 fn compile_package(package: impl AsRef<Path>) -> CompiledPackage {
     move_package::package_hooks::register_package_hooks(Box::new(SuiPackageHooks));
-    BuildConfig::new_for_testing()
-        .build(package.as_ref())
-        .unwrap()
+    BuildConfig::new_for_testing().build(package.as_ref()).unwrap()
 }
 
 fn sanitize_id(mut message: String, m: &HashMap<SuiAddress, &str>) -> String {
@@ -763,16 +678,7 @@ async fn upgrade_package(
     let package_digest = package.get_package_digest(with_unpublished_deps).to_vec();
     let package_deps = package.dependency_ids.published.into_values().collect();
 
-    upgrade_package_with_wallet(
-        context,
-        package_id,
-        upgrade_cap,
-        package_bytes,
-        package_deps,
-        package_digest,
-    )
-    .await
-    .0
+    upgrade_package_with_wallet(context, package_id, upgrade_cap, package_bytes, package_deps, package_digest).await.0
 }
 
 /// Compile and publish package at absolute path `package` to chain, along with its unpublished
@@ -883,8 +789,5 @@ pub async fn upgrade_package_with_wallet(
 
     let resp = context.execute_transaction_must_succeed(transaction).await;
 
-    (
-        get_new_package_obj_from_response(&resp).unwrap(),
-        resp.digest,
-    )
+    (get_new_package_obj_from_response(&resp).unwrap(), resp.digest)
 }

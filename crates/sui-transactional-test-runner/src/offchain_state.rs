@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_trait::async_trait;
 use std::time::Duration;
+
+use async_trait::async_trait;
 
 pub struct TestResponse {
     pub response_body: String,
@@ -22,9 +23,5 @@ pub trait OffchainStateReader: Send + Sync + 'static {
     /// Polls the checkpoint table until the given checkpoint is pruned.
     async fn wait_for_pruned_checkpoint(&self, checkpoint: u64, base_timeout: Duration);
     /// Executes a GraphQL query and returns the response.
-    async fn execute_graphql(
-        &self,
-        query: String,
-        show_usage: bool,
-    ) -> Result<TestResponse, anyhow::Error>;
+    async fn execute_graphql(&self, query: String, show_usage: bool) -> Result<TestResponse, anyhow::Error>;
 }

@@ -1,51 +1,67 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context;
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use futures::future::try_join_all;
-use futures::future::BoxFuture;
-use futures::FutureExt;
-use futures::{stream::FuturesUnordered, StreamExt};
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
-use prometheus::register_histogram_vec_with_registry;
-use prometheus::IntCounterVec;
-use prometheus::Registry;
-use prometheus::{register_counter_vec_with_registry, register_gauge_vec_with_registry};
-use prometheus::{register_int_counter_vec_with_registry, CounterVec};
-use prometheus::{register_int_gauge_with_registry, GaugeVec};
-use prometheus::{HistogramVec, IntGauge};
-use rand::seq::SliceRandom;
-use tokio::sync::mpsc::{channel, Sender};
-use tokio::sync::OnceCell;
-use tokio_util::sync::CancellationToken;
+use std::{
+    collections::{BTreeMap, VecDeque},
+    fmt::{Debug, Formatter},
+    future::Future,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
-use crate::drivers::driver::Driver;
-use crate::drivers::HistogramWrapper;
-use crate::system_state_observer::SystemStateObserver;
-use crate::workloads::payload::Payload;
-use crate::workloads::workload::ExpectedFailureType;
-use crate::workloads::{GroupID, WorkloadInfo};
-use crate::{ExecutionEffects, ValidatorProxy};
-use std::collections::{BTreeMap, VecDeque};
-use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-use sui_types::committee::Committee;
-use sui_types::quorum_driver_types::QuorumDriverError;
-use sui_types::transaction::{Transaction, TransactionDataAPI};
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
+use futures::{
+    future::{try_join_all, BoxFuture},
+    stream::FuturesUnordered,
+    FutureExt,
+    StreamExt,
+};
+use indicatif::{ProgressBar, ProgressStyle};
+use prometheus::{
+    register_counter_vec_with_registry,
+    register_gauge_vec_with_registry,
+    register_histogram_vec_with_registry,
+    register_int_counter_vec_with_registry,
+    register_int_gauge_with_registry,
+    CounterVec,
+    GaugeVec,
+    HistogramVec,
+    IntCounterVec,
+    IntGauge,
+    Registry,
+};
+use rand::seq::SliceRandom;
+use sui_types::{
+    committee::Committee,
+    quorum_driver_types::QuorumDriverError,
+    transaction::{Transaction, TransactionDataAPI},
+};
 use sysinfo::{CpuExt, System, SystemExt};
-use tokio::sync::Barrier;
-use tokio::task::{JoinHandle, JoinSet};
-use tokio::{time, time::Instant};
+use tokio::{
+    sync::{
+        mpsc::{channel, Sender},
+        Barrier,
+        OnceCell,
+    },
+    task::{JoinHandle, JoinSet},
+    time,
+    time::Instant,
+};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
-use super::Interval;
-use super::{BenchmarkStats, StressStats};
+use super::{BenchmarkStats, Interval, StressStats};
+use crate::{
+    drivers::{driver::Driver, HistogramWrapper},
+    system_state_observer::SystemStateObserver,
+    workloads::{payload::Payload, workload::ExpectedFailureType, GroupID, WorkloadInfo},
+    ExecutionEffects,
+    ValidatorProxy,
+};
 pub struct BenchMetrics {
     pub benchmark_duration: IntGauge,
     pub num_success: IntCounterVec,
@@ -61,9 +77,7 @@ pub struct BenchMetrics {
     pub num_success_cmds: IntCounterVec,
 }
 
-const LATENCY_SEC_BUCKETS: &[f64] = &[
-    0.1, 0.25, 0.5, 0.75, 1., 1.25, 1.5, 1.75, 2., 2.5, 5., 10., 20., 30., 60., 90.,
-];
+const LATENCY_SEC_BUCKETS: &[f64] = &[0.1, 0.25, 0.5, 0.75, 1., 1.25, 1.5, 1.75, 2., 2.5, 5., 10., 20., 30., 60., 90.];
 
 impl BenchMetrics {
     fn new(registry: &Registry) -> Self {
@@ -145,13 +159,8 @@ impl BenchMetrics {
                 registry,
             )
             .unwrap(),
-            cpu_usage: register_gauge_vec_with_registry!(
-                "cpu_usage",
-                "CPU usage per core",
-                &["cpu"],
-                registry,
-            )
-            .unwrap(),
+            cpu_usage: register_gauge_vec_with_registry!("cpu_usage", "CPU usage per core", &["cpu"], registry,)
+                .unwrap(),
         }
     }
 }
@@ -229,9 +238,11 @@ impl BenchDriver {
             token: CancellationToken::new(),
         }
     }
+
     pub fn terminate(&self) {
         self.token.cancel()
     }
+
     pub fn update_progress(
         start_time: Instant,
         interval: Interval,
@@ -257,6 +268,7 @@ impl BenchDriver {
         }
         progress_bar.set_message(format!("Gas Used: {gas_used}"));
     }
+
     pub async fn make_workers(
         &self,
         id: &mut u64,
@@ -269,10 +281,7 @@ impl BenchDriver {
         if qps == 0 {
             return vec![];
         }
-        let mut payloads = workload_info
-            .workload
-            .make_test_payloads(proxy.clone(), system_state_observer.clone())
-            .await;
+        let mut payloads = workload_info.workload.make_test_payloads(proxy.clone(), system_state_observer.clone()).await;
         let mut total_workers = workload_info.workload_params.num_workers;
         while total_workers > 0 {
             let target_qps = qps / total_workers;
@@ -336,17 +345,9 @@ impl Driver<(BenchmarkStats, StressStats)> for BenchDriver {
             let mut workers = vec![];
 
             for workload in workloads {
-                let proxy = proxies
-                    .choose(&mut rand::thread_rng())
-                    .context("Failed to get proxy for bench driver")?;
+                let proxy = proxies.choose(&mut rand::thread_rng()).context("Failed to get proxy for bench driver")?;
                 workers.extend(
-                    self.make_workers(
-                        &mut worker_id,
-                        workload,
-                        proxy.clone(),
-                        system_state_observer.clone(),
-                    )
-                    .await,
+                    self.make_workers(&mut worker_id, workload, proxy.clone(), system_state_observer.clone()).await,
                 );
             }
 
@@ -394,13 +395,7 @@ impl Driver<(BenchmarkStats, StressStats)> for BenchDriver {
             let mut stat;
             let start = Instant::now();
             while let Some(
-                sample_stat @ Stats {
-                    id,
-                    num_no_gas: _,
-                    num_in_flight: _,
-                    num_submitted: _,
-                    bench_stats: _,
-                },
+                sample_stat @ Stats { id, num_no_gas: _, num_in_flight: _, num_submitted: _, bench_stats: _ },
             ) = rx.recv().await
             {
                 // We use the special id as signal to clear up the stat collection map since that means
@@ -419,8 +414,7 @@ impl Driver<(BenchmarkStats, StressStats)> for BenchDriver {
                 let mut num_error_txes: u64 = 0;
                 let mut num_expected_error_txes: u64 = 0;
                 let mut num_success_cmds = 0;
-                let mut latency_histogram =
-                    hdrhistogram::Histogram::<u64>::new_with_max(120_000, 3).unwrap();
+                let mut latency_histogram = hdrhistogram::Histogram::<u64>::new_with_max(120_000, 3).unwrap();
 
                 let mut num_in_flight: u64 = 0;
                 let mut num_submitted: u64 = 0;
@@ -442,16 +436,10 @@ impl Driver<(BenchmarkStats, StressStats)> for BenchDriver {
                     num_no_gas += v.num_no_gas;
                     num_submitted += v.num_submitted;
                     num_in_flight += v.num_in_flight;
-                    latency_histogram
-                        .add(&v.bench_stats.latency_ms.histogram)
-                        .unwrap();
+                    latency_histogram.add(&v.bench_stats.latency_ms.histogram).unwrap();
                 }
                 let denom = num_success_txes + num_error_txes;
-                let _error_rate = if denom > 0 {
-                    num_error_txes as f32 / denom as f32
-                } else {
-                    0.0
-                };
+                let _error_rate = if denom > 0 { num_error_txes as f32 / denom as f32 } else { 0.0 };
                 counter += 1;
                 if counter % num_workers == 0 {
                     stat = format!(
@@ -492,19 +480,15 @@ impl Driver<(BenchmarkStats, StressStats)> for BenchDriver {
 
         let stress_stat_task = tokio::spawn(async move {
             let mut stress_stat = StressStats {
-                cpu_usage: HistogramWrapper {
-                    histogram: hdrhistogram::Histogram::<u64>::new_with_max(100, 3).unwrap(),
-                },
+                cpu_usage: HistogramWrapper { histogram: hdrhistogram::Histogram::<u64>::new_with_max(100, 3).unwrap() },
             };
             let mut stat_collection: Vec<StressStats> = Vec::new();
             let mut counter = 0;
-            while let Some(sample_stat @ StressStats { cpu_usage: _ }) = stress_stat_rx.recv().await
-            {
+            while let Some(sample_stat @ StressStats { cpu_usage: _ }) = stress_stat_rx.recv().await {
                 stress_stat.update(&sample_stat);
                 stat_collection.push(sample_stat);
 
-                let mut cpu_usage_histogram =
-                    hdrhistogram::Histogram::<u64>::new_with_max(100, 3).unwrap();
+                let mut cpu_usage_histogram = hdrhistogram::Histogram::<u64>::new_with_max(100, 3).unwrap();
                 for stat in stat_collection.iter() {
                     cpu_usage_histogram.add(&stat.cpu_usage.histogram).unwrap();
                 }
@@ -745,59 +729,33 @@ async fn run_bench_worker(
                 let latency = start.elapsed();
                 let time_from_start = total_benchmark_start_time.elapsed();
 
-                metrics_cloned
-                    .benchmark_duration
-                    .set(time_from_start.as_secs() as i64);
+                metrics_cloned.benchmark_duration.set(time_from_start.as_secs() as i64);
 
                 let square_latency_ms = latency.as_secs_f64().powf(2.0);
-                metrics_cloned
-                    .latency_s
-                    .with_label_values(&[&payload.to_string()])
-                    .observe(latency.as_secs_f64());
-                metrics_cloned
-                    .latency_squared_s
-                    .with_label_values(&[&payload.to_string()])
-                    .inc_by(square_latency_ms);
-                metrics_cloned
-                    .num_in_flight
-                    .with_label_values(&[&payload.to_string()])
-                    .dec();
+                metrics_cloned.latency_s.with_label_values(&[&payload.to_string()]).observe(latency.as_secs_f64());
+                metrics_cloned.latency_squared_s.with_label_values(&[&payload.to_string()]).inc_by(square_latency_ms);
+                metrics_cloned.num_in_flight.with_label_values(&[&payload.to_string()]).dec();
 
-                let num_commands =
-                    transaction.data().transaction_data().kind().num_commands() as u16;
+                let num_commands = transaction.data().transaction_data().kind().num_commands() as u16;
 
                 if effects.is_ok() {
-                    metrics_cloned
-                        .num_success
-                        .with_label_values(&[&payload.to_string()])
-                        .inc();
+                    metrics_cloned.num_success.with_label_values(&[&payload.to_string()]).inc();
                     metrics_cloned
                         .num_success_cmds
                         .with_label_values(&[&payload.to_string()])
                         .inc_by(num_commands as u64);
                 } else {
-                    metrics_cloned
-                        .num_error
-                        .with_label_values(&[&payload.to_string(), "execution"])
-                        .inc();
+                    metrics_cloned.num_error.with_label_values(&[&payload.to_string(), "execution"]).inc();
                 }
 
                 if let Some(sig_info) = effects.quorum_sig() {
                     sig_info.authorities(&committee).for_each(|name| {
-                        metrics_cloned
-                            .validators_in_effects_cert
-                            .with_label_values(&[&name.unwrap().to_string()])
-                            .inc()
+                        metrics_cloned.validators_in_effects_cert.with_label_values(&[&name.unwrap().to_string()]).inc()
                     })
                 }
 
                 payload.make_new_payload(&effects);
-                NextOp::Response {
-                    latency,
-                    num_commands,
-                    payload,
-                    gas_used: effects.gas_used(),
-                }
+                NextOp::Response { latency, num_commands, payload, gas_used: effects.gas_used() }
             }
             Err(err) => {
                 tracing::error!(
@@ -810,20 +768,14 @@ async fn run_bench_worker(
                         panic!("Transaction failed unexpectedly");
                     }
                     Some(_) => {
-                        metrics_cloned
-                            .num_expected_error
-                            .with_label_values(&[&payload.to_string()])
-                            .inc();
+                        metrics_cloned.num_expected_error.with_label_values(&[&payload.to_string()]).inc();
                         NextOp::Retry(Box::new((transaction, payload)))
                     }
                     None => {
                         if err
                             .downcast::<QuorumDriverError>()
                             .and_then(|err| {
-                                if matches!(
-                                    err,
-                                    QuorumDriverError::NonRecoverableTransactionError { .. }
-                                ) {
+                                if matches!(err, QuorumDriverError::NonRecoverableTransactionError { .. }) {
                                     Err(err.into())
                                 } else {
                                     Ok(())
@@ -833,10 +785,7 @@ async fn run_bench_worker(
                         {
                             NextOp::Failure
                         } else {
-                            metrics_cloned
-                                .num_error
-                                .with_label_values(&[&payload.to_string(), "rpc"])
-                                .inc();
+                            metrics_cloned.num_error.with_label_values(&[&payload.to_string(), "rpc"]).inc();
                             NextOp::Retry(Box::new((transaction, payload)))
                         }
                     }
@@ -1020,9 +969,7 @@ async fn run_bench_worker(
                 num_success_txes,
                 num_success_cmds,
                 total_gas_used: worker_gas_used,
-                latency_ms: HistogramWrapper {
-                    histogram: latency_histogram,
-                },
+                latency_ms: HistogramWrapper { histogram: latency_histogram },
             },
         })
         .is_err()
@@ -1031,25 +978,14 @@ async fn run_bench_worker(
     }
 
     // Wait for futures to complete so we can get the remaining payloads
-    info!(
-        "Waiting for {} txes to complete for worker id {}...",
-        futures.len(),
-        worker.id
-    );
+    info!("Waiting for {} txes to complete for worker id {}...", futures.len(), worker.id);
     while let Some(result) = futures.next().await {
         let p = match result {
             NextOp::Failure => {
-                error!(
-                    "Permanent failure to execute payload. May result in gas objects being leaked"
-                );
+                error!("Permanent failure to execute payload. May result in gas objects being leaked");
                 continue;
             }
-            NextOp::Response {
-                latency: _,
-                num_commands: _,
-                gas_used: _,
-                payload,
-            } => payload,
+            NextOp::Response { latency: _, num_commands: _, gas_used: _, payload } => payload,
             NextOp::Retry(b) => b.1,
         };
         free_pool.push_back(p);
@@ -1077,9 +1013,7 @@ fn create_progress_bar(duration: Interval) -> ProgressBar {
     match duration {
         Interval::Count(count) => new_progress_bar(count)
             .with_prefix("Running benchmark(count):")
-            .with_style(
-                ProgressStyle::with_template("{prefix}: {wide_bar} {pos}/{len}: {msg}").unwrap(),
-            ),
+            .with_style(ProgressStyle::with_template("{prefix}: {wide_bar} {pos}/{len}: {msg}").unwrap()),
         Interval::Time(Duration::MAX) => ProgressBar::hidden(),
         Interval::Time(duration) => new_progress_bar(duration.as_secs())
             .with_prefix("Running benchmark(duration):")
@@ -1099,23 +1033,15 @@ fn stress_stats_collector(
         tokio::time::sleep(Duration::from_secs(1)).await;
 
         while !progress.is_finished() {
-            let mut cpu_usage_histogram =
-                hdrhistogram::Histogram::<u64>::new_with_max(100, 3).unwrap();
+            let mut cpu_usage_histogram = hdrhistogram::Histogram::<u64>::new_with_max(100, 3).unwrap();
             system.refresh_cpu();
             for (i, cpu) in system.cpus().iter().enumerate() {
                 cpu_usage_histogram.saturating_record(cpu.cpu_usage() as u64);
-                metrics
-                    .cpu_usage
-                    .with_label_values(&[&format!("cpu_{i}").to_string()])
-                    .set(cpu.cpu_usage().into());
+                metrics.cpu_usage.with_label_values(&[&format!("cpu_{i}").to_string()]).set(cpu.cpu_usage().into());
             }
 
             if stress_stat_tx
-                .try_send(StressStats {
-                    cpu_usage: HistogramWrapper {
-                        histogram: cpu_usage_histogram,
-                    },
-                })
+                .try_send(StressStats { cpu_usage: HistogramWrapper { histogram: cpu_usage_histogram } })
                 .is_err()
             {
                 debug!("Failed to update stress stats!");

@@ -1,23 +1,36 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::displays::Pretty;
-use crate::replay::LocalExec;
-use move_core_types::annotated_value::{MoveTypeLayout, MoveValue};
-use move_core_types::language_storage::TypeTag;
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use std::{
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
+
+use move_core_types::{
+    annotated_value::{MoveTypeLayout, MoveValue},
+    language_storage::TypeTag,
+};
 use sui_execution::Executor;
-use sui_types::execution::ExecutionResult;
-use sui_types::object::bounded_visitor::BoundedVisitor;
-use sui_types::transaction::CallArg::Pure;
-use sui_types::transaction::{
-    write_sep, Argument, CallArg, Command, ObjectArg, ProgrammableMoveCall, ProgrammableTransaction,
+use sui_types::{
+    execution::ExecutionResult,
+    object::bounded_visitor::BoundedVisitor,
+    transaction::{
+        write_sep,
+        Argument,
+        CallArg,
+        CallArg::Pure,
+        Command,
+        ObjectArg,
+        ProgrammableMoveCall,
+        ProgrammableTransaction,
+    },
 };
 use tabled::{
     builder::Builder as TableBuilder,
     settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
 };
+
+use crate::{displays::Pretty, replay::LocalExec};
 
 pub struct FullPTB {
     pub ptb: ProgrammableTransaction,
@@ -82,10 +95,9 @@ impl<'a> Display for Pretty<'a, FullPTB> {
 
             let mut table = builder.build();
             table.with(TablePanel::header("Input Objects"));
-            table.with(TableStyle::rounded().horizontals([HorizontalLine::new(
-                1,
-                TableStyle::modern().get_horizontal(),
-            )]));
+            table.with(
+                TableStyle::rounded().horizontals([HorizontalLine::new(1, TableStyle::modern().get_horizontal())]),
+            );
             write!(f, "\n{}\n", table)?;
         } else {
             write!(f, "\n  No input objects for this transaction")?;
@@ -103,11 +115,7 @@ impl<'a> Display for Pretty<'a, FullPTB> {
                     Pretty(result)
                 )?
             } else {
-                write!(
-                    f,
-                    "╭───────────────────╮\n│ Command {i:<2} Output │\n╰───────────────────╯{}\n",
-                    Pretty(result)
-                )?
+                write!(f, "╭───────────────────╮\n│ Command {i:<2} Output │\n╰───────────────────╯{}\n", Pretty(result))?
             }
         }
 
@@ -124,10 +132,9 @@ impl<'a> Display for Pretty<'a, FullPTB> {
 
             let mut table = builder.build();
             table.with(TablePanel::header("Commands"));
-            table.with(TableStyle::rounded().horizontals([HorizontalLine::new(
-                1,
-                TableStyle::modern().get_horizontal(),
-            )]));
+            table.with(
+                TableStyle::rounded().horizontals([HorizontalLine::new(1, TableStyle::modern().get_horizontal())]),
+            );
             write!(f, "\n{}\n", table)?;
         } else {
             write!(f, "\n  No commands for this transaction")?;
@@ -159,20 +166,12 @@ impl<'a> Display for Pretty<'a, Command> {
                 write!(f, "\n │ Address: {}\n └", Pretty(addr))
             }
             Command::SplitCoins(coin, amounts) => {
-                write!(
-                    f,
-                    "SplitCoins:\n ┌\n │ Coin: {}\n │ Amounts: \n │   ",
-                    Pretty(coin)
-                )?;
+                write!(f, "SplitCoins:\n ┌\n │ Coin: {}\n │ Amounts: \n │   ", Pretty(coin))?;
                 write_sep(f, amounts.iter().map(Pretty), "\n │   ")?;
                 write!(f, "\n └")
             }
             Command::MergeCoins(target, coins) => {
-                write!(
-                    f,
-                    "MergeCoins:\n ┌\n │ Target: {}\n │ Coins: \n │   ",
-                    Pretty(target)
-                )?;
+                write!(f, "MergeCoins:\n ┌\n │ Target: {}\n │ Coins: \n │   ", Pretty(target))?;
                 write_sep(f, coins.iter().map(Pretty), "\n │   ")?;
                 write!(f, "\n └")
             }
@@ -195,19 +194,9 @@ impl<'a> Display for Pretty<'a, Command> {
 impl<'a> Display for Pretty<'a, ProgrammableMoveCall> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(move_call) = self;
-        let ProgrammableMoveCall {
-            package,
-            module,
-            function,
-            type_arguments,
-            arguments,
-        } = move_call;
+        let ProgrammableMoveCall { package, module, function, type_arguments, arguments } = move_call;
 
-        write!(
-            f,
-            "MoveCall:\n ┌\n │ Function:  {} \n │ Module:    {}\n │ Package:   {}",
-            function, module, package
-        )?;
+        write!(f, "MoveCall:\n ┌\n │ Function:  {} \n │ Module:    {}\n │ Package:   {}", function, module, package)?;
 
         if !type_arguments.is_empty() {
             write!(f, "\n │ Type Arguments: \n │   ")?;
@@ -237,10 +226,7 @@ impl<'a> Display for Pretty<'a, Argument> {
 }
 impl<'a> Display for Pretty<'a, ResolvedResults> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Pretty(ResolvedResults {
-            mutable_reference_outputs,
-            return_values,
-        }) = self;
+        let Pretty(ResolvedResults { mutable_reference_outputs, return_values }) = self;
 
         let len_m_ref = mutable_reference_outputs.len();
         let len_ret_vals = return_values.len();
@@ -255,10 +241,7 @@ impl<'a> Display for Pretty<'a, ResolvedResults> {
         }
 
         if len_m_ref > 0 {
-            write!(
-                f,
-                "\n Mutable Reference Outputs:\n ──────────────────────────"
-            )?;
+            write!(f, "\n Mutable Reference Outputs:\n ──────────────────────────")?;
         }
 
         for (arg, value) in mutable_reference_outputs {
@@ -297,15 +280,10 @@ fn resolve_to_layout(
     store_factory: &LocalExec,
 ) -> MoveTypeLayout {
     match type_tag {
-        TypeTag::Vector(inner) => {
-            MoveTypeLayout::Vector(Box::from(resolve_to_layout(inner, executor, store_factory)))
-        }
+        TypeTag::Vector(inner) => MoveTypeLayout::Vector(Box::from(resolve_to_layout(inner, executor, store_factory))),
         TypeTag::Struct(inner) => {
             let mut layout_resolver = executor.type_layout_resolver(Box::new(store_factory));
-            layout_resolver
-                .get_annotated_layout(inner)
-                .unwrap()
-                .into_layout()
+            layout_resolver.get_annotated_layout(inner).unwrap().into_layout()
         }
         TypeTag::Bool => MoveTypeLayout::Bool,
         TypeTag::U8 => MoveTypeLayout::U8,
@@ -344,10 +322,7 @@ pub fn transform_command_results_to_annotated(
         for (bytes, tag) in return_vals {
             return_vals_out.push(resolve_value(bytes, tag, executor, store_factory)?);
         }
-        output.push(ResolvedResults {
-            mutable_reference_outputs: m_refs_out,
-            return_values: return_vals_out,
-        });
+        output.push(ResolvedResults { mutable_reference_outputs: m_refs_out, return_values: return_vals_out });
     }
     Ok(output)
 }

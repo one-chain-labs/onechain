@@ -1,16 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+};
+
 use clap::Parser;
 use move_binary_format::CompiledModule;
 use move_cli::base;
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_package::BuildConfig;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::Path;
-use std::path::PathBuf;
 
 #[derive(Parser)]
 #[group(id = "sui-move-disassemmble")]
@@ -28,11 +30,7 @@ pub struct Disassemble {
 }
 
 impl Disassemble {
-    pub fn execute(
-        self,
-        package_path: Option<&Path>,
-        build_config: BuildConfig,
-    ) -> anyhow::Result<()> {
+    pub fn execute(self, package_path: Option<&Path>, build_config: BuildConfig) -> anyhow::Result<()> {
         if base::reroot_path(Some(&self.module_path)).is_ok() {
             // disassembling bytecode inside the source package that produced it--use the source info
             let module_name = self
@@ -53,10 +51,7 @@ impl Disassemble {
         }
 
         // disassembling a bytecode file with no source info
-        assert!(
-            Path::new(&self.module_path).exists(),
-            "Bad path to .mv file"
-        );
+        assert!(Path::new(&self.module_path).exists(), "Bad path to .mv file");
 
         let mut bytes = Vec::new();
         let mut file = BufReader::new(File::open(self.module_path)?);

@@ -1,21 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::io::{stderr, Write};
-use std::ops::Deref;
+use std::{
+    io::{stderr, Write},
+    ops::Deref,
+};
 
 use async_trait::async_trait;
-use clap::Command;
-use clap::CommandFactory;
-use clap::FromArgMatches;
-use clap::Parser;
+use clap::{Command, CommandFactory, FromArgMatches, Parser};
 use colored::Colorize;
 use sui_sdk::wallet_context::WalletContext;
 
-use crate::client_commands::SwitchResponse;
-use crate::client_commands::{SuiClientCommandResult, SuiClientCommands};
-use crate::shell::{
-    install_shell_plugins, AsyncHandler, CacheKey, CommandStructure, CompletionCache, Shell,
+use crate::{
+    client_commands::{SuiClientCommandResult, SuiClientCommands, SwitchResponse},
+    shell::{install_shell_plugins, AsyncHandler, CacheKey, CommandStructure, CompletionCache, Shell},
 };
 
 const SUI: &str = "   _____       _    ______                       __
@@ -51,39 +49,23 @@ pub async fn start_console(
     writeln!(out, "{}", context.config.deref())?;
 
     let client = context.get_client().await?;
-    writeln!(
-        out,
-        "Connecting to Sui full node. API version {}",
-        client.api_version()
-    )?;
+    writeln!(out, "Connecting to Sui full node. API version {}", client.api_version())?;
 
     if !client.available_rpc_methods().is_empty() {
         writeln!(out)?;
-        writeln!(
-            out,
-            "Available RPC methods: {:?}",
-            client.available_rpc_methods()
-        )?;
+        writeln!(out, "Available RPC methods: {:?}", client.available_rpc_methods())?;
     }
     if !client.available_subscriptions().is_empty() {
         writeln!(out)?;
-        writeln!(
-            out,
-            "Available Subscriptions: {:?}",
-            client.available_subscriptions()
-        )?;
+        writeln!(out, "Available Subscriptions: {:?}", client.available_subscriptions())?;
     }
 
     writeln!(out)?;
     writeln!(out, "Welcome to the Sui interactive console.")?;
     writeln!(out)?;
 
-    let mut shell = Shell::new(
-        "sui>-$ ",
-        context,
-        ClientCommandHandler,
-        CommandStructure::from_clap(&install_shell_plugins(app)),
-    );
+    let mut shell =
+        Shell::new("sui>-$ ", context, ClientCommandHandler, CommandStructure::from_clap(&install_shell_plugins(app)));
 
     shell.run_async(out, err).await
 }
@@ -110,9 +92,7 @@ impl AsyncHandler<WalletContext> for ClientCommandHandler {
 
 fn get_command(args: Vec<String>) -> Result<ConsoleOpts, anyhow::Error> {
     let app: Command = install_shell_plugins(ConsoleOpts::command());
-    Ok(ConsoleOpts::from_arg_matches(
-        &app.try_get_matches_from(args)?,
-    )?)
+    Ok(ConsoleOpts::from_arg_matches(&app.try_get_matches_from(args)?)?)
 }
 
 async fn handle_command(
@@ -128,11 +108,7 @@ async fn handle_command(
     if let Ok(mut cache) = completion_cache.write() {
         match result {
             SuiClientCommandResult::Addresses(ref addresses) => {
-                let addresses = addresses
-                    .addresses
-                    .iter()
-                    .map(|addr| format!("{}", addr.1))
-                    .collect::<Vec<_>>();
+                let addresses = addresses.addresses.iter().map(|addr| format!("{}", addr.1)).collect::<Vec<_>>();
                 cache.insert(CacheKey::flag("--address"), addresses.clone());
                 cache.insert(CacheKey::flag("--to"), addresses);
             }
@@ -151,10 +127,7 @@ async fn handle_command(
     result.print(!wallet_opts.json);
 
     // Quit shell after RPC switch
-    if matches!(
-        result,
-        SuiClientCommandResult::Switch(SwitchResponse { env: Some(_), .. })
-    ) {
+    if matches!(result, SuiClientCommandResult::Switch(SwitchResponse { env: Some(_), .. })) {
         println!("Sui environment switch completed, please restart Sui console.");
         return Ok(true);
     }

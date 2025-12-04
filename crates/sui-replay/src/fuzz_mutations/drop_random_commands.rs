@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::fuzz::TransactionKindMutator;
 use rand::seq::SliceRandom;
 use sui_types::transaction::TransactionKind;
 use tracing::info;
+
+use crate::fuzz::TransactionKindMutator;
 
 pub struct DropRandomCommands {
     pub rng: rand::rngs::StdRng,
@@ -23,11 +24,7 @@ impl TransactionKindMutator for DropRandomCommands {
             if p.commands.is_empty() {
                 return None;
             }
-            p.commands = p
-                .commands
-                .choose_multiple(&mut self.rng, p.commands.len() - 1)
-                .cloned()
-                .collect();
+            p.commands = p.commands.choose_multiple(&mut self.rng, p.commands.len() - 1).cloned().collect();
             info!("Mutation: Dropping random commands");
             Some(TransactionKind::ProgrammableTransaction(p))
         } else {

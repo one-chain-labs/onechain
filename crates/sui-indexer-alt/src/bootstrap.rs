@@ -29,22 +29,13 @@ use crate::Indexer;
 ///
 /// Can be cancelled via the `cancel` token, or through an interrupt signal (which will also cancel
 /// the token).
-pub async fn bootstrap(
-    indexer: &Indexer,
-    retry_interval: Duration,
-    cancel: CancellationToken,
-) -> Result<StoredGenesis> {
+pub async fn bootstrap(indexer: &Indexer, retry_interval: Duration, cancel: CancellationToken) -> Result<StoredGenesis> {
     let Ok(mut conn) = indexer.db().connect().await else {
         bail!("Bootstrap failed to get connection for DB");
     };
 
     // If the row has already been written, return it.
-    if let Some(genesis) = kv_genesis::table
-        .select(StoredGenesis::as_select())
-        .first(&mut conn)
-        .await
-        .optional()?
-    {
+    if let Some(genesis) = kv_genesis::table.select(StoredGenesis::as_select()).first(&mut conn).await.optional()? {
         info!(
             chain = genesis.chain()?.as_str(),
             protocol = ?genesis.initial_protocol_version(),
@@ -60,11 +51,7 @@ pub async fn bootstrap(
     // - Get the system state object that was written out by the system transaction.
     let ingestion_client = indexer.ingestion_client().clone();
     let wait_cancel = cancel.clone();
-    let genesis = tokio::spawn(async move {
-        ingestion_client
-            .wait_for(0, retry_interval, &wait_cancel)
-            .await
-    });
+    let genesis = tokio::spawn(async move { ingestion_client.wait_for(0, retry_interval, &wait_cancel).await });
 
     let Some(genesis_checkpoint) = graceful_shutdown(vec![genesis], cancel).await.pop() else {
         bail!("Bootstrap cancelled");
@@ -72,18 +59,12 @@ pub async fn bootstrap(
 
     let genesis_checkpoint = genesis_checkpoint.context("Failed to fetch genesis checkpoint")?;
 
-    let CheckpointData {
-        checkpoint_summary,
-        transactions,
-        ..
-    } = genesis_checkpoint.as_ref();
+    let CheckpointData { checkpoint_summary, transactions, .. } = genesis_checkpoint.as_ref();
 
-    let Some(genesis_transaction) = transactions.iter().find(|tx| {
-        matches!(
-            tx.transaction.intent_message().value.kind(),
-            TransactionKind::Genesis(_)
-        )
-    }) else {
+    let Some(genesis_transaction) = transactions
+        .iter()
+        .find(|tx| matches!(tx.transaction.intent_message().value.kind(), TransactionKind::Genesis(_)))
+    else {
         bail!("Could not find Genesis transaction");
     };
 

@@ -2,8 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use prometheus::{
-    register_int_counter_vec_with_registry, register_int_counter_with_registry,
-    register_int_gauge_with_registry, IntCounter, IntCounterVec, IntGauge, Registry,
+    register_int_counter_vec_with_registry,
+    register_int_counter_with_registry,
+    register_int_gauge_with_registry,
+    IntCounter,
+    IntCounterVec,
+    IntGauge,
+    Registry,
 };
 
 #[derive(Clone)]
@@ -29,8 +34,7 @@ pub struct TrafficControllerMetrics {
 impl TrafficControllerMetrics {
     pub fn new(registry: &Registry) -> Self {
         Self {
-            tallies: register_int_counter_with_registry!("tallies", "Number of tallies", registry)
-                .unwrap(),
+            tallies: register_int_counter_with_registry!("tallies", "Number of tallies", registry).unwrap(),
             connection_ip_blocklist_len: register_int_gauge_with_registry!(
                 "connection_ip_blocklist_len",
                 // make the below a multiline string

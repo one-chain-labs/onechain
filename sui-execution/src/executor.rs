@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{collections::HashSet, sync::Arc};
+
 use sui_protocol_config::ProtocolConfig;
-use sui_types::storage::BackingStore;
 use sui_types::{
     base_types::{ObjectRef, SuiAddress, TxContext},
     committee::EpochId,
@@ -15,6 +15,7 @@ use sui_types::{
     inner_temporary_store::InnerTemporaryStore,
     layout_resolver::LayoutResolver,
     metrics::LimitsMetrics,
+    storage::BackingStore,
     transaction::{CheckedInputObjects, ProgrammableTransaction, TransactionKind},
 };
 
@@ -40,12 +41,7 @@ pub trait Executor {
         transaction_kind: TransactionKind,
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
-    ) -> (
-        InnerTemporaryStore,
-        SuiGasStatus,
-        TransactionEffects,
-        Result<(), ExecutionError>,
-    );
+    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<(), ExecutionError>);
 
     fn dev_inspect_transaction(
         &self,
@@ -68,12 +64,7 @@ pub trait Executor {
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
         skip_all_checks: bool,
-    ) -> (
-        InnerTemporaryStore,
-        SuiGasStatus,
-        TransactionEffects,
-        Result<Vec<ExecutionResult>, ExecutionError>,
-    );
+    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Vec<ExecutionResult>, ExecutionError>);
 
     fn update_genesis_state(
         &self,

@@ -1,19 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use axum::extract::Query;
-use axum::extract::{Path, State};
-use axum::Json;
+use axum::{
+    extract::{Path, Query, State},
+    Json,
+};
 use sui_sdk_types::{CheckpointSequenceNumber, SignedCheckpointSummary};
 use sui_types::storage::ReadStore;
 
 use super::{ApiEndpoint, RouteHandler};
-use crate::reader::StateReader;
-use crate::rest::PageCursor;
-use crate::service::checkpoints::CheckpointId;
-use crate::types::{CheckpointResponse, GetCheckpointOptions};
-use crate::Result;
-use crate::{Direction, RpcService};
+use crate::{
+    reader::StateReader,
+    rest::PageCursor,
+    service::checkpoints::CheckpointId,
+    types::{CheckpointResponse, GetCheckpointOptions},
+    Direction,
+    Result,
+    RpcService,
+};
 
 /// Fetch a Checkpoint
 ///
@@ -80,10 +84,7 @@ async fn list_checkpoints(
     Query(parameters): Query<ListCheckpointsPaginationParameters>,
     Query(options): Query<GetCheckpointOptions>,
     State(state): State<StateReader>,
-) -> Result<(
-    PageCursor<CheckpointSequenceNumber>,
-    Json<Vec<CheckpointResponse>>,
-)> {
+) -> Result<(PageCursor<CheckpointSequenceNumber>, Json<Vec<CheckpointResponse>>)> {
     let latest_checkpoint = state.inner().get_latest_checkpoint()?.sequence_number;
     let oldest_checkpoint = state.inner().get_lowest_available_checkpoint()?;
     let limit = parameters.limit();
@@ -91,38 +92,26 @@ async fn list_checkpoints(
     let direction = parameters.direction();
 
     if start < oldest_checkpoint {
-        return Err(crate::RpcServiceError::new(
-            axum::http::StatusCode::GONE,
-            "Old checkpoints have been pruned",
-        ));
+        return Err(crate::RpcServiceError::new(axum::http::StatusCode::GONE, "Old checkpoints have been pruned"));
     }
 
     let checkpoints = state
         .checkpoint_iter(direction, start)
         .take(limit)
         .map(|result| {
-            result
-                .map_err(Into::into)
-                .and_then(|(checkpoint, contents)| {
-                    let SignedCheckpointSummary {
-                        checkpoint,
-                        signature,
-                    } = checkpoint.try_into()?;
-                    let contents = if options.include_contents() {
-                        Some(contents.try_into()?)
-                    } else {
-                        None
-                    };
-                    Ok(CheckpointResponse {
-                        sequence_number: checkpoint.sequence_number,
-                        digest: checkpoint.digest(),
-                        summary: Some(checkpoint),
-                        signature: Some(signature),
-                        contents,
-                        summary_bcs: None,
-                        contents_bcs: None,
-                    })
+            result.map_err(Into::into).and_then(|(checkpoint, contents)| {
+                let SignedCheckpointSummary { checkpoint, signature } = checkpoint.try_into()?;
+                let contents = if options.include_contents() { Some(contents.try_into()?) } else { None };
+                Ok(CheckpointResponse {
+                    sequence_number: checkpoint.sequence_number,
+                    digest: checkpoint.digest(),
+                    summary: Some(checkpoint),
+                    signature: Some(signature),
+                    contents,
+                    summary_bcs: None,
+                    contents_bcs: None,
                 })
+            })
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -160,9 +149,7 @@ pub struct ListCheckpointsPaginationParameters {
 
 impl ListCheckpointsPaginationParameters {
     pub fn limit(&self) -> usize {
-        self.limit
-            .map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE))
-            .unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
+        self.limit.map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE)).unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
     }
 
     pub fn start(&self, default: CheckpointSequenceNumber) -> CheckpointSequenceNumber {

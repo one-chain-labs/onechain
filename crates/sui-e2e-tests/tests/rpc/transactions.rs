@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_macros::sim_test;
-use sui_rpc_api::client::sdk::Client;
-use sui_rpc_api::proto::node::node_service_client::NodeServiceClient;
-use sui_rpc_api::proto::node::{
-    GetTransactionOptions, GetTransactionRequest, GetTransactionResponse,
+use sui_rpc_api::{
+    client::sdk::Client,
+    proto::node::{
+        node_service_client::NodeServiceClient,
+        GetTransactionOptions,
+        GetTransactionRequest,
+        GetTransactionResponse,
+    },
+    rest::transactions::ListTransactionsCursorParameters,
 };
-use sui_rpc_api::rest::transactions::ListTransactionsCursorParameters;
 use test_cluster::TestClusterBuilder;
 
 use crate::{stake_with_validator, transfer_coin};
@@ -22,9 +26,7 @@ async fn get_transaction() {
 
     let _transaction = client.get_transaction(&transaction_digest).await.unwrap();
 
-    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned())
-        .await
-        .unwrap();
+    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned()).await.unwrap();
 
     // Request default fields
     let GetTransactionResponse {
@@ -39,11 +41,7 @@ async fn get_transaction() {
         events_bcs,
         checkpoint,
         timestamp,
-    } = grpc_client
-        .get_transaction(GetTransactionRequest::new(transaction_digest))
-        .await
-        .unwrap()
-        .into_inner();
+    } = grpc_client.get_transaction(GetTransactionRequest::new(transaction_digest)).await.unwrap().into_inner();
 
     assert!(digest.is_some());
     assert!(transaction.is_none());
@@ -71,10 +69,7 @@ async fn get_transaction() {
         checkpoint,
         timestamp,
     } = grpc_client
-        .get_transaction(
-            GetTransactionRequest::new(transaction_digest)
-                .with_options(GetTransactionOptions::none()),
-        )
+        .get_transaction(GetTransactionRequest::new(transaction_digest).with_options(GetTransactionOptions::none()))
         .await
         .unwrap()
         .into_inner();
@@ -93,10 +88,7 @@ async fn get_transaction() {
 
     // Request all fields
     let response = grpc_client
-        .get_transaction(
-            GetTransactionRequest::new(transaction_digest)
-                .with_options(GetTransactionOptions::all()),
-        )
+        .get_transaction(GetTransactionRequest::new(transaction_digest).with_options(GetTransactionOptions::all()))
         .await
         .unwrap()
         .into_inner();
@@ -139,11 +131,8 @@ async fn list_transactions() {
 
     let client = Client::new(test_cluster.rpc_url()).unwrap();
 
-    let transactions = client
-        .list_transactions(&ListTransactionsCursorParameters::default())
-        .await
-        .unwrap()
-        .into_inner();
+    let transactions =
+        client.list_transactions(&ListTransactionsCursorParameters::default()).await.unwrap().into_inner();
 
     assert!(!transactions.is_empty());
 }

@@ -1,31 +1,34 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fs;
-use std::ops::Range;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    fs,
+    ops::Range,
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use anyhow::Context;
-use anyhow::Result;
-use object_store::path::Path;
-use object_store::DynObjectStore;
+use anyhow::{Context, Result};
+use object_store::{path::Path, DynObjectStore};
 use serde::Serialize;
-use tokio::sync::{mpsc, oneshot, Mutex};
-use tracing::{error, info};
-
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 use sui_data_ingestion_core::Worker;
 use sui_rpc_api::CheckpointData;
 use sui_storage::object_store::util::{copy_file, path_to_filesystem};
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tracing::{error, info};
 
-use crate::analytics_metrics::AnalyticsMetrics;
-use crate::handlers::AnalyticsHandler;
-use crate::writers::AnalyticsWriter;
 use crate::{
-    join_paths, AnalyticsIndexerConfig, FileMetadata, MaxCheckpointReader, ParquetSchema,
+    analytics_metrics::AnalyticsMetrics,
+    handlers::AnalyticsHandler,
+    join_paths,
+    writers::AnalyticsWriter,
+    AnalyticsIndexerConfig,
+    FileMetadata,
+    MaxCheckpointReader,
+    ParquetSchema,
     EPOCH_DIR_PREFIX,
 };
 
@@ -54,6 +57,7 @@ const CHECK_FILE_SIZE_ITERATION_CYCLE: u64 = 50;
 #[async_trait::async_trait]
 impl<S: Serialize + ParquetSchema + 'static> Worker for AnalyticsProcessor<S> {
     type Result = ();
+
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
         // get epoch id, checkpoint sequence number and timestamp, those are important
         // indexes when operating on data
@@ -73,29 +77,21 @@ impl<S: Serialize + ParquetSchema + 'static> Worker for AnalyticsProcessor<S> {
 
         assert_eq!(checkpoint_num, state.current_checkpoint_range.end);
 
-        let num_checkpoints_processed =
-            state.current_checkpoint_range.end - state.current_checkpoint_range.start;
+        let num_checkpoints_processed = state.current_checkpoint_range.end - state.current_checkpoint_range.start;
         let cut_new_files = (num_checkpoints_processed >= self.config.checkpoint_interval)
             || (state.last_commit_instant.elapsed().as_secs() > self.config.time_interval_s)
             || (state.num_checkpoint_iterations % CHECK_FILE_SIZE_ITERATION_CYCLE == 0
-                && state.writer.file_size()?.unwrap_or(0)
-                    > self.config.max_file_size_mb * 1024 * 1024);
+                && state.writer.file_size()?.unwrap_or(0) > self.config.max_file_size_mb * 1024 * 1024);
         if cut_new_files {
             self.cut(&mut state).await?;
             self.reset(&mut state)?;
         }
-        self.metrics
-            .total_received
-            .with_label_values(&[self.name()])
-            .inc();
+        self.metrics.total_received.with_label_values(&[self.name()]).inc();
         self.handler.process_checkpoint(checkpoint_data).await?;
         let rows = self.handler.read().await?;
         state.writer.write(&rows)?;
-        state.current_checkpoint_range.end = state
-            .current_checkpoint_range
-            .end
-            .checked_add(1)
-            .context("Checkpoint sequence num overflow")?;
+        state.current_checkpoint_range.end =
+            state.current_checkpoint_range.end.checked_add(1).context("Checkpoint sequence num overflow")?;
         state.num_checkpoint_iterations += 1;
         Ok(())
     }
@@ -141,20 +137,12 @@ impl<S: Serialize + ParquetSchema + 'static> AnalyticsProcessor<S> {
         ));
         let state = State {
             current_epoch: 0,
-            current_checkpoint_range: next_checkpoint_seq_num..next_checkpoint_seq_num,
+            current_checkpoint_range: next_checkpoint_seq_num .. next_checkpoint_seq_num,
             last_commit_instant: Instant::now(),
             num_checkpoint_iterations: 0,
             writer,
         };
-        Ok(Self {
-            handler,
-            state: Mutex::new(state),
-            kill_sender,
-            sender,
-            max_checkpoint_sender,
-            metrics,
-            config,
-        })
+        Ok(Self { handler, state: Mutex::new(state), kill_sender, sender, max_checkpoint_sender, metrics, config })
     }
 
     fn name(&self) -> &str {
@@ -162,9 +150,7 @@ impl<S: Serialize + ParquetSchema + 'static> AnalyticsProcessor<S> {
     }
 
     async fn cut(&self, state: &mut State<S>) -> anyhow::Result<()> {
-        if !state.current_checkpoint_range.is_empty()
-            && state.writer.flush(state.current_checkpoint_range.end)?
-        {
+        if !state.current_checkpoint_range.is_empty() && state.writer.flush(state.current_checkpoint_range.end)? {
             let file_metadata = FileMetadata::new(
                 self.config.file_type,
                 self.config.file_format,
@@ -182,11 +168,8 @@ impl<S: Serialize + ParquetSchema + 'static> AnalyticsProcessor<S> {
     }
 
     fn epoch_dir(&self, state: &State<S>) -> Result<PathBuf> {
-        let path = path_to_filesystem(
-            self.config.checkpoint_dir.to_path_buf(),
-            &self.config.file_type.dir_prefix(),
-        )?
-        .join(format!("{}{}", EPOCH_DIR_PREFIX, state.current_epoch));
+        let path = path_to_filesystem(self.config.checkpoint_dir.to_path_buf(), &self.config.file_type.dir_prefix())?
+            .join(format!("{}{}", EPOCH_DIR_PREFIX, state.current_epoch));
         Ok(path)
     }
 
@@ -201,16 +184,13 @@ impl<S: Serialize + ParquetSchema + 'static> AnalyticsProcessor<S> {
 
     fn reset(&self, state: &mut State<S>) -> Result<()> {
         self.reset_checkpoint_range(state);
-        state
-            .writer
-            .reset(state.current_epoch, state.current_checkpoint_range.start)?;
+        state.writer.reset(state.current_epoch, state.current_checkpoint_range.start)?;
         self.reset_last_commit_ts(state);
         Ok(())
     }
 
     fn reset_checkpoint_range(&self, state: &mut State<S>) {
-        state.current_checkpoint_range =
-            state.current_checkpoint_range.end..state.current_checkpoint_range.end
+        state.current_checkpoint_range = state.current_checkpoint_range.end .. state.current_checkpoint_range.end
     }
 
     fn reset_last_commit_ts(&self, state: &mut State<S>) {

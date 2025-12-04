@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context;
-use anyhow::Result;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
+use anyhow::{Context, Result};
+use serde::{de::DeserializeOwned, Serialize};
 use tracing::trace;
 
 pub mod certificate_deny_config;
@@ -91,17 +92,13 @@ where
     Self: DeserializeOwned + Serialize,
 {
     fn persisted(self, path: &Path) -> PersistedConfig<Self> {
-        PersistedConfig {
-            inner: self,
-            path: path.to_path_buf(),
-        }
+        PersistedConfig { inner: self, path: path.to_path_buf() }
     }
 
     fn load<P: AsRef<Path>>(path: P) -> Result<Self, anyhow::Error> {
         let path = path.as_ref();
         trace!("Reading config from {}", path.display());
-        let reader = fs::File::open(path)
-            .with_context(|| format!("Unable to load config from {}", path.display()))?;
+        let reader = fs::File::open(path).with_context(|| format!("Unable to load config from {}", path.display()))?;
         Ok(serde_yaml::from_reader(reader)?)
     }
 
@@ -109,8 +106,7 @@ where
         let path = path.as_ref();
         trace!("Writing config to {}", path.display());
         let config = serde_yaml::to_string(&self)?;
-        fs::write(path, config)
-            .with_context(|| format!("Unable to save config to {}", path.display()))?;
+        fs::write(path, config).with_context(|| format!("Unable to save config to {}", path.display()))?;
         Ok(())
     }
 }

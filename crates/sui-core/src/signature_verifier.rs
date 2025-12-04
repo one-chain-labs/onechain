@@ -1,10 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use either::Either;
-use fastcrypto_zkp::bn254::zk_login::JwkId;
-use fastcrypto_zkp::bn254::zk_login::{OIDCProvider, JWK};
-use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
+use fastcrypto_zkp::bn254::{
+    zk_login::{JwkId, OIDCProvider, JWK},
+    zk_login_api::ZkLoginEnv,
+};
 use futures::pin_mut;
 use im::hashmap::HashMap as ImHashMap;
 use itertools::{izip, Itertools as _};
@@ -12,26 +15,20 @@ use mysten_metrics::monitored_scope;
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use prometheus::{register_int_counter_with_registry, IntCounter, Registry};
 use shared_crypto::intent::Intent;
-use std::sync::Arc;
-use sui_types::digests::SenderSignedDataDigest;
-use sui_types::digests::ZKLoginInputsDigest;
-use sui_types::signature_verification::{
-    verify_sender_signed_data_message_signatures, VerifiedDigestCache,
-};
-use sui_types::transaction::SenderSignedData;
 use sui_types::{
     committee::Committee,
     crypto::{AuthoritySignInfoTrait, VerificationObligation},
-    digests::CertificateDigest,
+    digests::{CertificateDigest, SenderSignedDataDigest, ZKLoginInputsDigest},
     error::{SuiError, SuiResult},
     message_envelope::Message,
     messages_checkpoint::SignedCheckpointSummary,
     signature::VerifyParams,
-    transaction::{CertifiedTransaction, VerifiedCertificate},
+    signature_verification::{verify_sender_signed_data_message_signatures, VerifiedDigestCache},
+    transaction::{CertifiedTransaction, SenderSignedData, VerifiedCertificate},
 };
 use tap::TapFallible;
-use tokio::runtime::Handle;
 use tokio::{
+    runtime::Handle,
     sync::oneshot,
     time::{timeout, Duration},
 };
@@ -55,11 +52,7 @@ struct CertBuffer {
 
 impl CertBuffer {
     fn new(capacity: usize) -> Self {
-        Self {
-            certs: Vec::with_capacity(capacity),
-            senders: Vec::with_capacity(capacity),
-            id: 0,
-        }
+        Self { certs: Vec::with_capacity(capacity), senders: Vec::with_capacity(capacity), id: 0 }
     }
 
     // Function consumes MutexGuard, therefore releasing the lock after mem swap is done
@@ -193,10 +186,8 @@ impl SignatureVerifier {
         certs: Vec<&CertifiedTransaction>,
         checkpoints: Vec<&SignedCheckpointSummary>,
     ) -> SuiResult {
-        let certs: Vec<_> = certs
-            .into_iter()
-            .filter(|cert| !self.certificate_cache.is_cached(&cert.certificate_digest()))
-            .collect();
+        let certs: Vec<_> =
+            certs.into_iter().filter(|cert| !self.certificate_cache.is_cached(&cert.certificate_digest())).collect();
 
         // Verify only the user sigs of certificates that were not cached already, since whenever we
         // insert a certificate into the cache, it is already verified.
@@ -204,8 +195,7 @@ impl SignatureVerifier {
             self.verify_tx(cert.data())?;
         }
         batch_verify_all_certificates_and_checkpoints(&self.committee, &certs, &checkpoints)?;
-        self.certificate_cache
-            .cache_digests(certs.into_iter().map(|c| c.certificate_digest()).collect());
+        self.certificate_cache.cache_digests(certs.into_iter().map(|c| c.certificate_digest()).collect());
         Ok(())
     }
 
@@ -216,15 +206,10 @@ impl SignatureVerifier {
             return Ok(VerifiedCertificate::new_unchecked(cert));
         }
         self.verify_tx(cert.data())?;
-        self.verify_cert_skip_cache(cert)
-            .await
-            .tap_ok(|_| self.certificate_cache.cache_digest(cert_digest))
+        self.verify_cert_skip_cache(cert).await.tap_ok(|_| self.certificate_cache.cache_digest(cert_digest))
     }
 
-    pub async fn multi_verify_certs(
-        &self,
-        certs: Vec<CertifiedTransaction>,
-    ) -> Vec<SuiResult<VerifiedCertificate>> {
+    pub async fn multi_verify_certs(&self, certs: Vec<CertifiedTransaction>) -> Vec<SuiResult<VerifiedCertificate>> {
         // TODO: We could do better by pushing the all of `certs` into the verification queue at once,
         // but that's significantly more complex.
         let mut futures = Vec::with_capacity(certs.len());
@@ -235,10 +220,7 @@ impl SignatureVerifier {
     }
 
     /// exposed as a public method for the benchmarks
-    pub async fn verify_cert_skip_cache(
-        &self,
-        cert: CertifiedTransaction,
-    ) -> SuiResult<VerifiedCertificate> {
+    pub async fn verify_cert_skip_cache(&self, cert: CertifiedTransaction) -> SuiResult<VerifiedCertificate> {
         // this is the only innocent error we are likely to encounter - filter it before we poison
         // a whole batch.
         if cert.auth_sig().epoch != self.committee.epoch() {
@@ -251,10 +233,7 @@ impl SignatureVerifier {
         self.verify_cert_inner(cert).await
     }
 
-    async fn verify_cert_inner(
-        &self,
-        cert: CertifiedTransaction,
-    ) -> SuiResult<VerifiedCertificate> {
+    async fn verify_cert_inner(&self, cert: CertifiedTransaction) -> SuiResult<VerifiedCertificate> {
         // Cancellation safety: we use parking_lot locks, which cannot be held across awaits.
         // Therefore once the queue has been taken by a thread, it is guaranteed to process the
         // queue and send all results before the future can be cancelled by the caller.
@@ -314,9 +293,7 @@ impl SignatureVerifier {
         let metrics = self.metrics.clone();
         let zklogin_inputs_cache = self.zklogin_inputs_cache.clone();
         Handle::current()
-            .spawn_blocking(move || {
-                Self::process_queue_sync(committee, metrics, buffer, zklogin_inputs_cache)
-            })
+            .spawn_blocking(move || Self::process_queue_sync(committee, metrics, buffer, zklogin_inputs_cache))
             .await
             .expect("Spawn blocking should not fail");
     }
@@ -329,29 +306,22 @@ impl SignatureVerifier {
     ) {
         let _scope = monitored_scope("BatchCertificateVerifier::process_queue");
 
-        let results = batch_verify_certificates(
-            &committee,
-            &buffer.certs.iter().collect_vec(),
-            zklogin_inputs_cache,
+        let results = batch_verify_certificates(&committee, &buffer.certs.iter().collect_vec(), zklogin_inputs_cache);
+        izip!(results.into_iter(), buffer.certs.into_iter(), buffer.senders.into_iter(),).for_each(
+            |(result, cert, tx)| {
+                tx.send(match result {
+                    Ok(()) => {
+                        metrics.total_verified_certs.inc();
+                        Ok(VerifiedCertificate::new_unchecked(cert))
+                    }
+                    Err(e) => {
+                        metrics.total_failed_certs.inc();
+                        Err(e)
+                    }
+                })
+                .ok();
+            },
         );
-        izip!(
-            results.into_iter(),
-            buffer.certs.into_iter(),
-            buffer.senders.into_iter(),
-        )
-        .for_each(|(result, cert, tx)| {
-            tx.send(match result {
-                Ok(()) => {
-                    metrics.total_verified_certs.inc();
-                    Ok(VerifiedCertificate::new_unchecked(cert))
-                }
-                Err(e) => {
-                    metrics.total_failed_certs.inc();
-                    Err(e)
-                }
-            })
-            .ok();
-        });
     }
 
     /// Insert a JWK into the verifier state. Pre-existing entries for a given JwkId will not be
@@ -566,14 +536,12 @@ fn batch_verify(
 
     for cert in certs {
         let idx = obligation.add_message(cert.data(), cert.epoch(), Intent::sui_app(cert.scope()));
-        cert.auth_sig()
-            .add_to_verification_obligation(committee, &mut obligation, idx)?;
+        cert.auth_sig().add_to_verification_obligation(committee, &mut obligation, idx)?;
     }
 
     for ckpt in checkpoints {
         let idx = obligation.add_message(ckpt.data(), ckpt.epoch(), Intent::sui_app(ckpt.scope()));
-        ckpt.auth_sig()
-            .add_to_verification_obligation(committee, &mut obligation, idx)?;
+        ckpt.auth_sig().add_to_verification_obligation(committee, &mut obligation, idx)?;
     }
 
     obligation.verify_all()

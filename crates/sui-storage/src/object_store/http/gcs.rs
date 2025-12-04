@@ -1,18 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::object_store::http::{get, DEFAULT_USER_AGENT};
-use crate::object_store::ObjectStoreGetExt;
+use std::{fmt, sync::Arc};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
-use object_store::path::Path;
-use object_store::GetResult;
+use object_store::{path::Path, GetResult};
 use percent_encoding::{percent_encode, utf8_percent_encode, NON_ALPHANUMERIC};
-use reqwest::Client;
-use reqwest::ClientBuilder;
-use std::fmt;
-use std::sync::Arc;
+use reqwest::{Client, ClientBuilder};
+
+use crate::object_store::{
+    http::{get, DEFAULT_USER_AGENT},
+    ObjectStoreGetExt,
+};
 
 #[derive(Debug)]
 struct GoogleCloudStorageClient {
@@ -27,10 +28,7 @@ impl GoogleCloudStorageClient {
         let client = builder.https_only(false).build()?;
         let bucket_name_encoded = percent_encode(bucket.as_bytes(), NON_ALPHANUMERIC).to_string();
 
-        Ok(Self {
-            client,
-            bucket_name_encoded,
-        })
+        Ok(Self { client, bucket_name_encoded })
     }
 
     async fn get(&self, path: &Path) -> Result<GetResult> {
@@ -40,10 +38,7 @@ impl GoogleCloudStorageClient {
 
     fn object_url(&self, path: &Path) -> String {
         let encoded = utf8_percent_encode(path.as_ref(), NON_ALPHANUMERIC);
-        format!(
-            "https://storage.googleapis.com/{}/{}",
-            self.bucket_name_encoded, encoded
-        )
+        format!("https://storage.googleapis.com/{}/{}", self.bucket_name_encoded, encoded)
     }
 }
 
@@ -56,9 +51,7 @@ pub struct GoogleCloudStorage {
 impl GoogleCloudStorage {
     pub fn new(bucket: &str) -> Result<Self> {
         let gcs_client = GoogleCloudStorageClient::new(bucket)?;
-        Ok(GoogleCloudStorage {
-            client: Arc::new(gcs_client),
-        })
+        Ok(GoogleCloudStorage { client: Arc::new(gcs_client) })
     }
 }
 

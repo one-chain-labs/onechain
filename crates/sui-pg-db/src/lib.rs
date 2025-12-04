@@ -1,18 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use anyhow::anyhow;
-use diesel::migration::{MigrationSource, MigrationVersion};
-use diesel::pg::Pg;
-use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
+use diesel::{
+    migration::{MigrationSource, MigrationVersion},
+    pg::Pg,
+};
 use diesel_async::{
+    async_connection_wrapper::AsyncConnectionWrapper,
     pooled_connection::{
         bb8::{Pool, PooledConnection},
         AsyncDieselConnectionManager,
     },
-    AsyncPgConnection, RunQueryDsl,
+    AsyncPgConnection,
+    RunQueryDsl,
 };
-use std::time::Duration;
 use tracing::info;
 use url::Url;
 
@@ -52,19 +56,13 @@ impl Db {
     /// Construct a new DB connection pool that supports write and reads. Instances of [Db] can be
     /// cloned to share access to the same pool.
     pub async fn for_write(config: DbArgs) -> anyhow::Result<Self> {
-        Ok(Self {
-            read_only: false,
-            pool: pool(config).await?,
-        })
+        Ok(Self { read_only: false, pool: pool(config).await? })
     }
 
     /// Construct a new DB connection pool that defaults to read-only transactions. Instances of
     /// [Db] can be cloned to share access to the same pool.
     pub async fn for_read(config: DbArgs) -> anyhow::Result<Self> {
-        Ok(Self {
-            read_only: true,
-            pool: pool(config).await?,
-        })
+        Ok(Self { read_only: true, pool: pool(config).await? })
     }
 
     /// Retrieves a connection from the pool. Can fail with a timeout if a connection cannot be
@@ -72,9 +70,7 @@ impl Db {
     pub async fn connect(&self) -> anyhow::Result<Connection<'_>> {
         let mut conn = self.pool.get().await?;
         if self.read_only {
-            diesel::sql_query("SET default_transaction_read_only = 'on'")
-                .execute(&mut conn)
-                .await?;
+            diesel::sql_query("SET default_transaction_read_only = 'on'").execute(&mut conn).await?;
         }
 
         Ok(conn)
@@ -97,9 +93,7 @@ impl Db {
                 EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
             END LOOP;
         END $$;";
-        diesel::sql_query(drop_all_tables)
-            .execute(&mut conn)
-            .await?;
+        diesel::sql_query(drop_all_tables).execute(&mut conn).await?;
         info!("Dropped all tables.");
 
         let drop_all_procedures = "
@@ -113,9 +107,7 @@ impl Db {
                 EXECUTE 'DROP PROCEDURE IF EXISTS ' || quote_ident(r.proname) || '(' || r.argtypes || ') CASCADE';
             END LOOP;
         END $$;";
-        diesel::sql_query(drop_all_procedures)
-            .execute(&mut conn)
-            .await?;
+        diesel::sql_query(drop_all_procedures).execute(&mut conn).await?;
         info!("Dropped all procedures.");
 
         let drop_all_functions = "
@@ -129,9 +121,7 @@ impl Db {
                 EXECUTE 'DROP FUNCTION IF EXISTS ' || quote_ident(r.proname) || '(' || r.argtypes || ') CASCADE';
             END LOOP;
         END $$;";
-        diesel::sql_query(drop_all_functions)
-            .execute(&mut conn)
-            .await?;
+        diesel::sql_query(drop_all_functions).execute(&mut conn).await?;
         info!("Database cleared.");
         Ok(())
     }
@@ -165,10 +155,7 @@ impl Db {
 impl Default for DbArgs {
     fn default() -> Self {
         Self {
-            database_url: Url::parse(
-                "postgres://postgres:postgrespw@localhost:5432/sui_indexer_alt",
-            )
-            .unwrap(),
+            database_url: Url::parse("postgres://postgres:postgrespw@localhost:5432/sui_indexer_alt").unwrap(),
             db_connection_pool_size: 100,
             connection_timeout_ms: 60_000,
         }
@@ -201,10 +188,11 @@ async fn pool(args: DbArgs) -> anyhow::Result<Pool<AsyncPgConnection>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use diesel::prelude::QueryableByName;
     use diesel_async::RunQueryDsl;
     use diesel_migrations::EmbeddedMigrations;
+
+    use super::*;
 
     #[tokio::test]
     async fn temp_db_smoketest() {
@@ -213,19 +201,13 @@ mod tests {
         let url = db.database().url();
 
         info!(%url);
-        let db_args = DbArgs {
-            database_url: url.clone(),
-            ..Default::default()
-        };
+        let db_args = DbArgs { database_url: url.clone(), ..Default::default() };
 
         let db = Db::for_write(db_args).await.unwrap();
         let mut conn = db.connect().await.unwrap();
 
         // Run a simple query to verify the db can properly be queried
-        let resp = diesel::sql_query("SELECT datname FROM pg_database")
-            .execute(&mut conn)
-            .await
-            .unwrap();
+        let resp = diesel::sql_query("SELECT datname FROM pg_database").execute(&mut conn).await.unwrap();
 
         info!(?resp);
     }
@@ -241,36 +223,26 @@ mod tests {
         let temp_db = temp::TempDb::new().unwrap();
         let url = temp_db.database().url();
 
-        let db_args = DbArgs {
-            database_url: url.clone(),
-            ..Default::default()
-        };
+        let db_args = DbArgs { database_url: url.clone(), ..Default::default() };
 
         let db = Db::for_write(db_args.clone()).await.unwrap();
         let mut conn = db.connect().await.unwrap();
-        diesel::sql_query("CREATE TABLE test_table (id INTEGER PRIMARY KEY)")
-            .execute(&mut conn)
-            .await
-            .unwrap();
-        let cnt = diesel::sql_query(
-            "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_name = 'test_table'",
-        )
-        .get_result::<CountResult>(&mut conn)
-        .await
-        .unwrap();
+        diesel::sql_query("CREATE TABLE test_table (id INTEGER PRIMARY KEY)").execute(&mut conn).await.unwrap();
+        let cnt =
+            diesel::sql_query("SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_name = 'test_table'")
+                .get_result::<CountResult>(&mut conn)
+                .await
+                .unwrap();
         assert_eq!(cnt.cnt, 1);
 
-        reset_database::<EmbeddedMigrations>(db_args, None)
-            .await
-            .unwrap();
+        reset_database::<EmbeddedMigrations>(db_args, None).await.unwrap();
 
         let mut conn = db.connect().await.unwrap();
-        let cnt: CountResult = diesel::sql_query(
-            "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_name = 'test_table'",
-        )
-        .get_result(&mut conn)
-        .await
-        .unwrap();
+        let cnt: CountResult =
+            diesel::sql_query("SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_name = 'test_table'")
+                .get_result(&mut conn)
+                .await
+                .unwrap();
         assert_eq!(cnt.cnt, 0);
     }
 
@@ -279,10 +251,7 @@ mod tests {
         let temp_db = temp::TempDb::new().unwrap();
         let url = temp_db.database().url();
 
-        let db_args = DbArgs {
-            database_url: url.clone(),
-            ..Default::default()
-        };
+        let db_args = DbArgs { database_url: url.clone(), ..Default::default() };
 
         let writer = Db::for_write(db_args.clone()).await.unwrap();
         let reader = Db::for_read(db_args).await.unwrap();
@@ -290,18 +259,13 @@ mod tests {
         {
             // Create a table
             let mut conn = writer.connect().await.unwrap();
-            diesel::sql_query("CREATE TABLE test_table (id INTEGER PRIMARY KEY)")
-                .execute(&mut conn)
-                .await
-                .unwrap();
+            diesel::sql_query("CREATE TABLE test_table (id INTEGER PRIMARY KEY)").execute(&mut conn).await.unwrap();
         }
 
         {
             // Try an insert into it using the read-only connection, which should fail
             let mut conn = reader.connect().await.unwrap();
-            let result = diesel::sql_query("INSERT INTO test_table (id) VALUES (1)")
-                .execute(&mut conn)
-                .await;
+            let result = diesel::sql_query("INSERT INTO test_table (id) VALUES (1)").execute(&mut conn).await;
             assert!(result.is_err());
         }
 
@@ -309,30 +273,23 @@ mod tests {
             // Try and select from it using the read-only connection, which should succeed, but
             // return no results.
             let mut conn = reader.connect().await.unwrap();
-            let cnt: CountResult = diesel::sql_query("SELECT COUNT(*) as cnt FROM test_table")
-                .get_result(&mut conn)
-                .await
-                .unwrap();
+            let cnt: CountResult =
+                diesel::sql_query("SELECT COUNT(*) as cnt FROM test_table").get_result(&mut conn).await.unwrap();
             assert_eq!(cnt.cnt, 0);
         }
 
         {
             // Then try to write to it using the write connection, which should succeed
             let mut conn = writer.connect().await.unwrap();
-            diesel::sql_query("INSERT INTO test_table (id) VALUES (1)")
-                .execute(&mut conn)
-                .await
-                .unwrap();
+            diesel::sql_query("INSERT INTO test_table (id) VALUES (1)").execute(&mut conn).await.unwrap();
         }
 
         {
             // Finally, try to read from it using the read-only connection, which should now return
             // results.
             let mut conn = reader.connect().await.unwrap();
-            let cnt: CountResult = diesel::sql_query("SELECT COUNT(*) as cnt FROM test_table")
-                .get_result(&mut conn)
-                .await
-                .unwrap();
+            let cnt: CountResult =
+                diesel::sql_query("SELECT COUNT(*) as cnt FROM test_table").get_result(&mut conn).await.unwrap();
             assert_eq!(cnt.cnt, 1);
         }
     }

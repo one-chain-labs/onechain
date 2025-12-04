@@ -4,8 +4,7 @@
 use std::fmt::{self, Display};
 
 use anyhow::bail;
-use move_core_types::identifier;
-use move_core_types::parsing::parser::Token;
+use move_core_types::{identifier, parsing::parser::Token};
 
 #[derive(Eq, PartialEq, Debug, Clone, Copy)]
 pub enum CommandToken {
@@ -139,16 +138,12 @@ impl Token for CommandToken {
             }
             c if c.is_ascii_digit() => {
                 // c + remaining
-                let len = 1 + chars
-                    .take_while(|c| char::is_ascii_digit(c) || *c == '_')
-                    .count();
+                let len = 1 + chars.take_while(|c| char::is_ascii_digit(c) || *c == '_').count();
                 (CommandToken::Number, len)
             }
             c if c.is_ascii_alphabetic() || c == '_' => {
                 // c + remaining
-                let len = 1 + chars
-                    .take_while(|c| identifier::is_valid_identifier_char(*c))
-                    .count();
+                let len = 1 + chars.take_while(|c| identifier::is_valid_identifier_char(*c)).count();
                 (Self::Ident, len)
             }
             _ => bail!("unrecognized token: {}", s),
@@ -182,7 +177,7 @@ fn parse_sub_token_string(mut s: &str, start: &str, end: &str) -> anyhow::Result
             next
         } else {
             len += 1;
-            &s[1..]
+            &s[1 ..]
         }
     }
     Ok(len)

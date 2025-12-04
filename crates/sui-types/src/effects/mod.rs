@@ -1,32 +1,31 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use self::effects_v2::TransactionEffectsV2;
-use crate::base_types::{ExecutionDigests, ObjectID, ObjectRef, SequenceNumber};
-use crate::committee::{Committee, EpochId};
-use crate::crypto::{
-    default_hash, AuthoritySignInfo, AuthoritySignInfoTrait, AuthorityStrongQuorumSignInfo,
-    EmptySignInfo,
-};
-use crate::digests::{
-    ObjectDigest, TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest,
-};
-use crate::error::SuiResult;
-use crate::event::Event;
-use crate::execution::SharedInput;
-use crate::execution_status::ExecutionStatus;
-use crate::gas::GasCostSummary;
-use crate::message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope};
-use crate::object::Owner;
-use crate::storage::WriteKind;
+use std::collections::{BTreeMap, BTreeSet};
+
 use effects_v1::TransactionEffectsV1;
 pub use effects_v2::UnchangedSharedKind;
 use enum_dispatch::enum_dispatch;
 pub use object_change::{EffectsObjectChange, ObjectIn, ObjectOut};
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::{Intent, IntentScope};
-use std::collections::{BTreeMap, BTreeSet};
 pub use test_effects_builder::TestEffectsBuilder;
+
+use self::effects_v2::TransactionEffectsV2;
+use crate::{
+    base_types::{ExecutionDigests, ObjectID, ObjectRef, SequenceNumber},
+    committee::{Committee, EpochId},
+    crypto::{default_hash, AuthoritySignInfo, AuthoritySignInfoTrait, AuthorityStrongQuorumSignInfo, EmptySignInfo},
+    digests::{ObjectDigest, TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest},
+    error::SuiResult,
+    event::Event,
+    execution::SharedInput,
+    execution_status::ExecutionStatus,
+    gas::GasCostSummary,
+    message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope},
+    object::Owner,
+    storage::WriteKind,
+};
 
 mod effects_v1;
 mod effects_v2;
@@ -61,6 +60,7 @@ pub enum TransactionEffects {
 
 impl Message for TransactionEffects {
     type DigestType = TransactionEffectsDigest;
+
     const SCOPE: IntentScope = IntentScope::TransactionEffects;
 
     fn digest(&self) -> Self::DigestType {
@@ -150,10 +150,7 @@ impl TransactionEffects {
     }
 
     pub fn execution_digests(&self) -> ExecutionDigests {
-        ExecutionDigests {
-            transaction: *self.transaction_digest(),
-            effects: self.digest(),
-        }
+        ExecutionDigests { transaction: *self.transaction_digest(), effects: self.digest() }
     }
 
     pub fn estimate_effects_size_upperbound_v1(
@@ -180,11 +177,7 @@ impl TransactionEffects {
         fixed_sizes + approx_change_entry_size + deps_size
     }
 
-    pub fn estimate_effects_size_upperbound_v2(
-        num_writes: usize,
-        num_modifies: usize,
-        num_deps: usize,
-    ) -> usize {
+    pub fn estimate_effects_size_upperbound_v2(num_writes: usize, num_modifies: usize, num_deps: usize) -> usize {
         let fixed_sizes = APPROX_SIZE_OF_EXECUTION_STATUS
             + APPROX_SIZE_OF_EPOCH_ID
             + APPROX_SIZE_OF_GAS_COST_SUMMARY
@@ -208,16 +201,8 @@ impl TransactionEffects {
         self.mutated()
             .into_iter()
             .map(|(r, o)| (r, o, WriteKind::Mutate))
-            .chain(
-                self.created()
-                    .into_iter()
-                    .map(|(r, o)| (r, o, WriteKind::Create)),
-            )
-            .chain(
-                self.unwrapped()
-                    .into_iter()
-                    .map(|(r, o)| (r, o, WriteKind::Unwrap)),
-            )
+            .chain(self.created().into_iter().map(|(r, o)| (r, o, WriteKind::Create)))
+            .chain(self.unwrapped().into_iter().map(|(r, o)| (r, o, WriteKind::Unwrap)))
             .collect()
     }
 
@@ -228,11 +213,7 @@ impl TransactionEffects {
         self.deleted()
             .iter()
             .map(|obj_ref| (*obj_ref, ObjectRemoveKind::Delete))
-            .chain(
-                self.wrapped()
-                    .iter()
-                    .map(|obj_ref| (*obj_ref, ObjectRemoveKind::Wrap)),
-            )
+            .chain(self.wrapped().iter().map(|obj_ref| (*obj_ref, ObjectRemoveKind::Wrap)))
             .collect()
     }
 
@@ -249,10 +230,7 @@ impl TransactionEffects {
 
     /// Return an iterator of mutated objects, but excluding the gas object.
     pub fn mutated_excluding_gas(&self) -> Vec<(ObjectRef, Owner)> {
-        self.mutated()
-            .into_iter()
-            .filter(|o| o != &self.gas_object())
-            .collect()
+        self.mutated().into_iter().filter(|o| o != &self.gas_object()).collect()
     }
 
     pub fn summary_for_debug(&self) -> TransactionEffectsDebugSummary {
@@ -289,13 +267,10 @@ impl InputSharedObject {
     pub fn object_ref(&self) -> ObjectRef {
         match self {
             InputSharedObject::Mutate(oref) | InputSharedObject::ReadOnly(oref) => *oref,
-            InputSharedObject::ReadDeleted(id, version)
-            | InputSharedObject::MutateDeleted(id, version) => {
+            InputSharedObject::ReadDeleted(id, version) | InputSharedObject::MutateDeleted(id, version) => {
                 (*id, *version, ObjectDigest::OBJECT_DIGEST_DELETED)
             }
-            InputSharedObject::Cancelled(id, version) => {
-                (*id, *version, ObjectDigest::OBJECT_DIGEST_CANCELLED)
-            }
+            InputSharedObject::Cancelled(id, version) => (*id, *version, ObjectDigest::OBJECT_DIGEST_CANCELLED),
         }
     }
 }
@@ -426,16 +401,11 @@ pub type CertifiedTransactionEffects = TransactionEffectsEnvelope<AuthorityStron
 pub type TrustedSignedTransactionEffects = TrustedEnvelope<TransactionEffects, AuthoritySignInfo>;
 pub type VerifiedTransactionEffectsEnvelope<S> = VerifiedEnvelope<TransactionEffects, S>;
 pub type VerifiedSignedTransactionEffects = VerifiedTransactionEffectsEnvelope<AuthoritySignInfo>;
-pub type VerifiedCertifiedTransactionEffects =
-    VerifiedTransactionEffectsEnvelope<AuthorityStrongQuorumSignInfo>;
+pub type VerifiedCertifiedTransactionEffects = VerifiedTransactionEffectsEnvelope<AuthorityStrongQuorumSignInfo>;
 
 impl CertifiedTransactionEffects {
     pub fn verify_authority_signatures(&self, committee: &Committee) -> SuiResult {
-        self.auth_sig().verify_secure(
-            self.data(),
-            Intent::sui_app(IntentScope::TransactionEffects),
-            committee,
-        )
+        self.auth_sig().verify_secure(self.data(), Intent::sui_app(IntentScope::TransactionEffects), committee)
     }
 
     pub fn verify(self, committee: &Committee) -> SuiResult<VerifiedCertifiedTransactionEffects> {

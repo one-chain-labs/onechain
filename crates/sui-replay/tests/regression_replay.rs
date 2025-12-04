@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::path::PathBuf;
-use sui_replay::execute_replay_command;
-use sui_replay::ReplayToolCommand;
+
+use sui_replay::{execute_replay_command, ReplayToolCommand};
 
 #[tokio::test]
 async fn replay_sandboxes() {
@@ -17,8 +17,6 @@ async fn replay_sandboxes() {
         assert!(path.is_file());
         let cmd = ReplayToolCommand::ReplaySandbox { path };
 
-        execute_replay_command(None, true, true, None, None, cmd)
-            .await
-            .unwrap();
+        execute_replay_command(None, true, true, None, None, cmd).await.unwrap();
     }
 }

@@ -5,8 +5,7 @@ use move_binary_format::CompiledModule;
 use move_bytecode_verifier_meter::Meter;
 use move_vm_config::verifier::MeterConfig;
 use sui_protocol_config::ProtocolConfig;
-use sui_types::error::SuiResult;
-use sui_types::execution_config_utils::to_binary_config;
+use sui_types::{error::SuiResult, execution_config_utils::to_binary_config};
 
 pub trait Verifier {
     /// Create a new bytecode verifier meter.

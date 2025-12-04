@@ -48,11 +48,7 @@ impl NetworkService for Mutex<TestService> {
         Ok(())
     }
 
-    async fn handle_subscribe_blocks(
-        &self,
-        peer: AuthorityIndex,
-        last_received: Round,
-    ) -> ConsensusResult<BlockStream> {
+    async fn handle_subscribe_blocks(&self, peer: AuthorityIndex, last_received: Round) -> ConsensusResult<BlockStream> {
         let mut state = self.lock();
         state.handle_subscribe_blocks.push((peer, last_received));
         let own_blocks = state
@@ -92,10 +88,7 @@ impl NetworkService for Mutex<TestService> {
         unimplemented!("Unimplemented")
     }
 
-    async fn handle_get_latest_rounds(
-        &self,
-        _peer: AuthorityIndex,
-    ) -> ConsensusResult<(Vec<Round>, Vec<Round>)> {
+    async fn handle_get_latest_rounds(&self, _peer: AuthorityIndex) -> ConsensusResult<(Vec<Round>, Vec<Round>)> {
         unimplemented!("Unimplemented")
     }
 }

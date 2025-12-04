@@ -1,14 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::ExecutionErrorKind;
-use crate::error::SuiError;
-use crate::{
-    balance::{Balance, Supply},
-    error::ExecutionError,
-    object::{Data, Object},
-};
-use crate::{base_types::ObjectID, id::UID, SUI_FRAMEWORK_ADDRESS};
 use move_core_types::{
     annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     ident_str,
@@ -17,6 +9,15 @@ use move_core_types::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    balance::{Balance, Supply},
+    base_types::ObjectID,
+    error::{ExecutionError, ExecutionErrorKind, SuiError},
+    id::UID,
+    object::{Data, Object},
+    SUI_FRAMEWORK_ADDRESS,
+};
 
 pub const COIN_MODULE_NAME: &IdentStr = ident_str!("coin");
 pub const COIN_STRUCT_NAME: &IdentStr = ident_str!("Coin");
@@ -37,10 +38,7 @@ pub struct Coin {
 
 impl Coin {
     pub fn new(id: UID, value: u64) -> Self {
-        Self {
-            id,
-            balance: Balance::new(value),
-        }
+        Self { id, balance: Balance::new(value) }
     }
 
     pub fn type_(type_param: TypeTag) -> StructTag {
@@ -96,10 +94,7 @@ impl Coin {
         MoveStructLayout {
             type_: Self::type_(type_param.clone()),
             fields: Box::new(vec![
-                MoveFieldLayout::new(
-                    ident_str!("id").to_owned(),
-                    MoveTypeLayout::Struct(Box::new(UID::layout())),
-                ),
+                MoveFieldLayout::new(ident_str!("id").to_owned(), MoveTypeLayout::Struct(Box::new(UID::layout()))),
                 MoveFieldLayout::new(
                     ident_str!("balance").to_owned(),
                     MoveTypeLayout::Struct(Box::new(Balance::layout(type_param))),
@@ -111,9 +106,7 @@ impl Coin {
     /// Add balance to this coin, erroring if the new total balance exceeds the maximum
     pub fn add(&mut self, balance: Balance) -> Result<(), ExecutionError> {
         let Some(new_value) = self.value().checked_add(balance.value()) else {
-            return Err(ExecutionError::from_kind(
-                ExecutionErrorKind::CoinBalanceOverflow,
-            ));
+            return Err(ExecutionError::from_kind(ExecutionErrorKind::CoinBalanceOverflow));
         };
         self.balance = Balance::new(new_value);
         Ok(())
@@ -173,6 +166,7 @@ impl TreasuryCap {
 
 impl TryFrom<Object> for TreasuryCap {
     type Error = SuiError;
+
     fn try_from(object: Object) -> Result<Self, Self::Error> {
         match &object.data {
             Data::Move(o) => {
@@ -183,9 +177,7 @@ impl TryFrom<Object> for TreasuryCap {
             Data::Package(_) => {}
         }
 
-        Err(SuiError::TypeError {
-            error: format!("Object type is not a TreasuryCap: {:?}", object),
-        })
+        Err(SuiError::TypeError { error: format!("Object type is not a TreasuryCap: {:?}", object) })
     }
 }
 
@@ -244,6 +236,7 @@ impl CoinMetadata {
 
 impl TryFrom<Object> for CoinMetadata {
     type Error = SuiError;
+
     fn try_from(object: Object) -> Result<Self, Self::Error> {
         TryFrom::try_from(&object)
     }
@@ -251,6 +244,7 @@ impl TryFrom<Object> for CoinMetadata {
 
 impl TryFrom<&Object> for CoinMetadata {
     type Error = SuiError;
+
     fn try_from(object: &Object) -> Result<Self, Self::Error> {
         match &object.data {
             Data::Move(o) => {
@@ -261,8 +255,6 @@ impl TryFrom<&Object> for CoinMetadata {
             Data::Package(_) => {}
         }
 
-        Err(SuiError::TypeError {
-            error: format!("Object type is not a CoinMetadata: {:?}", object),
-        })
+        Err(SuiError::TypeError { error: format!("Object type is not a CoinMetadata: {:?}", object) })
     }
 }

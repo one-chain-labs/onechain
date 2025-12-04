@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use serde::{Deserialize, Serialize};
+
+use super::IDOperation;
 use crate::{
     base_types::VersionDigest,
     digests::ObjectDigest,
     object::{Object, Owner},
 };
-use serde::{Deserialize, Serialize};
-
-use super::IDOperation;
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct EffectsObjectChange {
@@ -32,10 +32,7 @@ impl EffectsObjectChange {
         id_created: bool,
         id_deleted: bool,
     ) -> Self {
-        debug_assert!(
-            !id_created || !id_deleted,
-            "Object ID can't be created and deleted at the same time."
-        );
+        debug_assert!(!id_created || !id_deleted, "Object ID can't be created and deleted at the same time.");
         Self {
             input_state: modified_at.map_or(ObjectIn::NotExist, ObjectIn::Exist),
             output_state: written.map_or(ObjectOut::NotExist, |o| {

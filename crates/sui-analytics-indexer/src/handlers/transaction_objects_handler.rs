@@ -3,16 +3,15 @@
 
 use anyhow::Result;
 use sui_data_ingestion_core::Worker;
+use sui_rpc_api::{CheckpointData, CheckpointTransaction};
+use sui_types::{base_types::ObjectID, effects::TransactionEffects, transaction::TransactionDataAPI};
 use tokio::sync::Mutex;
 
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::base_types::ObjectID;
-use sui_types::effects::TransactionEffects;
-use sui_types::transaction::TransactionDataAPI;
-
-use crate::handlers::{AnalyticsHandler, InputObjectTracker, ObjectStatusTracker};
-use crate::tables::TransactionObjectEntry;
-use crate::FileType;
+use crate::{
+    handlers::{AnalyticsHandler, InputObjectTracker, ObjectStatusTracker},
+    tables::TransactionObjectEntry,
+    FileType,
+};
 
 pub struct TransactionObjectsHandler {
     state: Mutex<State>,
@@ -27,11 +26,7 @@ impl Worker for TransactionObjectsHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions: checkpoint_transactions,
-            ..
-        } = checkpoint_data;
+        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
         let mut state = self.state.lock().await;
         for checkpoint_transaction in checkpoint_transactions {
             self.process_transaction(
@@ -67,12 +62,9 @@ impl AnalyticsHandler<TransactionObjectEntry> for TransactionObjectsHandler {
 
 impl TransactionObjectsHandler {
     pub fn new() -> Self {
-        TransactionObjectsHandler {
-            state: Mutex::new(State {
-                transaction_objects: vec![],
-            }),
-        }
+        TransactionObjectsHandler { state: Mutex::new(State { transaction_objects: vec![] }) }
     }
+
     fn process_transaction(
         &self,
         epoch: u64,
@@ -125,6 +117,7 @@ impl TransactionObjectsHandler {
                 )
             });
     }
+
     // Transaction object data.
     // Builds a view of the object in input and output of a transaction.
     fn process_transaction_object(

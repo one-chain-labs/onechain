@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
+
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use sui_types::base_types::TransactionDigest;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -33,12 +34,7 @@ impl CertificateDenyConfig {
     }
 
     pub fn certificate_deny_set(&self) -> &HashSet<TransactionDigest> {
-        self.certificate_deny_set.get_or_init(|| {
-            self.certificate_deny_list
-                .iter()
-                .cloned()
-                .collect::<HashSet<_>>()
-        })
+        self.certificate_deny_set.get_or_init(|| self.certificate_deny_list.iter().cloned().collect::<HashSet<_>>())
     }
 }
 

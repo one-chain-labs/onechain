@@ -108,10 +108,7 @@ impl Settings {
             Ok(settings)
         };
 
-        reader().map_err(|e| SettingsError::InvalidSettings {
-            file: path.to_string(),
-            message: e.to_string(),
-        })
+        reader().map_err(|e| SettingsError::InvalidSettings { file: path.to_string(), message: e.to_string() })
     }
 
     /// Get the name of the repository (from its url).
@@ -157,8 +154,7 @@ impl Settings {
     /// Check whether the input instance matches the criteria described in the settings.
     pub fn filter_instances(&self, instance: &Instance) -> bool {
         self.regions.contains(&instance.region)
-            && instance.specs.to_lowercase().replace('.', "")
-                == self.specs.to_lowercase().replace('.', "")
+            && instance.specs.to_lowercase().replace('.', "") == self.specs.to_lowercase().replace('.', "")
     }
 
     /// The number of regions specified in the settings.

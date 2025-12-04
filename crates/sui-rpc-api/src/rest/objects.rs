@@ -1,20 +1,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ApiEndpoint, RouteHandler};
-use crate::types::{GetObjectOptions, ObjectResponse};
-use crate::{reader::StateReader, rest::PageCursor, Result, RpcService, RpcServiceError};
-use axum::extract::Query;
-use axum::extract::{Path, State};
-use axum::Json;
+use axum::{
+    extract::{Path, Query, State},
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use sui_sdk_types::{ObjectId, TypeTag, Version};
-use sui_types::sui_sdk_types_conversions::type_tag_core_to_sdk;
 use sui_types::{
     storage::{DynamicFieldIndexInfo, DynamicFieldKey},
-    sui_sdk_types_conversions::SdkTypeConversionError,
+    sui_sdk_types_conversions::{type_tag_core_to_sdk, SdkTypeConversionError},
 };
 use tap::Pipe;
+
+use super::{ApiEndpoint, RouteHandler};
+use crate::{
+    reader::StateReader,
+    rest::PageCursor,
+    types::{GetObjectOptions, ObjectResponse},
+    Result,
+    RpcService,
+    RpcServiceError,
+};
 
 pub struct GetObject;
 
@@ -89,10 +96,7 @@ async fn list_dynamic_fields(
     Query(parameters): Query<ListDynamicFieldsQueryParameters>,
     State(state): State<StateReader>,
 ) -> Result<(PageCursor<ObjectId>, Json<Vec<DynamicFieldInfo>>)> {
-    let indexes = state
-        .inner()
-        .indexes()
-        .ok_or_else(RpcServiceError::not_found)?;
+    let indexes = state.inner().indexes().ok_or_else(RpcServiceError::not_found)?;
 
     let limit = parameters.limit();
     let start = parameters.start();
@@ -106,12 +110,7 @@ async fn list_dynamic_fields(
     let cursor = if dynamic_fields.len() > limit {
         // SAFETY: We've already verified that object_keys is greater than limit, which is
         // gaurenteed to be >= 1.
-        dynamic_fields
-            .pop()
-            .unwrap()
-            .field_id
-            .pipe(ObjectId::from)
-            .pipe(Some)
+        dynamic_fields.pop().unwrap().field_id.pipe(ObjectId::from).pipe(Some)
     } else {
         None
     };
@@ -127,9 +126,7 @@ pub struct ListDynamicFieldsQueryParameters {
 
 impl ListDynamicFieldsQueryParameters {
     pub fn limit(&self) -> usize {
-        self.limit
-            .map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE))
-            .unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
+        self.limit.map(|l| (l as usize).clamp(1, crate::rest::MAX_PAGE_SIZE)).unwrap_or(crate::rest::DEFAULT_PAGE_SIZE)
     }
 
     pub fn start(&self) -> Option<sui_types::base_types::ObjectID> {
@@ -155,12 +152,7 @@ impl TryFrom<(DynamicFieldKey, DynamicFieldIndexInfo)> for DynamicFieldInfo {
 
     fn try_from(value: (DynamicFieldKey, DynamicFieldIndexInfo)) -> Result<Self, Self::Error> {
         let DynamicFieldKey { parent, field_id } = value.0;
-        let DynamicFieldIndexInfo {
-            dynamic_field_type,
-            name_type,
-            name_value,
-            dynamic_object_id,
-        } = value.1;
+        let DynamicFieldIndexInfo { dynamic_field_type, name_type, name_value, dynamic_object_id } = value.1;
 
         Self {
             parent: parent.into(),

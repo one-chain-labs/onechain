@@ -14,8 +14,10 @@ use bytes::Bytes;
 use cfg_if::cfg_if;
 use consensus_config::{AuthorityIndex, NetworkKeyPair, NetworkPublicKey};
 use futures::{stream, Stream, StreamExt as _};
-use hyper_util::rt::{tokio::TokioIo, TokioTimer};
-use hyper_util::service::TowerToHyperService;
+use hyper_util::{
+    rt::{tokio::TokioIo, TokioTimer},
+    service::TowerToHyperService,
+};
 use mysten_common::sync::notify_once::NotifyOnce;
 use mysten_metrics::monitored_future;
 use mysten_network::{
@@ -41,22 +43,20 @@ use tracing::{debug, error, info, trace, warn};
 
 use super::{
     metrics_layer::{MetricsCallbackMaker, MetricsResponseCallback, SizedRequest, SizedResponse},
-    tonic_gen::{
-        consensus_service_client::ConsensusServiceClient,
-        consensus_service_server::ConsensusService,
-    },
-    BlockStream, NetworkClient, NetworkManager, NetworkService,
+    tonic_gen::{consensus_service_client::ConsensusServiceClient, consensus_service_server::ConsensusService},
+    BlockStream,
+    NetworkClient,
+    NetworkManager,
+    NetworkService,
 };
 use crate::{
     block::{BlockRef, VerifiedBlock},
     commit::CommitRange,
     context::Context,
     error::{ConsensusError, ConsensusResult},
-    network::{
-        tonic_gen::consensus_service_server::ConsensusServiceServer,
-        tonic_tls::certificate_server_name,
-    },
-    CommitIndex, Round,
+    network::{tonic_gen::consensus_service_server::ConsensusServiceServer, tonic_tls::certificate_server_name},
+    CommitIndex,
+    Round,
 };
 
 // Maximum bytes size in a single fetch_blocks()response.
@@ -83,11 +83,7 @@ pub(crate) struct TonicClient {
 
 impl TonicClient {
     pub(crate) fn new(context: Arc<Context>, network_keypair: NetworkKeyPair) -> Self {
-        Self {
-            context: context.clone(),
-            network_keypair,
-            channel_pool: Arc::new(ChannelPool::new(context)),
-        }
+        Self { context: context.clone(), network_keypair, channel_pool: Arc::new(ChannelPool::new(context)) }
     }
 
     async fn get_client(
@@ -96,10 +92,7 @@ impl TonicClient {
         timeout: Duration,
     ) -> ConsensusResult<ConsensusServiceClient<Channel>> {
         let config = &self.context.parameters.tonic;
-        let channel = self
-            .channel_pool
-            .get_channel(self.network_keypair.clone(), peer, timeout)
-            .await?;
+        let channel = self.channel_pool.get_channel(self.network_keypair.clone(), peer, timeout).await?;
         Ok(ConsensusServiceClient::new(channel)
             .max_encoding_message_size(config.message_size_limit)
             .max_decoding_message_size(config.message_size_limit))
@@ -111,16 +104,9 @@ impl TonicClient {
 impl NetworkClient for TonicClient {
     const SUPPORT_STREAMING: bool = true;
 
-    async fn send_block(
-        &self,
-        peer: AuthorityIndex,
-        block: &VerifiedBlock,
-        timeout: Duration,
-    ) -> ConsensusResult<()> {
+    async fn send_block(&self, peer: AuthorityIndex, block: &VerifiedBlock, timeout: Duration) -> ConsensusResult<()> {
         let mut client = self.get_client(peer, timeout).await?;
-        let mut request = Request::new(SendBlockRequest {
-            block: block.serialized().clone(),
-        });
+        let mut request = Request::new(SendBlockRequest { block: block.serialized().clone() });
         request.set_timeout(timeout);
         client
             .send_block(request)
@@ -137,18 +123,14 @@ impl NetworkClient for TonicClient {
     ) -> ConsensusResult<BlockStream> {
         let mut client = self.get_client(peer, timeout).await?;
         // TODO: add sampled block acknowledgments for latency measurements.
-        let request = Request::new(stream::once(async move {
-            SubscribeBlocksRequest {
-                last_received_round: last_received,
-            }
-        }));
-        let response = client.subscribe_blocks(request).await.map_err(|e| {
-            ConsensusError::NetworkRequest(format!("subscribe_blocks failed: {e:?}"))
-        })?;
-        let stream = response
-            .into_inner()
-            .take_while(|b| futures::future::ready(b.is_ok()))
-            .filter_map(move |b| async move {
+        let request =
+            Request::new(stream::once(async move { SubscribeBlocksRequest { last_received_round: last_received } }));
+        let response = client
+            .subscribe_blocks(request)
+            .await
+            .map_err(|e| ConsensusError::NetworkRequest(format!("subscribe_blocks failed: {e:?}")))?;
+        let stream =
+            response.into_inner().take_while(|b| futures::future::ready(b.is_ok())).filter_map(move |b| async move {
                 match b {
                     Ok(response) => Some(response.block),
                     Err(e) => {
@@ -158,8 +140,7 @@ impl NetworkClient for TonicClient {
                 }
             });
         let rate_limited_stream =
-            tokio_stream::StreamExt::throttle(stream, self.context.parameters.min_round_delay / 2)
-                .boxed();
+            tokio_stream::StreamExt::throttle(stream, self.context.parameters.min_round_delay / 2).boxed();
         Ok(rate_limited_stream)
     }
 
@@ -223,9 +204,7 @@ impl NetworkClient for TonicClient {
                                 "fetch_blocks failed mid-stream: {e:?}"
                             )));
                         }
-                        return Err(ConsensusError::NetworkRequest(format!(
-                            "fetch_blocks failed mid-stream: {e:?}"
-                        )));
+                        return Err(ConsensusError::NetworkRequest(format!("fetch_blocks failed mid-stream: {e:?}")));
                     } else {
                         warn!("fetch_blocks failed mid-stream: {e:?}");
                         break;
@@ -243,10 +222,7 @@ impl NetworkClient for TonicClient {
         timeout: Duration,
     ) -> ConsensusResult<(Vec<Bytes>, Vec<Bytes>)> {
         let mut client = self.get_client(peer, timeout).await?;
-        let mut request = Request::new(FetchCommitsRequest {
-            start: commit_range.start(),
-            end: commit_range.end(),
-        });
+        let mut request = Request::new(FetchCommitsRequest { start: commit_range.start(), end: commit_range.end() });
         request.set_timeout(timeout);
         let response = client
             .fetch_commits(request)
@@ -264,10 +240,7 @@ impl NetworkClient for TonicClient {
     ) -> ConsensusResult<Vec<Bytes>> {
         let mut client = self.get_client(peer, timeout).await?;
         let mut request = Request::new(FetchLatestBlocksRequest {
-            authorities: authorities
-                .iter()
-                .map(|authority| authority.value() as u32)
-                .collect(),
+            authorities: authorities.iter().map(|authority| authority.value() as u32).collect(),
         });
         request.set_timeout(timeout);
         let mut stream = client
@@ -308,9 +281,7 @@ impl NetworkClient for TonicClient {
                                 "fetch_blocks failed mid-stream: {e:?}"
                             )));
                         }
-                        return Err(ConsensusError::NetworkRequest(format!(
-                            "fetch_blocks failed mid-stream: {e:?}"
-                        )));
+                        return Err(ConsensusError::NetworkRequest(format!("fetch_blocks failed mid-stream: {e:?}")));
                     } else {
                         warn!("fetch_blocks failed mid-stream: {e:?}");
                         break;
@@ -329,9 +300,10 @@ impl NetworkClient for TonicClient {
         let mut client = self.get_client(peer, timeout).await?;
         let mut request = Request::new(GetLatestRoundsRequest {});
         request.set_timeout(timeout);
-        let response = client.get_latest_rounds(request).await.map_err(|e| {
-            ConsensusError::NetworkRequest(format!("get_latest_rounds failed: {e:?}"))
-        })?;
+        let response = client
+            .get_latest_rounds(request)
+            .await
+            .map_err(|e| ConsensusError::NetworkRequest(format!("get_latest_rounds failed: {e:?}")))?;
         let response = response.into_inner();
         Ok((response.highest_received, response.highest_accepted))
     }
@@ -356,10 +328,7 @@ struct ChannelPool {
 
 impl ChannelPool {
     fn new(context: Arc<Context>) -> Self {
-        Self {
-            context,
-            channels: RwLock::new(BTreeMap::new()),
-        }
+        Self { context, channels: RwLock::new(BTreeMap::new()) }
     }
 
     async fn get_channel(
@@ -376,19 +345,13 @@ impl ChannelPool {
         }
 
         let authority = self.context.committee.authority(peer);
-        let address = to_host_port_str(&authority.address).map_err(|e| {
-            ConsensusError::NetworkConfig(format!("Cannot convert address to host:port: {e:?}"))
-        })?;
+        let address = to_host_port_str(&authority.address)
+            .map_err(|e| ConsensusError::NetworkConfig(format!("Cannot convert address to host:port: {e:?}")))?;
         let address = format!("https://{address}");
         let config = &self.context.parameters.tonic;
         let buffer_size = config.connection_buffer_size;
         let client_tls_config = sui_tls::create_rustls_client_config(
-            self.context
-                .committee
-                .authority(peer)
-                .network_key
-                .clone()
-                .into_inner(),
+            self.context.committee.authority(peer).network_key.clone().into_inner(),
             certificate_server_name(&self.context),
             Some(network_keypair.private_key().into_inner()),
         );
@@ -457,15 +420,15 @@ impl<S: NetworkService> TonicServiceProxy<S> {
 
 #[async_trait]
 impl<S: NetworkService> ConsensusService for TonicServiceProxy<S> {
+    type FetchBlocksStream = Iter<std::vec::IntoIter<Result<FetchBlocksResponse, tonic::Status>>>;
+    type FetchLatestBlocksStream = Iter<std::vec::IntoIter<Result<FetchLatestBlocksResponse, tonic::Status>>>;
+    type SubscribeBlocksStream = Pin<Box<dyn Stream<Item = Result<SubscribeBlocksResponse, tonic::Status>> + Send>>;
+
     async fn send_block(
         &self,
         request: Request<SendBlockRequest>,
     ) -> Result<Response<SendBlockResponse>, tonic::Status> {
-        let Some(peer_index) = request
-            .extensions()
-            .get::<PeerInfo>()
-            .map(|p| p.authority_index)
-        else {
+        let Some(peer_index) = request.extensions().get::<PeerInfo>().map(|p| p.authority_index) else {
             return Err(tonic::Status::internal("PeerInfo not found"));
         };
         let block = request.into_inner().block;
@@ -476,28 +439,18 @@ impl<S: NetworkService> ConsensusService for TonicServiceProxy<S> {
         Ok(Response::new(SendBlockResponse {}))
     }
 
-    type SubscribeBlocksStream =
-        Pin<Box<dyn Stream<Item = Result<SubscribeBlocksResponse, tonic::Status>> + Send>>;
-
     async fn subscribe_blocks(
         &self,
         request: Request<Streaming<SubscribeBlocksRequest>>,
     ) -> Result<Response<Self::SubscribeBlocksStream>, tonic::Status> {
-        let Some(peer_index) = request
-            .extensions()
-            .get::<PeerInfo>()
-            .map(|p| p.authority_index)
-        else {
+        let Some(peer_index) = request.extensions().get::<PeerInfo>().map(|p| p.authority_index) else {
             return Err(tonic::Status::internal("PeerInfo not found"));
         };
         let mut request_stream = request.into_inner();
         let first_request = match request_stream.next().await {
             Some(Ok(r)) => r,
             Some(Err(e)) => {
-                debug!(
-                    "subscribe_blocks() request from {} failed: {e:?}",
-                    peer_index
-                );
+                debug!("subscribe_blocks() request from {} failed: {e:?}", peer_index);
                 return Err(tonic::Status::invalid_argument("Request error"));
             }
             None => {
@@ -511,22 +464,15 @@ impl<S: NetworkService> ConsensusService for TonicServiceProxy<S> {
             .map_err(|e| tonic::Status::internal(format!("{e:?}")))?
             .map(|block| Ok(SubscribeBlocksResponse { block }));
         let rate_limited_stream =
-            tokio_stream::StreamExt::throttle(stream, self.context.parameters.min_round_delay / 2)
-                .boxed();
+            tokio_stream::StreamExt::throttle(stream, self.context.parameters.min_round_delay / 2).boxed();
         Ok(Response::new(rate_limited_stream))
     }
-
-    type FetchBlocksStream = Iter<std::vec::IntoIter<Result<FetchBlocksResponse, tonic::Status>>>;
 
     async fn fetch_blocks(
         &self,
         request: Request<FetchBlocksRequest>,
     ) -> Result<Response<Self::FetchBlocksStream>, tonic::Status> {
-        let Some(peer_index) = request
-            .extensions()
-            .get::<PeerInfo>()
-            .map(|p| p.authority_index)
-        else {
+        let Some(peer_index) = request.extensions().get::<PeerInfo>().map(|p| p.authority_index) else {
             return Err(tonic::Status::internal("PeerInfo not found"));
         };
         let inner = request.into_inner();
@@ -561,45 +507,25 @@ impl<S: NetworkService> ConsensusService for TonicServiceProxy<S> {
         &self,
         request: Request<FetchCommitsRequest>,
     ) -> Result<Response<FetchCommitsResponse>, tonic::Status> {
-        let Some(peer_index) = request
-            .extensions()
-            .get::<PeerInfo>()
-            .map(|p| p.authority_index)
-        else {
+        let Some(peer_index) = request.extensions().get::<PeerInfo>().map(|p| p.authority_index) else {
             return Err(tonic::Status::internal("PeerInfo not found"));
         };
         let request = request.into_inner();
         let (commits, certifier_blocks) = self
             .service
-            .handle_fetch_commits(peer_index, (request.start..=request.end).into())
+            .handle_fetch_commits(peer_index, (request.start ..= request.end).into())
             .await
             .map_err(|e| tonic::Status::internal(format!("{e:?}")))?;
-        let commits = commits
-            .into_iter()
-            .map(|c| c.serialized().clone())
-            .collect();
-        let certifier_blocks = certifier_blocks
-            .into_iter()
-            .map(|b| b.serialized().clone())
-            .collect();
-        Ok(Response::new(FetchCommitsResponse {
-            commits,
-            certifier_blocks,
-        }))
+        let commits = commits.into_iter().map(|c| c.serialized().clone()).collect();
+        let certifier_blocks = certifier_blocks.into_iter().map(|b| b.serialized().clone()).collect();
+        Ok(Response::new(FetchCommitsResponse { commits, certifier_blocks }))
     }
-
-    type FetchLatestBlocksStream =
-        Iter<std::vec::IntoIter<Result<FetchLatestBlocksResponse, tonic::Status>>>;
 
     async fn fetch_latest_blocks(
         &self,
         request: Request<FetchLatestBlocksRequest>,
     ) -> Result<Response<Self::FetchLatestBlocksStream>, tonic::Status> {
-        let Some(peer_index) = request
-            .extensions()
-            .get::<PeerInfo>()
-            .map(|p| p.authority_index)
-        else {
+        let Some(peer_index) = request.extensions().get::<PeerInfo>().map(|p| p.authority_index) else {
             return Err(tonic::Status::internal("PeerInfo not found"));
         };
         let inner = request.into_inner();
@@ -607,14 +533,8 @@ impl<S: NetworkService> ConsensusService for TonicServiceProxy<S> {
         // Convert the authority indexes and validate them
         let mut authorities = vec![];
         for authority in inner.authorities.into_iter() {
-            let Some(authority) = self
-                .context
-                .committee
-                .to_authority_index(authority as usize)
-            else {
-                return Err(tonic::Status::internal(format!(
-                    "Invalid authority index provided {authority}"
-                )));
+            let Some(authority) = self.context.committee.to_authority_index(authority as usize) else {
+                return Err(tonic::Status::internal(format!("Invalid authority index provided {authority}")));
             };
             authorities.push(authority);
         }
@@ -638,11 +558,7 @@ impl<S: NetworkService> ConsensusService for TonicServiceProxy<S> {
         &self,
         request: Request<GetLatestRoundsRequest>,
     ) -> Result<Response<GetLatestRoundsResponse>, tonic::Status> {
-        let Some(peer_index) = request
-            .extensions()
-            .get::<PeerInfo>()
-            .map(|p| p.authority_index)
-        else {
+        let Some(peer_index) = request.extensions().get::<PeerInfo>().map(|p| p.authority_index) else {
             return Err(tonic::Status::internal("PeerInfo not found"));
         };
         let (highest_received, highest_accepted) = self
@@ -650,10 +566,7 @@ impl<S: NetworkService> ConsensusService for TonicServiceProxy<S> {
             .handle_get_latest_rounds(peer_index)
             .await
             .map_err(|e| tonic::Status::internal(format!("{e:?}")))?;
-        Ok(Response::new(GetLatestRoundsResponse {
-            highest_received,
-            highest_accepted,
-        }))
+        Ok(Response::new(GetLatestRoundsResponse { highest_received, highest_accepted }))
     }
 }
 
@@ -695,12 +608,7 @@ impl<S: NetworkService> NetworkManager<S> for TonicManager {
     }
 
     async fn install_service(&mut self, service: Arc<S>) {
-        self.context
-            .metrics
-            .network_metrics
-            .network_type
-            .with_label_values(&["tonic"])
-            .set(1);
+        self.context.metrics.network_metrics.network_type.with_label_values(&["tonic"]).set(1);
 
         info!("Starting tonic service");
 
@@ -728,8 +636,7 @@ impl<S: NetworkService> NetworkManager<S> for TonicManager {
 
         let http = {
             let mut builder =
-                hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
-                    .http2_only();
+                hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new()).http2_only();
             builder
                 .http2()
                 .timer(TokioTimer::new())
@@ -745,11 +652,7 @@ impl<S: NetworkService> NetworkManager<S> for TonicManager {
             self.network_keypair.clone().private_key().into_inner(),
             certificate_server_name(&self.context),
             AllowPublicKeys::new(
-                self.context
-                    .committee
-                    .authorities()
-                    .map(|(_i, a)| a.network_key.clone().into_inner())
-                    .collect(),
+                self.context.committee.authorities().map(|(_i, a)| a.network_key.clone().into_inner()).collect(),
             ),
         );
         let tls_acceptor = TlsAcceptor::from(Arc::new(tls_server_config));
@@ -969,12 +872,7 @@ impl<S: NetworkService> NetworkManager<S> for TonicManager {
         let _ = self.shutdown_notif.notify();
         self.server.join_next().await;
 
-        self.context
-            .metrics
-            .network_metrics
-            .network_type
-            .with_label_values(&["tonic"])
-            .set(0);
+        self.context.metrics.network_metrics.network_type.with_label_values(&["tonic"]).set(0);
     }
 }
 
@@ -984,15 +882,9 @@ fn to_host_port_str(addr: &Multiaddr) -> Result<String, &'static str> {
     let mut iter = addr.iter();
 
     match (iter.next(), iter.next()) {
-        (Some(Protocol::Ip4(ipaddr)), Some(Protocol::Udp(port))) => {
-            Ok(format!("{}:{}", ipaddr, port))
-        }
-        (Some(Protocol::Ip6(ipaddr)), Some(Protocol::Udp(port))) => {
-            Ok(format!("{}:{}", ipaddr, port))
-        }
-        (Some(Protocol::Dns(hostname)), Some(Protocol::Udp(port))) => {
-            Ok(format!("{}:{}", hostname, port))
-        }
+        (Some(Protocol::Ip4(ipaddr)), Some(Protocol::Udp(port))) => Ok(format!("{}:{}", ipaddr, port)),
+        (Some(Protocol::Ip6(ipaddr)), Some(Protocol::Udp(port))) => Ok(format!("{}:{}", ipaddr, port)),
+        (Some(Protocol::Dns(hostname)), Some(Protocol::Udp(port))) => Ok(format!("{}:{}", hostname, port)),
 
         _ => {
             tracing::warn!("unsupported multiaddr: '{addr}'");
@@ -1053,14 +945,9 @@ struct ConnectionsInfo {
 
 impl ConnectionsInfo {
     fn new(context: Arc<Context>) -> Self {
-        let authority_key_to_index = context
-            .committee
-            .authorities()
-            .map(|(index, authority)| (authority.network_key.clone(), index))
-            .collect();
-        Self {
-            authority_key_to_index,
-        }
+        let authority_key_to_index =
+            context.committee.authorities().map(|(index, authority)| (authority.network_key.clone(), index)).collect();
+        Self { authority_key_to_index }
     }
 
     fn authority_index(&self, key: &NetworkPublicKey) -> Option<AuthorityIndex> {
@@ -1084,10 +971,7 @@ impl SizedRequest for http::request::Parts {
 
     fn route(&self) -> String {
         let path = self.uri.path();
-        path.rsplit_once('/')
-            .map(|(_, route)| route)
-            .unwrap_or("unknown")
-            .to_string()
+        path.rsplit_once('/').map(|(_, route)| route).unwrap_or("unknown").to_string()
     }
 }
 

@@ -1,23 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use diesel::prelude::*;
 use move_core_types::identifier::Identifier;
-
 use sui_json_rpc_types::{type_and_fields_from_move_event_data, BcsEvent, SuiEvent};
 use sui_package_resolver::{PackageStore, Resolver};
-use sui_types::base_types::{ObjectID, SuiAddress};
-use sui_types::digests::TransactionDigest;
-use sui_types::event::EventID;
-use sui_types::object::bounded_visitor::BoundedVisitor;
-use sui_types::parse_sui_struct_tag;
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    digests::TransactionDigest,
+    event::EventID,
+    object::bounded_visitor::BoundedVisitor,
+    parse_sui_struct_tag,
+};
 
-use crate::errors::IndexerError;
-use crate::schema::events;
-use crate::types::IndexedEvent;
+use crate::{errors::IndexerError, schema::events, types::IndexedEvent};
 
 #[derive(Queryable, QueryableByName, Selectable, Insertable, Debug, Clone)]
 #[diesel(table_name = events)]
@@ -87,30 +85,21 @@ impl StoredEvent {
         };
 
         let type_ = parse_sui_struct_tag(&self.event_type)?;
-        let move_type_layout = package_resolver
-            .type_layout(type_.clone().into())
-            .await
-            .map_err(|e| {
-                IndexerError::ResolveMoveStructError(format!(
-                    "Failed to convert to sui event with Error: {e}",
-                ))
-            })?;
+        let move_type_layout = package_resolver.type_layout(type_.clone().into()).await.map_err(|e| {
+            IndexerError::ResolveMoveStructError(format!("Failed to convert to sui event with Error: {e}",))
+        })?;
         let move_object = BoundedVisitor::deserialize_value(&self.bcs, &move_type_layout)
             .map_err(|e| IndexerError::SerdeError(e.to_string()))?;
-        let (_, parsed_json) = type_and_fields_from_move_event_data(move_object)
-            .map_err(|e| IndexerError::SerdeError(e.to_string()))?;
-        let tx_digest =
-            TransactionDigest::try_from(self.transaction_digest.as_slice()).map_err(|e| {
-                IndexerError::SerdeError(format!(
-                    "Failed to parse transaction digest: {:?}, error: {}",
-                    self.transaction_digest, e
-                ))
-            })?;
+        let (_, parsed_json) =
+            type_and_fields_from_move_event_data(move_object).map_err(|e| IndexerError::SerdeError(e.to_string()))?;
+        let tx_digest = TransactionDigest::try_from(self.transaction_digest.as_slice()).map_err(|e| {
+            IndexerError::SerdeError(format!(
+                "Failed to parse transaction digest: {:?}, error: {}",
+                self.transaction_digest, e
+            ))
+        })?;
         Ok(SuiEvent {
-            id: EventID {
-                tx_digest,
-                event_seq: self.event_sequence_number as u64,
-            },
+            id: EventID { tx_digest, event_seq: self.event_sequence_number as u64 },
             package_id,
             transaction_module: Identifier::from_str(&self.module)?,
             sender,
@@ -124,9 +113,10 @@ impl StoredEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
     use sui_types::event::Event;
+
+    use super::*;
 
     #[test]
     fn test_canonical_string_of_event_type() {

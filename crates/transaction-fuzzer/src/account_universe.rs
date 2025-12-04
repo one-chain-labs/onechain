@@ -4,11 +4,13 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::executor::{ExecutionResult, Executor};
+use std::{fmt, sync::Arc};
+
 use once_cell::sync::Lazy;
 use proptest::{prelude::*, strategy::Union};
-use std::{fmt, sync::Arc};
 use sui_types::{storage::ObjectStore, transaction::Transaction};
+
+use crate::executor::{ExecutionResult, Executor};
 
 mod account;
 mod helpers;
@@ -30,10 +32,7 @@ static UNIVERSE_SIZE: Lazy<usize> = Lazy::new(|| {
         },
         Err(env::VarError::NotPresent) => 30,
         Err(err) => {
-            panic!(
-                "Could not read universe size from the environment, aborting: {:?}",
-                err
-            );
+            panic!("Could not read universe size from the environment, aborting: {:?}", err);
         }
     }
 });
@@ -50,11 +49,7 @@ pub fn default_num_transactions() -> usize {
 pub trait AUTransactionGen: fmt::Debug {
     /// Applies this transaction onto the universe, updating balances within the universe as
     /// necessary. Returns a signed transaction that can be run on the VM and the execution status.
-    fn apply(
-        &self,
-        universe: &mut AccountUniverse,
-        exec: &mut Executor,
-    ) -> (Transaction, ExecutionResult);
+    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult);
 
     /// Creates an arced version of this transaction, suitable for dynamic dispatch.
     fn arced(self) -> Arc<dyn AUTransactionGen>
@@ -66,11 +61,7 @@ pub trait AUTransactionGen: fmt::Debug {
 }
 
 impl AUTransactionGen for Arc<dyn AUTransactionGen> {
-    fn apply(
-        &self,
-        universe: &mut AccountUniverse,
-        exec: &mut Executor,
-    ) -> (Transaction, ExecutionResult) {
+    fn apply(&self, universe: &mut AccountUniverse, exec: &mut Executor) -> (Transaction, ExecutionResult) {
         (**self).apply(universe, exec)
     }
 }
@@ -86,7 +77,7 @@ pub fn log_balance_strategy(min_balance: u64, max_balance: u64) -> impl Strategy
     let mut lower_bound: u64 = 0;
     let mut upper_bound: u64 = min_balance;
     loop {
-        strategies.push(lower_bound..upper_bound);
+        strategies.push(lower_bound .. upper_bound);
         if upper_bound >= max_balance {
             break;
         }
@@ -103,10 +94,8 @@ pub fn run_and_assert_universe(
     executor: &mut Executor,
 ) -> Result<(), TestCaseError> {
     let mut universe = universe.setup(executor);
-    let (transactions, expected_values): (Vec<_>, Vec<_>) = transaction_gens
-        .iter()
-        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe, executor))
-        .unzip();
+    let (transactions, expected_values): (Vec<_>, Vec<_>) =
+        transaction_gens.iter().map(|transaction_gen| transaction_gen.clone().apply(&mut universe, executor)).unzip();
     let outputs = executor.execute_transactions(transactions);
     prop_assert_eq!(outputs.len(), expected_values.len());
 
@@ -122,22 +111,16 @@ pub fn run_and_assert_universe(
     assert_accounts_match(&universe, executor)
 }
 
-pub fn assert_accounts_match(
-    universe: &AccountUniverse,
-    executor: &Executor,
-) -> Result<(), TestCaseError> {
+pub fn assert_accounts_match(universe: &AccountUniverse, executor: &Executor) -> Result<(), TestCaseError> {
     let state = executor.state.clone();
     let backing_package_store = state.get_backing_package_store();
     let object_store = state.get_object_store();
     let epoch_store = state.load_epoch_store_one_call_per_task();
-    let mut layout_resolver = epoch_store
-        .executor()
-        .type_layout_resolver(Box::new(backing_package_store.as_ref()));
+    let mut layout_resolver = epoch_store.executor().type_layout_resolver(Box::new(backing_package_store.as_ref()));
     for (idx, account) in universe.accounts().iter().enumerate() {
         for (balance_idx, acc_object) in account.current_coins.iter().enumerate() {
             let object = object_store.get_object(&acc_object.id()).unwrap();
-            let total_oct_value =
-                object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            let total_oct_value = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
             let account_balance_i = account.current_balances[balance_idx];
             prop_assert_eq!(
                 account_balance_i,

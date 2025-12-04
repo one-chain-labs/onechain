@@ -1,19 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::system_state_observer::SystemStateObserver;
-use crate::workloads::payload::Payload;
-use crate::workloads::{Gas, GasCoinConfig};
-use crate::ValidatorProxy;
+use std::{str::FromStr, sync::Arc};
+
 use anyhow::anyhow;
 use async_trait::async_trait;
-use rand::distributions::{Distribution, Standard};
-use rand::Rng;
-use std::str::FromStr;
-use std::sync::Arc;
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+};
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 use sui_types::gas_coin::MIST_PER_OCT;
+
+use crate::{
+    system_state_observer::SystemStateObserver,
+    workloads::{payload::Payload, Gas, GasCoinConfig},
+    ValidatorProxy,
+};
 
 // This is the maximum gas we will transfer from primary coin into any gas coin
 // for running the benchmark
@@ -47,18 +51,12 @@ impl TryFrom<u32> for ExpectedFailureType {
         match value {
             0 => {
                 let mut rng = rand::thread_rng();
-                let n = rng.gen_range(1..ExpectedFailureType::COUNT - 1);
+                let n = rng.gen_range(1 .. ExpectedFailureType::COUNT - 1);
                 Ok(ExpectedFailureType::iter().nth(n).unwrap())
             }
-            _ => ExpectedFailureType::iter()
-                .nth(value as usize)
-                .ok_or_else(|| {
-                    anyhow!(
-                        "Invalid failure type specifier. Valid options are {} to {}",
-                        0,
-                        ExpectedFailureType::COUNT
-                    )
-                }),
+            _ => ExpectedFailureType::iter().nth(value as usize).ok_or_else(|| {
+                anyhow!("Invalid failure type specifier. Valid options are {} to {}", 0, ExpectedFailureType::COUNT)
+            }),
         }
     }
 }
@@ -73,17 +71,14 @@ impl FromStr for ExpectedFailureType {
             return Ok(q);
         }
 
-        Err(anyhow!(
-            "Invalid input string. Valid values are 0 to {}",
-            ExpectedFailureType::COUNT
-        ))
+        Err(anyhow!("Invalid input string. Valid values are 0 to {}", ExpectedFailureType::COUNT))
     }
 }
 
 impl Distribution<ExpectedFailureType> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> ExpectedFailureType {
         // Exclude the "Random" variant
-        let n = rng.gen_range(1..ExpectedFailureType::COUNT);
+        let n = rng.gen_range(1 .. ExpectedFailureType::COUNT);
         ExpectedFailureType::iter().nth(n).unwrap()
     }
 }

@@ -1,39 +1,44 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::gas_charger::GasCharger;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::language_storage::StructTag;
-use move_core_types::resolver::ResourceResolver;
-use parking_lot::RwLock;
 use std::collections::{BTreeMap, HashSet};
+
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag, resolver::ResourceResolver};
+use parking_lot::RwLock;
 use sui_protocol_config::ProtocolConfig;
-use sui_types::committee::EpochId;
-use sui_types::effects::{TransactionEffects, TransactionEvents};
-use sui_types::execution::{DynamicallyLoadedObjectMetadata, ExecutionResults, SharedInput};
-use sui_types::execution_config_utils::to_binary_config;
-use sui_types::execution_status::ExecutionStatus;
-use sui_types::inner_temporary_store::InnerTemporaryStore;
-use sui_types::layout_resolver::LayoutResolver;
-use sui_types::storage::{BackingStore, DeleteKindWithOldVersion, DenyListResult, PackageObject};
-use sui_types::sui_system_state::{get_sui_system_state_wrapper, AdvanceEpochParams};
 use sui_types::{
-    base_types::{
-        ObjectDigest, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest,
-        VersionDigest,
-    },
+    base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest, VersionDigest},
+    committee::EpochId,
+    effects::{TransactionEffects, TransactionEvents},
     error::{ExecutionError, SuiError, SuiResult},
     event::Event,
+    execution::{DynamicallyLoadedObjectMetadata, ExecutionResults, SharedInput},
+    execution_config_utils::to_binary_config,
+    execution_status::ExecutionStatus,
     fp_bail,
     gas::GasCostSummary,
-    object::Owner,
-    object::{Data, Object},
+    inner_temporary_store::InnerTemporaryStore,
+    is_system_package,
+    layout_resolver::LayoutResolver,
+    object::{Data, Object, Owner},
     storage::{
-        BackingPackageStore, ChildObjectResolver, ObjectChange, ParentSync, Storage, WriteKind,
+        BackingPackageStore,
+        BackingStore,
+        ChildObjectResolver,
+        DeleteKindWithOldVersion,
+        DenyListResult,
+        ObjectChange,
+        PackageObject,
+        ParentSync,
+        Storage,
+        WriteKind,
     },
+    sui_system_state::{get_sui_system_state_wrapper, AdvanceEpochParams},
     transaction::InputObjects,
+    SUI_SYSTEM_STATE_OBJECT_ID,
 };
-use sui_types::{is_system_package, SUI_SYSTEM_STATE_OBJECT_ID};
+
+use crate::gas_charger::GasCharger;
 
 pub struct TemporaryStore<'backing> {
     // The backing store for retrieving Move packages onchain.
@@ -125,10 +130,7 @@ impl<'backing> TemporaryStore<'backing> {
             // Record the version that the shared object was created at in its owner field.  Note,
             // this only works because shared objects must be created as shared (not created as
             // owned in one transaction and later converted to shared in another).
-            if let Owner::Shared {
-                initial_shared_version,
-            } = &mut obj.owner
-            {
+            if let Owner::Shared { initial_shared_version } = &mut obj.owner {
                 if *kind == WriteKind::Create {
                     assert_eq!(
                         *initial_shared_version,
@@ -146,11 +148,7 @@ impl<'backing> TemporaryStore<'backing> {
         InnerTemporaryStore {
             input_objects: self.input_objects,
             mutable_inputs: self.mutable_input_refs,
-            written: self
-                .written
-                .into_iter()
-                .map(|(id, (obj, _))| (id, obj))
-                .collect(),
+            written: self.written.into_iter().map(|(id, (obj, _))| (id, obj)).collect(),
             events: TransactionEvents { data: self.events },
             loaded_runtime_objects: self.loaded_child_objects,
             runtime_packages_loaded_from_db: self.runtime_packages_loaded_from_db.into_inner(),
@@ -210,23 +208,15 @@ impl<'backing> TemporaryStore<'backing> {
         let mut unwrapped_then_deleted = vec![];
         for (id, kind) in &self.deleted {
             match kind {
-                DeleteKindWithOldVersion::Normal(_) => deleted.push((
-                    *id,
-                    self.lamport_timestamp,
-                    ObjectDigest::OBJECT_DIGEST_DELETED,
-                )),
-                DeleteKindWithOldVersion::UnwrapThenDelete
-                | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => unwrapped_then_deleted
-                    .push((
-                        *id,
-                        self.lamport_timestamp,
-                        ObjectDigest::OBJECT_DIGEST_DELETED,
-                    )),
-                DeleteKindWithOldVersion::Wrap(_) => wrapped.push((
-                    *id,
-                    self.lamport_timestamp,
-                    ObjectDigest::OBJECT_DIGEST_WRAPPED,
-                )),
+                DeleteKindWithOldVersion::Normal(_) => {
+                    deleted.push((*id, self.lamport_timestamp, ObjectDigest::OBJECT_DIGEST_DELETED))
+                }
+                DeleteKindWithOldVersion::UnwrapThenDelete | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => {
+                    unwrapped_then_deleted.push((*id, self.lamport_timestamp, ObjectDigest::OBJECT_DIGEST_DELETED))
+                }
+                DeleteKindWithOldVersion::Wrap(_) => {
+                    wrapped.push((*id, self.lamport_timestamp, ObjectDigest::OBJECT_DIGEST_WRAPPED))
+                }
             }
         }
 
@@ -238,10 +228,7 @@ impl<'backing> TemporaryStore<'backing> {
             let (object, _kind) = &self.written[&coin_id];
             (object.compute_object_reference(), object.owner.clone())
         } else {
-            (
-                (ObjectID::ZERO, SequenceNumber::default(), ObjectDigest::MIN),
-                Owner::AddressOwner(SuiAddress::default()),
-            )
+            ((ObjectID::ZERO, SequenceNumber::default(), ObjectDigest::MIN), Owner::AddressOwner(SuiAddress::default()))
         };
 
         let mut mutated = vec![];
@@ -286,11 +273,7 @@ impl<'backing> TemporaryStore<'backing> {
             unwrapped_then_deleted,
             wrapped,
             updated_gas_object_info,
-            if inner.events.data.is_empty() {
-                None
-            } else {
-                Some(inner.events.digest())
-            },
+            if inner.events.data.is_empty() { None } else { Some(inner.events.digest()) },
             transaction_dependencies,
         );
         (inner, effects)
@@ -322,21 +305,15 @@ impl<'backing> TemporaryStore<'backing> {
         );
 
         debug_assert!(
-            {
-                self.written
-                    .iter()
-                    .all(|(_, (obj, _))| obj.previous_transaction == self.tx_digest)
-            },
+            { self.written.iter().all(|(_, (obj, _))| obj.previous_transaction == self.tx_digest) },
             "Object previous transaction not properly set",
         );
 
         if self.protocol_config.simplified_unwrap_then_delete() {
-            debug_assert!(self.deleted.iter().all(|(_, kind)| {
-                !matches!(
-                    kind,
-                    DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_)
-                )
-            }));
+            debug_assert!(self
+                .deleted
+                .iter()
+                .all(|(_, kind)| { !matches!(kind, DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_)) }));
         } else {
             debug_assert!(self
                 .deleted
@@ -367,9 +344,7 @@ impl<'backing> TemporaryStore<'backing> {
         // lamport timestamp invariant (that a transaction's lamport timestamp is strictly greater
         // than all versions witnessed by the transaction).
         debug_assert!(
-            kind != WriteKind::Create
-                || object.is_immutable()
-                || object.version() == SequenceNumber::MIN,
+            kind != WriteKind::Create || object.is_immutable() || object.version() == SequenceNumber::MIN,
             "Created mutable objects should not have a version set",
         );
 
@@ -393,7 +368,9 @@ impl<'backing> TemporaryStore<'backing> {
                 // In addition, gas objects should never be immutable, so gas smashing
                 // should not allow us to delete immutable objects
                 let digest = self.tx_digest;
-                panic!("Internal invariant violation in tx {digest}: Deleting immutable object {id}, delete kind {kind:?}")
+                panic!(
+                    "Internal invariant violation in tx {digest}: Deleting immutable object {id}, delete kind {kind:?}"
+                )
             }
         }
 
@@ -415,10 +392,7 @@ impl<'backing> TemporaryStore<'backing> {
     pub fn read_object(&self, id: &ObjectID) -> Option<&Object> {
         // there should be no read after delete
         debug_assert!(!self.deleted.contains_key(id));
-        self.written
-            .get(id)
-            .map(|(obj, _kind)| obj)
-            .or_else(|| self.input_objects.get(id))
+        self.written.get(id).map(|(obj, _kind)| obj).or_else(|| self.input_objects.get(id))
     }
 
     pub fn apply_object_changes(&mut self, changes: BTreeMap<ObjectID, ObjectChange>) {
@@ -463,9 +437,7 @@ impl<'backing> TemporaryStore<'backing> {
     }
 
     pub fn written_objects_size(&self) -> usize {
-        self.written
-            .iter()
-            .fold(0, |sum, obj| sum + obj.1 .0.object_size_for_gas_metering())
+        self.written.iter().fold(0, |sum, obj| sum + obj.1 .0.object_size_for_gas_metering())
     }
 
     /// If there are unmetered storage rebate (due to system transaction), we put them into
@@ -477,10 +449,7 @@ impl<'backing> TemporaryStore<'backing> {
             // And there is no storage rebate that needs distribution anyway.
             return;
         }
-        tracing::debug!(
-            "Amount of unmetered storage rebate from system tx: {:?}",
-            unmetered_storage_rebate
-        );
+        tracing::debug!("Amount of unmetered storage rebate from system tx: {:?}", unmetered_storage_rebate);
         let mut system_state_wrapper = self
             .read_object(&SUI_SYSTEM_STATE_OBJECT_ID)
             .expect("0x5 object must be muated in system tx with unmetered storage rebate")
@@ -549,9 +518,10 @@ impl<'backing> TemporaryStore<'backing> {
                 WriteKind::Mutate => {
                     // get owner at beginning of tx, since that's what we have to authenticate against
                     // _new_obj.owner is not relevant here
-                    let old_obj = self.store.get_object(id).unwrap_or_else(|| {
-                        panic!("Mutated object must exist in the store: ID = {:?}", id)
-                    });
+                    let old_obj = self
+                        .store
+                        .get_object(id)
+                        .unwrap_or_else(|| panic!("Mutated object must exist in the store: ID = {:?}", id));
                     match &old_obj.owner {
                         Owner::ObjectOwner(_parent) => {
                             objs_to_authenticate.push(*id);
@@ -563,10 +533,7 @@ impl<'backing> TemporaryStore<'backing> {
                             assert!(is_epoch_change, "Immutable objects cannot be written, except for Sui Framework/Move stdlib upgrades at epoch change boundaries");
                             // Note: this assumes that the only immutable objects an epoch change tx can update are system packages,
                             // but in principle we could allow others.
-                            assert!(
-                                is_system_package(*id),
-                                "Only system packages can be upgraded"
-                            );
+                            assert!(is_system_package(*id), "Only system packages can be upgraded");
                         }
                         Owner::ConsensusV2 { .. } => {
                             unimplemented!("ConsensusV2 does not exist for this execution version")
@@ -601,8 +568,7 @@ impl<'backing> TemporaryStore<'backing> {
                         }
                     }
                 }
-                DeleteKindWithOldVersion::UnwrapThenDelete
-                | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => {
+                DeleteKindWithOldVersion::UnwrapThenDelete | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => {
                     // unwrapped-then-deleted object was not an input to the tx,
                     // no ownership checks needed
                 }
@@ -665,10 +631,7 @@ impl<'backing> TemporaryStore<'backing> {
             obj.storage_rebate
         } else {
             // not a lot we can do safely and under this condition everything is broken
-            panic!(
-                "Looking up storage rebate of mutated object {:?} should not fail",
-                id
-            )
+            panic!("Looking up storage rebate of mutated object {:?} should not fail", id)
         }
     }
 
@@ -678,9 +641,7 @@ impl<'backing> TemporaryStore<'backing> {
                 .read_object(&gas_object_id)
                 .expect("We constructed the object map so it should always have the gas object id")
                 .clone();
-            self.written
-                .entry(gas_object_id)
-                .or_insert_with(|| (gas_object, WriteKind::Mutate));
+            self.written.entry(gas_object_id).or_insert_with(|| (gas_object, WriteKind::Mutate));
         }
         self.ensure_active_inputs_mutated();
     }
@@ -703,9 +664,7 @@ impl<'backing> TemporaryStore<'backing> {
                     } else {
                         // else, this is a dynamic field, not an input object
                         let expected_version = object.version();
-                        if let Some(old_obj) =
-                            self.store.get_object_by_key(object_id, expected_version)
-                        {
+                        if let Some(old_obj) = self.store.get_object_by_key(object_id, expected_version) {
                             old_obj.storage_rebate
                         } else {
                             // not a lot we can do safely and under this condition everything is broken
@@ -717,8 +676,7 @@ impl<'backing> TemporaryStore<'backing> {
             // new object size
             let new_object_size = object.object_size_for_gas_metering();
             // track changes and compute the new object `storage_rebate`
-            let new_storage_rebate =
-                gas_charger.track_storage_mutation(*object_id, new_object_size, old_storage_rebate);
+            let new_storage_rebate = gas_charger.track_storage_mutation(*object_id, new_object_size, old_storage_rebate);
             object.storage_rebate = new_storage_rebate;
             if !object.is_immutable() {
                 objects_to_update.push((object.clone(), *write_kind));
@@ -737,14 +695,12 @@ impl<'backing> TemporaryStore<'backing> {
     pub(crate) fn collect_rebate(&self, gas_charger: &mut GasCharger) {
         for (object_id, kind) in &self.deleted {
             match kind {
-                DeleteKindWithOldVersion::Wrap(version)
-                | DeleteKindWithOldVersion::Normal(version) => {
+                DeleteKindWithOldVersion::Wrap(version) | DeleteKindWithOldVersion::Normal(version) => {
                     // get and track the deleted object `storage_rebate`
                     let storage_rebate = self.get_input_storage_rebate(object_id, *version);
                     gas_charger.track_storage_mutation(*object_id, 0, storage_rebate);
                 }
-                DeleteKindWithOldVersion::UnwrapThenDelete
-                | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => {
+                DeleteKindWithOldVersion::UnwrapThenDelete | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => {
                     // an unwrapped object does not have a storage rebate, we will charge for storage changes via its wrapper object
                 }
             }
@@ -756,15 +712,10 @@ impl<'backing> TemporaryStore<'backing> {
 //==============================================================================
 
 impl<'backing> TemporaryStore<'backing> {
-    pub fn advance_epoch_safe_mode(
-        &mut self,
-        params: &AdvanceEpochParams,
-        protocol_config: &ProtocolConfig,
-    ) {
-        let wrapper = get_sui_system_state_wrapper(self.store.as_object_store())
-            .expect("System state wrapper object must exist");
-        let (new_object, _) =
-            wrapper.advance_epoch_safe_mode(params, self.store.as_object_store(), protocol_config);
+    pub fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams, protocol_config: &ProtocolConfig) {
+        let wrapper =
+            get_sui_system_state_wrapper(self.store.as_object_store()).expect("System state wrapper object must exist");
+        let (new_object, _) = wrapper.advance_epoch_safe_mode(params, self.store.as_object_store(), protocol_config);
         self.write_object(new_object, WriteKind::Mutate);
     }
 }
@@ -798,9 +749,7 @@ impl<'backing> TemporaryStore<'backing> {
         } else {
             // not in input objects, must be a dynamic field
             let Some(obj) = self.store.get_object_by_key(id, expected_version) else {
-                invariant_violation!(
-                    "Failed looking up dynamic field {id} in OCT conservation checking"
-                );
+                invariant_violation!("Failed looking up dynamic field {id} in OCT conservation checking");
             };
             obj.get_total_oct(layout_resolver).map_err(|e| {
                 make_invariant_violation!(
@@ -829,13 +778,13 @@ impl<'backing> TemporaryStore<'backing> {
                 WriteKind::Create | WriteKind::Unwrap => (*id, None, Some(object)),
             })
             .chain(self.deleted.iter().filter_map(|(id, kind)| match kind {
-                DeleteKindWithOldVersion::Normal(version)
-                | DeleteKindWithOldVersion::Wrap(version) => {
+                DeleteKindWithOldVersion::Normal(version) | DeleteKindWithOldVersion::Wrap(version) => {
                     let storage_rebate = self.get_input_storage_rebate(id, *version);
                     Some((*id, Some((*version, storage_rebate)), None))
                 }
-                DeleteKindWithOldVersion::UnwrapThenDelete
-                | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => None,
+                DeleteKindWithOldVersion::UnwrapThenDelete | DeleteKindWithOldVersion::UnwrapThenDeleteDEPRECATED(_) => {
+                    None
+                }
             }))
             .collect()
     }
@@ -901,25 +850,22 @@ impl<'backing> TemporaryStore<'backing> {
             // note: storage_cost flows into the storage_rebate field of the output objects, which is why it is not accounted for here.
             // similarly, all of the storage_rebate *except* the storage_fund_rebate_inflow gets credited to the gas coin
             // both computation costs and storage rebate inflow are
-            total_output_oct +=
-                gas_summary.computation_cost + gas_summary.non_refundable_storage_fee;
+            total_output_oct += gas_summary.computation_cost + gas_summary.non_refundable_storage_fee;
             if let Some((epoch_fees, epoch_rebates)) = advance_epoch_gas_summary {
                 total_input_oct += epoch_fees;
                 total_output_oct += epoch_rebates;
             }
             if total_input_oct != total_output_oct {
-                return Err(ExecutionError::invariant_violation(
-                format!("OCT conservation failed: input={}, output={}, this transaction either mints or burns OCT",
-                total_input_oct,
-                total_output_oct))
-            );
+                return Err(ExecutionError::invariant_violation(format!(
+                    "OCT conservation failed: input={}, output={}, this transaction either mints or burns OCT",
+                    total_input_oct, total_output_oct
+                )));
             }
         }
 
         // all OCT in storage rebate fields of input objects should flow either to the transaction storage rebate, or the non-refundable
         // storage rebate pool
-        if total_input_rebate != gas_summary.storage_rebate + gas_summary.non_refundable_storage_fee
-        {
+        if total_input_rebate != gas_summary.storage_rebate + gas_summary.non_refundable_storage_fee {
             // TODO: re-enable once we fix the edge case with OOG, gas smashing, and storage rebate
             /*return Err(ExecutionError::invariant_violation(
                 format!("OCT conservation failed--{} OCT in storage rebate field of input objects, {} OCT in tx storage rebate or tx non-refundable storage rebate",
@@ -954,8 +900,7 @@ impl<'backing> ChildObjectResolver for TemporaryStore<'backing> {
         if obj_opt.is_some() {
             Ok(obj_opt.cloned())
         } else {
-            self.store
-                .read_child_object(parent, child, child_version_upper_bound)
+            self.store.read_child_object(parent, child, child_version_upper_bound)
         }
     }
 
@@ -970,12 +915,7 @@ impl<'backing> ChildObjectResolver for TemporaryStore<'backing> {
         // transaction since `Receiving` doesn't have copy.
         debug_assert!(!self.deleted.contains_key(receiving_object_id));
         debug_assert!(!self.written.contains_key(receiving_object_id));
-        self.store.get_object_received_at_version(
-            owner,
-            receiving_object_id,
-            receive_object_at_version,
-            epoch_id,
-        )
+        self.store.get_object_received_at_version(owner, receiving_object_id, receive_object_at_version, epoch_id)
     }
 }
 
@@ -1005,17 +945,11 @@ impl<'backing> Storage for TemporaryStore<'backing> {
         TemporaryStore::save_loaded_runtime_objects(self, loaded_runtime_objects)
     }
 
-    fn save_wrapped_object_containers(
-        &mut self,
-        _wrapped_object_containers: BTreeMap<ObjectID, ObjectID>,
-    ) {
+    fn save_wrapped_object_containers(&mut self, _wrapped_object_containers: BTreeMap<ObjectID, ObjectID>) {
         unreachable!("Unused in v0")
     }
 
-    fn check_coin_deny_list(
-        &self,
-        _written_objects: &BTreeMap<ObjectID, Object>,
-    ) -> DenyListResult {
+    fn check_coin_deny_list(&self, _written_objects: &BTreeMap<ObjectID, Object>) -> DenyListResult {
         unreachable!("Coin denylist v2 is not supported in sui-execution v0");
     }
 }
@@ -1028,16 +962,10 @@ impl<'backing> BackingPackageStore for TemporaryStore<'backing> {
             self.store.get_package_object(package_id).inspect(|obj| {
                 // Track object but leave unchanged
                 if let Some(v) = obj {
-                    if !self
-                        .runtime_packages_loaded_from_db
-                        .read()
-                        .contains_key(package_id)
-                    {
+                    if !self.runtime_packages_loaded_from_db.read().contains_key(package_id) {
                         // TODO: Can this lock ever block execution?
                         // TODO: Why do we need a RwLock anyway???
-                        self.runtime_packages_loaded_from_db
-                            .write()
-                            .insert(*package_id, v.clone());
+                        self.runtime_packages_loaded_from_db.write().insert(*package_id, v.clone());
                     }
                 }
             })
@@ -1048,11 +976,7 @@ impl<'backing> BackingPackageStore for TemporaryStore<'backing> {
 impl<'backing> ResourceResolver for TemporaryStore<'backing> {
     type Error = SuiError;
 
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_resource(&self, address: &AccountAddress, struct_tag: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
         let object = match self.read_object(&ObjectID::from(*address)) {
             Some(x) => x,
             None => match self.read_object(&ObjectID::from(*address)) {
@@ -1075,10 +999,7 @@ impl<'backing> ResourceResolver for TemporaryStore<'backing> {
                 );
                 Ok(Some(m.contents().to_vec()))
             }
-            other => unimplemented!(
-                "Bad object lookup: expected Move object, but got {:?}",
-                other
-            ),
+            other => unimplemented!("Bad object lookup: expected Move object, but got {:?}", other),
         }
     }
 }

@@ -16,10 +16,7 @@ use move_binary_format::CompiledModule;
 use move_bytecode_source_map::utils::source_map_from_file;
 use move_command_line_common::{
     env::MOVE_HOME,
-    files::{
-        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
-        SOURCE_MAP_EXTENSION,
-    },
+    files::{extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION},
 };
 use move_compiler::{
     compiled_unit::NamedCompiledModule,
@@ -27,9 +24,7 @@ use move_compiler::{
     shared::{files::FileName, NumericalAddress},
 };
 use move_package::{
-    compilation::{
-        compiled_package::CompiledUnitWithSource, package_layout::CompiledPackageLayout,
-    },
+    compilation::{compiled_package::CompiledUnitWithSource, package_layout::CompiledPackageLayout},
     lock_file::schema::{Header, ToolchainVersion},
     source_package::{layout::SourcePackageLayout, parsed_manifest::PackageName},
 };
@@ -53,11 +48,7 @@ pub(crate) fn current_toolchain() -> ToolchainVersion {
 }
 
 pub(crate) fn legacy_toolchain() -> ToolchainVersion {
-    ToolchainVersion {
-        compiler_version: LEGACY_COMPILER_VERSION.into(),
-        edition: Edition::LEGACY,
-        flavor: Flavor::Sui,
-    }
+    ToolchainVersion { compiler_version: LEGACY_COMPILER_VERSION.into(), edition: Edition::LEGACY, flavor: Flavor::Sui }
 }
 
 /// Ensures `compiled_units` are compiled with the right compiler version, based on
@@ -70,8 +61,7 @@ pub(crate) fn units_for_toolchain(
     if std::env::var("SUI_RUN_TOOLCHAIN_BUILD").is_err() {
         return Ok(compiled_units.clone());
     }
-    let mut package_version_map: HashMap<Symbol, (ToolchainVersion, Vec<CompiledUnitWithSource>)> =
-        HashMap::new();
+    let mut package_version_map: HashMap<Symbol, (ToolchainVersion, Vec<CompiledUnitWithSource>)> = HashMap::new();
     // First iterate over packages, mapping the required version for each package in `package_version_map`.
     for (package, local_unit) in compiled_units {
         if let Some((_, units)) = package_version_map.get_mut(package) {
@@ -110,16 +100,12 @@ pub(crate) fn units_for_toolchain(
             // No ToolchainVersion and new Move.lock version implies current compiler.
             None => {
                 debug!("{package} on current compiler @ {CURRENT_COMPILER_VERSION}",);
-                package_version_map
-                    .insert(*package, (current_toolchain(), vec![local_unit.clone()]));
+                package_version_map.insert(*package, (current_toolchain(), vec![local_unit.clone()]));
             }
             // This dependency uses the current compiler.
-            Some(ToolchainVersion {
-                compiler_version, ..
-            }) if compiler_version == CURRENT_COMPILER_VERSION => {
+            Some(ToolchainVersion { compiler_version, .. }) if compiler_version == CURRENT_COMPILER_VERSION => {
                 debug!("{package} on current compiler @ {CURRENT_COMPILER_VERSION}",);
-                package_version_map
-                    .insert(*package, (current_toolchain(), vec![local_unit.clone()]));
+                package_version_map.insert(*package, (current_toolchain(), vec![local_unit.clone()]));
             }
             // This dependency needs a prior compiler. Mark it and compile.
             Some(toolchain_version) => {
@@ -147,21 +133,13 @@ pub(crate) fn units_for_toolchain(
         }
         let package_root = SourcePackageLayout::try_find_root(&local_units[0].source_path)?;
         let install_dir = tempfile::tempdir()?; // place compiled packages in this temp dir, don't pollute this packages build dir
-        download_and_compile(
-            package_root.clone(),
-            &install_dir,
-            &toolchain_version,
-            &package,
-        )?;
+        download_and_compile(package_root.clone(), &install_dir, &toolchain_version, &package)?;
 
         let compiled_unit_paths = vec![package_root.clone()];
-        let compiled_units = find_filenames(&compiled_unit_paths, |path| {
-            extension_equals(path, MOVE_COMPILED_EXTENSION)
-        })?;
-        let build_path = install_dir
-            .path()
-            .join(CompiledPackageLayout::path(&CompiledPackageLayout::Root))
-            .join(package.as_str());
+        let compiled_units =
+            find_filenames(&compiled_unit_paths, |path| extension_equals(path, MOVE_COMPILED_EXTENSION))?;
+        let build_path =
+            install_dir.path().join(CompiledPackageLayout::path(&CompiledPackageLayout::Root)).join(package.as_str());
         debug!("build path is {}", build_path.display());
 
         // Add all units compiled with the previous compiler.
@@ -177,11 +155,7 @@ pub(crate) fn units_for_toolchain(
 fn download_and_compile(
     root: PathBuf,
     install_dir: &TempDir,
-    ToolchainVersion {
-        compiler_version,
-        edition,
-        flavor,
-    }: &ToolchainVersion,
+    ToolchainVersion { compiler_version, edition, flavor }: &ToolchainVersion,
     dep_name: &Symbol,
 ) -> anyhow::Result<()> {
     let dest_dir = PathBuf::from_iter([&*MOVE_HOME, "binaries"]); // E.g., ~/.move/binaries
@@ -232,8 +206,7 @@ fn download_and_compile(
         let dest_tarball = dest_version.join(format!("{}.tgz", compiler_version));
         debug!("tarball destination: {} ", dest_tarball.display());
         if let Some(parent) = dest_tarball.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| anyhow!("failed to create directory for tarball: {e}"))?;
+            std::fs::create_dir_all(parent).map_err(|e| anyhow!("failed to create directory for tarball: {e}"))?;
         }
         let mut dest_file = File::create(&dest_tarball)?;
         io::copy(&mut response, &mut dest_file)?;
@@ -242,9 +215,7 @@ fn download_and_compile(
         let tar_gz = File::open(&dest_tarball)?;
         let tar = flate2::read::GzDecoder::new(tar_gz);
         let mut archive = Archive::new(tar);
-        archive
-            .unpack(&dest_version)
-            .map_err(|e| anyhow!("failed to untar compiler binary: {e}"))?;
+        archive.unpack(&dest_version).map_err(|e| anyhow!("failed to untar compiler binary: {e}"))?;
 
         let mut dest_binary = dest_version.clone();
         dest_binary.extend(["target", "release"]);
@@ -266,12 +237,7 @@ fn download_and_compile(
         root.display(),
         install_dir.path().display(),
     );
-    info!(
-        "{} {} (compiler @ {})",
-        "BUILDING".bold().green(),
-        dep_name.as_str(),
-        compiler_version.yellow()
-    );
+    info!("{} {} (compiler @ {})", "BUILDING".bold().green(), dep_name.as_str(), compiler_version.yellow());
     Command::new(dest_canonical_binary)
         .args([
             OsStr::new("move"),
@@ -286,17 +252,11 @@ fn download_and_compile(
             OsStr::new(install_dir.path()),
         ])
         .output()
-        .map_err(|e| {
-            anyhow!("failed to build package from compiler binary {compiler_version}: {e}",)
-        })?;
+        .map_err(|e| anyhow!("failed to build package from compiler binary {compiler_version}: {e}",))?;
     Ok(())
 }
 
-fn detect_platform(
-    package_path: &Path,
-    compiler_version: &String,
-    dest_dir: &Path,
-) -> anyhow::Result<String> {
+fn detect_platform(package_path: &Path, compiler_version: &String, dest_dir: &Path) -> anyhow::Result<String> {
     let s = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("macos", "aarch64") => "macos-arm64",
         ("macos", "x86_64") => "macos-x86_64",
@@ -323,8 +283,7 @@ fn detect_platform(
 
 #[cfg(unix)]
 fn set_executable_permission(path: &OsStr) -> anyhow::Result<()> {
-    use std::fs;
-    use std::os::unix::prelude::PermissionsExt;
+    use std::{fs, os::unix::prelude::PermissionsExt};
     let mut perms = fs::metadata(path)?.permissions();
     perms.set_mode(0o755);
     fs::set_permissions(path, perms)?;
@@ -333,9 +292,7 @@ fn set_executable_permission(path: &OsStr) -> anyhow::Result<()> {
 
 #[cfg(not(unix))]
 fn set_executable_permission(path: &OsStr) -> anyhow::Result<()> {
-    Command::new("icacls")
-        .args([path, OsStr::new("/grant"), OsStr::new("Everyone:(RX)")])
-        .status()?;
+    Command::new("icacls").args([path, OsStr::new("/grant"), OsStr::new("Everyone:(RX)")]).status()?;
     Ok(())
 }
 
@@ -354,10 +311,8 @@ fn decode_bytecode_file(
             .join(&path_to_file)
             .with_extension(SOURCE_MAP_EXTENSION),
     )?;
-    let source_path = &root_path
-        .join(CompiledPackageLayout::Sources.path())
-        .join(path_to_file)
-        .with_extension(MOVE_EXTENSION);
+    let source_path =
+        &root_path.join(CompiledPackageLayout::Sources.path()).join(path_to_file).with_extension(MOVE_EXTENSION);
     ensure!(
         source_path.is_file(),
         "Error decoding package: Unable to find corresponding source file for '{bytecode_path_str}' in package {package_name}"
@@ -365,10 +320,7 @@ fn decode_bytecode_file(
     let module = CompiledModule::deserialize_with_defaults(&bytecode_bytes)?;
     let (address_bytes, module_name) = {
         let id = module.self_id();
-        let parsed_addr = NumericalAddress::new(
-            id.address().into_bytes(),
-            move_compiler::shared::NumberFormat::Hex,
-        );
+        let parsed_addr = NumericalAddress::new(id.address().into_bytes(), move_compiler::shared::NumberFormat::Hex);
         let module_name = FileName::from(id.name().as_str());
         (parsed_addr, module_name)
     };
@@ -380,8 +332,5 @@ fn decode_bytecode_file(
         source_map,
         address_name: None,
     };
-    Ok(CompiledUnitWithSource {
-        unit,
-        source_path: source_path.clone(),
-    })
+    Ok(CompiledUnitWithSource { unit, source_path: source_path.clone() })
 }

@@ -12,28 +12,27 @@ use lru::LruCache;
 use mysten_common::fatal;
 use mysten_metrics::monitored_scope;
 use parking_lot::RwLock;
+use sui_config::node::AuthorityOverloadConfig;
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, TransactionDigest},
     committee::EpochId,
     digests::TransactionEffectsDigest,
     error::{SuiError, SuiResult},
+    executable_transaction::VerifiedExecutableTransaction,
+    fp_bail,
     fp_ensure,
     message_envelope::Message,
     storage::InputKey,
-    transaction::{TransactionDataAPI, VerifiedCertificate},
+    transaction::{SenderSignedData, TransactionDataAPI, VerifiedCertificate},
 };
-use sui_types::{executable_transaction::VerifiedExecutableTransaction, fp_bail};
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::time::Instant;
+use tap::TapOptional;
+use tokio::{sync::mpsc::UnboundedSender, time::Instant};
 use tracing::{error, info, instrument, trace, warn};
 
 use crate::{
-    authority::authority_per_epoch_store::AuthorityPerEpochStore, execution_cache::ObjectCacheRead,
+    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityMetrics},
+    execution_cache::{ObjectCacheRead, TransactionCacheRead},
 };
-use crate::{authority::AuthorityMetrics, execution_cache::TransactionCacheRead};
-use sui_config::node::AuthorityOverloadConfig;
-use sui_types::transaction::SenderSignedData;
-use tap::TapOptional;
 
 #[cfg(test)]
 #[path = "unit_tests/transaction_manager_tests.rs"]
@@ -94,12 +93,7 @@ struct CacheInner {
 
 impl CacheInner {
     fn new(max_size: usize, metrics: Arc<AuthorityMetrics>) -> Self {
-        Self {
-            versioned_cache: LruCache::unbounded(),
-            unversioned_cache: LruCache::unbounded(),
-            max_size,
-            metrics,
-        }
+        Self { versioned_cache: LruCache::unbounded(), unversioned_cache: LruCache::unbounded(), max_size, metrics }
     }
 }
 
@@ -107,55 +101,37 @@ impl CacheInner {
     fn shrink(&mut self) {
         while self.versioned_cache.len() > self.max_size {
             self.versioned_cache.pop_lru();
-            self.metrics
-                .transaction_manager_object_cache_evictions
-                .inc();
+            self.metrics.transaction_manager_object_cache_evictions.inc();
         }
         while self.unversioned_cache.len() > self.max_size {
             self.unversioned_cache.pop_lru();
-            self.metrics
-                .transaction_manager_object_cache_evictions
-                .inc();
+            self.metrics.transaction_manager_object_cache_evictions.inc();
         }
-        self.metrics
-            .transaction_manager_object_cache_size
-            .set(self.versioned_cache.len() as i64);
-        self.metrics
-            .transaction_manager_package_cache_size
-            .set(self.unversioned_cache.len() as i64);
+        self.metrics.transaction_manager_object_cache_size.set(self.versioned_cache.len() as i64);
+        self.metrics.transaction_manager_package_cache_size.set(self.unversioned_cache.len() as i64);
     }
 
     fn insert(&mut self, object: &InputKey) {
         if let Some(version) = object.version() {
-            if let Some((previous_id, previous_version)) =
-                self.versioned_cache.push(object.id(), version)
-            {
+            if let Some((previous_id, previous_version)) = self.versioned_cache.push(object.id(), version) {
                 if previous_id == object.id() && previous_version > version {
                     // do not allow highest known version to decrease
                     // This should not be possible unless bugs are introduced elsewhere in this
                     // module.
                     self.versioned_cache.put(object.id(), previous_version);
                 } else {
-                    self.metrics
-                        .transaction_manager_object_cache_evictions
-                        .inc();
+                    self.metrics.transaction_manager_object_cache_evictions.inc();
                 }
             }
-            self.metrics
-                .transaction_manager_object_cache_size
-                .set(self.versioned_cache.len() as i64);
+            self.metrics.transaction_manager_object_cache_size.set(self.versioned_cache.len() as i64);
         } else if let Some((previous_id, _)) = self.unversioned_cache.push(object.id(), ()) {
             // lru_cache will does not check if the value being evicted is the same as the value
             // being inserted, so we do need to check if the id is different before counting this
             // as an eviction.
             if previous_id != object.id() {
-                self.metrics
-                    .transaction_manager_package_cache_evictions
-                    .inc();
+                self.metrics.transaction_manager_package_cache_evictions.inc();
             }
-            self.metrics
-                .transaction_manager_package_cache_size
-                .set(self.unversioned_cache.len() as i64);
+            self.metrics.transaction_manager_package_cache_size.set(self.unversioned_cache.len() as i64);
         }
     }
 
@@ -191,10 +167,7 @@ impl AvailableObjectsCache {
     }
 
     fn new_with_size(metrics: Arc<AuthorityMetrics>, size: usize) -> Self {
-        Self {
-            cache: CacheInner::new(size, metrics),
-            unbounded_cache_enabled: 0,
-        }
+        Self { cache: CacheInner::new(size, metrics), unbounded_cache_enabled: 0 }
     }
 
     fn enable_unbounded_cache(&mut self) {
@@ -280,17 +253,10 @@ impl Inner {
         let input_txns = self
             .input_objects
             .get_mut(&input_key.id())
-            .unwrap_or_else(|| {
-                panic!(
-                    "# of transactions waiting on object {:?} cannot be 0",
-                    input_key.id()
-                )
-            });
+            .unwrap_or_else(|| panic!("# of transactions waiting on object {:?} cannot be 0", input_key.id()));
         for digest in digests.iter() {
             let age_opt = input_txns.remove(digest).expect("digest must be in map");
-            metrics
-                .transaction_manager_transaction_queue_age_s
-                .observe(age_opt.elapsed().as_secs_f64());
+            metrics.transaction_manager_transaction_queue_age_s.observe(age_opt.elapsed().as_secs_f64());
         }
 
         if input_txns.is_empty() {
@@ -360,24 +326,13 @@ impl TransactionManager {
     /// REQUIRED: Shared object locks must be taken before calling enqueueing transactions
     /// with shared objects!
     #[instrument(level = "trace", skip_all)]
-    pub(crate) fn enqueue_certificates(
-        &self,
-        certs: Vec<VerifiedCertificate>,
-        epoch_store: &AuthorityPerEpochStore,
-    ) {
-        let executable_txns = certs
-            .into_iter()
-            .map(VerifiedExecutableTransaction::new_from_certificate)
-            .collect();
+    pub(crate) fn enqueue_certificates(&self, certs: Vec<VerifiedCertificate>, epoch_store: &AuthorityPerEpochStore) {
+        let executable_txns = certs.into_iter().map(VerifiedExecutableTransaction::new_from_certificate).collect();
         self.enqueue(executable_txns, epoch_store)
     }
 
     #[instrument(level = "trace", skip_all)]
-    pub(crate) fn enqueue(
-        &self,
-        certs: Vec<VerifiedExecutableTransaction>,
-        epoch_store: &AuthorityPerEpochStore,
-    ) {
+    pub(crate) fn enqueue(&self, certs: Vec<VerifiedExecutableTransaction>, epoch_store: &AuthorityPerEpochStore) {
         let certs = certs.into_iter().map(|cert| (cert, None)).collect();
         self.enqueue_impl(certs, epoch_store)
     }
@@ -388,19 +343,13 @@ impl TransactionManager {
         certs: Vec<(VerifiedExecutableTransaction, TransactionEffectsDigest)>,
         epoch_store: &AuthorityPerEpochStore,
     ) {
-        let certs = certs
-            .into_iter()
-            .map(|(cert, fx)| (cert, Some(fx)))
-            .collect();
+        let certs = certs.into_iter().map(|(cert, fx)| (cert, Some(fx))).collect();
         self.enqueue_impl(certs, epoch_store)
     }
 
     fn enqueue_impl(
         &self,
-        certs: Vec<(
-            VerifiedExecutableTransaction,
-            Option<TransactionEffectsDigest>,
-        )>,
+        certs: Vec<(VerifiedExecutableTransaction, Option<TransactionEffectsDigest>)>,
         epoch_store: &AuthorityPerEpochStore,
     ) {
         let reconfig_lock = self.inner.read();
@@ -428,42 +377,30 @@ impl TransactionManager {
         let certs: Vec<_> = certs
             .into_iter()
             .filter_map(|(cert, fx_digest)| {
-                let input_object_kinds = cert
-                    .data()
-                    .intent_message()
-                    .value
-                    .input_objects()
-                    .expect("input_objects() cannot fail");
-                let mut input_object_keys =
-                    match epoch_store.get_input_object_keys(&cert.key(), &input_object_kinds) {
-                        Ok(keys) => keys,
-                        Err(e) => {
-                            // Because we do not hold the transaction lock during enqueue, it is possible
-                            // that the transaction was executed and the shared version assignments deleted
-                            // since the earlier check. This is a rare race condition, and it is better to
-                            // handle it ad-hoc here than to hold tx locks for every cert for the duration
-                            // of this function in order to remove the race.
-                            if self
-                                .transaction_cache_read
-                                .is_tx_already_executed(cert.digest())
-                            {
-                                return None;
-                            }
-                            fatal!("Failed to get input object keys: {:?}", e);
+                let input_object_kinds =
+                    cert.data().intent_message().value.input_objects().expect("input_objects() cannot fail");
+                let mut input_object_keys = match epoch_store.get_input_object_keys(&cert.key(), &input_object_kinds) {
+                    Ok(keys) => keys,
+                    Err(e) => {
+                        // Because we do not hold the transaction lock during enqueue, it is possible
+                        // that the transaction was executed and the shared version assignments deleted
+                        // since the earlier check. This is a rare race condition, and it is better to
+                        // handle it ad-hoc here than to hold tx locks for every cert for the duration
+                        // of this function in order to remove the race.
+                        if self.transaction_cache_read.is_tx_already_executed(cert.digest()) {
+                            return None;
                         }
-                    };
+                        fatal!("Failed to get input object keys: {:?}", e);
+                    }
+                };
 
                 if input_object_kinds.len() != input_object_keys.len() {
                     error!("Duplicated input objects: {:?}", input_object_kinds);
                 }
 
-                let receiving_object_entries =
-                    cert.data().intent_message().value.receiving_objects();
+                let receiving_object_entries = cert.data().intent_message().value.receiving_objects();
                 for entry in receiving_object_entries {
-                    let key = InputKey::VersionedObject {
-                        id: entry.0,
-                        version: entry.1,
-                    };
+                    let key = InputKey::VersionedObject { id: entry.0, version: entry.1 };
                     receiving_objects.insert(key);
                     input_object_keys.insert(key);
                 }
@@ -506,11 +443,7 @@ impl TransactionManager {
         // So missing objects' availability are checked again after acquiring TM lock.
         let cache_miss_availability = self
             .object_cache_read
-            .multi_input_objects_available(
-                &input_object_cache_misses,
-                receiving_objects,
-                epoch_store.epoch(),
-            )
+            .multi_input_objects_available(&input_object_cache_misses, receiving_objects, epoch_store.epoch())
             .into_iter()
             .zip(input_object_cache_misses);
 
@@ -531,9 +464,7 @@ impl TransactionManager {
                 // even if they cause evictions.
                 inner.available_objects_cache.insert(&key);
             }
-            object_availability
-                .insert(key, Some(available))
-                .expect("entry must already exist");
+            object_availability.insert(key, Some(available)).expect("entry must already exist");
         }
 
         // Now recheck the cache for anything that became available (via notify_commit) since we
@@ -557,10 +488,7 @@ impl TransactionManager {
                 certificate: cert,
                 expected_effects_digest,
                 waiting_input_objects: input_object_keys,
-                stats: PendingCertificateStats {
-                    enqueue_time: pending_cert_enqueue_time,
-                    ready_time: None,
-                },
+                stats: PendingCertificateStats { enqueue_time: pending_cert_enqueue_time, ready_time: None },
             });
         }
 
@@ -582,10 +510,7 @@ impl TransactionManager {
 
             // skip already pending txes
             if inner.pending_certificates.contains_key(&digest) {
-                self.metrics
-                    .transaction_manager_num_enqueued_certificates
-                    .with_label_values(&["already_pending"])
-                    .inc();
+                self.metrics.transaction_manager_num_enqueued_certificates.with_label_values(&["already_pending"]).inc();
                 continue;
             }
             // skip already executing txes
@@ -597,8 +522,7 @@ impl TransactionManager {
                 continue;
             }
             // skip already executed txes
-            let is_tx_already_executed =
-                self.transaction_cache_read.is_tx_already_executed(&digest);
+            let is_tx_already_executed = self.transaction_cache_read.is_tx_already_executed(&digest);
             if is_tx_already_executed {
                 self.metrics
                     .transaction_manager_num_enqueued_certificates
@@ -608,10 +532,7 @@ impl TransactionManager {
             }
 
             let mut waiting_input_objects = BTreeSet::new();
-            std::mem::swap(
-                &mut waiting_input_objects,
-                &mut pending_cert.waiting_input_objects,
-            );
+            std::mem::swap(&mut waiting_input_objects, &mut pending_cert.waiting_input_objects);
             for key in waiting_input_objects {
                 if !object_availability[&key].unwrap() {
                     // The input object is not yet available.
@@ -630,10 +551,7 @@ impl TransactionManager {
 
             // Ready transactions can start to execute.
             if pending_cert.waiting_input_objects.is_empty() {
-                self.metrics
-                    .transaction_manager_num_enqueued_certificates
-                    .with_label_values(&["ready"])
-                    .inc();
+                self.metrics.transaction_manager_num_enqueued_certificates.with_label_values(&["ready"]).inc();
                 pending_cert.stats.ready_time = Some(Instant::now());
                 // Send to execution driver for execution.
                 self.certificate_ready(&mut inner, pending_cert);
@@ -641,36 +559,22 @@ impl TransactionManager {
             }
 
             assert!(
-                inner
-                    .pending_certificates
-                    .insert(digest, pending_cert)
-                    .is_none(),
+                inner.pending_certificates.insert(digest, pending_cert).is_none(),
                 "Duplicated pending certificate {:?}",
                 digest
             );
 
-            self.metrics
-                .transaction_manager_num_enqueued_certificates
-                .with_label_values(&["pending"])
-                .inc();
+            self.metrics.transaction_manager_num_enqueued_certificates.with_label_values(&["pending"]).inc();
         }
 
-        self.metrics
-            .transaction_manager_num_missing_objects
-            .set(inner.missing_inputs.len() as i64);
-        self.metrics
-            .transaction_manager_num_pending_certificates
-            .set(inner.pending_certificates.len() as i64);
+        self.metrics.transaction_manager_num_missing_objects.set(inner.missing_inputs.len() as i64);
+        self.metrics.transaction_manager_num_pending_certificates.set(inner.pending_certificates.len() as i64);
 
         inner.maybe_reserve_capacity();
     }
 
     #[cfg(test)]
-    pub(crate) fn objects_available(
-        &self,
-        input_keys: Vec<InputKey>,
-        epoch_store: &AuthorityPerEpochStore,
-    ) {
+    pub(crate) fn objects_available(&self, input_keys: Vec<InputKey>, epoch_store: &AuthorityPerEpochStore) {
         let reconfig_lock = self.inner.read();
         let mut inner = reconfig_lock.write();
         let _scope = monitored_scope("TransactionManager::objects_available::wlock");
@@ -700,23 +604,15 @@ impl TransactionManager {
 
         for input_key in input_keys {
             trace!(?input_key, "object available");
-            for mut ready_cert in
-                inner.find_ready_transactions(input_key, update_cache, &self.metrics)
-            {
+            for mut ready_cert in inner.find_ready_transactions(input_key, update_cache, &self.metrics) {
                 ready_cert.stats.ready_time = Some(available_time);
                 self.certificate_ready(inner, ready_cert);
             }
         }
 
-        self.metrics
-            .transaction_manager_num_missing_objects
-            .set(inner.missing_inputs.len() as i64);
-        self.metrics
-            .transaction_manager_num_pending_certificates
-            .set(inner.pending_certificates.len() as i64);
-        self.metrics
-            .transaction_manager_num_executing_certificates
-            .set(inner.executing_certificates.len() as i64);
+        self.metrics.transaction_manager_num_missing_objects.set(inner.missing_inputs.len() as i64);
+        self.metrics.transaction_manager_num_pending_certificates.set(inner.pending_certificates.len() as i64);
+        self.metrics.transaction_manager_num_executing_certificates.set(inner.executing_certificates.len() as i64);
     }
 
     /// Notifies TransactionManager about a transaction that has been committed.
@@ -734,26 +630,23 @@ impl TransactionManager {
             let _scope = monitored_scope("TransactionManager::notify_commit::wlock");
 
             if inner.epoch != epoch_store.epoch() {
-                warn!("Ignoring committed certificate from wrong epoch. Expected={} Actual={} CertificateDigest={:?}", inner.epoch, epoch_store.epoch(), digest);
+                warn!(
+                    "Ignoring committed certificate from wrong epoch. Expected={} Actual={} CertificateDigest={:?}",
+                    inner.epoch,
+                    epoch_store.epoch(),
+                    digest
+                );
                 return;
             }
 
-            self.objects_available_locked(
-                &mut inner,
-                epoch_store,
-                output_object_keys,
-                true,
-                commit_time,
-            );
+            self.objects_available_locked(&mut inner, epoch_store, output_object_keys, true, commit_time);
 
             if !inner.executing_certificates.remove(digest) {
                 trace!("{:?} not found in executing certificates, likely because it is a system transaction", digest);
                 return;
             }
 
-            self.metrics
-                .transaction_manager_num_executing_certificates
-                .set(inner.executing_certificates.len() as i64);
+            self.metrics.transaction_manager_num_executing_certificates.set(inner.executing_certificates.len() as i64);
 
             inner.maybe_shrink_capacity();
         }
@@ -764,9 +657,7 @@ impl TransactionManager {
         trace!(tx_digest = ?pending_certificate.certificate.digest(), "certificate ready");
         assert_eq!(pending_certificate.waiting_input_objects.len(), 0);
         // Record as an executing certificate.
-        assert!(inner
-            .executing_certificates
-            .insert(*pending_certificate.certificate.digest()));
+        assert!(inner.executing_certificates.insert(*pending_certificate.certificate.digest()));
         self.metrics.txn_ready_rate_tracker.lock().record();
         let _ = self.tx_ready_certificates.send(pending_certificate);
         self.metrics.transaction_manager_num_ready.inc();
@@ -777,28 +668,18 @@ impl TransactionManager {
     pub(crate) fn get_missing_input(&self, digest: &TransactionDigest) -> Option<Vec<InputKey>> {
         let reconfig_lock = self.inner.read();
         let inner = reconfig_lock.read();
-        inner
-            .pending_certificates
-            .get(digest)
-            .map(|cert| cert.waiting_input_objects.clone().into_iter().collect())
+        inner.pending_certificates.get(digest).map(|cert| cert.waiting_input_objects.clone().into_iter().collect())
     }
 
     // Returns the number of transactions waiting on each object ID, as well as the age of the oldest transaction in the queue.
-    pub(crate) fn objects_queue_len_and_age(
-        &self,
-        keys: Vec<ObjectID>,
-    ) -> Vec<(ObjectID, usize, Option<Duration>)> {
+    pub(crate) fn objects_queue_len_and_age(&self, keys: Vec<ObjectID>) -> Vec<(ObjectID, usize, Option<Duration>)> {
         let reconfig_lock = self.inner.read();
         let inner = reconfig_lock.read();
         keys.into_iter()
             .map(|key| {
                 let default_map = TransactionQueue::default();
                 let txns = inner.input_objects.get(&key).unwrap_or(&default_map);
-                (
-                    key,
-                    txns.len(),
-                    txns.first().map(|(time, _)| time.elapsed()),
-                )
+                (key, txns.len(), txns.first().map(|(time, _)| time.elapsed()))
             })
             .collect()
     }
@@ -844,10 +725,7 @@ impl TransactionManager {
         ) {
             // When this occurs, most likely transactions piled up on a shared object.
             if queue_len >= overload_config.max_transaction_manager_per_object_queue_length {
-                info!(
-                    "Overload detected on object {:?} with {} pending transactions",
-                    object_id, queue_len
-                );
+                info!("Overload detected on object {:?} with {} pending transactions", object_id, queue_len);
                 fp_bail!(SuiError::TooManyTransactionsPendingOnObject {
                     object_id,
                     queue_len,
@@ -878,26 +756,10 @@ impl TransactionManager {
     pub(crate) fn check_empty_for_testing(&self) {
         let reconfig_lock = self.inner.read();
         let inner = reconfig_lock.read();
-        assert!(
-            inner.missing_inputs.is_empty(),
-            "Missing inputs: {:?}",
-            inner.missing_inputs
-        );
-        assert!(
-            inner.input_objects.is_empty(),
-            "Input objects: {:?}",
-            inner.input_objects
-        );
-        assert!(
-            inner.pending_certificates.is_empty(),
-            "Pending certificates: {:?}",
-            inner.pending_certificates
-        );
-        assert!(
-            inner.executing_certificates.is_empty(),
-            "Executing certificates: {:?}",
-            inner.executing_certificates
-        );
+        assert!(inner.missing_inputs.is_empty(), "Missing inputs: {:?}", inner.missing_inputs);
+        assert!(inner.input_objects.is_empty(), "Input objects: {:?}", inner.input_objects);
+        assert!(inner.pending_certificates.is_empty(), "Pending certificates: {:?}", inner.pending_certificates);
+        assert!(inner.executing_certificates.is_empty(), "Executing certificates: {:?}", inner.executing_certificates);
     }
 }
 
@@ -1009,9 +871,10 @@ impl TransactionQueue {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use prometheus::Registry;
     use rand::{Rng, RngCore};
+
+    use super::*;
 
     #[test]
     #[cfg_attr(msim, ignore)]
@@ -1020,7 +883,7 @@ mod test {
         let mut cache = AvailableObjectsCache::new_with_size(metrics, 5);
 
         // insert 10 unique unversioned objects
-        for i in 0..10 {
+        for i in 0 .. 10 {
             let object = ObjectID::new([i; 32]);
             let input_key = InputKey::Package { id: object };
             assert_eq!(cache.is_object_available(&input_key), None);
@@ -1029,36 +892,30 @@ mod test {
         }
 
         // first 5 have been evicted
-        for i in 0..5 {
+        for i in 0 .. 5 {
             let object = ObjectID::new([i; 32]);
             let input_key = InputKey::Package { id: object };
             assert_eq!(cache.is_object_available(&input_key), None);
         }
 
         // insert 10 unique versioned objects
-        for i in 0..10 {
+        for i in 0 .. 10 {
             let object = ObjectID::new([i; 32]);
-            let input_key = InputKey::VersionedObject {
-                id: object,
-                version: (i as u64).into(),
-            };
+            let input_key = InputKey::VersionedObject { id: object, version: (i as u64).into() };
             assert_eq!(cache.is_object_available(&input_key), None);
             cache.insert(&input_key);
             assert_eq!(cache.is_object_available(&input_key), Some(true));
         }
 
         // first 5 versioned objects have been evicted
-        for i in 0..5 {
+        for i in 0 .. 5 {
             let object = ObjectID::new([i; 32]);
-            let input_key = InputKey::VersionedObject {
-                id: object,
-                version: (i as u64).into(),
-            };
+            let input_key = InputKey::VersionedObject { id: object, version: (i as u64).into() };
             assert_eq!(cache.is_object_available(&input_key), None);
         }
 
         // but versioned objects do not cause evictions of unversioned objects
-        for i in 5..10 {
+        for i in 5 .. 10 {
             let object = ObjectID::new([i; 32]);
             let input_key = InputKey::Package { id: object };
             assert_eq!(cache.is_object_available(&input_key), Some(true));
@@ -1066,22 +923,13 @@ mod test {
 
         // object 9 is available at version 9
         let object = ObjectID::new([9; 32]);
-        let input_key = InputKey::VersionedObject {
-            id: object,
-            version: 9.into(),
-        };
+        let input_key = InputKey::VersionedObject { id: object, version: 9.into() };
         assert_eq!(cache.is_object_available(&input_key), Some(true));
         // but not at version 10
-        let input_key = InputKey::VersionedObject {
-            id: object,
-            version: 10.into(),
-        };
+        let input_key = InputKey::VersionedObject { id: object, version: 10.into() };
         assert_eq!(cache.is_object_available(&input_key), Some(false));
         // it is available at version 8 (this case can be used by readonly shared objects)
-        let input_key = InputKey::VersionedObject {
-            id: object,
-            version: 8.into(),
-        };
+        let input_key = InputKey::VersionedObject { id: object, version: 8.into() };
         assert_eq!(cache.is_object_available(&input_key), Some(true));
     }
 
@@ -1198,7 +1046,7 @@ mod test {
     fn transaction_queue_random_test() {
         let mut rng = rand::thread_rng();
         let mut digests = Vec::new();
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             let mut digest = [0; 32];
             rng.fill_bytes(&mut digest);
             digests.push(TransactionDigest::new(digest));
@@ -1211,9 +1059,9 @@ mod test {
 
         // first insert some random digests so that the queue starts
         // out well-populated
-        for _ in 0..70 {
+        for _ in 0 .. 70 {
             now += Duration::from_secs(1);
-            let digest = digests[rng.gen_range(0..digests.len())];
+            let digest = digests[rng.gen_range(0 .. digests.len())];
             let time = now;
             queue.insert(digest, time);
             verifier.entry(digest).or_insert(time);
@@ -1221,12 +1069,12 @@ mod test {
 
         // Do random operations on both the queue and the verifier, and
         // verify that the two structures always agree
-        for _ in 0..100000 {
+        for _ in 0 .. 100000 {
             // advance time
             now += Duration::from_secs(1);
 
             // pick a random digest
-            let digest = digests[rng.gen_range(0..digests.len())];
+            let digest = digests[rng.gen_range(0 .. digests.len())];
 
             // either insert or remove it
             if rng.gen_bool(0.5) {
@@ -1240,10 +1088,7 @@ mod test {
 
             assert_eq!(
                 queue.first(),
-                verifier
-                    .iter()
-                    .min_by_key(|(_, time)| **time)
-                    .map(|(digest, time)| (*time, *digest))
+                verifier.iter().min_by_key(|(_, time)| **time).map(|(digest, time)| (*time, *digest))
             );
         }
     }

@@ -37,10 +37,10 @@ pub(crate) struct RocksDBStore {
 
 impl RocksDBStore {
     const BLOCKS_CF: &'static str = "blocks";
-    const DIGESTS_BY_AUTHORITIES_CF: &'static str = "digests";
     const COMMITS_CF: &'static str = "commits";
-    const COMMIT_VOTES_CF: &'static str = "commit_votes";
     const COMMIT_INFO_CF: &'static str = "commit_info";
+    const COMMIT_VOTES_CF: &'static str = "commit_votes";
+    const DIGESTS_BY_AUTHORITIES_CF: &'static str = "digests";
 
     /// Creates a new instance of RocksDB storage.
     pub(crate) fn new(path: &str) -> Self {
@@ -64,13 +64,8 @@ impl RocksDBStore {
             (Self::COMMIT_VOTES_CF, cf_options.clone()),
             (Self::COMMIT_INFO_CF, cf_options.clone()),
         ];
-        let rocksdb = open_cf_opts(
-            path,
-            Some(db_options.options),
-            metrics_conf,
-            &column_family_options,
-        )
-        .expect("Cannot open database");
+        let rocksdb = open_cf_opts(path, Some(db_options.options), metrics_conf, &column_family_options)
+            .expect("Cannot open database");
 
         let (blocks, digests_by_authorities, commits, commit_votes, commit_info) = reopen!(&rocksdb,
             Self::BLOCKS_CF;<(Round, AuthorityIndex, BlockDigest), bytes::Bytes>,
@@ -80,13 +75,7 @@ impl RocksDBStore {
             Self::COMMIT_INFO_CF;<(CommitIndex, CommitDigest), CommitInfo>
         );
 
-        Self {
-            blocks,
-            digests_by_authorities,
-            commits,
-            commit_votes,
-            commit_info,
-        }
+        Self { blocks, digests_by_authorities, commits, commit_votes, commit_info }
     }
 }
 
@@ -98,45 +87,33 @@ impl Store for RocksDBStore {
         for block in write_batch.blocks {
             let block_ref = block.reference();
             batch
-                .insert_batch(
-                    &self.blocks,
-                    [(
-                        (block_ref.round, block_ref.author, block_ref.digest),
-                        block.serialized(),
-                    )],
-                )
+                .insert_batch(&self.blocks, [(
+                    (block_ref.round, block_ref.author, block_ref.digest),
+                    block.serialized(),
+                )])
                 .map_err(ConsensusError::RocksDBFailure)?;
             batch
-                .insert_batch(
-                    &self.digests_by_authorities,
-                    [((block_ref.author, block_ref.round, block_ref.digest), ())],
-                )
+                .insert_batch(&self.digests_by_authorities, [(
+                    (block_ref.author, block_ref.round, block_ref.digest),
+                    (),
+                )])
                 .map_err(ConsensusError::RocksDBFailure)?;
             for vote in block.commit_votes() {
                 batch
-                    .insert_batch(
-                        &self.commit_votes,
-                        [((vote.index, vote.digest, block_ref), ())],
-                    )
+                    .insert_batch(&self.commit_votes, [((vote.index, vote.digest, block_ref), ())])
                     .map_err(ConsensusError::RocksDBFailure)?;
             }
         }
 
         for commit in write_batch.commits {
             batch
-                .insert_batch(
-                    &self.commits,
-                    [((commit.index(), commit.digest()), commit.serialized())],
-                )
+                .insert_batch(&self.commits, [((commit.index(), commit.digest()), commit.serialized())])
                 .map_err(ConsensusError::RocksDBFailure)?;
         }
 
         for (commit_ref, commit_info) in write_batch.commit_info {
             batch
-                .insert_batch(
-                    &self.commit_info,
-                    [((commit_ref.index, commit_ref.digest), commit_info)],
-                )
+                .insert_batch(&self.commit_info, [((commit_ref.index, commit_ref.digest), commit_info)])
                 .map_err(ConsensusError::RocksDBFailure)?;
         }
 
@@ -146,16 +123,12 @@ impl Store for RocksDBStore {
     }
 
     fn read_blocks(&self, refs: &[BlockRef]) -> ConsensusResult<Vec<Option<VerifiedBlock>>> {
-        let keys = refs
-            .iter()
-            .map(|r| (r.round, r.author, r.digest))
-            .collect::<Vec<_>>();
+        let keys = refs.iter().map(|r| (r.round, r.author, r.digest)).collect::<Vec<_>>();
         let serialized = self.blocks.multi_get(keys)?;
         let mut blocks = vec![];
         for (key, serialized) in refs.iter().zip(serialized) {
             if let Some(serialized) = serialized {
-                let signed_block: SignedBlock =
-                    bcs::from_bytes(&serialized).map_err(ConsensusError::MalformedBlock)?;
+                let signed_block: SignedBlock = bcs::from_bytes(&serialized).map_err(ConsensusError::MalformedBlock)?;
                 // Only accepted blocks should have been written to storage.
                 let block = VerifiedBlock::new_verified(signed_block, serialized);
                 // Makes sure block data is not corrupted, by comparing digests.
@@ -169,10 +142,7 @@ impl Store for RocksDBStore {
     }
 
     fn contains_blocks(&self, refs: &[BlockRef]) -> ConsensusResult<Vec<bool>> {
-        let refs = refs
-            .iter()
-            .map(|r| (r.round, r.author, r.digest))
-            .collect::<Vec<_>>();
+        let refs = refs.iter().map(|r| (r.round, r.author, r.digest)).collect::<Vec<_>>();
         let exist = self.blocks.multi_contains_keys(refs)?;
         Ok(exist)
     }
@@ -189,11 +159,7 @@ impl Store for RocksDBStore {
         Ok(found)
     }
 
-    fn scan_blocks_by_author(
-        &self,
-        author: AuthorityIndex,
-        start_round: Round,
-    ) -> ConsensusResult<Vec<VerifiedBlock>> {
+    fn scan_blocks_by_author(&self, author: AuthorityIndex, start_round: Round) -> ConsensusResult<Vec<VerifiedBlock>> {
         let mut refs = vec![];
         for kv in self.digests_by_authorities.safe_range_iter((
             Included((author, start_round, BlockDigest::MIN)),
@@ -205,9 +171,7 @@ impl Store for RocksDBStore {
         let results = self.read_blocks(refs.as_slice())?;
         let mut blocks = Vec::with_capacity(refs.len());
         for (r, block) in refs.into_iter().zip(results.into_iter()) {
-            blocks.push(
-                block.unwrap_or_else(|| panic!("Storage inconsistency: block {:?} not found!", r)),
-            );
+            blocks.push(block.unwrap_or_else(|| panic!("Storage inconsistency: block {:?} not found!", r)));
         }
         Ok(blocks)
     }
@@ -239,9 +203,7 @@ impl Store for RocksDBStore {
         let results = self.read_blocks(refs.as_slices().0)?;
         let mut blocks = vec![];
         for (r, block) in refs.into_iter().zip(results.into_iter()) {
-            blocks.push(
-                block.unwrap_or_else(|| panic!("Storage inconsistency: block {:?} not found!", r)),
-            );
+            blocks.push(block.unwrap_or_else(|| panic!("Storage inconsistency: block {:?} not found!", r)));
         }
         Ok(blocks)
     }
@@ -261,10 +223,10 @@ impl Store for RocksDBStore {
 
     fn scan_commits(&self, range: CommitRange) -> ConsensusResult<Vec<TrustedCommit>> {
         let mut commits = vec![];
-        for result in self.commits.safe_range_iter((
-            Included((range.start(), CommitDigest::MIN)),
-            Included((range.end(), CommitDigest::MAX)),
-        )) {
+        for result in self
+            .commits
+            .safe_range_iter((Included((range.start(), CommitDigest::MIN)), Included((range.end(), CommitDigest::MAX))))
+        {
             let ((_index, digest), serialized) = result?;
             let commit = TrustedCommit::new_trusted(
                 bcs::from_bytes(&serialized).map_err(ConsensusError::MalformedCommit)?,

@@ -3,10 +3,14 @@
 
 use anyhow::Context;
 use diesel::{
-    backend::Backend, deserialize, expression::AsExpression, prelude::*, serialize,
-    sql_types::SmallInt, FromSqlRow,
+    backend::Backend,
+    deserialize,
+    expression::AsExpression,
+    prelude::*,
+    serialize,
+    sql_types::SmallInt,
+    FromSqlRow,
 };
-
 use sui_field_count::FieldCount;
 use sui_types::object::{Object, Owner};
 
@@ -98,15 +102,12 @@ impl StoredObjInfo {
             package: type_.map(|t| t.address().to_vec()),
             module: type_.map(|t| t.module().to_string()),
             name: type_.map(|t| t.name().to_string()),
-            instantiation: type_
-                .map(|t| bcs::to_bytes(&t.type_params()))
-                .transpose()
-                .with_context(|| {
-                    format!(
-                        "Failed to serialize type parameters for {}",
-                        object.id().to_canonical_display(/* with_prefix */ true),
-                    )
-                })?,
+            instantiation: type_.map(|t| bcs::to_bytes(&t.type_params())).transpose().with_context(|| {
+                format!(
+                    "Failed to serialize type parameters for {}",
+                    object.id().to_canonical_display(/* with_prefix */ true),
+                )
+            })?,
         })
     }
 }

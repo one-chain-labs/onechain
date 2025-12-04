@@ -38,23 +38,13 @@ pub struct Committee {
 impl Committee {
     pub fn new(epoch: Epoch, authorities: Vec<Authority>) -> Self {
         assert!(!authorities.is_empty(), "Committee cannot be empty!");
-        assert!(
-            authorities.len() < u32::MAX as usize,
-            "Too many authorities ({})!",
-            authorities.len()
-        );
+        assert!(authorities.len() < u32::MAX as usize, "Too many authorities ({})!", authorities.len());
 
         let total_stake = authorities.iter().map(|a| a.stake).sum();
         assert_ne!(total_stake, 0, "Total stake cannot be zero!");
         let quorum_threshold = 2 * total_stake / 3 + 1;
         let validity_threshold = (total_stake + 2) / 3;
-        Self {
-            epoch,
-            total_stake,
-            quorum_threshold,
-            validity_threshold,
-            authorities,
-        }
+        Self { epoch, total_stake, quorum_threshold, validity_threshold, authorities }
     }
 
     /// -----------------------------------------------------------------------
@@ -85,10 +75,7 @@ impl Committee {
     }
 
     pub fn authorities(&self) -> impl Iterator<Item = (AuthorityIndex, &Authority)> {
-        self.authorities
-            .iter()
-            .enumerate()
-            .map(|(i, a)| (AuthorityIndex(i as u32), a))
+        self.authorities.iter().enumerate().map(|(i, a)| (AuthorityIndex(i as u32), a))
     }
 
     /// -----------------------------------------------------------------------
@@ -151,18 +138,15 @@ pub struct Authority {
 /// NOTE: for safety, invalid AuthorityIndex should be impossible to create. So AuthorityIndex
 /// should not be created or incremented outside of this file. AuthorityIndex received from peers
 /// should be validated before use.
-#[derive(
-    Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Debug, Default, Hash, Serialize, Deserialize,
-)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct AuthorityIndex(u32);
 
 impl AuthorityIndex {
-    // Minimum committee size is 1, so 0 index is always valid.
-    pub const ZERO: Self = Self(0);
-
+    pub const MAX: Self = Self(u32::MAX);
     // Only for scanning rows in the database. Invalid elsewhere.
     pub const MIN: Self = Self::ZERO;
-    pub const MAX: Self = Self(u32::MAX);
+    // Minimum committee size is 1, so 0 index is always valid.
+    pub const ZERO: Self = Self(0);
 
     pub fn value(&self) -> usize {
         self.0 as usize
@@ -219,7 +203,7 @@ mod tests {
         // GIVEN
         let epoch = 100;
         let num_of_authorities = 9;
-        let authority_stakes = (1..=9).map(|s| s as Stake).collect();
+        let authority_stakes = (1 ..= 9).map(|s| s as Stake).collect();
         let (committee, _) = local_committee_and_keys(epoch, authority_stakes);
 
         // THEN make sure the output Committee fields are populated correctly.

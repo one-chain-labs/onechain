@@ -1,12 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{env, sync::Arc};
+
 use clap::Parser;
-use std::env;
-use std::sync::Arc;
 use sui_config::sui_config_dir;
-use sui_faucet::{create_wallet_context, start_faucet, AppState};
-use sui_faucet::{FaucetConfig, SimpleFaucet};
+use sui_faucet::{create_wallet_context, start_faucet, AppState, FaucetConfig, SimpleFaucet};
 use tracing::info;
 
 const CONCURRENCY_LIMIT: usize = 30;
@@ -18,16 +17,10 @@ bin_version::bin_version!();
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     // initialize tracing
-    let _guard = telemetry_subscribers::TelemetryConfig::new()
-        .with_env()
-        .init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
 
     let config: FaucetConfig = FaucetConfig::parse();
-    let FaucetConfig {
-        wallet_client_timeout_secs,
-        ref write_ahead_log,
-        ..
-    } = config;
+    let FaucetConfig { wallet_client_timeout_secs, ref write_ahead_log, .. } = config;
 
     let context = create_wallet_context(wallet_client_timeout_secs, sui_config_dir()?)?;
 
@@ -41,19 +34,10 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("Starting Prometheus HTTP endpoint at {}", prom_binding);
     let registry_service = mysten_metrics::start_prometheus_server(prom_binding);
     let prometheus_registry = registry_service.default_registry();
-    prometheus_registry
-        .register(mysten_metrics::uptime_metric("faucet", VERSION, "unknown"))
-        .unwrap();
+    prometheus_registry.register(mysten_metrics::uptime_metric("faucet", VERSION, "unknown")).unwrap();
 
     let app_state = Arc::new(AppState {
-        faucet: SimpleFaucet::new(
-            context,
-            &prometheus_registry,
-            write_ahead_log,
-            config.clone(),
-        )
-        .await
-        .unwrap(),
+        faucet: SimpleFaucet::new(context, &prometheus_registry, write_ahead_log, config.clone()).await.unwrap(),
         config,
     });
 

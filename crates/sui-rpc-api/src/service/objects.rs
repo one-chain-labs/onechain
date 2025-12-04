@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::GetObjectOptions;
-use crate::types::ObjectResponse;
-use crate::Result;
-use crate::RpcService;
-use sui_sdk_types::ObjectId;
-use sui_sdk_types::Version;
+use sui_sdk_types::{ObjectId, Version};
 use tap::Pipe;
+
+use crate::{
+    types::{GetObjectOptions, ObjectResponse},
+    Result,
+    RpcService,
+};
 
 impl RpcService {
     pub fn get_object(
@@ -21,15 +22,10 @@ impl RpcService {
                 .get_object_with_version(object_id, version)?
                 .ok_or_else(|| ObjectNotFoundError::new_with_version(object_id, version))?
         } else {
-            self.reader
-                .get_object(object_id)?
-                .ok_or_else(|| ObjectNotFoundError::new(object_id))?
+            self.reader.get_object(object_id)?.ok_or_else(|| ObjectNotFoundError::new(object_id))?
         };
 
-        let object_bcs = options
-            .include_object_bcs()
-            .then(|| bcs::to_bytes(&object))
-            .transpose()?;
+        let object_bcs = options.include_object_bcs().then(|| bcs::to_bytes(&object)).transpose()?;
 
         ObjectResponse {
             object_id: object.object_id(),
@@ -50,17 +46,11 @@ pub struct ObjectNotFoundError {
 
 impl ObjectNotFoundError {
     pub fn new(object_id: ObjectId) -> Self {
-        Self {
-            object_id,
-            version: None,
-        }
+        Self { object_id, version: None }
     }
 
     pub fn new_with_version(object_id: ObjectId, version: Version) -> Self {
-        Self {
-            object_id,
-            version: Some(version),
-        }
+        Self { object_id, version: Some(version) }
     }
 }
 

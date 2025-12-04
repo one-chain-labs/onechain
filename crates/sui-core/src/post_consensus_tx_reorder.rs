@@ -1,9 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_handler::{
-    SequencedConsensusTransactionKind, VerifiedSequencedConsensusTransaction,
-};
 use mysten_metrics::monitored_scope;
 use sui_protocol_config::ConsensusTransactionOrdering;
 use sui_types::{
@@ -11,13 +8,12 @@ use sui_types::{
     transaction::TransactionDataAPI as _,
 };
 
+use crate::consensus_handler::{SequencedConsensusTransactionKind, VerifiedSequencedConsensusTransaction};
+
 pub struct PostConsensusTxReorder {}
 
 impl PostConsensusTxReorder {
-    pub fn reorder(
-        transactions: &mut [VerifiedSequencedConsensusTransaction],
-        kind: ConsensusTransactionOrdering,
-    ) {
+    pub fn reorder(transactions: &mut [VerifiedSequencedConsensusTransaction], kind: ConsensusTransactionOrdering) {
         // TODO: make the reordering algorithm richer and depend on object hotness as well.
         // Order transactions based on their gas prices. System transactions without gas price
         // are put to the beginning of the sequenced_transactions vector.

@@ -15,11 +15,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub enum PlainTransactionInfoResponse {
     Signed(SignedTransaction),
-    ExecutedWithCert(
-        CertifiedTransaction,
-        SignedTransactionEffects,
-        TransactionEvents,
-    ),
+    ExecutedWithCert(CertifiedTransaction, SignedTransactionEffects, TransactionEvents),
     ExecutedWithoutCert(Transaction, SignedTransactionEffects, TransactionEvents),
 }
 

@@ -51,12 +51,9 @@ impl BalanceChange {
     /// `BalanceChange` was queried for. This is stored on `BalanceChange` so that when viewing that
     /// entity's state, it will be as if it was read at the same checkpoint.
     pub(crate) fn read(bytes: &[u8], checkpoint_viewed_at: u64) -> Result<Self, Error> {
-        let stored = bcs::from_bytes(bytes)
-            .map_err(|e| Error::Internal(format!("Error deserializing BalanceChange: {e}")))?;
+        let stored =
+            bcs::from_bytes(bytes).map_err(|e| Error::Internal(format!("Error deserializing BalanceChange: {e}")))?;
 
-        Ok(Self {
-            stored,
-            checkpoint_viewed_at,
-        })
+        Ok(Self { stored, checkpoint_viewed_at })
     }
 }

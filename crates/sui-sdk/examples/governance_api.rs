@@ -40,15 +40,12 @@ async fn main() -> Result<(), anyhow::Error> {
     // List all active validators
 
     println!(" *** List active validators *** ");
-    sui_system_state
-        .active_validators
-        .into_iter()
-        .for_each(|validator| {
-            println!(
-                "Name: {}, Description: {}, SuiAddress: {:?}",
-                validator.name, validator.description, validator.sui_address
-            )
-        });
+    sui_system_state.active_validators.into_iter().for_each(|validator| {
+        println!(
+            "Name: {}, Description: {}, SuiAddress: {:?}",
+            validator.name, validator.description, validator.sui_address
+        )
+    });
 
     println!(" *** List active validators ***\n");
     // Reference Gas Price

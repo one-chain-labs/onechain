@@ -1,34 +1,35 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{str::FromStr, sync::Arc, time::Duration};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use moka::sync::{Cache as MokaCache, CacheBuilder as MokaCacheBuilder};
-use reqwest::header::{HeaderValue, CONTENT_LENGTH};
-use reqwest::Client;
-use reqwest::Url;
+use reqwest::{
+    header::{HeaderValue, CONTENT_LENGTH},
+    Client,
+    Url,
+};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
-use sui_types::base_types::{ObjectID, SequenceNumber, VersionNumber};
-use sui_types::object::Object;
-use sui_types::storage::ObjectKey;
 use sui_types::{
+    base_types::{ObjectID, SequenceNumber, VersionNumber},
     digests::{CheckpointContentsDigest, CheckpointDigest, TransactionDigest},
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiError, SuiResult},
-    messages_checkpoint::{
-        CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber,
-    },
+    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber},
+    object::Object,
+    storage::ObjectKey,
     transaction::Transaction,
 };
 use tap::{TapFallible, TapOptional};
 use tracing::{error, info, instrument, trace, warn};
 
-use crate::key_value_store::{TransactionKeyValueStore, TransactionKeyValueStoreTrait};
-use crate::key_value_store_metrics::KeyValueStoreMetrics;
+use crate::{
+    key_value_store::{TransactionKeyValueStore, TransactionKeyValueStoreTrait},
+    key_value_store_metrics::KeyValueStoreMetrics,
+};
 
 pub struct HttpKVStore {
     base_url: Url,
@@ -53,8 +54,7 @@ pub fn encoded_tagged_key(key: &TaggedKey) -> String {
 }
 
 pub fn encode_object_key(object_id: &ObjectID, version: &VersionNumber) -> String {
-    let bytes =
-        bcs::to_bytes(&ObjectKey(*object_id, *version)).expect("failed to serialize object key");
+    let bytes = bcs::to_bytes(&ObjectKey(*object_id, *version)).expect("failed to serialize object key");
     base64_url::encode(&bytes)
 }
 
@@ -104,12 +104,8 @@ impl Key {
         match self {
             Key::Tx(digest) => encode_digest(digest),
             Key::Fx(digest) => encode_digest(digest),
-            Key::CheckpointContents(seq) => {
-                encoded_tagged_key(&TaggedKey::CheckpointSequenceNumber(*seq))
-            }
-            Key::CheckpointSummary(seq) => {
-                encoded_tagged_key(&TaggedKey::CheckpointSequenceNumber(*seq))
-            }
+            Key::CheckpointContents(seq) => encoded_tagged_key(&TaggedKey::CheckpointSequenceNumber(*seq)),
+            Key::CheckpointSummary(seq) => encoded_tagged_key(&TaggedKey::CheckpointSequenceNumber(*seq)),
             Key::CheckpointContentsByDigest(digest) => encode_digest(digest),
             Key::CheckpointSummaryByDigest(digest) => encode_digest(digest),
             Key::TxToCheckpoint(digest) => encode_digest(digest),
@@ -145,9 +141,7 @@ pub fn path_elements_to_key(digest: &str, type_: &str) -> anyhow::Result<Key> {
                 Err(_) => {
                     let tagged_key = bcs::from_bytes(&decoded_digest)?;
                     match tagged_key {
-                        TaggedKey::CheckpointSequenceNumber(seq) => {
-                            Ok(Key::CheckpointContents(seq))
-                        }
+                        TaggedKey::CheckpointSequenceNumber(seq) => Ok(Key::CheckpointContents(seq)),
                     }
                 }
                 Ok(cc_digest) => Ok(Key::CheckpointContentsByDigest(cc_digest)),
@@ -165,9 +159,7 @@ pub fn path_elements_to_key(digest: &str, type_: &str) -> anyhow::Result<Key> {
                 Ok(cs_digest) => Ok(Key::CheckpointSummaryByDigest(cs_digest)),
             }
         }
-        "tx2c" => Ok(Key::TxToCheckpoint(TransactionDigest::try_from(
-            decoded_digest,
-        )?)),
+        "tx2c" => Ok(Key::TxToCheckpoint(TransactionDigest::try_from(decoded_digest)?)),
         "ob" => {
             let object_key: ObjectKey = bcs::from_bytes(&decoded_digest)?;
             Ok(Key::ObjectKey(object_key.0, object_key.1))
@@ -186,41 +178,23 @@ impl HttpKVStore {
         Ok(TransactionKeyValueStore::new("http", metrics, inner))
     }
 
-    pub fn new(
-        base_url: &str,
-        cache_size: u64,
-        metrics: Arc<KeyValueStoreMetrics>,
-    ) -> SuiResult<Self> {
+    pub fn new(base_url: &str, cache_size: u64, metrics: Arc<KeyValueStoreMetrics>) -> SuiResult<Self> {
         info!("creating HttpKVStore with base_url: {}", base_url);
 
         let client = Client::builder().http2_prior_knowledge().build().unwrap();
 
-        let base_url = if base_url.ends_with('/') {
-            base_url.to_string()
-        } else {
-            format!("{}/", base_url)
-        };
+        let base_url = if base_url.ends_with('/') { base_url.to_string() } else { format!("{}/", base_url) };
 
         let base_url = Url::parse(&base_url).into_sui_result()?;
 
-        let cache = MokaCacheBuilder::new(cache_size)
-            .time_to_idle(Duration::from_secs(600))
-            .build();
+        let cache = MokaCacheBuilder::new(cache_size).time_to_idle(Duration::from_secs(600)).build();
 
-        Ok(Self {
-            base_url,
-            client,
-            cache,
-            metrics,
-        })
+        Ok(Self { base_url, client, cache, metrics })
     }
 
     fn get_url(&self, key: &Key) -> SuiResult<Url> {
         let (digest, item_type) = key.to_path_elements();
-        let joined = self
-            .base_url
-            .join(&format!("{}/{}", digest, item_type))
-            .into_sui_result()?;
+        let joined = self.base_url.join(&format!("{}/{}", digest, item_type)).into_sui_result()?;
         Url::from_str(joined.as_str()).into_sui_result()
     }
 
@@ -237,31 +211,18 @@ impl HttpKVStore {
 
         if let Some(res) = self.cache.get(&url) {
             trace!("found cached data for url: {}, len: {:?}", url, res.len());
-            self.metrics
-                .key_value_store_num_fetches_success
-                .with_label_values(&["http_cache", key.ty()])
-                .inc();
+            self.metrics.key_value_store_num_fetches_success.with_label_values(&["http_cache", key.ty()]).inc();
             return Ok(Some(res));
         }
 
-        self.metrics
-            .key_value_store_num_fetches_not_found
-            .with_label_values(&["http_cache", key.ty()])
-            .inc();
+        self.metrics.key_value_store_num_fetches_not_found.with_label_values(&["http_cache", key.ty()]).inc();
 
-        let resp = self
-            .client
-            .get(url.clone())
-            .send()
-            .await
-            .into_sui_result()?;
+        let resp = self.client.get(url.clone()).send().await.into_sui_result()?;
         trace!(
             "got response {} for url: {}, len: {:?}",
             url,
             resp.status(),
-            resp.headers()
-                .get(CONTENT_LENGTH)
-                .unwrap_or(&HeaderValue::from_static("0"))
+            resp.headers().get(CONTENT_LENGTH).unwrap_or(&HeaderValue::from_static("0"))
         );
         // return None if 400
         if resp.status().is_success() {
@@ -280,9 +241,7 @@ where
     K: std::fmt::Debug,
     T: for<'de> Deserialize<'de>,
 {
-    bcs::from_bytes(bytes)
-        .tap_err(|e| warn!("Error deserializing data for key {:?}: {:?}", key, e))
-        .ok()
+    bcs::from_bytes(bytes).tap_err(|e| warn!("Error deserializing data for key {:?}: {:?}", key, e)).ok()
 }
 
 fn map_fetch<'a, K>(fetch: (&'a SuiResult<Option<Bytes>>, &'a K)) -> Option<(&'a Bytes, &'a K)>
@@ -306,18 +265,14 @@ fn multi_split_slice<'a, T>(slice: &'a [T], lengths: &'a [usize]) -> Vec<&'a [T]
         .iter()
         .map(|length| {
             let end = start + length;
-            let result = &slice[start..end];
+            let result = &slice[start .. end];
             start = end;
             result
         })
         .collect()
 }
 
-fn deser_check_digest<T, D>(
-    digest: &D,
-    bytes: &Bytes,
-    get_expected_digest: impl FnOnce(&T) -> D,
-) -> Option<T>
+fn deser_check_digest<T, D>(digest: &D, bytes: &Bytes, get_expected_digest: impl FnOnce(&T) -> D) -> Option<T>
 where
     D: std::fmt::Debug + PartialEq,
     T: for<'de> Deserialize<'de>,
@@ -327,10 +282,7 @@ where
         if expected_digest == *digest {
             Some(o)
         } else {
-            error!(
-                "Digest mismatch - expected: {:?}, got: {:?}",
-                digest, expected_digest,
-            );
+            error!("Digest mismatch - expected: {:?}, got: {:?}", digest, expected_digest,);
             None
         }
     })
@@ -347,15 +299,12 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
         let num_txns = transactions.len();
         let num_effects = effects.len();
 
-        let keys = transactions
-            .iter()
-            .map(|tx| Key::Tx(*tx))
-            .chain(effects.iter().map(|fx| Key::Fx(*fx)))
-            .collect::<Vec<_>>();
+        let keys =
+            transactions.iter().map(|tx| Key::Tx(*tx)).chain(effects.iter().map(|fx| Key::Fx(*fx))).collect::<Vec<_>>();
 
         let fetches = self.multi_fetch(keys).await;
-        let txn_slice = fetches[..num_txns].to_vec();
-        let fx_slice = fetches[num_txns..num_txns + num_effects].to_vec();
+        let txn_slice = fetches[.. num_txns].to_vec();
+        let fx_slice = fetches[num_txns .. num_txns + num_effects].to_vec();
 
         let txn_results = txn_slice
             .iter()
@@ -363,9 +312,8 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
             .zip(transactions.iter())
             .map(map_fetch)
             .map(|maybe_bytes| {
-                maybe_bytes.and_then(|(bytes, digest)| {
-                    deser_check_digest(digest, bytes, |tx: &Transaction| *tx.digest())
-                })
+                maybe_bytes
+                    .and_then(|(bytes, digest)| deser_check_digest(digest, bytes, |tx: &Transaction| *tx.digest()))
             })
             .collect::<Vec<_>>();
 
@@ -376,9 +324,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
             .map(map_fetch)
             .map(|maybe_bytes| {
                 maybe_bytes.and_then(|(bytes, digest)| {
-                    deser_check_digest(digest, bytes, |fx: &TransactionEffects| {
-                        *fx.transaction_digest()
-                    })
+                    deser_check_digest(digest, bytes, |fx: &TransactionEffects| *fx.transaction_digest())
                 })
             })
             .collect::<Vec<_>>();
@@ -399,16 +345,8 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
         let keys = checkpoint_summaries
             .iter()
             .map(|cp| Key::CheckpointSummary(*cp))
-            .chain(
-                checkpoint_contents
-                    .iter()
-                    .map(|cp| Key::CheckpointContents(*cp)),
-            )
-            .chain(
-                checkpoint_summaries_by_digest
-                    .iter()
-                    .map(|cp| Key::CheckpointSummaryByDigest(*cp)),
-            )
+            .chain(checkpoint_contents.iter().map(|cp| Key::CheckpointContents(*cp)))
+            .chain(checkpoint_summaries_by_digest.iter().map(|cp| Key::CheckpointSummaryByDigest(*cp)))
             .collect::<Vec<_>>();
 
         let summaries_len = checkpoint_summaries.len();
@@ -425,19 +363,14 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
             .iter()
             .zip(checkpoint_summaries.iter())
             .map(map_fetch)
-            .map(|maybe_bytes| {
-                maybe_bytes
-                    .and_then(|(bytes, seq)| deser::<_, CertifiedCheckpointSummary>(seq, bytes))
-            })
+            .map(|maybe_bytes| maybe_bytes.and_then(|(bytes, seq)| deser::<_, CertifiedCheckpointSummary>(seq, bytes)))
             .collect::<Vec<_>>();
 
         let contents_results = result_slices[1]
             .iter()
             .zip(checkpoint_contents.iter())
             .map(map_fetch)
-            .map(|maybe_bytes| {
-                maybe_bytes.and_then(|(bytes, seq)| deser::<_, CheckpointContents>(seq, bytes))
-            })
+            .map(|maybe_bytes| maybe_bytes.and_then(|(bytes, seq)| deser::<_, CheckpointContents>(seq, bytes)))
             .collect::<Vec<_>>();
 
         let summaries_by_digest_results = result_slices[2]
@@ -450,11 +383,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
                 })
             })
             .collect::<Vec<_>>();
-        Ok((
-            summaries_results,
-            contents_results,
-            summaries_by_digest_results,
-        ))
+        Ok((summaries_results, contents_results, summaries_by_digest_results))
     }
 
     #[instrument(level = "trace", skip_all)]
@@ -463,32 +392,22 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
         digest: TransactionDigest,
     ) -> SuiResult<Option<CheckpointSequenceNumber>> {
         let key = Key::TxToCheckpoint(digest);
-        self.fetch(key).await.map(|maybe| {
-            maybe.and_then(|bytes| deser::<_, CheckpointSequenceNumber>(&key, bytes.as_ref()))
-        })
+        self.fetch(key)
+            .await
+            .map(|maybe| maybe.and_then(|bytes| deser::<_, CheckpointSequenceNumber>(&key, bytes.as_ref())))
     }
 
     #[instrument(level = "trace", skip_all)]
-    async fn get_object(
-        &self,
-        object_id: ObjectID,
-        version: SequenceNumber,
-    ) -> SuiResult<Option<Object>> {
+    async fn get_object(&self, object_id: ObjectID, version: SequenceNumber) -> SuiResult<Option<Object>> {
         let key = Key::ObjectKey(object_id, version);
         self.fetch(key).await.map(|maybe| {
             maybe
                 .and_then(|bytes| deser::<_, Object>(&key, bytes.as_ref()))
                 .tap_some(|_| {
-                    self.metrics
-                        .key_value_store_num_fetches_success
-                        .with_label_values(&["http", key.ty()])
-                        .inc();
+                    self.metrics.key_value_store_num_fetches_success.with_label_values(&["http", key.ty()]).inc();
                 })
                 .tap_none(|| {
-                    self.metrics
-                        .key_value_store_num_fetches_not_found
-                        .with_label_values(&["http", key.ty()])
-                        .inc();
+                    self.metrics.key_value_store_num_fetches_not_found.with_label_values(&["http", key.ty()]).inc();
                 })
         })
     }
@@ -498,10 +417,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
         &self,
         digests: &[TransactionDigest],
     ) -> SuiResult<Vec<Option<CheckpointSequenceNumber>>> {
-        let keys = digests
-            .iter()
-            .map(|digest| Key::TxToCheckpoint(*digest))
-            .collect::<Vec<_>>();
+        let keys = digests.iter().map(|digest| Key::TxToCheckpoint(*digest)).collect::<Vec<_>>();
 
         let fetches = self.multi_fetch(keys).await;
 
@@ -509,10 +425,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
             .iter()
             .zip(digests.iter())
             .map(map_fetch)
-            .map(|maybe_bytes| {
-                maybe_bytes
-                    .and_then(|(bytes, key)| deser::<_, CheckpointSequenceNumber>(&key, bytes))
-            })
+            .map(|maybe_bytes| maybe_bytes.and_then(|(bytes, key)| deser::<_, CheckpointSequenceNumber>(&key, bytes)))
             .collect::<Vec<_>>();
 
         Ok(results)
@@ -523,10 +436,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
         &self,
         digests: &[TransactionDigest],
     ) -> SuiResult<Vec<Option<TransactionEvents>>> {
-        let keys = digests
-            .iter()
-            .map(|digest| Key::EventsByTxDigest(*digest))
-            .collect::<Vec<_>>();
+        let keys = digests.iter().map(|digest| Key::EventsByTxDigest(*digest)).collect::<Vec<_>>();
         Ok(self
             .multi_fetch(keys)
             .await
@@ -534,8 +444,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
             .zip(digests.iter())
             .map(map_fetch)
             .map(|maybe_bytes| {
-                maybe_bytes
-                    .and_then(|(bytes, key)| deser::<_, TransactionEvents>(&key, &bytes.slice(1..)))
+                maybe_bytes.and_then(|(bytes, key)| deser::<_, TransactionEvents>(&key, &bytes.slice(1 ..)))
             })
             .collect::<Vec<_>>())
     }

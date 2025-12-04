@@ -75,11 +75,7 @@ impl WriteBatch {
         commits: Vec<TrustedCommit>,
         commit_info: Vec<(CommitRef, CommitInfo)>,
     ) -> Self {
-        WriteBatch {
-            blocks,
-            commits,
-            commit_info,
-        }
+        WriteBatch { blocks, commits, commit_info }
     }
 
     // Test setters.

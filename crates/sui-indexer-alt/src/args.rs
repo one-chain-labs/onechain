@@ -3,12 +3,13 @@
 
 use std::path::PathBuf;
 
-#[cfg(feature = "benchmark")]
-use crate::benchmark::BenchmarkArgs;
-use crate::IndexerArgs;
 use clap::Subcommand;
 use sui_indexer_alt_framework::ingestion::ClientArgs;
 use sui_pg_db::DbArgs;
+
+#[cfg(feature = "benchmark")]
+use crate::benchmark::BenchmarkArgs;
+use crate::IndexerArgs;
 
 #[derive(clap::Parser, Debug, Clone)]
 pub struct Args {

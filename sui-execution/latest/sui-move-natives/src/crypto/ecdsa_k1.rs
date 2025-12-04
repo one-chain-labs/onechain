@@ -1,16 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
-use fastcrypto::secp256k1::Secp256k1KeyPair;
-use fastcrypto::secp256k1::Secp256k1PrivateKey;
-use fastcrypto::traits::RecoverableSigner;
+use std::collections::VecDeque;
+
 use fastcrypto::{
     error::FastCryptoError,
     hash::{Keccak256, Sha256},
     secp256k1::{
-        recoverable::Secp256k1RecoverableSignature, Secp256k1PublicKey, Secp256k1Signature,
+        recoverable::Secp256k1RecoverableSignature,
+        Secp256k1KeyPair,
+        Secp256k1PrivateKey,
+        Secp256k1PublicKey,
+        Secp256k1Signature,
     },
-    traits::{RecoverableSignature, ToFromBytes},
+    traits::{RecoverableSignature, RecoverableSigner, ToFromBytes},
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
@@ -21,11 +23,11 @@ use move_vm_types::{
     pop_arg,
     values::{self, Value, VectorRef},
 };
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, SeedableRng};
 use smallvec::smallvec;
-use std::collections::VecDeque;
 use sui_types::crypto::KeypairTraits;
+
+use crate::NativesCostTable;
 
 pub const FAIL_TO_RECOVER_PUBKEY: u64 = 0;
 pub const INVALID_SIGNATURE: u64 = 1;
@@ -81,10 +83,7 @@ pub fn ecrecover(
     // Load the cost parameters from the protocol config
     let (ecdsa_k1_ecrecover_cost_params, crypto_invalid_arguments_cost) = {
         let cost_table = &context.extensions().get::<NativesCostTable>();
-        (
-            cost_table.ecdsa_k1_ecrecover_cost_params.clone(),
-            cost_table.crypto_invalid_arguments_cost,
-        )
+        (cost_table.ecdsa_k1_ecrecover_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
     let (base_cost, cost_per_byte, cost_per_block, block_size) = match hash {
         KECCAK256 => (
@@ -102,10 +101,7 @@ pub fn ecrecover(
         _ => {
             // Charge for failure but dont fail if we run out of gas otherwise the actual error is masked by OUT_OF_GAS error
             context.charge_gas(crypto_invalid_arguments_cost);
-            return Ok(NativeResult::err(
-                context.gas_used(),
-                FAIL_TO_RECOVER_PUBKEY,
-            ));
+            return Ok(NativeResult::err(context.gas_used(), FAIL_TO_RECOVER_PUBKEY));
         }
     };
 
@@ -138,10 +134,7 @@ pub fn ecrecover(
     };
 
     match pk {
-        Ok(pk) => Ok(NativeResult::ok(
-            cost,
-            smallvec![Value::vector_u8(pk.as_bytes().to_vec())],
-        )),
+        Ok(pk) => Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(pk.as_bytes().to_vec())])),
         Err(_) => Ok(NativeResult::err(cost, FAIL_TO_RECOVER_PUBKEY)),
     }
 }
@@ -159,16 +152,10 @@ pub fn decompress_pubkey(
     debug_assert!(args.len() == 1);
 
     // Load the cost parameters from the protocol config
-    let ecdsa_k1_decompress_pubkey_cost_params = &context
-        .extensions()
-        .get::<NativesCostTable>()
-        .ecdsa_k1_decompress_pubkey_cost_params
-        .clone();
+    let ecdsa_k1_decompress_pubkey_cost_params =
+        &context.extensions().get::<NativesCostTable>().ecdsa_k1_decompress_pubkey_cost_params.clone();
     // Charge the base cost for this oper
-    native_charge_gas_early_exit!(
-        context,
-        ecdsa_k1_decompress_pubkey_cost_params.ecdsa_k1_decompress_pubkey_cost_base
-    );
+    native_charge_gas_early_exit!(context, ecdsa_k1_decompress_pubkey_cost_params.ecdsa_k1_decompress_pubkey_cost_base);
 
     let pubkey = pop_arg!(args, VectorRef);
     let pubkey_ref = pubkey.as_bytes_ref();
@@ -178,10 +165,7 @@ pub fn decompress_pubkey(
     match Secp256k1PublicKey::from_bytes(&pubkey_ref) {
         Ok(pubkey) => {
             let uncompressed = &pubkey.pubkey.serialize_uncompressed();
-            Ok(NativeResult::ok(
-                cost,
-                smallvec![Value::vector_u8(uncompressed.to_vec())],
-            ))
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(uncompressed.to_vec())]))
         }
         Err(_) => Ok(NativeResult::err(cost, INVALID_PUBKEY)),
     }
@@ -227,37 +211,27 @@ pub fn secp256k1_verify(
     // Load the cost parameters from the protocol config
     let (ecdsa_k1_secp256k1_verify_cost_params, crypto_invalid_arguments_cost) = {
         let cost_table = &context.extensions().get::<NativesCostTable>();
-        (
-            cost_table.ecdsa_k1_secp256k1_verify_cost_params.clone(),
-            cost_table.crypto_invalid_arguments_cost,
-        )
+        (cost_table.ecdsa_k1_secp256k1_verify_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
 
     let (base_cost, cost_per_byte, cost_per_block, block_size) = match hash {
         KECCAK256 => (
             ecdsa_k1_secp256k1_verify_cost_params.ecdsa_k1_secp256k1_verify_keccak256_cost_base,
-            ecdsa_k1_secp256k1_verify_cost_params
-                .ecdsa_k1_secp256k1_verify_keccak256_msg_cost_per_byte,
-            ecdsa_k1_secp256k1_verify_cost_params
-                .ecdsa_k1_secp256k1_verify_keccak256_msg_cost_per_block,
+            ecdsa_k1_secp256k1_verify_cost_params.ecdsa_k1_secp256k1_verify_keccak256_msg_cost_per_byte,
+            ecdsa_k1_secp256k1_verify_cost_params.ecdsa_k1_secp256k1_verify_keccak256_msg_cost_per_block,
             KECCAK256_BLOCK_SIZE,
         ),
         SHA256 => (
             ecdsa_k1_secp256k1_verify_cost_params.ecdsa_k1_secp256k1_verify_sha256_cost_base,
-            ecdsa_k1_secp256k1_verify_cost_params
-                .ecdsa_k1_secp256k1_verify_sha256_msg_cost_per_byte,
-            ecdsa_k1_secp256k1_verify_cost_params
-                .ecdsa_k1_secp256k1_verify_sha256_msg_cost_per_block,
+            ecdsa_k1_secp256k1_verify_cost_params.ecdsa_k1_secp256k1_verify_sha256_msg_cost_per_byte,
+            ecdsa_k1_secp256k1_verify_cost_params.ecdsa_k1_secp256k1_verify_sha256_msg_cost_per_block,
             SHA256_BLOCK_SIZE,
         ),
         _ => {
             // Charge for failure but dont fail if we run out of gas otherwise the actual error is masked by OUT_OF_GAS error
             context.charge_gas(crypto_invalid_arguments_cost);
 
-            return Ok(NativeResult::ok(
-                context.gas_used(),
-                smallvec![Value::bool(false)],
-            ));
+            return Ok(NativeResult::ok(context.gas_used(), smallvec![Value::bool(false)]));
         }
     };
     // Charge the base cost for this oper
@@ -332,23 +306,14 @@ pub fn secp256k1_sign(
     let kp = Secp256k1KeyPair::from(sk);
 
     let signature = match (hash, recoverable) {
-        (KECCAK256, true) => kp
-            .sign_recoverable_with_hash::<Keccak256>(&msg_ref)
-            .as_bytes()
-            .to_vec(),
+        (KECCAK256, true) => kp.sign_recoverable_with_hash::<Keccak256>(&msg_ref).as_bytes().to_vec(),
         (KECCAK256, false) => kp.sign_with_hash::<Keccak256>(&msg_ref).as_bytes().to_vec(),
-        (SHA256, true) => kp
-            .sign_recoverable_with_hash::<Sha256>(&msg_ref)
-            .as_bytes()
-            .to_vec(),
+        (SHA256, true) => kp.sign_recoverable_with_hash::<Sha256>(&msg_ref).as_bytes().to_vec(),
         (SHA256, false) => kp.sign_with_hash::<Sha256>(&msg_ref).as_bytes().to_vec(),
         _ => return Ok(NativeResult::err(cost, INVALID_HASH_FUNCTION)),
     };
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::vector_u8(signature)],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(signature)]))
 }
 
 /***************************************************************************************************
@@ -383,11 +348,8 @@ pub fn secp256k1_keypair_from_seed(
     let pk_bytes = kp.public().as_bytes().to_vec();
     let sk_bytes = kp.private().as_bytes().to_vec();
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::struct_(values::Struct::pack(vec![
-            Value::vector_u8(sk_bytes),
-            Value::vector_u8(pk_bytes),
-        ]))],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::struct_(values::Struct::pack(vec![
+        Value::vector_u8(sk_bytes),
+        Value::vector_u8(pk_bytes),
+    ]))]))
 }

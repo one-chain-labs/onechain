@@ -9,13 +9,12 @@ use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
+use super::IndexedCheckpoint;
 use crate::{
     metrics::{CheckpointLagMetricReporter, IndexerMetrics},
     pipeline::Break,
     task::TrySpawnStreamExt,
 };
-
-use super::IndexedCheckpoint;
 
 /// Implementors of this trait are responsible for transforming checkpoint into rows for their
 /// table. The `FANOUT` associated value controls how many concurrent workers will be used to
@@ -72,15 +71,9 @@ pub(super) fn processor<P: Processor + Send + Sync + 'static>(
                         return Err(Break::Cancel);
                     }
 
-                    metrics
-                        .total_handler_checkpoints_received
-                        .with_label_values(&[P::NAME])
-                        .inc();
+                    metrics.total_handler_checkpoints_received.with_label_values(&[P::NAME]).inc();
 
-                    let guard = metrics
-                        .handler_checkpoint_latency
-                        .with_label_values(&[P::NAME])
-                        .start_timer();
+                    let guard = metrics.handler_checkpoint_latency.with_label_values(&[P::NAME]).start_timer();
 
                     let values = processor.process(&checkpoint)?;
                     let elapsed = guard.stop_and_record();
@@ -99,25 +92,13 @@ pub(super) fn processor<P: Processor + Send + Sync + 'static>(
 
                     checkpoint_lag_reporter.report_lag(cp_sequence_number, timestamp_ms);
 
-                    metrics
-                        .total_handler_checkpoints_processed
-                        .with_label_values(&[P::NAME])
-                        .inc();
+                    metrics.total_handler_checkpoints_processed.with_label_values(&[P::NAME]).inc();
 
-                    metrics
-                        .total_handler_rows_created
-                        .with_label_values(&[P::NAME])
-                        .inc_by(values.len() as u64);
+                    metrics.total_handler_rows_created.with_label_values(&[P::NAME]).inc_by(values.len() as u64);
 
-                    tx.send(IndexedCheckpoint::new(
-                        epoch,
-                        cp_sequence_number,
-                        tx_hi,
-                        timestamp_ms,
-                        values,
-                    ))
-                    .await
-                    .map_err(|_| Break::Cancel)?;
+                    tx.send(IndexedCheckpoint::new(epoch, cp_sequence_number, tx_hi, timestamp_ms, values))
+                        .await
+                        .map_err(|_| Break::Cancel)?;
 
                     Ok(())
                 }

@@ -1,10 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::{
-    kv_transactions, tx_affected_addresses, tx_affected_objects, tx_balance_changes, tx_calls,
-    tx_digests, tx_kinds,
-};
 use diesel::{
     backend::Backend,
     deserialize::{self, FromSqlRow},
@@ -16,6 +12,16 @@ use diesel::{
 use serde::{Deserialize, Serialize};
 use sui_field_count::FieldCount;
 use sui_types::object::Owner;
+
+use crate::schema::{
+    kv_transactions,
+    tx_affected_addresses,
+    tx_affected_objects,
+    tx_balance_changes,
+    tx_calls,
+    tx_digests,
+    tx_kinds,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BalanceChange {

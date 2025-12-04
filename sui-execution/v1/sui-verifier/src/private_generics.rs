@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{
-    file_format::{
-        Bytecode, FunctionDefinition, FunctionHandle, FunctionInstantiation, ModuleHandle,
-        SignatureToken,
-    },
+    file_format::{Bytecode, FunctionDefinition, FunctionHandle, FunctionInstantiation, ModuleHandle, SignatureToken},
     CompiledModule,
 };
 use move_bytecode_utils::format_signature_token;
@@ -23,11 +20,8 @@ pub const PUBLIC_TRANSFER_FUNCTIONS: &[&IdentStr] = &[
     ident_str!("public_share_object"),
     ident_str!("receive"),
 ];
-pub const PRIVATE_TRANSFER_FUNCTIONS: &[&IdentStr] = &[
-    ident_str!("transfer"),
-    ident_str!("freeze_object"),
-    ident_str!("share_object"),
-];
+pub const PRIVATE_TRANSFER_FUNCTIONS: &[&IdentStr] =
+    &[ident_str!("transfer"), ident_str!("freeze_object"), ident_str!("share_object")];
 pub const TRANSFER_IMPL_FUNCTIONS: &[&IdentStr] = &[
     ident_str!("transfer_impl"),
     ident_str!("freeze_object_impl"),
@@ -46,9 +40,7 @@ pub const TRANSFER_IMPL_FUNCTIONS: &[&IdentStr] = &[
 /// Concretely, with `event::emit<T>(...)`:
 /// - `T` must be a type declared in the current module
 pub fn verify_module(module: &CompiledModule) -> Result<(), ExecutionError> {
-    if *module.address() == SUI_FRAMEWORK_ADDRESS
-        && module.name() == IdentStr::new(TEST_SCENARIO_MODULE_NAME).unwrap()
-    {
+    if *module.address() == SUI_FRAMEWORK_ADDRESS && module.name() == IdentStr::new(TEST_SCENARIO_MODULE_NAME).unwrap() {
         // exclude test_module which is a test-only module in the Sui framework which "emulates"
         // transactional execution and needs to allow test code to bypass private generics
         return Ok(());
@@ -74,10 +66,7 @@ fn verify_function(view: &CompiledModule, fdef: &FunctionDefinition) -> Result<(
     };
     for instr in &code.code {
         if let Bytecode::CallGeneric(finst_idx) = instr {
-            let FunctionInstantiation {
-                handle,
-                type_parameters,
-            } = view.function_instantiation_at(*finst_idx);
+            let FunctionInstantiation { handle, type_parameters } = view.function_instantiation_at(*finst_idx);
 
             let fhandle = view.function_handle_at(*handle);
             let mhandle = view.module_handle_at(fhandle.module);
@@ -192,10 +181,7 @@ fn is_defined_in_current_module(view: &CompiledModule, type_arg: &SignatureToken
     }
 }
 
-fn addr_module<'a>(
-    view: &'a CompiledModule,
-    mhandle: &ModuleHandle,
-) -> (AccountAddress, &'a IdentStr) {
+fn addr_module<'a>(view: &'a CompiledModule, mhandle: &ModuleHandle) -> (AccountAddress, &'a IdentStr) {
     let maddr = view.address_identifier_at(mhandle.address);
     let mident = view.identifier_at(mhandle.name);
     (*maddr, mident)

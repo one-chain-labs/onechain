@@ -35,13 +35,9 @@ impl ObjectRead {
 
     /// The object at this version.  May not be available due to pruning.
     async fn object(&self, ctx: &Context<'_>) -> Result<Option<Object>> {
-        Object::query(
-            ctx,
-            self.address_impl(),
-            Object::at_version(self.version_impl(), self.checkpoint_viewed_at),
-        )
-        .await
-        .extend()
+        Object::query(ctx, self.address_impl(), Object::at_version(self.version_impl(), self.checkpoint_viewed_at))
+            .await
+            .extend()
     }
 }
 

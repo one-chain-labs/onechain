@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::str::FromStr;
+
 use sui_json_rpc::name_service::{self, Domain};
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
@@ -40,37 +41,16 @@ fn test_expirations() {
 #[test]
 fn test_name_service_outputs() {
     assert_eq!("@test".parse::<Domain>().unwrap().to_string(), "test.sui");
-    assert_eq!(
-        "test.sui".parse::<Domain>().unwrap().to_string(),
-        "test.sui"
-    );
-    assert_eq!(
-        "test@sld".parse::<Domain>().unwrap().to_string(),
-        "test.sld.sui"
-    );
-    assert_eq!(
-        "test.test@example".parse::<Domain>().unwrap().to_string(),
-        "test.test.example.sui"
-    );
-    assert_eq!(
-        "sui@sui".parse::<Domain>().unwrap().to_string(),
-        "sui.sui.sui"
-    );
+    assert_eq!("test.sui".parse::<Domain>().unwrap().to_string(), "test.sui");
+    assert_eq!("test@sld".parse::<Domain>().unwrap().to_string(), "test.sld.sui");
+    assert_eq!("test.test@example".parse::<Domain>().unwrap().to_string(), "test.test.example.sui");
+    assert_eq!("sui@sui".parse::<Domain>().unwrap().to_string(), "sui.sui.sui");
 
     assert_eq!("@sui".parse::<Domain>().unwrap().to_string(), "sui.sui");
 
-    assert_eq!(
-        "test*test@test".parse::<Domain>().unwrap().to_string(),
-        "test.test.test.sui"
-    );
-    assert_eq!(
-        "test.test.sui".parse::<Domain>().unwrap().to_string(),
-        "test.test.sui"
-    );
-    assert_eq!(
-        "test.test.test.sui".parse::<Domain>().unwrap().to_string(),
-        "test.test.test.sui"
-    );
+    assert_eq!("test*test@test".parse::<Domain>().unwrap().to_string(), "test.test.test.sui");
+    assert_eq!("test.test.sui".parse::<Domain>().unwrap().to_string(), "test.test.sui");
+    assert_eq!("test.test.test.sui".parse::<Domain>().unwrap().to_string(), "test.test.test.sui");
 }
 
 #[test]

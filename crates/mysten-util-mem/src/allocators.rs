@@ -9,13 +9,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#[cfg(feature = "std")]
-use crate::malloc_size::MallocUnconditionalSizeOf;
-use crate::malloc_size::{MallocSizeOf, MallocSizeOfOps, VoidPtrToSizeFn};
 #[cfg(not(feature = "std"))]
 use core::ffi::c_void;
 #[cfg(feature = "std")]
 use std::os::raw::c_void;
+
+#[cfg(feature = "std")]
+use crate::malloc_size::MallocUnconditionalSizeOf;
+use crate::malloc_size::{MallocSizeOf, MallocSizeOfOps, VoidPtrToSizeFn};
 
 mod usable_size {
 
@@ -66,11 +67,7 @@ mod usable_size {
 
 /// Get a new instance of a MallocSizeOfOps
 pub fn new_malloc_size_ops() -> MallocSizeOfOps {
-    MallocSizeOfOps::new(
-        usable_size::malloc_usable_size,
-        usable_size::new_enclosing_size_fn(),
-        None,
-    )
+    MallocSizeOfOps::new(usable_size::malloc_usable_size, usable_size::new_enclosing_size_fn(), None)
 }
 
 /// Extension methods for `MallocSizeOf` trait, do not implement

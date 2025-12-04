@@ -5,9 +5,8 @@ use std::time::Instant;
 
 use tracing::{debug, info};
 
-use crate::watermarks::PrunerWatermark;
-
 use super::{CommitterWatermark, Processor};
+use crate::watermarks::PrunerWatermark;
 
 /// Tracing message for the watermark update will be logged at info level at least this many
 /// checkpoints.
@@ -27,11 +26,7 @@ pub(crate) struct WatermarkLogger {
 
 impl WatermarkLogger {
     pub fn new(name: &'static str, init_watermark: impl Into<LoggerWatermark>) -> Self {
-        Self {
-            name,
-            timer: Instant::now(),
-            prev_watermark: init_watermark.into(),
-        }
+        Self { name, timer: Instant::now(), prev_watermark: init_watermark.into() }
     }
 
     /// Log the watermark update.
@@ -42,19 +37,14 @@ impl WatermarkLogger {
     ///
     /// If the watermark update is less than `LOUD_WATERMARK_UPDATE_INTERVAL` checkpoints apart,
     /// the log message will be at debug level. Otherwise, it will be at info level.
-    pub fn log<H: Processor>(
-        &mut self,
-        watermark: impl Into<LoggerWatermark>,
-        watermark_update_latency: f64,
-    ) {
+    pub fn log<H: Processor>(&mut self, watermark: impl Into<LoggerWatermark>, watermark_update_latency: f64) {
         let watermark: LoggerWatermark = watermark.into();
         let logger_timer_elapsed = self.timer.elapsed().as_secs_f64();
         let realtime_average_tps = match (self.prev_watermark.transaction, watermark.transaction) {
             (Some(prev), Some(curr)) => Some((curr - prev) as f64 / logger_timer_elapsed),
             _ => None,
         };
-        let realtime_average_cps =
-            (watermark.checkpoint - self.prev_watermark.checkpoint) as f64 / logger_timer_elapsed;
+        let realtime_average_cps = (watermark.checkpoint - self.prev_watermark.checkpoint) as f64 / logger_timer_elapsed;
 
         if watermark.checkpoint < self.prev_watermark.checkpoint + LOUD_WATERMARK_UPDATE_INTERVAL {
             debug!(
@@ -87,18 +77,12 @@ impl WatermarkLogger {
 
 impl From<&CommitterWatermark<'_>> for LoggerWatermark {
     fn from(watermark: &CommitterWatermark) -> Self {
-        Self {
-            checkpoint: watermark.checkpoint_hi_inclusive,
-            transaction: Some(watermark.tx_hi),
-        }
+        Self { checkpoint: watermark.checkpoint_hi_inclusive, transaction: Some(watermark.tx_hi) }
     }
 }
 
 impl From<&PrunerWatermark<'_>> for LoggerWatermark {
     fn from(watermark: &PrunerWatermark) -> Self {
-        Self {
-            checkpoint: watermark.pruner_hi,
-            transaction: None,
-        }
+        Self { checkpoint: watermark.pruner_hi, transaction: None }
     }
 }

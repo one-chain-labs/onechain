@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::*;
+
 use crate::types::{
     digest::Digest,
     sui_address::SuiAddress,
     type_filter::{ModuleFilter, TypeFilter},
 };
-use async_graphql::*;
 
 #[derive(InputObject, Clone, Default)]
 pub(crate) struct EventFilter {

@@ -1,23 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitored_scope;
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
+    hash::{Hash, Hasher},
+    sync::Arc,
+    time::Duration,
+};
+
 use futures::FutureExt;
 use parking_lot::Mutex;
 use prometheus::{
-    register_int_counter_vec_with_registry, register_int_gauge_vec_with_registry, IntCounterVec,
-    IntGaugeVec, Registry,
+    register_int_counter_vec_with_registry,
+    register_int_gauge_vec_with_registry,
+    IntCounterVec,
+    IntGaugeVec,
+    Registry,
 };
-use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::runtime::Handle;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::TrySendError;
-use tokio::time::Instant;
+use tokio::{
+    runtime::Handle,
+    sync::{mpsc, mpsc::error::TrySendError},
+    time::Instant,
+};
 use tracing::{debug, error};
+
+use crate::monitored_scope;
 
 type Point = u64;
 type HistogramMessage = (HistogramLabels, Point);
@@ -86,13 +93,7 @@ struct HistogramLabelsInner {
 /// * If histogram data is produced too fast, the data is dropped and error! log is emitted
 impl HistogramVec {
     pub fn new_in_registry(name: &str, desc: &str, labels: &[&str], registry: &Registry) -> Self {
-        Self::new_in_registry_with_percentiles(
-            name,
-            desc,
-            labels,
-            registry,
-            vec![500usize, 950, 990],
-        )
+        Self::new_in_registry_with_percentiles(name, desc, labels, registry, vec![500usize, 950, 990])
     }
 
     /// Allows to specify percentiles in 1/1000th, e.g. 90pct is specified as 900
@@ -105,37 +106,19 @@ impl HistogramVec {
     ) -> Self {
         let sum_name = format!("{}_sum", name);
         let count_name = format!("{}_count", name);
-        let sum =
-            register_int_counter_vec_with_registry!(sum_name, desc, labels, registry).unwrap();
-        let count =
-            register_int_counter_vec_with_registry!(count_name, desc, labels, registry).unwrap();
+        let sum = register_int_counter_vec_with_registry!(sum_name, desc, labels, registry).unwrap();
+        let count = register_int_counter_vec_with_registry!(count_name, desc, labels, registry).unwrap();
         let labels: Vec<_> = labels.iter().cloned().chain(["pct"]).collect();
         let gauge = register_int_gauge_vec_with_registry!(name, desc, &labels, registry).unwrap();
         Self::new(gauge, sum, count, percentiles, name)
     }
 
     // Do not expose it to public interface because we need labels to have a specific format (e.g. add last label is "pct")
-    fn new(
-        gauge: IntGaugeVec,
-        sum: IntCounterVec,
-        count: IntCounterVec,
-        percentiles: Vec<usize>,
-        name: &str,
-    ) -> Self {
+    fn new(gauge: IntGaugeVec, sum: IntCounterVec, count: IntCounterVec, percentiles: Vec<usize>, name: &str) -> Self {
         let (sender, receiver) = mpsc::channel(1000);
-        let reporter = HistogramReporter {
-            gauge,
-            sum,
-            count,
-            percentiles,
-            known_labels: Default::default(),
-        };
+        let reporter = HistogramReporter { gauge, sum, count, percentiles, known_labels: Default::default() };
         let reporter = Arc::new(Mutex::new(reporter));
-        let collector = HistogramCollector {
-            reporter,
-            channel: receiver,
-            _name: name.to_string(),
-        };
+        let collector = HistogramCollector { reporter, channel: receiver, _name: name.to_string() };
         Handle::current().spawn(collector.run());
         Self { channel: sender }
     }
@@ -143,10 +126,7 @@ impl HistogramVec {
     pub fn with_label_values(&self, labels: &[&str]) -> Histogram {
         let labels = labels.iter().map(ToString::to_string).collect();
         let labels = HistogramLabelsInner::new(labels);
-        Histogram {
-            labels,
-            channel: self.channel.clone(),
-        }
+        Histogram { labels, channel: self.channel.clone() }
     }
 }
 
@@ -194,10 +174,7 @@ impl Histogram {
     }
 
     pub fn start_timer(&self) -> HistogramTimerGuard {
-        HistogramTimerGuard {
-            histogram: self,
-            start: Instant::now(),
-        }
+        HistogramTimerGuard { histogram: self, start: Instant::now() }
     }
 }
 
@@ -241,10 +218,7 @@ impl HistogramCollector {
             }
         }
         if count > MAX_POINTS {
-            error!(
-                "Too many data points for histogram, dropping {} points",
-                count - MAX_POINTS
-            );
+            error!("Too many data points for histogram, dropping {} points", count - MAX_POINTS);
         }
         if Arc::strong_count(&self.reporter) != 1 {
             #[cfg(not(debug_assertions))]
@@ -311,15 +285,15 @@ impl HistogramReporter {
 
 impl<'a> Drop for HistogramTimerGuard<'a> {
     fn drop(&mut self) {
-        self.histogram
-            .report(self.start.elapsed().as_millis() as u64);
+        self.histogram.report(self.start.elapsed().as_millis() as u64);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use prometheus::proto::MetricFamily;
+
+    use super::*;
 
     #[test]
     fn pct_index_test() {
@@ -343,13 +317,8 @@ mod tests {
     #[tokio::test]
     async fn histogram_test() {
         let registry = Registry::new();
-        let histogram = HistogramVec::new_in_registry_with_percentiles(
-            "test",
-            "xx",
-            &["lab"],
-            &registry,
-            vec![500, 900],
-        );
+        let histogram =
+            HistogramVec::new_in_registry_with_percentiles("test", "xx", &["lab"], &registry, vec![500, 900]);
         let a = histogram.with_label_values(&["a"]);
         let b = histogram.with_label_values(&["b"]);
         a.report(1);
@@ -362,10 +331,7 @@ mod tests {
         b.report(40);
         tokio::time::sleep(Duration::from_millis(1500)).await;
         let gather = registry.gather();
-        let gather: HashMap<_, _> = gather
-            .into_iter()
-            .map(|f| (f.get_name().to_string(), f))
-            .collect();
+        let gather: HashMap<_, _> = gather.into_iter().map(|f| (f.get_name().to_string(), f)).collect();
         let hist = gather.get("test").unwrap();
         let sum = gather.get("test_sum").unwrap();
         let count = gather.get("test_count").unwrap();

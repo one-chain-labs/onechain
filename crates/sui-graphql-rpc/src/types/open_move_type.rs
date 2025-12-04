@@ -121,35 +121,25 @@ impl OpenMoveType {
 
 impl From<OpenSignature> for OpenMoveType {
     fn from(signature: OpenSignature) -> Self {
-        OpenMoveType {
-            signature: signature.into(),
-        }
+        OpenMoveType { signature: signature.into() }
     }
 }
 
 impl From<OpenSignatureBody> for OpenMoveType {
     fn from(signature: OpenSignatureBody) -> Self {
-        OpenMoveType {
-            signature: signature.into(),
-        }
+        OpenMoveType { signature: signature.into() }
     }
 }
 
 impl From<OpenSignature> for OpenMoveTypeSignature {
     fn from(signature: OpenSignature) -> Self {
-        OpenMoveTypeSignature {
-            ref_: signature.ref_.map(OpenMoveTypeReference::from),
-            body: signature.body.into(),
-        }
+        OpenMoveTypeSignature { ref_: signature.ref_.map(OpenMoveTypeReference::from), body: signature.body.into() }
     }
 }
 
 impl From<OpenSignatureBody> for OpenMoveTypeSignature {
     fn from(signature: OpenSignatureBody) -> Self {
-        OpenMoveTypeSignature {
-            ref_: None,
-            body: signature.into(),
-        }
+        OpenMoveTypeSignature { ref_: None, body: signature.into() }
     }
 }
 
@@ -254,12 +244,7 @@ impl fmt::Display for OpenMoveTypeSignatureBody {
             B::U256 => write!(f, "u256"),
             B::Vector(sig) => write!(f, "vector<{sig}>"),
 
-            B::Datatype {
-                package,
-                module,
-                type_,
-                type_parameters,
-            } => {
+            B::Datatype { package, module, type_, type_parameters } => {
                 write!(f, "{package}::{module}::{type_}")?;
 
                 let mut params = type_parameters.iter();
@@ -286,13 +271,12 @@ pub(crate) fn abilities(set: AbilitySet) -> Vec<MoveAbility> {
 mod tests {
     use std::str::FromStr;
 
-    use super::*;
-
     use expect_test::expect;
     use move_core_types::language_storage::StructTag;
     use sui_package_resolver::{DatatypeKey, DatatypeRef};
-
     use OpenSignatureBody as S;
+
+    use super::*;
 
     fn struct_key(s: &str) -> DatatypeKey {
         DatatypeRef::from(&StructTag::from_str(s).unwrap()).as_key()
@@ -300,10 +284,10 @@ mod tests {
 
     #[test]
     fn generic_signature() {
-        let signature = OpenMoveTypeSignature::from(S::Datatype(
-            struct_key("0x2::table::Table"),
-            vec![S::TypeParameter(0), S::TypeParameter(1)],
-        ));
+        let signature = OpenMoveTypeSignature::from(S::Datatype(struct_key("0x2::table::Table"), vec![
+            S::TypeParameter(0),
+            S::TypeParameter(1),
+        ]));
 
         let expect = expect![[r#"
             OpenMoveTypeSignature {
@@ -327,10 +311,10 @@ mod tests {
 
     #[test]
     fn instance_signature() {
-        let signature = OpenMoveTypeSignature::from(S::Datatype(
-            struct_key("0x2::coin::Coin"),
-            vec![S::Datatype(struct_key("0x2::oct::OCT"), vec![])],
-        ));
+        let signature = OpenMoveTypeSignature::from(S::Datatype(struct_key("0x2::coin::Coin"), vec![S::Datatype(
+            struct_key("0x2::oct::OCT"),
+            vec![],
+        )]));
 
         let expect = expect![[r#"
             OpenMoveTypeSignature {
@@ -354,10 +338,10 @@ mod tests {
 
     #[test]
     fn generic_signature_repr() {
-        let signature = OpenMoveTypeSignature::from(S::Datatype(
-            struct_key("0x2::table::Table"),
-            vec![S::TypeParameter(0), S::TypeParameter(1)],
-        ));
+        let signature = OpenMoveTypeSignature::from(S::Datatype(struct_key("0x2::table::Table"), vec![
+            S::TypeParameter(0),
+            S::TypeParameter(1),
+        ]));
 
         let expect = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::table::Table<$0, $1>"];
         expect.assert_eq(&format!("{signature}"));
@@ -365,10 +349,10 @@ mod tests {
 
     #[test]
     fn instance_signature_repr() {
-        let signature = OpenMoveTypeSignature::from(S::Datatype(
-            struct_key("0x2::coin::Coin"),
-            vec![S::Datatype(struct_key("0x2::oct::OCT"), vec![])],
-        ));
+        let signature = OpenMoveTypeSignature::from(S::Datatype(struct_key("0x2::coin::Coin"), vec![S::Datatype(
+            struct_key("0x2::oct::OCT"),
+            vec![],
+        )]));
 
         let expect = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>"];
         expect.assert_eq(&format!("{signature}"));

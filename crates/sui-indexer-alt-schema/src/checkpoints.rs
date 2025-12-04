@@ -30,11 +30,7 @@ impl StoredGenesis {
     /// Try and identify the chain that this indexer is idnexing based on its genesis checkpoint
     /// digest.
     pub fn chain(&self) -> Result<Chain> {
-        let bytes: [u8; 32] = self
-            .genesis_digest
-            .clone()
-            .try_into()
-            .map_err(|_| anyhow!("Bad genesis digest"))?;
+        let bytes: [u8; 32] = self.genesis_digest.clone().try_into().map_err(|_| anyhow!("Bad genesis digest"))?;
 
         let digest = CheckpointDigest::new(bytes);
         let identifier = ChainIdentifier::from(digest);

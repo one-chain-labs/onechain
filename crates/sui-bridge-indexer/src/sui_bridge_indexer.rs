@@ -2,25 +2,38 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Error;
+use sui_bridge::events::{
+    EmergencyOpEvent,
+    MoveBlocklistValidatorEvent,
+    MoveNewTokenEvent,
+    MoveTokenDepositedEvent,
+    MoveTokenRegistrationEvent,
+    MoveTokenTransferApproved,
+    MoveTokenTransferClaimed,
+    UpdateRouteLimitEvent,
+    UpdateTokenPriceEvent,
+};
+use sui_indexer_builder::{indexer_builder::DataMapper, sui_datasource::CheckpointTxnData};
+use sui_types::{
+    effects::TransactionEffectsAPI,
+    event::Event,
+    execution_status::ExecutionStatus,
+    full_checkpoint_content::CheckpointTransaction,
+    BRIDGE_ADDRESS,
+    SUI_BRIDGE_OBJECT_ID,
+};
 use tracing::{info, warn};
 
-use sui_bridge::events::{
-    EmergencyOpEvent, MoveBlocklistValidatorEvent, MoveNewTokenEvent, MoveTokenDepositedEvent,
-    MoveTokenRegistrationEvent, MoveTokenTransferApproved, MoveTokenTransferClaimed,
-    UpdateRouteLimitEvent, UpdateTokenPriceEvent,
-};
-use sui_indexer_builder::indexer_builder::DataMapper;
-use sui_indexer_builder::sui_datasource::CheckpointTxnData;
-use sui_types::effects::TransactionEffectsAPI;
-use sui_types::event::Event;
-use sui_types::execution_status::ExecutionStatus;
-use sui_types::full_checkpoint_content::CheckpointTransaction;
-use sui_types::{BRIDGE_ADDRESS, SUI_BRIDGE_OBJECT_ID};
-
-use crate::metrics::BridgeIndexerMetrics;
 use crate::{
-    BridgeDataSource, GovernanceAction, GovernanceActionType, ProcessedTxnData, SuiTxnError,
-    TokenTransfer, TokenTransferData, TokenTransferStatus,
+    metrics::BridgeIndexerMetrics,
+    BridgeDataSource,
+    GovernanceAction,
+    GovernanceActionType,
+    ProcessedTxnData,
+    SuiTxnError,
+    TokenTransfer,
+    TokenTransferData,
+    TokenTransferStatus,
 };
 
 /// Data mapper impl
@@ -30,24 +43,16 @@ pub struct SuiBridgeDataMapper {
 }
 
 impl DataMapper<CheckpointTxnData, ProcessedTxnData> for SuiBridgeDataMapper {
-    fn map(
-        &self,
-        (data, checkpoint_num, timestamp_ms): CheckpointTxnData,
-    ) -> Result<Vec<ProcessedTxnData>, Error> {
+    fn map(&self, (data, checkpoint_num, timestamp_ms): CheckpointTxnData) -> Result<Vec<ProcessedTxnData>, Error> {
         self.metrics.total_oct_bridge_transactions.inc();
-        if !data
-            .input_objects
-            .iter()
-            .any(|obj| obj.id() == SUI_BRIDGE_OBJECT_ID)
-        {
+        if !data.input_objects.iter().any(|obj| obj.id() == SUI_BRIDGE_OBJECT_ID) {
             return Ok(vec![]);
         }
 
         match &data.events {
             Some(events) => {
                 let token_transfers = events.data.iter().try_fold(vec![], |mut result, ev| {
-                    if let Some(data) = process_sui_event(ev, &data, checkpoint_num, timestamp_ms)?
-                    {
+                    if let Some(data) = process_sui_event(ev, &data, checkpoint_num, timestamp_ms)? {
                         result.push(data);
                     }
                     Ok::<_, anyhow::Error>(result)

@@ -124,12 +124,10 @@ pub(crate) fn functional_group(type_: &str, field: &str) -> Option<FunctionalGro
 mod tests {
     use std::collections::BTreeSet;
 
-    use async_graphql::registry::Registry;
-    use async_graphql::OutputType;
-
-    use crate::types::query::Query;
+    use async_graphql::{registry::Registry, OutputType};
 
     use super::*;
+    use crate::types::query::Query;
 
     #[test]
     /// Makes sure all the functional groups correspond to real elements of the schema unless they

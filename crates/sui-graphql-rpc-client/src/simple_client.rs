@@ -1,15 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ClientError;
-use reqwest::header;
-use reqwest::header::HeaderValue;
-use reqwest::Response;
-use serde_json::Value;
 use std::collections::BTreeMap;
+
+use reqwest::{header, header::HeaderValue, Response};
+use serde_json::Value;
 use sui_graphql_rpc_headers::LIMITS_HEADER;
 
 use super::response::GraphqlResponse;
+use crate::ClientError;
 
 #[derive(Clone, Debug)]
 pub struct GraphqlQueryVariable {
@@ -26,10 +25,7 @@ pub struct SimpleClient {
 
 impl SimpleClient {
     pub fn new<S: Into<String>>(base_url: S) -> Self {
-        Self {
-            inner: reqwest::Client::new(),
-            url: base_url.into(),
-        }
+        Self { inner: reqwest::Client::new(), url: base_url.into() }
     }
 
     pub async fn execute(
@@ -37,11 +33,7 @@ impl SimpleClient {
         query: String,
         headers: Vec<(header::HeaderName, header::HeaderValue)>,
     ) -> Result<serde_json::Value, ClientError> {
-        self.execute_impl(query, vec![], headers, false)
-            .await?
-            .json()
-            .await
-            .map_err(|e| e.into())
+        self.execute_impl(query, vec![], headers, false).await?.json().await.map_err(|e| e.into())
     }
 
     pub async fn execute_to_graphql(
@@ -52,10 +44,7 @@ impl SimpleClient {
         mut headers: Vec<(header::HeaderName, header::HeaderValue)>,
     ) -> Result<GraphqlResponse, ClientError> {
         if get_usage {
-            headers.push((
-                LIMITS_HEADER.clone().as_str().try_into().unwrap(),
-                HeaderValue::from_static("true"),
-            ));
+            headers.push((LIMITS_HEADER.clone().as_str().try_into().unwrap(), HeaderValue::from_static("true")));
         }
         GraphqlResponse::from_resp(self.execute_impl(query, variables, headers, false).await?).await
     }
@@ -74,17 +63,9 @@ impl SimpleClient {
             })
         } else {
             // Make type defs which is a csv is the form of $var_name: $var_type
-            let type_defs_csv = type_defs
-                .iter()
-                .map(|(name, ty)| format!("${}: {}", name, ty))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let query = format!(
-                "{} ({}) {}",
-                if is_mutation { "mutation" } else { "query" },
-                type_defs_csv,
-                query
-            );
+            let type_defs_csv =
+                type_defs.iter().map(|(name, ty)| format!("${}: {}", name, ty)).collect::<Vec<_>>().join(", ");
+            let query = format!("{} ({}) {}", if is_mutation { "mutation" } else { "query" }, type_defs_csv, query);
             serde_json::json!({
                 "query": query,
                 "variables": var_vals,
@@ -103,16 +84,12 @@ impl SimpleClient {
         mutation: String,
         variables: Vec<GraphqlQueryVariable>,
     ) -> Result<GraphqlResponse, ClientError> {
-        GraphqlResponse::from_resp(self.execute_impl(mutation, variables, vec![], true).await?)
-            .await
+        GraphqlResponse::from_resp(self.execute_impl(mutation, variables, vec![], true).await?).await
     }
 
     /// Send a request to the GraphQL server to check if it is alive.
     pub async fn ping(&self) -> Result<(), ClientError> {
-        self.inner
-            .get(format!("{}/health", self.url))
-            .send()
-            .await?;
+        self.inner.get(format!("{}/health", self.url)).send().await?;
         Ok(())
     }
 
@@ -130,21 +107,13 @@ pub fn resolve_variables(
 
     for (idx, GraphqlQueryVariable { name, ty, value }) in vars.iter().enumerate() {
         if !is_valid_variable_name(name) {
-            return Err(ClientError::InvalidVariableName {
-                var_name: name.to_owned(),
-            });
+            return Err(ClientError::InvalidVariableName { var_name: name.to_owned() });
         }
         if name.trim().is_empty() {
-            return Err(ClientError::InvalidEmptyItem {
-                item_type: "Variable name".to_owned(),
-                idx,
-            });
+            return Err(ClientError::InvalidEmptyItem { item_type: "Variable name".to_owned(), idx });
         }
         if ty.trim().is_empty() {
-            return Err(ClientError::InvalidEmptyItem {
-                item_type: "Variable type".to_owned(),
-                idx,
-            });
+            return Err(ClientError::InvalidEmptyItem { item_type: "Variable type".to_owned(), idx });
         }
         if let Some(var_type_prev) = type_defs.get(name) {
             if var_type_prev != ty {
@@ -175,7 +144,7 @@ pub fn is_valid_variable_name(s: &str) -> bool {
 
     match fst {
         '_' => if s.len() > 1 {},
-        'a'..='z' | 'A'..='Z' => {}
+        'a' ..= 'z' | 'A' ..= 'Z' => {}
         _ => return false,
     }
 

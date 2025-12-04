@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use fastcrypto::{encoding::Base64, traits::ToFromBytes};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+
 use super::{SuiSystemState, SuiSystemStateTrait};
 use crate::{
     base_types::{AuthorityName, ObjectID, SuiAddress},
@@ -14,10 +19,6 @@ use crate::{
     sui_serde::{BigInt, Readable},
     sui_system_state::get_validator_from_table,
 };
-use fastcrypto::{encoding::Base64, traits::ToFromBytes};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 
 /// This is the JSON-RPC type for the OCT system state object.
 /// It flattens all fields to make them top-level fields such that it as minimum

@@ -1,28 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::Path;
+
 use anyhow::Result;
 use fastcrypto::encoding::{Base64, Encoding};
-use std::path::Path;
 use sui_data_ingestion_core::Worker;
-use sui_types::SYSTEM_PACKAGE_ADDRESSES;
-use tokio::sync::Mutex;
-
 use sui_json_rpc_types::SuiMoveStruct;
 use sui_package_resolver::Resolver;
 use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::base_types::ObjectID;
-use sui_types::effects::TransactionEffects;
-use sui_types::object::Object;
+use sui_types::{base_types::ObjectID, effects::TransactionEffects, object::Object, SYSTEM_PACKAGE_ADDRESSES};
+use tokio::sync::Mutex;
 
-use crate::handlers::{
-    get_move_struct, get_owner_address, get_owner_type, initial_shared_version, AnalyticsHandler,
-    ObjectStatusTracker,
+use crate::{
+    handlers::{
+        get_move_struct,
+        get_owner_address,
+        get_owner_type,
+        initial_shared_version,
+        AnalyticsHandler,
+        ObjectStatusTracker,
+    },
+    package_store::{LocalDBPackageStore, PackageCache},
+    tables::{ObjectEntry, ObjectStatus},
+    FileType,
 };
-
-use crate::package_store::{LocalDBPackageStore, PackageCache};
-use crate::tables::{ObjectEntry, ObjectStatus};
-use crate::FileType;
 
 pub struct ObjectHandler {
     state: Mutex<State>,
@@ -40,11 +42,7 @@ impl Worker for ObjectHandler {
     type Result = ();
 
     async fn process_checkpoint(&self, checkpoint_data: &CheckpointData) -> Result<()> {
-        let CheckpointData {
-            checkpoint_summary,
-            transactions: checkpoint_transactions,
-            ..
-        } = checkpoint_data;
+        let CheckpointData { checkpoint_summary, transactions: checkpoint_transactions, .. } = checkpoint_data;
         let mut state = self.state.lock().await;
         for checkpoint_transaction in checkpoint_transactions {
             for object in checkpoint_transaction.output_objects.iter() {
@@ -60,10 +58,7 @@ impl Worker for ObjectHandler {
             )
             .await?;
             if checkpoint_summary.end_of_epoch_data.is_some() {
-                state
-                    .resolver
-                    .package_store()
-                    .evict(SYSTEM_PACKAGE_ADDRESSES.iter().copied());
+                state.resolver.package_store().evict(SYSTEM_PACKAGE_ADDRESSES.iter().copied());
             }
         }
         Ok(())
@@ -98,11 +93,10 @@ impl ObjectHandler {
         };
         Self {
             state: Mutex::new(state),
-            package_filter: package_filter
-                .clone()
-                .map(|x| ObjectID::from_hex_literal(&x).unwrap()),
+            package_filter: package_filter.clone().map(|x| ObjectID::from_hex_literal(&x).unwrap()),
         }
     }
+
     async fn process_transaction(
         &self,
         epoch: u64,
@@ -114,15 +108,7 @@ impl ObjectHandler {
     ) -> Result<()> {
         let object_status_tracker = ObjectStatusTracker::new(effects);
         for object in checkpoint_transaction.output_objects.iter() {
-            self.process_object(
-                epoch,
-                checkpoint,
-                timestamp_ms,
-                object,
-                &object_status_tracker,
-                state,
-            )
-            .await?;
+            self.process_object(epoch, checkpoint, timestamp_ms, object, &object_status_tracker, state).await?;
         }
         for (object_ref, _) in effects.all_removed_objects().iter() {
             let entry = ObjectEntry {
@@ -150,6 +136,7 @@ impl ObjectHandler {
         }
         Ok(())
     }
+
     // Object data. Only called if there are objects in the transaction.
     // Responsible to build the live object table.
     async fn process_object(
@@ -162,12 +149,9 @@ impl ObjectHandler {
         state: &mut State,
     ) -> Result<()> {
         let move_obj_opt = object.data.try_as_move();
-        let has_public_transfer = move_obj_opt
-            .map(|o| o.has_public_transfer())
-            .unwrap_or(false);
-        let move_struct = if let Some((tag, contents)) = object
-            .struct_tag()
-            .and_then(|tag| object.data.try_as_move().map(|mo| (tag, mo.contents())))
+        let has_public_transfer = move_obj_opt.map(|o| o.has_public_transfer()).unwrap_or(false);
+        let move_struct = if let Some((tag, contents)) =
+            object.struct_tag().and_then(|tag| object.data.try_as_move().map(|mo| (tag, mo.contents())))
         {
             let move_struct = get_move_struct(&tag, contents, &state.resolver).await?;
             Some(move_struct)
@@ -176,9 +160,7 @@ impl ObjectHandler {
         };
         let (struct_tag, sui_move_struct) = if let Some(move_struct) = move_struct {
             match move_struct.into() {
-                SuiMoveStruct::WithTypes { type_, fields } => {
-                    (Some(type_), Some(SuiMoveStruct::WithFields(fields)))
-                }
+                SuiMoveStruct::WithTypes { type_, fields } => (Some(type_), Some(SuiMoveStruct::WithFields(fields))),
                 fields => (object.struct_tag(), Some(fields)),
             }
         } else {
@@ -222,11 +204,7 @@ impl ObjectHandler {
             storage_rebate: Some(object.storage_rebate),
             bcs: Some(Base64::encode(bcs::to_bytes(object).unwrap())),
             coin_type: object.coin_type_maybe().map(|t| t.to_string()),
-            coin_balance: if object.coin_type_maybe().is_some() {
-                Some(object.get_coin_value_unsafe())
-            } else {
-                None
-            },
+            coin_balance: if object.coin_type_maybe().is_some() { Some(object.get_coin_value_unsafe()) } else { None },
             struct_tag: struct_tag.map(|x| x.to_string()),
             object_json: sui_move_struct.map(|x| x.to_json_value().to_string()),
         };

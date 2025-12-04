@@ -1,24 +1,31 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data::{Db, DbConnection, QueryExecutor};
-use crate::error::Error;
-use crate::metrics::Metrics;
-use crate::types::chain_identifier::ChainIdentifier;
+use std::{mem, sync::Arc, time::Duration};
+
 use async_graphql::ServerError;
 use diesel::{
-    query_dsl::positional_order_dsl::PositionalOrderDsl, CombineDsl, ExpressionMethods,
-    OptionalExtension, QueryDsl,
+    query_dsl::positional_order_dsl::PositionalOrderDsl,
+    CombineDsl,
+    ExpressionMethods,
+    OptionalExtension,
+    QueryDsl,
 };
 use diesel_async::scoped_futures::ScopedFutureExt;
-use std::mem;
-use std::sync::Arc;
-use std::time::Duration;
 use sui_indexer::schema::checkpoints;
-use tokio::sync::{watch, RwLock};
-use tokio::time::Interval;
+use tokio::{
+    sync::{watch, RwLock},
+    time::Interval,
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
+
+use crate::{
+    data::{Db, DbConnection, QueryExecutor},
+    error::Error,
+    metrics::Metrics,
+    types::chain_identifier::ChainIdentifier,
+};
 
 /// Watermark task that periodically updates the current checkpoint, checkpoint timestamp, and
 /// epoch values.
@@ -56,12 +63,7 @@ pub(crate) struct Watermark {
 
 /// Starts an infinite loop that periodically updates the watermark.
 impl WatermarkTask {
-    pub(crate) fn new(
-        db: Db,
-        metrics: Metrics,
-        sleep: Duration,
-        cancel: CancellationToken,
-    ) -> Self {
+    pub(crate) fn new(db: Db, metrics: Metrics, sleep: Duration, cancel: CancellationToken) -> Self {
         let (sender, receiver) = watch::channel(0);
 
         Self {
@@ -163,13 +165,7 @@ impl WatermarkTask {
 impl Watermark {
     pub(crate) async fn new(lock: WatermarkLock) -> Self {
         let w = lock.read().await;
-        Self {
-            hi_cp: w.hi_cp,
-            hi_cp_timestamp_ms: w.hi_cp_timestamp_ms,
-            epoch: w.epoch,
-            lo_cp: w.lo_cp,
-            lo_tx: w.lo_tx,
-        }
+        Self { hi_cp: w.hi_cp, hi_cp_timestamp_ms: w.hi_cp_timestamp_ms, epoch: w.epoch, lo_cp: w.lo_cp, lo_tx: w.lo_tx }
     }
 
     #[allow(clippy::type_complexity)]
@@ -180,22 +176,12 @@ impl Watermark {
                 async {
                     conn.results(move || {
                         let min_cp = dsl::checkpoints
-                            .select((
-                                dsl::sequence_number,
-                                dsl::timestamp_ms,
-                                dsl::epoch,
-                                dsl::min_tx_sequence_number,
-                            ))
+                            .select((dsl::sequence_number, dsl::timestamp_ms, dsl::epoch, dsl::min_tx_sequence_number))
                             .order_by(dsl::sequence_number.asc())
                             .limit(1);
 
                         let max_cp = dsl::checkpoints
-                            .select((
-                                dsl::sequence_number,
-                                dsl::timestamp_ms,
-                                dsl::epoch,
-                                dsl::min_tx_sequence_number,
-                            ))
+                            .select((dsl::sequence_number, dsl::timestamp_ms, dsl::epoch, dsl::min_tx_sequence_number))
                             .order_by(dsl::sequence_number.desc())
                             .limit(1);
 
@@ -219,19 +205,15 @@ impl Watermark {
             (cp, tx)
         } else {
             return Err(Error::Internal(
-                "Expected entry for tx lower bound and min_tx_sequence_number to be non-null"
-                    .to_string(),
+                "Expected entry for tx lower bound and min_tx_sequence_number to be non-null".to_string(),
             ));
         };
 
-        let (hi_cp, hi_cp_timestamp_ms, epoch) =
-            if let Some((cp, timestamp_ms, epoch, _)) = result.last() {
-                (cp, timestamp_ms, epoch)
-            } else {
-                return Err(Error::Internal(
-                    "Expected entry for tx upper bound".to_string(),
-                ));
-            };
+        let (hi_cp, hi_cp_timestamp_ms, epoch) = if let Some((cp, timestamp_ms, epoch, _)) = result.last() {
+            (cp, timestamp_ms, epoch)
+        } else {
+            return Err(Error::Internal("Expected entry for tx upper bound".to_string()));
+        };
 
         Ok(Some(Watermark {
             hi_cp: *hi_cp as u64,

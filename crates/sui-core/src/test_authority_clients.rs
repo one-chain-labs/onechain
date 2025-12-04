@@ -8,30 +8,34 @@ use std::{
     time::Duration,
 };
 
-use crate::authority::test_authority_builder::TestAuthorityBuilder;
-use crate::{authority::AuthorityState, authority_client::AuthorityAPI};
 use async_trait::async_trait;
 use mysten_metrics::spawn_monitored_task;
 use sui_config::genesis::Genesis;
-use sui_types::messages_grpc::{
-    HandleCertificateResponseV2, HandleSoftBundleCertificatesRequestV3,
-    HandleSoftBundleCertificatesResponseV3, HandleTransactionResponse, ObjectInfoRequest,
-    ObjectInfoResponse, SystemStateRequest, TransactionInfoRequest, TransactionInfoResponse,
-};
-use sui_types::sui_system_state::SuiSystemState;
 use sui_types::{
     crypto::AuthorityKeyPair,
-    error::SuiError,
-    messages_checkpoint::{CheckpointRequest, CheckpointResponse},
+    effects::TransactionEffectsAPI,
+    error::{SuiError, SuiResult},
+    messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
+    messages_grpc::{
+        HandleCertificateRequestV3,
+        HandleCertificateResponseV2,
+        HandleCertificateResponseV3,
+        HandleSoftBundleCertificatesRequestV3,
+        HandleSoftBundleCertificatesResponseV3,
+        HandleTransactionResponse,
+        ObjectInfoRequest,
+        ObjectInfoResponse,
+        SystemStateRequest,
+        TransactionInfoRequest,
+        TransactionInfoResponse,
+    },
+    sui_system_state::SuiSystemState,
     transaction::{CertifiedTransaction, Transaction, VerifiedTransaction},
 };
-use sui_types::{
-    effects::TransactionEffectsAPI,
-    messages_checkpoint::{CheckpointRequestV2, CheckpointResponseV2},
-};
-use sui_types::{
-    error::SuiResult,
-    messages_grpc::{HandleCertificateRequestV3, HandleCertificateResponseV3},
+
+use crate::{
+    authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
+    authority_client::AuthorityAPI,
 };
 
 #[derive(Clone, Copy, Default)]
@@ -73,14 +77,10 @@ impl AuthorityAPI for LocalAuthorityClient {
             .map(|_| VerifiedTransaction::new_from_verified(transaction))?;
         let result = state.handle_transaction(&epoch_store, transaction).await;
         if self.fault_config.fail_after_handle_transaction {
-            return Err(SuiError::GenericAuthorityError {
-                error: "Mock error after handle_transaction".to_owned(),
-            });
+            return Err(SuiError::GenericAuthorityError { error: "Mock error after handle_transaction".to_owned() });
         }
         if let Some(duration) = self.fault_config.overload_retry_after_handle_transaction {
-            return Err(SuiError::ValidatorOverloadedRetryAfter {
-                retry_after_secs: duration.as_secs(),
-            });
+            return Err(SuiError::ValidatorOverloadedRetryAfter { retry_after_secs: duration.as_secs() });
         }
         result
     }
@@ -99,14 +99,13 @@ impl AuthorityAPI for LocalAuthorityClient {
             include_output_objects: false,
             include_auxiliary_data: false,
         };
-        spawn_monitored_task!(Self::handle_certificate(state, request, fault_config))
-            .await
-            .unwrap()
-            .map(|resp| HandleCertificateResponseV2 {
+        spawn_monitored_task!(Self::handle_certificate(state, request, fault_config)).await.unwrap().map(|resp| {
+            HandleCertificateResponseV2 {
                 signed_effects: resp.effects,
                 events: resp.events.unwrap_or_default(),
                 fastpath_input_objects: vec![],
-            })
+            }
+        })
     }
 
     async fn handle_certificate_v3(
@@ -116,9 +115,7 @@ impl AuthorityAPI for LocalAuthorityClient {
     ) -> Result<HandleCertificateResponseV3, SuiError> {
         let state = self.state.clone();
         let fault_config = self.fault_config;
-        spawn_monitored_task!(Self::handle_certificate(state, request, fault_config))
-            .await
-            .unwrap()
+        spawn_monitored_task!(Self::handle_certificate(state, request, fault_config)).await.unwrap()
     }
 
     async fn handle_soft_bundle_certificates_v3(
@@ -129,10 +126,7 @@ impl AuthorityAPI for LocalAuthorityClient {
         unimplemented!()
     }
 
-    async fn handle_object_info_request(
-        &self,
-        request: ObjectInfoRequest,
-    ) -> Result<ObjectInfoResponse, SuiError> {
+    async fn handle_object_info_request(&self, request: ObjectInfoRequest) -> Result<ObjectInfoResponse, SuiError> {
         let state = self.state.clone();
         state.handle_object_info_request(request).await
     }
@@ -146,49 +140,31 @@ impl AuthorityAPI for LocalAuthorityClient {
         state.handle_transaction_info_request(request).await
     }
 
-    async fn handle_checkpoint(
-        &self,
-        request: CheckpointRequest,
-    ) -> Result<CheckpointResponse, SuiError> {
+    async fn handle_checkpoint(&self, request: CheckpointRequest) -> Result<CheckpointResponse, SuiError> {
         let state = self.state.clone();
 
         state.handle_checkpoint_request(&request)
     }
 
-    async fn handle_checkpoint_v2(
-        &self,
-        request: CheckpointRequestV2,
-    ) -> Result<CheckpointResponseV2, SuiError> {
+    async fn handle_checkpoint_v2(&self, request: CheckpointRequestV2) -> Result<CheckpointResponseV2, SuiError> {
         let state = self.state.clone();
 
         state.handle_checkpoint_request_v2(&request)
     }
 
-    async fn handle_system_state_object(
-        &self,
-        _request: SystemStateRequest,
-    ) -> Result<SuiSystemState, SuiError> {
+    async fn handle_system_state_object(&self, _request: SystemStateRequest) -> Result<SuiSystemState, SuiError> {
         self.state.get_sui_system_state_object_for_testing()
     }
 }
 
 impl LocalAuthorityClient {
     pub async fn new(secret: AuthorityKeyPair, genesis: &Genesis) -> Self {
-        let state = TestAuthorityBuilder::new()
-            .with_genesis_and_keypair(genesis, &secret)
-            .build()
-            .await;
-        Self {
-            state,
-            fault_config: LocalAuthorityClientFaultConfig::default(),
-        }
+        let state = TestAuthorityBuilder::new().with_genesis_and_keypair(genesis, &secret).build().await;
+        Self { state, fault_config: LocalAuthorityClientFaultConfig::default() }
     }
 
     pub fn new_from_authority(state: Arc<AuthorityState>) -> Self {
-        Self {
-            state,
-            fault_config: LocalAuthorityClientFaultConfig::default(),
-        }
+        Self { state, fault_config: LocalAuthorityClientFaultConfig::default() }
     }
 
     // One difference between this implementation and actual certificate execution, is that
@@ -208,15 +184,10 @@ impl LocalAuthorityClient {
         // from previous epochs.
         let tx_digest = *request.certificate.digest();
         let epoch_store = state.epoch_store_for_testing();
-        let signed_effects = match state
-            .get_signed_effects_and_maybe_resign(&tx_digest, &epoch_store)
-        {
+        let signed_effects = match state.get_signed_effects_and_maybe_resign(&tx_digest, &epoch_store) {
             Ok(Some(effects)) => effects,
             _ => {
-                let certificate = epoch_store
-                    .signature_verifier
-                    .verify_cert(request.certificate)
-                    .await?;
+                let certificate = epoch_store.signature_verifier.verify_cert(request.certificate).await?;
                 //let certificate = certificate.verify(epoch_store.committee())?;
                 state.enqueue_certificates_for_execution(vec![certificate.clone()], &epoch_store);
                 let effects = state.notify_read_effects(*certificate.digest()).await?;
@@ -270,11 +241,7 @@ pub struct MockAuthorityApi {
 
 impl MockAuthorityApi {
     pub fn new(delay: Duration, count: Arc<Mutex<u32>>) -> Self {
-        MockAuthorityApi {
-            delay,
-            count,
-            handle_object_info_request_result: None,
-        }
+        MockAuthorityApi { delay, count, handle_object_info_request_result: None }
     }
 
     pub fn set_handle_object_info_request(&mut self, result: SuiResult<ObjectInfoResponse>) {
@@ -319,10 +286,7 @@ impl AuthorityAPI for MockAuthorityApi {
     }
 
     /// Handle Object information requests for this account.
-    async fn handle_object_info_request(
-        &self,
-        _request: ObjectInfoRequest,
-    ) -> Result<ObjectInfoResponse, SuiError> {
+    async fn handle_object_info_request(&self, _request: ObjectInfoRequest) -> Result<ObjectInfoResponse, SuiError> {
         self.handle_object_info_request_result.clone().unwrap()
     }
 
@@ -342,29 +306,18 @@ impl AuthorityAPI for MockAuthorityApi {
             tokio::time::sleep(self.delay).await;
         }
 
-        Err(SuiError::TransactionNotFound {
-            digest: request.transaction_digest,
-        })
+        Err(SuiError::TransactionNotFound { digest: request.transaction_digest })
     }
 
-    async fn handle_checkpoint(
-        &self,
-        _request: CheckpointRequest,
-    ) -> Result<CheckpointResponse, SuiError> {
+    async fn handle_checkpoint(&self, _request: CheckpointRequest) -> Result<CheckpointResponse, SuiError> {
         unimplemented!();
     }
 
-    async fn handle_checkpoint_v2(
-        &self,
-        _request: CheckpointRequestV2,
-    ) -> Result<CheckpointResponseV2, SuiError> {
+    async fn handle_checkpoint_v2(&self, _request: CheckpointRequestV2) -> Result<CheckpointResponseV2, SuiError> {
         unimplemented!();
     }
 
-    async fn handle_system_state_object(
-        &self,
-        _request: SystemStateRequest,
-    ) -> Result<SuiSystemState, SuiError> {
+    async fn handle_system_state_object(&self, _request: SystemStateRequest) -> Result<SuiSystemState, SuiError> {
         unimplemented!();
     }
 }
@@ -418,10 +371,7 @@ impl AuthorityAPI for HandleTransactionTestAuthorityClient {
         unimplemented!()
     }
 
-    async fn handle_object_info_request(
-        &self,
-        _request: ObjectInfoRequest,
-    ) -> Result<ObjectInfoResponse, SuiError> {
+    async fn handle_object_info_request(&self, _request: ObjectInfoRequest) -> Result<ObjectInfoResponse, SuiError> {
         unimplemented!()
     }
 
@@ -432,24 +382,15 @@ impl AuthorityAPI for HandleTransactionTestAuthorityClient {
         unimplemented!()
     }
 
-    async fn handle_checkpoint(
-        &self,
-        _request: CheckpointRequest,
-    ) -> Result<CheckpointResponse, SuiError> {
+    async fn handle_checkpoint(&self, _request: CheckpointRequest) -> Result<CheckpointResponse, SuiError> {
         unimplemented!()
     }
 
-    async fn handle_checkpoint_v2(
-        &self,
-        _request: CheckpointRequestV2,
-    ) -> Result<CheckpointResponseV2, SuiError> {
+    async fn handle_checkpoint_v2(&self, _request: CheckpointRequestV2) -> Result<CheckpointResponseV2, SuiError> {
         unimplemented!()
     }
 
-    async fn handle_system_state_object(
-        &self,
-        _request: SystemStateRequest,
-    ) -> Result<SuiSystemState, SuiError> {
+    async fn handle_system_state_object(&self, _request: SystemStateRequest) -> Result<SuiSystemState, SuiError> {
         unimplemented!()
     }
 }

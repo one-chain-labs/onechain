@@ -1,22 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Result;
-use crate::RpcService;
 use sui_sdk_types::{EpochId, ValidatorCommittee};
+
+use crate::{Result, RpcService};
 
 impl RpcService {
     pub fn get_committee(&self, epoch: Option<EpochId>) -> Result<ValidatorCommittee> {
-        let epoch = if let Some(epoch) = epoch {
-            epoch
-        } else {
-            self.reader.inner().get_latest_checkpoint()?.epoch()
-        };
+        let epoch = if let Some(epoch) = epoch { epoch } else { self.reader.inner().get_latest_checkpoint()?.epoch() };
 
-        let committee = self
-            .reader
-            .get_committee(epoch)
-            .ok_or_else(|| CommitteeNotFoundError::new(epoch))?;
+        let committee = self.reader.get_committee(epoch).ok_or_else(|| CommitteeNotFoundError::new(epoch))?;
 
         Ok(committee)
     }

@@ -44,8 +44,7 @@ pub struct Args {
 }
 
 pub async fn restore(args: &Args) -> anyhow::Result<()> {
-    let archival_checkpoint_info =
-        ArchivalCheckpointInfo::read_archival_checkpoint_info(args).await?;
+    let archival_checkpoint_info = ArchivalCheckpointInfo::read_archival_checkpoint_info(args).await?;
     let mut snapshot_restorer =
         SnapshotRestorer::new(args, archival_checkpoint_info.next_checkpoint_after_epoch).await?;
     snapshot_restorer.restore().await?;

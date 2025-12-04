@@ -1,30 +1,38 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt;
-use std::fmt::Write;
-use std::fmt::{Debug, Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::Deref;
-use std::str::FromStr;
+use std::{
+    fmt,
+    fmt::{Debug, Display, Formatter, Write},
+    marker::PhantomData,
+    ops::Deref,
+    str::FromStr,
+};
 
 use fastcrypto::encoding::Hex;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::language_storage::{StructTag, TypeTag};
+use move_core_types::{
+    account_address::AccountAddress,
+    language_storage::{StructTag, TypeTag},
+};
 use schemars::JsonSchema;
-use serde;
-use serde::de::{Deserializer, Error};
-use serde::ser::{Error as SerError, Serializer};
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::DisplayFromStr;
-use serde_with::{Bytes, DeserializeAs, SerializeAs};
-
+use serde::{
+    self,
+    de::{Deserializer, Error},
+    ser::{Error as SerError, Serializer},
+    Deserialize,
+    Serialize,
+};
+use serde_with::{serde_as, Bytes, DeserializeAs, DisplayFromStr, SerializeAs};
 use sui_protocol_config::ProtocolVersion;
 
 use crate::{
-    parse_sui_struct_tag, parse_sui_type_tag, DEEPBOOK_ADDRESS, SUI_CLOCK_ADDRESS,
-    SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS, SUI_SYSTEM_STATE_ADDRESS,
+    parse_sui_struct_tag,
+    parse_sui_type_tag,
+    DEEPBOOK_ADDRESS,
+    SUI_CLOCK_ADDRESS,
+    SUI_FRAMEWORK_ADDRESS,
+    SUI_SYSTEM_ADDRESS,
+    SUI_SYSTEM_STATE_ADDRESS,
 };
 
 #[inline]
@@ -116,12 +124,8 @@ impl<'de> DeserializeAs<'de, AccountAddress> for HexAccountAddress {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        if s.starts_with("0x") {
-            AccountAddress::from_hex_literal(&s)
-        } else {
-            AccountAddress::from_hex(&s)
-        }
-        .map_err(to_custom_error::<'de, D, _>)
+        if s.starts_with("0x") { AccountAddress::from_hex_literal(&s) } else { AccountAddress::from_hex(&s) }
+            .map_err(to_custom_error::<'de, D, _>)
     }
 }
 
@@ -136,9 +140,7 @@ impl SerializeAs<roaring::RoaringBitmap> for SuiBitmap {
     {
         let mut bytes = vec![];
 
-        source
-            .serialize_into(&mut bytes)
-            .map_err(to_custom_ser_error::<S, _>)?;
+        source.serialize_into(&mut bytes).map_err(to_custom_ser_error::<S, _>)?;
         Bytes::serialize_as(&bytes, serializer)
     }
 }
@@ -320,10 +322,7 @@ where
 pub struct SequenceNumber(#[schemars(with = "BigInt<u64>")] u64);
 
 impl SerializeAs<crate::base_types::SequenceNumber> for SequenceNumber {
-    fn serialize_as<S>(
-        value: &crate::base_types::SequenceNumber,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    fn serialize_as<S>(value: &crate::base_types::SequenceNumber, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {

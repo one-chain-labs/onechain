@@ -1,13 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ClientError;
-use async_graphql::{Response, ServerError, Value};
-use reqwest::header::{HeaderMap, HeaderName};
-use reqwest::Response as ReqwestResponse;
-use serde_json::json;
 use std::{collections::BTreeMap, net::SocketAddr};
+
+use async_graphql::{Response, ServerError, Value};
+use reqwest::{
+    header::{HeaderMap, HeaderName},
+    Response as ReqwestResponse,
+};
+use serde_json::json;
 use sui_graphql_rpc_headers::VERSION_HEADER;
+
+use super::ClientError;
 
 #[derive(Debug)]
 pub struct GraphqlResponse {
@@ -26,13 +30,7 @@ impl GraphqlResponse {
         let status = resp.status();
         let full_response: Response = resp.json().await.map_err(ClientError::InnerClientError)?;
 
-        Ok(Self {
-            headers,
-            remote_address,
-            http_version,
-            status,
-            full_response,
-        })
+        Ok(Self { headers, remote_address, http_version, status, full_response })
     }
 
     pub fn graphql_version(&self) -> Result<String, ClientError> {
@@ -91,16 +89,11 @@ impl GraphqlResponse {
                 obj.into_iter()
                     .map(|(k, v)| match v {
                         Value::Number(n) => {
-                            n.as_u64().ok_or(ClientError::InvalidUsageNumber {
-                                usage_name: k.to_string(),
-                                usage_number: n,
-                            })
+                            n.as_u64()
+                                .ok_or(ClientError::InvalidUsageNumber { usage_name: k.to_string(), usage_number: n })
                         }
                         .map(|q| (k.to_string(), q)),
-                        _ => Err(ClientError::InvalidUsageValue {
-                            usage_name: k.to_string(),
-                            usage_value: v,
-                        }),
+                        _ => Err(ClientError::InvalidUsageValue { usage_name: k.to_string(), usage_value: v }),
                     })
                     .collect::<Result<BTreeMap<String, u64>, ClientError>>()?,
             ),

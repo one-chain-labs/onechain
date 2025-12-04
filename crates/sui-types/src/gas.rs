@@ -7,22 +7,22 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 pub mod checked {
 
-    use crate::gas_model::gas_predicates::gas_price_too_high;
-    use crate::{
-        effects::{TransactionEffects, TransactionEffectsAPI},
-        error::{ExecutionError, SuiResult, UserInputError, UserInputResult},
-        gas_model::{gas_v2::SuiGasStatus as SuiGasStatusV2, tables::GasStatus},
-        object::Object,
-        sui_serde::{BigInt, Readable},
-        transaction::ObjectReadResult,
-        ObjectID,
-    };
     use enum_dispatch::enum_dispatch;
     use itertools::MultiUnzip;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
     use serde_with::serde_as;
     use sui_protocol_config::ProtocolConfig;
+
+    use crate::{
+        effects::{TransactionEffects, TransactionEffectsAPI},
+        error::{ExecutionError, SuiResult, UserInputError, UserInputResult},
+        gas_model::{gas_predicates::gas_price_too_high, gas_v2::SuiGasStatus as SuiGasStatusV2, tables::GasStatus},
+        object::Object,
+        sui_serde::{BigInt, Readable},
+        transaction::ObjectReadResult,
+        ObjectID,
+    };
 
     #[enum_dispatch]
     pub trait SuiGasStatusAPI {
@@ -39,12 +39,7 @@ pub mod checked {
         fn reset_storage_cost_and_rebate(&mut self);
         fn charge_storage_read(&mut self, size: usize) -> Result<(), ExecutionError>;
         fn charge_publish_package(&mut self, size: usize) -> Result<(), ExecutionError>;
-        fn track_storage_mutation(
-            &mut self,
-            object_id: ObjectID,
-            new_size: usize,
-            storage_rebate: u64,
-        ) -> u64;
+        fn track_storage_mutation(&mut self, object_id: ObjectID, new_size: usize, storage_rebate: u64) -> u64;
         fn charge_storage_and_rebate(&mut self) -> Result<(), ExecutionError>;
         fn adjust_computation_on_out_of_gas(&mut self);
     }
@@ -70,26 +65,13 @@ pub mod checked {
 
             // gas price must be bigger or equal to reference gas price
             if gas_price < reference_gas_price {
-                return Err(UserInputError::GasPriceUnderRGP {
-                    gas_price,
-                    reference_gas_price,
-                }
-                .into());
+                return Err(UserInputError::GasPriceUnderRGP { gas_price, reference_gas_price }.into());
             }
-            if gas_price_too_high(config.gas_model_version()) && gas_price >= config.max_gas_price()
-            {
-                return Err(UserInputError::GasPriceTooHigh {
-                    max_gas_price: config.max_gas_price(),
-                }
-                .into());
+            if gas_price_too_high(config.gas_model_version()) && gas_price >= config.max_gas_price() {
+                return Err(UserInputError::GasPriceTooHigh { max_gas_price: config.max_gas_price() }.into());
             }
 
-            Ok(Self::V2(SuiGasStatusV2::new_with_budget(
-                gas_budget,
-                gas_price,
-                reference_gas_price,
-                config,
-            )))
+            Ok(Self::V2(SuiGasStatusV2::new_with_budget(gas_budget, gas_price, reference_gas_price, config)))
         }
 
         pub fn new_unmetered() -> Self {
@@ -98,11 +80,7 @@ pub mod checked {
 
         // This is the only public API on SuiGasStatus, all other gas related operations should
         // go through `GasCharger`
-        pub fn check_gas_balance(
-            &self,
-            gas_objs: &[&ObjectReadResult],
-            gas_budget: u64,
-        ) -> UserInputResult {
+        pub fn check_gas_balance(&self, gas_objs: &[&ObjectReadResult], gas_budget: u64) -> UserInputResult {
             match self {
                 Self::V2(status) => status.check_gas_balance(gas_objs, gas_budget),
             }
@@ -163,12 +141,7 @@ pub mod checked {
             storage_rebate: u64,
             non_refundable_storage_fee: u64,
         ) -> GasCostSummary {
-            GasCostSummary {
-                computation_cost,
-                storage_cost,
-                storage_rebate,
-                non_refundable_storage_fee,
-            }
+            GasCostSummary { computation_cost, storage_cost, storage_rebate, non_refundable_storage_fee }
         }
 
         pub fn gas_used(&self) -> u64 {
@@ -191,9 +164,7 @@ pub mod checked {
             self.gas_used() as i64 - self.storage_rebate as i64
         }
 
-        pub fn new_from_txn_effects<'a>(
-            transactions: impl Iterator<Item = &'a TransactionEffects>,
-        ) -> GasCostSummary {
+        pub fn new_from_txn_effects<'a>(transactions: impl Iterator<Item = &'a TransactionEffects>) -> GasCostSummary {
             let (storage_costs, computation_costs, storage_rebates, non_refundable_storage_fee): (
                 Vec<u64>,
                 Vec<u64>,
@@ -264,15 +235,11 @@ pub mod checked {
     pub fn get_gas_balance(gas_object: &Object) -> UserInputResult<u64> {
         if let Some(move_obj) = gas_object.data.try_as_move() {
             if !move_obj.type_().is_gas_coin() {
-                return Err(UserInputError::InvalidGasObject {
-                    object_id: gas_object.id(),
-                });
+                return Err(UserInputError::InvalidGasObject { object_id: gas_object.id() });
             }
             Ok(move_obj.get_coin_value_unsafe())
         } else {
-            Err(UserInputError::InvalidGasObject {
-                object_id: gas_object.id(),
-            })
+            Err(UserInputError::InvalidGasObject { object_id: gas_object.id() })
         }
     }
 }

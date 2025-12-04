@@ -187,9 +187,7 @@ impl IngestionLayer {
     pub fn finish(self, base: IngestionConfig) -> IngestionConfig {
         check_extra("ingestion", self.extra);
         IngestionConfig {
-            checkpoint_buffer_size: self
-                .checkpoint_buffer_size
-                .unwrap_or(base.checkpoint_buffer_size),
+            checkpoint_buffer_size: self.checkpoint_buffer_size.unwrap_or(base.checkpoint_buffer_size),
             ingest_concurrency: self.ingest_concurrency.unwrap_or(base.ingest_concurrency),
             retry_interval_ms: self.retry_interval_ms.unwrap_or(base.retry_interval_ms),
         }
@@ -199,9 +197,7 @@ impl IngestionLayer {
 impl ConsistencyLayer {
     pub fn finish(self, base: ConsistencyConfig) -> ConsistencyConfig {
         check_extra("consistency", self.extra);
-        ConsistencyConfig {
-            consistent_range: self.consistent_range.unwrap_or(base.consistent_range),
-        }
+        ConsistencyConfig { consistent_range: self.consistent_range.unwrap_or(base.consistent_range) }
     }
 }
 
@@ -245,9 +241,7 @@ impl CommitterLayer {
         CommitterConfig {
             write_concurrency: self.write_concurrency.unwrap_or(base.write_concurrency),
             collect_interval_ms: self.collect_interval_ms.unwrap_or(base.collect_interval_ms),
-            watermark_interval_ms: self
-                .watermark_interval_ms
-                .unwrap_or(base.watermark_interval_ms),
+            watermark_interval_ms: self.watermark_interval_ms.unwrap_or(base.watermark_interval_ms),
         }
     }
 }
@@ -408,9 +402,7 @@ impl Merge for PipelineLayer {
             obj_info: self.obj_info.merge(other.obj_info),
             obj_info_pruner: self.obj_info_pruner.merge(other.obj_info_pruner),
             coin_balance_buckets: self.coin_balance_buckets.merge(other.coin_balance_buckets),
-            coin_balance_buckets_pruner: self
-                .coin_balance_buckets_pruner
-                .merge(other.coin_balance_buckets_pruner),
+            coin_balance_buckets_pruner: self.coin_balance_buckets_pruner.merge(other.coin_balance_buckets_pruner),
             cp_sequence_numbers: self.cp_sequence_numbers.merge(other.cp_sequence_numbers),
             ev_emit_mod: self.ev_emit_mod.merge(other.ev_emit_mod),
             ev_struct_inst: self.ev_struct_inst.merge(other.ev_struct_inst),
@@ -422,9 +414,7 @@ impl Merge for PipelineLayer {
             kv_protocol_configs: self.kv_protocol_configs.merge(other.kv_protocol_configs),
             kv_transactions: self.kv_transactions.merge(other.kv_transactions),
             obj_versions: self.obj_versions.merge(other.obj_versions),
-            tx_affected_addresses: self
-                .tx_affected_addresses
-                .merge(other.tx_affected_addresses),
+            tx_affected_addresses: self.tx_affected_addresses.merge(other.tx_affected_addresses),
             tx_affected_objects: self.tx_affected_objects.merge(other.tx_affected_objects),
             tx_balance_changes: self.tx_balance_changes.merge(other.tx_balance_changes),
             tx_calls: self.tx_calls.merge(other.tx_calls),
@@ -458,10 +448,7 @@ impl From<IngestionConfig> for IngestionLayer {
 
 impl From<ConsistencyConfig> for ConsistencyLayer {
     fn from(config: ConsistencyConfig) -> Self {
-        Self {
-            consistent_range: Some(config.consistent_range),
-            extra: Default::default(),
-        }
+        Self { consistent_range: Some(config.consistent_range), extra: Default::default() }
     }
 }
 
@@ -538,34 +525,16 @@ mod tests {
 
     #[test]
     fn merge_simple() {
-        let this = ConsistencyLayer {
-            consistent_range: Some(3000),
-            extra: Default::default(),
-        };
+        let this = ConsistencyLayer { consistent_range: Some(3000), extra: Default::default() };
 
-        let that = ConsistencyLayer {
-            consistent_range: Some(4000),
-            extra: Default::default(),
-        };
+        let that = ConsistencyLayer { consistent_range: Some(4000), extra: Default::default() };
 
         let this_then_that = this.clone().merge(that.clone());
         let that_then_this = that.clone().merge(this.clone());
 
-        assert_matches!(
-            this_then_that,
-            ConsistencyLayer {
-                consistent_range: Some(4000),
-                extra: _,
-            }
-        );
+        assert_matches!(this_then_that, ConsistencyLayer { consistent_range: Some(4000), extra: _ });
 
-        assert_matches!(
-            that_then_this,
-            ConsistencyLayer {
-                consistent_range: Some(3000),
-                extra: _,
-            }
-        );
+        assert_matches!(that_then_this, ConsistencyLayer { consistent_range: Some(3000), extra: _ });
     }
 
     #[test]
@@ -621,81 +590,75 @@ mod tests {
         let this_then_that = this.clone().merge(that.clone());
         let that_then_this = that.clone().merge(this.clone());
 
-        assert_matches!(
-            this_then_that,
-            PipelineLayer {
-                sum_displays: Some(SequentialLayer {
-                    committer: Some(CommitterLayer {
-                        write_concurrency: Some(5),
-                        collect_interval_ms: Some(1000),
-                        watermark_interval_ms: Some(500),
-                        extra: _,
-                    }),
-                    checkpoint_lag: Some(200),
+        assert_matches!(this_then_that, PipelineLayer {
+            sum_displays: Some(SequentialLayer {
+                committer: Some(CommitterLayer {
+                    write_concurrency: Some(5),
+                    collect_interval_ms: Some(1000),
+                    watermark_interval_ms: Some(500),
                     extra: _,
                 }),
-                sum_packages: Some(SequentialLayer {
-                    committer: Some(CommitterLayer {
-                        write_concurrency: Some(10),
-                        collect_interval_ms: None,
-                        watermark_interval_ms: Some(1000),
-                        extra: _,
-                    }),
-                    checkpoint_lag: None,
+                checkpoint_lag: Some(200),
+                extra: _,
+            }),
+            sum_packages: Some(SequentialLayer {
+                committer: Some(CommitterLayer {
+                    write_concurrency: Some(10),
+                    collect_interval_ms: None,
+                    watermark_interval_ms: Some(1000),
                     extra: _,
                 }),
-                ev_emit_mod: Some(ConcurrentLayer {
-                    committer: Some(CommitterLayer {
-                        write_concurrency: Some(5),
-                        collect_interval_ms: Some(500),
-                        watermark_interval_ms: None,
-                        extra: _,
-                    }),
-                    pruner: None,
-                    checkpoint_lag: None,
+                checkpoint_lag: None,
+                extra: _,
+            }),
+            ev_emit_mod: Some(ConcurrentLayer {
+                committer: Some(CommitterLayer {
+                    write_concurrency: Some(5),
+                    collect_interval_ms: Some(500),
+                    watermark_interval_ms: None,
                     extra: _,
                 }),
-                ..
-            },
-        );
+                pruner: None,
+                checkpoint_lag: None,
+                extra: _,
+            }),
+            ..
+        },);
 
-        assert_matches!(
-            that_then_this,
-            PipelineLayer {
-                sum_displays: Some(SequentialLayer {
-                    committer: Some(CommitterLayer {
-                        write_concurrency: Some(10),
-                        collect_interval_ms: Some(1000),
-                        watermark_interval_ms: Some(500),
-                        extra: _,
-                    }),
-                    checkpoint_lag: Some(100),
+        assert_matches!(that_then_this, PipelineLayer {
+            sum_displays: Some(SequentialLayer {
+                committer: Some(CommitterLayer {
+                    write_concurrency: Some(10),
+                    collect_interval_ms: Some(1000),
+                    watermark_interval_ms: Some(500),
                     extra: _,
                 }),
-                sum_packages: Some(SequentialLayer {
-                    committer: Some(CommitterLayer {
-                        write_concurrency: Some(10),
-                        collect_interval_ms: None,
-                        watermark_interval_ms: Some(1000),
-                        extra: _,
-                    }),
-                    checkpoint_lag: None,
+                checkpoint_lag: Some(100),
+                extra: _,
+            }),
+            sum_packages: Some(SequentialLayer {
+                committer: Some(CommitterLayer {
+                    write_concurrency: Some(10),
+                    collect_interval_ms: None,
+                    watermark_interval_ms: Some(1000),
                     extra: _,
                 }),
-                ev_emit_mod: Some(ConcurrentLayer {
-                    committer: Some(CommitterLayer {
-                        write_concurrency: Some(5),
-                        collect_interval_ms: Some(500),
-                        watermark_interval_ms: None,
-                        extra: _,
-                    }),
-                    pruner: None,
-                    checkpoint_lag: None,
+                checkpoint_lag: None,
+                extra: _,
+            }),
+            ev_emit_mod: Some(ConcurrentLayer {
+                committer: Some(CommitterLayer {
+                    write_concurrency: Some(5),
+                    collect_interval_ms: Some(500),
+                    watermark_interval_ms: None,
                     extra: _,
                 }),
-                ..
-            },
-        );
+                pruner: None,
+                checkpoint_lag: None,
+                extra: _,
+            }),
+            ..
+        },);
     }
 
     #[test]
@@ -719,138 +682,76 @@ mod tests {
         let this_then_that = this.clone().merge(that.clone());
         let that_then_this = that.clone().merge(this.clone());
 
-        assert_matches!(
-            this_then_that,
-            PrunerLayer {
-                interval_ms: Some(400),
-                delay_ms: Some(100),
-                retention: Some(500),
-                max_chunk_size: Some(600),
-                extra: _,
-            },
-        );
+        assert_matches!(this_then_that, PrunerLayer {
+            interval_ms: Some(400),
+            delay_ms: Some(100),
+            retention: Some(500),
+            max_chunk_size: Some(600),
+            extra: _,
+        },);
 
-        assert_matches!(
-            that_then_this,
-            PrunerLayer {
-                interval_ms: Some(400),
-                delay_ms: Some(100),
-                retention: Some(500),
-                max_chunk_size: Some(300),
-                extra: _,
-            },
-        );
+        assert_matches!(that_then_this, PrunerLayer {
+            interval_ms: Some(400),
+            delay_ms: Some(100),
+            retention: Some(500),
+            max_chunk_size: Some(300),
+            extra: _,
+        },);
     }
 
     #[test]
     fn finish_concurrent_unpruned_override() {
-        let layer = ConcurrentLayer {
-            committer: None,
-            pruner: None,
-            checkpoint_lag: None,
-            extra: Default::default(),
-        };
+        let layer = ConcurrentLayer { committer: None, pruner: None, checkpoint_lag: None, extra: Default::default() };
 
         let base = ConcurrentConfig {
-            committer: CommitterConfig {
-                write_concurrency: 5,
-                collect_interval_ms: 50,
-                watermark_interval_ms: 500,
-            },
+            committer: CommitterConfig { write_concurrency: 5, collect_interval_ms: 50, watermark_interval_ms: 500 },
             pruner: Some(PrunerConfig::default()),
             checkpoint_lag: Some(100),
         };
 
-        assert_matches!(
-            layer.finish(base),
-            ConcurrentConfig {
-                committer: CommitterConfig {
-                    write_concurrency: 5,
-                    collect_interval_ms: 50,
-                    watermark_interval_ms: 500,
-                },
-                pruner: None,
-                checkpoint_lag: Some(100),
-            },
-        );
+        assert_matches!(layer.finish(base), ConcurrentConfig {
+            committer: CommitterConfig { write_concurrency: 5, collect_interval_ms: 50, watermark_interval_ms: 500 },
+            pruner: None,
+            checkpoint_lag: Some(100),
+        },);
     }
 
     #[test]
     fn finish_concurrent_no_pruner() {
-        let layer = ConcurrentLayer {
-            committer: None,
-            pruner: None,
-            checkpoint_lag: None,
-            extra: Default::default(),
-        };
+        let layer = ConcurrentLayer { committer: None, pruner: None, checkpoint_lag: None, extra: Default::default() };
 
         let base = ConcurrentConfig {
-            committer: CommitterConfig {
-                write_concurrency: 5,
-                collect_interval_ms: 50,
-                watermark_interval_ms: 500,
-            },
+            committer: CommitterConfig { write_concurrency: 5, collect_interval_ms: 50, watermark_interval_ms: 500 },
             pruner: None,
             checkpoint_lag: Some(100),
         };
 
-        assert_matches!(
-            layer.finish(base),
-            ConcurrentConfig {
-                committer: CommitterConfig {
-                    write_concurrency: 5,
-                    collect_interval_ms: 50,
-                    watermark_interval_ms: 500,
-                },
-                pruner: None,
-                checkpoint_lag: Some(100),
-            },
-        );
+        assert_matches!(layer.finish(base), ConcurrentConfig {
+            committer: CommitterConfig { write_concurrency: 5, collect_interval_ms: 50, watermark_interval_ms: 500 },
+            pruner: None,
+            checkpoint_lag: Some(100),
+        },);
     }
 
     #[test]
     fn finish_concurrent_pruner() {
         let layer = ConcurrentLayer {
             committer: None,
-            pruner: Some(PrunerLayer {
-                interval_ms: Some(1000),
-                ..Default::default()
-            }),
+            pruner: Some(PrunerLayer { interval_ms: Some(1000), ..Default::default() }),
             checkpoint_lag: None,
             extra: Default::default(),
         };
 
         let base = ConcurrentConfig {
-            committer: CommitterConfig {
-                write_concurrency: 5,
-                collect_interval_ms: 50,
-                watermark_interval_ms: 500,
-            },
-            pruner: Some(PrunerConfig {
-                interval_ms: 100,
-                delay_ms: 200,
-                retention: 300,
-                max_chunk_size: 400,
-            }),
+            committer: CommitterConfig { write_concurrency: 5, collect_interval_ms: 50, watermark_interval_ms: 500 },
+            pruner: Some(PrunerConfig { interval_ms: 100, delay_ms: 200, retention: 300, max_chunk_size: 400 }),
             checkpoint_lag: None,
         };
 
-        assert_matches!(
-            layer.finish(base),
-            ConcurrentConfig {
-                committer: CommitterConfig {
-                    write_concurrency: 5,
-                    collect_interval_ms: 50,
-                    watermark_interval_ms: 500,
-                },
-                pruner: Some(PrunerConfig {
-                    interval_ms: 1000,
-                    delay_ms: 200,
-                    retention: 300,
-                    max_chunk_size: 400,
-                }),
-                checkpoint_lag: None,
-            },
-        );
+        assert_matches!(layer.finish(base), ConcurrentConfig {
+            committer: CommitterConfig { write_concurrency: 5, collect_interval_ms: 50, watermark_interval_ms: 500 },
+            pruner: Some(PrunerConfig { interval_ms: 1000, delay_ms: 200, retention: 300, max_chunk_size: 400 }),
+            checkpoint_lag: None,
+        },);
     }
 }

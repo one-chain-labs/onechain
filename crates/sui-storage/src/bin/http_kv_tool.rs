@@ -1,15 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{str::FromStr, sync::Arc};
+
 use clap::*;
-use std::str::FromStr;
-use std::sync::Arc;
-use sui_storage::http_key_value_store::*;
-use sui_storage::key_value_store::TransactionKeyValueStore;
-use sui_storage::key_value_store_metrics::KeyValueStoreMetrics;
-use sui_types::base_types::ObjectID;
-use sui_types::digests::{CheckpointDigest, TransactionDigest};
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use sui_storage::{
+    http_key_value_store::*,
+    key_value_store::TransactionKeyValueStore,
+    key_value_store_metrics::KeyValueStoreMetrics,
+};
+use sui_types::{
+    base_types::ObjectID,
+    digests::{CheckpointDigest, TransactionDigest},
+    messages_checkpoint::CheckpointSequenceNumber,
+};
 
 #[derive(Parser)]
 #[command(rename_all = "kebab-case")]
@@ -40,26 +44,14 @@ enum Command {
 impl Command {
     async fn execute(self) -> anyhow::Result<(), anyhow::Error> {
         match self {
-            Command::Fetch {
-                base_url,
-                digest,
-                seq,
-                type_,
-            } => {
+            Command::Fetch { base_url, digest, seq, type_ } => {
                 let metrics = KeyValueStoreMetrics::new_for_tests();
                 let http_kv = Arc::new(HttpKVStore::new(&base_url, 100, metrics).unwrap());
-                let kv = TransactionKeyValueStore::new(
-                    "http_kv",
-                    KeyValueStoreMetrics::new_for_tests(),
-                    http_kv,
-                );
+                let kv = TransactionKeyValueStore::new("http_kv", KeyValueStoreMetrics::new_for_tests(), http_kv);
 
                 let seqs: Vec<_> = seq
                     .into_iter()
-                    .map(|s| {
-                        CheckpointSequenceNumber::from_str(&s)
-                            .expect("invalid checkpoint sequence number")
-                    })
+                    .map(|s| CheckpointSequenceNumber::from_str(&s).expect("invalid checkpoint sequence number"))
                     .collect();
 
                 // verify that type is valid
@@ -67,10 +59,7 @@ impl Command {
                     "tx" | "fx" => {
                         let digests: Vec<_> = digest
                             .into_iter()
-                            .map(|digest| {
-                                TransactionDigest::from_str(&digest)
-                                    .expect("invalid transaction digest")
-                            })
+                            .map(|digest| TransactionDigest::from_str(&digest).expect("invalid transaction digest"))
                             .collect();
 
                         if type_ == "tx" {
@@ -99,15 +88,10 @@ impl Command {
                     "ckpt_summary" => {
                         let digests: Vec<_> = digest
                             .into_iter()
-                            .map(|s| {
-                                CheckpointDigest::from_str(&s).expect("invalid checkpoint digest")
-                            })
+                            .map(|s| CheckpointDigest::from_str(&s).expect("invalid checkpoint digest"))
                             .collect();
 
-                        let ckpts = kv
-                            .multi_get_checkpoints(&seqs, &[], &digests)
-                            .await
-                            .unwrap();
+                        let ckpts = kv.multi_get_checkpoints(&seqs, &[], &digests).await.unwrap();
 
                         for (seq, ckpt) in seqs.iter().zip(ckpts.0.iter()) {
                             // populate digest before printing
@@ -128,10 +112,7 @@ impl Command {
                     }
 
                     _ => {
-                        println!(
-                            "Invalid key type: {}. Must be one of 'tx', 'fx', or 'ev'.",
-                            type_
-                        );
+                        println!("Invalid key type: {}. Must be one of 'tx', 'fx', or 'ev'.", type_);
                         std::process::exit(1);
                     }
                 }
@@ -176,9 +157,7 @@ struct App {
 
 #[tokio::main]
 async fn main() {
-    let _guard = telemetry_subscribers::TelemetryConfig::new()
-        .with_env()
-        .init();
+    let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
 
     let app = App::parse();
     app.command.execute().await.unwrap();

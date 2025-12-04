@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::messages_checkpoint::CheckpointSequenceNumber;
-use crate::{committee::EpochId, crypto::AuthorityStrongQuorumSignInfo};
-
-use crate::message_envelope::{Envelope, TrustedEnvelope, VerifiedEnvelope};
-use crate::transaction::SenderSignedData;
-use crate::transaction::TransactionDataAPI;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    committee::EpochId,
+    crypto::AuthorityStrongQuorumSignInfo,
+    message_envelope::{Envelope, TrustedEnvelope, VerifiedEnvelope},
+    messages_checkpoint::CheckpointSequenceNumber,
+    transaction::{SenderSignedData, TransactionDataAPI},
+};
 
 /// CertificateProof is a proof that a transaction certs existed at a given epoch and hence can be executed.
 /// There are two types of proofs: one that is proven by inclusion in a checkpoint and one that is proven by quorum signature.

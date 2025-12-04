@@ -26,26 +26,18 @@ decl_derive!([MallocSizeOf, attributes(ignore_malloc_size_of)] => malloc_size_of
 
 fn malloc_size_of_derive(s: synstructure::Structure) -> proc_macro2::TokenStream {
     let match_body = s.each(|binding| {
-        let ignore = binding
-            .ast()
-            .attrs
-            .iter()
-            .any(|attr| match attr.parse_meta().unwrap() {
-                syn::Meta::Path(ref path) | syn::Meta::List(syn::MetaList { ref path, .. })
-                    if path.is_ident("ignore_malloc_size_of") =>
-                {
-                    panic!(
-                        "#[ignore_malloc_size_of] should have an explanation, \
+        let ignore = binding.ast().attrs.iter().any(|attr| match attr.parse_meta().unwrap() {
+            syn::Meta::Path(ref path) | syn::Meta::List(syn::MetaList { ref path, .. })
+                if path.is_ident("ignore_malloc_size_of") =>
+            {
+                panic!(
+                    "#[ignore_malloc_size_of] should have an explanation, \
 					 e.g. #[ignore_malloc_size_of = \"because reasons\"]"
-                    );
-                }
-                syn::Meta::NameValue(syn::MetaNameValue { ref path, .. })
-                    if path.is_ident("ignore_malloc_size_of") =>
-                {
-                    true
-                }
-                _ => false,
-            });
+                );
+            }
+            syn::Meta::NameValue(syn::MetaNameValue { ref path, .. }) if path.is_ident("ignore_malloc_size_of") => true,
+            _ => false,
+        });
         if ignore {
             None
         } else if let syn::Type::Array(..) = binding.ast().ty {
@@ -67,9 +59,7 @@ fn malloc_size_of_derive(s: synstructure::Structure) -> proc_macro2::TokenStream
     let mut where_clause = where_clause.unwrap_or(&parse_quote!(where)).clone();
     for param in ast.generics.type_params() {
         let ident = &param.ident;
-        where_clause
-            .predicates
-            .push(parse_quote!(#ident: mysten_util_mem::MallocSizeOf));
+        where_clause.predicates.push(parse_quote!(#ident: mysten_util_mem::MallocSizeOf));
     }
 
     let tokens = quote! {

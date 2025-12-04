@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Callback, MakeCallbackHandler};
 use tower::Layer;
+
+use super::{Callback, MakeCallbackHandler};
 
 /// [`Layer`] that adds callbacks to a [`Service`].
 ///
@@ -32,9 +33,6 @@ where
     type Service = Callback<S, M>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        Callback {
-            inner,
-            make_callback_handler: self.make_handler.clone(),
-        }
+        Callback { inner, make_callback_handler: self.make_handler.clone() }
     }
 }

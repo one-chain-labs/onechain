@@ -63,10 +63,7 @@ fn derive_tuple() {
         tp2: (Vec<u8>, Vec<u8>),
     }
 
-    let t = Trivia {
-        tp1: (),
-        tp2: (vec![7u8; 1024], vec![9u8; 1024]),
-    };
+    let t = Trivia { tp1: (), tp2: (vec![7u8; 1024], vec![9u8; 1024]) };
 
     assert!(t.malloc_size_of() > 2000);
     assert!(t.malloc_size_of() < 3000);

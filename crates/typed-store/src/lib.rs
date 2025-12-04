@@ -1,12 +1,7 @@
 // Copyright (c) 2021, Facebook, Inc. and its affiliates
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-#![warn(
-    future_incompatible,
-    nonstandard_style,
-    rust_2018_idioms,
-    rust_2021_compatibility
-)]
+#![warn(future_incompatible, nonstandard_style, rust_2018_idioms, rust_2021_compatibility)]
 
 // Re-export rocksdb so that consumers can use the version of rocksdb via typed-store
 pub use rocksdb;
@@ -153,5 +148,4 @@ pub type StoreError = typed_store_error::TypedStoreError;
 /// //     bad_field: u32,
 /// // #}
 pub use typed_store_derive::DBMapUtils;
-
 pub use typed_store_derive::SallyDB;

@@ -1,17 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use std::str::FromStr;
+use std::{collections::BTreeSet, fmt::Display, str::FromStr, time::Duration};
 
-use crate::functional_group::FunctionalGroup;
 use async_graphql::*;
 use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
-use move_core_types::ident_str;
-use move_core_types::identifier::IdentStr;
+use move_core_types::{ident_str, identifier::IdentStr};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Display, time::Duration};
 use sui_default_config::DefaultConfig;
 use sui_json_rpc::name_service::NameServiceConfig;
 use sui_types::base_types::{ObjectID, SuiAddress};
+
+use crate::functional_group::FunctionalGroup;
 
 pub(crate) const RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD: Duration = Duration::from_millis(30_000);
 pub(crate) const MAX_CONCURRENT_REQUESTS: usize = 1_000;
@@ -19,10 +18,8 @@ pub(crate) const MAX_CONCURRENT_REQUESTS: usize = 1_000;
 // Move Registry constants
 pub(crate) const MOVE_REGISTRY_MODULE: &IdentStr = ident_str!("name");
 pub(crate) const MOVE_REGISTRY_TYPE: &IdentStr = ident_str!("Name");
-const MOVE_REGISTRY_PACKAGE: &str =
-    "0x62c1f5b1cb9e3bfc3dd1f73c95066487b662048a6358eabdbf67f6cdeca6db4b";
-const MOVE_REGISTRY_TABLE_ID: &str =
-    "0xe8417c530cde59eddf6dfb760e8a0e3e2c6f17c69ddaab5a73dd6a6e65fc463b";
+const MOVE_REGISTRY_PACKAGE: &str = "0x62c1f5b1cb9e3bfc3dd1f73c95066487b662048a6358eabdbf67f6cdeca6db4b";
+const MOVE_REGISTRY_TABLE_ID: &str = "0xe8417c530cde59eddf6dfb760e8a0e3e2c6f17c69ddaab5a73dd6a6e65fc463b";
 const DEFAULT_PAGE_LIMIT: u16 = 50;
 
 /// The combination of all configurations for the GraphQL service.
@@ -241,11 +238,7 @@ impl ServiceConfig {
 
     /// List of all features that are enabled on this GraphQL service.
     async fn enabled_features(&self) -> Vec<FunctionalGroup> {
-        FunctionalGroup::all()
-            .iter()
-            .filter(|g| !self.disabled_features.contains(g))
-            .copied()
-            .collect()
+        FunctionalGroup::all().iter().filter(|g| !self.disabled_features.contains(g)).copied().collect()
     }
 
     /// The maximum depth a GraphQL query can be to be accepted by this service.
@@ -396,9 +389,7 @@ impl ServiceConfig {
     pub fn test_defaults() -> Self {
         Self {
             background_tasks: BackgroundTasksConfig::test_defaults(),
-            zklogin: ZkLoginConfig {
-                env: ZkLoginEnv::Test,
-            },
+            zklogin: ZkLoginConfig { env: ZkLoginEnv::Test },
             ..Default::default()
         }
     }
@@ -412,11 +403,7 @@ impl ServiceConfig {
     ) -> Self {
         Self {
             move_registry: MoveRegistryConfig {
-                resolution_type: if external {
-                    ResolutionType::External
-                } else {
-                    ResolutionType::Internal
-                },
+                resolution_type: if external { ResolutionType::External } else { ResolutionType::Internal },
                 external_api_url: endpoint,
                 package_address: pkg_address.unwrap_or_default(),
                 registry_id: object_id.unwrap_or(ObjectID::random()),
@@ -455,21 +442,13 @@ impl MoveRegistryConfig {
         package_address: SuiAddress,
         registry_id: ObjectID,
     ) -> Self {
-        Self {
-            resolution_type,
-            external_api_url,
-            page_limit,
-            package_address,
-            registry_id,
-        }
+        Self { resolution_type, external_api_url, page_limit, package_address, registry_id }
     }
 }
 
 impl Default for Ide {
     fn default() -> Self {
-        Self {
-            ide_title: "Sui GraphQL IDE".to_string(),
-        }
+        Self { ide_title: "Sui GraphQL IDE".to_string() }
     }
 }
 
@@ -546,9 +525,7 @@ impl Default for InternalFeatureConfig {
 
 impl Default for BackgroundTasksConfig {
     fn default() -> Self {
-        Self {
-            watermark_update_ms: 500,
-        }
+        Self { watermark_update_ms: 500 }
     }
 }
 
@@ -646,10 +623,8 @@ mod tests {
         .unwrap();
 
         use FunctionalGroup as G;
-        let expect = ServiceConfig {
-            disabled_features: BTreeSet::from([G::Coins, G::NameService]),
-            ..Default::default()
-        };
+        let expect =
+            ServiceConfig { disabled_features: BTreeSet::from([G::Coins, G::NameService]), ..Default::default() };
 
         assert_eq!(actual, expect)
     }
@@ -663,10 +638,7 @@ mod tests {
         )
         .unwrap();
 
-        let expect = ServiceConfig {
-            experiments: Experiments { test_flag: true },
-            ..Default::default()
-        };
+        let expect = ServiceConfig { experiments: Experiments { test_flag: true }, ..Default::default() };
 
         assert_eq!(actual, expect)
     }
@@ -743,11 +715,7 @@ mod tests {
 
         // When reading partially, the other parts will come from the default implementation.
         let expect = ServiceConfig {
-            limits: Limits {
-                max_query_depth: 42,
-                max_query_nodes: 320,
-                ..Default::default()
-            },
+            limits: Limits { max_query_depth: 42, max_query_nodes: 320, ..Default::default() },
             disabled_features: BTreeSet::from([FunctionalGroup::Analytics]),
             ..Default::default()
         };

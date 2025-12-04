@@ -196,12 +196,10 @@ impl Default for Parameters {
             min_round_delay: Parameters::default_min_round_delay(),
             max_forward_time_drift: Parameters::default_max_forward_time_drift(),
             max_blocks_per_fetch: Parameters::default_max_blocks_per_fetch(),
-            sync_last_known_own_block_timeout:
-                Parameters::default_sync_last_known_own_block_timeout(),
+            sync_last_known_own_block_timeout: Parameters::default_sync_last_known_own_block_timeout(),
             round_prober_interval_ms: Parameters::default_round_prober_interval_ms(),
             round_prober_request_timeout_ms: Parameters::default_round_prober_request_timeout_ms(),
-            propagation_delay_stop_proposal_threshold:
-                Parameters::default_propagation_delay_stop_proposal_threshold(),
+            propagation_delay_stop_proposal_threshold: Parameters::default_propagation_delay_stop_proposal_threshold(),
             dag_state_cached_rounds: Parameters::default_dag_state_cached_rounds(),
             commit_sync_parallel_fetches: Parameters::default_commit_sync_parallel_fetches(),
             commit_sync_batch_size: Parameters::default_commit_sync_batch_size(),
@@ -230,9 +228,7 @@ impl AnemoParameters {
 
 impl Default for AnemoParameters {
     fn default() -> Self {
-        Self {
-            excessive_message_size: AnemoParameters::default_excessive_message_size(),
-        }
+        Self { excessive_message_size: AnemoParameters::default_excessive_message_size() }
     }
 }
 

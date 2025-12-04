@@ -28,9 +28,7 @@ async fn main() {
     colored::control::set_virtual_terminal(true).unwrap();
 
     let app = App::parse();
-    let (_guards, handle) = telemetry_subscribers::TelemetryConfig::new()
-        .with_env()
-        .init();
+    let (_guards, handle) = telemetry_subscribers::TelemetryConfig::new().with_env().init();
 
     exit_main!(app.command.execute(handle).await);
 }

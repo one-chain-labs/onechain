@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::io::{self, Cursor, Read};
+
 use bytes::Buf;
 use bytes_varint::VarIntSupport;
 use clap::*;
@@ -9,7 +11,6 @@ use opentelemetry_proto::tonic::{
     common::v1::{any_value, AnyValue, KeyValue},
 };
 use prost::Message;
-use std::io::{self, Cursor, Read};
 use tonic::Request;
 
 #[derive(Parser, Debug)]
@@ -48,10 +49,7 @@ async fn main() {
     let mut trace_exporter = TraceServiceClient::connect(endpoint).await.unwrap();
 
     let service_name = args.service_name.unwrap_or_else(|| {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
         format!("sui-node-{}", timestamp)
     });
 
@@ -71,17 +69,13 @@ async fn main() {
                 for attr in resource.attributes.iter_mut() {
                     if attr.key == "service.name" {
                         service_name_found = true;
-                        attr.value = Some(AnyValue {
-                            value: Some(any_value::Value::StringValue(service_name.clone())),
-                        });
+                        attr.value = Some(AnyValue { value: Some(any_value::Value::StringValue(service_name.clone())) });
                     }
                 }
                 if !service_name_found {
                     resource.attributes.push(KeyValue {
                         key: "service.name".to_string(),
-                        value: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue(service_name.clone())),
-                        }),
+                        value: Some(AnyValue { value: Some(any_value::Value::StringValue(service_name.clone())) }),
                     });
                 }
             }
@@ -107,21 +101,17 @@ where
         let len = cursor.get_u64_varint().unwrap() as usize;
 
         if cursor.remaining() < len {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Incomplete message",
-            ));
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Incomplete message"));
         }
 
         // Create a slice for just this message
         let msg_bytes = cursor
             .chunk()
-            .get(..len)
+            .get(.. len)
             .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "Buffer underflow"))?;
 
-        let msg = M::decode(msg_bytes).map_err(|e| {
-            io::Error::new(io::ErrorKind::InvalidData, format!("Decode error: {}", e))
-        })?;
+        let msg = M::decode(msg_bytes)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Decode error: {}", e)))?;
         messages.push(msg);
 
         // Advance the cursor

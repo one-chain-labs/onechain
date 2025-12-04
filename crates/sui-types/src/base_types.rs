@@ -2,91 +2,73 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::coin::Coin;
-use crate::coin::CoinMetadata;
-use crate::coin::TreasuryCap;
-use crate::coin::COIN_MODULE_NAME;
-use crate::coin::COIN_STRUCT_NAME;
-pub use crate::committee::EpochId;
-use crate::crypto::{
-    AuthorityPublicKeyBytes, DefaultHash, PublicKey, SignatureScheme, SuiPublicKey, SuiSignature,
+use std::{
+    cmp::max,
+    convert::{TryFrom, TryInto},
+    fmt,
+    str::FromStr,
 };
-pub use crate::digests::{ObjectDigest, TransactionDigest, TransactionEffectsDigest};
-use crate::dynamic_field::DynamicFieldInfo;
-use crate::dynamic_field::DynamicFieldType;
-use crate::effects::TransactionEffects;
-use crate::effects::TransactionEffectsAPI;
-use crate::epoch_data::EpochData;
-use crate::error::ExecutionErrorKind;
-use crate::error::SuiError;
-use crate::error::{ExecutionError, SuiResult};
-use crate::gas_coin::GasCoin;
-use crate::gas_coin::GAS;
-use crate::governance::StakedOct;
-use crate::governance::STAKED_OCT_STRUCT_NAME;
-use crate::governance::STAKING_POOL_MODULE_NAME;
-use crate::id::RESOLVED_SUI_ID;
-use crate::messages_checkpoint::CheckpointTimestamp;
-use crate::multisig::MultiSigPublicKey;
-use crate::object::{Object, Owner};
-use crate::parse_sui_struct_tag;
-use crate::signature::GenericSignature;
-use crate::sui_serde::Readable;
-use crate::sui_serde::{to_sui_struct_tag_string, HexAccountAddress};
-use crate::transaction::Transaction;
-use crate::transaction::VerifiedTransaction;
-use crate::zk_login_authenticator::ZkLoginAuthenticator;
-use crate::MOVE_STDLIB_ADDRESS;
-use crate::SUI_CLOCK_OBJECT_ID;
-use crate::SUI_FRAMEWORK_ADDRESS;
-use crate::SUI_SYSTEM_ADDRESS;
+
 use anyhow::anyhow;
-use fastcrypto::encoding::decode_bytes_hex;
-use fastcrypto::encoding::{Encoding, Hex};
-use fastcrypto::hash::HashFunction;
-use fastcrypto::traits::AllowedRng;
+use fastcrypto::{
+    encoding::{decode_bytes_hex, Encoding, Hex},
+    hash::HashFunction,
+    traits::AllowedRng,
+};
 use fastcrypto_zkp::bn254::zk_login::ZkLoginInputs;
-use move_binary_format::file_format::SignatureToken;
-use move_binary_format::CompiledModule;
+use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use move_bytecode_utils::resolve_struct;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::annotated_value as A;
-use move_core_types::ident_str;
-use move_core_types::identifier::IdentStr;
-use move_core_types::language_storage::ModuleId;
-use move_core_types::language_storage::StructTag;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{
+    account_address::AccountAddress,
+    annotated_value as A,
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{ModuleId, StructTag, TypeTag},
+};
 use rand::Rng;
 use schemars::JsonSchema;
-use serde::ser::Error;
-use serde::ser::SerializeSeq;
-use serde::Serializer;
-use serde::{Deserialize, Serialize};
+use serde::{
+    ser::{Error, SerializeSeq},
+    Deserialize,
+    Serialize,
+    Serializer,
+};
 use serde_with::serde_as;
 use shared_crypto::intent::HashingIntentScope;
-use std::cmp::max;
-use std::convert::{TryFrom, TryInto};
-use std::fmt;
-use std::str::FromStr;
+
+use crate::{
+    coin::{Coin, CoinMetadata, TreasuryCap, COIN_MODULE_NAME, COIN_STRUCT_NAME},
+    crypto::{AuthorityPublicKeyBytes, DefaultHash, PublicKey, SignatureScheme, SuiPublicKey, SuiSignature},
+    dynamic_field::{DynamicFieldInfo, DynamicFieldType},
+    effects::{TransactionEffects, TransactionEffectsAPI},
+    epoch_data::EpochData,
+    error::{ExecutionError, ExecutionErrorKind, SuiError, SuiResult},
+    gas_coin::{GasCoin, GAS},
+    governance::{StakedOct, STAKED_OCT_STRUCT_NAME, STAKING_POOL_MODULE_NAME},
+    id::RESOLVED_SUI_ID,
+    messages_checkpoint::CheckpointTimestamp,
+    multisig::MultiSigPublicKey,
+    object::{Object, Owner},
+    parse_sui_struct_tag,
+    signature::GenericSignature,
+    sui_serde::{to_sui_struct_tag_string, HexAccountAddress, Readable},
+    transaction::{Transaction, VerifiedTransaction},
+    zk_login_authenticator::ZkLoginAuthenticator,
+    MOVE_STDLIB_ADDRESS,
+    SUI_CLOCK_OBJECT_ID,
+    SUI_FRAMEWORK_ADDRESS,
+    SUI_SYSTEM_ADDRESS,
+};
+pub use crate::{
+    committee::EpochId,
+    digests::{ObjectDigest, TransactionDigest, TransactionEffectsDigest},
+};
 
 #[cfg(test)]
 #[path = "unit_tests/base_types_tests.rs"]
 mod base_types_tests;
 
-#[derive(
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Copy,
-    Clone,
-    Hash,
-    Default,
-    Debug,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Default, Debug, Serialize, Deserialize, JsonSchema)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct SequenceNumber(u64);
 
@@ -140,19 +122,11 @@ pub type VersionDigest = (SequenceNumber, ObjectDigest);
 pub type ObjectRef = (ObjectID, SequenceNumber, ObjectDigest);
 
 pub fn random_object_ref() -> ObjectRef {
-    (
-        ObjectID::random(),
-        SequenceNumber::new(),
-        ObjectDigest::new([0; 32]),
-    )
+    (ObjectID::random(), SequenceNumber::new(), ObjectDigest::new([0; 32]))
 }
 
 pub fn update_object_ref_for_testing(object_ref: ObjectRef) -> ObjectRef {
-    (
-        object_ref.0,
-        object_ref.1.next(),
-        ObjectDigest::new([0; 32]),
-    )
+    (object_ref.0, object_ref.1.next(), ObjectDigest::new([0; 32]))
 }
 
 /// Wrapper around StructTag with a space-efficient representation for common types like coins
@@ -265,9 +239,7 @@ impl MoveObjectType {
     pub fn is_gas_coin(&self) -> bool {
         match &self.0 {
             MoveObjectType_::GasCoin => true,
-            MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) | MoveObjectType_::Other(_) => {
-                false
-            }
+            MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) | MoveObjectType_::Other(_) => false,
         }
     }
 
@@ -283,26 +255,20 @@ impl MoveObjectType {
     pub fn is_staked_oct(&self) -> bool {
         match &self.0 {
             MoveObjectType_::StakedOct => true,
-            MoveObjectType_::GasCoin | MoveObjectType_::Coin(_) | MoveObjectType_::Other(_) => {
-                false
-            }
+            MoveObjectType_::GasCoin | MoveObjectType_::Coin(_) | MoveObjectType_::Other(_) => false,
         }
     }
 
     pub fn is_coin_metadata(&self) -> bool {
         match &self.0 {
-            MoveObjectType_::GasCoin | MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) => {
-                false
-            }
+            MoveObjectType_::GasCoin | MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) => false,
             MoveObjectType_::Other(s) => CoinMetadata::is_coin_metadata(s),
         }
     }
 
     pub fn is_treasury_cap(&self) -> bool {
         match &self.0 {
-            MoveObjectType_::GasCoin | MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) => {
-                false
-            }
+            MoveObjectType_::GasCoin | MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) => false,
             MoveObjectType_::Other(s) => TreasuryCap::is_treasury_type(s),
         }
     }
@@ -320,9 +286,7 @@ impl MoveObjectType {
     }
 
     pub fn is_coin_deny_cap(&self) -> bool {
-        self.address() == SUI_FRAMEWORK_ADDRESS
-            && self.module().as_str() == "coin"
-            && self.name().as_str() == "DenyCap"
+        self.address() == SUI_FRAMEWORK_ADDRESS && self.module().as_str() == "coin" && self.name().as_str() == "DenyCap"
     }
 
     pub fn is_coin_deny_cap_v2(&self) -> bool {
@@ -333,9 +297,7 @@ impl MoveObjectType {
 
     pub fn is_dynamic_field(&self) -> bool {
         match &self.0 {
-            MoveObjectType_::GasCoin | MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) => {
-                false
-            }
+            MoveObjectType_::GasCoin | MoveObjectType_::StakedOct | MoveObjectType_::Coin(_) => false,
             MoveObjectType_::Other(s) => DynamicFieldInfo::is_dynamic_field(s),
         }
     }
@@ -366,9 +328,7 @@ impl MoveObjectType {
         match &self.0 {
             MoveObjectType_::GasCoin => GasCoin::is_gas_coin(s),
             MoveObjectType_::StakedOct => StakedOct::is_staked_oct(s),
-            MoveObjectType_::Coin(inner) => {
-                Coin::is_coin(s) && s.type_params.len() == 1 && inner == &s.type_params[0]
-            }
+            MoveObjectType_::Coin(inner) => Coin::is_coin(s) && s.type_params.len() == 1 && inner == &s.type_params[0],
             MoveObjectType_::Other(o) => s == o,
         }
     }
@@ -428,12 +388,7 @@ pub fn is_primitive_type_tag(t: &TypeTag) -> bool {
         T::Bool | T::U8 | T::U16 | T::U32 | T::U64 | T::U128 | T::U256 | T::Address => true,
         T::Vector(inner) => is_primitive_type_tag(inner),
         T::Struct(st) => {
-            let StructTag {
-                address,
-                module,
-                name,
-                type_params: type_args,
-            } = &**st;
+            let StructTag { address, module, name, type_params: type_args } = &**st;
             let resolved_struct = (address, module.as_ident_str(), name.as_ident_str());
             // is id or..
             if resolved_struct == RESOLVED_SUI_ID {
@@ -448,9 +403,7 @@ pub fn is_primitive_type_tag(t: &TypeTag) -> bool {
                 return true;
             }
             // is option of a primitive
-            resolved_struct == RESOLVED_STD_OPTION
-                && type_args.len() == 1
-                && is_primitive_type_tag(&type_args[0])
+            resolved_struct == RESOLVED_STD_OPTION && type_args.len() == 1 && is_primitive_type_tag(&type_args[0])
         }
         T::Signer => false,
     }
@@ -467,10 +420,7 @@ pub enum ObjectType {
 
 impl From<&Object> for ObjectType {
     fn from(o: &Object) -> Self {
-        o.data
-            .type_()
-            .map(|t| ObjectType::Struct(t.clone()))
-            .unwrap_or(ObjectType::Package)
+        o.data.type_().map(|t| ObjectType::Struct(t.clone())).unwrap_or(ObjectType::Package)
     }
 }
 
@@ -567,9 +517,7 @@ impl From<&ObjectInfo> for ObjectRef {
 pub const SUI_ADDRESS_LENGTH: usize = ObjectID::LENGTH;
 
 #[serde_as]
-#[derive(
-    Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema,
-)]
+#[derive(Eq, Default, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct SuiAddress(
     #[schemars(with = "Hex")]
@@ -596,10 +544,7 @@ impl SuiAddress {
     }
 
     /// Serialize an `Option<SuiAddress>` in Hex.
-    pub fn optional_address_as_hex<S>(
-        key: &Option<SuiAddress>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn optional_address_as_hex<S>(key: &Option<SuiAddress>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {
@@ -607,9 +552,7 @@ impl SuiAddress {
     }
 
     /// Deserialize into an `Option<SuiAddress>`.
-    pub fn optional_address_from_hex<'de, D>(
-        deserializer: D,
-    ) -> Result<Option<SuiAddress>, D::Error>
+    pub fn optional_address_from_hex<'de, D>(deserializer: D) -> Result<Option<SuiAddress>, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -625,9 +568,7 @@ impl SuiAddress {
 
     /// Parse a SuiAddress from a byte array or buffer.
     pub fn from_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self, SuiError> {
-        <[u8; SUI_ADDRESS_LENGTH]>::try_from(bytes.as_ref())
-            .map_err(|_| SuiError::InvalidAddress)
-            .map(SuiAddress)
+        <[u8; SUI_ADDRESS_LENGTH]>::try_from(bytes.as_ref()).map_err(|_| SuiError::InvalidAddress).map(SuiAddress)
     }
 
     /// This derives a zkLogin address by parsing the iss and address_seed from [struct ZkLoginAuthenticator].
@@ -687,6 +628,7 @@ impl AsRef<[u8]> for SuiAddress {
 
 impl FromStr for SuiAddress {
     type Err = anyhow::Error;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         decode_bytes_hex(s).map_err(|e| anyhow!(e))
     }
@@ -738,6 +680,7 @@ impl From<&MultiSigPublicKey> for SuiAddress {
 /// [zklogin_flag || iss_bytes_length || iss_bytes || unpadded_address_seed_in_bytes].
 impl TryFrom<&ZkLoginAuthenticator> for SuiAddress {
     type Error = SuiError;
+
     fn try_from(authenticator: &ZkLoginAuthenticator) -> SuiResult<Self> {
         SuiAddress::try_from_unpadded(&authenticator.inputs)
     }
@@ -745,31 +688,23 @@ impl TryFrom<&ZkLoginAuthenticator> for SuiAddress {
 
 impl TryFrom<&GenericSignature> for SuiAddress {
     type Error = SuiError;
+
     /// Derive a SuiAddress from a serialized signature in Sui [GenericSignature].
     fn try_from(sig: &GenericSignature) -> SuiResult<Self> {
         match sig {
             GenericSignature::Signature(sig) => {
                 let scheme = sig.scheme();
                 let pub_key_bytes = sig.public_key_bytes();
-                let pub_key = PublicKey::try_from_bytes(scheme, pub_key_bytes).map_err(|_| {
-                    SuiError::InvalidSignature {
-                        error: "Cannot parse pubkey".to_string(),
-                    }
-                })?;
+                let pub_key = PublicKey::try_from_bytes(scheme, pub_key_bytes)
+                    .map_err(|_| SuiError::InvalidSignature { error: "Cannot parse pubkey".to_string() })?;
                 Ok(SuiAddress::from(&pub_key))
             }
             GenericSignature::MultiSig(ms) => Ok(ms.get_pk().into()),
-            GenericSignature::MultiSigLegacy(ms) => {
-                Ok(crate::multisig::MultiSig::try_from(ms.clone())
-                    .map_err(|_| SuiError::InvalidSignature {
-                        error: "Invalid legacy multisig".to_string(),
-                    })?
-                    .get_pk()
-                    .into())
-            }
-            GenericSignature::ZkLoginAuthenticator(zklogin) => {
-                SuiAddress::try_from_unpadded(&zklogin.inputs)
-            }
+            GenericSignature::MultiSigLegacy(ms) => Ok(crate::multisig::MultiSig::try_from(ms.clone())
+                .map_err(|_| SuiError::InvalidSignature { error: "Invalid legacy multisig".to_string() })?
+                .get_pk()
+                .into()),
+            GenericSignature::ZkLoginAuthenticator(zklogin) => SuiAddress::try_from_unpadded(&zklogin.inputs),
             GenericSignature::PasskeyAuthenticator(s) => Ok(SuiAddress::from(&s.get_pk()?)),
         }
     }
@@ -793,9 +728,7 @@ pub fn dbg_addr(name: u8) -> SuiAddress {
     SuiAddress(addr)
 }
 
-#[derive(
-    Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema, Debug,
-)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema, Debug)]
 pub struct ExecutionDigests {
     pub transaction: TransactionDigest,
     pub effects: TransactionEffectsDigest,
@@ -803,17 +736,11 @@ pub struct ExecutionDigests {
 
 impl ExecutionDigests {
     pub fn new(transaction: TransactionDigest, effects: TransactionEffectsDigest) -> Self {
-        Self {
-            transaction,
-            effects,
-        }
+        Self { transaction, effects }
     }
 
     pub fn random() -> Self {
-        Self {
-            transaction: TransactionDigest::random(),
-            effects: TransactionEffectsDigest::random(),
-        }
+        Self { transaction: TransactionDigest::random(), effects: TransactionEffectsDigest::random() }
     }
 }
 
@@ -826,10 +753,7 @@ pub struct ExecutionData {
 impl ExecutionData {
     pub fn new(transaction: Transaction, effects: TransactionEffects) -> ExecutionData {
         debug_assert_eq!(transaction.digest(), effects.transaction_digest());
-        Self {
-            transaction,
-            effects,
-        }
+        Self { transaction, effects }
     }
 
     pub fn digests(&self) -> ExecutionDigests {
@@ -846,24 +770,15 @@ pub struct VerifiedExecutionData {
 impl VerifiedExecutionData {
     pub fn new(transaction: VerifiedTransaction, effects: TransactionEffects) -> Self {
         debug_assert_eq!(transaction.digest(), effects.transaction_digest());
-        Self {
-            transaction,
-            effects,
-        }
+        Self { transaction, effects }
     }
 
     pub fn new_unchecked(data: ExecutionData) -> Self {
-        Self {
-            transaction: VerifiedTransaction::new_unchecked(data.transaction),
-            effects: data.effects,
-        }
+        Self { transaction: VerifiedTransaction::new_unchecked(data.transaction), effects: data.effects }
     }
 
     pub fn into_inner(self) -> ExecutionData {
-        ExecutionData {
-            transaction: self.transaction.into_inner(),
-            effects: self.effects,
-        }
+        ExecutionData { transaction: self.transaction.into_inner(), effects: self.effects }
     }
 
     pub fn digests(&self) -> ExecutionDigests {
@@ -873,27 +788,18 @@ impl VerifiedExecutionData {
 
 pub const STD_OPTION_MODULE_NAME: &IdentStr = ident_str!("option");
 pub const STD_OPTION_STRUCT_NAME: &IdentStr = ident_str!("Option");
-pub const RESOLVED_STD_OPTION: (&AccountAddress, &IdentStr, &IdentStr) = (
-    &MOVE_STDLIB_ADDRESS,
-    STD_OPTION_MODULE_NAME,
-    STD_OPTION_STRUCT_NAME,
-);
+pub const RESOLVED_STD_OPTION: (&AccountAddress, &IdentStr, &IdentStr) =
+    (&MOVE_STDLIB_ADDRESS, STD_OPTION_MODULE_NAME, STD_OPTION_STRUCT_NAME);
 
 pub const STD_ASCII_MODULE_NAME: &IdentStr = ident_str!("ascii");
 pub const STD_ASCII_STRUCT_NAME: &IdentStr = ident_str!("String");
-pub const RESOLVED_ASCII_STR: (&AccountAddress, &IdentStr, &IdentStr) = (
-    &MOVE_STDLIB_ADDRESS,
-    STD_ASCII_MODULE_NAME,
-    STD_ASCII_STRUCT_NAME,
-);
+pub const RESOLVED_ASCII_STR: (&AccountAddress, &IdentStr, &IdentStr) =
+    (&MOVE_STDLIB_ADDRESS, STD_ASCII_MODULE_NAME, STD_ASCII_STRUCT_NAME);
 
 pub const STD_UTF8_MODULE_NAME: &IdentStr = ident_str!("string");
 pub const STD_UTF8_STRUCT_NAME: &IdentStr = ident_str!("String");
-pub const RESOLVED_UTF8_STR: (&AccountAddress, &IdentStr, &IdentStr) = (
-    &MOVE_STDLIB_ADDRESS,
-    STD_UTF8_MODULE_NAME,
-    STD_UTF8_STRUCT_NAME,
-);
+pub const RESOLVED_UTF8_STR: (&AccountAddress, &IdentStr, &IdentStr) =
+    (&MOVE_STDLIB_ADDRESS, STD_UTF8_MODULE_NAME, STD_UTF8_STRUCT_NAME);
 
 pub const TX_CONTEXT_MODULE_NAME: &IdentStr = ident_str!("tx_context");
 pub const TX_CONTEXT_STRUCT_NAME: &IdentStr = ident_str!("TxContext");
@@ -954,12 +860,7 @@ pub enum TxContextKind {
 
 impl TxContext {
     pub fn new(sender: &SuiAddress, digest: &TransactionDigest, epoch_data: &EpochData) -> Self {
-        Self::new_from_components(
-            sender,
-            digest,
-            &epoch_data.epoch_id(),
-            epoch_data.epoch_start_timestamp(),
-        )
+        Self::new_from_components(sender, digest, &epoch_data.epoch_id(), epoch_data.epoch_start_timestamp())
     }
 
     pub fn new_from_components(
@@ -1032,10 +933,7 @@ impl TxContext {
     /// serialize/deserialize and this is the reason why this method
     /// consumes the other context..
     pub fn update_state(&mut self, other: TxContext) -> Result<(), ExecutionError> {
-        if self.sender != other.sender
-            || self.digest != other.digest
-            || other.ids_created < self.ids_created
-        {
+        if self.sender != other.sender || self.digest != other.digest || other.ids_created < self.ids_created {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::InvariantViolation,
                 "Immutable fields for TxContext changed",
@@ -1047,11 +945,7 @@ impl TxContext {
 
     // Generate a random TxContext for testing.
     pub fn random_for_testing_only() -> Self {
-        Self::new(
-            &SuiAddress::random_for_testing_only(),
-            &TransactionDigest::random(),
-            &EpochData::new_test(),
-        )
+        Self::new(&SuiAddress::random_for_testing_only(), &TransactionDigest::random(), &EpochData::new_test())
     }
 
     /// Generate a TxContext for testing with a specific sender.
@@ -1062,12 +956,11 @@ impl TxContext {
 
 // TODO: rename to version
 impl SequenceNumber {
-    pub const MIN: SequenceNumber = SequenceNumber(u64::MIN);
-    pub const MAX: SequenceNumber = SequenceNumber(0x7fff_ffff_ffff_ffff);
     pub const CANCELLED_READ: SequenceNumber = SequenceNumber(SequenceNumber::MAX.value() + 1);
     pub const CONGESTED: SequenceNumber = SequenceNumber(SequenceNumber::MAX.value() + 2);
-    pub const RANDOMNESS_UNAVAILABLE: SequenceNumber =
-        SequenceNumber(SequenceNumber::MAX.value() + 3);
+    pub const MAX: SequenceNumber = SequenceNumber(0x7fff_ffff_ffff_ffff);
+    pub const MIN: SequenceNumber = SequenceNumber(u64::MIN);
+    pub const RANDOMNESS_UNAVAILABLE: SequenceNumber = SequenceNumber(SequenceNumber::MAX.value() + 3);
 
     pub const fn new() -> Self {
         SequenceNumber(0)
@@ -1148,9 +1041,10 @@ impl From<SequenceNumber> for usize {
 impl ObjectID {
     /// The number of bytes in an address.
     pub const LENGTH: usize = AccountAddress::LENGTH;
+    pub const MAX: Self = Self::new([0xff; Self::LENGTH]);
     /// Hex address: 0x0
     pub const ZERO: Self = Self::new([0u8; Self::LENGTH]);
-    pub const MAX: Self = Self::new([0xff; Self::LENGTH]);
+
     /// Create a new ObjectID
     pub const fn new(obj_id: [u8; Self::LENGTH]) -> Self {
         Self(AccountAddress::new(obj_id))
@@ -1211,13 +1105,13 @@ impl ObjectID {
         // If the string is too short, pad it
         if hex_len < Self::LENGTH * 2 {
             let mut hex_str = String::with_capacity(Self::LENGTH * 2);
-            for _ in 0..Self::LENGTH * 2 - hex_len {
+            for _ in 0 .. Self::LENGTH * 2 - hex_len {
                 hex_str.push('0');
             }
-            hex_str.push_str(&literal[2..]);
+            hex_str.push_str(&literal[2 ..]);
             Self::from_str(&hex_str)
         } else {
-            Self::from_str(&literal[2..])
+            Self::from_str(&literal[2 ..])
         }
     }
 
@@ -1232,7 +1126,7 @@ impl ObjectID {
 
         // truncate into an ObjectID.
         // OK to access slice because digest should never be shorter than ObjectID::LENGTH.
-        ObjectID::try_from(&hash.as_ref()[0..ObjectID::LENGTH]).unwrap()
+        ObjectID::try_from(&hash.as_ref()[0 .. ObjectID::LENGTH]).unwrap()
     }
 
     /// Incremenent the ObjectID by usize IDs, assuming the ObjectID hex is a number represented as an array of bytes
@@ -1241,7 +1135,7 @@ impl ObjectID {
         let mut step_copy = step;
 
         let mut carry = 0;
-        for idx in (0..Self::LENGTH).rev() {
+        for idx in (0 .. Self::LENGTH).rev() {
             if step_copy == 0 {
                 // Nothing else to do
                 break;
@@ -1271,7 +1165,7 @@ impl ObjectID {
         }
 
         // This logic increments the integer representation of an ObjectID u8 array
-        for idx in (0..Self::LENGTH).rev() {
+        for idx in (0 .. Self::LENGTH).rev() {
             if prev_val[idx] == 0xFF {
                 prev_val[idx] = 0;
             } else {
@@ -1286,7 +1180,7 @@ impl ObjectID {
     pub fn in_range(offset: ObjectID, count: u64) -> Result<Vec<ObjectID>, anyhow::Error> {
         let mut ret = Vec::new();
         let mut prev = offset;
-        for o in 0..count {
+        for o in 0 .. count {
             if o != 0 {
                 prev = prev.next_increment()?;
             }
@@ -1401,11 +1295,7 @@ impl From<SuiAddress> for AccountAddress {
 impl fmt::Display for MoveObjectType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         let s: StructTag = self.clone().into();
-        write!(
-            f,
-            "{}",
-            to_sui_struct_tag_string(&s).map_err(fmt::Error::custom)?
-        )
+        write!(f, "{}", to_sui_struct_tag_string(&s).map_err(fmt::Error::custom)?)
     }
 }
 
@@ -1472,9 +1362,7 @@ impl<T> TryFrom<Vec<T>> for SizeOneVec<T> {
         if v.len() != 1 {
             Err(anyhow!("Expected a vec of size 1"))
         } else {
-            Ok(SizeOneVec {
-                e: v.pop().unwrap(),
-            })
+            Ok(SizeOneVec { e: v.pop().unwrap() })
         }
     }
 }

@@ -1,11 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use axum::{extract::State, Json};
+
 use super::{ApiEndpoint, RouteHandler};
-use crate::types::NodeInfo;
-use crate::{Result, RpcService};
-use axum::extract::State;
-use axum::Json;
+use crate::{types::NodeInfo, Result, RpcService};
 
 /// Get basic information about the state of a Node
 pub struct GetNodeInfo;

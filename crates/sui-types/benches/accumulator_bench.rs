@@ -1,23 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use fastcrypto::hash::MultisetHash;
-use sui_types::accumulator::Accumulator;
-use sui_types::base_types::ObjectDigest;
-
 use criterion::*;
+use fastcrypto::hash::MultisetHash;
+use sui_types::{accumulator::Accumulator, base_types::ObjectDigest};
 
 fn accumulator_benchmark(c: &mut Criterion) {
     {
-        let digests: Vec<_> = (0..1_000).map(|_| ObjectDigest::random()).collect();
+        let digests: Vec<_> = (0 .. 1_000).map(|_| ObjectDigest::random()).collect();
         let mut accumulator = Accumulator::default();
 
         let mut group = c.benchmark_group("accumulator");
         group.throughput(Throughput::Elements(digests.len() as u64));
 
-        group.bench_function("accumulate_digests", |b| {
-            b.iter(|| accumulator.insert_all(&digests))
-        });
+        group.bench_function("accumulate_digests", |b| b.iter(|| accumulator.insert_all(&digests)));
     }
 
     {
@@ -35,9 +31,7 @@ fn accumulator_benchmark(c: &mut Criterion) {
         let serialized = bcs::to_bytes(&point).unwrap();
 
         group.bench_function("sum_accumulators", |b| b.iter(|| accumulator.union(&point)));
-        group.bench_function("serialize_accumulators", |b| {
-            b.iter(|| bcs::to_bytes(&accumulator).unwrap())
-        });
+        group.bench_function("serialize_accumulators", |b| b.iter(|| bcs::to_bytes(&accumulator).unwrap()));
         group.bench_function("deserialize_accumulators", |b| {
             b.iter(|| bcs::from_bytes::<Accumulator>(&serialized).unwrap())
         });

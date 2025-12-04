@@ -352,7 +352,7 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
             }
             CommitteeConfig::Deterministic((size, keys)) => {
                 // If no keys are provided, generate them.
-                let keys = keys.unwrap_or((0..size.get()).map(|_| get_key_pair_from_rng(&mut rng).1).collect());
+                let keys = keys.unwrap_or((0 .. size.get()).map(|_| get_key_pair_from_rng(&mut rng).1).collect());
 
                 let mut configs = vec![];
                 for (i, key) in keys.into_iter().enumerate() {
@@ -527,6 +527,7 @@ mod tests {
 #[cfg(test)]
 mod test {
     use std::{collections::HashSet, sync::Arc};
+
     use sui_config::genesis::Genesis;
     use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
     use sui_types::{

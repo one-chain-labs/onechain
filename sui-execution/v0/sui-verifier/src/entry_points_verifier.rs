@@ -11,7 +11,9 @@ use sui_types::{
     base_types::{TxContext, TxContextKind, TX_CONTEXT_MODULE_NAME, TX_CONTEXT_STRUCT_NAME},
     clock::Clock,
     error::ExecutionError,
-    is_object, is_object_vector, is_primitive,
+    is_object,
+    is_object_vector,
+    is_primitive,
     move_package::{is_test_fun, FnInfoMap},
     SUI_FRAMEWORK_ADDRESS,
 };
@@ -67,10 +69,7 @@ pub fn verify_module(
     Ok(())
 }
 
-fn verify_init_not_called(
-    module: &CompiledModule,
-    fdef: &FunctionDefinition,
-) -> Result<(), String> {
+fn verify_init_not_called(module: &CompiledModule, fdef: &FunctionDefinition) -> Result<(), String> {
     let code = match &fdef.code {
         None => return Ok(()),
         Some(code) => code,
@@ -109,36 +108,20 @@ fn verify_init_function(
     fdef: &FunctionDefinition,
 ) -> Result<(), String> {
     if fdef.visibility != Visibility::Private {
-        return Err(format!(
-            "{}. '{}' function must be private",
-            module.self_id(),
-            INIT_FN_NAME
-        ));
+        return Err(format!("{}. '{}' function must be private", module.self_id(), INIT_FN_NAME));
     }
 
     if config.ban_entry_init() && fdef.is_entry {
-        return Err(format!(
-            "{}. '{}' cannot be 'entry'",
-            module.self_id(),
-            INIT_FN_NAME
-        ));
+        return Err(format!("{}. '{}' cannot be 'entry'", module.self_id(), INIT_FN_NAME));
     }
 
     let fhandle = module.function_handle_at(fdef.function);
     if !fhandle.type_parameters.is_empty() {
-        return Err(format!(
-            "{}. '{}' function cannot have type parameters",
-            module.self_id(),
-            INIT_FN_NAME
-        ));
+        return Err(format!("{}. '{}' function cannot have type parameters", module.self_id(), INIT_FN_NAME));
     }
 
     if !module.signature_at(fhandle.return_).is_empty() {
-        return Err(format!(
-            "{}, '{}' function cannot have return values",
-            module.self_id(),
-            INIT_FN_NAME
-        ));
+        return Err(format!("{}, '{}' function cannot have return values", module.self_id(), INIT_FN_NAME));
     }
 
     let parameters = &module.signature_at(fhandle.parameters).0;
@@ -170,16 +153,13 @@ fn verify_init_function(
     }
 }
 
-fn verify_entry_function_impl(
-    module: &CompiledModule,
-    func_def: &FunctionDefinition,
-) -> Result<(), String> {
+fn verify_entry_function_impl(module: &CompiledModule, func_def: &FunctionDefinition) -> Result<(), String> {
     let handle = module.function_handle_at(func_def.function);
     let params = module.signature_at(handle.parameters);
 
     let all_non_ctx_params = match params.0.last() {
         Some(last_param) if TxContext::kind(module, last_param) != TxContextKind::None => {
-            &params.0[0..params.0.len() - 1]
+            &params.0[0 .. params.0.len() - 1]
         }
         _ => &params.0,
     };
@@ -199,15 +179,11 @@ fn verify_return_type(
     type_parameters: &[AbilitySet],
     return_ty: &SignatureToken,
 ) -> Result<(), String> {
-    if matches!(
-        return_ty,
-        SignatureToken::Reference(_) | SignatureToken::MutableReference(_)
-    ) {
+    if matches!(return_ty, SignatureToken::Reference(_) | SignatureToken::MutableReference(_)) {
         return Err("Invalid entry point return type. Expected a non reference type.".to_owned());
     }
-    let abilities = view
-        .abilities(return_ty, type_parameters)
-        .map_err(|e| format!("Unexpected CompiledModule error: {}", e))?;
+    let abilities =
+        view.abilities(return_ty, type_parameters).map_err(|e| format!("Unexpected CompiledModule error: {}", e))?;
     if abilities.has_drop() {
         Ok(())
     } else {
