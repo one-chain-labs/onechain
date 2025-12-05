@@ -15311,7 +15311,7 @@ dependencies = [
 [[package]]
 name = "sui-sdk-types"
 version = "0.0.1"
-source = "git+https://github.com/one-chain-labs/onechain-rust-sdk.git?rev=cb174b66714ea643e4b78bbfadb3f9c17e635460#cb174b66714ea643e4b78bbfadb3f9c17e635460"
+source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=cb174b66714ea643e4b78bbfadb3f9c17e635460#cb174b66714ea643e4b78bbfadb3f9c17e635460"
 dependencies = [
  "base64ct",
  "bcs",
@@ -15732,7 +15732,7 @@ dependencies = [
 [[package]]
 name = "sui-transaction-builder"
 version = "0.1.0"
-source = "git+https://github.com/one-chain-labs/onechain-rust-sdk.git?rev=cb174b66714ea643e4b78bbfadb3f9c17e635460#cb174b66714ea643e4b78bbfadb3f9c17e635460"
+source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=cb174b66714ea643e4b78bbfadb3f9c17e635460#cb174b66714ea643e4b78bbfadb3f9c17e635460"
 dependencies = [
  "base64ct",
  "bcs",
