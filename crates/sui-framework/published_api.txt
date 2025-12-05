@@ -88,10 +88,10 @@ pool_id
 fungible_staked_oct_pool_id
 	public fun
 	0x3::staking_pool
-lock
+staked_oct_amount
 	public fun
 	0x3::staking_pool
-staked_oct_amount
+lock
 	public fun
 	0x3::staking_pool
 stake_activation_epoch
@@ -99,9 +99,6 @@ stake_activation_epoch
 	0x3::staking_pool
 is_preactive
 	public fun
-	0x3::staking_pool
-activation_epoch
-	public(package) fun
 	0x3::staking_pool
 is_inactive
 	public fun
@@ -159,9 +156,6 @@ initial_exchange_rate
 	0x3::staking_pool
 check_balance_invariants
 	fun
-	0x3::staking_pool
-calculate_rewards
-	public(package) fun
 	0x3::staking_pool
 ValidatorMetadata
 	public struct
