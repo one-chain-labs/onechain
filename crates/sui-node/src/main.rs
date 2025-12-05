@@ -138,7 +138,7 @@ fn main() {
             Some(chain_identifier) => chain_identifier.to_string(),
             None => "unknown".to_string(),
         };
-        info!("Sui chain identifier: {chain_identifier}");
+        info!("One chain identifier: {chain_identifier}");
         prometheus_registry
             .register(mysten_metrics::uptime_metric(
                 if is_validator { "validator" } else { "fullnode" },
