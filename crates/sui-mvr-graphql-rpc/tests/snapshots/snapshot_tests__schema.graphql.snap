@@ -4607,7 +4607,7 @@ type Validator {
 	"""
 	The total number of SUI tokens in this pool.
 	"""
-	stakingPoolSuiBalance: BigInt
+	stakingPoolOctBalance: BigInt
 	"""
 	The epoch stake rewards will be added here at the end of each epoch.
 	"""
@@ -4623,7 +4623,7 @@ type Validator {
 	"""
 	Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
 	"""
-	pendingTotalSuiWithdraw: BigInt
+	pendingTotalOctWithdraw: BigInt
 	"""
 	Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
 	"""
@@ -4800,4 +4800,3 @@ schema {
 	query: Query
 	mutation: Mutation
 }
-
