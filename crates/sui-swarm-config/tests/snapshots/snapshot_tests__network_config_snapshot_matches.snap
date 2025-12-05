@@ -91,6 +91,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -107,6 +108,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -127,6 +129,7 @@ validator_configs:
         - Onefc
         - Playtron
         - Slack
+        - Telegram
         - TestHuionepay
         - TestIssuer
         - Threedos
@@ -260,6 +263,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -276,6 +280,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -296,6 +301,7 @@ validator_configs:
         - Onefc
         - Playtron
         - Slack
+        - Telegram
         - TestHuionepay
         - TestIssuer
         - Threedos
@@ -429,6 +435,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -445,6 +452,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -465,6 +473,7 @@ validator_configs:
         - Onefc
         - Playtron
         - Slack
+        - Telegram
         - TestHuionepay
         - TestIssuer
         - Threedos
@@ -598,6 +607,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -614,6 +624,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -634,6 +645,7 @@ validator_configs:
         - Onefc
         - Playtron
         - Slack
+        - Telegram
         - TestHuionepay
         - TestIssuer
         - Threedos
@@ -767,6 +779,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -783,6 +796,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -803,6 +817,7 @@ validator_configs:
         - Onefc
         - Playtron
         - Slack
+        - Telegram
         - TestHuionepay
         - TestIssuer
         - Threedos
@@ -936,6 +951,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -952,6 +968,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -972,6 +989,7 @@ validator_configs:
         - Onefc
         - Playtron
         - Slack
+        - Telegram
         - TestHuionepay
         - TestIssuer
         - Threedos
@@ -1105,6 +1123,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -1121,6 +1140,7 @@ validator_configs:
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
         - TestHuionepay
         - Threedos
         - Twitch
@@ -1141,6 +1161,7 @@ validator_configs:
         - Onefc
         - Playtron
         - Slack
+        - Telegram
         - TestHuionepay
         - TestIssuer
         - Threedos

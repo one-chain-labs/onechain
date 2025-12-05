@@ -1,16 +1,16 @@
 {
   "openrpc": "1.2.6",
   "info": {
-    "title": "Sui JSON-RPC",
-    "description": "Sui JSON-RPC API for interaction with Sui Full node. Make RPC calls using https://fullnode.NETWORK.sui.io:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
+    "title": "OneChain JSON-RPC",
+    "description": "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
     "contact": {
-      "name": "Mysten Labs",
-      "url": "https://mystenlabs.com",
-      "email": "build@mystenlabs.com"
+      "name": "OneChain Labs",
+      "url": "https://onelabs.cc",
+      "email": "build@onelabs.cc"
     },
     "license": {
       "name": "Apache-2.0",
-      "url": "https://raw.githubusercontent.com/MystenLabs/sui/main/LICENSE"
+      "url": "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE"
     },
     "version": "1.0.4"
   },
