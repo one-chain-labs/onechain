@@ -33,7 +33,7 @@ async fn main() {
             protocol_key: key.public().into(),
             worker_key: worker_key.public().clone(),
             account_address: SuiAddress::from(account_key.public()),
-            revenue_receiving_address: addr,
+            revenue_receiving_address: SuiAddress::from(account_key.public()),
             network_key: network_key.public().clone(),
             gas_price: sui_config::node::DEFAULT_VALIDATOR_GAS_PRICE,
             commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
